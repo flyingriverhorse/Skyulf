@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skyulf - End-to-End Machine Learning Solutions</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.globe.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        skyulf: {
+                            blue: '#0ea5e9',
+                            dark: '#0c4a6e',
+                            light: '#e0f2fe'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .hero-gradient {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0c4a6e 100%);
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px -12px rgba(14, 165, 233, 0.25);
+        }
+        .code-block {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg fixed w-full z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center">
+                        <span class="text-skyulf-blue text-2xl font-bold">Skyulf</span>
+                    </div>
+                    <div class="hidden md:ml-10 md:flex md:space-x-8">
+                        <a href="#" class="border-b-2 border-skyulf-blue text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium">Home</a>
+                        <a href="#" class="border-transparent hover:border-gray-300 border-b-2 text-gray-500 hover:text-gray-700 inline-flex items-center px-1 pt-1 text-sm font-medium">Features</a>
+                        <a href="#" class="border-transparent hover:border-gray-300 border-b-2 text-gray-500 hover:text-gray-700 inline-flex items-center px-1 pt-1 text-sm font-medium">Pricing</a>
+                        <a href="#" class="border-transparent hover:border-gray-300 border-b-2 text-gray-500 hover:text-gray-700 inline-flex items-center px-1 pt-1 text-sm font-medium">Contact</a>
+                    </div>
+                </div>
+                <div class="hidden md:flex items-center">
+                    <a href="#" class="ml-4 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-skyulf-blue hover:bg-skyulf-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-skyulf-blue">Get Started</a>
+                </div>
+                <div class="md:hidden flex items-center">
+                    <button type="button" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-skyulf-blue">
+                        <i data-feather="menu"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section with Vanta.js Globe -->
+    <div id="vanta-bg" class="hero-gradient min-h-screen flex items-center justify-center pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
+            <h1 class="text-4xl md:text-6xl font-extrabold text-white" data-aos="fade-up">
+                End-to-End Machine Learning
+            </h1>
+            <p class="mt-6 text-xl md:text-2xl text-blue-100 max-w-3xl mx-auto" data-aos="fade-up" data-aos-delay="200">
+                From data ingestion to model creation, Skyulf provides Python-based solutions with integrated Jupyter notebooks and LLM-powered automation
+            </p>
+            <div class="mt-10 flex justify-center gap-4" data-aos="fade-up" data-aos-delay="400">
+                <a href="#" class="px-8 py-3 border border-transparent text-base font-medium rounded-md text-skyulf-blue bg-white hover:bg-blue-50 md:py-4 md:text-lg md:px-10">
+                    Start Free Trial
+                </a>
+                <a href="#" class="px-8 py-3 border border-white text-base font-medium rounded-md text-white bg-transparent hover:bg-white hover:text-skyulf-blue md:py-4 md:text-lg md:px-10">
+                    View Demo
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900" data-aos="fade-up">
+                    Complete ML Workflow in One Platform
+                </h2>
+                <p class="mt-4 text-xl text-gray-600 max-w-3xl mx-auto" data-aos="fade-up" data-aos-delay="200">
+                    Skyulf streamlines your machine learning pipeline with intelligent automation and powerful tools
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <!-- Feature 1 -->
+                <div class="feature-card bg-skyulf-light rounded-xl p-6 transition-all duration-300" data-aos="fade-up" data-aos-delay="100">
+                    <div class="w-12 h-12 bg-skyulf-blue rounded-lg flex items-center justify-center text-white">
+                        <i data-feather="database" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="mt-4 text-xl font-semibold text-gray-900">Data Ingestion</h3>
+                    <p class="mt-2 text-gray-600">Seamlessly connect to multiple data sources with automated ingestion pipelines</p>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="feature-card bg-skyulf-light rounded-xl p-6 transition-all duration-300" data-aos="fade-up" data-aos-delay="200">
+                    <div class="w-12 h-12 bg-skyulf-blue rounded-lg flex items-center justify-center text-white">
+                        <i data-feather="bar-chart-2" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="mt-4 text-xl font-semibold text-gray-900">LLM-Powered EDA</h3>
+                    <p class="mt-2 text-gray-600">Advanced AI analyzes your data automatically and generates comprehensive exploratory analysis</p>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="feature-card bg-skyulf-light rounded-xl p-6 transition-all duration-300" data-aos="fade-up" data-aos-delay="300">
+                    <div class="w-12 h-12 bg-skyulf-blue rounded-lg flex items-center justify-center text-white">
+                        <i data-feather="cpu" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="mt-4 text-xl font-semibold text-gray-900">Feature Engineering</h3>
+                    <p class="mt-2 text-gray-600">Intelligent feature creation and selection powered by machine learning algorithms</p>
+                </div>
+
+                <!-- Feature 4 -->
+                <div class="feature-card bg-skyulf-light rounded-xl p-6 transition-all duration-300" data-aos="fade-up" data-aos-delay="400">
+                    <div class="w-12 h-12 bg-skyulf-blue rounded-lg flex items-center justify-center text-white">
+                        <i data-feather="code" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="mt-4 text-xl font-semibold text-gray-900">Jupyter Integration</h3>
+                    <p class="mt-2 text-gray-600">Full Python environment with integrated Jupyter notebooks at every stage</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Code Example Section -->
+    <section class="py-20 bg-gray-900">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="lg:grid lg:grid-cols-2 lg:gap-12 items-center">
+                <div data-aos="fade-right">
+                    <h2 class="text-3xl md:text-4xl font-bold text-white">
+                        Python-Powered Workflow
+                    </h2>
+                    <p class="mt-4 text-xl text-blue-100">
+                        Write clean Python code with our integrated environment. Skyulf automatically generates documentation and suggests improvements using LLM technology.
+                    </p>
+                    <ul class="mt-6 space-y-3">
+                        <li class="flex items-center text-blue-100">
+                            <i data-feather="check-circle" class="w-5 h-5 text-green-400 mr-2"></i>
+                            <span>Auto-complete and intelligent code suggestions</span>
+                        </li>
+                        <li class="flex items-center text-blue-100">
+                            <i data-feather="check-circle" class="w-5 h-5 text-green-400 mr-2"></i>
+                            <span>Real-time collaboration in Jupyter notebooks</span>
+                        </li>
+                        <li class="flex items-center text-blue-100">
+                            <i data-feather="check-circle" class="w-5 h-5 text-green-400 mr-2"></i>
+                            <span>Version control integration</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="mt-10 lg:mt-0" data-aos="fade-left">
+                    <div class="bg-gray-800 rounded-lg overflow-hidden">
+                        <div class="bg-gray-700 px-4 py-2 flex items-center">
+                            <div class="flex space-x-2">
+                                <div class="w-3 h-3 bg-red-400 rounded-full"></div>
+                                <div class="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                                <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                            </div>
+                            <div class="ml-2 text-sm text-gray-300">feature_engineering.py</div>
+                        </div>
+                        <div class="p-4 code-block text-sm text-green-400 bg-gray-900">
+                            <pre><code>import pandas as pd
+import numpy as np
+from skyulf.automl import AutoFeatureEngineer
+
+# Load your dataset
+df = pd.read_csv('your_data.csv')
+
+# Initialize Auto Feature Engineer
+afe = AutoFeatureEngineer(llm_assist=True)
+
+# Automated feature engineering
+enhanced_df = afe.transform(df)
+
+# View AI-generated feature explanations
+print(afe.get_feature_explanations())
+
+# Export to model training
+enhanced_df.to_csv('enhanced_features.csv', index=False)</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-20 hero-gradient">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-3xl md:text-4xl font-bold text-white" data-aos="fade-up">
+                Ready to Transform Your ML Pipeline?
+            </h2>
+            <p class="mt-4 text-xl text-blue-100 max-w-3xl mx-auto" data-aos="fade-up" data-aos-delay="200">
+                Join thousands of data scientists who use Skyulf to accelerate their machine learning workflows
+            </p>
+            <div class="mt-10" data-aos="fade-up" data-aos-delay="400">
+                <a href="#" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-skyulf-blue bg-white hover:bg-blue-50">
+                    Get Started for Free
+                    <i data-feather="arrow-right" class="ml-2 w-5 h-5"></i>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white">
+        <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+                <div>
+                    <h3 class="text-sm font-semibold tracking-wider uppercase">Product</h3>
+                    <ul class="mt-4 space-y-2">
+                        <li><a href="#" class="text-gray-400 hover:text-white">Features</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">Pricing</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">Documentation</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold tracking-wider uppercase">Company</h3>
+                    <ul class="mt-4 space-y-2">
+                        <li><a href="#" class="text-gray-400 hover:text-white">About</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">Blog</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">Careers</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold tracking-wider uppercase">Support</h3>
+                    <ul class="mt-4 space-y-2">
+                        <li><a href="#" class="text-gray-400 hover:text-white">Help Center</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">Contact</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">Status</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold tracking-wider uppercase">Connect</h3>
+                    <ul class="mt-4 space-y-2">
+                        <li><a href="#" class="text-gray-400 hover:text-white">Twitter</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">LinkedIn</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">GitHub</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="mt-12 border-t border-gray-700 pt-8 flex flex-col md:flex-row justify-between items-center">
+                <p class="text-gray-400 text-sm">© 2023 Skyulf Inc. All rights reserved.</p>
+                <div class="mt-4 md:mt-0 flex space-x-6">
+                    <a href="#" class="text-gray-400 hover:text-white">
+                        <i data-feather="twitter" class="w-5 h-5"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white">
+                        <i data-feather="github" class="w-5 h-5"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white">
+                        <i data-feather="linkedin" class="w-5 h-5"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize animations
+        AOS.init({
+            duration: 800,
+            once: true
+        });
+
+        // Initialize Vanta.js globe
+        VANTA.GLOBE({
+            el: "#vanta-bg",
+            mouseControls: true,
+            touchControls: true,
+            gyroControls: false,
+            minHeight: 200.00,
+            minWidth: 200.00,
+            scale: 1.00,
+            scaleMobile: 1.00,
+            color: 0x0ea5e9,
+            backgroundColor: 0x0c4a6e,
+            size: 0.8
+        });
+
+        // Initialize Feather Icons
+        feather.replace();
+    </script>
+</body>
+</html>

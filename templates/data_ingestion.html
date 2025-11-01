@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Ingestion - ML Platform</title>
+    <!-- Modern Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Data Ingestion specific styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/data_ingestion.css') }}">
+    <!-- Shared notification & overlay styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shared/notifications.css') }}">
+
+</head>
+<body>
+    <!-- Initializing overlay (inline styles so it renders immediately and prevents UI flash) -->
+    <div id="initLoadingOverlay" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:30000;background:rgba(255,255,255,0.97);">
+        <div style="text-align:center;">
+            <div style="font-size:2rem;margin-bottom:0.5rem;"><i class="fas fa-spinner fa-spin"></i></div>
+            <div style="font-weight:600;margin-bottom:0.25rem;">Initializing Data Ingestion...</div>
+            <div style="color:#666;font-size:0.95rem;">Please wait while the application loads features and configuration.</div>
+        </div>
+    </div>
+    <!-- Early theme application to prevent light-mode flash (unified 'eda-theme') -->
+    <script>
+    (function() {
+        try {
+            const saved = localStorage.getItem('eda-theme');
+            if (saved === 'dark') {
+                document.body.classList.add('dark-mode');
+            }
+        } catch (e) { /* ignore */ }
+    })();
+    </script>
+    <!-- Modern Navigation (same as Snowflake page) -->
+    <nav class="modern-nav">
+        <div class="nav-container">
+            <div class="nav-links">
+                <a href="{{ url_for('data.data_dashboard') }}" class="nav-link active">
+                    <i class="fas fa-database"></i> Data Ingestion
+                </a>
+            </div>
+            <div class="nav-actions">
+                <!-- Go to Top Button -->
+                <button class="go-to-top" onclick="scrollToTop()" title="Go to Top">
+                    <i class="fas fa-arrow-up"></i>
+                </button>
+                {% if current_user %}
+                    <span class="navbar-text me-3">Welcome, {{ current_user.display_name }}</span>
+                    <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
+                {% endif %}
+                <!-- Dark Mode Toggle Button -->
+                <button class="theme-toggle-nav" onclick="toggleTheme()" title="Toggle Dark Mode">
+                    <i class="fas fa-moon" id="theme-icon"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dashboard-container" id="dashboardContainer" style="display: none;">
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-btn active" data-tab="upload">
+                <i class="fas fa-upload"></i> File Upload
+            </button>
+            <!-- <button class="tab-btn" data-tab="cloud">
+                <i class="fas fa-cloud"></i> Cloud & Sheets
+            </button> -->
+            <button class="tab-btn" data-tab="sources">
+                <i class="fas fa-list"></i> Data Sources
+            </button>
+        </div>
+
+        <!-- File Upload Tab -->
+        <div id="upload" class="tab-content active">
+            <div class="content-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-upload"></i> File Upload</h3>
+                    <span class="badge">CSV, Excel, Parquet, JSON</span>
+                </div>
+                
+                <div class="info-box">
+                    <h5><i class="fas fa-info-circle"></i> Supported Formats</h5>
+                    <p>Upload data files in CSV, Excel (.xlsx, .xls), Parquet, or JSON format. The system will automatically detect the format and provide a preview of your data.</p>
+                    <small class="text-muted">Maximum file size: 500MB. Large files will be processed in chunks for better performance.</small>
+                </div>
+
+                <!-- File Upload Area -->
+                <div class="upload-drop-zone" id="uploadDropZone">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <h5>Drop files here or click to browse</h5>
+                    <p class="text-muted">Supports CSV, Excel, Parquet, and JSON files</p>
+                    <input type="file" id="fileInput" style="display: none;" accept=".csv,.xlsx,.xls,.parquet,.json,.txt">
+                </div>
+
+                <!-- Custom Name Input -->
+                <div class="form-group">
+                    <label class="form-label">Dataset Name (Optional)</label>
+                    <input type="text" id="customName" class="form-control-enhanced" 
+                           placeholder="Enter a custom name for this dataset">
+                </div>
+
+                <!-- Upload Button -->
+                <div class="d-flex gap-3">
+                    <button class="btn-modern btn-primary-modern" id="uploadBtn" disabled>
+                        <i class="fas fa-upload"></i> Upload File
+                    </button>
+                    <button class="btn-modern btn-secondary-modern" onclick="clearUploadForm()">
+                        <i class="fas fa-eraser"></i> Clear
+                    </button>
+                </div>
+
+                <!-- File Info Display -->
+                <div id="fileInfoDisplay" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Cloud & Sheets Tab 
+        <div id="cloud" class="tab-content">
+            <div class="content-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-cloud"></i> Cloud Storage & Google Sheets</h3>
+                    <span class="badge">S3, GCS, Google Sheets</span>
+                </div>
+                
+                <div class="info-box">
+                    <h5><i class="fas fa-cloud-upload-alt"></i> Cloud Data Sources</h5>
+                    <p>Connect to cloud storage services and Google Sheets using native APIs for optimized data retrieval.</p>
+                </div> -->
+
+                <!-- Environment Setup Info 
+                <div class="setup-info" id="cloudSetupInfo">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> Credentials Required</h6>
+                        <div id="cloudSetupInstructions">
+                            <p>Enter your credentials below. They are not saved permanently - only used for this session.</p>
+                        </div>
+                    </div>
+                </div> -->
+
+                <!-- Cloud Service Selection
+                <div class="form-group">
+                    <label class="form-label">Cloud Service Type</label>
+                    <select id="cloudConnectorType" class="form-control-enhanced" onchange="loadCloudConnectorInterface()">
+                        <option value="">Select Cloud Service</option>
+                        <option value="s3">Amazon S3</option>
+                        <option value="gcs">Google Cloud Storage</option>
+                        <option value="google_sheets">Google Sheets</option>
+                    </select>
+                </div>  -->
+
+                <!-- Credentials Section 
+                <div id="cloudCredentialsSection" class="credentials-section" style="display: none;"> -->
+                    
+                    <!-- S3 Credentials 
+                    <div id="s3Credentials" class="credential-group" style="display: none;">
+                        <h6><i class="fas fa-key"></i> Amazon S3 Credentials</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">AWS Access Key ID</label>
+                                    <input type="text" id="awsAccessKey" class="form-control-enhanced" 
+                                           placeholder="AKIAIOSFODNN7EXAMPLE">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">AWS Secret Access Key</label>
+                                    <input type="password" id="awsSecretKey" class="form-control-enhanced" 
+                                           placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">AWS Region</label>
+                            <select id="awsRegion" class="form-control-enhanced">
+                                <option value="us-east-1">US East (N. Virginia)</option>
+                                <option value="us-west-2">US West (Oregon)</option>
+                                <option value="eu-west-1">Europe (Ireland)</option>
+                                <option value="ap-southeast-1">Asia Pacific (Singapore)</option>
+                            </select>
+                        </div>
+                    </div> -->
+
+                    <!-- GCS Credentials 
+                    <div id="gcsCredentials" class="credential-group" style="display: none;">
+                        <h6><i class="fas fa-key"></i> Google Cloud Storage Credentials</h6>
+                        <div class="form-group">
+                            <label class="form-label">Service Account JSON</label>
+                            <textarea id="gcsServiceAccount" class="form-control-enhanced" rows="6"
+                                      placeholder='Paste your service account JSON here:
+                                    {
+                                    "type": "service_account",
+                                    "project_id": "your-project-id",
+                                    "private_key_id": "...",
+                                    "private_key": "...",
+                                    "client_email": "...",
+                                    ...
+                                    }'></textarea>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> This credential is not saved. Create a service account with Storage Object Viewer permissions.
+                            </small>
+                        </div>
+                    </div> -->
+
+                    <!-- Google Sheets Credentials 
+                    <div id="sheetsCredentials" class="credential-group" style="display: none;">
+                        <h6><i class="fas fa-key"></i> Google Sheets Credentials</h6>
+                        <div class="form-group">
+                            <label class="form-label">Service Account JSON</label>
+                            <textarea id="sheetsServiceAccount" class="form-control-enhanced" rows="6"
+                                      placeholder='Paste your service account JSON here:
+                                    {
+                                    "type": "service_account",
+                                    "project_id": "your-project-id",
+                                    "private_key_id": "...",
+                                    "private_key": "...",
+                                    "client_email": "...",
+                                    ...
+                                    }'></textarea>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> This credential is not saved. Enable Google Sheets API and create service account with Editor permissions.
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-3 mb-3">
+                        <button class="btn-modern btn-success-modern" onclick="testCloudCredentials()">
+                            <i class="fas fa-check"></i> Test Credentials
+                        </button>
+                        <button class="btn-modern btn-secondary-modern" onclick="clearCloudCredentials()">
+                            <i class="fas fa-eraser"></i> Clear
+                        </button>
+                    </div>
+                </div> -->
+
+                <!-- Cloud Resource Browser 
+                <div id="cloudSchemaBrowser" class="schema-browser" style="display: none;">
+                    <h6><i class="fas fa-sitemap"></i> <span id="cloudBrowserTitle">Resource Browser</span></h6> -->
+                    
+                    <!-- Cloud Storage options 
+                    <div id="cloudStorageOptions" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label">Bucket/Container Name</label>
+                            <input type="text" id="cloudBucketName" class="form-control-enhanced" 
+                                   placeholder="my-data-bucket">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Prefix/Folder (Optional)</label>
+                            <input type="text" id="cloudStoragePrefix" class="form-control-enhanced" 
+                                   placeholder="data/exports/">
+                        </div>
+                        <button class="btn-modern btn-sm btn-secondary-modern mt-2" onclick="loadCloudStorageResources()">
+                            <i class="fas fa-search"></i> Browse Files
+                        </button>
+                    </div> -->
+
+                    <!-- Google Sheets options 
+                    <div id="cloudSheetsOptions" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label">Spreadsheet ID or URL</label>
+                            <input type="text" id="cloudSpreadsheetId" class="form-control-enhanced" 
+                                   placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> You can paste either:
+                                <br>• Just the ID: <code>1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms</code>
+                                <br>• Or the full URL: <code>https://docs.google.com/spreadsheets/d/<strong>SPREADSHEET_ID</strong>/edit</code>
+                                <br>The system will automatically extract the ID from URLs.
+                            </small>
+                        </div>
+                        <button class="btn-modern btn-sm btn-secondary-modern mt-2" onclick="loadCloudSheetResources()">
+                            <i class="fas fa-search"></i> Browse Worksheets
+                        </button>
+                    </div>
+                    
+                    <div id="cloudResourcesList" class="resources-list"></div>
+                </div> -->
+
+                <!-- Cloud Ingestion Options 
+                <div id="cloudIngestionOptions" class="ingestion-options" style="display: none;">
+                    <h6><i class="fas fa-download"></i> Cloud Ingestion Options</h6>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Dataset Name</label>
+                        <input type="text" id="cloudConnectorDatasetName" class="form-control-enhanced" 
+                               placeholder="Name for this data source">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Selected Resource</label>
+                        <input type="text" id="cloudSelectedTable" class="form-control-enhanced" readonly>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Row Limit</label>
+                        <input type="number" id="cloudRowLimit" class="form-control-enhanced" 
+                               value="1000" min="1" max="100000">
+                    </div>
+
+                    <div class="d-flex gap-3">
+                        <button class="btn-modern btn-primary-modern" onclick="ingestFromCloudConnector()">
+                            <i class="fas fa-download"></i> Ingest Data
+                        </button>
+                        <button class="btn-modern btn-secondary-modern" onclick="clearCloudConnectorForm()">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+                </div> -->
+
+                <!-- Cloud Connector Results 
+                <div id="cloudConnectorResults" style="display: none;"></div>
+            </div>
+        </div> -->
+
+        <!-- Data Sources Tab -->
+        <div id="sources" class="tab-content">
+            <div class="content-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-list"></i> Data Sources</h3>
+                    <div class="d-flex gap-2 align-items-center">
+                        <button class="btn-modern btn-secondary-modern" onclick="refreshDataSources()">
+                            <i class="fas fa-sync"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="info-box">
+                    <h5><i class="fas fa-database"></i> Registered Data Sources</h5>
+                    <p>View and manage all your registered data sources. Click on any source to preview the data or load it for ML workflows.</p>
+                </div>
+
+                <!-- Search & Filter Controls -->
+                <div class="search-filter-bar mb-3">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-5">
+                            <label class="form-label mb-1"><i class="fas fa-search"></i> Search</label>
+                            <input type="text" id="dsSearchInput" class="form-control-enhanced" placeholder="Search name, id, type, metadata...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label mb-1"><i class="fas fa-filter"></i> Category</label>
+                            <select id="dsCategoryFilter" class="form-control-enhanced">
+                                <option value="">All Categories</option>
+                                <option value="file">File</option>
+                                <option value="database">Database</option>
+                                <option value="cloud">Cloud</option>
+                                <option value="api">API</option>
+                                <option value="scraped">Scraped</option>
+                                <option value="snowflake">Snowflake</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label mb-1"><i class="fas fa-sort"></i> Limit</label>
+                            <input type="number" id="dsLimitInput" class="form-control-enhanced" value="50" min="1" max="200">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label mb-1"><i class="fas fa-sort"></i> Order by</label>
+                            <select id="dsOrderSelect" class="form-control-enhanced">
+                                <option value="created_desc">Created (newest)</option>
+                                <option value="created_asc">Created (oldest)</option>
+                                <option value="name_asc">Name (A-Z)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-grid">
+                            <button class="btn-modern btn-outline-modern" id="dsSearchBtn"><i class="fas fa-search"></i> Go</button>
+                        </div>
+                    </div>
+                    <div class="mt-2 d-flex gap-2 flex-wrap">
+                        <span class="badge bg-secondary small" id="dsResultCount" style="display:none;"></span>
+                        <button class="btn btn-sm btn-outline-secondary" id="dsClearSearchBtn" style="display:none;"><i class="fas fa-times"></i> Clear</button>
+                    </div>
+                </div>
+
+                <!-- Data Sources List -->
+                <div id="dataSourcesList">
+                    <!-- Dynamic content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Loading Overlay (reuse from Snowflake) -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-card">
+            <div class="spinner"></div>
+            <h5 id="loading-title">Processing...</h5>
+            <p class="text-muted" id="loading-message">Please wait while we process your request</p>
+            <div class="loading-timer">
+                <span id="timer-display">00:00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Preview Modal -->
+    <div id="dataPreviewModal" class="xml-modal">
+        <div class="xml-modal-content">
+            <div class="xml-modal-header">
+                <h3>ML Workflow Preview</h3>
+                <button class="xml-modal-close" onclick="closeDataPreviewModal()">&times;</button>
+            </div>
+            <div class="xml-modal-body">
+                <div id="dataPreviewContent"></div>
+                
+                <!-- Primary EDA Action Button (Prominent & Beautiful) -->
+                <div class="eda-hero-section">
+                    <div class="eda-hero-content">
+                        <h4 class="eda-hero-title">Ready for ML Workflow?</h4>
+                        <p class="eda-hero-subtitle">Transform your dataset into features and model-ready pipelines</p>
+                        <div class="eda-buttons-container">
+                            <button class="btn-eda-hero" onclick="moveToEDA()">
+                                <div class="eda-button-content">
+                                    <i class="fas fa-project-diagram eda-icon"></i>
+                                    <div class="eda-text-content">
+                                        <span class="eda-main-text">Open ML Workflow</span>
+                                        <span class="eda-sub-text">Feature engineering & modeling</span>
+                                    </div>
+                                    <i class="fas fa-arrow-right eda-arrow"></i>
+                                </div>
+                            </button>
+                        </div>
+                        <!-- eda-features removed as requested -->
+                    </div>
+                </div>
+
+                <!-- Standard Actions -->
+                <div class="xml-actions">
+                    <button class="btn-modern btn-secondary-modern" onclick="closeDataPreviewModal()">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Management Modal -->
+    <div id="syncManagementModal" class="xml-modal">
+        <div class="xml-modal-content">
+            <div class="xml-modal-header">
+                <h3><i class="fas fa-sync-alt"></i> Automated Sync Configuration</h3>
+                <button class="xml-modal-close" onclick="closeSyncModal()">&times;</button>
+            </div>
+            <div class="xml-modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Configure automatic data synchronization for database connectors.
+                </div>
+                
+                <form id="syncConfigForm">
+                    <input type="hidden" id="syncSourceId" />
+                    
+                    <div class="form-group mb-3">
+                        <label class="form-label"><i class="fas fa-sync"></i> One-off Sync</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="syncEnabled" />
+                            <label class="form-check-label" for="syncEnabled">
+                                Automatically sync this data source
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Scheduling removed: one-off/manual sync model only -->
+
+                    <div class="form-group mb-3">
+                        <label class="form-label"><i class="fas fa-columns"></i> Incremental Sync Column (optional)</label>
+                        <input type="text" id="syncColumn" class="form-control-enhanced" 
+                               placeholder="e.g., updated_at, modified_date">
+                        <small class="form-text text-muted">Column to use for incremental sync (timestamp/date column)</small>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="form-label"><i class="fas fa-check-circle"></i> Incremental Sync</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="syncIncremental" />
+                            <label class="form-check-label" for="syncIncremental">Enable incremental sync (uses the Incremental Sync Column)</label>
+                        </div>
+                        <small class="form-text text-muted">When enabled, the connector will attempt to fetch only new/updated rows based on the configured column.</small>
+                    </div>
+                </form>
+
+                <div class="sync-status" id="syncStatusDiv" style="display: none;">
+                    <h6><i class="fas fa-info-circle"></i> Current Status</h6>
+                    <div id="syncStatusContent"></div>
+                </div>
+
+                <div class="xml-actions">
+                    <button class="btn-modern btn-success-modern" onclick="saveSyncConfig()">
+                        <i class="fas fa-save"></i> Save Configuration
+                    </button>
+                    <button class="btn-modern btn-warning-modern" onclick="forceSyncNow()">
+                        <i class="fas fa-sync-alt"></i> Sync Now
+                    </button>
+                    <button class="btn-modern btn-danger-modern" onclick="removeSyncConfig()">
+                        <i class="fas fa-trash"></i> Remove Sync
+                    </button>
+                    <button class="btn-modern btn-secondary-modern" onclick="closeSyncModal()">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    
+    <!-- Data Ingestion JavaScript -->
+    <script src="/static/js/data_ingestion/data_ingestion_loader.js"></script>
+
+        <script>
+    // Data ingestion initialization
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Data ingestion page loaded');
+    });
+    </script>
+</body>
+</html>

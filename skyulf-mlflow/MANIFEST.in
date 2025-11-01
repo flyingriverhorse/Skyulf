@@ -1,0 +1,8 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include requirements.txt
+recursive-include skyulf_mlflow *.py
+recursive-include skyulf_mlflow *.typed
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]

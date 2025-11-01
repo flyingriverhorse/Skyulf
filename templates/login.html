@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login - Wizard's Portal</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <style>
+        .magic-orb {
+            position: absolute;
+            top: -30px;
+            right: -30px;
+            width: 60px;
+            height: 60px;
+            z-index: 10;
+        }
+        
+        .orb-outer {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: var(--orb-outer-gradient);
+            border-radius: 50%;
+            box-shadow: 0 0 20px var(--orb-sparkle), 0 0 40px rgba(236,201,75,0.18);
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .orb-inner {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: var(--orb-inner-gradient);
+            border-radius: 50%;
+            top: 15px;
+            left: 15px;
+        }
+        
+        .orb-glow {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, var(--orb-glow-color) 0%, transparent 70%);
+            border-radius: 50%;
+            top: -10px;
+            left: -10px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .magic-sparkle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--orb-sparkle);
+            border-radius: 50%;
+            opacity: 0;
+            animation: sparkle 2s infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-5px) rotate(5deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.1); }
+        }
+        
+        @keyframes sparkle {
+            0% { opacity: 0; transform: translateY(0) scale(0); }
+            50% { opacity: 1; transform: translateY(-10px) scale(1); }
+            100% { opacity: 0; transform: translateY(-20px) scale(0); }
+        }
+        
+        .login-container {
+            position: relative;
+            overflow: visible;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <script>
+    // Apply saved dark mode early to avoid flash
+    (function(){ 
+        try{ 
+            const edaTheme = localStorage.getItem('eda-theme');
+            const darkMode = localStorage.getItem('darkMode');
+            const isDark = edaTheme === 'dark' || (edaTheme === null && darkMode === 'true');
+            if (isDark) { 
+                document.documentElement.classList.add('dark-mode'); 
+                document.body.classList.add('dark-mode'); 
+            } 
+        }catch(e){} 
+    })();
+    </script>
+
+    <!-- Dark Mode Toggle -->
+    <button id="darkModeToggle" class="dark-mode-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+        <span class="icon dark-icon">🌙</span>
+        <span class="icon light-icon">☀️</span>
+    </button>
+
+    <div class="login-container rounded-xl shadow-2xl relative" data-aos="zoom-in">
+        <div class="magic-orb">
+            <div class="orb-glow"></div>
+            <div class="orb-outer"></div>
+            <div class="orb-inner"></div>
+        </div>
+
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-white mb-2">Welcome to Wizard's Data Vault</h1>
+            <p class="text-purple-200">Enter your magical credentials</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-4 px-3 py-2 rounded-md text-sm {{ 'bg-red-800 text-red-100' if category == 'error' else 'bg-green-800 text-green-100' if category == 'success' else 'bg-indigo-800 text-indigo-100' }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('auth.login') }}" id="loginForm" class="space-y-6">
+            <div>
+                <label class="block text-purple-200 text-sm font-medium mb-2" for="username">Magical Alias</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i data-feather="user" class="text-purple-400"></i></div>
+                    <input id="username" name="username" type="text" autocomplete="username" required placeholder="Enter your wizard name" class="form-input pl-10">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-purple-200 text-sm font-medium mb-2" for="password">Secret Incantation</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i data-feather="lock" class="text-purple-400"></i></div>
+                    <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Your powerful password" class="form-input pl-10">
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between">
+                <div class="flex items-center"><input id="remember" name="remember" type="checkbox" class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded"><label for="remember" class="ml-2 text-sm text-purple-200">Remember my magic</label></div>
+                <a href="#" class="text-sm text-purple-300 hover:text-purple-100">Forgot incantation?</a>
+            </div>
+
+            <button type="submit" id="loginBtn" class="btn btn-primary btn-block">Cast Login Spell</button>
+
+            <div class="text-center"><p class="text-purple-200 text-sm">New to the Data? <a href="#" class="font-medium text-purple-300 hover:text-white">Wanna join?</a></p></div>
+        </form>
+        {% if sso_url %}
+        <div class="mt-4 text-center">
+            <a href="{{ sso_url }}" class="btn btn-sso btn-block" role="button">Sign in with SSO</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+    // Initialize UI behaviors
+    AOS.init({ duration: 800, once: true });
+    feather.replace();
+
+    function initDarkMode() {
+        const toggle = document.getElementById('darkModeToggle');
+        const edaTheme = localStorage.getItem('eda-theme');
+        const darkMode = localStorage.getItem('darkMode');
+        const saved = edaTheme === 'dark' || (edaTheme === null && darkMode === 'true');
+        apply(saved);
+
+        function apply(isDark){
+            if(isDark){ document.documentElement.classList.add('dark-mode'); document.body.classList.add('dark-mode'); }
+            else{ document.documentElement.classList.remove('dark-mode'); document.body.classList.remove('dark-mode'); }
+        }
+
+        if(!toggle) return;
+        toggle.addEventListener('click', () => {
+            const currentTheme = localStorage.getItem('eda-theme');
+            const currentDark = localStorage.getItem('darkMode');
+            const now = !(currentTheme === 'dark' || (currentTheme === null && currentDark === 'true'));
+            localStorage.setItem('eda-theme', now ? 'dark' : 'light');
+            localStorage.setItem('darkMode', now);
+            apply(now);
+            toggle.style.transform = 'scale(0.92)'; setTimeout(()=> toggle.style.transform = '', 150);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'd'){ e.preventDefault(); toggle.click(); }
+        });
+    }
+
+    function initFormHandling(){
+        const form = document.getElementById('loginForm');
+        const btn = document.getElementById('loginBtn');
+        if(!form) return;
+        form.addEventListener('submit', function(){
+            if(btn){ btn.classList.add('loading'); btn.disabled = true; setTimeout(()=>{ btn.classList.remove('loading'); btn.disabled = false; },10000); }
+        });
+
+        const inputs = form.querySelectorAll('input[required]');
+        inputs.forEach(input => {
+            input.addEventListener('blur', function(){
+                if(this.value.trim() === '') this.style.borderColor = 'var(--error-color)'; else this.style.borderColor = 'var(--success-color)';
+            });
+            input.addEventListener('input', function(){ if(this.value.trim() !== '') this.style.borderColor = ''; });
+        });
+    }
+
+    function initKeyboardNavigation(){
+        document.addEventListener('keydown', function(e){
+            if(e.key === 'Enter' && (e.target.type === 'text' || e.target.type === 'password')){
+                const form = e.target.closest('form'); if(form){ const submitBtn = form.querySelector('button[type="submit"]'); if(submitBtn && !submitBtn.disabled) submitBtn.click(); }
+            }
+        });
+    }
+
+    function initAlertDismissal(){
+        const alerts = document.querySelectorAll('.alert'); alerts.forEach(alert => {
+            if(alert.classList.contains('alert-success') || alert.classList.contains('alert-info')){
+                setTimeout(()=>{ alert.style.opacity='0'; alert.style.transform='translateY(-10px)'; setTimeout(()=> alert.remove(),300); },5000);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function(){
+        // add sparkles to orb
+        const orb = document.querySelector('.magic-orb'); if(orb){ for(let i=0;i<5;i++){ const s=document.createElement('div'); s.className='magic-sparkle'; s.style.top = Math.random()*40+'px'; s.style.right = Math.random()*50+'px'; s.style.animationDelay = (Math.random()*2)+'s'; orb.appendChild(s); }}
+
+        initDarkMode(); initFormHandling(); initKeyboardNavigation(); initAlertDismissal();
+    });
+
+    // entrance animation
+    window.addEventListener('load', function(){ const container=document.querySelector('.login-container'); if(!container) return; container.style.opacity='0'; container.style.transform='translateY(20px)'; setTimeout(()=>{ container.style.transition='opacity .6s ease, transform .6s ease'; container.style.opacity='1'; container.style.transform='translateY(0)'; },100); });
+    </script>
+
+</body>
+</html>

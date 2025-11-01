@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>500 - Internal Server Error</title>
+    <link rel="stylesheet" href="/static/css/error-pages.css">
+</head>
+<body class="error-500">
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+    </button>
+    <div class="error-container">
+        <div class="error-icon error">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+            </svg>
+        </div>
+        
+        <div class="error-code">500</div>
+        
+        <h1 class="error-title">Internal Server Error</h1>
+        
+        <p class="error-message">
+            {% if error_message %}
+                {{ error_message }}
+            {% else %}
+                Something went wrong on our end. We're working to fix it. Please try again later.
+            {% endif %}
+        </p>
+        
+        {% if error_details and config.DEBUG %}
+        <div class="error-details">
+            {{ error_details }}
+        </div>
+        {% endif %}
+        
+        <div class="error-actions">
+            <a href="/" class="btn btn-primary">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 0L0 8l1.5 1.5L8 3l6.5 6.5L16 8z"/>
+                </svg>
+                Go to Home
+            </a>
+            <a href="javascript:location.reload()" class="btn btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M1.5 2.75a.75.75 0 01.75-.75h11.5a.75.75 0 010 1.5H3.56l.84.84A5.25 5.25 0 018.25 3a5.25 5.25 0 013.858 8.693.75.75 0 01-1.116-1.006A3.75 3.75 0 108.25 4.5a3.733 3.733 0 00-2.78 1.22l-.97.97v-1.94a.75.75 0 00-1.5 0v3.5c0 .414.336.75.75.75h3.5a.75.75 0 000-1.5H4.31l.97-.97A5.231 5.231 0 018.25 3z"/>
+                </svg>
+                Try Again
+            </a>
+        </div>
+        
+        {% if request_id %}
+        <div class="error-meta">
+            <span class="error-meta-item">Request ID: {{ request_id }}</span>
+            <span class="error-meta-item">Timestamp: {{ timestamp or "N/A" }}</span>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="error-footer">
+        If this problem persists, <a href="/support">contact support</a> with the request ID above.
+    </div>
+    
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+        (function() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtualenv
+.venv/
+venv/
+ENV/
+
+# Pytest
+.pytest_cache/
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.*
+
+# Jupyter
+ipynb_checkpoints/
+
+# OS files
+Thumbs.db
+desktop.ini
+
+# Data / outputs
+exports/
+uploads/
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+
+# === Virtual Environments ===
+venv/
+.env/
+env/
+.venv/
+.env.example
+
+# === Jupyter Notebooks ===
+.ipynb_checkpoints
+
+# === IDE / Editors ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === Logs & Caches ===
+*.log
+*.pot
+*.pyc
+*.pkl
+*.cache/
+.pytest_cache/
+
+# === Environment variables ===
+.env        # your dotenv file with secrets
+env
+.venv
+venv
+
+# === Data files ===
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.arrow
+
+# === Build / Dist ===
+build/
+dist/
+*.egg-info/
+
+# ===  Files ===
+cache
+exports
+logs
+temp/
+uploads/
+data_science_examples
+data
+
+# === Tests ===
+test.py
+*.Tests/
+tests/
+Tests/
+.env
+
+# === Ruff Cache ===
+.ruff_cache
+
+# === MyPy Cache ===
+.mypy_cache/
+__pycache__
+
+# === Uploads ===
+app_data
+backups
+
+# tools
+.tools

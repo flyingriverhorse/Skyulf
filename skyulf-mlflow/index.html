@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skyulf-MLFlow Library</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-color: #0a111f;
+            color: #f5f7fa;
+            line-height: 1.6;
+        }
+        header {
+            background: linear-gradient(135deg, #14213d, #264653);
+            padding: 3rem 1.5rem;
+            text-align: center;
+        }
+        header h1 {
+            margin-bottom: 0.5rem;
+            font-size: 2.5rem;
+            letter-spacing: 0.05em;
+        }
+        header p {
+            margin: 0.25rem 0;
+            font-size: 1.1rem;
+            color: #dce4f2;
+        }
+        nav {
+            background-color: #202b3d;
+            padding: 0.75rem 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        nav a {
+            color: #8ecae6;
+            margin-right: 1.25rem;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        nav a:hover {
+            color: #ffb703;
+        }
+        main {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 3rem;
+        }
+        section {
+            background-color: #111827;
+            border: 1px solid #243447;
+            border-radius: 12px;
+            padding: 1.75rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 25px rgba(7, 17, 35, 0.28);
+        }
+        h2 {
+            color: #f4a261;
+            margin-top: 0;
+        }
+        pre {
+            background-color: #0b1726;
+            border: 1px solid #1d2c40;
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        code {
+            color: #f8f9fc;
+        }
+        ul {
+            padding-left: 1.25rem;
+        }
+        footer {
+            text-align: center;
+            padding: 1.5rem;
+            background-color: #0b1320;
+            color: #7c8ca6;
+            font-size: 0.9rem;
+        }
+        .cta {
+            display: inline-block;
+            margin-top: 1rem;
+            padding: 0.75rem 1.75rem;
+            background-color: #219ebc;
+            color: #0b1320;
+            font-weight: bold;
+            border-radius: 6px;
+            text-decoration: none;
+        }
+        .cta:hover {
+            background-color: #ffb703;
+            color: #0a111f;
+        }
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #243447;
+        }
+        .tab-button {
+            background-color: #1a2332;
+            color: #8ecae6;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .tab-button:hover {
+            background-color: #243447;
+            color: #ffb703;
+        }
+        .tab-button.active {
+            background-color: #264653;
+            color: #f4a261;
+            border-bottom: 3px solid #f4a261;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .output-terminal {
+            background-color: #000000;
+            color: #00ff00;
+            padding: 1.5rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            line-height: 1.4;
+            border: 2px solid #1d2c40;
+        }
+        .output-terminal .success {
+            color: #00ff00;
+        }
+        .output-terminal .warning {
+            color: #ffb703;
+        }
+        .output-terminal .error {
+            color: #ff6b6b;
+        }
+        .output-terminal .info {
+            color: #8ecae6;
+        }
+        .output-terminal .highlight {
+            color: #f4a261;
+            font-weight: bold;
+        }
+        .accordion {
+            background-color: #1a2332;
+            color: #8ecae6;
+            cursor: pointer;
+            padding: 1rem 1.5rem;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 1.1rem;
+            font-weight: bold;
+            transition: 0.3s;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .accordion:hover {
+            background-color: #243447;
+        }
+        .accordion.active {
+            background-color: #264653;
+            color: #f4a261;
+        }
+        .accordion:after {
+            content: '\002B';
+            color: #8ecae6;
+            font-weight: bold;
+            font-size: 1.3rem;
+        }
+        .accordion.active:after {
+            content: "\2212";
+            color: #f4a261;
+        }
+        .panel {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background-color: #0e1621;
+            border-radius: 0 0 8px 8px;
+            margin-bottom: 1rem;
+        }
+        .panel-content {
+            padding: 1.5rem;
+        }
+    </style>
+    <script>
+        function switchTab(tabName) {
+            // Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+            
+            // Remove active class from all buttons
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(button => button.classList.remove('active'));
+            
+            // Show selected tab and mark button as active
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function toggleAccordion(element) {
+            element.classList.toggle("active");
+            var panel = element.nextElementSibling;
+            if (panel.style.maxHeight) {
+                panel.style.maxHeight = null;
+            } else {
+                panel.style.maxHeight = panel.scrollHeight + "px";
+            }
+        }
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Skyulf-MLFlow Library</h1>
+        <p>A personal ML toolkit I built to stop copy-pasting the same preprocessing code in every project</p>
+        <p>Works with <code>sklearn</code>, <code>pandas</code>, and <code>imbalanced-learn</code> - just simpler.</p>
+        <a class="cta" href="https://github.com/flyingriverhorse/skyulf_mlflow_library" target="_blank" rel="noopener">Check it out on GitHub</a>
+    </header>
+
+    <nav>
+        <a href="#tutorial">Full Tutorial</a>
+        <a href="#features">Features Guide</a>
+        <a href="#production-output">Production Pipeline</a>
+        <a href="#examples">More Examples</a>
+        <a href="#status">Project Status</a>
+    </nav>
+
+    <main>
+        <section id="tutorial">
+            <h2>Complete Tutorial: Train Your First Model</h2>
+            <p>Let's predict customer churn from start to finish. This shows the entire workflow:</p>
+
+            <button class="accordion" onclick="toggleAccordion(this)">1. Install</button>
+            <div class="panel">
+                <div class="panel-content">
+<pre><code>git clone https://github.com/flyingriverhorse/skyulf_mlflow_library.git
+cd skyulf_mlflow_library
+pip install -e ".[all]"  # Install with all features
+</code></pre>
+                </div>
+            </div>
+
+            <button class="accordion" onclick="toggleAccordion(this)">2. Load Data & Split</button>
+            <div class="panel">
+                <div class="panel-content">
+<pre><code>import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+
+# Load your CSV (we'll create sample data here)
+df = pd.DataFrame({
+    'customer_id': range(1, 101),
+    'age': np.random.randint(18, 70, 100),
+    'monthly_spend': np.random.uniform(20, 200, 100),
+    'city': np.random.choice(['NYC', 'LA', 'SF'], 100),
+    'churned': np.random.randint(0, 2, 100)  # 0 = stayed, 1 = left
+})
+
+# Add realistic missing values
+df.loc[df.sample(frac=0.1).index, 'age'] = None
+
+# Split FIRST (prevents data leakage)
+train_df = df.sample(frac=0.8, random_state=42)
+test_df = df.drop(train_df.index)
+print(f"Train: {len(train_df)}, Test: {len(test_df)}")
+</code></pre>
+                </div>
+            </div>
+
+            <button class="accordion" onclick="toggleAccordion(this)">3. Clean Missing Data</button>
+            <div class="panel">
+                <div class="panel-content">
+<pre><code>from skyulf_mlflow_library.preprocessing import SimpleImputer
+
+# Replace missing values with column mean
+imputer = SimpleImputer(strategy='mean')
+train_df = imputer.fit_transform(train_df)    # Learn from training data
+test_df = imputer.transform(test_df)          # Apply to test data
+</code></pre>
+                </div>
+            </div>
+
+            <button class="accordion" onclick="toggleAccordion(this)">4. Scale Numbers</button>
+            <div class="panel">
+                <div class="panel-content">
+<pre><code>from skyulf_mlflow_library.preprocessing import StandardScaler
+
+# Make age and spend comparable (mean=0, std=1)
+scaler = StandardScaler(columns=['age', 'monthly_spend'])
+train_df = scaler.fit_transform(train_df)
+test_df = scaler.transform(test_df)
+</code></pre>
+                </div>
+            </div>
+
+            <button class="accordion" onclick="toggleAccordion(this)">5. Encode Categories</button>
+            <div class="panel">
+                <div class="panel-content">
+<pre><code>from skyulf_mlflow_library.features.encoding import OneHotEncoder
+
+# Convert city names to numbers
+encoder = OneHotEncoder(columns=['city'], drop_first=True)
+train_df = encoder.fit_transform(train_df)
+test_df = encoder.transform(test_df)
+</code></pre>
+                </div>
+            </div>
+
+            <button class="accordion" onclick="toggleAccordion(this)">6. Train Model</button>
+            <div class="panel">
+                <div class="panel-content">
+<pre><code>from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
+
+# Prepare features and target
+X_train = train_df.drop(['churned', 'customer_id'], axis=1)
+y_train = train_df['churned']
+X_test = test_df.drop(['churned', 'customer_id'], axis=1)
+y_test = test_df['churned']
+
+# Train
+model = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
+model.fit(X_train, y_train)
+
+# Evaluate
+y_pred = model.predict(X_test)
+print(f"Accuracy: {accuracy_score(y_test, y_pred):.1%}")
+print(classification_report(y_test, y_pred))
+</code></pre>
+
+            <button class="accordion" onclick="toggleAccordion(this)">7. Save for Later</button>
+            <div class="panel">
+                <div class="panel-content">
+<pre><code>from skyulf_mlflow_library.modeling import ModelRegistry
+
+registry = ModelRegistry('./my_models')
+registry.save_model(
+    model=model,
+    name='churn_predictor',
+    metrics={'accuracy': accuracy_score(y_test, y_pred)},
+    description='First version trained on Nov 2024 data'
+)
+print("Model saved as version 1!")
+
+# Load it later:
+# loaded_model = registry.load_model('churn_predictor', version='latest')
+</code></pre>
+                </div>
+            </div>
+
+            <p><strong>That's it!</strong> You just went from raw data to a trained, saved model. The key insight: fit transformers on training data, then apply the same transformations to test data.</p>
+        </section>
+
+
+        <section id="production-output">
+            <h2>Production Pipeline Output</h2>
+            <p>See what the complete end-to-end pipeline produces when you run <code>production_pipeline_with_registry.py</code>:</p>
+            
+            <div class="tabs">
+                <button class="tab-button active" onclick="switchTab('tab-overview')">Overview</button>
+                <button class="tab-button" onclick="switchTab('tab-eda')">EDA Phase</button>
+                <button class="tab-button" onclick="switchTab('tab-training')">Training & Evaluation</button>
+                <button class="tab-button" onclick="switchTab('tab-inference')">Production Inference</button>
+                <button class="tab-button" onclick="switchTab('tab-comparison')">Version Comparison</button>
+            </div>
+
+            <div id="tab-overview" class="tab-content active">
+                <h3>Complete Workflow</h3>
+                <p>The production pipeline demonstrates these phases:</p>
+                <div class="output-terminal">
+<span class="highlight">╔══════════════════════════════════════════════════════════════════════════════╗
+║                    PRODUCTION ML PIPELINE EXAMPLE                            ║
+║               with Model Registry Integration                                ║
+║          Includes: EDA → Feature Engineering → Modeling → Registry           ║
+╚══════════════════════════════════════════════════════════════════════════════╝</span>
+
+<span class="info">📂 Loading data...</span>
+
+<span class="success">Phase 0: Exploratory Data Analysis (EDA)</span>
+  → Data quality report (completeness, quality score, checks)
+  → Domain detection with recommendations
+
+<span class="success">Phase 1: Training</span>
+  → Feature engineering (FeatureMath + SmartBinning)
+  → Encoding & Scaling
+  → Model training (RandomForestClassifier)
+
+<span class="success">Phase 2: Evaluation</span>
+  → Metrics: accuracy, f1_score, roc_auc, precision, recall
+  → Classification report
+
+<span class="success">Phase 3: Model Registry</span>
+  → Save complete pipeline with metadata
+  → Version tracking
+
+<span class="success">Phase 4: Production Inference</span>
+  → Load pipeline from registry
+  → Make predictions on new data
+
+<span class="success">Phase 5: Version Comparison</span>
+  → Compare metrics across versions
+  → Track performance over time
+
+<span class="highlight">✅ WORKFLOW COMPLETE!</span>
+                </div>
+            </div>
+
+            <div id="tab-eda" class="tab-content">
+                <h3>EDA Phase: Data Quality & Domain Analysis</h3>
+                <div class="output-terminal">
+<span class="highlight">================================================================================
+EXPLORATORY DATA ANALYSIS (EDA)
+================================================================================</span>
+
+<span class="info">📊 Generating Data Quality Report...</span>
+
+Dataset Shape: <span class="success">1000 rows × 10 columns</span>
+
+Data Completeness: <span class="success">100.00%</span>
+Quality Score: <span class="success">100.00/100</span>
+
+<span class="success">✅ Quality Checks:</span>
+  ✓ No Duplicate Rows
+  ✓ No Empty Columns
+  ✓ Reasonable Missing Data
+  ✓ Consistent Data Types
+  ✓ No Constant Columns
+
+<span class="info">🔍 Analyzing Domain Characteristics...</span>
+
+Detected Domain: <span class="highlight">fraud</span>
+Confidence: <span class="info">32.71%</span>
+Secondary Domains: finance, retail
+
+<span class="info">💡 Domain-Specific Recommendations:</span>
+  1. Inspect class imbalance and consider resampling or class weighting
+  2. Review high-risk rule triggers and investigation outcomes
+  3. Analyze temporal or geographic spikes in suspicious activity
+  4. Validate feature leakage and ensure robust cross-validation setup
+                </div>
+            </div>
+
+            <div id="tab-training" class="tab-content">
+                <h3>Training & Evaluation Phase</h3>
+                <div class="output-terminal">
+<span class="highlight">================================================================================
+TRAINING PHASE
+================================================================================</span>
+
+Dataset: <span class="info">1000 samples with 258 churned customers (25.80%)</span>
+Train: <span class="success">800 samples</span>, Test: <span class="success">200 samples</span>
+
+Training production pipeline...
+
+<span class="info">Step 1: Feature Engineering...</span>
+  Created features: <span class="success">['avg_monthly_spend', 'service_value', 'age_group']</span>
+
+<span class="info">Step 2: Encoding categorical variables...</span>
+  Encoded columns: <span class="success">['contract_type', 'payment_method', 'age_group']</span>
+
+<span class="info">Step 3: Scaling numerical features...</span>
+  Scaled columns: <span class="success">['monthly_charges', 'total_charges']</span>
+
+<span class="info">Step 4: Training model...</span>
+  <span class="success">Model trained successfully!</span>
+
+<span class="highlight">================================================================================
+EVALUATION PHASE
+================================================================================</span>
+
+<span class="info">Performance Metrics:</span>
+  accuracy:  <span class="success">0.7250</span>
+  f1_score:  <span class="success">0.3678</span>
+  roc_auc:   <span class="success">0.6459</span>
+  precision: <span class="success">0.4571</span>
+  recall:    <span class="success">0.3077</span>
+
+<span class="info">Classification Report:</span>
+              precision    recall  f1-score   support
+
+   Not Churn       0.78      0.87      0.82       148
+       Churn       0.46      0.31      0.37        52
+
+    accuracy                           0.72       200
+   macro avg       0.62      0.59      0.60       200
+weighted avg       0.70      0.72      0.71       200
+
+<span class="highlight">================================================================================
+SAVING TO MODEL REGISTRY
+================================================================================</span>
+
+<span class="success">✅ Pipeline saved with model ID: 6</span>
+   Model name: customer_churn_production_pipeline
+   Includes: Feature engineering, encoding, scaling, and trained model
+                </div>
+            </div>
+
+            <div id="tab-inference" class="tab-content">
+                <h3>Production Inference Phase</h3>
+                <div class="output-terminal">
+<span class="highlight">================================================================================
+PRODUCTION INFERENCE PHASE
+================================================================================</span>
+
+Loading production pipeline from registry...
+<span class="success">✅ Pipeline loaded successfully!</span>
+
+<span class="info">Simulating new customer data...</span>
+
+New customers to score: <span class="info">3</span>
+ customer_id  age  tenure_months  contract_type
+        2000   25              3 Month-to-Month
+        2001   55             48       Two Year
+        2002   40             24       One Year
+
+<span class="info">Making predictions...</span>
+
+<span class="highlight">================================================================================
+PREDICTION RESULTS
+================================================================================</span>
+ customer_id  age  tenure_months  contract_type  churn_prediction  churn_probability risk_level
+        2000   25              3 Month-to-Month                 0           0.463813     <span class="warning">Medium</span>
+        2001   55             48       Two Year                 0           0.144326        <span class="success">Low</span>
+        2002   40             24       One Year                 0           0.431883     <span class="warning">Medium</span>
+
+<span class="info">Key Insights:</span>
+  • Customer 2000: Short tenure (3 months) + Month-to-Month contract = Medium risk
+  • Customer 2001: Long tenure (48 months) + Two Year contract = Low risk
+  • Customer 2002: 24-month tenure + One Year contract = Medium risk
+                </div>
+            </div>
+
+            <div id="tab-comparison" class="tab-content">
+                <h3>Model Version Comparison</h3>
+                <div class="output-terminal">
+<span class="highlight">================================================================================
+MODEL VERSION COMPARISON
+================================================================================</span>
+
+<span class="info">Comparing all saved versions of 'customer_churn_production_pipeline':</span>
+
+ Version  Accuracy  F1 Score  ROC AUC                    Created
+       4     0.725  0.367816  0.64592 2025-11-01T22:21:54.369220
+       3     0.725  0.367816  0.64592 2025-11-01T22:10:31.560342
+       2     0.725  0.367816  0.64592 2025-11-01T22:09:55.401283
+       1     0.725  0.367816  0.64592 2025-11-01T22:09:02.128147
+
+<span class="info">💡 Version Tracking Benefits:</span>
+  • Compare performance across training runs
+  • Roll back to previous versions if needed
+  • Track model evolution over time
+  • A/B test different model configurations
+  • Audit trail for production models
+
+<span class="success">✅ All versions saved with complete metadata and metrics</span>
+
+<span class="highlight">================================================================================
+✅ WORKFLOW COMPLETE!
+================================================================================</span>
+
+<span class="info">📋 Key Takeaways:</span>
+  1. <span class="success">✅</span> EDA revealed data quality and domain characteristics
+  2. <span class="success">✅</span> Entire pipeline (feature engineering + encoding + scaling + model) is saved
+  3. <span class="success">✅</span> Train-inference parity is guaranteed
+  4. <span class="success">✅</span> Model versioning and metadata tracking are handled automatically
+  5. <span class="success">✅</span> Production predictions are as simple as: load_model → predict
+
+<span class="info">Next Steps:</span>
+  - Deploy the pipeline to a REST API (FastAPI, Flask)
+  - Set up model monitoring and retraining triggers
+  - Implement A/B testing with multiple versions
+  - Add model explainability (SHAP, LIME)
+                </div>
+            </div>
+        </section>
+
+        <section id="examples">
+            <h2>More Real Examples</h2>
+            <p>Check the <code>examples/</code> folder in the repo for complete, runnable scripts:</p>
+            <ul>
+                <li><code>01_basic_usage.py</code> - Simple preprocessing pipeline</li>
+                <li><code>04_feature_math.py</code> - Advanced feature engineering</li>
+                <li><code>05_smart_binning.py</code> - All binning strategies</li>
+                <li><code>09_feature_selection.py</code> - Compare selection methods</li>
+                <li><code>10_full_library_showcase.py</code> - Everything in one place</li>
+                <li><strong><code>production_pipeline_with_registry.py</code> - Complete end-to-end production pipeline with model registry</strong></li>
+            </ul>
+            
+            <h3>End-to-End Production Example</h3>
+            <p>The production pipeline example shows a complete, real-world ML workflow:</p>
+            <ul>
+                <li>✅ Load and preprocess customer data</li>
+                <li>✅ Feature engineering with FeatureMath (ratios, binning, aggregations)</li>
+                <li>✅ Encode categorical variables (one-hot encoding)</li>
+                <li>✅ Scale numerical features (StandardScaler)</li>
+                <li>✅ Train Random Forest classifier</li>
+                <li>✅ Evaluate with comprehensive metrics</li>
+                <li>✅ Save complete pipeline to Model Registry</li>
+                <li>✅ Load and make predictions (train-inference parity)</li>
+            </ul>
+            <p>This example demonstrates <strong>production-ready best practices</strong> including proper train/test splitting, bundling all transformations with the model, and versioning everything for reproducibility.</p>
+        </section>
+
+        <section id="status">
+            <h2>Questions or Issues?</h2>
+            <p>Open an issue on <a href="https://github.com/flyingriverhorse/skyulf_mlflow_library/issues">GitHub</a> or check the docs folder for detailed guides.</p>
+        </section>
+    </main>
+
+    <footer>
+        Built by Murat during late-night coding sessions • MIT License • 2025
+    </footer>
+</body>
+</html>

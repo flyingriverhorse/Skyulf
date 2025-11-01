@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Workflow Canvas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='feature_canvas/feature-canvas.css') }}">
+</head>
+<body>
+    {% set source_id = request.query_params.get('source_id', '') %}
+    {% set dataset_name = request.query_params.get('dataset_name', '') %}
+    {% set dataset_label = dataset_name or (source_id if source_id else '') %}
+
+    <div class="feature-canvas-page">
+        <header class="feature-canvas-navbar">
+            <div class="feature-canvas-navbar__brand-group">
+                <a class="feature-canvas-navbar__brand" href="{{ url_for('index') }}">ML automation</a>
+                <span class="feature-canvas-navbar__subtitle">ML workflow</span>
+            </div>
+            <nav class="feature-canvas-navbar__links" aria-label="Primary navigation">
+                <a class="feature-canvas-navbar__link" href="{{ url_for('data.data_dashboard') }}">Data ingestion</a>
+                <a
+                    class="feature-canvas-navbar__link feature-canvas-navbar__link--active"
+                    href="{{ url_for('ml_workflow_page') }}{% if source_id %}?source_id={{ source_id | urlencode }}{% endif %}"
+                >ML workflow</a>
+            </nav>
+            <div class="feature-canvas-navbar__actions">
+                {% if current_user %}
+                    <a class="feature-canvas-navbar__link feature-canvas-navbar__link--muted" href="{{ url_for('auth.logout') }}">Logout</a>
+                {% else %}
+                    <a class="feature-canvas-navbar__link feature-canvas-navbar__link--muted" href="{{ url_for('auth.login') }}">Login</a>
+                {% endif %}
+            </div>
+        </header>
+        <main class="feature-canvas-shell">
+            <div
+                id="ml-workflow-root"
+                data-source-id="{{ source_id }}"
+                {% if dataset_name %}data-dataset-name="{{ dataset_name }}"{% endif %}
+            ></div>
+        </main>
+    </div>
+
+    <script type="module" src="{{ url_for('static', filename='feature_canvas/feature-canvas.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

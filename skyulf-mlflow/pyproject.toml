@@ -1,0 +1,181 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skyulf_mlflow_library"
+version = "0.1.1"
+description = "A comprehensive machine learning library for data ingestion, feature engineering, and model management"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Murat", email = "murath.unsal@unsal.com"}
+]
+keywords = [
+    "machine-learning",
+    "data-science",
+    "feature-engineering",
+    "data-ingestion",
+    "preprocessing",
+    "mlops",
+    "scikit-learn",
+    "pipeline"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "pandas>=1.5.0",
+    "numpy>=1.21.0",
+    "scikit-learn>=1.0.0",
+    "scipy>=1.7.0",
+    "rapidfuzz>=3.0.0",
+]
+
+[project.optional-dependencies]
+sampling = [
+    "imbalanced-learn>=0.10.0",
+]
+encoding = [
+    "category-encoders>=2.5.0",
+]
+sql = [
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+]
+excel = [
+    "openpyxl>=3.0.0",
+    "xlrd>=2.0.0",
+]
+parquet = [
+    "pyarrow>=10.0.0",
+]
+all = [
+    "imbalanced-learn>=0.10.0",
+    "category-encoders>=2.5.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "openpyxl>=3.0.0",
+    "xlrd>=2.0.0",
+    "pyarrow>=10.0.0",
+    "rapidfuzz>=3.0.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+    "mypy>=1.0.0",
+    "isort>=5.10.0",
+    "sphinx>=5.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/skyulf/skyulf-mlflow"
+Documentation = "https://skyulf-mlflow.readthedocs.io"
+Repository = "https://github.com/skyulf/skyulf-mlflow"
+"Bug Tracker" = "https://github.com/skyulf/skyulf-mlflow/issues"
+
+[tool.setuptools]
+packages = {find = {}}
+
+[tool.setuptools.package-data]
+skyulf_mlflow = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_optional = true
+
+[[tool.mypy.overrides]]
+module = [
+    "pandas.*",
+    "numpy.*",
+    "sklearn.*",
+    "scipy.*",
+    "imblearn.*",
+    "category_encoders.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--cov=skyulf_mlflow",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
+
+[tool.coverage.run]
+source = ["skyulf_mlflow"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]

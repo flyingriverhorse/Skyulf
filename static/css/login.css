@@ -1,0 +1,475 @@
+:root {
+    --primary-color: #667eea;
+    --primary-hover: #5a67d8;
+    --accent-color: #764ba2;
+    --fantasy-glow: #ffd475;
+    --nebula-1: #2b1055;
+    --nebula-2: #53346a;
+    --error-color: #f56565;
+    --success-color: #48bb78;
+    --info-color: #4299e1;
+    --border-color: #e6edf3;
+    --text-color: #1f2937;
+    --text-subtle: #6b7280;
+    --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --card-bg: rgba(255,255,255,0.98);
+    --dark-card-bg: rgba(30,61,90,0.95);
+    --primary-gradient: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    --heading-gradient: linear-gradient(90deg,#6b46c1 0%, #667eea 100%);
+    --radius: 12px;
+    --transition: 220ms cubic-bezier(.2,.8,.2,1);
+    --shadow-soft: 0 6px 18px rgba(12,22,62,0.12);
+    --input-bg: rgba(255,255,255,0.04);
+    --placeholder-color: rgba(255,255,255,0.45);
+    /* orb colors */
+    --orb-outer-gradient: radial-gradient(circle at 30% 30%, #ECC94B, #D69E2E);
+    --orb-inner-gradient: radial-gradient(circle at 40% 40%, #FFFFFF, #F6E05E);
+    --orb-glow-color: rgba(236,201,75,0.2);
+    --orb-sparkle: #ECC94B;
+    /* container sizing */
+    --login-max-width: 320px;
+    --login-padding: 16px;
+}
+
+.dark-mode, html.dark-mode, body.dark-mode {
+    --primary-color: #7c3aed;
+    --primary-hover: #6d28d9;
+    --accent-color: #8b5cf6;
+    --border-color: #2b394a;
+    --text-color: #f8fafc;
+    --text-subtle: #94a3b8;
+    --card-bg: var(--dark-card-bg);
+    --bg-gradient: linear-gradient(135deg,#0b1226 0%, #14243b 100%);
+    --primary-gradient: linear-gradient(90deg,#8b5cf6 0%, #7c3aed 100%);
+    --heading-gradient: linear-gradient(90deg,#a78bfa 0%, #7c3aed 100%);
+    --input-bg: rgba(255,255,255,0.02);
+    --placeholder-color: rgba(255,255,255,0.6);
+    /* orb dark variants */
+    --orb-outer-gradient: radial-gradient(circle at 30% 30%, #93c5fd, #60a5fa);
+    --orb-inner-gradient: radial-gradient(circle at 40% 40%, #e6f0ff, #c7e0ff);
+    --orb-glow-color: rgba(96,165,250,0.18);
+    --orb-sparkle: #A5B4FC;
+}
+
+/* Base reset for the login page */
+* { box-sizing: border-box; }
+html,body { height:100%; }
+body {
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: var(--bg-gradient);
+    color:var(--text-color);
+    padding:24px;
+    transition: background var(--transition), color var(--transition);
+}
+
+/* Decorative full-bleed fantasy / sci-fi SVG scene behind the card */
+.fantasy-scene{
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    opacity: 0.95;
+    transform-origin: center;
+}
+.fantasy-scene svg{ width:100vw; height:100vh; display:block; }
+
+/* star twinkle animation */
+.stars .star{ opacity:0.85; transform-origin:center; }
+.stars .star:nth-child(1){ animation: twinkle 3s ease-in-out infinite; }
+.stars .star:nth-child(2){ animation: twinkle 4.2s ease-in-out infinite; }
+.stars .star:nth-child(3){ animation: twinkle 2.6s ease-in-out infinite; }
+.stars .star:nth-child(4){ animation: twinkle 3.8s ease-in-out infinite; }
+.stars .star:nth-child(5){ animation: twinkle 5s ease-in-out infinite; }
+.stars .star:nth-child(6){ animation: twinkle 4.6s ease-in-out infinite; }
+.stars .star:nth-child(7){ animation: twinkle 3.2s ease-in-out infinite; }
+
+@keyframes twinkle{
+    0%{ opacity:0.2; transform: scale(0.9); }
+    50%{ opacity:1; transform: scale(1.15); }
+    100%{ opacity:0.2; transform: scale(0.95); }
+}
+
+/* drifting rune strokes */
+.runes .rune{ stroke-opacity:0.9; stroke-dasharray: 120; stroke-dashoffset: 120; animation: draw-rune 6s ease-in-out infinite; }
+.runes .rune-1{ animation-delay: 0s; }
+.runes .rune-2{ animation-delay: 1.2s; }
+.runes .rune-3{ animation-delay: 2.4s; }
+.runes .rune-4{ animation-delay: 3.6s; }
+
+@keyframes draw-rune{
+    0%{ stroke-dashoffset: 120; opacity:0; transform: translateY(6px); }
+    40%{ stroke-dashoffset: 0; opacity:1; transform: translateY(0); }
+    80%{ opacity:0.45; }
+    100%{ stroke-dashoffset: -40; opacity:0; transform: translateY(-8px); }
+}
+
+/* gentle parallax on larger screens */
+@media (min-width:900px){
+    .fantasy-scene{ transform: translateZ(0) scale(1.02); }
+}
+
+/* decorative soft particles behind the card */
+body::before{
+    content:'';
+    position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background-image:
+        radial-gradient(circle at 25% 75%, rgba(255,255,255,0.06) 0%, transparent 30%),
+        radial-gradient(circle at 80% 20%, rgba(0,0,0,0.03) 0%, transparent 30%);
+    opacity:0.95;
+}
+
+.login-wrapper{ width:100%; max-width:var(--login-max-width); margin:0 auto; }
+
+/* Ensure text inside the login card/container follows theme variables
+   and overrides any Tailwind utility classes applied in the template. */
+.login-container{ color: var(--text-color); }
+.login-container h1,
+.login-container .brand h1,
+.login-container .logo-section h1 { color: var(--text-color); }
+.login-container p,
+.login-container .subtitle,
+.login-container label,
+.login-container .test-users,
+.login-container .divider span { color: var(--text-subtle); }
+
+/* Links and accents inside the card use accent/primary colors that
+   adapt with the dark-mode variables. */
+.login-container a{ color: var(--accent-color); text-decoration: none; }
+.login-container a:hover{ color: var(--primary-hover); }
+
+/* Ensure icons (feather icons using currentColor) inherit themed color */
+.login-container [data-feather], .login-container i { color: inherit; }
+
+/* Ensure SSO button text remains visible and high-contrast in all modes */
+.btn-sso{ color: #fff !important; }
+
+/* Input icon container adjustments: ensure the absolute icon area is sized
+    and positioned so it doesn't overlap the input text; accommodate templates
+    that use Tailwind utility classes like .relative and .absolute. */
+.login-container .relative > .absolute{ left: 8px !important; width: 36px !important; top: 0; bottom: 0; display: flex !important; align-items: center; justify-content: center; pointer-events: none !important; }
+
+/* Ensure inputs that include a left icon (pl-10 used in template) have
+    enough left padding so text does not sit beneath the icon. */
+.login-container input.form-input.pl-10,
+.login-container input.pl-10{ padding-left: 46px !important; }
+
+/* Fallback for inputs that rely only on .form-input class */
+.login-container input.form-input{ padding-left: 14px; }
+
+/* Responsive adjustments: slightly larger on wide screens, tighter padding on small */
+@media (min-width:900px){
+    :root{ --login-max-width: 360px; }
+    .login-container{ padding: calc(var(--login-padding) + 6px); }
+}
+
+@media (max-width:420px){
+    :root{ --login-max-width: 100%; }
+    .login-container{ padding: 14px; }
+}
+
+.login-card{
+    background:var(--card-bg);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow-soft);
+    padding:18px 16px;
+    border:1px solid var(--border-color);
+    transition: transform var(--transition), box-shadow var(--transition);
+    position:relative;
+    overflow:hidden;
+}
+
+/* Support legacy .login-container used in templates; allow overflow visible so decorative elements (orb) can sit outside the card */
+.login-container{
+    background:var(--card-bg);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow-soft);
+    padding:var(--login-padding);
+    border:1px solid var(--border-color);
+    transition: transform var(--transition), box-shadow var(--transition);
+    position:relative;
+    overflow:visible;
+    max-width: var(--login-max-width);
+    width: 100%;
+}
+
+.login-card:hover{ transform:translateY(-6px); box-shadow:0 18px 42px rgba(12,22,62,0.18); }
+.login-card:hover, .login-container:hover{ transform:translateY(-6px); box-shadow:0 18px 42px rgba(12,22,62,0.18); }
+
+.brand, .logo-section{
+    text-align:center; margin-bottom:18px;
+}
+.brand img, .logo-section .logo{ max-width:160px; height:auto; display:inline-block; filter:drop-shadow(0 6px 12px rgba(0,0,0,0.08)); }
+.brand h1, .logo-section h1{
+    font-size:1.25rem;
+    margin-top:8px;
+    font-weight:800;
+    letter-spacing:-0.02em;
+    /* gradient text with fallback */
+    color:var(--text-color);
+    background: var(--heading-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* alternate fantasy/sci-fi typography when available */
+.logo-section h1{ font-family: 'Cinzel', 'Orbitron', Inter, sans-serif; font-weight:700; }
+.brand h1{ font-family: 'Orbitron', 'Cinzel', Inter, sans-serif; }
+
+/* subtle glow accents for headings */
+.brand h1, .logo-section h1{ text-shadow: 0 6px 18px rgba(102,126,234,0.08), 0 1px 0 rgba(255,255,255,0.02); }
+
+/* make card feel like a portal */
+.login-card::before{
+    content:'';
+    position:absolute; inset:-40%; z-index:-1; filter: blur(36px); opacity:0.08;
+    background: radial-gradient(circle at 30% 20%, rgba(102,126,234,0.45), transparent 18%), radial-gradient(circle at 80% 70%, rgba(183,90,255,0.35), transparent 15%);
+    transform: rotate(8deg);
+}
+.brand .subtitle, .logo-section .subtitle{ color:var(--text-subtle); font-size:0.95rem; margin-top:6px; }
+
+.form-group{ margin-bottom:14px; }
+.form-label{ display:block; font-weight:600; margin-bottom:6px; color:var(--text-color); }
+.form-input{
+    width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border-color);
+    background:var(--input-bg); color:var(--text-color); font-size:0.95rem; transition: box-shadow var(--transition), border-color var(--transition);
+}
+.form-input:focus{ outline:none; border-color:var(--primary-color); box-shadow:0 6px 18px rgba(102,126,234,0.12); transform:translateY(-1px); }
+
+/* Also style native inputs so template doesn't need extra classes */
+input[type="text"], input[type="password"]{
+    width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border-color);
+    background:var(--input-bg); color:var(--text-color); font-size:0.95rem; transition: box-shadow var(--transition), border-color var(--transition);
+}
+input[type="text"]:focus, input[type="password"]:focus{ outline:none; border-color:var(--primary-color); box-shadow:0 6px 18px rgba(102,126,234,0.12); }
+.btn-row{ display:flex; gap:10px; margin-top:6px; }
+.btn-primary{
+    flex:1;
+    padding:8px 12px;
+    color:#fff;
+    background: var(--primary-gradient);
+    cursor:pointer;
+    transition: transform var(--transition), box-shadow var(--transition), opacity var(--transition);
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    min-height:36px;
+    box-shadow: 0 6px 18px rgba(102,126,234,0.08);
+    font-weight:700;
+    border:none;
+    border-radius:999px;
+}
+.btn-primary:hover{ transform: translateY(-2px) scale(1.01); box-shadow:0 18px 42px rgba(102,126,234,0.12); }
+.btn-primary:active{ transform: translateY(0) scale(0.995); }
+.btn-primary:focus{ outline: 3px solid rgba(102,126,234,0.18); outline-offset: 2px; }
+
+.btn-sso{
+    flex:1;
+    padding:12px 14px;
+    border-radius:10px;
+    border:none;
+    color:#fff;
+    background:linear-gradient(135deg,#10b981,#059669);
+    font-weight:700;
+}
+.btn-sso:hover{ transform:translateY(-2px); }
+
+.divider{ text-align:center; margin:18px 0; position:relative; }
+.divider::before{ content:''; position:absolute; left:8px; right:8px; top:50%; height:1px; background:linear-gradient(90deg, transparent, rgba(0,0,0,0.06), transparent); transform:translateY(-50%); }
+.divider span{ background:var(--card-bg); padding:0 12px; color:var(--text-subtle); font-weight:600; }
+
+.info-box{ background:rgba(66,153,225,0.04); border-radius:10px; padding:12px; color:var(--info-color); border:1px solid rgba(66,153,225,0.12); font-size:0.9rem; }
+
+.alert{ padding:12px; border-radius:10px; margin-bottom:12px; font-weight:600; }
+.alert-error{ background:rgba(245,101,101,0.08); color:var(--error-color); border:1px solid rgba(245,101,101,0.18); }
+.alert-success{ background:rgba(72,187,120,0.06); color:var(--success-color); border:1px solid rgba(72,187,120,0.12); }
+
+.test-users{ text-align:center; margin-top:10px; color:var(--text-subtle); }
+.test-users a{ color:var(--primary-color); text-decoration:none; font-weight:600; }
+.test-users a:hover{ color:var(--primary-hover); }
+
+/* small screens */
+@media (max-width:420px){ .login-card{ padding:20px; } }
+
+/* helper for toast notifications created by JS */
+.notification-toast{ box-shadow:0 8px 24px rgba(0,0,0,0.12); }
+
+/* Generic button base to support loading state and accessibility */
+.btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    width:auto; /* don't force full-width by default; use .btn-block when needed */
+    padding:8px 12px;
+    border-radius:999px; /* pill */
+    border:none;
+    font-weight:700;
+    cursor:pointer;
+    position:relative;
+    overflow:hidden;
+    transition: transform var(--transition), box-shadow var(--transition), opacity var(--transition);
+    text-decoration: none;
+    color: var(--text-color);
+}
+
+/* Loading spinner used by JS when submit starts */
+.btn.loading{
+    color: transparent !important;
+    pointer-events: none;
+}
+.btn.loading::after{
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 2px solid rgba(255,255,255,0.95);
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+}
+
+/* Utility to make a button full width */
+.btn-block{ width:100%; display:flex; }
+
+/* Button disabled state */
+.btn:disabled,
+.btn[disabled]{ opacity:0.6; cursor:not-allowed; transform:none; }
+
+/* Ensure anchor.btn looks like a button */
+a.btn{ display:inline-flex; align-items:center; justify-content:center; }
+
+/* Ensure colored buttons always show white text on top of gradients */
+.btn-primary{
+    flex:1;
+    padding:8px 12px;
+    color:#fff !important;
+    background: var(--primary-gradient);
+    cursor:pointer;
+    transition: transform var(--transition), box-shadow var(--transition), opacity var(--transition);
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    min-height:40px;
+    box-shadow: 0 8px 22px rgba(102,126,234,0.08);
+    font-weight:700;
+    border:none;
+    border-radius:999px;
+}
+.btn-primary:hover{ transform: translateY(-2px) scale(1.01); box-shadow:0 18px 42px rgba(102,126,234,0.12); }
+.btn-primary:active{ transform: translateY(0) scale(0.995); }
+.btn-primary:focus{ outline: 3px solid rgba(102,126,234,0.18); outline-offset: 2px; }
+
+/* icon inside buttons */
+.btn-icon{ display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; color:rgba(255,255,255,0.95); }
+.btn-text{ font-size:1rem; line-height:1.1; font-weight:800; }
+
+/* smaller layout on narrow screens */
+@media (max-width:420px){
+    .btn-text{ font-size:0.98rem; }
+}
+
+/* Ensure Sign In text remains white in light mode (explicit) */
+html:not(.dark-mode) .btn-primary .btn-text, body:not(.dark-mode) .btn-primary .btn-text { color: #fff !important; }
+/* Ensure SSO button text remains white in light mode */
+/* Ensure SSO button text remains white in light mode */
+html:not(.dark-mode) .btn-sso, body:not(.dark-mode) .btn-sso, html:not(.dark-mode) .btn-sso *, body:not(.dark-mode) .btn-sso * { color: #fff !important; }
+/* Improve contrast for SSO button */
+.btn-sso{ background: linear-gradient(135deg,#7c3aed,#4f46e5); }
+
+/* Error page visual (small animated icon next to code) */
+.error-row{ display:flex; align-items:center; justify-content:center; gap:18px; flex-wrap:wrap; }
+.error-visual{ display:inline-flex; align-items:center; justify-content:center; width:96px; height:96px; }
+.error-visual svg{ width:100%; height:100%; display:block; }
+.error-visual .ring{ transform-origin:50% 50%; animation: ring-rotate 4s linear infinite; opacity:0.95; }
+.error-visual .icon{ animation: icon-bounce 1.6s cubic-bezier(.2,.9,.3,1) infinite; transform-origin:50% 50%; }
+
+@keyframes ring-rotate{
+    0%{ transform: rotate(0deg); }
+    50%{ transform: rotate(6deg); }
+    100%{ transform: rotate(0deg); }
+}
+
+@keyframes icon-bounce{
+    0%{ transform: translateY(0) rotate(0deg); }
+    30%{ transform: translateY(-6px) rotate(-4deg); }
+    60%{ transform: translateY(0) rotate(3deg); }
+    100%{ transform: translateY(0) rotate(0deg); }
+}
+
+/* Make error actions side-by-side on wider screens, stacked on small screens */
+.error-actions{ display:flex; gap:12px; flex-direction:column; width:100%; }
+@media (min-width:520px){
+    .error-actions{ flex-direction:row; justify-content:center; }
+    .error-actions .btn-block{ width:auto; min-width:160px; }
+}
+
+@keyframes spin{
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Dark mode toggle styling (keeps parity with other pages) */
+.dark-mode-toggle{
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.96));
+    border: 2px solid rgba(0,0,0,0.06);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 180ms ease, box-shadow 180ms ease;
+    box-shadow: var(--shadow-soft);
+    z-index: 1000;
+}
+.dark-mode-toggle .icon{ font-size: 18px; color: var(--text-subtle); }
+.dark-mode-toggle:focus{ outline:none; }
+/* icon visibility toggles */
+.dark-mode-toggle .light-icon{ display: none; }
+body.dark-mode .dark-mode-toggle .dark-icon{ display: none; }
+body.dark-mode .dark-mode-toggle .light-icon{ display: block; }
+/* Dark-mode specific toggle look */
+html.dark-mode .dark-mode-toggle, body.dark-mode .dark-mode-toggle{
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+    border: 2px solid rgba(255,255,255,0.04);
+}
+html.dark-mode .dark-mode-toggle .icon, body.dark-mode .dark-mode-toggle .icon{ color: var(--text-subtle); }
+
+/* Alerts: include info variant used by flashes */
+.alert-info{ background-color: rgba(66,153,225,0.08); color: var(--info-color); border:1px solid rgba(66,153,225,0.18); }
+
+/* Focus visible for accessibility */
+.btn:focus-visible,
+input:focus-visible,
+.dark-mode-toggle:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* Input validation helpers */
+input:invalid{ border-color: var(--error-color); }
+input:valid{ border-color: var(--success-color); }
+
+/* placeholder color */
+::placeholder{ color: var(--placeholder-color); }
+
+/* Custom scrollbar for webkit browsers (subtle) */
+::-webkit-scrollbar{ width: 8px; }
+::-webkit-scrollbar-track{ background: rgba(0,0,0,0.03); }
+::-webkit-scrollbar-thumb{ background: var(--border-color); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover{ background: var(--text-subtle); }
