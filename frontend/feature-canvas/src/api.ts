@@ -1120,20 +1120,26 @@ export async function fetchDropColumnRecommendations(
 ): Promise<DropColumnRecommendationsResponse> {
   const { sampleSize = 500, graph, targetNodeId } = options;
 
-  const params = new URLSearchParams({
+  const body: any = {
     dataset_source_id: sourceId,
-    sample_size: String(sampleSize),
-  });
+    sample_size: sampleSize,
+  };
 
   if (graph && Array.isArray(graph.nodes) && Array.isArray(graph.edges)) {
-    params.set('graph', JSON.stringify({ nodes: graph.nodes, edges: graph.edges }));
+    body.graph = { nodes: graph.nodes, edges: graph.edges };
   }
 
   if (targetNodeId) {
-    params.set('target_node_id', targetNodeId);
+    body.target_node_id = targetNodeId;
   }
 
-  const response = await fetch(`/ml-workflow/api/recommendations/drop-columns?${params.toString()}`);
+  const response = await fetch('/ml-workflow/api/recommendations/drop-columns', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
   if (!response.ok) {
     throw new Error('Failed to load column drop recommendations');
@@ -1148,20 +1154,26 @@ export async function fetchLabelEncodingRecommendations(
 ): Promise<LabelEncodingRecommendationsResponse> {
   const { sampleSize = 500, graph, targetNodeId } = options;
 
-  const params = new URLSearchParams({
+  const body: any = {
     dataset_source_id: sourceId,
-    sample_size: String(sampleSize),
-  });
+    sample_size: sampleSize,
+  };
 
   if (graph && Array.isArray(graph.nodes) && Array.isArray(graph.edges)) {
-    params.set('graph', JSON.stringify({ nodes: graph.nodes, edges: graph.edges }));
+    body.graph = { nodes: graph.nodes, edges: graph.edges };
   }
 
   if (targetNodeId) {
-    params.set('target_node_id', targetNodeId);
+    body.target_node_id = targetNodeId;
   }
 
-  const response = await fetch(`/ml-workflow/api/recommendations/label-encoding?${params.toString()}`);
+  const response = await fetch('/ml-workflow/api/recommendations/label-encoding', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
   if (!response.ok) {
     throw new Error('Failed to load label encoding recommendations');
@@ -1176,20 +1188,26 @@ export async function fetchOrdinalEncodingRecommendations(
 ): Promise<OrdinalEncodingRecommendationsResponse> {
   const { sampleSize = 500, graph, targetNodeId } = options;
 
-  const params = new URLSearchParams({
+  const body: any = {
     dataset_source_id: sourceId,
-    sample_size: String(sampleSize),
-  });
+    sample_size: sampleSize,
+  };
 
   if (graph && Array.isArray(graph.nodes) && Array.isArray(graph.edges)) {
-    params.set('graph', JSON.stringify({ nodes: graph.nodes, edges: graph.edges }));
+    body.graph = { nodes: graph.nodes, edges: graph.edges };
   }
 
   if (targetNodeId) {
-    params.set('target_node_id', targetNodeId);
+    body.target_node_id = targetNodeId;
   }
 
-  const response = await fetch(`/ml-workflow/api/recommendations/ordinal-encoding?${params.toString()}`);
+  const response = await fetch('/ml-workflow/api/recommendations/ordinal-encoding', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
   if (!response.ok) {
     throw new Error('Failed to load ordinal encoding suggestions');
@@ -1204,20 +1222,26 @@ export async function fetchTargetEncodingRecommendations(
 ): Promise<TargetEncodingRecommendationsResponse> {
   const { sampleSize = 500, graph, targetNodeId } = options;
 
-  const params = new URLSearchParams({
+  const body: any = {
     dataset_source_id: sourceId,
-    sample_size: String(sampleSize),
-  });
+    sample_size: sampleSize,
+  };
 
   if (graph && Array.isArray(graph.nodes) && Array.isArray(graph.edges)) {
-    params.set('graph', JSON.stringify({ nodes: graph.nodes, edges: graph.edges }));
+    body.graph = { nodes: graph.nodes, edges: graph.edges };
   }
 
   if (targetNodeId) {
-    params.set('target_node_id', targetNodeId);
+    body.target_node_id = targetNodeId;
   }
 
-  const response = await fetch(`/ml-workflow/api/recommendations/target-encoding?${params.toString()}`);
+  const response = await fetch('/ml-workflow/api/recommendations/target-encoding', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
   if (!response.ok) {
     throw new Error('Failed to load target encoding recommendations');
@@ -1232,20 +1256,26 @@ export async function fetchHashEncodingRecommendations(
 ): Promise<HashEncodingRecommendationsResponse> {
   const { sampleSize = 500, graph, targetNodeId } = options;
 
-  const params = new URLSearchParams({
+  const body: any = {
     dataset_source_id: sourceId,
-    sample_size: String(sampleSize),
-  });
+    sample_size: sampleSize,
+  };
 
   if (graph && Array.isArray(graph.nodes) && Array.isArray(graph.edges)) {
-    params.set('graph', JSON.stringify({ nodes: graph.nodes, edges: graph.edges }));
+    body.graph = { nodes: graph.nodes, edges: graph.edges };
   }
 
   if (targetNodeId) {
-    params.set('target_node_id', targetNodeId);
+    body.target_node_id = targetNodeId;
   }
 
-  const response = await fetch(`/ml-workflow/api/recommendations/hash-encoding?${params.toString()}`);
+  const response = await fetch('/ml-workflow/api/recommendations/hash-encoding', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
   if (!response.ok) {
     throw new Error('Failed to load hash encoding recommendations');
@@ -1260,20 +1290,26 @@ export async function fetchOneHotEncodingRecommendations(
 ): Promise<OneHotEncodingRecommendationsResponse> {
   const { sampleSize = 500, graph, targetNodeId } = options;
 
-  const params = new URLSearchParams({
+  const body: any = {
     dataset_source_id: sourceId,
-    sample_size: String(sampleSize),
-  });
+    sample_size: sampleSize,
+  };
 
   if (graph && Array.isArray(graph.nodes) && Array.isArray(graph.edges)) {
-    params.set('graph', JSON.stringify({ nodes: graph.nodes, edges: graph.edges }));
+    body.graph = { nodes: graph.nodes, edges: graph.edges };
   }
 
   if (targetNodeId) {
-    params.set('target_node_id', targetNodeId);
+    body.target_node_id = targetNodeId;
   }
 
-  const response = await fetch(`/ml-workflow/api/recommendations/one-hot-encoding?${params.toString()}`);
+  const response = await fetch('/ml-workflow/api/recommendations/one-hot-encoding', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
   if (!response.ok) {
     throw new Error('Failed to load one-hot encoding recommendations');
@@ -1288,20 +1324,26 @@ export async function fetchDummyEncodingRecommendations(
 ): Promise<DummyEncodingRecommendationsResponse> {
   const { sampleSize = 500, graph, targetNodeId } = options;
 
-  const params = new URLSearchParams({
+  const body: any = {
     dataset_source_id: sourceId,
-    sample_size: String(sampleSize),
-  });
+    sample_size: sampleSize,
+  };
 
   if (graph && Array.isArray(graph.nodes) && Array.isArray(graph.edges)) {
-    params.set('graph', JSON.stringify({ nodes: graph.nodes, edges: graph.edges }));
+    body.graph = { nodes: graph.nodes, edges: graph.edges };
   }
 
   if (targetNodeId) {
-    params.set('target_node_id', targetNodeId);
+    body.target_node_id = targetNodeId;
   }
 
-  const response = await fetch(`/ml-workflow/api/recommendations/dummy-encoding?${params.toString()}`);
+  const response = await fetch('/ml-workflow/api/recommendations/dummy-encoding', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
   if (!response.ok) {
     throw new Error('Failed to load dummy encoding recommendations');
@@ -1323,31 +1365,37 @@ export async function fetchSkewnessRecommendations(
 ): Promise<SkewnessRecommendationsResponse> {
   const { sampleSize = 500, transformations, graph, targetNodeId } = options;
 
-  const params = new URLSearchParams({
+  const body: any = {
     dataset_source_id: sourceId,
-    sample_size: String(sampleSize),
-  });
+    sample_size: sampleSize,
+  };
 
   if (Array.isArray(transformations)) {
     if (transformations.length > 0) {
-      params.set('transformations', JSON.stringify(transformations));
+      body.transformations = JSON.stringify(transformations);
     }
   } else if (transformations && typeof transformations === 'object') {
     const keys = Object.keys(transformations);
     if (keys.length > 0) {
-      params.set('transformations', JSON.stringify(transformations));
+      body.transformations = JSON.stringify(transformations);
     }
   }
 
   if (graph && Array.isArray(graph.nodes) && Array.isArray(graph.edges)) {
-    params.set('graph', JSON.stringify({ nodes: graph.nodes, edges: graph.edges }));
+    body.graph = { nodes: graph.nodes, edges: graph.edges };
   }
 
   if (targetNodeId) {
-    params.set('target_node_id', targetNodeId);
+    body.target_node_id = targetNodeId;
   }
 
-  const response = await fetch(`/ml-workflow/api/recommendations/skewness?${params.toString()}`);
+  const response = await fetch('/ml-workflow/api/recommendations/skewness', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
   if (!response.ok) {
     throw new Error('Failed to load skewness recommendations');
@@ -1368,20 +1416,26 @@ export async function fetchScalingRecommendations(
 ): Promise<ScalingRecommendationsResponse> {
   const { sampleSize = 500, graph, targetNodeId } = options;
 
-  const params = new URLSearchParams({
+  const body: any = {
     dataset_source_id: sourceId,
-    sample_size: String(sampleSize),
-  });
+    sample_size: sampleSize,
+  };
 
   if (graph && Array.isArray(graph.nodes) && Array.isArray(graph.edges)) {
-    params.set('graph', JSON.stringify({ nodes: graph.nodes, edges: graph.edges }));
+    body.graph = { nodes: graph.nodes, edges: graph.edges };
   }
 
   if (targetNodeId) {
-    params.set('target_node_id', targetNodeId);
+    body.target_node_id = targetNodeId;
   }
 
-  const response = await fetch(`/ml-workflow/api/recommendations/scaling?${params.toString()}`);
+  const response = await fetch('/ml-workflow/api/recommendations/scaling', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
   if (!response.ok) {
     throw new Error('Failed to load scaling recommendations');
@@ -1407,20 +1461,26 @@ export async function fetchOutlierRecommendations(
       ? Math.min(5000, Math.max(50, Math.round(sampleSize)))
       : 500;
 
-  const params = new URLSearchParams({
+  const body: any = {
     dataset_source_id: sourceId,
-    sample_size: String(normalizedSampleSize),
-  });
+    sample_size: normalizedSampleSize,
+  };
 
   if (graph && Array.isArray(graph.nodes) && Array.isArray(graph.edges)) {
-    params.set('graph', JSON.stringify({ nodes: graph.nodes, edges: graph.edges }));
+    body.graph = { nodes: graph.nodes, edges: graph.edges };
   }
 
   if (targetNodeId) {
-    params.set('target_node_id', targetNodeId);
+    body.target_node_id = targetNodeId;
   }
 
-  const response = await fetch(`/ml-workflow/api/recommendations/outliers?${params.toString()}`);
+  const response = await fetch('/ml-workflow/api/recommendations/outliers', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
   if (!response.ok) {
     throw new Error('Failed to load outlier recommendations');

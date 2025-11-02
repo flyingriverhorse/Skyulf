@@ -20,6 +20,7 @@ from pandas.api import types as pd_types
 import joblib
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -269,6 +270,34 @@ DROP_COLUMN_FILTER_LABELS: Dict[str, Dict[str, Optional[str]]] = {
         "description": "Columns surfaced by broader EDA heuristics.",
     },
 }
+
+
+# Request body models for POST recommendation endpoints
+class RecommendationRequest(BaseModel):
+    """Base request model for recommendation endpoints."""
+    dataset_source_id: str = Field(..., description="Identifier of the dataset source")
+    sample_size: int = Field(
+        default=500,
+        ge=50,
+        le=5000,
+        description="Number of rows to sample for analysis"
+    )
+    graph: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Pipeline graph structure with nodes and edges"
+    )
+    target_node_id: Optional[str] = Field(
+        None,
+        description="ID of the target node in the pipeline"
+    )
+
+
+class SkewnessRecommendationRequest(RecommendationRequest):
+    """Request model for skewness recommendations with transformations."""
+    transformations: Optional[str] = Field(
+        None,
+        description="JSON string of applied transformations"
+    )
 
 
 router = APIRouter(prefix="/ml-workflow", tags=["ml-workflow"])
@@ -1136,7 +1165,7 @@ async def _prepare_categorical_recommendation_context(
     eda_service: FeatureEngineeringEDAService,
     dataset_source_id: str,
     sample_size: int,
-    graph: Optional[str],
+    graph: Optional[Dict[str, Any]],
     target_node_id: Optional[str],
     skip_catalog_types: Optional[Set[str]] = None,
 ) -> Tuple[pd.DataFrame, Dict[str, Dict[str, Any]], List[str]]:
@@ -1166,16 +1195,11 @@ async def _prepare_categorical_recommendation_context(
     )
 
     if graph:
-        try:
-            graph_payload = json.loads(graph)
-        except (TypeError, ValueError):  # pragma: no cover - bad payload
-            raise HTTPException(status_code=400, detail="graph must be valid JSON")
-
-        if not isinstance(graph_payload, dict):  # pragma: no cover - invalid type
+        if not isinstance(graph, dict):  # pragma: no cover - invalid type
             raise HTTPException(status_code=400, detail="graph payload must be a JSON object")
 
-        graph_node_map = _sanitize_graph_nodes(graph_payload.get("nodes"))
-        graph_edges = _sanitize_graph_edges(graph_payload.get("edges"))
+        graph_node_map = _sanitize_graph_nodes(graph.get("nodes"))
+        graph_edges = _sanitize_graph_edges(graph.get("edges"))
 
     if graph_node_map or graph_edges or normalized_target_node:
         graph_node_map = _ensure_dataset_node(graph_node_map)
@@ -3936,52 +3960,38 @@ async def get_node_catalog() -> List[FeatureNodeCatalogEntry]:
     return _build_preprocessing_nodes()
 
 
-@router.get(
+@router.post(
     "/api/recommendations/drop-columns",
     response_model=DropColumnRecommendations,
 )
 async def get_drop_column_recommendations(
-    dataset_source_id: str = Query(..., description="Source identifier for generating recommendations."),
-    sample_size: int = Query(500, ge=50, le=5000, description="Rows sampled when computing EDA statistics."),
-    graph: Optional[str] = Query(
-        None,
-        description="JSON payload containing graph nodes and edges to simulate upstream pipeline steps.",
-    ),
-    target_node_id: Optional[str] = Query(
-        None,
-        description="Identifier of the node requesting drop-column insights to determine upstream context.",
-    ),
+    request: RecommendationRequest = Body(...),
     session: AsyncSession = Depends(get_async_session),
 ) -> DropColumnRecommendations:
     """Return column drop suggestions derived from EDA quality insights."""
 
-    normalized_id = dataset_source_id.strip()
+    normalized_id = str(request.dataset_source_id).strip()
     if not normalized_id:
         raise HTTPException(status_code=400, detail="dataset_source_id must not be empty")
 
     graph_node_map: Dict[str, Dict[str, Any]] = {}
     graph_edges: List[Dict[str, Any]] = []
     normalized_target_node = (
-        target_node_id.strip() if isinstance(target_node_id, str) and target_node_id.strip() else None
+        request.target_node_id.strip() if isinstance(request.target_node_id, str) and request.target_node_id.strip() else None
     )
 
-    if graph:
-        try:
-            graph_payload = json.loads(graph)
-        except (TypeError, ValueError):  # pragma: no cover - bad payload
-            raise HTTPException(status_code=400, detail="graph must be valid JSON")
-
-        if not isinstance(graph_payload, dict):  # pragma: no cover - invalid type
+    if request.graph:
+        if not isinstance(request.graph, dict):  # pragma: no cover - invalid type
             raise HTTPException(status_code=400, detail="graph payload must be a JSON object")
 
-        graph_node_map = _sanitize_graph_nodes(graph_payload.get("nodes"))
-        graph_edges = _sanitize_graph_edges(graph_payload.get("edges"))
+        graph_node_map = _sanitize_graph_nodes(request.graph.get("nodes"))
+        graph_edges = _sanitize_graph_edges(request.graph.get("edges"))
 
     if graph_node_map or graph_edges or normalized_target_node:
         graph_node_map = _ensure_dataset_node(graph_node_map)
 
-    eda_service = _build_eda_service(session, sample_size)
-    report = await eda_service.quality_report(normalized_id, sample_size=sample_size)
+    eda_service = _build_eda_service(session, request.sample_size)
+    report = await eda_service.quality_report(normalized_id, sample_size=request.sample_size)
 
     if not report.get("success"):
         detail = report.get("error") or "Unable to generate quality report"
@@ -4119,7 +4129,7 @@ async def get_drop_column_recommendations(
     allowed_columns: Optional[Set[str]] = None
 
     if graph_node_map or graph_edges or normalized_target_node:
-        preview_payload = await eda_service.preview_source(normalized_id, sample_size=sample_size)
+        preview_payload = await eda_service.preview_source(normalized_id, sample_size=request.sample_size)
         if preview_payload.get("success"):
             preview_data = preview_payload.get("preview") or {}
             sample_rows = preview_data.get("sample_data") or []
@@ -4270,34 +4280,25 @@ async def get_drop_column_recommendations(
     )
 
 
-@router.get(
+@router.post(
     "/api/recommendations/label-encoding",
     response_model=LabelEncodingRecommendationsResponse,
 )
 async def get_label_encoding_recommendations(
-    dataset_source_id: str = Query(..., description="Source identifier for generating label encoding suggestions."),
-    sample_size: int = Query(500, ge=50, le=5000, description="Rows sampled when scanning for categorical text."),
-    graph: Optional[str] = Query(
-        None,
-        description="JSON payload containing graph nodes and edges to simulate upstream pipeline steps.",
-    ),
-    target_node_id: Optional[str] = Query(
-        None,
-        description="Identifier of the node requesting label encoding insights to determine upstream context.",
-    ),
+    request: RecommendationRequest = Body(...),
     session: AsyncSession = Depends(get_async_session),
 ) -> LabelEncodingRecommendationsResponse:
-    normalized_id = dataset_source_id.strip()
+    normalized_id = str(request.dataset_source_id).strip()
     if not normalized_id:
         raise HTTPException(status_code=400, detail="dataset_source_id must not be empty")
 
-    eda_service = _build_eda_service(session, sample_size)
+    eda_service = _build_eda_service(session, request.sample_size)
     frame, column_metadata, notes = await _prepare_categorical_recommendation_context(
         eda_service=eda_service,
         dataset_source_id=normalized_id,
-        sample_size=sample_size,
-        graph=graph,
-        target_node_id=target_node_id,
+        sample_size=request.sample_size,
+        graph=request.graph,
+        target_node_id=request.target_node_id,
         skip_catalog_types={
             "label_encoding",
             "dummy_encoding",
@@ -4336,34 +4337,25 @@ async def get_label_encoding_recommendations(
     )
 
 
-@router.get(
+@router.post(
     "/api/recommendations/target-encoding",
     response_model=TargetEncodingRecommendationsResponse,
 )
 async def get_target_encoding_recommendations(
-    dataset_source_id: str = Query(..., description="Source identifier for generating target encoding suggestions."),
-    sample_size: int = Query(500, ge=50, le=5000, description="Rows sampled when scanning for categorical text."),
-    graph: Optional[str] = Query(
-        None,
-        description="JSON payload containing graph nodes and edges to simulate upstream pipeline steps.",
-    ),
-    target_node_id: Optional[str] = Query(
-        None,
-        description="Identifier of the node requesting target encoding insights to determine upstream context.",
-    ),
+    request: RecommendationRequest = Body(...),
     session: AsyncSession = Depends(get_async_session),
 ) -> TargetEncodingRecommendationsResponse:
-    normalized_id = dataset_source_id.strip()
+    normalized_id = str(request.dataset_source_id).strip()
     if not normalized_id:
         raise HTTPException(status_code=400, detail="dataset_source_id must not be empty")
 
-    eda_service = _build_eda_service(session, sample_size)
+    eda_service = _build_eda_service(session, request.sample_size)
     frame, column_metadata, notes = await _prepare_categorical_recommendation_context(
         eda_service=eda_service,
         dataset_source_id=normalized_id,
-        sample_size=sample_size,
-        graph=graph,
-        target_node_id=target_node_id,
+        sample_size=request.sample_size,
+        graph=request.graph,
+        target_node_id=request.target_node_id,
         skip_catalog_types={
             "target_encoding",
             "label_encoding",
@@ -4409,34 +4401,25 @@ async def get_target_encoding_recommendations(
     )
 
 
-@router.get(
+@router.post(
     "/api/recommendations/hash-encoding",
     response_model=HashEncodingRecommendationsResponse,
 )
 async def get_hash_encoding_recommendations(
-    dataset_source_id: str = Query(..., description="Source identifier for generating hash encoding suggestions."),
-    sample_size: int = Query(500, ge=50, le=5000, description="Rows sampled when scanning for categorical text."),
-    graph: Optional[str] = Query(
-        None,
-        description="JSON payload containing graph nodes and edges to simulate upstream pipeline steps.",
-    ),
-    target_node_id: Optional[str] = Query(
-        None,
-        description="Identifier of the node requesting hash encoding insights to determine upstream context.",
-    ),
+    request: RecommendationRequest = Body(...),
     session: AsyncSession = Depends(get_async_session),
 ) -> HashEncodingRecommendationsResponse:
-    normalized_id = dataset_source_id.strip()
+    normalized_id = str(request.dataset_source_id).strip()
     if not normalized_id:
         raise HTTPException(status_code=400, detail="dataset_source_id must not be empty")
 
-    eda_service = _build_eda_service(session, sample_size)
+    eda_service = _build_eda_service(session, request.sample_size)
     frame, column_metadata, notes = await _prepare_categorical_recommendation_context(
         eda_service=eda_service,
         dataset_source_id=normalized_id,
-        sample_size=sample_size,
-        graph=graph,
-        target_node_id=target_node_id,
+        sample_size=request.sample_size,
+        graph=request.graph,
+        target_node_id=request.target_node_id,
         skip_catalog_types={
             "hash_encoding",
             "label_encoding",
@@ -4482,34 +4465,25 @@ async def get_hash_encoding_recommendations(
     )
 
 
-@router.get(
+@router.post(
     "/api/recommendations/ordinal-encoding",
     response_model=OrdinalEncodingRecommendationsResponse,
 )
 async def get_ordinal_encoding_recommendations(
-    dataset_source_id: str = Query(..., description="Source identifier for generating ordinal encoding suggestions."),
-    sample_size: int = Query(500, ge=50, le=5000, description="Rows sampled when scanning for categorical text."),
-    graph: Optional[str] = Query(
-        None,
-        description="JSON payload containing graph nodes and edges to simulate upstream pipeline steps.",
-    ),
-    target_node_id: Optional[str] = Query(
-        None,
-        description="Identifier of the node requesting ordinal encoding insights to determine upstream context.",
-    ),
+    request: RecommendationRequest = Body(...),
     session: AsyncSession = Depends(get_async_session),
 ) -> OrdinalEncodingRecommendationsResponse:
-    normalized_id = dataset_source_id.strip()
+    normalized_id = str(request.dataset_source_id).strip()
     if not normalized_id:
         raise HTTPException(status_code=400, detail="dataset_source_id must not be empty")
 
-    eda_service = _build_eda_service(session, sample_size)
+    eda_service = _build_eda_service(session, request.sample_size)
     frame, column_metadata, notes = await _prepare_categorical_recommendation_context(
         eda_service=eda_service,
         dataset_source_id=normalized_id,
-        sample_size=sample_size,
-        graph=graph,
-        target_node_id=target_node_id,
+        sample_size=request.sample_size,
+        graph=request.graph,
+        target_node_id=request.target_node_id,
         skip_catalog_types={
             "target_encoding",
             "ordinal_encoding",
@@ -4553,48 +4527,38 @@ async def get_ordinal_encoding_recommendations(
     )
 
 
-@router.get(
+@router.post(
     "/api/recommendations/one-hot-encoding",
     response_model=OneHotEncodingRecommendationsResponse,
 )
 async def get_one_hot_encoding_recommendations(
-    dataset_source_id: str = Query(..., description="Source identifier for generating one-hot encoding suggestions."),
-    sample_size: int = Query(500, ge=50, le=5000, description="Rows sampled when scanning for categorical text."),
-    graph: Optional[str] = Query(
-        None,
-        description="JSON payload containing graph nodes and edges to simulate upstream pipeline steps.",
-    ),
-    target_node_id: Optional[str] = Query(
-        None,
-        description="Identifier of the node requesting one-hot encoding insights to determine upstream context.",
-    ),
+    request: RecommendationRequest = Body(...),
     session: AsyncSession = Depends(get_async_session),
 ) -> OneHotEncodingRecommendationsResponse:
     logger.debug(
         "One-hot encoding recommendations request",
         extra={
-            "dataset_source_id": dataset_source_id,
-            "target_node_id": target_node_id,
-            "has_graph": bool(graph),
-            "graph_length": len(graph) if graph else 0,
+            "dataset_source_id": request.dataset_source_id,
+            "target_node_id": request.target_node_id,
+            "has_graph": bool(request.graph),
         },
     )
     
-    normalized_id = dataset_source_id.strip()
+    normalized_id = str(request.dataset_source_id).strip()
     if not normalized_id:
         raise HTTPException(status_code=400, detail="dataset_source_id must not be empty")
 
-    logger.debug("Building EDA service", extra={"sample_size": sample_size})
-    eda_service = _build_eda_service(session, sample_size)
+    logger.debug("Building EDA service", extra={"sample_size": request.sample_size})
+    eda_service = _build_eda_service(session, request.sample_size)
     
     logger.debug("Calling _prepare_categorical_recommendation_context")
     try:
         frame, column_metadata, notes = await _prepare_categorical_recommendation_context(
             eda_service=eda_service,
             dataset_source_id=normalized_id,
-            sample_size=sample_size,
-            graph=graph,
-            target_node_id=target_node_id,
+            sample_size=request.sample_size,
+            graph=request.graph,
+            target_node_id=request.target_node_id,
             skip_catalog_types={
                 "target_encoding",
                 "one_hot_encoding",
@@ -4647,34 +4611,25 @@ async def get_one_hot_encoding_recommendations(
     )
 
 
-@router.get(
+@router.post(
     "/api/recommendations/dummy-encoding",
     response_model=DummyEncodingRecommendationsResponse,
 )
 async def get_dummy_encoding_recommendations(
-    dataset_source_id: str = Query(..., description="Source identifier for generating dummy encoding suggestions."),
-    sample_size: int = Query(500, ge=50, le=5000, description="Rows sampled when scanning for categorical text."),
-    graph: Optional[str] = Query(
-        None,
-        description="JSON payload containing graph nodes and edges to simulate upstream pipeline steps.",
-    ),
-    target_node_id: Optional[str] = Query(
-        None,
-        description="Identifier of the node requesting dummy encoding insights to determine upstream context.",
-    ),
+    request: RecommendationRequest = Body(...),
     session: AsyncSession = Depends(get_async_session),
 ) -> DummyEncodingRecommendationsResponse:
-    normalized_id = dataset_source_id.strip()
+    normalized_id = str(request.dataset_source_id).strip()
     if not normalized_id:
         raise HTTPException(status_code=400, detail="dataset_source_id must not be empty")
 
-    eda_service = _build_eda_service(session, sample_size)
+    eda_service = _build_eda_service(session, request.sample_size)
     frame, column_metadata, notes = await _prepare_categorical_recommendation_context(
         eda_service=eda_service,
         dataset_source_id=normalized_id,
-        sample_size=sample_size,
-        graph=graph,
-        target_node_id=target_node_id,
+        sample_size=request.sample_size,
+        graph=request.graph,
+        target_node_id=request.target_node_id,
         skip_catalog_types={
             "target_encoding",
             "dummy_encoding",
@@ -4720,31 +4675,22 @@ async def get_dummy_encoding_recommendations(
     )
 
 
-@router.get(
+@router.post(
     "/api/recommendations/scaling",
     response_model=ScalingRecommendationsResponse,
 )
 async def get_scaling_recommendations(
-    dataset_source_id: str = Query(..., description="Source identifier for generating scaling insights."),
-    sample_size: int = Query(500, ge=50, le=5000, description="Rows sampled when computing scaling statistics."),
-    graph: Optional[str] = Query(
-        None,
-        description="JSON payload containing graph nodes and edges to simulate upstream pipeline steps.",
-    ),
-    target_node_id: Optional[str] = Query(
-        None,
-        description="Identifier of the node requesting scaling insights to determine upstream context.",
-    ),
+    request: RecommendationRequest = Body(...),
     session: AsyncSession = Depends(get_async_session),
 ) -> ScalingRecommendationsResponse:
     """Return recommended scaling strategies for numeric columns."""
 
-    normalized_id = dataset_source_id.strip()
+    normalized_id = str(request.dataset_source_id).strip()
     if not normalized_id:
         raise HTTPException(status_code=400, detail="dataset_source_id must not be empty")
 
-    eda_service = _build_eda_service(session, sample_size)
-    preview_payload = await eda_service.preview_source(normalized_id, sample_size=sample_size)
+    eda_service = _build_eda_service(session, request.sample_size)
+    preview_payload = await eda_service.preview_source(normalized_id, sample_size=request.sample_size)
 
     if not preview_payload.get("success"):
         detail = preview_payload.get("error") or preview_payload.get("message") or "Unable to preview dataset"
@@ -4765,19 +4711,14 @@ async def get_scaling_recommendations(
 
     graph_node_map: Dict[str, Dict[str, Any]] = {}
     graph_edges: List[Dict[str, Any]] = []
-    normalized_target_node = target_node_id.strip() if isinstance(target_node_id, str) and target_node_id.strip() else None
+    normalized_target_node = request.target_node_id.strip() if isinstance(request.target_node_id, str) and request.target_node_id.strip() else None
 
-    if graph:
-        try:
-            graph_payload = json.loads(graph)
-        except (TypeError, ValueError):  # pragma: no cover - bad payload
-            raise HTTPException(status_code=400, detail="graph must be valid JSON")
-
-        if not isinstance(graph_payload, dict):  # pragma: no cover - invalid type
+    if request.graph:
+        if not isinstance(request.graph, dict):  # pragma: no cover - invalid type
             raise HTTPException(status_code=400, detail="graph payload must be a JSON object")
 
-        graph_node_map = _sanitize_graph_nodes(graph_payload.get("nodes"))
-        graph_edges = _sanitize_graph_edges(graph_payload.get("edges"))
+        graph_node_map = _sanitize_graph_nodes(request.graph.get("nodes"))
+        graph_edges = _sanitize_graph_edges(request.graph.get("edges"))
 
     if graph_node_map or graph_edges or normalized_target_node:
         graph_node_map = _ensure_dataset_node(graph_node_map)
@@ -4803,29 +4744,20 @@ async def get_scaling_recommendations(
     )
 
 
-@router.get(
+@router.post(
     "/api/recommendations/outliers",
     response_model=OutlierRecommendationsResponse,
 )
 async def get_outlier_recommendations(
-    dataset_source_id: str = Query(..., description="Source identifier for generating outlier diagnostics."),
-    sample_size: int = Query(500, ge=50, le=5000, description="Rows sampled when computing outlier statistics."),
-    graph: Optional[str] = Query(
-        None,
-        description="JSON payload containing graph nodes and edges to simulate upstream pipeline steps.",
-    ),
-    target_node_id: Optional[str] = Query(
-        None,
-        description="Identifier of the node requesting outlier insights to determine upstream context.",
-    ),
+    request: RecommendationRequest = Body(...),
     session: AsyncSession = Depends(get_async_session),
 ) -> OutlierRecommendationsResponse:
-    normalized_id = dataset_source_id.strip()
+    normalized_id = str(request.dataset_source_id).strip()
     if not normalized_id:
         raise HTTPException(status_code=400, detail="dataset_source_id must not be empty")
 
-    eda_service = _build_eda_service(session, sample_size)
-    preview_payload = await eda_service.preview_source(normalized_id, sample_size=sample_size)
+    eda_service = _build_eda_service(session, request.sample_size)
+    preview_payload = await eda_service.preview_source(normalized_id, sample_size=request.sample_size)
 
     if not preview_payload.get("success"):
         detail = preview_payload.get("error") or preview_payload.get("message") or "Unable to preview dataset"
@@ -4846,19 +4778,14 @@ async def get_outlier_recommendations(
 
     graph_node_map: Dict[str, Dict[str, Any]] = {}
     graph_edges: List[Dict[str, Any]] = []
-    normalized_target_node = target_node_id.strip() if isinstance(target_node_id, str) and target_node_id.strip() else None
+    normalized_target_node = request.target_node_id.strip() if isinstance(request.target_node_id, str) and request.target_node_id.strip() else None
 
-    if graph:
-        try:
-            graph_payload = json.loads(graph)
-        except (TypeError, ValueError):  # pragma: no cover - bad payload
-            raise HTTPException(status_code=400, detail="graph must be valid JSON")
-
-        if not isinstance(graph_payload, dict):  # pragma: no cover - invalid type
+    if request.graph:
+        if not isinstance(request.graph, dict):  # pragma: no cover - invalid type
             raise HTTPException(status_code=400, detail="graph payload must be a JSON object")
 
-        graph_node_map = _sanitize_graph_nodes(graph_payload.get("nodes"))
-        graph_edges = _sanitize_graph_edges(graph_payload.get("edges"))
+        graph_node_map = _sanitize_graph_nodes(request.graph.get("nodes"))
+        graph_edges = _sanitize_graph_edges(request.graph.get("edges"))
 
     if graph_node_map or graph_edges or normalized_target_node:
         graph_node_map = _ensure_dataset_node(graph_node_map)
@@ -4885,35 +4812,22 @@ async def get_outlier_recommendations(
     )
 
 
-@router.get(
+@router.post(
     "/api/recommendations/skewness",
     response_model=SkewnessRecommendationsResponse,
 )
 async def get_skewness_recommendations(
-    dataset_source_id: str = Query(..., description="Source identifier for generating skewness insights."),
-    sample_size: int = Query(500, ge=50, le=5000, description="Rows sampled when computing skewness statistics."),
-    transformations: Optional[str] = Query(
-        None,
-        description="JSON payload describing column transformations to preview post-transform distributions.",
-    ),
-    graph: Optional[str] = Query(
-        None,
-        description="JSON payload containing graph nodes and edges to simulate upstream pipeline steps.",
-    ),
-    target_node_id: Optional[str] = Query(
-        None,
-        description="Identifier of the node requesting skewness insights to determine upstream context.",
-    ),
+    request: SkewnessRecommendationRequest = Body(...),
     session: AsyncSession = Depends(get_async_session),
 ) -> SkewnessRecommendationsResponse:
     """Return transformation suggestions for skewed numeric columns."""
 
-    normalized_id = dataset_source_id.strip()
+    normalized_id = str(request.dataset_source_id).strip()
     if not normalized_id:
         raise HTTPException(status_code=400, detail="dataset_source_id must not be empty")
 
-    eda_service = _build_eda_service(session, sample_size)
-    preview_payload = await eda_service.preview_source(normalized_id, sample_size=sample_size)
+    eda_service = _build_eda_service(session, request.sample_size)
+    preview_payload = await eda_service.preview_source(normalized_id, sample_size=request.sample_size)
 
     if not preview_payload.get("success"):
         detail = preview_payload.get("error") or preview_payload.get("message") or "Unable to preview dataset"
@@ -4936,18 +4850,13 @@ async def get_skewness_recommendations(
     graph_edges: List[Dict[str, Any]] = []
     graph_execution_order: List[str] = []
     graph_selected_methods: Dict[str, str] = {}
-    normalized_target_node = target_node_id.strip() if isinstance(target_node_id, str) and target_node_id.strip() else None
-    if graph:
-        try:
-            graph_payload = json.loads(graph)
-        except (TypeError, ValueError):  # pragma: no cover - bad payload
-            raise HTTPException(status_code=400, detail="graph must be valid JSON")
-
-        if not isinstance(graph_payload, dict):  # pragma: no cover - invalid type
+    normalized_target_node = request.target_node_id.strip() if isinstance(request.target_node_id, str) and request.target_node_id.strip() else None
+    if request.graph:
+        if not isinstance(request.graph, dict):  # pragma: no cover - invalid type
             raise HTTPException(status_code=400, detail="graph payload must be a JSON object")
 
-        graph_node_map = _sanitize_graph_nodes(graph_payload.get("nodes"))
-        graph_edges = _sanitize_graph_edges(graph_payload.get("edges"))
+        graph_node_map = _sanitize_graph_nodes(request.graph.get("nodes"))
+        graph_edges = _sanitize_graph_edges(request.graph.get("edges"))
     if graph_node_map or graph_edges or normalized_target_node:
         graph_node_map = _ensure_dataset_node(graph_node_map)
         graph_execution_order = _execution_order(graph_node_map, graph_edges, normalized_target_node)
@@ -4971,9 +4880,9 @@ async def get_skewness_recommendations(
         )
 
     selected_methods: Dict[str, str] = {}
-    if transformations:
+    if request.transformations:
         try:
-            payload = json.loads(transformations)
+            payload = json.loads(request.transformations)
         except (TypeError, ValueError):  # pragma: no cover - bad payload
             raise HTTPException(status_code=400, detail="transformations must be valid JSON")
 
@@ -4998,7 +4907,7 @@ async def get_skewness_recommendations(
 
     return SkewnessRecommendationsResponse(
         dataset_source_id=normalized_id,
-        sample_size=sample_size,
+        sample_size=request.sample_size,
         skewness_threshold=SKEWNESS_THRESHOLD,
         methods=_skewness_method_details(),
         columns=recommendations,
@@ -5046,7 +4955,16 @@ async def get_binned_distribution(
     if graph:
         try:
             graph_payload = json.loads(graph)
-        except (TypeError, ValueError):  # pragma: no cover - bad payload
+        except (TypeError, ValueError) as e:  # pragma: no cover - bad payload
+            logger.error(
+                f"Failed to parse graph JSON in binned-distribution endpoint: {e}",
+                extra={
+                    "endpoint": "/api/analytics/binned-distribution",
+                    "graph_type": type(graph).__name__,
+                    "graph_length": len(graph),
+                    "graph_preview": graph[:200] if graph else None,
+                },
+            )
             raise HTTPException(status_code=400, detail="graph must be valid JSON")
 
         if not isinstance(graph_payload, dict):  # pragma: no cover - invalid type
@@ -5171,7 +5089,16 @@ async def get_quick_profile(
     if graph:
         try:
             graph_payload = json.loads(graph)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as e:
+            logger.error(
+                f"Failed to parse graph JSON in quick-profile endpoint: {e}",
+                extra={
+                    "endpoint": "/api/analytics/quick-profile",
+                    "graph_type": type(graph).__name__,
+                    "graph_length": len(graph),
+                    "graph_preview": graph[:200] if graph else None,
+                },
+            )
             raise HTTPException(status_code=400, detail="graph must be valid JSON")
 
         if not isinstance(graph_payload, dict):

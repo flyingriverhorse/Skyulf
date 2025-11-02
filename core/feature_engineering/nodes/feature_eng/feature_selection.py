@@ -65,6 +65,45 @@ except Exception:  # pragma: no cover - defensive guard
 
 logger = logging.getLogger(__name__)
 
+
+def _check_f_classif_zero_variance(X: np.ndarray, y: np.ndarray) -> Tuple[bool, List[int]]:
+    """
+    Check if any features have zero within-class variance, which causes
+    divide-by-zero warnings in f_classif.
+    
+    Returns:
+        (has_zero_variance, problematic_feature_indices)
+    """
+    if X.shape[0] == 0 or X.shape[1] == 0:
+        return False, []
+    
+    problematic_features = []
+    unique_classes = np.unique(y)
+    
+    if len(unique_classes) < 2:
+        return False, []
+    
+    for feature_idx in range(X.shape[1]):
+        feature_values = X[:, feature_idx]
+        
+        # Check variance within each class
+        has_zero_var_in_class = False
+        for class_label in unique_classes:
+            class_mask = (y == class_label)
+            class_values = feature_values[class_mask]
+            
+            if len(class_values) > 0:
+                # Check if all values are identical (zero variance)
+                if np.var(class_values) == 0.0:
+                    has_zero_var_in_class = True
+                    break
+        
+        if has_zero_var_in_class:
+            problematic_features.append(feature_idx)
+    
+    return len(problematic_features) > 0, problematic_features
+
+
 TRANSFORMER_NAME = "feature_selection"
 SUPPORTED_METHODS: Tuple[str, ...] = (
     "select_k_best",
@@ -589,6 +628,26 @@ def apply_feature_selection(
 
         if train_rows > 0 and fit_rows > 0 and (y_train is None or len(y_train) > 0):
             try:
+                # Add safeguard for f_classif to prevent divide-by-zero warnings
+                if (
+                    y_train is not None 
+                    and config.method not in {"variance_threshold"}
+                    and score_name == "f_classif"
+                    and resolved_problem_type == "classification"
+                ):
+                    has_zero_var, problematic_indices = _check_f_classif_zero_variance(
+                        X_train.values, y_train.values
+                    )
+                    if has_zero_var:
+                        problematic_columns = [valid_columns[i] for i in problematic_indices if i < len(valid_columns)]
+                        warning_msg = (
+                            f"Feature selection: {len(problematic_columns)} feature(s) have zero within-class variance "
+                            f"and may produce unreliable f_classif scores. "
+                            f"Consider removing constant features first."
+                        )
+                        logger.warning(warning_msg)
+                        signal.notes.append(warning_msg)
+                
                 if y_train is not None and config.method not in {"variance_threshold"}:
                     selector.fit(X_train.values, y_train.values)
                 else:
@@ -642,6 +701,26 @@ def apply_feature_selection(
             signal.notes.append(message)
             return frame, message, signal
         try:
+            # Add safeguard for f_classif to prevent divide-by-zero warnings
+            if (
+                y_fit is not None 
+                and config.method not in {"variance_threshold"}
+                and score_name == "f_classif"
+                and resolved_problem_type == "classification"
+            ):
+                has_zero_var, problematic_indices = _check_f_classif_zero_variance(
+                    X_fit.values, y_fit.values
+                )
+                if has_zero_var:
+                    problematic_columns = [valid_columns[i] for i in problematic_indices if i < len(valid_columns)]
+                    warning_msg = (
+                        f"Feature selection: {len(problematic_columns)} feature(s) have zero within-class variance "
+                        f"and may produce unreliable f_classif scores. "
+                        f"Consider removing constant features first."
+                    )
+                    logger.warning(warning_msg)
+                    signal.notes.append(warning_msg)
+            
             if y_fit is not None and config.method not in {"variance_threshold"}:
                 selector.fit(X_fit.values, y_fit.values)
             else:

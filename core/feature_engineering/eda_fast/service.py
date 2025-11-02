@@ -20,7 +20,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 from pandas.api import types as pd_types
-from pandas.errors import DtypeWarning
+from pandas.errors import DtypeWarning, ParserError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.data_ingestion.serialization import JSONSafeSerializer
@@ -439,7 +439,22 @@ class FeatureEngineeringEDAService:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DtypeWarning)
-            return pd.read_csv(handle, **read_kwargs)
+            try:
+                return pd.read_csv(handle, **read_kwargs)
+            except ParserError:
+                fallback_kwargs = dict(read_kwargs)
+                fallback_kwargs.pop("engine", None)
+                fallback_kwargs.setdefault("engine", "python")
+                fallback_kwargs.setdefault("on_bad_lines", "skip")
+
+                if hasattr(handle, "seek"):
+                    try:  # pragma: no cover - defensive reset for IO handles
+                        handle.seek(0)
+                    except (OSError, ValueError):
+                        pass
+
+                warnings.simplefilter("ignore", DtypeWarning)
+                return pd.read_csv(handle, **fallback_kwargs)
 
     def _estimate_total_rows(self, file_path: Path, frame: pd.DataFrame, sample_size: int) -> int:
         # If we already cached an explicit row count, reuse it.

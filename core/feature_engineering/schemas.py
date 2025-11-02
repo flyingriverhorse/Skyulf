@@ -1220,6 +1220,8 @@ class TargetEncodingNodeSignal(BaseModel):
     encode_missing: bool = False
     handle_unknown: Optional[str] = None
     global_mean: Optional[float] = None
+    encoded_columns: List[TargetEncodingAppliedColumnSignal] = Field(default_factory=list)
+    skipped_columns: List[str] = Field(default_factory=list)
 
 
 class FeatureSelectionFeatureSummary(BaseModel):

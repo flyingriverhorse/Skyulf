@@ -572,6 +572,13 @@ def apply_target_encoding(
                     "placeholder": placeholder_token if effective_encode_missing else None,
                     "global_mean": float(effective_global_mean),
                 }
+                # Build human-readable method label for transformer audit UI
+                method_parts = ["Target Encoding (smoothed mean"]
+                if effective_smoothing > 0.0:
+                    method_parts.append(f", smoothing={effective_smoothing:g}")
+                method_parts.append(")")
+                method_label = "".join(method_parts)
+
                 metadata: Dict[str, Any] = {
                     "encoded_column": encoded_column_name,
                     "replaced_original": replaced_original,
@@ -585,6 +592,7 @@ def apply_target_encoding(
                     "placeholder": placeholder_token if effective_encode_missing else None,
                     "target_column": config.target_column,
                     "train_rows": train_row_count,
+                    "method_label": method_label,
                 }
 
                 storage.store_transformer(
