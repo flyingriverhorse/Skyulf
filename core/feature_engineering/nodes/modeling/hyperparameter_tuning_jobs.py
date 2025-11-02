@@ -38,6 +38,7 @@ async def create_tuning_job(
     payload: HyperparameterTuningJobCreate,
     *,
     user_id: Optional[int] = None,
+    model_type_override: Optional[str] = None,
 ) -> HyperparameterTuningJob:
     """Persist a new hyperparameter tuning job request."""
 
@@ -56,6 +57,8 @@ async def create_tuning_job(
     if payload.target_node_id:
         job_metadata.setdefault("target_node_id", payload.target_node_id)
 
+    model_type_value = (model_type_override or payload.model_type).strip()
+
     job = HyperparameterTuningJob(
         id=job_id,
         dataset_source_id=payload.dataset_source_id,
@@ -64,7 +67,7 @@ async def create_tuning_job(
         user_id=user_id,
         status=HyperparameterTuningJobStatus.QUEUED.value,
         run_number=run_number,
-        model_type=payload.model_type,
+        model_type=model_type_value,
         search_strategy=payload.search_strategy,
         search_space=payload.search_space,
         baseline_hyperparameters=payload.baseline_hyperparameters or {},

@@ -41,6 +41,7 @@ async def create_training_job(
     payload: TrainingJobCreate,
     *,
     user_id: Optional[int] = None,
+    model_type_override: Optional[str] = None,
 ) -> TrainingJob:
     """Persist a new training job and compute its semantic version."""
 
@@ -59,6 +60,8 @@ async def create_training_job(
     if payload.target_node_id:
         job_metadata.setdefault("target_node_id", payload.target_node_id)
 
+    model_type_value = (model_type_override or payload.model_type).strip()
+
     job = TrainingJob(
         id=job_id,
         dataset_source_id=payload.dataset_source_id,
@@ -67,7 +70,7 @@ async def create_training_job(
         user_id=user_id,
         status=TrainingJobStatus.QUEUED.value,
         version=version,
-        model_type=payload.model_type,
+        model_type=model_type_value,
         hyperparameters=payload.hyperparameters or {},
         job_metadata=job_metadata,
         graph=payload.graph.model_dump(),

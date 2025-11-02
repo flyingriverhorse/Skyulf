@@ -84,7 +84,7 @@ async def main() -> None:
         dataset_source_id=DATASET_SOURCE_ID,
         pipeline_id=PIPELINE_ID,
         node_id=TRAINING_NODE_ID,
-        model_type="random_forest_classifier",
+        model_types=["random_forest_classifier"],
         hyperparameters={"n_estimators": 50},
         metadata={"initiated_by": "script"},
         run_training=True,

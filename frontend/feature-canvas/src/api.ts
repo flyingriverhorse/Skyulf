@@ -926,6 +926,11 @@ export type TrainingJobResponse = {
   target_node_id?: string | null;
 };
 
+export type TrainingJobBatchResponse = {
+  jobs: TrainingJobResponse[];
+  total?: number;
+};
+
 export type TrainingJobSummary = {
   id: string;
   dataset_source_id: string;
@@ -1020,7 +1025,8 @@ export type TrainingJobCreatePayload = {
   dataset_source_id: string;
   pipeline_id: string;
   node_id: string;
-  model_type: string;
+  model_type?: string;
+  model_types?: string[];
   hyperparameters?: Record<string, any> | null;
   metadata?: Record<string, any> | null;
   job_metadata?: Record<string, any> | null;
@@ -1062,6 +1068,11 @@ export type HyperparameterTuningJobResponse = {
   target_node_id?: string | null;
 };
 
+export type HyperparameterTuningJobBatchResponse = {
+  jobs: HyperparameterTuningJobResponse[];
+  total?: number;
+};
+
 export type HyperparameterTuningJobSummary = {
   id: string;
   dataset_source_id: string;
@@ -1089,7 +1100,8 @@ export type HyperparameterTuningJobCreatePayload = {
   dataset_source_id: string;
   pipeline_id: string;
   node_id: string;
-  model_type: string;
+  model_type?: string;
+  model_types?: string[];
   search_strategy: 'grid' | 'random';
   search_space: Record<string, any>;
   baseline_hyperparameters?: Record<string, any> | null;
@@ -1947,7 +1959,7 @@ export async function generatePipelineId(
 
 export async function createTrainingJob(
   payload: TrainingJobCreatePayload
-): Promise<TrainingJobResponse> {
+): Promise<TrainingJobBatchResponse> {
   const response = await fetch('/ml-workflow/api/training-jobs', {
     method: 'POST',
     headers: {
@@ -1965,7 +1977,19 @@ export async function createTrainingJob(
     throw new Error(detail || 'Failed to enqueue training job');
   }
 
-  return response.json();
+  const data = await response.json();
+
+  if (data && Array.isArray(data?.jobs)) {
+    const jobs: TrainingJobResponse[] = data.jobs;
+    const total = typeof data.total === 'number' ? data.total : jobs.length;
+    return { jobs, total };
+  }
+
+  if (data && data.id) {
+    return { jobs: [data as TrainingJobResponse], total: 1 };
+  }
+
+  return { jobs: [], total: 0 };
 }
 
 export async function fetchTrainingJob(jobId: string): Promise<TrainingJobResponse> {
@@ -2069,7 +2093,7 @@ export async function evaluateTrainingJob(
 
 export async function createHyperparameterTuningJob(
   payload: HyperparameterTuningJobCreatePayload
-): Promise<HyperparameterTuningJobResponse> {
+): Promise<HyperparameterTuningJobBatchResponse> {
   const response = await fetch('/ml-workflow/api/hyperparameter-tuning-jobs', {
     method: 'POST',
     headers: {
@@ -2087,7 +2111,19 @@ export async function createHyperparameterTuningJob(
     throw new Error(detail || 'Failed to enqueue tuning job');
   }
 
-  return response.json();
+  const data = await response.json();
+
+  if (data && Array.isArray(data?.jobs)) {
+    const jobs: HyperparameterTuningJobResponse[] = data.jobs;
+    const total = typeof data.total === 'number' ? data.total : jobs.length;
+    return { jobs, total };
+  }
+
+  if (data && data.id) {
+    return { jobs: [data as HyperparameterTuningJobResponse], total: 1 };
+  }
+
+  return { jobs: [], total: 0 };
 }
 
 export async function fetchHyperparameterTuningJob(

@@ -224,6 +224,7 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 	const [pipelineId, setPipelineId] = useState<string | null>(null);
 	const [pipelineError, setPipelineError] = useState<string | null>(null);
 	const [lastCreatedJob, setLastCreatedJob] = useState<TrainingJobResponse | null>(null);
+	const [lastCreatedJobCount, setLastCreatedJobCount] = useState<number>(0);
 	const [hyperparamValues, setHyperparamValues] = useState<Record<string, any>>({});
 	const [showAdvanced, setShowAdvanced] = useState(false);
 	const advancedInitializedRef = useRef(false);
@@ -561,8 +562,11 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 		error: createJobError,
 	} = useMutation({
 		mutationFn: createTrainingJob,
-		onSuccess: (job) => {
-			setLastCreatedJob(job);
+		onSuccess: (result) => {
+			const jobCount = Array.isArray(result.jobs) ? result.jobs.length : 0;
+			const firstJob = jobCount > 0 ? result.jobs[0] : null;
+			setLastCreatedJob(firstJob);
+			setLastCreatedJobCount(jobCount);
 			queryClient.invalidateQueries({ queryKey: trainingJobsQueryKey });
 		},
 	});
@@ -916,11 +920,14 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 			});
 		}
 
+		const requestedModelTypes = modelType ? [modelType] : [];
+
 		const payload = {
 			dataset_source_id: sourceId,
 			pipeline_id: pipelineId,
 			node_id: nodeId,
-			model_type: modelType,
+			model_type: modelType || undefined,
+			model_types: requestedModelTypes.length ? requestedModelTypes : undefined,
 			hyperparameters:
 				showAdvanced && sanitizedHyperparameters ? cloneJson(sanitizedHyperparameters) : undefined,
 			metadata: metadataPayload,
@@ -1058,7 +1065,15 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 
 			{lastCreatedJob && (
 				<p className="canvas-modal__note canvas-modal__note--info">
-					Training job {lastCreatedJob.id} queued (version {lastCreatedJob.version}).
+					{lastCreatedJobCount > 1 ? (
+						<span>
+							Queued {lastCreatedJobCount} training jobs. Latest job {lastCreatedJob.id} (version {lastCreatedJob.version}).
+						</span>
+					) : (
+						<span>
+							Training job {lastCreatedJob.id} queued (version {lastCreatedJob.version}).
+						</span>
+					)}
 				</p>
 			)}
 			{isTuningJobsLoading && (

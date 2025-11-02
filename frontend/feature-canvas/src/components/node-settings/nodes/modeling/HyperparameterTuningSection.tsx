@@ -475,6 +475,7 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
   const [pipelineId, setPipelineId] = useState<string | null>(null);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [lastCreatedJob, setLastCreatedJob] = useState<HyperparameterTuningJobResponse | null>(null);
+  const [lastCreatedJobCount, setLastCreatedJobCount] = useState<number>(0);
   const [pipelineIdFromSavedConfig, setPipelineIdFromSavedConfig] = useState<string | null>(null);
   const [hasDraftChanges, setHasDraftChanges] = useState(false);
 
@@ -1252,8 +1253,11 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
     error: createJobError,
   } = useMutation({
     mutationFn: createHyperparameterTuningJob,
-    onSuccess: (job) => {
-      setLastCreatedJob(job);
+    onSuccess: (result) => {
+      const jobCount = Array.isArray(result.jobs) ? result.jobs.length : 0;
+      const firstJob = jobCount > 0 ? result.jobs[0] : null;
+      setLastCreatedJob(firstJob);
+      setLastCreatedJobCount(jobCount);
       queryClient.invalidateQueries({ queryKey: tuningJobsQueryKey });
     },
   });
@@ -1426,11 +1430,14 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
       : {};
     const filteredSearchSpacePayload = cloneJson(filteredSearchOverrides);
 
+    const requestedModelTypes = modelType ? [modelType] : [];
+
     const payload = {
       dataset_source_id: sourceId,
       pipeline_id: pipelineId,
       node_id: nodeId,
-      model_type: modelType,
+      model_type: modelType || undefined,
+      model_types: requestedModelTypes.length ? requestedModelTypes : undefined,
       search_strategy: searchStrategy,
       search_space: filteredSearchSpacePayload,
       baseline_hyperparameters: filteredBaselinePayload,
@@ -1589,7 +1596,15 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
 
       {lastCreatedJob && (
         <p className="canvas-modal__note canvas-modal__note--info">
-          Tuning job {lastCreatedJob.id} queued (run {lastCreatedJob.run_number}).
+          {lastCreatedJobCount > 1 ? (
+            <span>
+              Queued {lastCreatedJobCount} tuning jobs. Latest job {lastCreatedJob.id} (run {lastCreatedJob.run_number}).
+            </span>
+          ) : (
+            <span>
+              Tuning job {lastCreatedJob.id} queued (run {lastCreatedJob.run_number}).
+            </span>
+          )}
         </p>
       )}
 

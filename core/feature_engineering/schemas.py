@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Literal, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
-from pydantic import AliasChoices, BaseModel, Field, computed_field
+from pydantic import AliasChoices, BaseModel, Field, computed_field, model_validator
 
 
 class DropColumnCandidate(BaseModel):
@@ -1601,17 +1601,68 @@ class TrainingJobStatus(str, Enum):
 
 
 class TrainingJobCreate(BaseModel):
-    """Payload used when enqueueing a new model training job."""
+    """Payload used when enqueueing one or more model training jobs."""
 
     dataset_source_id: str
     pipeline_id: str
     node_id: str
-    model_type: str
+    model_types: List[str] = Field(default_factory=list)
     hyperparameters: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = Field(default=None, validation_alias="job_metadata")
     run_training: bool = True
     graph: FeatureGraph
     target_node_id: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_model_types(cls, data: Any) -> Any:
+        """Allow legacy payloads that submit `model_type` as a scalar."""
+
+        if not isinstance(data, dict):
+            return data
+
+        existing = data.get("model_types")
+        if existing is not None:
+            if isinstance(existing, list):
+                return data
+            data["model_types"] = [existing]
+            return data
+
+        single = data.get("model_type")
+        if single is None:
+            return data
+
+        if isinstance(single, list):
+            data["model_types"] = single
+        else:
+            data["model_types"] = [single]
+
+        return data
+
+    @model_validator(mode="after")
+    def _ensure_model_types(self) -> "TrainingJobCreate":
+        normalized: List[str] = []
+        seen: set[str] = set()
+        for entry in self.model_types:
+            if entry is None:
+                continue
+            candidate = str(entry).strip()
+            if candidate and candidate not in seen:
+                normalized.append(candidate)
+                seen.add(candidate)
+
+        if not normalized:
+            raise ValueError("Training job payload requires at least one model type")
+
+        object.__setattr__(self, "model_types", normalized)
+        return self
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def model_type(self) -> str:
+        """Return the primary model type for backward compatibility."""
+
+        return self.model_types[0]
 
 
 class TrainingJobResponse(BaseModel):
@@ -1691,6 +1742,17 @@ class TrainingJobListResponse(BaseModel):
     total: int = 0
 
 
+class TrainingJobBatchResponse(BaseModel):
+    """Response payload when multiple training jobs are created at once."""
+
+    jobs: List[TrainingJobResponse] = Field(default_factory=list)
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def total(self) -> int:
+        return len(self.jobs)
+
+
 class HyperparameterTuningJobStatus(str, Enum):
     """Lifecycle states for hyperparameter tuning jobs."""
 
@@ -1702,12 +1764,12 @@ class HyperparameterTuningJobStatus(str, Enum):
 
 
 class HyperparameterTuningJobCreate(BaseModel):
-    """Payload used when enqueueing a new hyperparameter tuning job."""
+    """Payload used when enqueueing one or more hyperparameter tuning jobs."""
 
     dataset_source_id: str
     pipeline_id: str
     node_id: str
-    model_type: str
+    model_types: List[str] = Field(default_factory=list)
     search_strategy: Literal["grid", "random"] = "random"
     search_space: Dict[str, Any]
     n_iterations: Optional[int] = Field(default=None, validation_alias=AliasChoices("n_iterations", "n_iter"))
@@ -1719,6 +1781,53 @@ class HyperparameterTuningJobCreate(BaseModel):
     run_tuning: bool = True
     graph: FeatureGraph
     target_node_id: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_model_types(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        existing = data.get("model_types")
+        if existing is not None:
+            if isinstance(existing, list):
+                return data
+            data["model_types"] = [existing]
+            return data
+
+        single = data.get("model_type")
+        if single is None:
+            return data
+
+        if isinstance(single, list):
+            data["model_types"] = single
+        else:
+            data["model_types"] = [single]
+
+        return data
+
+    @model_validator(mode="after")
+    def _ensure_model_types(self) -> "HyperparameterTuningJobCreate":
+        normalized: List[str] = []
+        seen: set[str] = set()
+        for entry in self.model_types:
+            if entry is None:
+                continue
+            candidate = str(entry).strip()
+            if candidate and candidate not in seen:
+                normalized.append(candidate)
+                seen.add(candidate)
+
+        if not normalized:
+            raise ValueError("Hyperparameter tuning payload requires at least one model type")
+
+        object.__setattr__(self, "model_types", normalized)
+        return self
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def model_type(self) -> str:
+        return self.model_types[0]
 
 
 class HyperparameterTuningJobResponse(BaseModel):
@@ -1802,6 +1911,17 @@ class HyperparameterTuningJobListResponse(BaseModel):
 
     jobs: List[HyperparameterTuningJobSummary] = Field(default_factory=list)
     total: int = 0
+
+
+class HyperparameterTuningJobBatchResponse(BaseModel):
+    """Response payload when multiple tuning jobs are created."""
+
+    jobs: List[HyperparameterTuningJobResponse] = Field(default_factory=list)
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def total(self) -> int:
+        return len(self.jobs)
 
 
 class PipelinePreviewColumnStat(BaseModel):

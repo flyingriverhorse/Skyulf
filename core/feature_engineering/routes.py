@@ -30,7 +30,7 @@ from core.auth.models import User
 from core.data_ingestion.serialization import JSONSafeSerializer
 import core.database.engine as db_engine
 from core.database.engine import get_async_session
-from core.database.models import DataSource, FeatureEngineeringPipeline, HyperparameterTuningJob
+from core.database.models import DataSource, FeatureEngineeringPipeline, HyperparameterTuningJob, TrainingJob
 from core.feature_engineering.eda_fast import FeatureEngineeringEDAService
 from core.feature_engineering.eda_fast.service import DEFAULT_SAMPLE_CAP
 from core.feature_engineering.full_capture import FullDatasetCaptureService
@@ -208,11 +208,13 @@ from .schemas import (
     ModelEvaluationReport,
     ModelEvaluationRequest,
     TrainingJobCreate,
+    TrainingJobBatchResponse,
     TrainingJobListResponse,
     TrainingJobResponse,
     TrainingJobStatus,
     TrainingJobSummary,
     HyperparameterTuningJobCreate,
+    HyperparameterTuningJobBatchResponse,
     HyperparameterTuningJobListResponse,
     HyperparameterTuningJobResponse,
     HyperparameterTuningJobStatus,
@@ -5561,40 +5563,48 @@ async def upsert_pipeline(
 
 @router.post(
     "/api/training-jobs",
-    response_model=TrainingJobResponse,
+    response_model=TrainingJobBatchResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def enqueue_training_job(
     payload: TrainingJobCreate,
     session: AsyncSession = Depends(get_async_session),
-) -> TrainingJobResponse:
-    """Create a background training job and optionally dispatch it to Celery (no authentication required)."""
+) -> TrainingJobBatchResponse:
+    """Create one or more background training jobs and optionally dispatch them to Celery."""
+
+    created_jobs: List[TrainingJob] = []
 
     try:
-        job = await create_training_job_record(
-            session,
-            payload,
-            user_id=None,  # No user tracking required
-        )
+        for model_type in payload.model_types:
+            scoped_payload = payload.model_copy(update={"model_types": [model_type]})
+            job = await create_training_job_record(
+                session,
+                scoped_payload,
+                user_id=None,
+                model_type_override=model_type,
+            )
+            created_jobs.append(job)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     if payload.run_training:
-        try:
-            dispatch_training_job(job.id)
-        except Exception as exc:  # pragma: no cover - Celery connection issues
-            await update_job_status(
-                session,
-                job,
-                status=TrainingJobStatus.FAILED,
-                error_message="Failed to enqueue training job",
-            )
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Failed to enqueue training job",
-            ) from exc
+        for job in created_jobs:
+            try:
+                dispatch_training_job(job.id)
+            except Exception as exc:  # pragma: no cover - Celery connection issues
+                await update_job_status(
+                    session,
+                    job,
+                    status=TrainingJobStatus.FAILED,
+                    error_message="Failed to enqueue training job",
+                )
+                raise HTTPException(
+                    status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Failed to enqueue training job",
+                ) from exc
 
-    return TrainingJobResponse.model_validate(job, from_attributes=True)
+    job_payloads = [TrainingJobResponse.model_validate(job, from_attributes=True) for job in created_jobs]
+    return TrainingJobBatchResponse(jobs=job_payloads)
 
 
 @router.get(
@@ -5832,40 +5842,50 @@ async def evaluate_trained_model(
 
 @router.post(
     "/api/hyperparameter-tuning-jobs",
-    response_model=HyperparameterTuningJobResponse,
+    response_model=HyperparameterTuningJobBatchResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def enqueue_hyperparameter_tuning_job(
     payload: HyperparameterTuningJobCreate,
     session: AsyncSession = Depends(get_async_session),
-) -> HyperparameterTuningJobResponse:
-    """Create a new hyperparameter tuning job and optionally dispatch it to Celery."""
+
+) -> HyperparameterTuningJobBatchResponse:
+    """Create one or more hyperparameter tuning jobs and optionally dispatch them."""
+    created_jobs: List[HyperparameterTuningJob] = []
 
     try:
-        job = await create_hyperparameter_tuning_job_record(
-            session,
-            payload,
-            user_id=None,
-        )
+        for model_type in payload.model_types:
+            scoped_payload = payload.model_copy(update={"model_types": [model_type]})
+            job = await create_hyperparameter_tuning_job_record(
+                session,
+                scoped_payload,
+                user_id=None,
+                model_type_override=model_type,
+            )
+            created_jobs.append(job)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     if payload.run_tuning:
-        try:
-            dispatch_hyperparameter_tuning_job(job.id)
-        except Exception as exc:  # pragma: no cover - Celery connection issues
-            await update_tuning_job_status(
-                session,
-                job,
-                status=HyperparameterTuningJobStatus.FAILED,
-                error_message="Failed to enqueue tuning job",
-            )
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Failed to enqueue tuning job",
-            ) from exc
+        for job in created_jobs:
+            try:
+                dispatch_hyperparameter_tuning_job(job.id)
+            except Exception as exc:  # pragma: no cover - Celery connection issues
+                await update_tuning_job_status(
+                    session,
+                    job,
+                    status=HyperparameterTuningJobStatus.FAILED,
+                    error_message="Failed to enqueue tuning job",
+                )
+                raise HTTPException(
+                    status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Failed to enqueue tuning job",
+                ) from exc
 
-    return HyperparameterTuningJobResponse.model_validate(job, from_attributes=True)
+    job_payloads = [
+        HyperparameterTuningJobResponse.model_validate(job, from_attributes=True) for job in created_jobs
+    ]
+    return HyperparameterTuningJobBatchResponse(jobs=job_payloads)
 
 
 @router.get(
