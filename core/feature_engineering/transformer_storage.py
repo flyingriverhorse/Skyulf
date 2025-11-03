@@ -10,6 +10,7 @@ Storage is in-memory for now, but can be extended to Redis or database later.
 from __future__ import annotations
 
 import logging
+import warnings
 from copy import deepcopy
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -37,6 +38,15 @@ def _sanitize_for_storage(value: Any) -> Any:
     return value
 
 
+DEPRECATION_MESSAGE = (
+    "TransformerStorage is deprecated. Use SklearnPipelineStore from "
+    "core.feature_engineering.sklearn_pipeline_store instead."
+)
+
+
+_DEPRECATION_EMITTED = False
+
+
 class TransformerStorage:
     """In-memory storage for fitted transformers.
     
@@ -45,6 +55,15 @@ class TransformerStorage:
     """
     
     def __init__(self):
+        global _DEPRECATION_EMITTED
+        if not _DEPRECATION_EMITTED:
+            warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
+            logger.warning(
+                "TransformerStorage is deprecated and will be removed in a future release. "
+                "Switch to core.feature_engineering.sklearn_pipeline_store.",
+            )
+            _DEPRECATION_EMITTED = True
+
         self._storage: Dict[str, Dict[str, Any]] = {}
         # Store metadata about when transformers were created
         self._metadata: Dict[str, Dict[str, Any]] = {}
@@ -349,14 +368,14 @@ class TransformerStorage:
         return f"{pipeline_id}:{node_id}:{transformer_name}"
 
 
-# Global singleton instance
-_transformer_storage = TransformerStorage()
+# Global singleton instance (deprecated)
+_transformer_storage: Optional[TransformerStorage] = None
 
 
 def get_transformer_storage() -> TransformerStorage:
-    """Get the global transformer storage instance.
-    
-    Returns:
-        TransformerStorage singleton
-    """
+    """Get the global transformer storage instance (deprecated)."""
+
+    global _transformer_storage
+    if _transformer_storage is None:
+        _transformer_storage = TransformerStorage()
     return _transformer_storage

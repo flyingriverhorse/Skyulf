@@ -14,7 +14,7 @@ from core.feature_engineering.schemas import (
     FeatureSelectionFeatureSummary,
     FeatureSelectionNodeSignal,
 )
-from core.feature_engineering.transformer_storage import get_transformer_storage
+from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
 
 from .utils import (
     _auto_detect_numeric_columns,
@@ -597,7 +597,7 @@ def apply_feature_selection(
     feature_summaries: List[FeatureSelectionFeatureSummary] = []
 
     if pipeline_id and has_splits:
-        storage = get_transformer_storage()
+        storage = get_pipeline_store()
         split_counts = working_frame[SPLIT_TYPE_COLUMN].value_counts().to_dict()
         train_mask = working_frame[SPLIT_TYPE_COLUMN] == "train"
         train_rows = int(split_counts.get("train", 0))

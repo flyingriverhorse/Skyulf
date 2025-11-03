@@ -11,6 +11,9 @@ build/
 venv/
 ENV/
 
+#docs
+docs
+
 # Pytest
 .pytest_cache/
 

@@ -18,7 +18,7 @@ from core.feature_engineering.schemas import (
     TransformerAuditNodeSignal,
     TransformerSplitActivitySignal,
 )
-from core.feature_engineering.transformer_storage import get_transformer_storage
+from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
 
 logger = logging.getLogger(__name__)
 
@@ -116,14 +116,17 @@ def apply_transformer_audit(
         )
         return frame, "Transformer audit: pipeline context unavailable", signal
 
-    storage = get_transformer_storage()
-    stats = storage.get_stats()
-    
-    records = storage.list_transformers(pipeline_id=pipeline_id)
+    pipeline_store = get_pipeline_store()
+
+    pipeline_stats = pipeline_store.get_stats()
+
+    records = pipeline_store.list_pipelines(pipeline_id=pipeline_id)
     if not records:
         signal.notes.append("No stored transformers detected for this pipeline.")
-        signal.notes.append(f"Total transformers in storage: {stats.get('total_transformers', 0)}")
-        if stats.get('storage_keys'):
+        signal.notes.append(
+            f"Pipeline store entries total: {pipeline_stats.get('total_transformers', 0)}"
+        )
+        if pipeline_stats.get('storage_keys'):
             signal.notes.append("No transformer activity recorded yet. Run a preview after executing split-aware transformation nodes.")
         return frame, "Transformer audit: no transformers recorded", signal
 

@@ -21,7 +21,7 @@ from core.feature_engineering.schemas import (
 )
 
 from .utils import _coerce_config_boolean, _format_interval_value
-from core.feature_engineering.transformer_storage import get_transformer_storage
+from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
 
 # Import split detection constant
 SPLIT_TYPE_COLUMN = "__split_type__"
@@ -455,7 +455,7 @@ def _apply_binning_discretization(
 
         # Store binning metadata for transformer audit (even for pandas-based methods)
         if pipeline_id and node_id and has_splits:
-            storage = get_transformer_storage()
+            storage = get_pipeline_store()
             
             # Determine method label
             if config.strategy == "equal_width":
@@ -849,7 +849,7 @@ def _apply_kbins_discretizer(
             
             # Store transformer if we have pipeline_id and node_id
             if pipeline_id and node_id and has_splits:
-                storage = get_transformer_storage()
+                storage = get_pipeline_store()
                 
                 train_rows = int(train_mask.sum()) if train_mask is not None else 0
                 test_rows = int(test_mask.sum()) if test_mask is not None else 0

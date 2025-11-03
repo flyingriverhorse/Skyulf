@@ -15,7 +15,7 @@ from core.feature_engineering.schemas import (
     PolynomialFeaturesNodeSignal,
     PolynomialGeneratedFeature,
 )
-from core.feature_engineering.transformer_storage import get_transformer_storage
+from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
 
 from .utils import (
     _auto_detect_numeric_columns,
@@ -322,7 +322,7 @@ def apply_polynomial_features(
         signal.filled_columns = filled_columns
 
     has_splits = SPLIT_TYPE_COLUMN in working_frame.columns
-    storage = get_transformer_storage() if pipeline_id and has_splits else None
+    storage = get_pipeline_store() if pipeline_id and has_splits else None
     split_counts: Dict[str, int] = {}
 
     transformer: Optional[PolynomialFeatures] = None

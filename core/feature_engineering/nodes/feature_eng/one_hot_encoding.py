@@ -163,7 +163,7 @@ def apply_one_hot_encoding(
     Returns:
         Tuple of (transformed_frame, summary_message, signal_metadata)
     """
-    from core.feature_engineering.transformer_storage import get_transformer_storage
+    from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
     from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
     
     node_id = node.get("id") if isinstance(node, dict) else None
@@ -236,7 +236,7 @@ def apply_one_hot_encoding(
     # Get transformer storage if we have pipeline_id
     storage = None
     if pipeline_id and has_splits:
-        storage = get_transformer_storage()
+        storage = get_pipeline_store()
         logger.debug("One-hot encoding using transformer storage", extra={"node_id": node_id})
 
     working_frame = frame.copy()

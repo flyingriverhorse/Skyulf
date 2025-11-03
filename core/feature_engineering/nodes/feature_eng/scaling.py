@@ -26,7 +26,7 @@ except Exception:  # pragma: no cover - defensive guard
     MaxAbsScaler = None  # type: ignore[assignment]
     RobustScaler = None  # type: ignore[assignment]
 
-from core.feature_engineering.transformer_storage import get_transformer_storage
+from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
 from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
 
 from .binning import _detect_numeric_columns, _is_binary_numeric
@@ -391,7 +391,7 @@ def _apply_scale_numeric_features(
 
     # Check if we have split column for train/test/validation awareness
     has_splits = SPLIT_TYPE_COLUMN in working_frame.columns
-    storage = get_transformer_storage() if pipeline_id and has_splits else None
+    storage = get_pipeline_store() if pipeline_id and has_splits else None
 
     split_counts: Dict[str, int] = {}
     train_mask: Optional[pd.Series] = None

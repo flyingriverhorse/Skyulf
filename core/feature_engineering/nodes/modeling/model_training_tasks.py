@@ -46,7 +46,7 @@ from config import get_settings
 from core.database.engine import create_tables, init_db
 from core.database.models import get_database_session
 from core.feature_engineering.schemas import TrainingJobStatus
-from core.feature_engineering.transformer_storage import get_transformer_storage
+from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
 import json
 
 from .dataset_split import SPLIT_TYPE_COLUMN
@@ -860,7 +860,7 @@ def _train_and_save_model(
 
     transformers: List[Dict[str, Any]] = []
     if pipeline_id:
-        storage = get_transformer_storage()
+        storage = get_pipeline_store()
         records = storage.list_transformers(pipeline_id=pipeline_id)
         for record in records:
             node_id_value = record.get("node_id")
