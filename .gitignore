@@ -12,7 +12,7 @@ venv/
 ENV/
 
 #docs
-docs
+.docs
 
 # Pytest
 .pytest_cache/
