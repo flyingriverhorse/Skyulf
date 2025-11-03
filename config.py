@@ -11,14 +11,20 @@ import secrets
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from logging.handlers import RotatingFileHandler
+from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def setup_universal_logging(
-    log_file: str = "logs/fastapi_app.log", log_level: str = "INFO"
+    log_file: str = "logs/fastapi_app.log",
+    log_level: str = "INFO",
+    rotation_type: str = "size",
+    rotation_when: str | None = None,
+    rotation_interval: int = 1,
+    max_bytes: int = 50 * 1024 * 1024,
+    backup_count: int = 10,
 ) -> None:
     """
     Universal logging setup for FastAPI applications.
@@ -40,14 +46,26 @@ def setup_universal_logging(
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
 
-    # Enhanced file handler with better error handling and larger rotation
+    # Choose a file handler based on rotation_type (size or time)
     try:
-        file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=50 * 1024 * 1024,  # Increased to 50MB for modern applications
-            backupCount=10,  # Keep more backup files
-            encoding="utf-8",
-        )
+        if rotation_type and rotation_type.lower() in ("time", "timed"):
+            # Use TimedRotatingFileHandler for time-based rotation
+            when = rotation_when or "midnight"
+            file_handler = TimedRotatingFileHandler(
+                filename=log_file,
+                when=when,
+                interval=rotation_interval,
+                backupCount=backup_count,
+                encoding="utf-8",
+            )
+        else:
+            # Default to size-based rotation
+            file_handler = RotatingFileHandler(
+                log_file,
+                maxBytes=max_bytes,
+                backupCount=backup_count,
+                encoding="utf-8",
+            )
         file_handler.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
         # Enhanced formatter with more context for debugging
@@ -432,6 +450,13 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s [%(filename)s:%(lineno)d in %(funcName)s()]"
     LOG_MAX_SIZE: int = 50 * 1024 * 1024  # 50MB
     LOG_BACKUP_COUNT: int = 10
+    # Rotation strategy: 'size' (default) or 'time'
+    LOG_ROTATION_TYPE: str = "size"
+    # When using time-based rotation, this controls the 'when' argument
+    # Accepts values like 'midnight', 'D', 'H', 'M', 'S', or 'W0'-'W6'
+    LOG_ROTATION_WHEN: Optional[str] = "midnight"
+    # Interval for time-based rotation (e.g., 1 day when when='midnight')
+    LOG_ROTATION_INTERVAL: int = 1
     
     # === CACHE CONFIGURATION ===
     CACHE_TYPE: str = "filesystem"  # Good for ML model caching

@@ -16,21 +16,22 @@ current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir.parent))
 
 # Import after path setup
-from config import get_settings
+from config import get_settings, setup_universal_logging
 from main import app
 
 
 def setup_logging():
     """Setup logging configuration."""
     settings = get_settings()
-    
-    logging.basicConfig(
-        level=getattr(logging, settings.LOG_LEVEL),
-        format=settings.LOG_FORMAT,
-        handlers=[
-            logging.StreamHandler(),  # Console output
-            logging.FileHandler(settings.LOG_FILE) if settings.LOG_FILE else logging.NullHandler()
-        ]
+    # Use the unified logging setup which supports time-based rotation
+    setup_universal_logging(
+        log_file=settings.LOG_FILE,
+        log_level=settings.LOG_LEVEL,
+        rotation_type=settings.LOG_ROTATION_TYPE,
+        rotation_when=settings.LOG_ROTATION_WHEN,
+        rotation_interval=settings.LOG_ROTATION_INTERVAL,
+        max_bytes=settings.LOG_MAX_SIZE,
+        backup_count=settings.LOG_BACKUP_COUNT,
     )
 
 
