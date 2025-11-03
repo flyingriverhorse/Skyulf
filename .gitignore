@@ -11,8 +11,11 @@ build/
 venv/
 ENV/
 
-#docs
-.docs
+# docs
+docs/
+
+#DB
+mlops_database.db
 
 # Pytest
 .pytest_cache/
