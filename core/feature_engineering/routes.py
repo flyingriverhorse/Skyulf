@@ -118,6 +118,10 @@ from .nodes.feature_eng.ordinal_encoding import (
     ORDINAL_ENCODING_DEFAULT_UNKNOWN_VALUE,
     apply_ordinal_encoding,
 )
+from .nodes.modeling.hyperparameter_tuning_registry import (
+    get_default_strategy_value,
+    get_strategy_choices_for_ui,
+)
 from .nodes.feature_eng.target_encoding import (
     TARGET_ENCODING_DEFAULT_MAX_CATEGORIES,
     TARGET_ENCODING_DEFAULT_SUFFIX,
@@ -3389,6 +3393,9 @@ async def get_node_catalog() -> List[FeatureNodeCatalogEntry]:
             },
         }
 
+        tuning_strategy_choices = get_strategy_choices_for_ui()
+        tuning_strategy_default = get_default_strategy_value()
+
         tuning_default_search_space = {
             "C": [0.1, 1.0, 10.0],
             "solver": ["lbfgs", "saga"],
@@ -3440,13 +3447,10 @@ async def get_node_catalog() -> List[FeatureNodeCatalogEntry]:
                 {
                     "name": "search_strategy",
                     "label": "Search strategy",
-                    "description": "Use grid search to exhaustively explore candidates or random search to sample.",
+                    "description": "Choose how to explore the search space. Available strategies are configured in application settings.",
                     "type": "select",
-                    "default": "random",
-                    "options": [
-                        {"value": "random", "label": "Random search"},
-                        {"value": "grid", "label": "Grid search"},
-                    ],
+                    "default": tuning_strategy_default,
+                    "options": tuning_strategy_choices,
                 },
                 {
                     "name": "search_space",
@@ -3458,7 +3462,7 @@ async def get_node_catalog() -> List[FeatureNodeCatalogEntry]:
                 {
                     "name": "search_iterations",
                     "label": "Max iterations",
-                    "description": "Maximum sampled combinations when random search is enabled (ignored for grid).",
+                    "description": "Maximum sampled combinations when random or Optuna search is enabled (ignored for grid and halving).",
                     "type": "number",
                     "default": 20,
                     "min": 1.0,
@@ -3468,7 +3472,7 @@ async def get_node_catalog() -> List[FeatureNodeCatalogEntry]:
                 {
                     "name": "search_random_state",
                     "label": "Random state",
-                    "description": "Optional seed controlling candidate sampling order for random search.",
+                    "description": "Optional seed controlling candidate sampling order for random/Optuna search.",
                     "type": "number",
                     "default": 42,
                     "min": 0.0,
@@ -3532,7 +3536,7 @@ async def get_node_catalog() -> List[FeatureNodeCatalogEntry]:
                 "problem_type": "classification",
                 "model_type": default_model_type,
                 "baseline_hyperparameters": default_hyperparameters_text,
-                "search_strategy": "random",
+                "search_strategy": tuning_strategy_default,
                 "search_space": default_search_space_text,
                 "search_iterations": 20,
                 "search_random_state": 42,

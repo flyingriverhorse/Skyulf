@@ -1147,13 +1147,22 @@ async def _run_training_workflow(job_id: str) -> None:
             if dataset_meta:
                 metadata_update["dataset"] = dataset_meta
 
-            await update_job_status(
+            job = await update_job_status(
                 session,
                 job,
                 status=TrainingJobStatus.SUCCEEDED,
                 metrics=metrics,
                 artifact_uri=artifact_uri,
                 metadata=metadata_update,
+            )
+
+            logger.info(
+                "Training job %s succeeded (model=%s, version=%s, pipeline=%s, node=%s)",
+                job.id,
+                model_type,
+                job.version,
+                job.pipeline_id,
+                job.node_id,
             )
         except Exception as exc:  # pragma: no cover - defensive guard for worker runtime
             logger.exception("Training job %s failed", job_id)

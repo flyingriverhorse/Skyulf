@@ -421,6 +421,7 @@ const RESETTABLE_NODE_TYPES = new Set([
   'train_test_split',
   'train_model_draft',
   'model_evaluation',
+  'hyperparameter_tuning',
 ]);
 
 const AUTO_CONFIRMED_NODE_TYPES = new Set(['transformer_audit']);

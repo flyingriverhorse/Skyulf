@@ -6,7 +6,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from pydantic import AliasChoices, BaseModel, Field, computed_field, model_validator
+from pydantic import AliasChoices, BaseModel, Field, computed_field, field_validator, model_validator
+
+from core.feature_engineering.nodes.modeling.hyperparameter_tuning_registry import (
+    get_default_strategy_value,
+    normalize_strategy_value,
+)
 
 
 class DropColumnCandidate(BaseModel):
@@ -1770,7 +1775,7 @@ class HyperparameterTuningJobCreate(BaseModel):
     pipeline_id: str
     node_id: str
     model_types: List[str] = Field(default_factory=list)
-    search_strategy: Literal["grid", "random"] = "random"
+    search_strategy: str = Field(default_factory=get_default_strategy_value)
     search_space: Dict[str, Any]
     n_iterations: Optional[int] = Field(default=None, validation_alias=AliasChoices("n_iterations", "n_iter"))
     scoring: Optional[str] = None
@@ -1829,6 +1834,11 @@ class HyperparameterTuningJobCreate(BaseModel):
     def model_type(self) -> str:
         return self.model_types[0]
 
+    @field_validator("search_strategy", mode="before")
+    @classmethod
+    def _normalize_search_strategy(cls, value: Any) -> str:
+        return normalize_strategy_value(value)
+
 
 class HyperparameterTuningJobResponse(BaseModel):
     """Detailed representation of a hyperparameter tuning job."""
@@ -1841,7 +1851,7 @@ class HyperparameterTuningJobResponse(BaseModel):
     status: HyperparameterTuningJobStatus
     run_number: int
     model_type: str
-    search_strategy: Literal["grid", "random"]
+    search_strategy: str
     search_space: Optional[Dict[str, Any]] = None
     baseline_hyperparameters: Optional[Dict[str, Any]] = None
     n_iterations: Optional[int] = None
@@ -1876,6 +1886,11 @@ class HyperparameterTuningJobResponse(BaseModel):
         metadata = self.metadata or {}
         return metadata.get("target_node_id")
 
+    @field_validator("search_strategy", mode="before")
+    @classmethod
+    def _normalize_search_strategy(cls, value: Any) -> str:
+        return normalize_strategy_value(value)
+
 
 class HyperparameterTuningJobSummary(BaseModel):
     """Compact representation of tuning jobs for listings."""
@@ -1887,7 +1902,7 @@ class HyperparameterTuningJobSummary(BaseModel):
     status: HyperparameterTuningJobStatus
     run_number: int
     model_type: str
-    search_strategy: Literal["grid", "random"]
+    search_strategy: str
     metadata: Optional[Dict[str, Any]] = Field(
         default=None,
         alias="job_metadata",
@@ -1904,6 +1919,11 @@ class HyperparameterTuningJobSummary(BaseModel):
         "populate_by_name": True,
         "from_attributes": True,
     }
+
+    @field_validator("search_strategy", mode="before")
+    @classmethod
+    def _normalize_search_strategy(cls, value: Any) -> str:
+        return normalize_strategy_value(value)
 
 
 class HyperparameterTuningJobListResponse(BaseModel):

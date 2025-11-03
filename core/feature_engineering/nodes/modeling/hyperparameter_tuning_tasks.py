@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 from dataclasses import dataclass
@@ -11,12 +12,14 @@ from typing import Any, Dict, List, Optional
 
 import joblib
 import numpy as np
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+from sklearn.experimental import enable_halving_search_cv  # noqa: F401
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, HalvingGridSearchCV, HalvingRandomSearchCV
 
 from config import get_settings
 from core.database.models import get_database_session
 
 from .hyperparameter_tuning_jobs import get_tuning_job, update_tuning_job_status
+from .hyperparameter_tuning_registry import get_default_strategy_value, resolve_strategy_selection
 from .model_training_registry import get_model_spec
 from .model_training_tasks import (
     CrossValidationConfig,
@@ -32,6 +35,39 @@ from .model_training_tasks import (
 from core.feature_engineering.schemas import HyperparameterTuningJobStatus
 from .model_hyperparameters import get_hyperparameters_for_model
 
+try:  # optuna support is optional for early-stopping strategies
+    from optuna.distributions import CategoricalDistribution
+    from optuna.samplers import TPESampler
+
+    _HAS_OPTUNA = True
+except ImportError:  # pragma: no cover - optional dependency safeguard
+    CategoricalDistribution = None  # type: ignore[assignment]
+    TPESampler = None  # type: ignore[assignment]
+    _HAS_OPTUNA = False
+
+OptunaSearchCV = None  # type: ignore[assignment]
+
+if _HAS_OPTUNA:
+    try:
+        from optuna.integration import OptunaSearchCV as _OptunaSearchCV  # type: ignore[attr-defined]
+
+        OptunaSearchCV = _OptunaSearchCV
+    except ImportError:  # pragma: no cover - optuna>=3.4 fallback
+        try:
+            from optuna.integration.sklearn import OptunaSearchCV as _OptunaSearchCV  # type: ignore[attr-defined]
+
+            OptunaSearchCV = _OptunaSearchCV
+        except ImportError:  # pragma: no cover - optuna>=4 fallback
+            try:
+                from optuna_integration.sklearn import OptunaSearchCV as _OptunaSearchCV  # type: ignore[attr-defined]
+
+                OptunaSearchCV = _OptunaSearchCV
+            except ImportError:  # pragma: no cover - integration package missing
+                OptunaSearchCV = None  # type: ignore[assignment]
+
+    if OptunaSearchCV is None:
+        _HAS_OPTUNA = False
+
 logger = logging.getLogger(__name__)
 
 _settings = get_settings()
@@ -40,6 +76,7 @@ _settings = get_settings()
 @dataclass(frozen=True)
 class SearchConfiguration:
     strategy: str
+    selected_strategy: str
     search_space: Dict[str, List[Any]]
     n_iterations: Optional[int]
     scoring: Optional[str]
@@ -188,11 +225,106 @@ def _coerce_cross_validation_config(raw: Any) -> CrossValidationConfig:
         return _parse_cross_validation_config(raw)
     return _parse_cross_validation_config({})
 
+def _sanitize_logistic_regression_hyperparameters(
+    base_params: Dict[str, Any], search_space: Dict[str, List[Any]]
+) -> None:
+    safe_solvers = ("lbfgs", "saga")
+    safe_penalties = ("l2", "none")
+
+    def _normalize_value(value: Any, safe_values: tuple[str, ...], fallback: str) -> str:
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in safe_values:
+                return lowered
+        return fallback
+
+    def _sanitize_candidates(candidates: List[Any], safe_values: tuple[str, ...], fallback: str) -> List[str]:
+        sanitized: List[str] = []
+        for candidate in candidates:
+            if not isinstance(candidate, str):
+                continue
+            lowered = candidate.strip().lower()
+            if lowered in safe_values and lowered not in sanitized:
+                sanitized.append(lowered)
+        if not sanitized:
+            sanitized = [fallback]
+        return sanitized
+
+    fallback_solver = safe_solvers[0]
+    fallback_penalty = safe_penalties[0]
+
+    normalized_solver = _normalize_value(base_params.get("solver"), safe_solvers, fallback_solver)
+    normalized_penalty = _normalize_value(base_params.get("penalty"), safe_penalties, fallback_penalty)
+
+    base_params["solver"] = normalized_solver
+    base_params["penalty"] = normalized_penalty
+    base_params.pop("l1_ratio", None)
+
+    if "solver" in search_space:
+        search_space["solver"] = _sanitize_candidates(search_space["solver"], safe_solvers, normalized_solver)
+    if "penalty" in search_space:
+        search_space["penalty"] = _sanitize_candidates(search_space["penalty"], safe_penalties, normalized_penalty)
+
+    # Elastic net combinations require l1_ratio. Remove unsupported parameters to avoid estimator failures.
+    search_space.pop("l1_ratio", None)
+
+def _build_optuna_distributions(search_space: Dict[str, List[Any]]) -> Dict[str, Any]:
+    if not _HAS_OPTUNA or CategoricalDistribution is None:
+        raise RuntimeError("Optuna is not installed. Install the optional dependency to use the optuna search strategy.")
+
+    distributions: Dict[str, Any] = {}
+    for key, candidates in search_space.items():
+        if not candidates:
+            continue
+
+        unique_values: List[Any] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            marker = repr(candidate)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            unique_values.append(candidate)
+
+        if not unique_values:
+            continue
+
+        distributions[key] = CategoricalDistribution(unique_values)
+
+    if not distributions:
+        raise ValueError("Search space is empty after filtering unsupported hyperparameters for the optuna strategy.")
+
+    return distributions
+
+
+def _create_optuna_searcher(optuna_kwargs: Dict[str, Any], search_config: SearchConfiguration):
+    if not _HAS_OPTUNA or OptunaSearchCV is None:  # pragma: no cover - guarded by caller
+        raise RuntimeError(
+            "Optuna strategy requested but Optuna's sklearn integration is unavailable. Install 'optuna' together with 'optuna-integration' and restart the worker."
+        )
+
+    kwargs: Dict[str, Any] = dict(optuna_kwargs)
+    sampler_added = False
+
+    if TPESampler is not None and _optuna_accepts_sampler():
+        kwargs["sampler"] = TPESampler(
+            seed=search_config.random_state if search_config.random_state is not None else None
+        )
+        sampler_added = True
+
+    try:
+        return OptunaSearchCV(**kwargs)
+    except TypeError as exc:
+        if sampler_added and "sampler" in str(exc):
+            logger.debug("OptunaSearchCV rejected 'sampler'; retrying without sampler. Error: %s", exc)
+            kwargs.pop("sampler", None)
+            return OptunaSearchCV(**kwargs)
+        raise
+
 
 def _build_search_configuration(job, node_config: Dict[str, Any]) -> SearchConfiguration:
-    strategy = str(job.search_strategy or node_config.get("search_strategy", "random")).strip().lower()
-    if strategy not in {"grid", "random"}:
-        strategy = "random"
+    raw_strategy = job.search_strategy or node_config.get("search_strategy") or get_default_strategy_value()
+    selected_strategy, strategy_impl = resolve_strategy_selection(raw_strategy)
 
     search_space_source = job.search_space or node_config.get("search_space") or {}
     search_space = _coerce_search_space(search_space_source)
@@ -221,19 +353,46 @@ def _build_search_configuration(job, node_config: Dict[str, Any]) -> SearchConfi
         elif isinstance(raw_iterations, str) and raw_iterations.strip().isdigit():
             n_iterations = int(raw_iterations.strip())
 
+    if strategy_impl == "halving":
+        n_iterations = None
+
     cross_validation = job.cross_validation or node_config
     cv_config = _coerce_cross_validation_config(cross_validation)
     if not cv_config.enabled:
         cv_config = CrossValidationConfig(True, "auto", max(cv_config.folds, 3), cv_config.shuffle, cv_config.random_state, cv_config.refit_strategy)
 
     return SearchConfiguration(
-        strategy=strategy,
+        strategy=strategy_impl,
+        selected_strategy=selected_strategy,
         search_space=search_space,
         n_iterations=n_iterations,
         scoring=scoring,
         random_state=random_state,
         cross_validation=cv_config,
     )
+
+
+_OPTUNA_ACCEPTS_SAMPLER: Optional[bool] = None
+
+
+def _optuna_accepts_sampler() -> bool:
+    global _OPTUNA_ACCEPTS_SAMPLER
+
+    if _OPTUNA_ACCEPTS_SAMPLER is not None:
+        return _OPTUNA_ACCEPTS_SAMPLER
+
+    if not _HAS_OPTUNA or OptunaSearchCV is None:
+        _OPTUNA_ACCEPTS_SAMPLER = False
+        return False
+
+    try:
+        signature = inspect.signature(OptunaSearchCV.__init__)  # type: ignore[attr-defined]
+    except (TypeError, ValueError):  # pragma: no cover - dynamic loading edge cases
+        _OPTUNA_ACCEPTS_SAMPLER = False
+        return False
+
+    _OPTUNA_ACCEPTS_SAMPLER = "sampler" in signature.parameters
+    return _OPTUNA_ACCEPTS_SAMPLER
 
 
 def _summarize_results(cv_results_: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
@@ -344,7 +503,30 @@ async def _run_hyperparameter_tuning_workflow(job_id: str) -> None:
                     "Search space is empty after filtering unsupported hyperparameters for this estimator."
                 )
 
-            splitter = _build_cv_splitter(resolved_problem_type, search_config.cross_validation, y_train)
+            if spec.key == "logistic_regression":
+                _sanitize_logistic_regression_hyperparameters(base_params, filtered_search_space)
+
+            # Build CV splitter - halving strategies require fixed random_state for consistent folds
+            cv_config = search_config.cross_validation
+            if search_config.strategy in ("halving", "halving_random"):
+                # Force random_state for halving strategies to ensure consistent folds
+                if cv_config.shuffle and cv_config.random_state is None:
+                    # Create a new config with a fixed random_state while preserving refit strategy
+                    forced_random_state = (
+                        search_config.random_state
+                        if search_config.random_state is not None
+                        else 42
+                    )
+                    cv_config = CrossValidationConfig(
+                        enabled=cv_config.enabled,
+                        strategy=cv_config.strategy,
+                        folds=cv_config.folds,
+                        shuffle=cv_config.shuffle,
+                        random_state=forced_random_state,
+                        refit_strategy=cv_config.refit_strategy,
+                    )
+            
+            splitter = _build_cv_splitter(resolved_problem_type, cv_config, y_train)
 
             estimator = spec.factory(**base_params)
             search_kwargs = {
@@ -358,6 +540,46 @@ async def _run_hyperparameter_tuning_workflow(job_id: str) -> None:
 
             if search_config.strategy == "grid":
                 searcher = GridSearchCV(param_grid=filtered_search_space, **search_kwargs)
+            elif search_config.strategy == "halving":
+                searcher = HalvingGridSearchCV(
+                    param_grid=filtered_search_space,
+                    resource="n_samples",
+                    **search_kwargs,
+                )
+            elif search_config.strategy == "halving_random":
+                halving_random_kwargs: Dict[str, Any] = {
+                    **search_kwargs,
+                    "param_distributions": filtered_search_space,
+                    "random_state": search_config.random_state,
+                }
+                if search_config.n_iterations is not None and search_config.n_iterations > 0:
+                    halving_random_kwargs["n_candidates"] = int(max(1, search_config.n_iterations))
+                searcher = HalvingRandomSearchCV(**halving_random_kwargs)
+            elif search_config.strategy == "optuna":
+                if not _HAS_OPTUNA or OptunaSearchCV is None:
+                    raise RuntimeError(
+                        "Optuna strategy requested but Optuna's sklearn integration is unavailable. Install 'optuna' together with 'optuna-integration' and restart the worker."
+                    )
+
+                optuna_distributions = _build_optuna_distributions(filtered_search_space)
+                iterations = search_config.n_iterations
+                if iterations is None or iterations <= 0:
+                    iterations = min(30, max(len(optuna_distributions), 1) * 10)
+
+                optuna_kwargs: Dict[str, Any] = {
+                    "estimator": estimator,
+                    "param_distributions": optuna_distributions,
+                    "n_trials": int(iterations),
+                    "cv": splitter,
+                    "scoring": search_config.scoring,
+                    "refit": True,
+                    "return_train_score": True,
+                    "n_jobs": 1,
+                }
+                if search_config.random_state is not None:
+                    optuna_kwargs["random_state"] = search_config.random_state
+
+                searcher = _create_optuna_searcher(optuna_kwargs, search_config)
             else:
                 iterations = search_config.n_iterations
                 if iterations is None or iterations <= 0:
@@ -377,6 +599,7 @@ async def _run_hyperparameter_tuning_workflow(job_id: str) -> None:
             metrics: Dict[str, Any] = {
                 "search": {
                     "strategy": search_config.strategy,
+                    "selected_strategy": search_config.selected_strategy,
                     "scoring": search_config.scoring or "default",
                     "n_candidates": len(searcher.cv_results_.get("params", [])),
                     "best_index": int(searcher.best_index_),
@@ -393,6 +616,16 @@ async def _run_hyperparameter_tuning_workflow(job_id: str) -> None:
                     "random_state": search_config.cross_validation.random_state,
                 },
             }
+
+            if search_config.strategy in {"halving", "halving_random"}:
+                if hasattr(searcher, "n_resources_"):
+                    metrics["search"]["n_resources_per_step"] = [int(value) for value in getattr(searcher, "n_resources_", [])]
+                if hasattr(searcher, "n_candidates_"):
+                    metrics["search"]["n_candidates_per_step"] = [int(value) for value in getattr(searcher, "n_candidates_", [])]
+
+            if search_config.strategy == "optuna":
+                if hasattr(searcher, "n_trials_"):
+                    metrics["search"]["n_trials"] = int(getattr(searcher, "n_trials_", 0))
 
             X_train_array = X_train.to_numpy(dtype=np.float64)
             if resolved_problem_type == "classification":

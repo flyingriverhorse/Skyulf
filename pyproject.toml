@@ -53,5 +53,7 @@ dependencies = [
     "xgboost>=2.1.4",
     "rapidfuzz>=3.6.1",
     "cookiecutter>=2.6.0",
+    "optuna>=4.0,<5",
+    "optuna-integration>=4.0,<5",
 ]
 

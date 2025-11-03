@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   FeatureGraph,
   FeatureNodeParameter,
   FeatureNodeParameterOption,
+  HyperparameterTuningJobCreatePayload,
   HyperparameterTuningJobListResponse,
   HyperparameterTuningJobResponse,
   HyperparameterTuningJobSummary,
@@ -18,6 +19,7 @@ import {
   type FetchHyperparameterTuningJobsOptions,
 } from '../../../../api';
 import { formatRelativeTime } from '../../utils/formatters';
+import { stableStringify } from '../../utils/configParsers';
 import type { TrainModelDraftConfig } from './TrainModelDraftSection';
 import type { TrainModelCVConfig } from '../../hooks/useModelingConfiguration';
 
@@ -27,6 +29,42 @@ const STATUS_LABEL: Record<string, string> = {
   succeeded: 'Succeeded',
   failed: 'Failed',
   cancelled: 'Cancelled',
+};
+
+const TUNING_STRATEGIES_KEY = '__tuning_strategies';
+const TUNING_ACTIVE_ID_KEY = '__active_tuning_strategy_id';
+const TUNING_EXPANDED_KEY = '__expanded_tuning_strategy_ids';
+
+const SEARCH_STRATEGY_FALLBACKS = ['random', 'grid', 'halving', 'optuna'];
+
+type SearchStrategy = string;
+
+const normalizeSearchStrategyValue = (
+  value: unknown,
+  knownValues?: readonly string[],
+): SearchStrategy | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed.length) {
+    return null;
+  }
+  const lowered = trimmed.toLowerCase();
+
+  if (knownValues && knownValues.length > 0) {
+    const match = knownValues.find((candidate) => candidate.toLowerCase() === lowered);
+    if (match) {
+      return match;
+    }
+  }
+
+  const fallbackMatch = SEARCH_STRATEGY_FALLBACKS.find((candidate) => candidate.toLowerCase() === lowered);
+  if (fallbackMatch) {
+    return fallbackMatch;
+  }
+
+  return trimmed;
 };
 
 type HyperparameterTuningSectionProps = {
@@ -356,6 +394,19 @@ const buildDefaultSearchSpace = (
 ): Record<string, any[]> => {
   const space: Record<string, any[]> = {};
 
+  const solverField = fields.find((field) => field?.name === 'solver');
+  const penaltyField = fields.find((field) => field?.name === 'penalty');
+  const isLogisticRegressionConfig = Boolean(
+    solverField &&
+      penaltyField &&
+      Array.isArray(solverField.options) &&
+      solverField.options.some((option) => option?.value === 'liblinear') &&
+      Array.isArray(penaltyField.options) &&
+      penaltyField.options.some((option) => option?.value === 'elasticnet'),
+  );
+  const logisticSafeSolvers = new Set(['lbfgs', 'saga']);
+  const logisticSafePenalties = new Set(['l2', 'none']);
+
   fields.forEach((field) => {
     if (!field?.name) {
       return;
@@ -377,7 +428,33 @@ const buildDefaultSearchSpace = (
 
     const defaultValue = defaults?.[field.name];
 
-    if (field.type === 'number') {
+    if (isLogisticRegressionConfig && field.name === 'solver') {
+      const options = Array.isArray(field.options) ? field.options : [];
+      options.forEach((option) => {
+        if (option?.value && logisticSafeSolvers.has(String(option.value))) {
+          addCandidate(option.value);
+        }
+      });
+      if (!candidateMap.size && typeof defaultValue === 'string' && logisticSafeSolvers.has(defaultValue)) {
+        addCandidate(defaultValue);
+      }
+      if (!candidateMap.size) {
+        logisticSafeSolvers.forEach((solver) => addCandidate(solver));
+      }
+    } else if (isLogisticRegressionConfig && field.name === 'penalty') {
+      const options = Array.isArray(field.options) ? field.options : [];
+      options.forEach((option) => {
+        if (option?.value && logisticSafePenalties.has(String(option.value))) {
+          addCandidate(option.value);
+        }
+      });
+      if (!candidateMap.size && typeof defaultValue === 'string' && logisticSafePenalties.has(defaultValue)) {
+        addCandidate(defaultValue);
+      }
+      if (!candidateMap.size) {
+        logisticSafePenalties.forEach((penalty) => addCandidate(penalty));
+      }
+    } else if (field.type === 'number') {
       const numericDefault = toFiniteNumber(defaultValue);
       const numericMin = toFiniteNumber(field.min);
       const numericMax = toFiniteNumber(field.max);
@@ -453,6 +530,267 @@ const SCORING_SUGGESTIONS: Record<'classification' | 'regression', Array<{ value
   ],
 };
 
+type TuningStrategyDraft = {
+  id: string;
+  label: string;
+  config: Record<string, any>;
+  searchSpaceTexts: Record<string, string>;
+  searchSpaceFieldErrors: Record<string, string | null>;
+  hasAutoFilledSearchSpace: boolean;
+  searchSpaceManuallyCleared: boolean;
+};
+
+const createStrategyId = () => `strategy-${Math.random().toString(36).slice(2, 10)}`;
+
+const stripTuningMetadata = (config: Record<string, any> | null | undefined): Record<string, any> => {
+  if (!isRecord(config)) {
+    return {};
+  }
+  const cloned = cloneJson(config);
+  if (!isRecord(cloned)) {
+    return {};
+  }
+  delete cloned[TUNING_STRATEGIES_KEY];
+  delete cloned[TUNING_ACTIVE_ID_KEY];
+  delete cloned[TUNING_EXPANDED_KEY];
+  return cloned;
+};
+
+const cloneConfigForStrategy = (config: Record<string, any> | null | undefined): Record<string, any> => {
+  return stripTuningMetadata(config);
+};
+
+const createStrategyDraft = (
+  label: string,
+  config: Record<string, any> | null | undefined,
+  extras?: Partial<Omit<TuningStrategyDraft, 'id' | 'label' | 'config'>>,
+): TuningStrategyDraft => ({
+  id: createStrategyId(),
+  label,
+  config: cloneConfigForStrategy(config),
+  searchSpaceTexts: extras?.searchSpaceTexts ? { ...extras.searchSpaceTexts } : {},
+  searchSpaceFieldErrors: extras?.searchSpaceFieldErrors ? { ...extras.searchSpaceFieldErrors } : {},
+  hasAutoFilledSearchSpace: extras?.hasAutoFilledSearchSpace ?? false,
+  searchSpaceManuallyCleared: extras?.searchSpaceManuallyCleared ?? false,
+});
+
+const createStrategyLabel = (ordinal: number): string => `Strategy ${ordinal}`;
+
+type PersistedStrategyEntry = {
+  id: string;
+  label: string;
+  config: Record<string, any>;
+  searchSpaceTexts: Record<string, string>;
+  searchSpaceFieldErrors: Record<string, string | null>;
+  hasAutoFilledSearchSpace: boolean;
+  searchSpaceManuallyCleared: boolean;
+};
+
+type PersistedStrategyMetadata = {
+  strategies: PersistedStrategyEntry[];
+  activeId: string | null;
+  expandedIds: string[];
+};
+
+const sanitizeStringMap = (raw: unknown): Record<string, string> => {
+  if (!isRecord(raw)) {
+    return {};
+  }
+  return Object.keys(raw)
+    .filter((key) => typeof raw[key] === 'string')
+    .sort()
+    .reduce<Record<string, string>>((accumulator, key) => {
+      accumulator[key] = String(raw[key]);
+      return accumulator;
+    }, {});
+};
+
+const sanitizeNullableStringMap = (raw: unknown): Record<string, string | null> => {
+  if (!isRecord(raw)) {
+    return {};
+  }
+  return Object.keys(raw)
+    .filter((key) => raw[key] === null || typeof raw[key] === 'string')
+    .sort()
+    .reduce<Record<string, string | null>>((accumulator, key) => {
+      const value = raw[key];
+      accumulator[key] = value === null ? null : String(value);
+      return accumulator;
+    }, {});
+};
+
+const extractStoredStrategyMetadataFields = (config: Record<string, any> | null | undefined): Record<string, any> => {
+  if (!isRecord(config)) {
+    return {};
+  }
+    const metadata: Record<string, any> = {};
+  if (Object.prototype.hasOwnProperty.call(config, TUNING_STRATEGIES_KEY)) {
+    metadata[TUNING_STRATEGIES_KEY] = cloneJson(config[TUNING_STRATEGIES_KEY]);
+  }
+  if (Object.prototype.hasOwnProperty.call(config, TUNING_ACTIVE_ID_KEY)) {
+    metadata[TUNING_ACTIVE_ID_KEY] = config[TUNING_ACTIVE_ID_KEY];
+  }
+  if (Object.prototype.hasOwnProperty.call(config, TUNING_EXPANDED_KEY)) {
+    metadata[TUNING_EXPANDED_KEY] = cloneJson(config[TUNING_EXPANDED_KEY]);
+  }
+  return metadata;
+};
+
+const createEmptyPersistedMetadata = (): PersistedStrategyMetadata => ({
+  strategies: [],
+  activeId: null,
+  expandedIds: [],
+});
+
+const convertConfigToPersistedMetadata = (
+  config: Record<string, any> | null | undefined,
+): PersistedStrategyMetadata => {
+  const metadata = createEmptyPersistedMetadata();
+  if (!isRecord(config)) {
+    return metadata;
+  }
+
+  const rawStrategies = config[TUNING_STRATEGIES_KEY];
+  if (Array.isArray(rawStrategies)) {
+    const seenIds = new Set<string>();
+    rawStrategies.forEach((entry) => {
+      if (!isRecord(entry)) {
+        return;
+      }
+      let id = typeof entry.id === 'string' ? entry.id.trim() : '';
+      if (!id || seenIds.has(id)) {
+        id = createStrategyId();
+      }
+      seenIds.add(id);
+
+      const labelRaw = typeof entry.label === 'string' ? entry.label.trim() : '';
+      const label = labelRaw.length ? labelRaw : createStrategyLabel(metadata.strategies.length + 1);
+
+      const baseConfig = isRecord(entry.config) ? entry.config : {};
+      const strategyEntry: PersistedStrategyEntry = {
+        id,
+        label,
+        config: stripTuningMetadata(baseConfig),
+        searchSpaceTexts: sanitizeStringMap(entry.searchSpaceTexts),
+        searchSpaceFieldErrors: sanitizeNullableStringMap(entry.searchSpaceFieldErrors),
+        hasAutoFilledSearchSpace: Boolean(entry.hasAutoFilledSearchSpace),
+        searchSpaceManuallyCleared: Boolean(entry.searchSpaceManuallyCleared),
+      };
+      metadata.strategies.push(strategyEntry);
+    });
+  }
+
+  const availableIds = new Set(metadata.strategies.map((entry) => entry.id));
+
+  const rawActiveId = config[TUNING_ACTIVE_ID_KEY];
+  const candidateActiveId = typeof rawActiveId === 'string' ? rawActiveId.trim() : '';
+  metadata.activeId = candidateActiveId && availableIds.has(candidateActiveId)
+    ? candidateActiveId
+    : metadata.strategies[0]?.id ?? null;
+
+  const rawExpanded = config[TUNING_EXPANDED_KEY];
+  const expandedIds = Array.isArray(rawExpanded)
+    ? rawExpanded
+        .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+        .filter((entry): entry is string => Boolean(entry) && availableIds.has(entry))
+    : [];
+
+  if (metadata.activeId && !expandedIds.includes(metadata.activeId)) {
+    expandedIds.push(metadata.activeId);
+  }
+
+  metadata.expandedIds = Array.from(new Set(expandedIds)).sort();
+
+  return metadata;
+};
+
+const buildStrategyDraftFromPersisted = (entry: PersistedStrategyEntry): TuningStrategyDraft => ({
+  id: entry.id,
+  label: entry.label,
+  config: cloneConfigForStrategy(entry.config),
+  searchSpaceTexts: { ...entry.searchSpaceTexts },
+  searchSpaceFieldErrors: { ...entry.searchSpaceFieldErrors },
+  hasAutoFilledSearchSpace: entry.hasAutoFilledSearchSpace,
+  searchSpaceManuallyCleared: entry.searchSpaceManuallyCleared,
+});
+
+const convertDraftStateToPersistedMetadata = (
+  strategies: TuningStrategyDraft[],
+  activeStrategyId: string,
+  expandedStrategyIds: Set<string>,
+): PersistedStrategyMetadata => {
+  const persistedStrategies = strategies.map((strategy, index) => ({
+    id: typeof strategy.id === 'string' && strategy.id.trim().length ? strategy.id : createStrategyId(),
+    label:
+      typeof strategy.label === 'string' && strategy.label.trim().length
+        ? strategy.label
+        : createStrategyLabel(index + 1),
+    config: stripTuningMetadata(strategy.config),
+    searchSpaceTexts: sanitizeStringMap(strategy.searchSpaceTexts),
+    searchSpaceFieldErrors: sanitizeNullableStringMap(strategy.searchSpaceFieldErrors),
+    hasAutoFilledSearchSpace: Boolean(strategy.hasAutoFilledSearchSpace),
+    searchSpaceManuallyCleared: Boolean(strategy.searchSpaceManuallyCleared),
+  }));
+
+  const availableIds = new Set(persistedStrategies.map((entry) => entry.id));
+  const resolvedActiveId =
+    typeof activeStrategyId === 'string' && availableIds.has(activeStrategyId)
+      ? activeStrategyId
+      : persistedStrategies[0]?.id ?? null;
+
+  const expandedArray = Array.from(expandedStrategyIds ?? new Set<string>())
+    .filter((id) => availableIds.has(id));
+  if (resolvedActiveId && !expandedArray.includes(resolvedActiveId)) {
+    expandedArray.push(resolvedActiveId);
+  }
+
+  return {
+    strategies: persistedStrategies,
+    activeId: resolvedActiveId,
+    expandedIds: Array.from(new Set(expandedArray)).sort(),
+  };
+};
+
+const resolveActiveStrategyId = (
+  strategies: TuningStrategyDraft[],
+  requestedId: string | null,
+): string => {
+  if (requestedId && strategies.some((strategy) => strategy.id === requestedId)) {
+    return requestedId;
+  }
+  return strategies[0]?.id ?? '';
+};
+
+const resolveExpandedStrategyIds = (
+  strategies: TuningStrategyDraft[],
+  requestedIds: string[],
+): Set<string> => {
+  const available = new Set(strategies.map((strategy) => strategy.id));
+  const resolved = requestedIds.filter((id) => available.has(id));
+  if (!resolved.length && strategies[0]) {
+    resolved.push(strategies[0].id);
+  }
+  return new Set(resolved);
+};
+
+const buildMetadataSignature = (metadata: PersistedStrategyMetadata): string => {
+  return stableStringify(metadata);
+};
+
+const shallowEqualRecord = (a: Record<string, any>, b: Record<string, any>): boolean => {
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+  for (const key of keysA) {
+    if (a[key] !== b[key]) {
+      return false;
+    }
+  }
+  return true;
+};
+
 export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionProps> = ({
   nodeId,
   sourceId,
@@ -478,10 +816,19 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
   const [lastCreatedJobCount, setLastCreatedJobCount] = useState<number>(0);
   const [pipelineIdFromSavedConfig, setPipelineIdFromSavedConfig] = useState<string | null>(null);
   const [hasDraftChanges, setHasDraftChanges] = useState(false);
+  const [batchEnqueueError, setBatchEnqueueError] = useState<string | null>(null);
 
   const targetColumn = (config?.targetColumn ?? '').trim();
   const problemType = config?.problemType === 'regression' ? 'regression' : 'classification';
-  const modelType = (runtimeConfig?.modelType ?? '').trim();
+  const modelTypeParameterName = modelTypeParameter?.name ?? 'model_type';
+  const searchStrategyParameterName = searchStrategyParameter?.name ?? 'search_strategy';
+  const searchIterationsParameterName = searchIterationsParameter?.name ?? 'search_iterations';
+  const searchRandomStateParameterName = searchRandomStateParameter?.name ?? 'search_random_state';
+  const scoringMetricParameterName = scoringMetricParameter?.name ?? 'scoring_metric';
+  const selectedModelTypeRaw = draftConfigState?.[modelTypeParameterName];
+  const modelType = typeof selectedModelTypeRaw === 'string' && selectedModelTypeRaw.trim().length
+    ? selectedModelTypeRaw.trim()
+    : (runtimeConfig?.modelType ?? '').trim();
 
   const hyperparamQuery = useQuery<ModelHyperparametersResponse, Error>({
     queryKey: ['model-hyperparameters', modelType],
@@ -512,10 +859,46 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
   const cvShuffle = Boolean(cvConfig?.shuffle);
   const cvRandomState = cvConfig?.randomState ?? null;
 
-  const rawSearchStrategy = String(draftConfigState?.search_strategy ?? '').trim().toLowerCase();
-  const searchStrategy: 'grid' | 'random' = rawSearchStrategy === 'grid' ? 'grid' : 'random';
+  const searchStrategyOptions = useMemo<string[]>(() => {
+    const values: string[] = [];
+    (searchStrategyParameter?.options ?? []).forEach((option) => {
+      if (!option || typeof option.value !== 'string') {
+        return;
+      }
+      const trimmed = option.value.trim();
+      if (!trimmed.length) {
+        return;
+      }
+      const lowered = trimmed.toLowerCase();
+      if (!values.some((candidate) => candidate.toLowerCase() === lowered)) {
+        values.push(trimmed);
+      }
+    });
+    return values;
+  }, [searchStrategyParameter]);
 
-  const rawIterations = draftConfigState?.search_iterations;
+  const availableSearchStrategies = useMemo<SearchStrategy[]>(() => {
+    if (searchStrategyOptions.length > 0) {
+      return [...searchStrategyOptions];
+    }
+    return [...SEARCH_STRATEGY_FALLBACKS];
+  }, [searchStrategyOptions]);
+
+  const parameterDefaultStrategy = normalizeSearchStrategyValue(
+    searchStrategyParameter?.default,
+    searchStrategyOptions,
+  );
+  const draftSearchStrategy = normalizeSearchStrategyValue(
+    draftConfigState?.[searchStrategyParameterName],
+    searchStrategyOptions,
+  );
+  const searchStrategy: SearchStrategy =
+    draftSearchStrategy ??
+    parameterDefaultStrategy ??
+    availableSearchStrategies[0] ??
+    SEARCH_STRATEGY_FALLBACKS[0];
+
+  const rawIterations = draftConfigState?.[searchIterationsParameterName];
   let searchIterations: number | null = null;
   if (typeof rawIterations === 'number' && Number.isFinite(rawIterations)) {
     searchIterations = Math.max(1, Math.floor(rawIterations));
@@ -526,7 +909,7 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
     }
   }
 
-  const rawSearchRandomState = draftConfigState?.search_random_state;
+  const rawSearchRandomState = draftConfigState?.[searchRandomStateParameterName];
   let searchRandomState: number | null = null;
   if (typeof rawSearchRandomState === 'number' && Number.isFinite(rawSearchRandomState)) {
     searchRandomState = Math.trunc(rawSearchRandomState);
@@ -537,8 +920,18 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
     }
   }
 
-  const rawScoringMetric = typeof draftConfigState?.scoring_metric === 'string'
-    ? draftConfigState.scoring_metric.trim()
+  const searchIterationsDefault =
+    typeof searchIterationsParameter?.default === 'number' && Number.isFinite(searchIterationsParameter.default)
+      ? Math.max(1, Math.floor(searchIterationsParameter.default))
+      : null;
+
+  const searchRandomStateDefault =
+    typeof searchRandomStateParameter?.default === 'number' && Number.isFinite(searchRandomStateParameter.default)
+      ? Math.trunc(searchRandomStateParameter.default)
+      : null;
+
+  const rawScoringMetric = typeof draftConfigState?.[scoringMetricParameterName] === 'string'
+    ? String(draftConfigState[scoringMetricParameterName]).trim()
     : '';
   const scoringMetric = rawScoringMetric.length ? rawScoringMetric : null;
 
@@ -578,8 +971,448 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
   const [searchSpaceFieldErrors, setSearchSpaceFieldErrors] = useState<Record<string, string | null>>({});
   const [hasAutoFilledSearchSpace, setHasAutoFilledSearchSpace] = useState(false);
   const [searchSpaceManuallyCleared, setSearchSpaceManuallyCleared] = useState(false);
+  const initialMetadataRef = useRef<{
+    strategies: TuningStrategyDraft[];
+    activeId: string;
+    expanded: Set<string>;
+    signature: string;
+  } | null>(null);
+
+  if (!initialMetadataRef.current) {
+    const persistedMetadata = convertConfigToPersistedMetadata(draftConfigState);
+    const hasPersistedStrategies = persistedMetadata.strategies.length > 0;
+
+    const buildDefaultStrategyDrafts = (): TuningStrategyDraft[] => {
+      const baseConfigTemplate = cloneConfigForStrategy(draftConfigState);
+      const initialStrategyValue =
+        normalizeSearchStrategyValue(
+          baseConfigTemplate?.[searchStrategyParameterName],
+          availableSearchStrategies,
+        ) ?? searchStrategy;
+
+      const strategyOrder = Array.from(new Set<SearchStrategy>([initialStrategyValue, ...availableSearchStrategies]));
+
+      return strategyOrder.map((strategyValue, index) => {
+        const configCloneRaw = cloneJson(baseConfigTemplate);
+        const configClone: Record<string, any> = isRecord(configCloneRaw) ? configCloneRaw : {};
+        configClone[searchStrategyParameterName] = strategyValue;
+
+        if (strategyValue === 'random' || strategyValue === 'optuna') {
+          const iterationsValue = searchIterations !== null ? searchIterations : searchIterationsDefault;
+          if (iterationsValue !== null) {
+            configClone[searchIterationsParameterName] = iterationsValue;
+          } else {
+            delete configClone[searchIterationsParameterName];
+          }
+
+          const randomStateValue = searchRandomState !== null ? searchRandomState : searchRandomStateDefault;
+          if (randomStateValue !== null) {
+            configClone[searchRandomStateParameterName] = randomStateValue;
+          } else {
+            delete configClone[searchRandomStateParameterName];
+          }
+        } else {
+          delete configClone[searchIterationsParameterName];
+          delete configClone[searchRandomStateParameterName];
+        }
+
+        return createStrategyDraft(createStrategyLabel(index + 1), configClone, {
+          searchSpaceTexts: {},
+          searchSpaceFieldErrors: {},
+          hasAutoFilledSearchSpace: false,
+          searchSpaceManuallyCleared: false,
+        });
+      });
+    };
+
+    let initialStrategies = hasPersistedStrategies
+      ? persistedMetadata.strategies.map(buildStrategyDraftFromPersisted)
+      : buildDefaultStrategyDrafts();
+
+    if (!initialStrategies.length) {
+      initialStrategies = [createStrategyDraft(createStrategyLabel(1), draftConfigState)];
+    }
+
+    const resolvedActive = resolveActiveStrategyId(initialStrategies, persistedMetadata.activeId);
+    const resolvedExpanded = resolveExpandedStrategyIds(initialStrategies, persistedMetadata.expandedIds);
+    if (resolvedActive && !resolvedExpanded.has(resolvedActive) && initialStrategies.length) {
+      resolvedExpanded.add(resolvedActive);
+    }
+
+    const initialSignature = buildMetadataSignature(persistedMetadata);
+
+    initialMetadataRef.current = {
+      strategies: initialStrategies,
+      activeId: resolvedActive,
+      expanded: resolvedExpanded,
+      signature: initialSignature,
+    };
+  }
+
+  const [strategies, setStrategies] = useState<TuningStrategyDraft[]>(() =>
+    initialMetadataRef.current ? initialMetadataRef.current.strategies : [createStrategyDraft(createStrategyLabel(1), draftConfigState)],
+  );
+  const [expandedStrategyIds, setExpandedStrategyIds] = useState<Set<string>>(
+    () => new Set(initialMetadataRef.current ? Array.from(initialMetadataRef.current.expanded) : []),
+  );
+  const [activeStrategyId, setActiveStrategyId] = useState<string>(
+    () => initialMetadataRef.current?.activeId ?? (initialMetadataRef.current?.strategies[0]?.id ?? ''),
+  );
+  const persistedMetadataSignatureRef = useRef<string>(initialMetadataRef.current?.signature ?? '');
+  const lastAppliedStrategyRef = useRef<string | null>(null);
+  const lastModelTypeRef = useRef<string | null>(null);
+  const activeStrategy = useMemo(() => {
+    if (!strategies.length) {
+      return null;
+    }
+    const explicit = strategies.find((strategy) => strategy.id === activeStrategyId);
+    return explicit ?? strategies[0];
+  }, [activeStrategyId, strategies]);
+
+  const persistedMetadataFromConfig = useMemo(
+    () => convertConfigToPersistedMetadata(draftConfigState),
+    [draftConfigState],
+  );
+  const configMetadataSignature = useMemo(
+    () => buildMetadataSignature(persistedMetadataFromConfig),
+    [persistedMetadataFromConfig],
+  );
 
   useEffect(() => {
+    if (configMetadataSignature === persistedMetadataSignatureRef.current) {
+      return;
+    }
+
+    const nextStrategies = persistedMetadataFromConfig.strategies.length
+      ? persistedMetadataFromConfig.strategies.map(buildStrategyDraftFromPersisted)
+      : [createStrategyDraft(createStrategyLabel(1), draftConfigState)];
+    const nextActiveId = resolveActiveStrategyId(nextStrategies, persistedMetadataFromConfig.activeId);
+    const nextExpandedSet = resolveExpandedStrategyIds(nextStrategies, persistedMetadataFromConfig.expandedIds);
+    if (nextActiveId && !nextExpandedSet.has(nextActiveId) && nextStrategies.length) {
+      nextExpandedSet.add(nextActiveId);
+    }
+
+    lastAppliedStrategyRef.current = null;
+    setStrategies(nextStrategies);
+    setActiveStrategyId(nextActiveId);
+    setExpandedStrategyIds(nextExpandedSet);
+    persistedMetadataSignatureRef.current = configMetadataSignature;
+  }, [
+    configMetadataSignature,
+    persistedMetadataFromConfig,
+    draftConfigState,
+  ]);
+
+  useEffect(() => {
+    if (!strategies.length) {
+      return;
+    }
+    const hasActive = strategies.some((strategy) => strategy.id === activeStrategyId);
+    if (!hasActive) {
+      setActiveStrategyId(strategies[0].id);
+    }
+  }, [activeStrategyId, strategies]);
+
+  useEffect(() => {
+    const metadata = convertDraftStateToPersistedMetadata(strategies, activeStrategyId, expandedStrategyIds);
+    const nextSignature = buildMetadataSignature(metadata);
+    if (persistedMetadataSignatureRef.current === nextSignature) {
+      return;
+    }
+
+    setDraftConfigState((previous) => {
+      const previousMetadata = convertConfigToPersistedMetadata(previous);
+      const previousSignature = buildMetadataSignature(previousMetadata);
+      if (previousSignature === nextSignature) {
+        persistedMetadataSignatureRef.current = previousSignature;
+        return previous ?? {};
+      }
+
+      const nextState = previous ? { ...previous } : {};
+
+      if (metadata.strategies.length) {
+        nextState[TUNING_STRATEGIES_KEY] = metadata.strategies.map((entry) => ({
+          ...entry,
+          config: cloneJson(entry.config),
+          searchSpaceTexts: { ...entry.searchSpaceTexts },
+          searchSpaceFieldErrors: { ...entry.searchSpaceFieldErrors },
+        }));
+      } else {
+        delete nextState[TUNING_STRATEGIES_KEY];
+      }
+
+      if (metadata.activeId) {
+        nextState[TUNING_ACTIVE_ID_KEY] = metadata.activeId;
+      } else {
+        delete nextState[TUNING_ACTIVE_ID_KEY];
+      }
+
+      if (metadata.expandedIds.length) {
+        nextState[TUNING_EXPANDED_KEY] = [...metadata.expandedIds];
+      } else {
+        delete nextState[TUNING_EXPANDED_KEY];
+      }
+
+      persistedMetadataSignatureRef.current = nextSignature;
+      return nextState;
+    });
+  }, [activeStrategyId, expandedStrategyIds, setDraftConfigState, strategies]);
+
+  useEffect(() => {
+    if (!activeStrategy) {
+      return;
+    }
+    if (lastAppliedStrategyRef.current === activeStrategy.id) {
+      return;
+    }
+    lastAppliedStrategyRef.current = activeStrategy.id;
+    const nextConfig = cloneConfigForStrategy(activeStrategy.config);
+    setDraftConfigState((previous) => {
+      const preservedMetadata = extractStoredStrategyMetadataFields(previous);
+      return {
+        ...preservedMetadata,
+        ...nextConfig,
+      };
+    });
+    setSearchSpaceTexts(activeStrategy.searchSpaceTexts ?? {});
+    setSearchSpaceFieldErrors(activeStrategy.searchSpaceFieldErrors ?? {});
+    setHasAutoFilledSearchSpace(activeStrategy.hasAutoFilledSearchSpace ?? false);
+    setSearchSpaceManuallyCleared(activeStrategy.searchSpaceManuallyCleared ?? false);
+    const strategyModelType = typeof nextConfig?.[modelTypeParameterName] === 'string'
+      ? String(nextConfig[modelTypeParameterName])
+      : (runtimeConfig?.modelType ?? '');
+    lastModelTypeRef.current = strategyModelType;
+  }, [activeStrategy, modelTypeParameterName, runtimeConfig?.modelType, setDraftConfigState]);
+
+  useEffect(() => {
+    if (!activeStrategy) {
+      return;
+    }
+    const nextConfig = cloneConfigForStrategy(draftConfigState);
+    const configChanged = JSON.stringify(nextConfig) !== JSON.stringify(activeStrategy.config ?? {});
+    const textsChanged = !shallowEqualRecord(searchSpaceTexts, activeStrategy.searchSpaceTexts);
+    const errorsChanged = !shallowEqualRecord(searchSpaceFieldErrors, activeStrategy.searchSpaceFieldErrors);
+    const autoFillChanged = activeStrategy.hasAutoFilledSearchSpace !== hasAutoFilledSearchSpace;
+    const clearedChanged = activeStrategy.searchSpaceManuallyCleared !== searchSpaceManuallyCleared;
+
+    if (!configChanged && !textsChanged && !errorsChanged && !autoFillChanged && !clearedChanged) {
+      return;
+    }
+
+    setStrategies((previous) =>
+      previous.map((strategy) => {
+        if (strategy.id !== activeStrategy.id) {
+          return strategy;
+        }
+        return {
+          ...strategy,
+          config: nextConfig,
+          searchSpaceTexts: { ...searchSpaceTexts },
+          searchSpaceFieldErrors: { ...searchSpaceFieldErrors },
+          hasAutoFilledSearchSpace,
+          searchSpaceManuallyCleared,
+        };
+      }),
+    );
+  }, [
+    activeStrategy,
+    draftConfigState,
+    hasAutoFilledSearchSpace,
+    searchSpaceFieldErrors,
+    searchSpaceManuallyCleared,
+    searchSpaceTexts,
+  ]);
+
+  const handleAddStrategy = useCallback(() => {
+    const nextOrdinal = strategies.length + 1;
+    const baseConfig = cloneConfigForStrategy(draftConfigState);
+    const usedStrategies = new Set<SearchStrategy>();
+    strategies.forEach((strategy) => {
+      const normalized = normalizeSearchStrategyValue(
+        strategy.config?.[searchStrategyParameterName],
+        availableSearchStrategies,
+      );
+      if (normalized) {
+        usedStrategies.add(normalized);
+      }
+    });
+
+    const nextStrategyValue = availableSearchStrategies.find((candidate) => !usedStrategies.has(candidate)) ?? searchStrategy;
+
+    const configCloneRaw = cloneJson(baseConfig);
+    const configWithStrategy: Record<string, any> = isRecord(configCloneRaw) ? configCloneRaw : {};
+    configWithStrategy[searchStrategyParameterName] = nextStrategyValue;
+
+    if (nextStrategyValue === 'random' || nextStrategyValue === 'optuna') {
+      const iterationsValue = searchIterations !== null ? searchIterations : searchIterationsDefault;
+      if (iterationsValue !== null) {
+        configWithStrategy[searchIterationsParameterName] = iterationsValue;
+      } else {
+        delete configWithStrategy[searchIterationsParameterName];
+      }
+
+      const randomStateValue = searchRandomState !== null ? searchRandomState : searchRandomStateDefault;
+      if (randomStateValue !== null) {
+        configWithStrategy[searchRandomStateParameterName] = randomStateValue;
+      } else {
+        delete configWithStrategy[searchRandomStateParameterName];
+      }
+    } else {
+      delete configWithStrategy[searchIterationsParameterName];
+      delete configWithStrategy[searchRandomStateParameterName];
+    }
+
+    const newStrategy = createStrategyDraft(createStrategyLabel(nextOrdinal), configWithStrategy, {
+      searchSpaceTexts: { ...searchSpaceTexts },
+      searchSpaceFieldErrors: {},
+      hasAutoFilledSearchSpace,
+      searchSpaceManuallyCleared,
+    });
+
+    setStrategies((previous) => [...previous, newStrategy]);
+    setExpandedStrategyIds((prev) => new Set([...prev, newStrategy.id]));
+    lastAppliedStrategyRef.current = null;
+    setActiveStrategyId(newStrategy.id);
+  }, [
+    availableSearchStrategies,
+    draftConfigState,
+    hasAutoFilledSearchSpace,
+    searchIterations,
+    searchIterationsDefault,
+    searchRandomState,
+    searchRandomStateDefault,
+    searchSpaceManuallyCleared,
+    searchSpaceTexts,
+    searchStrategy,
+    searchStrategyParameterName,
+    searchIterationsParameterName,
+    searchRandomStateParameterName,
+    setStrategies,
+    setActiveStrategyId,
+    setExpandedStrategyIds,
+    strategies,
+  ]);
+
+  const handleToggleStrategy = useCallback((strategyId: string) => {
+    setExpandedStrategyIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(strategyId)) {
+        next.delete(strategyId);
+      } else {
+        next.add(strategyId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleActivateStrategy = useCallback(
+    (strategyId: string) => {
+      if (!strategyId || strategyId === activeStrategyId) {
+        return;
+      }
+      lastAppliedStrategyRef.current = null;
+      setActiveStrategyId(strategyId);
+      setExpandedStrategyIds((previous) => {
+        const next = new Set(previous);
+        next.add(strategyId);
+        return next;
+      });
+    },
+    [activeStrategyId],
+  );
+
+  const handleRemoveStrategy = useCallback(
+    (strategyId: string) => {
+      let nextActiveId: string | null = null;
+      setStrategies((previous) => {
+        if (previous.length <= 1) {
+          return previous;
+        }
+        const filtered = previous.filter((strategy) => strategy.id !== strategyId);
+        if (!filtered.length) {
+          return previous;
+        }
+        const relabeled = filtered.map((strategy, index) => ({
+          ...strategy,
+          label: createStrategyLabel(index + 1),
+        }));
+        if (strategyId === activeStrategyId) {
+          lastAppliedStrategyRef.current = null;
+          const fallbackId = relabeled[0].id;
+          nextActiveId = fallbackId;
+          setActiveStrategyId(fallbackId);
+        }
+        return relabeled;
+      });
+      setExpandedStrategyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(strategyId);
+        if (nextActiveId) {
+          next.add(nextActiveId);
+        }
+        return next;
+      });
+    },
+    [activeStrategyId],
+  );
+
+  const strategySummaries = useMemo(() => {
+    return strategies.map((strategy, index) => {
+      const config = strategy.config ?? {};
+      const modelValueRaw = config?.[modelTypeParameterName];
+      const modelValue = typeof modelValueRaw === 'string' ? modelValueRaw.trim() : '';
+      const modelLabel = modelTypeOptions.find((option) => option.value === modelValue)?.label ?? modelValue;
+
+      const searchStrategyValueRaw = config?.[searchStrategyParameterName];
+      const searchStrategyValue = typeof searchStrategyValueRaw === 'string' ? searchStrategyValueRaw.trim() : '';
+      const searchLabel = (searchStrategyParameter?.options ?? []).find((option) => option.value === searchStrategyValue)?.label;
+
+      const scoringValueRaw = config?.[scoringMetricParameterName];
+      const scoringValue = typeof scoringValueRaw === 'string' ? scoringValueRaw.trim() : '';
+
+      const baselineParsed = parseJsonObject(config?.baseline_hyperparameters);
+      const baselineError = baselineParsed.error;
+
+      const searchParse = parseJsonObject(config?.search_space);
+      const normalized = normalizeSearchSpace(searchParse.value);
+      const parameterCount = normalized.value ? Object.keys(normalized.value).length : 0;
+      const candidateCount = normalized.value
+        ? Object.values(normalized.value).reduce((total, values) =>
+            total + (Array.isArray(values) ? values.length : 0),
+          0)
+        : 0;
+      const hasErrors = baselineError !== null || Object.values(strategy.searchSpaceFieldErrors).some((message) => Boolean(message));
+
+      return {
+        id: strategy.id,
+        label: strategy.label || createStrategyLabel(index + 1),
+        modelLabel: modelLabel || 'Select model',
+        searchStrategyLabel: searchLabel ?? (searchStrategyValue || 'Random search'),
+        scoringLabel: scoringValue || 'Estimator default',
+        parameterCount,
+        candidateCount,
+        hasErrors,
+      };
+    });
+  }, [
+    modelTypeOptions,
+    modelTypeParameterName,
+    scoringMetricParameterName,
+    searchStrategyParameter,
+    searchStrategyParameterName,
+    strategies,
+  ]);
+
+  useEffect(() => {
+    const previous = lastModelTypeRef.current;
+    if (previous === null) {
+      lastModelTypeRef.current = modelType;
+      return;
+    }
+    if (previous === modelType) {
+      return;
+    }
+    lastModelTypeRef.current = modelType;
     setSearchSpaceTexts({});
     setSearchSpaceFieldErrors({});
     setHasAutoFilledSearchSpace(false);
@@ -1052,35 +1885,52 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
     };
   }, [graph]);
 
-  const graphWithDraftConfig = useMemo<FeatureGraph | null>(() => {
-    if (!graphPayload) {
-      return null;
-    }
-    if (!draftConfigState || Object.keys(draftConfigState).length === 0) {
-      return graphPayload;
-    }
-    const clonedGraph = cloneJson(graphPayload);
-    if (!clonedGraph || !Array.isArray(clonedGraph.nodes)) {
-      return clonedGraph;
-    }
-    clonedGraph.nodes = clonedGraph.nodes.map((node: any) => {
-      if (!node || node.id !== nodeId) {
-        return node;
+  const mergeConfigIntoGraph = useCallback(
+    (configToMerge: Record<string, any> | null | undefined): FeatureGraph | null => {
+      if (!graphPayload) {
+        return null;
       }
-      const existingData = node?.data ?? {};
-      const existingConfig = existingData?.config ?? {};
-      const mergedConfig = { ...existingConfig, ...draftConfigState };
-      return {
-        ...node,
-        data: {
-          ...existingData,
-          config: mergedConfig,
-          isConfigured: true,
-        },
-      };
-    });
-    return clonedGraph;
-  }, [draftConfigState, graphPayload, nodeId]);
+      const clonedGraph = cloneJson(graphPayload);
+      if (!clonedGraph || !Array.isArray(clonedGraph.nodes)) {
+        return graphPayload;
+      }
+
+      const sanitizedConfig = stripTuningMetadata(configToMerge);
+      const hasSanitizedConfig = Object.keys(sanitizedConfig).length > 0;
+
+      clonedGraph.nodes = clonedGraph.nodes.map((node: any) => {
+        if (!node || node.id !== nodeId) {
+          return node;
+        }
+        const existingData = node?.data ?? {};
+        const existingConfig = existingData?.config ?? {};
+        const sanitizedExistingConfig = stripTuningMetadata(existingConfig);
+        const mergedConfig = hasSanitizedConfig
+          ? { ...sanitizedExistingConfig, ...sanitizedConfig }
+          : sanitizedExistingConfig;
+
+        return {
+          ...node,
+          data: {
+            ...existingData,
+            config: mergedConfig,
+            isConfigured: true,
+          },
+        };
+      });
+
+      return clonedGraph;
+    },
+    [graphPayload, nodeId],
+  );
+
+  const graphWithDraftConfig = useMemo<FeatureGraph | null>(() => {
+    const merged = mergeConfigIntoGraph(draftConfigState);
+    if (merged) {
+      return merged;
+    }
+    return graphPayload;
+  }, [draftConfigState, graphPayload, mergeConfigIntoGraph]);
 
   const validationConnectionStatus = useMemo(() => {
     if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) {
@@ -1273,7 +2123,7 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
     if (!targetColumn) {
       notes.push('Set a target column before tuning.');
     }
-    if (validationConnectionStatus !== true) {
+    if (validationConnectionStatus === false) {
       notes.push('Connect the validation split to this node to enable tuning.');
     }
     if (!modelType) {
@@ -1291,8 +2141,8 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
     if (hasSearchSpaceFieldErrors) {
       notes.push('Resolve invalid candidate values in the search space.');
     }
-    if (searchStrategy === 'random' && !searchIterations) {
-      notes.push('Provide the maximum iterations for random search.');
+    if ((searchStrategy === 'random' || searchStrategy === 'optuna') && !searchIterations) {
+      notes.push('Provide the maximum iterations for random or Optuna search.');
     }
     if (cvEnabled && cvFolds < 2) {
       notes.push('Cross-validation requires at least 2 folds.');
@@ -1345,7 +2195,7 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
   }, [modelTypeOptions, modelTypeParameter]);
 
   const handleEnqueueTuning = useCallback(async () => {
-    if (!pipelineId || !sourceId || !modelType || !hasSearchSpaceEntries) {
+    if (!pipelineId || !sourceId || !graphPayload || strategies.length === 0) {
       return;
     }
 
@@ -1364,131 +2214,307 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
-    const graphForTuning = graphWithDraftConfig ?? graphPayload;
-    if (!graphForTuning) {
+    const buildStrategyPlans = async (): Promise<{
+      plans: Array<{ payload: HyperparameterTuningJobCreatePayload; label: string }>;
+      issues: string[];
+    }> => {
+      const plans: Array<{ payload: HyperparameterTuningJobCreatePayload; label: string }> = [];
+      const issues: string[] = [];
+
+      const resolveAllowedNamesForModel = async (
+        resolvedModelType: string,
+      ): Promise<Set<string>> => {
+        if (!resolvedModelType) {
+          return new Set<string>();
+        }
+
+        if (resolvedModelType === modelType) {
+          return allowedHyperparamNames;
+        }
+
+        const queryKey = ['model-hyperparameters', resolvedModelType] as const;
+        const cached = queryClient.getQueryData<ModelHyperparametersResponse>(queryKey);
+        const collectNames = (fields: ModelHyperparameterField[] | undefined | null) => {
+          const names = new Set<string>();
+          (fields ?? []).forEach((field) => {
+            if (field?.name) {
+              names.add(field.name);
+            }
+          });
+          return names;
+        };
+
+        if (cached) {
+          return collectNames(cached.fields);
+        }
+
+        try {
+          const result = await queryClient.fetchQuery<ModelHyperparametersResponse>({
+            queryKey,
+            queryFn: () => fetchModelHyperparameters(resolvedModelType),
+          });
+          return collectNames(result?.fields);
+        } catch (error) {
+          return new Set<string>();
+        }
+      };
+
+      for (let index = 0; index < strategies.length; index += 1) {
+        const strategy = strategies[index];
+        const strategyLabel = strategy.label || createStrategyLabel(index + 1);
+        const strategyConfig = cloneConfigForStrategy(strategy.config);
+
+        const rawModelType = strategyConfig?.[modelTypeParameterName];
+        const resolvedModelType =
+          typeof rawModelType === 'string' && rawModelType.trim().length
+            ? rawModelType.trim()
+            : modelType;
+
+        if (!resolvedModelType) {
+          issues.push(`${strategyLabel} is missing a model selection.`);
+          continue;
+        }
+
+        const resolvedSearchStrategy =
+          normalizeSearchStrategyValue(
+            strategyConfig?.[searchStrategyParameterName],
+            availableSearchStrategies,
+          ) ??
+          parameterDefaultStrategy ??
+          'random';
+
+        const strategyAllowedNames = await resolveAllowedNamesForModel(resolvedModelType);
+
+        const baselineParse = parseJsonObject(strategyConfig?.baseline_hyperparameters);
+        const baselineValues = baselineParse.value ?? {};
+        const sanitizedBaseline =
+          strategyAllowedNames.size > 0
+            ? filterHyperparametersByFields(baselineValues, strategyAllowedNames)
+            : cloneJson(baselineValues);
+
+        const searchSpaceParse = parseJsonObject(strategyConfig?.search_space);
+        if (searchSpaceParse.error) {
+          issues.push(`${strategyLabel} has invalid search space: ${searchSpaceParse.error}`);
+          continue;
+        }
+
+        const normalizedSearch = normalizeSearchSpace(searchSpaceParse.value);
+        if (normalizedSearch.error) {
+          issues.push(`${strategyLabel} has invalid search space: ${normalizedSearch.error}`);
+          continue;
+        }
+
+        const rawSearchSpace = normalizedSearch.value ?? {};
+        const sanitizedSearchSpace =
+          strategyAllowedNames.size > 0
+            ? filterSearchSpaceByFields(rawSearchSpace, strategyAllowedNames)
+            : cloneJson(rawSearchSpace);
+
+        if (!sanitizedSearchSpace || Object.keys(sanitizedSearchSpace).length === 0) {
+          issues.push(`${strategyLabel} requires at least one hyperparameter in the search space.`);
+          continue;
+        }
+
+        if (Object.values(strategy.searchSpaceFieldErrors ?? {}).some((message) => Boolean(message))) {
+          issues.push(`${strategyLabel} has search space entries that need attention.`);
+          continue;
+        }
+
+        const parameterCount = Object.keys(sanitizedSearchSpace).length;
+        let candidateProduct: number | null = null;
+        if (parameterCount > 0) {
+          let product = 1;
+          let overflow = false;
+          Object.values(sanitizedSearchSpace).forEach((values: any) => {
+            const size = Array.isArray(values) ? values.length : 0;
+            product *= Math.max(size, 1);
+            if (!Number.isFinite(product) || product > 1_000_000) {
+              overflow = true;
+            }
+          });
+          candidateProduct = overflow ? null : product;
+        }
+
+        const scoringRaw = strategyConfig?.[scoringMetricParameterName];
+        const scoringValue = typeof scoringRaw === 'string' ? scoringRaw.trim() : '';
+        const resolvedScoring = scoringValue.length ? scoringValue : null;
+
+        const resolveIterations = () => {
+          const rawIterations = strategyConfig?.[searchIterationsParameterName];
+          let iterations: number | null = null;
+          if (typeof rawIterations === 'number' && Number.isFinite(rawIterations)) {
+            iterations = Math.max(1, Math.floor(rawIterations));
+          } else if (typeof rawIterations === 'string') {
+            const parsed = Number(rawIterations.trim());
+            if (Number.isFinite(parsed) && parsed > 0) {
+              iterations = Math.max(1, Math.floor(parsed));
+            }
+          }
+          if (iterations === null && (resolvedSearchStrategy === 'random' || resolvedSearchStrategy === 'optuna')) {
+            return searchIterationsDefault !== null ? searchIterationsDefault : null;
+          }
+          return iterations;
+        };
+
+        const resolveRandomState = () => {
+          const rawState = strategyConfig?.[searchRandomStateParameterName];
+          let value: number | null = null;
+          if (typeof rawState === 'number' && Number.isFinite(rawState)) {
+            value = Math.trunc(rawState);
+          } else if (typeof rawState === 'string') {
+            const parsed = Number(rawState.trim());
+            if (Number.isFinite(parsed)) {
+              value = Math.trunc(parsed);
+            }
+          }
+          if (value === null && (resolvedSearchStrategy === 'random' || resolvedSearchStrategy === 'optuna')) {
+            return searchRandomStateDefault !== null ? searchRandomStateDefault : null;
+          }
+          return value;
+        };
+
+        const resolvedIterations = resolveIterations();
+        const resolvedRandomState = resolveRandomState();
+
+        const metadata: Record<string, any> = {};
+        if (targetColumn) {
+          metadata.target_column = targetColumn;
+        }
+        if (problemType) {
+          metadata.problem_type = problemType;
+        }
+        metadata.strategy_id = strategy.id;
+        metadata.strategy_label = strategyLabel;
+        metadata.strategy_index = index + 1;
+        metadata.search_strategy = resolvedSearchStrategy;
+        if (resolvedIterations !== null && (resolvedSearchStrategy === 'random' || resolvedSearchStrategy === 'optuna')) {
+          metadata.max_iterations = resolvedIterations;
+        }
+        if (resolvedScoring) {
+          metadata.scoring_metric = resolvedScoring;
+        }
+        if (resolvedRandomState !== null) {
+          metadata.random_state = resolvedRandomState;
+        }
+        metadata.search_space_keys = Object.keys(sanitizedSearchSpace);
+        if (parameterCount > 0) {
+          metadata.search_space_parameters = parameterCount;
+        }
+        if (candidateProduct !== null) {
+          metadata.search_space_candidates = candidateProduct;
+        }
+        metadata.cross_validation = {
+          enabled: cvEnabled,
+          strategy: cvStrategy,
+          folds: cvFolds,
+          shuffle: cvShuffle,
+          random_state: cvRandomState,
+        };
+
+        const graphForStrategy = mergeConfigIntoGraph(strategyConfig) ?? graphPayload;
+        if (!graphForStrategy) {
+          issues.push(`Unable to build pipeline graph for ${strategyLabel}.`);
+          continue;
+        }
+
+        const baselinePayload =
+          sanitizedBaseline && Object.keys(sanitizedBaseline).length > 0 ? cloneJson(sanitizedBaseline) : undefined;
+        const searchSpacePayload = cloneJson(sanitizedSearchSpace);
+
+        const payload: HyperparameterTuningJobCreatePayload = {
+          dataset_source_id: sourceId,
+          pipeline_id: pipelineId,
+          node_id: nodeId,
+          model_type: resolvedModelType,
+          model_types: [resolvedModelType],
+          search_strategy: resolvedSearchStrategy,
+          search_space: searchSpacePayload,
+          baseline_hyperparameters: baselinePayload,
+          n_iterations:
+            resolvedSearchStrategy === 'random' || resolvedSearchStrategy === 'optuna'
+              ? resolvedIterations ?? undefined
+              : undefined,
+          scoring: resolvedScoring ?? undefined,
+          random_state: resolvedRandomState ?? undefined,
+          cross_validation: {
+            enabled: cvEnabled,
+            strategy: cvStrategy,
+            folds: cvFolds,
+            shuffle: cvShuffle,
+            random_state: cvRandomState,
+          },
+          metadata,
+          job_metadata: metadata,
+          run_tuning: true,
+          graph: graphForStrategy,
+          target_node_id: nodeId,
+        };
+
+        plans.push({ payload, label: strategyLabel });
+      }
+
+      return { plans, issues };
+    };
+
+    setBatchEnqueueError(null);
+    const { plans, issues } = await buildStrategyPlans();
+    if (!plans.length) {
+      if (issues.length) {
+        setBatchEnqueueError(issues.join(' '));
+      }
       return;
     }
 
-  const metadata: Record<string, any> = {};
-    if (targetColumn) {
-      metadata.target_column = targetColumn;
-    }
-    if (problemType) {
-      metadata.problem_type = problemType;
-    }
-    metadata.search_strategy = searchStrategy;
-    if (searchIterations) {
-      metadata.max_iterations = searchIterations;
-    }
-    if (scoringMetric) {
-      metadata.scoring_metric = scoringMetric;
-    }
-    if (hasSearchSpaceEntries) {
-      metadata.search_space_keys = Object.keys(filteredSearchOverrides);
-    }
-    const { parameterCount, candidateProduct } = searchSpaceDimension;
-    if (parameterCount > 0) {
-      metadata.search_space_parameters = parameterCount;
-    }
-    if (candidateProduct !== null) {
-      metadata.search_space_candidates = candidateProduct;
-    }
-    metadata.cross_validation = {
-      enabled: cvEnabled,
-      strategy: cvStrategy,
-      folds: cvFolds,
-      shuffle: cvShuffle,
-      random_state: cvRandomState,
-    };
-
-    const metadataPayload = Object.keys(metadata).length ? metadata : undefined;
-
-    const enhancedGraph = cloneJson(graphForTuning);
-    if (enhancedGraph && Array.isArray(enhancedGraph.nodes)) {
-      enhancedGraph.nodes = enhancedGraph.nodes.map((node: any) => {
-        if (!node || node.id !== nodeId) {
-          return node;
+    const aggregatedJobs: HyperparameterTuningJobResponse[] = [];
+    for (const { payload } of plans) {
+      try {
+        const result = await enqueueTuningJob(payload);
+        if (Array.isArray(result?.jobs) && result.jobs.length) {
+          aggregatedJobs.push(...result.jobs);
         }
-        const existingData = node?.data ?? {};
-        const existingConfig = existingData?.config ?? {};
-        const mergedConfig = draftConfigState
-          ? { ...existingConfig, ...draftConfigState }
-          : existingConfig;
-        return {
-          ...node,
-          data: {
-            ...existingData,
-            config: mergedConfig,
-            isConfigured: true,
-          },
-        };
-      });
+      } catch (error) {
+        if (error instanceof Error && error.message) {
+          setBatchEnqueueError(error.message);
+        } else {
+          setBatchEnqueueError('Failed to enqueue one or more tuning jobs.');
+        }
+        return;
+      }
     }
 
-    const filteredBaselinePayload = Object.keys(filteredBaselineOverrides).length
-      ? cloneJson(filteredBaselineOverrides)
-      : {};
-    const filteredSearchSpacePayload = cloneJson(filteredSearchOverrides);
-
-    const requestedModelTypes = modelType ? [modelType] : [];
-
-    const payload = {
-      dataset_source_id: sourceId,
-      pipeline_id: pipelineId,
-      node_id: nodeId,
-      model_type: modelType || undefined,
-      model_types: requestedModelTypes.length ? requestedModelTypes : undefined,
-      search_strategy: searchStrategy,
-      search_space: filteredSearchSpacePayload,
-      baseline_hyperparameters: filteredBaselinePayload,
-      n_iterations: searchStrategy === 'random' ? searchIterations ?? undefined : undefined,
-      scoring: scoringMetric ?? undefined,
-      random_state: searchRandomState ?? undefined,
-      cross_validation: {
-        enabled: cvEnabled,
-        strategy: cvStrategy,
-        folds: cvFolds,
-        shuffle: cvShuffle,
-        random_state: cvRandomState,
-      },
-      metadata: metadataPayload,
-      job_metadata: metadataPayload,
-      run_tuning: true,
-      graph: enhancedGraph ?? cloneJson(graphForTuning),
-      target_node_id: nodeId,
-    };
-
-    try {
-      await enqueueTuningJob(payload);
-    } catch (error) {
-      // surfaced via createJobError
+    if (aggregatedJobs.length) {
+      const latestJob = aggregatedJobs[aggregatedJobs.length - 1];
+      setLastCreatedJob(latestJob);
+      setLastCreatedJobCount(aggregatedJobs.length);
     }
   }, [
+    allowedHyperparamNames,
     cvEnabled,
     cvFolds,
     cvRandomState,
     cvShuffle,
     cvStrategy,
-    draftConfigState,
     enqueueTuningJob,
-    filteredBaselineOverrides,
-    filteredSearchOverrides,
     graphPayload,
-    graphWithDraftConfig,
-    hasDraftChanges,
-    hasSearchSpaceEntries,
+    mergeConfigIntoGraph,
     modelType,
+    modelTypeParameterName,
     nodeId,
     onSaveDraftConfig,
+    parameterDefaultStrategy,
+    queryClient,
     pipelineId,
     problemType,
-    scoringMetric,
-    searchIterations,
-    searchRandomState,
-    searchSpaceDimension,
-    searchStrategy,
+    scoringMetricParameterName,
+    searchIterationsDefault,
+    searchIterationsParameterName,
+    searchRandomStateDefault,
+    searchRandomStateParameterName,
+    searchStrategyParameterName,
+    setBatchEnqueueError,
     setHasDraftChanges,
     sourceId,
+    strategies,
     targetColumn,
   ]);
 
@@ -1500,7 +2526,22 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
 
   const renderJobSummary = (job: HyperparameterTuningJobSummary) => {
     const statusLabel = STATUS_LABEL[job.status] ?? job.status;
-    const strategyLabel = job.search_strategy === 'grid' ? 'Grid search' : 'Random search';
+    const modelOptionLabel = modelTypeOptions.find((option) => option.value === job.model_type)?.label;
+    const modelLabel = (modelOptionLabel ?? job.model_type ?? '').trim();
+    const strategyLabel = (() => {
+      switch (job.search_strategy) {
+        case 'grid':
+          return 'Grid search';
+        case 'halving':
+          return 'Successive halving';
+        case 'halving_random':
+          return 'Successive halving (randomized)';
+        case 'optuna':
+          return 'Optuna search';
+        default:
+          return 'Random search';
+      }
+    })();
     const updatedLabel = job.updated_at ? formatRelativeTime(job.updated_at) : null;
     const fallbackUpdated = job.updated_at || job.created_at;
     const timestampLabel = fallbackUpdated
@@ -1508,6 +2549,9 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
       : null;
 
     const detailParts: string[] = [];
+    if (modelLabel) {
+      detailParts.push(`Model ${modelLabel}`);
+    }
     detailParts.push(strategyLabel);
     if (Array.isArray(job.results) && job.results.length > 0) {
       detailParts.push(`${job.results.length} candidates`);
@@ -1541,6 +2585,13 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
       <div className="canvas-modal__section-header">
         <h3>Hyperparameter tuning jobs</h3>
         <div className="canvas-modal__section-actions">
+          <button
+            type="button"
+            className="btn btn-outline-secondary"
+            onClick={handleAddStrategy}
+          >
+            Add strategy
+          </button>
           <button
             type="button"
             className="btn btn-outline-secondary"
@@ -1588,6 +2639,10 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
         <p className="canvas-modal__note canvas-modal__note--error">{createJobError.message}</p>
       )}
 
+      {batchEnqueueError && (
+        <p className="canvas-modal__note canvas-modal__note--error">{batchEnqueueError}</p>
+      )}
+
       {jobsError && !(createJobError instanceof Error) && (
         <p className="canvas-modal__note canvas-modal__note--error">
           {jobsError.message || 'Unable to load tuning jobs.'}
@@ -1608,7 +2663,7 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
         </p>
       )}
 
-  {hasSearchSpaceEntries && searchSpaceDimension.parameterCount > 0 && (
+      {hasSearchSpaceEntries && searchSpaceDimension.parameterCount > 0 && (
         <p className="canvas-modal__note canvas-modal__note--muted">
           Search space covers {searchSpaceDimension.parameterCount} hyperparameter{searchSpaceDimension.parameterCount === 1 ? '' : 's'}
           {searchSpaceDimension.candidateProduct !== null
@@ -1618,212 +2673,287 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
         </p>
       )}
 
-      <div className="canvas-modal__parameter-grid">
-        {filteredModelTypeParameter && renderParameterField(filteredModelTypeParameter)}
-        {searchStrategyParameter && renderParameterField(searchStrategyParameter)}
-        {searchStrategy === 'random' && searchIterationsParameter && renderParameterField(searchIterationsParameter)}
-        {searchStrategy === 'random' && searchRandomStateParameter && renderParameterField(searchRandomStateParameter)}
-      </div>
+      <div className="canvas-imputer__list" style={{ marginTop: '1.25rem' }}>
+        {strategies.map((strategy, index) => {
+          const summary = strategySummaries[index];
+          const isActive = Boolean(activeStrategy && activeStrategy.id === strategy.id);
+          const isExpanded = expandedStrategyIds.has(strategy.id);
+          const summaryParts: string[] = [];
+          if (summary?.modelLabel) {
+            summaryParts.push(summary.modelLabel);
+          }
+          if (summary?.searchStrategyLabel) {
+            summaryParts.push(summary.searchStrategyLabel);
+          }
+          if (summary?.scoringLabel) {
+            summaryParts.push(`Scoring ${summary.scoringLabel}`);
+          }
+          if (summary?.parameterCount) {
+            const candidateLabel = summary.candidateCount
+              ? `${summary.parameterCount} param${summary.parameterCount === 1 ? '' : 's'} • ${summary.candidateCount} candidate${summary.candidateCount === 1 ? '' : 's'}`
+              : `${summary.parameterCount} param${summary.parameterCount === 1 ? '' : 's'}`;
+            summaryParts.push(candidateLabel);
+          } else if (!summaryParts.includes('Needs attention')) {
+            summaryParts.push('No search values');
+          }
+          if (summary?.hasErrors) {
+            summaryParts.push('Needs attention');
+          }
+          const summaryText = summaryParts.length > 0 ? summaryParts.join(' · ') : 'Configure strategy settings';
 
-      <div
-        style={{
-          marginTop: '1rem',
-          padding: '1rem 1.25rem',
-          background: 'rgba(15, 23, 42, 0.25)',
-          border: '1px solid rgba(148, 163, 184, 0.2)',
-          borderRadius: '6px',
-        }}
-      >
-        <div style={{ fontWeight: 600, color: '#e2e8f0', display: 'block' }}>{scoringLabel}</div>
-        <p style={{ margin: '0.4rem 0 0.75rem', fontSize: '0.85rem', color: 'rgba(148, 163, 184, 0.85)' }}>
-          {scoringDescription}
-        </p>
-        <div
-          id={scoringInputId}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.4rem 0.75rem',
-            borderRadius: '999px',
-            border: '1px solid rgba(148, 163, 184, 0.35)',
-            background: 'rgba(15, 23, 42, 0.35)',
-            color: 'rgba(203, 213, 225, 0.9)',
-            fontSize: '0.85rem',
-            maxWidth: '320px',
-            marginBottom: '0.75rem',
-          }}
-        >
-          <span style={{ opacity: 0.75 }}>Selected:</span>
-          <strong style={{ color: '#e2e8f0' }}>{scoringDraft || 'Estimator default'}</strong>
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.5rem',
-            marginTop: '0.75rem',
-          }}
-        >
-          {scoringSuggestions.map((suggestion) => (
-            <button
-              key={suggestion.value}
-              type="button"
-              onClick={() => handleScoringChange(suggestion.value)}
-              style={{
-                padding: '0.35rem 0.7rem',
-                fontSize: '0.8rem',
-                borderRadius: '999px',
-                border: '1px solid rgba(148, 163, 184, 0.35)',
-                background: scoringDraft === suggestion.value ? 'rgba(59, 130, 246, 0.2)' : 'rgba(15, 23, 42, 0.35)',
-                color: scoringDraft === suggestion.value ? '#bfdbfe' : 'rgba(203, 213, 225, 0.9)',
-                cursor: 'pointer',
-              }}
-            >
-              {suggestion.label}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => handleScoringChange('')}
-            style={{
-              padding: '0.35rem 0.7rem',
-              fontSize: '0.8rem',
-              borderRadius: '999px',
-              border: '1px solid rgba(148, 163, 184, 0.35)',
-              background: 'rgba(15, 23, 42, 0.35)',
-              color: 'rgba(203, 213, 225, 0.9)',
-              cursor: 'pointer',
-            }}
-          >
-            Reset to default
-          </button>
-        </div>
-      </div>
-
-      {modelType && hyperparamFields.length > 0 && (
-        <div
-          style={{
-            marginTop: '1.25rem',
-            padding: '1.25rem',
-            background: 'rgba(15, 23, 42, 0.2)',
-            border: '1px solid rgba(148, 163, 184, 0.2)',
-            borderRadius: '6px',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#e2e8f0' }}>Baseline hyperparameter overrides</h4>
-              <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: 'rgba(148, 163, 184, 0.85)' }}>
-                Pre-fill model defaults before the search runs. Leave fields blank to keep the template values.
-              </p>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.85rem', color: 'rgba(148, 163, 184, 0.85)' }}>
-                {baselineOverrideCount > 0
-                  ? `${baselineOverrideCount} override${baselineOverrideCount === 1 ? '' : 's'} configured`
-                  : 'Using template defaults'}
-              </span>
-              {baselineOverrideCount > 0 && (
+          return (
+            <div key={strategy.id} className="canvas-imputer__card">
+              <div className="canvas-imputer__card-header">
                 <button
                   type="button"
-                  onClick={handleResetBaselineOverrides}
-                  style={{
-                    padding: '0.35rem 0.7rem',
-                    fontSize: '0.8rem',
-                    borderRadius: '999px',
-                    border: '1px solid rgba(148, 163, 184, 0.35)',
-                    background: 'rgba(15, 23, 42, 0.35)',
-                    color: 'rgba(203, 213, 225, 0.9)',
-                    cursor: 'pointer',
+                  className="canvas-imputer__card-toggle"
+                  onClick={() => {
+                    handleToggleStrategy(strategy.id);
+                    if (!isActive) {
+                      handleActivateStrategy(strategy.id);
+                    }
                   }}
+                  aria-expanded={isExpanded}
+                  aria-controls={`tuning-strategy-body-${strategy.id}`}
                 >
-                  Reset overrides
+                  <span
+                    className={`canvas-imputer__toggle-icon${isExpanded ? ' canvas-imputer__toggle-icon--open' : ''}`}
+                    aria-hidden="true"
+                  />
+                  <span className="canvas-imputer__card-text">
+                    <span className="canvas-imputer__card-title">{summary?.label ?? createStrategyLabel(index + 1)}</span>
+                    <span className="canvas-imputer__card-summary">{summaryText}</span>
+                  </span>
                 </button>
+                {strategies.length > 1 && (
+                  <button
+                    type="button"
+                    className="canvas-imputer__remove"
+                    onClick={() => handleRemoveStrategy(strategy.id)}
+                    aria-label={`Remove ${summary?.label ?? createStrategyLabel(index + 1)}`}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {isExpanded && isActive && (
+                <div className="canvas-imputer__card-body" id={`tuning-strategy-body-${strategy.id}`}>
+                  <div className="canvas-modal__parameter-grid">
+                    {filteredModelTypeParameter && renderParameterField(filteredModelTypeParameter)}
+                    {searchStrategyParameter && renderParameterField(searchStrategyParameter)}
+                    {(searchStrategy === 'random' || searchStrategy === 'optuna') &&
+                      searchIterationsParameter &&
+                      renderParameterField(searchIterationsParameter)}
+                    {(searchStrategy === 'random' || searchStrategy === 'optuna') &&
+                      searchRandomStateParameter &&
+                      renderParameterField(searchRandomStateParameter)}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: '1rem',
+                      padding: '1rem 1.25rem',
+                      background: 'rgba(15, 23, 42, 0.25)',
+                      border: '1px solid rgba(148, 163, 184, 0.2)',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: '#e2e8f0', display: 'block' }}>{scoringLabel}</div>
+                    <p style={{ margin: '0.4rem 0 0.75rem', fontSize: '0.85rem', color: 'rgba(148, 163, 184, 0.85)' }}>
+                      {scoringDescription}
+                    </p>
+                    <div
+                      id={scoringInputId}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.4rem 0.75rem',
+                        borderRadius: '999px',
+                        border: '1px solid rgba(148, 163, 184, 0.35)',
+                        background: 'rgba(15, 23, 42, 0.35)',
+                        color: 'rgba(203, 213, 225, 0.9)',
+                        fontSize: '0.85rem',
+                        maxWidth: '320px',
+                        marginBottom: '0.75rem',
+                      }}
+                    >
+                      <span style={{ opacity: 0.75 }}>Selected:</span>
+                      <strong style={{ color: '#e2e8f0' }}>{scoringDraft || 'Estimator default'}</strong>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '0.5rem',
+                        marginTop: '0.75rem',
+                      }}
+                    >
+                      {scoringSuggestions.map((suggestion) => (
+                        <button
+                          key={suggestion.value}
+                          type="button"
+                          onClick={() => handleScoringChange(suggestion.value)}
+                          style={{
+                            padding: '0.35rem 0.7rem',
+                            fontSize: '0.8rem',
+                            borderRadius: '999px',
+                            border: '1px solid rgba(148, 163, 184, 0.35)',
+                            background: scoringDraft === suggestion.value ? 'rgba(59, 130, 246, 0.2)' : 'rgba(15, 23, 42, 0.35)',
+                            color: scoringDraft === suggestion.value ? '#bfdbfe' : 'rgba(203, 213, 225, 0.9)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {suggestion.label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => handleScoringChange('')}
+                        style={{
+                          padding: '0.35rem 0.7rem',
+                          fontSize: '0.8rem',
+                          borderRadius: '999px',
+                          border: '1px solid rgba(148, 163, 184, 0.35)',
+                          background: 'rgba(15, 23, 42, 0.35)',
+                          color: 'rgba(203, 213, 225, 0.9)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Reset to default
+                      </button>
+                    </div>
+                  </div>
+
+                  {modelType && hyperparamFields.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: '1.25rem',
+                        padding: '1.25rem',
+                        background: 'rgba(15, 23, 42, 0.2)',
+                        border: '1px solid rgba(148, 163, 184, 0.2)',
+                        borderRadius: '6px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#e2e8f0' }}>Baseline hyperparameter overrides</h4>
+                          <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: 'rgba(148, 163, 184, 0.85)' }}>
+                            Pre-fill model defaults before the search runs. Leave fields blank to keep the template values.
+                          </p>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.85rem', color: 'rgba(148, 163, 184, 0.85)' }}>
+                            {baselineOverrideCount > 0
+                              ? `${baselineOverrideCount} override${baselineOverrideCount === 1 ? '' : 's'} configured`
+                              : 'Using template defaults'}
+                          </span>
+                          {baselineOverrideCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleResetBaselineOverrides}
+                              style={{
+                                padding: '0.35rem 0.7rem',
+                                fontSize: '0.8rem',
+                                borderRadius: '999px',
+                                border: '1px solid rgba(148, 163, 184, 0.35)',
+                                background: 'rgba(15, 23, 42, 0.35)',
+                                color: 'rgba(203, 213, 225, 0.9)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Reset overrides
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {baselineError && (
+                        <p className="canvas-modal__note canvas-modal__note--error" style={{ marginTop: '0.75rem' }}>
+                          {baselineError}
+                        </p>
+                      )}
+                      <div
+                        style={{
+                          marginTop: '1rem',
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                          gap: '1rem',
+                        }}
+                      >
+                        {hyperparamFields.map(renderBaselineField)}
+                      </div>
+                    </div>
+                  )}
+
+                  {modelType && hyperparamFields.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: '1.25rem',
+                        padding: '1.25rem',
+                        background: 'rgba(15, 23, 42, 0.2)',
+                        border: '1px solid rgba(148, 163, 184, 0.2)',
+                        borderRadius: '6px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#e2e8f0' }}>Search space</h4>
+                          <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: 'rgba(148, 163, 184, 0.85)' }}>
+                            Provide candidate values for each hyperparameter. Separate entries with commas or new lines.
+                          </p>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.85rem', color: 'rgba(148, 163, 184, 0.85)' }}>
+                            {searchOverrideCount > 0
+                              ? `${searchOverrideCount} parameter${searchOverrideCount === 1 ? '' : 's'} targeted`
+                              : 'No parameters queued for tuning yet'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleClearSearchSpace}
+                            disabled={searchOverrideCount === 0}
+                            style={{
+                              padding: '0.35rem 0.7rem',
+                              fontSize: '0.8rem',
+                              borderRadius: '999px',
+                              border: '1px solid rgba(148, 163, 184, 0.35)',
+                              background: searchOverrideCount === 0 ? 'rgba(15, 23, 42, 0.2)' : 'rgba(15, 23, 42, 0.35)',
+                              color: searchOverrideCount === 0 ? 'rgba(148, 163, 184, 0.5)' : 'rgba(203, 213, 225, 0.9)',
+                              cursor: searchOverrideCount === 0 ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            Clear search space
+                          </button>
+                        </div>
+                      </div>
+                      {searchSpaceError && (
+                        <p className="canvas-modal__note canvas-modal__note--error" style={{ marginTop: '0.75rem' }}>
+                          {searchSpaceError}
+                        </p>
+                      )}
+                      {hasSearchSpaceFieldErrors && (
+                        <p className="canvas-modal__note canvas-modal__note--warning" style={{ marginTop: '0.75rem' }}>
+                          Fix the highlighted search entries before launching tuning jobs.
+                        </p>
+                      )}
+                      <div
+                        style={{
+                          marginTop: '1rem',
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                          gap: '1rem',
+                        }}
+                      >
+                        {hyperparamFields.map(renderSearchSpaceField)}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-          </div>
-          {baselineError && (
-            <p className="canvas-modal__note canvas-modal__note--error" style={{ marginTop: '0.75rem' }}>
-              {baselineError}
-            </p>
-          )}
-          <div
-            style={{
-              marginTop: '1rem',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: '1rem',
-            }}
-          >
-            {hyperparamFields.map(renderBaselineField)}
-          </div>
-        </div>
-      )}
-
-      {modelType && hyperparamFields.length > 0 && (
-        <div
-          style={{
-            marginTop: '1.25rem',
-            padding: '1.25rem',
-            background: 'rgba(15, 23, 42, 0.2)',
-            border: '1px solid rgba(148, 163, 184, 0.2)',
-            borderRadius: '6px',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#e2e8f0' }}>Search space</h4>
-              <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: 'rgba(148, 163, 184, 0.85)' }}>
-                Provide candidate values for each hyperparameter. Separate entries with commas or new lines.
-              </p>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.85rem', color: 'rgba(148, 163, 184, 0.85)' }}>
-                {searchOverrideCount > 0
-                  ? `${searchOverrideCount} parameter${searchOverrideCount === 1 ? '' : 's'} targeted`
-                  : 'No parameters queued for tuning yet'}
-              </span>
-              <button
-                type="button"
-                onClick={handleClearSearchSpace}
-                disabled={searchOverrideCount === 0}
-                style={{
-                  padding: '0.35rem 0.7rem',
-                  fontSize: '0.8rem',
-                  borderRadius: '999px',
-                  border: '1px solid rgba(148, 163, 184, 0.35)',
-                  background: searchOverrideCount === 0 ? 'rgba(15, 23, 42, 0.2)' : 'rgba(15, 23, 42, 0.35)',
-                  color: searchOverrideCount === 0 ? 'rgba(148, 163, 184, 0.5)' : 'rgba(203, 213, 225, 0.9)',
-                  cursor: searchOverrideCount === 0 ? 'not-allowed' : 'pointer',
-                }}
-              >
-                Clear search space
-              </button>
-            </div>
-          </div>
-          {searchSpaceError && (
-            <p className="canvas-modal__note canvas-modal__note--error" style={{ marginTop: '0.75rem' }}>
-              {searchSpaceError}
-            </p>
-          )}
-          {hasSearchSpaceFieldErrors && (
-            <p className="canvas-modal__note canvas-modal__note--warning" style={{ marginTop: '0.75rem' }}>
-              Fix the highlighted search entries before launching tuning jobs.
-            </p>
-          )}
-          <div
-            style={{
-              marginTop: '1rem',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-              gap: '1rem',
-            }}
-          >
-            {hyperparamFields.map(renderSearchSpaceField)}
-          </div>
-        </div>
-      )}
+          );
+        })}
+      </div>
 
       {cvEnabled && (
         <p className="canvas-modal__note canvas-modal__note--muted">

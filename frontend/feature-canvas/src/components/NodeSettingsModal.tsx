@@ -6508,7 +6508,13 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     <div className="canvas-modal" role="dialog" aria-modal="true" aria-labelledby="node-settings-title">
       <div className="canvas-modal__backdrop" onClick={onClose} />
       <div className="canvas-modal__panel">
-        <NodeSettingsHeader title={title} isDataset={datasetBadge} onClose={onClose} />
+        <NodeSettingsHeader
+          title={title}
+          isDataset={datasetBadge}
+          onClose={onClose}
+          canResetNode={canResetNode}
+          onResetNode={handleResetNode}
+        />
 
         <div className="canvas-modal__body">
           {connectionInfo && (

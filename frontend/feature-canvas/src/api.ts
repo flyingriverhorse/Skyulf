@@ -1046,7 +1046,7 @@ export type HyperparameterTuningJobResponse = {
   status: HyperparameterTuningJobStatus;
   run_number: number;
   model_type: string;
-  search_strategy: 'grid' | 'random';
+  search_strategy: string;
   search_space?: Record<string, any> | null;
   baseline_hyperparameters?: Record<string, any> | null;
   n_iterations?: number | null;
@@ -1081,7 +1081,7 @@ export type HyperparameterTuningJobSummary = {
   status: HyperparameterTuningJobStatus;
   run_number: number;
   model_type: string;
-  search_strategy: 'grid' | 'random';
+  search_strategy: string;
   metadata?: Record<string, any> | null;
   metrics?: Record<string, any> | null;
   results?: Array<Record<string, any>> | null;
@@ -1102,7 +1102,7 @@ export type HyperparameterTuningJobCreatePayload = {
   node_id: string;
   model_type?: string;
   model_types?: string[];
-  search_strategy: 'grid' | 'random';
+  search_strategy: string;
   search_space: Record<string, any>;
   baseline_hyperparameters?: Record<string, any> | null;
   n_iterations?: number | null;

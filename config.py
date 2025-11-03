@@ -302,6 +302,44 @@ class Settings(BaseSettings):
     ML_DEFAULT_TEST_SIZE: float = 0.2  # 20% test split by default
     # Used anywhere we seed random operations (core/ml services)
     ML_RANDOM_STATE: int = 42  # Reproducible results
+
+    HYPERPARAMETER_TUNING_STRATEGIES: List[Dict[str, Any]] = [
+        {
+            "value": "random",
+            "label": "Random search",
+            "description": "Sample candidate hyperparameters uniformly at random.",
+            "impl": "random",
+            "aliases": ["random_search"],
+        },
+        {
+            "value": "grid",
+            "label": "Grid search",
+            "description": "Evaluate every combination in the search space.",
+            "impl": "grid",
+            "aliases": ["grid_search"],
+        },
+        {
+            "value": "halving",
+            "label": "Successive halving (grid)",
+            "description": "Successively allocate resources to the best grid candidates.",
+            "impl": "halving",
+            "aliases": ["successive_halving", "halving_grid"],
+        },
+        {
+            "value": "halving_random",
+            "label": "Successive halving (random)",
+            "description": "Random sampling with successive halving to prune weak candidates.",
+            "impl": "halving_random",
+            "aliases": ["successive_halving_random", "halving_search"],
+        },
+        {
+            "value": "optuna",
+            "label": "Optuna (TPE)",
+            "description": "Bayesian optimisation with pruning via Optuna.",
+            "impl": "optuna",
+            "aliases": ["bayesian", "optuna_tpe"],
+        },
+    ]
     
     # === ADVANCED EDA / GRANULAR RUNTIME SETTINGS === None is unlimited
     # Analysis-type runtime: max rows before we sample (core/eda/advanced_eda/granular_runtime/__init__.py)

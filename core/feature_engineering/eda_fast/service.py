@@ -60,11 +60,14 @@ class FeatureEngineeringEDAService:
         *,
         row_count_ttl: int = 300,
         sample_cap: Optional[int] = None,
+        quality_report_ttl: int = 300,
     ) -> None:
         self.session = session
         self.data_service = DataIngestionService(session)
         self._row_count_cache: Dict[str, Tuple[int, float]] = {}
         self._row_count_ttl = max(0, int(row_count_ttl))
+        self._quality_report_cache: Dict[str, Tuple[Dict[str, Any], float]] = {}
+        self._quality_report_ttl = max(0, int(quality_report_ttl))
         resolved_cap = sample_cap if isinstance(sample_cap, int) and sample_cap > 0 else DEFAULT_SAMPLE_CAP
         self._sample_cap = int(resolved_cap)
         self._large_dataset_preview_cap = min(self._sample_cap, LARGE_DATASET_PREVIEW_CAP)
@@ -147,6 +150,11 @@ class FeatureEngineeringEDAService:
     async def quality_report(self, source_id: str, *, sample_size: int = 500) -> Dict[str, Any]:
         """Generate reduced quality metadata for the requested dataset."""
 
+        # Check cache first
+        cached_report = self._get_cached_quality_report(source_id, sample_size)
+        if cached_report is not None:
+            return cached_report
+
         file_path = await self._resolve_source_file_path(source_id)
         if not file_path:
             return {
@@ -186,8 +194,13 @@ class FeatureEngineeringEDAService:
                 "sampling_mode": sampling_mode,
                 "sampling_adjustments": adjustments,
                 "large_dataset": is_large,
+                "from_cache": False,
             },
         }
+        
+        # Cache the result
+        self._set_cached_quality_report(source_id, sample_size, payload)
+        
         return payload
 
     async def preview_rows_window(
@@ -485,8 +498,18 @@ class FeatureEngineeringEDAService:
         extension = file_path.suffix.lower()
         try:
             if extension == ".csv":
-                with file_path.open("r", encoding="utf-8", errors="ignore") as handle:
-                    return max(sum(1 for _ in handle) - 1, 0)
+                # Use faster buffered reading for large CSV files
+                count = 0
+                with file_path.open("rb") as handle:
+                    # Read in 64KB chunks for faster counting
+                    buffer_size = 65536
+                    read_f = handle.raw.read if hasattr(handle, "raw") else handle.read
+                    buf = read_f(buffer_size)
+                    while buf:
+                        count += buf.count(b'\n')
+                        buf = read_f(buffer_size)
+                # Subtract header row
+                return max(count - 1, 0)
             if extension in {".xlsx", ".xls"}:
                 return int(pd.read_excel(file_path, usecols=[0]).shape[0])
             if extension == ".json":
@@ -517,6 +540,38 @@ class FeatureEngineeringEDAService:
             return
         key = str(file_path.resolve())
         self._row_count_cache[key] = (int(count), time.time())
+
+    def _get_cached_quality_report(self, source_id: str, sample_size: int) -> Optional[Dict[str, Any]]:
+        """Retrieve cached quality report if valid."""
+        if self._quality_report_ttl == 0:
+            return None
+        
+        cache_key = f"{source_id}:{sample_size}"
+        cached = self._quality_report_cache.get(cache_key)
+        if not cached:
+            return None
+        
+        report, timestamp = cached
+        if time.time() - timestamp > self._quality_report_ttl:
+            self._quality_report_cache.pop(cache_key, None)
+            return None
+        
+        # Update meta to indicate cache hit
+        cached_report = dict(report)
+        if "meta" in cached_report:
+            cached_report["meta"] = dict(cached_report["meta"])
+            cached_report["meta"]["from_cache"] = True
+            cached_report["meta"]["cache_age_seconds"] = int(time.time() - timestamp)
+        
+        return cached_report
+
+    def _set_cached_quality_report(self, source_id: str, sample_size: int, report: Dict[str, Any]) -> None:
+        """Cache quality report for future requests."""
+        if self._quality_report_ttl == 0:
+            return
+        
+        cache_key = f"{source_id}:{sample_size}"
+        self._quality_report_cache[cache_key] = (report, time.time())
 
     def _resolve_sampling_strategy(
         self,

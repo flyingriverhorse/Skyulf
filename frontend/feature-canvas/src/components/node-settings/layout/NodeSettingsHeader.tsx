@@ -17,9 +17,17 @@ type NodeSettingsHeaderProps = {
   title: string;
   isDataset: boolean;
   onClose: () => void;
+  canResetNode?: boolean;
+  onResetNode?: () => void;
 };
 
-export const NodeSettingsHeader: React.FC<NodeSettingsHeaderProps> = ({ title, isDataset, onClose }) => (
+export const NodeSettingsHeader: React.FC<NodeSettingsHeaderProps> = ({
+  title,
+  isDataset,
+  onClose,
+  canResetNode = false,
+  onResetNode,
+}) => (
   <div className="canvas-modal__header">
     <div className="canvas-modal__title-group">
       <PlaceholderIcon type={isDataset ? 'dataset' : 'default'} />
@@ -34,8 +42,19 @@ export const NodeSettingsHeader: React.FC<NodeSettingsHeaderProps> = ({ title, i
         </p>
       </div>
     </div>
-    <button type="button" className="canvas-modal__close" onClick={onClose} aria-label="Close settings">
-      ×
-    </button>
+    <div className="canvas-modal__header-actions">
+      {canResetNode && onResetNode && (
+        <button
+          type="button"
+          className="btn btn-outline-secondary"
+          onClick={onResetNode}
+        >
+          Reset node
+        </button>
+      )}
+      <button type="button" className="canvas-modal__close" onClick={onClose} aria-label="Close settings">
+        ×
+      </button>
+    </div>
   </div>
 );
