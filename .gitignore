@@ -116,5 +116,8 @@ __pycache__
 app_data
 backups
 
+# Local library bundle — ignore the vendored `skyulf-mlflow` package
+skyulf-mlflow/
+
 # tools
 .tools
