@@ -118,6 +118,7 @@ backups
 
 # Local library bundle — ignore the vendored `skyulf-mlflow` package
 skyulf-mlflow/
+.skyulf-mlflow
 
 # tools
 .tools
