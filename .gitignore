@@ -15,8 +15,9 @@ ENV/
 docs/
 
 #DB
+.mlops_database.db/
+.mlops_database.db
 mlops_database.db
-
 # Pytest
 .pytest_cache/
 
