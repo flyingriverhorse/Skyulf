@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question
+    url: https://github.com/flyingriverhorse/skyulf-mlflow/discussions
+    about: Use GitHub Discussions for general questions and ideas
+  - name: Security reports
+    url: https://github.com/flyingriverhorse/skyulf-mlflow/security/policy
+    about: Please follow the instructions in SECURITY.md for sensitive issues
