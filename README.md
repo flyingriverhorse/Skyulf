@@ -1,5 +1,10 @@
 # Skyulf — local‑first MLOps web app (FastAPI)
 
+![CI](https://github.com/flyingriverhorse/skyulf-mlflow/actions/workflows/ci.yml/badge.svg)
+![CodeQL](https://github.com/flyingriverhorse/skyulf-mlflow/actions/workflows/codeql.yml/badge.svg)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue)
+![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue)
+
 **© 2025 Murat Unsal — Skyulf Project**
 
 > ⚠️ **Early Alpha (v0.0.1)**: This is a passion project in active development. Expect bugs, incomplete features, and visual inconsistencies. Use at your own risk and please report issues on GitHub!
@@ -14,6 +19,10 @@ What you get out of the box:
 - LLM helpers that can run locally (Ollama) or via APIs, with dataset‑aware guardrails - if configured.
 
 Note: This repo hosts the FastAPI app. A separate reusable ML utility library lives under `skyulf-mlflow/`.
+
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow guidance, and read our [Code of Conduct](CODE_OF_CONDUCT.md). Use GitHub Issues for bugs and Discussions for questions. Good first issues are labeled.
 
 ## Quick start
 
