@@ -12,7 +12,7 @@ httpx>=0.25.0,<1.0.0
 
 # ML stack used by tests
 pandas>=2.0.0,<3.0.0
-numpy>=1.24.0,<2.0.0
+numpy>=1.24.0,<3.0.0
 scikit-learn>=1.4.0,<2.0.0
 scipy>=1.13.1
 imbalanced-learn>=0.12.0,<1.0.0
