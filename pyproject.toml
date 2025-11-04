@@ -1,7 +1,9 @@
+# © 2025 Murat Unsal — Skyulf Project
+
 [project]
-name = "fastapi-app"
-version = "0.1.0"
-description = "Add your description here"
+name = "skyulf-mlflow-app"
+version = "0.0.1"
+description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

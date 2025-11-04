@@ -1,6 +1,8 @@
 """
 FastAPI Configuration Management
 
+© 2025 Murat Unsal — Skyulf Project
+
 Comprehensive configuration system migrated from Flask with modern Pydantic validation.
 Includes ML platform settings, LLM configurations, and feature management.
 """

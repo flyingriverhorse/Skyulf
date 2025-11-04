@@ -1,0 +1,44 @@
+# © 2025 Murat Unsal — Skyulf Project
+
+name: Feature request
+description: Suggest an idea for this project
+labels: [enhancement]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One sentence describing the feature
+      placeholder: e.g. "Export trained models to ONNX"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What user problem does this solve?
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe how it could work (UI/API)
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Data ingestion
+        - EDA/Feature Canvas
+        - Model training
+        - LLM helpers
+        - Admin/UX
+        - Docs
+        - Infrastructure
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context

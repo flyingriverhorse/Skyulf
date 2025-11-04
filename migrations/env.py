@@ -1,3 +1,6 @@
+"""
+© 2025 Murat Unsal — Skyulf Project
+"""
 import sys
 from pathlib import Path
 

@@ -1,6 +1,8 @@
 """
 FastAPI MLops Application Entry Point
 
+© 2025 Murat Unsal — Skyulf Project
+
 This module creates and configures the FastAPI application instance.
 It provides better concurrency support compared to the Flask implementation.
 """

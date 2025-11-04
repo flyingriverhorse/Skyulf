@@ -1,0 +1,1188 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<!--
+    © 2025 Murat Unsal — Skyulf Project
+    A passion project for local-first MLOps
+-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skyulf - Local-first MLOps Control Room</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/animejs/lib/anime.iife.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f8fafc;
+        }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 8s ease infinite;
+        }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .floating-card {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .grid-pattern {
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+        
+        .tech-card {
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .tech-card:hover {
+            transform: translateY(-8px);
+            border-color: #3b82f6;
+            box-shadow: 0 20px 40px rgba(59, 130, 246, 0.2);
+        }
+        
+        .pulse-dot {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0.4; transform: scale(1); }
+        }
+        
+        .automation-flow {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .flow-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        }
+        
+        .flow-node {
+            animation: flowMove 3s linear infinite;
+        }
+        
+        @keyframes flowMove {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Feature Canvas Mock - matches actual frontend */
+        .canvas-mock {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            background: linear-gradient(135deg, #0b1628 0%, #0f172a 50%, #1e293b 100%);
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: inset 0 0 48px rgba(15, 18, 26, 0.6);
+        }
+
+        .canvas-mock__grid {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.08) 1px, transparent 1px);
+            background-size: 50px 50px;
+            opacity: 0.4;
+        }
+
+        .canvas-mock__nodes {
+            position: absolute;
+            inset: 0;
+            padding: 80px 40px;
+            display: block;
+            z-index: 2;
+        }
+
+        .canvas-mock__node {
+            position: absolute;
+            left: var(--x, 50%);
+            top: var(--y, 50%);
+            min-width: 160px;
+            max-width: 180px;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            background: radial-gradient(circle at top, rgba(46, 56, 77, 0.95), rgba(17, 24, 39, 0.94));
+            box-shadow: 0 24px 50px rgba(15, 23, 42, 0.45);
+            padding: 12px 14px;
+            color: #e2e8f0;
+            transform: translate(-50%, -50%);
+            cursor: grab;
+            transition: transform 0.18s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+
+        .canvas-mock__node.is-dragging {
+            cursor: grabbing;
+            box-shadow: 0 30px 60px rgba(59, 130, 246, 0.35);
+        }
+
+        .canvas-mock__node:hover {
+            transform: translate(-50%, -50%) scale(1.02);
+            box-shadow: 0 28px 60px rgba(59, 130, 246, 0.3);
+            border-color: rgba(94, 234, 212, 0.5);
+        }
+
+        body.is-dragging,
+        body.is-dragging * {
+            user-select: none !important;
+        }
+
+        .canvas-mock__node::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 18px;
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            pointer-events: none;
+        }
+
+        .canvas-mock__node-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .canvas-mock__node-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #f8fafc;
+            line-height: 1.3;
+        }
+
+        .canvas-mock__drag-handle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 999px;
+            background: rgba(30, 41, 59, 0.9);
+            color: rgba(226, 232, 240, 0.85);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: grab;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
+        }
+
+        .canvas-mock__node-desc {
+            font-size: 0.8rem;
+            color: rgba(203, 213, 225, 0.92);
+            line-height: 1.4;
+        }
+
+        .canvas-mock__handle {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            border: 2.5px solid #0f172a;
+            z-index: 10;
+            transition: transform 0.18s ease;
+            box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .canvas-mock__handle--left {
+            left: 0;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(148, 163, 184, 0.6);
+            border-color: rgba(100, 116, 139, 1);
+        }
+
+        .canvas-mock__handle--right {
+            right: 0;
+            top: 50%;
+            transform: translate(50%, -50%);
+            background: rgba(45, 212, 191, 0.5);
+            border-color: rgba(20, 184, 166, 1);
+        }
+
+        .canvas-mock__handle:hover {
+            transform: translate(-50%, -50%) scale(1.15);
+        }
+
+        .canvas-mock__handle--right:hover {
+            transform: translate(50%, -50%) scale(1.15);
+        }
+
+        .canvas-mock__edge {
+            position: absolute;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .canvas-mock__edge path {
+            animation: dashFlow 2s linear infinite;
+        }
+
+        @keyframes dashFlow {
+            0% {
+                stroke-dashoffset: 28;
+            }
+            100% {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .canvas-mock__edge-gradient {
+            stop:nth-child(1) { stop-color: #38bdf8; stop-opacity: 0.85; }
+            stop:nth-child(2) { stop-color: #6366f1; stop-opacity: 0.95; }
+            stop:nth-child(3) { stop-color: #a855f7; stop-opacity: 0.9; }
+        }
+
+        @media (max-width: 1280px) {
+            .canvas-mock {
+                height: 550px;
+            }
+
+            .canvas-mock__nodes {
+                padding: 70px 30px;
+            }
+
+            .canvas-mock__node {
+                min-width: 150px;
+                max-width: 160px;
+                min-height: 95px;
+            }
+        }
+        
+        @media (max-width: 1024px) {
+            .canvas-mock {
+                height: 700px;
+            }
+
+            .canvas-mock__nodes {
+                position: static;
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 24px;
+                padding: 40px 24px;
+            }
+
+            .canvas-mock__node {
+                position: relative;
+                left: auto;
+                top: auto;
+                min-width: 100%;
+                transform: none;
+                cursor: default;
+            }
+
+            .canvas-mock__node:hover {
+                transform: translateY(-4px);
+            }
+
+            .canvas-mock__edge path {
+                display: none;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .canvas-mock {
+                height: 750px;
+            }
+
+            .canvas-mock__nodes {
+                padding: 32px 16px;
+                gap: 20px;
+            }
+
+            .canvas-mock__node {
+                min-width: 100%;
+                min-height: 100px;
+            }
+            
+            .canvas-mock__node-title {
+                font-size: 0.95rem;
+            }
+            
+            .canvas-mock__node-desc {
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 glass-effect">
+        <div class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <span class="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+                            Skyulf
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="#features" class="text-gray-300 hover:text-white transition-colors">Platform</a>
+                        <a href="#nodes" class="text-gray-300 hover:text-white transition-colors">Nodes</a>
+                        <a href="#tour" class="text-gray-300 hover:text-white transition-colors">Product Tour</a>
+                        <a href="#roadmap" class="text-gray-300 hover:text-white transition-colors">Roadmap</a>
+                        <a href="#community" class="text-gray-300 hover:text-white transition-colors">Community</a>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <a href="https://github.com/flyingriverhorse/skyulf-mlflow" target="_blank" rel="noopener" class="hidden sm:inline-flex text-gray-300 hover:text-white transition-colors">GitHub</a>
+                    <a href="https://github.com/flyingriverhorse/skyulf-mlflow/discussions" target="_blank" rel="noopener" class="text-gray-300 hover:text-white transition-colors">Discussions</a>
+                    <a href="#community" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all">
+                        Get Involved
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                <div class="text-center lg:text-left">
+                    <h1 class="text-5xl md:text-7xl font-bold mb-6" data-aos="fade-up" data-aos-delay="50">
+                        <span class="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                            MLOps on your terms
+                        </span>
+                        <span class="block text-white">Run everything locally</span>
+                    </h1>
+                    <p class="text-xl text-gray-300 mb-8" data-aos="fade-up" data-aos-delay="100">
+                        Skyulf gives you a FastAPI workspace to build ML pipelines—load data, engineer features, train models—all running on your own infrastructure.
+                    </p>
+                    <p class="text-sm text-gray-400 italic mb-8" data-aos="fade-up" data-aos-delay="120">
+                        A passion project by Murat Unsal. Built to prove you don't need cloud vendors for MLOps.
+                    </p>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10" data-aos="fade-up" data-aos-delay="150">
+                        <div class="relative group cursor-pointer">
+                            <div class="absolute inset-0 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg opacity-0 group-hover:opacity-100 blur transition-opacity duration-300"></div>
+                            <div class="relative glass-effect rounded-lg p-3 text-center border border-blue-500/30 hover:border-blue-400/60 transition-all duration-300 transform group-hover:scale-105">
+                                <svg class="w-6 h-6 mx-auto mb-2 text-blue-400 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                </svg>
+                                <p class="text-xs text-gray-100 font-semibold leading-tight">Drag & drop</p>
+                            </div>
+                        </div>
+                        <div class="relative group cursor-pointer">
+                            <div class="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg opacity-0 group-hover:opacity-100 blur transition-opacity duration-300"></div>
+                            <div class="relative glass-effect rounded-lg p-3 text-center border border-emerald-500/30 hover:border-emerald-400/60 transition-all duration-300 transform group-hover:scale-105">
+                                <svg class="w-6 h-6 mx-auto mb-2 text-emerald-400 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                </svg>
+                                <p class="text-xs text-gray-100 font-semibold leading-tight">Private</p>
+                            </div>
+                        </div>
+                        <div class="relative group cursor-pointer">
+                            <div class="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg opacity-0 group-hover:opacity-100 blur transition-opacity duration-300"></div>
+                            <div class="relative glass-effect rounded-lg p-3 text-center border border-purple-500/30 hover:border-purple-400/60 transition-all duration-300 transform group-hover:scale-105">
+                                <svg class="w-6 h-6 mx-auto mb-2 text-purple-400 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                                <p class="text-xs text-gray-100 font-semibold leading-tight">Fast</p>
+                            </div>
+                        </div>
+                        <div class="relative group cursor-pointer">
+                            <div class="absolute inset-0 bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg opacity-0 group-hover:opacity-100 blur transition-opacity duration-300"></div>
+                            <div class="relative glass-effect rounded-lg p-3 text-center border border-orange-500/30 hover:border-orange-400/60 transition-all duration-300 transform group-hover:scale-105">
+                                <svg class="w-6 h-6 mx-auto mb-2 text-orange-400 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                                </svg>
+                                <p class="text-xs text-gray-100 font-semibold leading-tight">Scalable</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-4 sm:items-center" data-aos="fade-up" data-aos-delay="200">
+                        <a href="https://github.com/flyingriverhorse/skyulf-mlflow" target="_blank" rel="noopener" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105 text-center">
+                            Star on GitHub
+                        </a>
+                        <a href="https://github.com/flyingriverhorse/skyulf-mlflow#quick-start" target="_blank" rel="noopener" class="border border-gray-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:border-white transition-all text-center">
+                            Launch Quickstart
+                        </a>
+                        <a href="#community" class="flex items-center justify-center gap-2 text-lg font-semibold text-gray-200 hover:text-white transition-colors">
+                            <i data-feather="message-circle" class="w-5 h-5"></i>
+                            Join the community
+                        </a>
+                    </div>
+                </div>
+                <div class="relative" data-aos="fade-left" data-aos-delay="200">
+                    <div class="text-center mb-6" data-aos="fade-up" data-aos-delay="50">
+                        <p class="text-sm text-yellow-400/80">
+                            ⚠️ <strong>Early Alpha (v0.0.1)</strong>: This is a work in progress. Expect bugs, incomplete features, and visual inconsistencies.
+                        </p>
+                    </div>
+                    <div class="absolute -top-10 -left-10 w-32 h-32 bg-blue-500/20 blur-3xl rounded-full"></div>
+                    <div class="absolute -bottom-16 -right-16 w-48 h-48 bg-purple-500/20 blur-3xl rounded-full"></div>
+                    <div class="glass-effect rounded-3xl p-6 relative overflow-hidden border border-white/10">
+                        <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-transparent pointer-events-none"></div>
+                        <div class="relative rounded-2xl overflow-hidden shadow-2xl border border-white/5">
+                            <!-- Feature Canvas mock matching actual frontend design -->
+                            <div class="canvas-mock">
+                                <div class="canvas-mock__grid"></div>
+                                <svg class="canvas-mock__edge" style="position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 1; pointer-events: none;">
+                                    <defs>
+                                        <linearGradient id="edge-gradient-1" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" style="stop-color:#38bdf8;stop-opacity:1" />
+                                            <stop offset="50%" style="stop-color:#6366f1;stop-opacity:1" />
+                                            <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+                                        </linearGradient>
+                                        <linearGradient id="edge-gradient-2" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" style="stop-color:#38bdf8;stop-opacity:1" />
+                                            <stop offset="50%" style="stop-color:#6366f1;stop-opacity:1" />
+                                            <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+                                        </linearGradient>
+                                        <linearGradient id="edge-gradient-3" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" style="stop-color:#38bdf8;stop-opacity:1" />
+                                            <stop offset="50%" style="stop-color:#6366f1;stop-opacity:1" />
+                                            <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+                                        </linearGradient>
+                                        <filter id="glow">
+                                            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                                            <feMerge>
+                                                <feMergeNode in="coloredBlur"/>
+                                                <feMergeNode in="SourceGraphic"/>
+                                            </feMerge>
+                                        </filter>
+                                    </defs>
+                                    <!-- Connection from node 1 right handle to node 2 left handle -->
+                                    <path data-connection="source->split"
+                                          d="M0 0 C 0 0, 0 0, 0 0"
+                                          fill="none"
+                                          stroke="url(#edge-gradient-1)" 
+                                          stroke-width="2.5" 
+                                          stroke-dasharray="8,6"
+                                          stroke-linecap="round"
+                                          filter="url(#glow)" 
+                                          opacity="0.9" />
+                                    <!-- Connection from node 2 right handle to node 3 left handle -->
+                                    <path data-connection="split->trainer"
+                                          d="M0 0 C 0 0, 0 0, 0 0"
+                                          fill="none"
+                                          stroke="url(#edge-gradient-2)" 
+                                          stroke-width="2.5" 
+                                          stroke-dasharray="8,6"
+                                          stroke-linecap="round"
+                                          filter="url(#glow)" 
+                                          opacity="0.9" />
+                                </svg>
+                                <div class="canvas-mock__nodes">
+                                    <div class="canvas-mock__node" data-node-id="source" data-initial-y="48">
+                                        <div class="canvas-mock__handle canvas-mock__handle--right"></div>
+                                        <div class="canvas-mock__node-header">
+                                            <h4 class="canvas-mock__node-title">Dataset Source</h4>
+                                            <span class="canvas-mock__drag-handle">⋮⋮</span>
+                                        </div>
+                                        <p class="canvas-mock__node-desc">transactions.csv<br></p>
+                                    </div>
+                                    <div class="canvas-mock__node" data-node-id="split" data-initial-y="55">
+                                        <div class="canvas-mock__handle canvas-mock__handle--left"></div>
+                                        <div class="canvas-mock__handle canvas-mock__handle--right"></div>
+                                        <div class="canvas-mock__node-header">
+                                            <h4 class="canvas-mock__node-title">Train/Val/Test Split</h4>
+                                            <span class="canvas-mock__drag-handle">⋮⋮</span>
+                                        </div>
+                                        <p class="canvas-mock__node-desc"><span style="color: rgba(148,163,184,0.85); font-size: 0.75rem;">70% / 15% / 15%</span></p>
+                                    </div>
+                                    <div class="canvas-mock__node" data-node-id="trainer" data-initial-y="45">
+                                        <div class="canvas-mock__handle canvas-mock__handle--left"></div>
+                                        <div class="canvas-mock__node-header">
+                                            <h4 class="canvas-mock__node-title">Model Trainer</h4>
+                                            <span class="canvas-mock__drag-handle">⋮⋮</span>
+                                        </div>
+                                        <p class="canvas-mock__node-desc">Celery async<br></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="flex justify-center mb-6" data-aos="fade-up">
+                <div class="inline-flex items-center px-4 py-2 rounded-full glass-effect border border-white/10">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2 pulse-dot"></span>
+                    <span class="text-sm uppercase tracking-wide text-gray-200">Open source · Apache-2.0 License</span>
+                </div>
+            </div>
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-4xl font-bold mb-4">What's inside</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    A web UI for ingesting data, engineering features, training models, and running background jobs—all without uploading to third-party clouds.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="100">
+                    <div class="w-14 h-14 bg-blue-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="upload" class="w-8 h-8 text-blue-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Data Ingestion</h3>
+                    <p class="text-xs text-blue-300 uppercase tracking-wide mb-2">Alpha · Available now</p>
+                    <p class="text-gray-400">
+                        Load CSV, Excel, Parquet, or SQL data. Schema gets detected automatically and results are cached so experiments stay reproducible. 
+                    </p>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="150">
+                    <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="grid" class="w-8 h-8 text-purple-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Feature Canvas</h3>
+                    <p class="text-xs text-purple-300 uppercase tracking-wide mb-2">Alpha · Available now</p>
+                    <p class="text-gray-400">
+                        Drag and drop to wire up feature pipelines, or write Python recipes directly. Includes transforms for scaling, binning, feature selection, and geospatial ops (planned).
+                    </p>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="200">
+                    <div class="w-14 h-14 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="cpu" class="w-8 h-8 text-emerald-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Async Training</h3>
+                    <p class="text-xs text-emerald-300 uppercase tracking-wide mb-2">Alpha · Available now</p>
+                    <p class="text-gray-400">
+                        Kick off grid searches, random sweeps, or halving trials in the background with Celery workers. Hook in Optuna if you want fancier hyperparameter tuning.
+                    </p>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="250">
+                    <div class="w-14 h-14 bg-pink-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="shield" class="w-8 h-8 text-pink-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">LLM Helpers</h3>
+                    <p class="text-xs text-pink-300 uppercase tracking-wide mb-2">Planned · Roadmap</p>
+                    <p class="text-gray-400">
+                        Connect OpenAI, Anthropic, DeepSeek, or run Ollama locally. Built-in guardrails help keep LLM outputs tied to your actual data.
+                    </p>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="300">
+                    <div class="w-14 h-14 bg-orange-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="activity" class="w-8 h-8 text-orange-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Run Monitoring</h3>
+                    <p class="text-xs text-orange-300 uppercase tracking-wide mb-2">Planned · Roadmap</p>
+                    <p class="text-gray-400">
+                        We're working on live logs and run tracking. Exports will be MLflow-compatible so you can plug into other observability tools.
+                    </p>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="350">
+                    <div class="w-14 h-14 bg-indigo-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="git-merge" class="w-8 h-8 text-indigo-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Self-hosted DevEx</h3>
+                    <p class="text-xs text-indigo-300 uppercase tracking-wide mb-2">Alpha · Available now</p>
+                    <p class="text-gray-400">
+                        Configure once via `config.py`, run on SQLite by default, and graduate to PostgreSQL or Docker when you’re ready.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Nodes Section -->
+    <section id="nodes" class="py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-4xl font-bold mb-4">Build pipelines with nodes</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    The Feature Canvas lets you snap together nodes for ingestion, transforms, training, and monitoring—all open source, all running locally.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="100">
+                    <div class="w-14 h-14 bg-blue-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="database" class="w-8 h-8 text-blue-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Ingestion</h3>
+                    <p class="text-xs text-blue-300 uppercase tracking-wide mb-2">Alpha nodes available</p>
+                    <ul class="space-y-2 text-gray-400">
+                        <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>CSV, Excel, Parquet loaders</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>SQL/AsyncPG connectors</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>REST fetchers (planned)</li>
+                    </ul>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="150">
+                    <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="git-branch" class="w-8 h-8 text-purple-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Transforms</h3>
+                    <p class="text-xs text-purple-300 uppercase tracking-wide mb-2">Alpha nodes available</p>
+                    <ul class="space-y-2 text-gray-400">
+                        <li class="flex items-center"><span class="w-2 h-2 bg-purple-400 rounded-full mr-3"></span>Scaling, encoding, binning</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-purple-400 rounded-full mr-3"></span>Feature selection</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-purple-400 rounded-full mr-3"></span>PCA (Planned)</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-purple-400 rounded-full mr-3"></span>Geospatial + time features (Planned)</li>
+                    </ul>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="200">
+                    <div class="w-14 h-14 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="cpu" class="w-8 h-8 text-emerald-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Modeling</h3>
+                    <p class="text-xs text-emerald-300 uppercase tracking-wide mb-2">Alpha nodes available</p>
+                    <ul class="space-y-2 text-gray-400">
+                        <li class="flex items-center"><span class="w-2 h-2 bg-emerald-400 rounded-full mr-3"></span>Scikit-learn trainers</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-emerald-400 rounded-full mr-3"></span>Hyperparameter Tunings</li>
+                    </ul>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="250">
+                    <div class="w-14 h-14 bg-pink-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="activity" class="w-8 h-8 text-pink-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Observability</h3>
+                    <p class="text-xs text-pink-300 uppercase tracking-wide mb-2">Planned</p>
+                    <ul class="space-y-2 text-gray-400">
+                        <li class="flex items-center"><span class="w-2 h-2 bg-pink-400 rounded-full mr-3"></span>Cross-validation metrics</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-pink-400 rounded-full mr-3"></span>Drift + anomaly checks</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-pink-400 rounded-full mr-3"></span>Exports to dashboards & MLflow</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Product Tour Section -->
+    <section id="tour" class="py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div class="order-2 lg:order-1" data-aos="fade-right">
+                    <div class="glass-effect rounded-3xl p-6 border border-white/10">
+                        <div class="rounded-2xl overflow-hidden border border-white/5">
+                            <!-- Swap this placeholder GIF with a capture from your product -->
+                            <img src="/static/app-preview.gif" alt="Flow builder product tour" class="w-full h-full object-cover">
+                        </div>
+                    </div>
+                </div>
+                <div class="order-1 lg:order-2" data-aos="fade-left">
+                    <div class="inline-flex items-center px-4 py-2 rounded-full glass-effect border border-white/10 mb-6">
+                        <span class="w-2 h-2 rounded-full bg-blue-400 mr-2"></span>
+                        <span class="text-sm uppercase tracking-wide text-gray-200">Product tour</span>
+                    </div>
+                    <h2 class="text-4xl font-bold mb-6">See Skyulf in action</h2>
+                    <p class="text-lg text-gray-300 mb-10">
+                        From ingestion to deployment, Skyulf keeps your experiments reproducible and private. Here’s a snapshot of how a local-first team moves from raw data to a deployed model.
+                    </p>
+                    <div class="space-y-6">
+                        <div class="glass-effect rounded-2xl p-6 border border-white/10">
+                            <div class="flex items-start gap-4">
+                                <span class="text-lg font-semibold text-blue-300">01.</span>
+                                <div>
+                                    <h3 class="text-xl font-semibold text-white mb-1">Load your data</h3>
+                                    <p class="text-gray-400">Point to CSV, Parquet, or SQL sources. Schema gets detected automatically and everything's cached for repeat runs. REST loaders are coming next.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-effect rounded-2xl p-6 border border-white/10">
+                            <div class="flex items-start gap-4">
+                                <span class="text-lg font-semibold text-purple-300">02.</span>
+                                <div>
+                                    <h3 class="text-xl font-semibold text-white mb-1">Build your pipeline</h3>
+                                    <p class="text-gray-400">Drag nodes around the canvas to wire up transforms. Preview stats at each step before saving to the feature store.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-effect rounded-2xl p-6 border border-white/10">
+                            <div class="flex items-start gap-4">
+                                <span class="text-lg font-semibold text-pink-300">03.</span>
+                                <div>
+                                    <h3 class="text-xl font-semibold text-white mb-1">Train and monitor</h3>
+                                    <p class="text-gray-400">Launch training runs in the background, track metrics as they come in. MLflow-compatible exports are planned for seamless deployment.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Roadmap Section -->
+    <section id="roadmap" class="py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-4xl font-bold mb-4">Release snapshot</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    Skyulf is evolving in the open. Track what’s shipping now and what the community is rallying around next.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div class="glass-effect rounded-3xl p-8 border border-white/10" data-aos="fade-up" data-aos-delay="100">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                            <i data-feather="tag" class="w-5 h-5 text-blue-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm uppercase tracking-wide text-blue-300">Now shipping</p>
+                            <h3 class="text-2xl font-semibold text-white">v0.0.1 · Alpha</h3>
+                        </div>
+                    </div>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span>Feature Canvas with ingestion + transform nodes and cached EDA previews.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span>Async model training via Celery workers with grid/random/halving search.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span>Local-first auth, admin scaffolding, and health endpoints ready for self-hosting.</span></li>
+                    </ul>
+                </div>
+                <div class="glass-effect rounded-3xl p-8 border border-white/10" data-aos="fade-up" data-aos-delay="150">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                            <i data-feather="compass" class="w-5 h-5 text-purple-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm uppercase tracking-wide text-purple-300">In discovery</p>
+                            <h3 class="text-2xl font-semibold text-white">v0.1.0 · Community beta</h3>
+                        </div>
+                    </div>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span>Expanded node library: scheduling, notifications, and evaluation drift monitors.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span>Improved experiment tracking with richer dashboards and export presets.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span>Contributor experience upgrades: CLI scaffolding, templated test harnesses, and docs revamp.</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases Section -->
+    <section id="solutions" class="py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-4xl font-bold mb-4">Who's using this</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    Teams working with sensitive data who can't upload to cloud services. In the future, will be added more sectors—education, finance, IoT, and beyond. <span class="text-blue-400 font-semibold">Anyone can use it freely.</span>
+                </p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                <div class="glass-effect rounded-3xl p-8 border border-white/10" data-aos="fade-up" data-aos-delay="100">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                            <i data-feather="shield" class="w-5 h-5 text-blue-400"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white">Healthcare & Research</h3>
+                    </div>
+                    <p class="text-gray-400 mb-6">Train models on patient data or research datasets that can't leave your infrastructure due to GDPR or institutional policies.</p>
+                    <p class="text-xs text-blue-300 uppercase tracking-wide mb-4">Current users</p>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-blue-400 rounded-full"></span>Load CSV/Parquet exports from local databases</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-blue-400 rounded-full"></span>Engineer features without cloud uploads</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-blue-400 rounded-full"></span>Train models with hyperparameter search locally</li>
+                    </ul>
+                </div>
+                <div class="glass-effect rounded-3xl p-8 border border-white/10" data-aos="fade-up" data-aos-delay="150">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                            <i data-feather="globe" class="w-5 h-5 text-purple-400"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white">Government & Public Sector</h3>
+                    </div>
+                    <p class="text-gray-400 mb-6">Municipalities and public institutions working with citizen data that must stay on-premises for privacy and compliance.</p>
+                    <p class="text-xs text-purple-300 uppercase tracking-wide mb-4">Target use case</p>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-purple-400 rounded-full"></span>GDPR-compliant data processing</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-purple-400 rounded-full"></span>No cloud vendor lock-in</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-purple-400 rounded-full"></span>Full audit trails for transparency</li>
+                    </ul>
+                </div>
+                <div class="glass-effect rounded-3xl p-8 border border-white/10" data-aos="fade-up" data-aos-delay="200">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                            <i data-feather="briefcase" class="w-5 h-5 text-emerald-400"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white">SMEs & Startups</h3>
+                    </div>
+                    <p class="text-gray-400 mb-6">Small teams who need ML tooling but want to avoid expensive SaaS subscriptions and keep data under their own control.</p>
+                    <p class="text-xs text-emerald-300 uppercase tracking-wide mb-4">Growing user base</p>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full"></span>Run on SQLite to start, scale to Postgres later</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full"></span>Self-host with Docker or bare metal</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full"></span>No per-user licensing or API fees</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Community Section -->
+    <section id="community" class="py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-4xl font-bold mb-4">Build with the Skyulf community</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    Contribute new nodes, test releases, or help shape the roadmap. Here’s where to start.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <a href="https://github.com/flyingriverhorse/skyulf-mlflow" target="_blank" rel="noopener" class="tech-card rounded-3xl p-8 border border-white/10 hover:border-blue-500 transition-all" data-aos="fade-up" data-aos-delay="100">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                            <i data-feather="github" class="w-6 h-6 text-blue-400"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white">GitHub</h3>
+                    </div>
+                    <p class="text-gray-400">Explore the source, open issues, and blueprints for new nodes and integrations.</p>
+                </a>
+                <a href="https://github.com/flyingriverhorse/skyulf-mlflow#quick-start" target="_blank" rel="noopener" class="tech-card rounded-3xl p-8 border border-white/10 hover:border-purple-500 transition-all" data-aos="fade-up" data-aos-delay="150">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                            <i data-feather="book-open" class="w-6 h-6 text-purple-400"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white">Documentation</h3>
+                    </div>
+                    <p class="text-gray-400">Step-by-step guides to run Skyulf locally, configure environments, and ship your first flow.</p>
+                </a>
+                <a href="https://github.com/flyingriverhorse/skyulf-mlflow/discussions" target="_blank" rel="noopener" class="tech-card rounded-3xl p-8 border border-white/10 hover:border-emerald-500 transition-all" data-aos="fade-up" data-aos-delay="200">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                            <i data-feather="zap" class="w-6 h-6 text-emerald-400"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white">Discussions</h3>
+                    </div>
+                    <p class="text-gray-400">Join Discussions to propose nodes, share ideas, and coordinate contribution sprints.</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="hero-gradient rounded-3xl p-12 text-center" data-aos="zoom-in">
+                <h2 class="text-4xl font-bold mb-6">Help shape Skyulf</h2>
+                <p class="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
+                    We’re building a self-hosted, transparent MLOps stack together. Contribute code, docs, or feedback—every commit counts.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="https://github.com/flyingriverhorse/skyulf-mlflow" target="_blank" rel="noopener" class="bg-white text-gray-900 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 transition-all">
+                        Contribute on GitHub
+                    </a>
+                    <a href="https://github.com/flyingriverhorse/skyulf-mlflow/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener" class="border border-white text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-white hover:text-gray-900 transition-all">
+                        Read Contributing Guide
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-4 sm:px-6 lg:px-8 border-t border-gray-800">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <span class="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+                        Skyulf
+                    </span>
+                    <p class="text-gray-400 mt-4">
+                        Local-first MLOps for privacy-preserving teams.
+                    </p>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Product</h4>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full"></span>Automated feature stores</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full"></span>Continuous evaluation hooks</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full"></span>Production-grade backfills</li>
+                        <li><a href="#" class="hover:text-white transition-colors">API</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Resources</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="https://github.com/flyingriverhorse/skyulf-mlflow" class="hover:text-white transition-colors" target="_blank" rel="noopener">GitHub Repository</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Documentation</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Blog</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Community</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Support</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Project</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#roadmap" class="hover:text-white transition-colors">Roadmap</a></li>
+                        <li><a href="https://github.com/flyingriverhorse/skyulf-mlflow/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener" class="hover:text-white transition-colors">Contributing</a></li>
+                        <li><a href="https://github.com/flyingriverhorse/skyulf-mlflow/tree/master/docs" target="_blank" rel="noopener" class="hover:text-white transition-colors">Documentation</a></li>
+                        <li><a href="https://github.com/flyingriverhorse/skyulf-mlflow/blob/master/SECURITY.md" target="_blank" rel="noopener" class="hover:text-white transition-colors">Security</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-12 pt-8">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+                    <p class="text-gray-400">© 2025 Murat Unsal — Skyulf Project. Apache-2.0.</p>
+                    <div class="flex space-x-6 mt-4 md:mt-0">
+                    <a href="https://www.linkedin.com/in/murat-u/" class="text-gray-400 hover:text-white transition-colors">
+                        <i data-feather="linkedin" class="w-5 h-5"></i>
+                    </a>
+                    <a href="https://github.com/flyingriverhorse/skyulf-mlflow" class="text-gray-400 hover:text-white transition-colors">
+                        <i data-feather="github" class="w-5 h-5"></i>
+                    </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        AOS.init({
+            duration: 800,
+            once: true,
+            offset: 100
+        });
+        
+        feather.replace();
+        
+        // Animation for automation flow
+        document.addEventListener('DOMContentLoaded', function() {
+            const flowNode = document.querySelector('.flow-node');
+            if (flowNode) {
+                anime({
+                    targets: flowNode,
+                    left: ['0%', '100%'],
+                    duration: 3000,
+                    loop: true,
+                    easing: 'linear'
+                });
+            }
+            
+            // Add floating animation to multiple elements
+            const floatingElements = document.querySelectorAll('.floating-card');
+            floatingElements.forEach((el, index) => {
+                anime({
+                    targets: el,
+                    translateY: [-10, 10],
+                    duration: 2000 + index * 500,
+                    loop: true,
+                    direction: 'alternate',
+                    easing: 'easeInOutSine'
+                });
+            });
+
+            const canvas = document.querySelector('.canvas-mock');
+            if (canvas) {
+                const svg = canvas.querySelector('.canvas-mock__edge');
+                const nodeElements = Array.from(canvas.querySelectorAll('.canvas-mock__node'));
+
+                if (svg && nodeElements.length) {
+                    const connectionConfigs = [
+                        { id: 'source->split', from: 'source', fromHandle: '.canvas-mock__handle--right', to: 'split', toHandle: '.canvas-mock__handle--left' },
+                        { id: 'split->trainer', from: 'split', fromHandle: '.canvas-mock__handle--right', to: 'trainer', toHandle: '.canvas-mock__handle--left' }
+                    ];
+
+                    const nodeMap = new Map(nodeElements.map(node => [node.dataset.nodeId, node]));
+                    const connections = connectionConfigs
+                        .map(cfg => ({
+                            path: svg.querySelector(`[data-connection="${cfg.id}"]`),
+                            sourceHandle: nodeMap.get(cfg.from)?.querySelector(cfg.fromHandle),
+                            targetHandle: nodeMap.get(cfg.to)?.querySelector(cfg.toHandle)
+                        }))
+                        .filter(conn => conn.path && conn.sourceHandle && conn.targetHandle);
+
+                    const updateConnections = () => {
+                        if (window.innerWidth <= 1024) {
+                            svg.style.opacity = '0';
+                            return;
+                        }
+
+                        svg.style.opacity = '1';
+                        const canvasRect = canvas.getBoundingClientRect();
+                        svg.setAttribute('viewBox', `0 0 ${canvasRect.width} ${canvasRect.height}`);
+                        svg.setAttribute('width', canvasRect.width);
+                        svg.setAttribute('height', canvasRect.height);
+                        svg.setAttribute('preserveAspectRatio', 'none');
+
+                        connections.forEach(({ path, sourceHandle, targetHandle }) => {
+                            const sourceRect = sourceHandle.getBoundingClientRect();
+                            const targetRect = targetHandle.getBoundingClientRect();
+
+                            const startX = (sourceRect.left + sourceRect.width / 2) - canvasRect.left;
+                            const startY = (sourceRect.top + sourceRect.height / 2) - canvasRect.top;
+                            const endX = (targetRect.left + targetRect.width / 2) - canvasRect.left;
+                            const endY = (targetRect.top + targetRect.height / 2) - canvasRect.top;
+
+                            const deltaX = Math.max(Math.abs(endX - startX) * 0.35, 60);
+
+                            const pathData = `M ${startX} ${startY} C ${startX + deltaX} ${startY}, ${endX - deltaX} ${endY}, ${endX} ${endY}`;
+                            path.setAttribute('d', pathData);
+                        });
+                    };
+
+                    const applyInitialLayout = ({ force = false } = {}) => {
+                        if (force) {
+                            nodeElements.forEach(node => delete node.dataset.hasCustomPosition);
+                        }
+
+                        if (window.innerWidth <= 1024) {
+                            updateConnections();
+                            return;
+                        }
+
+                        const canvasRect = canvas.getBoundingClientRect();
+                        const useCompactLayout = canvasRect.width < 900;
+
+                        nodeElements.forEach((node, index) => {
+                            if (!force && node.dataset.hasCustomPosition === 'true') {
+                                return;
+                            }
+
+                            let xPercent;
+                            let yPercent;
+
+                            if (useCompactLayout) {
+                                const positions = [
+                                    { x: 30, y: 35 },
+                                    { x: 70, y: 50 },
+                                    { x: 50, y: 72 }
+                                ];
+                                xPercent = positions[index].x;
+                                yPercent = positions[index].y;
+                            } else {
+                                const positions = [
+                                    { x: 22, y: 50 },
+                                    { x: 50, y: 50 },
+                                    { x: 78, y: 50 }
+                                ];
+                                xPercent = positions[index].x;
+                                yPercent = positions[index].y;
+                            }
+
+                            node.style.setProperty('--x', `${xPercent}%`);
+                            node.style.setProperty('--y', `${yPercent}%`);
+                        });
+
+                        requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                                updateConnections();
+                            });
+                        });
+                    };
+
+                    applyInitialLayout({ force: true });
+                    window.addEventListener('resize', () => {
+                        requestAnimationFrame(() => applyInitialLayout());
+                    });
+
+                    if (window.matchMedia('(pointer:fine)').matches) {
+                        nodeElements.forEach(node => {
+                            node.addEventListener('pointerdown', event => {
+                                if (window.innerWidth <= 1024) {
+                                    return;
+                                }
+
+                                if (event.button !== 0) {
+                                    return;
+                                }
+
+                                event.preventDefault();
+
+                                const pointerId = event.pointerId;
+                                node.setPointerCapture(pointerId);
+                                node.classList.add('is-dragging');
+                                document.body.classList.add('is-dragging');
+
+                                const nodeRect = node.getBoundingClientRect();
+                                const width = nodeRect.width;
+                                const height = nodeRect.height;
+                                const offsetX = event.clientX - (nodeRect.left + width / 2);
+                                const offsetY = event.clientY - (nodeRect.top + height / 2);
+                                let didDrag = false;
+
+                                const handleMove = moveEvent => {
+                                    const rect = canvas.getBoundingClientRect();
+                                    let centerX = moveEvent.clientX - offsetX;
+                                    let centerY = moveEvent.clientY - offsetY;
+
+                                    const minX = rect.left + width / 2;
+                                    const maxX = rect.right - width / 2;
+                                    const minY = rect.top + height / 2;
+                                    const maxY = rect.bottom - height / 2;
+
+                                    centerX = Math.min(Math.max(centerX, minX), maxX);
+                                    centerY = Math.min(Math.max(centerY, minY), maxY);
+
+                                    const percentX = ((centerX - rect.left) / rect.width) * 100;
+                                    const percentY = ((centerY - rect.top) / rect.height) * 100;
+
+                                    node.style.setProperty('--x', `${percentX.toFixed(2)}%`);
+                                    node.style.setProperty('--y', `${percentY.toFixed(2)}%`);
+
+                                    requestAnimationFrame(() => updateConnections());
+                                    didDrag = true;
+                                };
+
+                                const handleUp = () => {
+                                    node.releasePointerCapture(pointerId);
+                                    node.removeEventListener('pointermove', handleMove);
+                                    node.removeEventListener('pointerup', handleUp);
+                                    node.removeEventListener('pointercancel', handleUp);
+                                    node.classList.remove('is-dragging');
+                                    document.body.classList.remove('is-dragging');
+                                    if (didDrag) {
+                                        node.dataset.hasCustomPosition = 'true';
+                                    }
+                                    updateConnections();
+                                };
+
+                                node.addEventListener('pointermove', handleMove);
+                                node.addEventListener('pointerup', handleUp);
+                                node.addEventListener('pointercancel', handleUp);
+                            });
+                        });
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

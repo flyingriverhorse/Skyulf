@@ -1,4 +1,4 @@
-"""Feature engineering API routes."""
+"""MLops API routes."""
 
 from __future__ import annotations
 

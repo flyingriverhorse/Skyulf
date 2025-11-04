@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for considering contributing! This repo focuses on the backend (FastAPI + Celery + scikit-learn). The UI may be partial or separate.
+Thanks for considering contributing! This repo focuses on the backend (FastAPI + Celery + scikit-learn).
 
 ## Dev setup
 - Install Python 3.12 (3.10+ supported).

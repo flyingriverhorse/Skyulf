@@ -1,6 +1,8 @@
 """
 FastAPI Application Startup Script
 
+© 2025 Murat Unsal — Skyulf Project
+
 This script starts the FastAPI application with proper configuration.
 It replaces the Flask run.py with modern async server capabilities.
 """
