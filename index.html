@@ -1152,6 +1152,19 @@
         </div>
     </footer>
 
+    <!-- Scroll Buttons -->
+    <button id="scroll-to-top" class="fixed right-6 bottom-24 bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-full shadow-lg opacity-0 pointer-events-none transition-all duration-300 hover:scale-110 z-50 group" onclick="scrollToTop()">
+        <svg class="w-6 h-6 group-hover:animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+        </svg>
+    </button>
+    
+    <button id="scroll-to-bottom" class="fixed right-6 bottom-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-full shadow-lg opacity-0 pointer-events-none transition-all duration-300 hover:scale-110 z-50 group" onclick="scrollToBottom()">
+        <svg class="w-6 h-6 group-hover:animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+        </svg>
+    </button>
+
     <script>
         AOS.init({
             duration: 800,
@@ -1415,6 +1428,48 @@
                         noResults.classList.add('hidden');
                     }
                 });
+            }
+        });
+
+        // Scroll Button Functions
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+
+        function scrollToBottom() {
+            window.scrollTo({
+                top: document.body.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+
+        // Show/hide scroll buttons based on scroll position
+        window.addEventListener('scroll', function() {
+            const scrollToTopBtn = document.getElementById('scroll-to-top');
+            const scrollToBottomBtn = document.getElementById('scroll-to-bottom');
+            const scrollPosition = window.scrollY;
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.body.scrollHeight;
+            
+            // Show top button after scrolling down 300px
+            if (scrollPosition > 300) {
+                scrollToTopBtn.style.opacity = '1';
+                scrollToTopBtn.style.pointerEvents = 'auto';
+            } else {
+                scrollToTopBtn.style.opacity = '0';
+                scrollToTopBtn.style.pointerEvents = 'none';
+            }
+            
+            // Show bottom button when not at the bottom (within 100px of bottom)
+            if (scrollPosition + windowHeight < documentHeight - 100) {
+                scrollToBottomBtn.style.opacity = '1';
+                scrollToBottomBtn.style.pointerEvents = 'auto';
+            } else {
+                scrollToBottomBtn.style.opacity = '0';
+                scrollToBottomBtn.style.pointerEvents = 'none';
             }
         });
     </script>
