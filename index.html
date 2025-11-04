@@ -913,6 +913,184 @@
         </div>
     </section>
 
+    <!-- FAQ Section -->
+    <section id="faq" class="py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="text-center mb-12" data-aos="fade-up">
+                <h2 class="text-4xl md:text-5xl font-bold mb-4">Frequently Asked Questions</h2>
+                <p class="text-xl text-gray-400">Everything you need to know about Skyulf</p>
+            </div>
+
+            <!-- Search Box -->
+            <div class="max-w-4xl mx-auto mb-8" data-aos="fade-up" data-aos-delay="100">
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="faq-search" 
+                        placeholder="Search questions..." 
+                        class="w-full px-6 py-4 pl-14 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-all"
+                    >
+                    <svg class="absolute left-4 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <p id="faq-no-results" class="text-center text-gray-400 mt-4 hidden">No questions found. Try a different search term.</p>
+            </div>
+
+            <div class="max-w-4xl mx-auto space-y-3" data-aos="fade-up" data-aos-delay="150" id="faq-container">
+                <!-- FAQ Item 1 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">What is Skyulf?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Skyulf is a self-hosted MLOps platform that lets you build, train, and monitor machine learning pipelines entirely on your infrastructure. 
+                                Unlike cloud-based solutions, your data never leaves your servers—perfect for privacy-sensitive or regulated environments.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 2 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">Why local-first?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Local-first means complete data sovereignty. No vendor lock-in, no surprise cloud bills, no data privacy concerns. 
+                                You control where your models train, where your data lives, and who can access it. It's MLOps on your terms.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 3 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">How is this different from cloud MLOps platforms?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Cloud platforms require uploading your data to third-party servers and charge based on usage. Skyulf runs 100% on-premise or in your private cloud. 
+                                No data leaves your network, no usage-based pricing, and no vendor dependencies. You own the infrastructure and the workflow.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 4 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">What's the current status?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Skyulf is in <strong>early alpha</strong> (version 0.0.1). Core features like the drag-and-drop Feature Canvas, 
+                                experiment tracking, and model monitoring are functional but actively evolving. Expect breaking changes as we refine the platform. 
+                                Check our <a href="https://github.com/flyingriverhorse/skyulf-mlflow/blob/master/ROADMAP.md" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">roadmap</a> for what's coming next.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 5 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">Can I use this in production?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Not yet. Skyulf is a <strong>passion project in early alpha</strong> and not production-ready. 
+                                Use it for experimentation, learning, and contributing—but don't rely on it for critical workloads until we hit stable releases. 
+                                We'll announce production readiness clearly in the docs and releases.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 6 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">How can I contribute?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Contributions are welcome! Check out our 
+                                <a href="https://github.com/flyingriverhorse/skyulf-mlflow/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">Contributing Guide</a> 
+                                to get started. Whether it's code, documentation, bug reports, or feature ideas—every contribution helps shape Skyulf. 
+                                Join us on <a href="https://github.com/flyingriverhorse/skyulf-mlflow" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">GitHub</a>.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 7 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">What's your vision for Skyulf?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                To make MLOps accessible, transparent, and privacy-first. We want data scientists and ML engineers to own their entire workflow—from 
+                                data ingestion to model deployment—without compromising on tools or privacy. Skyulf aims to be the go-to self-hosted MLOps stack for teams 
+                                who value data sovereignty and open-source principles.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 8 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">Is this really free?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Yes. Skyulf is 100% open source under the Apache 2.0 license. Free to use, modify, and deploy. No hidden costs, no premium tiers. 
+                                If you find it useful, consider <a href="https://github.com/flyingriverhorse/skyulf-mlflow" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">starring the repo</a> 
+                                or contributing back to the project.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Footer -->
     <footer class="py-12 px-4 sm:px-6 lg:px-8 border-t border-gray-800">
         <div class="max-w-[1400px] mx-auto">
@@ -1181,6 +1359,62 @@
                         });
                     }
                 }
+            }
+        });
+
+        // FAQ Toggle Function
+        function toggleFAQ(button) {
+            const faqItem = button.closest('.faq-item');
+            const answer = faqItem.querySelector('.faq-answer');
+            const icon = faqItem.querySelector('.faq-icon');
+            const isOpen = answer.style.maxHeight && answer.style.maxHeight !== '0px';
+            
+            if (isOpen) {
+                answer.style.maxHeight = '0px';
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                answer.style.maxHeight = answer.scrollHeight + 'px';
+                icon.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        // FAQ Search Function
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('faq-search');
+            const faqItems = document.querySelectorAll('.faq-item');
+            const noResults = document.getElementById('faq-no-results');
+
+            if (searchInput) {
+                searchInput.addEventListener('input', function(e) {
+                    const searchTerm = e.target.value.toLowerCase().trim();
+                    let visibleCount = 0;
+
+                    faqItems.forEach(item => {
+                        const question = item.querySelector('.faq-question h3').textContent.toLowerCase();
+                        const answer = item.querySelector('.faq-answer').textContent.toLowerCase();
+                        
+                        if (question.includes(searchTerm) || answer.includes(searchTerm)) {
+                            item.style.display = 'block';
+                            visibleCount++;
+                        } else {
+                            item.style.display = 'none';
+                            // Close the item if it was open
+                            const answerDiv = item.querySelector('.faq-answer');
+                            const icon = item.querySelector('.faq-icon');
+                            if (answerDiv) {
+                                answerDiv.style.maxHeight = '0px';
+                                icon.style.transform = 'rotate(0deg)';
+                            }
+                        }
+                    });
+
+                    // Show/hide no results message
+                    if (visibleCount === 0 && searchTerm !== '') {
+                        noResults.classList.remove('hidden');
+                    } else {
+                        noResults.classList.add('hidden');
+                    }
+                });
             }
         });
     </script>
