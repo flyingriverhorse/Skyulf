@@ -19,7 +19,7 @@ asyncpg>=0.29.0,<1.0.0    # Async PostgreSQL support (optional)
 python-jose[cryptography]>=3.3.0,<4.0.0  # JWT token handling
 passlib[bcrypt]>=1.7.4,<2.0.0             # Password hashing
 python-multipart>=0.0.6,<1.0.0            # Form data support
-bcrypt==4.0.1                              # Pin bcrypt to a compatible version for passlib
+bcrypt==5.0.0                              # Pin bcrypt to a compatible version for passlib
 
 # === TEMPLATE SUPPORT ===
 jinja2>=3.1.0,<4.0.0                      # Template engine
