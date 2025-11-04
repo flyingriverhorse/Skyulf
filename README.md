@@ -1,4 +1,4 @@
-# Skyulf — local‑first MLOps web app (FastAPI)
+# Skyulf — local‑first MLOps web app
 
 ![CI](https://github.com/flyingriverhorse/skyulf-mlflow/actions/workflows/ci.yml/badge.svg)
 ![CodeQL](https://github.com/flyingriverhorse/skyulf-mlflow/actions/workflows/codeql.yml/badge.svg)
@@ -81,11 +81,6 @@ Health endpoints
 ## License
 
 Apache-2.0. See `LICENSE`.
-
-## NGI Zero fit (at a glance)
-- Open source, self-hostable building blocks
-- Clear path to privacy-preserving ML (differential privacy, federated adapter), interoperability (ONNX, MLflow-compatible packaging), and auditability (provenance, SBOM)
-- See `docs/ngi-zero-concept-note.md` for proposed milestones and deliverables
 
 If you’re interested in contributing or sponsoring, see `.github/FUNDING.yml` and open a Discussion. Good first issues will be labeled.
 
