@@ -17,6 +17,7 @@ Describe the change and what it improves for users.
 - [ ] Added/updated tests where appropriate
 - [ ] Updated docs/README where appropriate
 - [ ] No secrets or sensitive data committed
+- [ ] All commits are signed off (DCO) with `git commit -s`
 
 ## Screenshots or demo (optional)
 

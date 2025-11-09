@@ -1,0 +1,45 @@
+# © 2025 Murat Unsal — Skyulf Project
+
+name: DCO Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  dco-check:
+    runs-on: ubuntu-latest
+    name: DCO Sign-off Check
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check DCO
+        run: |
+          # Check all commits in the PR for DCO sign-off
+          git fetch origin ${{ github.base_ref }}
+          commits=$(git rev-list origin/${{ github.base_ref }}..${{ github.event.pull_request.head.sha }})
+          
+          missing_dco=0
+          for commit in $commits; do
+            if ! git show -s --format=%B $commit | grep -q "^Signed-off-by: "; then
+              echo "❌ Commit $commit is missing 'Signed-off-by' line"
+              git show -s --format="Author: %an <%ae>%nSubject: %s" $commit
+              missing_dco=1
+            fi
+          done
+          
+          if [ $missing_dco -eq 1 ]; then
+            echo ""
+            echo "❌ One or more commits are missing DCO sign-off."
+            echo "Please sign off your commits using 'git commit -s' or amend with 'git commit --amend --signoff'"
+            exit 1
+          fi
+          
+          echo "✅ All commits are properly signed off!"

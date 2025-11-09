@@ -6,6 +6,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue)](#quick-start)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](.pre-commit-config.yaml)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![DCO](https://img.shields.io/badge/DCO-required-green)](DCO.txt)
 ![](https://img.shields.io/badge/tagline-MLOps%20%3A%20FastAPI%20%2B%20Celery-blue)
 
 > ⚠️ **Early Alpha (v0.0.1)**: This is a passion project in active development. Expect bugs, incomplete features, and visual inconsistencies. Use at your own risk and please report issues on GitHub!
@@ -30,7 +31,9 @@ What you get out of the box:
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow guidance, and read our [Code of Conduct](CODE_OF_CONDUCT.md). Use GitHub Issues for bugs and Discussions for questions. Good first issues are labeled.
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow guidance, and read our [Code of Conduct](CODE_OF_CONDUCT.md). 
+
+**Important:** All commits must include a DCO sign-off (`git commit -s`). See [DCO.txt](DCO.txt) for details.
 
 ## Quick start
 
