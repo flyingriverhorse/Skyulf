@@ -1,0 +1,1502 @@
+﻿{
+    "value":  [
+                  {
+                      "type":  "drop_missing_columns",
+                      "label":  "Drop high-missing columns",
+                      "description":  "Drop columns",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "preprocessing",
+                      "tags":  [
+                                   "missing_data",
+                                   "cleanup"
+                               ],
+                      "parameters":  [
+                                         {
+                                             "name":  "missing_threshold",
+                                             "label":  "Missingness threshold (%)",
+                                             "description":  "Columns at or above this missing percentage will be removed.",
+                                             "type":  "number",
+                                             "default":  40.0,
+                                             "min":  0.0,
+                                             "max":  100.0,
+                                             "step":  1.0,
+                                             "unit":  "%"
+                                         },
+                                         {
+                                             "name":  "columns",
+                                             "label":  "Columns to drop (recommended)",
+                                             "description":  "Pre-populated with EDA suggestions covering high-missing, empty, or constant columns.",
+                                             "type":  "multi_select",
+                                             "source":  {
+                                                            "type":  "drop_column_recommendations",
+                                                            "endpoint":  "/ml-workflow/api/recommendations/drop-columns",
+                                                            "value_key":  "candidates"
+                                                        }
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "missing_threshold":  40.0,
+                                             "columns":  [
+
+                                                         ]
+                                         }
+                  },
+                  {
+                      "type":  "drop_missing_rows",
+                      "label":  "Drop high-missing rows",
+                      "description":  "Remove rows with excessive missing values.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "preprocessing",
+                      "tags":  [
+                                   "missing_data",
+                                   "cleanup"
+                               ],
+                      "parameters":  [
+                                         {
+                                             "name":  "missing_threshold",
+                                             "label":  "Missingness threshold (%)",
+                                             "description":  "Rows at or above this missing percentage will be removed.",
+                                             "type":  "number",
+                                             "default":  50.0,
+                                             "min":  0.0,
+                                             "max":  100.0,
+                                             "step":  1.0,
+                                             "unit":  "%"
+                                         },
+                                         {
+                                             "name":  "drop_if_any_missing",
+                                             "label":  "Drop rows with any missing value",
+                                             "description":  "Override the threshold and drop rows that contain any missing value.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "missing_threshold":  50.0,
+                                             "drop_if_any_missing":  false
+                                         }
+                  },
+                  {
+                      "type":  "missing_value_indicator",
+                      "label":  "Missing value indicator",
+                      "description":  "Append binary *_was_missing columns that flag rows with missing data.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "preprocessing",
+                      "tags":  [
+                                   "missing_data",
+                                   "feature_engineering"
+                               ],
+                      "parameters":  [
+                                         {
+                                             "name":  "columns",
+                                             "label":  "Columns to flag",
+                                             "description":  "Choose columns to generate missing-value indicator fields (default: columns with missing data).",
+                                             "type":  "multi_select"
+                                         },
+                                         {
+                                             "name":  "flag_suffix",
+                                             "label":  "Indicator suffix",
+                                             "description":  "Suffix appended to the original column name when creating the flag column.",
+                                             "type":  "text",
+                                             "default":  "_was_missing"
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "columns":  [
+
+                                                         ],
+                                             "flag_suffix":  "_was_missing"
+                                         }
+                  },
+                  {
+                      "type":  "cast_column_types",
+                      "label":  "Cast column types",
+                      "description":  "Convert selected columns to a target pandas dtype (e.g., float64, Int64, datetime).",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "preprocessing",
+                      "tags":  [
+                                   "typing",
+                                   "cleanup"
+                               ],
+                      "parameters":  [
+                                         {
+                                             "name":  "columns",
+                                             "label":  "Columns to cast",
+                                             "description":  "Select columns to convert to the target dtype.",
+                                             "type":  "multi_select"
+                                         },
+                                         {
+                                             "name":  "target_dtype",
+                                             "label":  "Target dtype",
+                                             "description":  "Enter a pandas dtype such as float64, Int64, string, boolean, or datetime64[ns].",
+                                             "type":  "text"
+                                         },
+                                         {
+                                             "name":  "coerce_on_error",
+                                             "label":  "Coerce invalid values",
+                                             "description":  "Convert unparseable values to missing instead of raising errors.",
+                                             "type":  "boolean",
+                                             "default":  true
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "columns":  [
+
+                                                         ],
+                                             "target_dtype":  "float64",
+                                             "coerce_on_error":  true
+                                         }
+                  },
+                  {
+                      "type":  "imputation_methods",
+                      "label":  "Imputation methods",
+                      "description":  "Configure statistical or model-driven fills (mean/median/mode, KNN, regression, MICE).",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "preprocessing",
+                      "tags":  [
+                                   "missing_data",
+                                   "imputation",
+                                   "advanced"
+                               ],
+                      "parameters":  [
+                                         {
+                                             "name":  "strategies",
+                                             "label":  "Imputation recipes",
+                                             "description":  "Configure multivariate strategies like KNN, regression, or MICE per column group.",
+                                             "type":  "text"
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "strategies":  [
+
+                                                            ]
+                                         }
+                  },
+                  {
+                      "type":  "binning_discretization",
+                      "label":  "Binning / Discretization",
+                      "description":  "Convert continuous features into discrete bins using equal-width, equal-frequency (quantile), or custom domain-based strategies. Useful for reducing noise or capturing threshold-based effects. Note: Tree-based models typically don\u0027t require binning.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "preprocessing",
+                      "tags":  [
+                                   "numeric",
+                                   "discretization",
+                                   "binning",
+                                   "feature_engineering"
+                               ],
+                      "parameters":  [
+                                         {
+                                             "name":  "binning_rules",
+                                             "label":  "Binning rules",
+                                             "description":  "Configure binning strategy per column: equal-width, equal-frequency (quantile), or custom edges.",
+                                             "type":  "text"
+                                         },
+                                         {
+                                             "name":  "default_strategy",
+                                             "label":  "Default strategy",
+                                             "description":  "Default binning strategy for columns without explicit rules.",
+                                             "type":  "text",
+                                             "default":  "equal_width"
+                                         },
+                                         {
+                                             "name":  "default_bins",
+                                             "label":  "Default number of bins",
+                                             "description":  "Default number of bins to create (for equal-width and equal-frequency strategies).",
+                                             "type":  "number",
+                                             "default":  5,
+                                             "min":  2.0,
+                                             "max":  20.0,
+                                             "step":  1.0
+                                         },
+                                         {
+                                             "name":  "label_format",
+                                             "label":  "Label format",
+                                             "description":  "How to label bins: \u0027ordinal\u0027 (0,1,2...), \u0027interval\u0027 ([0-10], [10-20]...), or \u0027left_edge\u0027 (0, 10, 20...).",
+                                             "type":  "text",
+                                             "default":  "ordinal"
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "binning_rules":  [
+
+                                                               ],
+                                             "default_strategy":  "equal_width",
+                                             "default_bins":  5,
+                                             "label_format":  "ordinal"
+                                         }
+                  },
+                  {
+                      "type":  "label_encoding",
+                      "label":  "Label encode categories",
+                      "description":  "Convert categorical columns into integer codes for model-ready features.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "Categorical Encoding",
+                      "tags":  [
+                                   "categorical",
+                                   "encoding",
+                                   "feature_engineering"
+                               ],
+                      "parameters":  [
+                                         {
+                                             "name":  "columns",
+                                             "label":  "Columns to encode",
+                                             "description":  "Choose categorical columns or leave blank to rely on auto-detection.",
+                                             "type":  "multi_select",
+                                             "source":  {
+                                                 "type":  "label_encoding_recommendations",
+                                                 "endpoint":  "/ml-workflow/api/recommendations/label-encoding",
+                                                 "value_key":  "columns"
+                                             }
+                                         },
+                                         {
+                                             "name":  "auto_detect",
+                                             "label":  "Auto-detect categorical columns",
+                                             "description":  "Automatically include text columns when their unique values stay under the configured limit.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "max_unique_values",
+                                             "label":  "Max categories for auto-detect",
+                                             "description":  "Upper bound on unique values when auto-detect is enabled (0 disables the cap).",
+                                             "type":  "number",
+                                             "default":  50,
+                                             "min":  0.0,
+                                             "max":  1000.0,
+                                             "step":  1.0
+                                         },
+                                         {
+                                             "name":  "output_suffix",
+                                             "label":  "Encoded suffix",
+                                             "description":  "Suffix applied to the encoded column when the original is retained.",
+                                             "type":  "text",
+                                             "default":  "_encoded"
+                                         },
+                                         {
+                                             "name":  "drop_original",
+                                             "label":  "Replace original column",
+                                             "description":  "Overwrite the source column instead of creating a suffixed copy.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "missing_strategy",
+                                             "label":  "Missing value strategy",
+                                             "description":  "Keep missing values as <NA> or assign a dedicated integer code.",
+                                             "type":  "select",
+                                             "default":  "keep_na",
+                                             "options":  [
+                                                              {
+                                                                  "value":  "keep_na",
+                                                                  "label":  "Keep as <NA>"
+                                                              },
+                                                              {
+                                                                  "value":  "encode",
+                                                                  "label":  "Assign code"
+                                                              }
+                                                          ]
+                                         },
+                                         {
+                                             "name":  "missing_code",
+                                             "label":  "Missing value code",
+                                             "description":  "Integer code used when assigning a dedicated value to missing entries.",
+                                             "type":  "number",
+                                             "default":  -1,
+                                             "step":  1.0
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "columns":  [
+
+                                                         ],
+                                             "auto_detect":  false,
+                                             "max_unique_values":  50,
+                                             "output_suffix":  "_encoded",
+                                             "drop_original":  false,
+                                             "missing_strategy":  "keep_na",
+                                             "missing_code":  -1,
+                                             "skipped_columns":  [
+
+                                                                 ]
+                                         }
+                  },
+                  {
+                      "type":  "target_encoding",
+                      "label":  "Target encode categories",
+                      "description":  "Replace categorical values with smoothed averages of a numeric target column.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                       "dataset"
+                                   ],
+                      "category":  "Categorical Encoding",
+                      "tags":  [
+                                     "categorical",
+                                     "encoding",
+                                     "feature_engineering"
+                                 ],
+                      "parameters":  [
+                                         {
+                                             "name":  "columns",
+                                             "label":  "Columns to encode",
+                                             "description":  "Select categorical columns or rely on auto-detection when safe.",
+                                             "type":  "multi_select",
+                                             "source":  {
+                                                 "type":  "target_encoding_recommendations",
+                                                 "endpoint":  "/ml-workflow/api/recommendations/target-encoding",
+                                                 "value_key":  "columns"
+                                             }
+                                         },
+                                         {
+                                             "name":  "target_column",
+                                             "label":  "Target column",
+                                             "description":  "Numeric target column used to compute per-category averages (e.g., regression value or 0/1 outcome).",
+                                             "type":  "text",
+                                             "placeholder":  "target"
+                                         },
+                                         {
+                                             "name":  "auto_detect",
+                                             "label":  "Auto-detect categorical columns",
+                                             "description":  "Automatically include text columns that stay within the category limit.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "max_categories",
+                                             "label":  "Max categories",
+                                             "description":  "Upper bound on unique values when auto-detect is enabled (0 disables the cap).",
+                                             "type":  "number",
+                                             "default":  50,
+                                             "min":  0.0,
+                                             "max":  1000.0,
+                                             "step":  1.0
+                                         },
+                                         {
+                                             "name":  "output_suffix",
+                                             "label":  "Encoded suffix",
+                                             "description":  "Suffix added to new encoded columns when originals are retained.",
+                                             "type":  "text",
+                                             "default":  "_target"
+                                         },
+                                         {
+                                             "name":  "drop_original",
+                                             "label":  "Replace original column",
+                                             "description":  "Overwrite the source column instead of creating a suffixed copy.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "smoothing",
+                                             "label":  "Smoothing strength",
+                                             "description":  "Higher values pull category means toward the global average to reduce overfitting.",
+                                             "type":  "number",
+                                             "default":  20.0,
+                                             "min":  0.0,
+                                             "step":  1.0
+                                         },
+                                         {
+                                             "name":  "encode_missing",
+                                             "label":  "Encode missing values",
+                                             "description":  "Assign the global mean to rows where the categorical value is missing.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "handle_unknown",
+                                             "label":  "Handle unseen categories",
+                                             "description":  "Choose whether to assign the global mean or raise an error for categories not observed during fitting.",
+                                             "type":  "select",
+                                             "default":  "global_mean",
+                                             "options":  [
+                                                              {
+                                                                  "value":  "global_mean",
+                                                                  "label":  "Use global mean"
+                                                              },
+                                                              {
+                                                                  "value":  "error",
+                                                                  "label":  "Raise error"
+                                                              }
+                                                          ]
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "columns":  [
+
+                                                         ],
+                                             "target_column":  "",
+                                             "auto_detect":  false,
+                                             "max_categories":  50,
+                                             "output_suffix":  "_target",
+                                             "drop_original":  false,
+                                             "smoothing":  20.0,
+                                             "encode_missing":  false,
+                                             "handle_unknown":  "global_mean",
+                                             "skipped_columns":  [
+
+                                                                  ]
+                                         }
+                  },
+                  {
+                      "type":  "ordinal_encoding",
+                      "label":  "Ordinal encode categories",
+                      "description":  "Map categorical columns to ordered codes with optional unknown fallbacks.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "Categorical Encoding",
+                      "tags":  [
+                                     "categorical",
+                                     "encoding",
+                                     "feature_engineering"
+                                 ],
+                      "parameters":  [
+                                         {
+                                             "name":  "columns",
+                                             "label":  "Columns to encode",
+                                             "description":  "Select categorical columns or rely on auto-detection when safe.",
+                                             "type":  "multi_select",
+                                             "source":  {
+                                                 "type":  "ordinal_encoding_recommendations",
+                                                 "endpoint":  "/ml-workflow/api/recommendations/ordinal-encoding",
+                                                 "value_key":  "columns"
+                                             }
+                                         },
+                                         {
+                                             "name":  "auto_detect",
+                                             "label":  "Auto-detect categorical columns",
+                                             "description":  "Automatically include text columns that stay within the category limit.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "max_categories",
+                                             "label":  "Max categories",
+                                             "description":  "Upper bound on unique values when auto-detect is enabled (0 disables the cap).",
+                                             "type":  "number",
+                                             "default":  50,
+                                             "min":  0.0,
+                                             "max":  1000.0,
+                                             "step":  1.0
+                                         },
+                                         {
+                                             "name":  "output_suffix",
+                                             "label":  "Encoded suffix",
+                                             "description":  "Suffix added to new encoded columns when originals are retained.",
+                                             "type":  "text",
+                                             "default":  "_ordinal"
+                                         },
+                                         {
+                                             "name":  "drop_original",
+                                             "label":  "Replace original column",
+                                             "description":  "Overwrite the source column instead of creating a suffixed copy.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "encode_missing",
+                                             "label":  "Encode missing values",
+                                             "description":  "Assign the fallback code to missing values instead of leaving them null.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "handle_unknown",
+                                             "label":  "Handle unseen categories",
+                                             "description":  "Choose whether to assign a fallback code or raise an error for unknown categories.",
+                                             "type":  "select",
+                                             "default":  "use_encoded_value",
+                                             "options":  [
+                                                              {
+                                                                  "value":  "use_encoded_value",
+                                                                  "label":  "Assign fallback code"
+                                                              },
+                                                              {
+                                                                  "value":  "error",
+                                                                  "label":  "Raise error"
+                                                              }
+                                                          ]
+                                         },
+                                         {
+                                             "name":  "unknown_value",
+                                             "label":  "Fallback code",
+                                             "description":  "Integer code applied to unseen categories or missing values when enabled.",
+                                             "type":  "number",
+                                             "default":  -1,
+                                             "step":  1.0
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "columns":  [
+
+                                                         ],
+                                             "auto_detect":  false,
+                                             "max_categories":  50,
+                                             "output_suffix":  "_ordinal",
+                                             "drop_original":  false,
+                                             "encode_missing":  false,
+                                             "handle_unknown":  "use_encoded_value",
+                                             "unknown_value":  -1,
+                                             "skipped_columns":  [
+
+                                                                 ]
+                                         }
+                  },
+                  {
+                      "type":  "dummy_encoding",
+                      "label":  "Dummy encode categories",
+                      "description":  "Expand categorical columns while dropping a reference level per feature.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "Categorical Encoding",
+                      "tags":  [
+                                   "categorical",
+                                   "encoding",
+                                   "feature_engineering"
+                               ],
+                      "parameters":  [
+                                         {
+                                             "name":  "columns",
+                                             "label":  "Columns to encode",
+                                             "description":  "Select categorical columns or rely on auto-detection to capture safe candidates.",
+                                             "type":  "multi_select",
+                                             "source":  {
+                                                 "type":  "dummy_encoding_recommendations",
+                                                 "endpoint":  "/ml-workflow/api/recommendations/dummy-encoding",
+                                                 "value_key":  "columns"
+                                             }
+                                         },
+                                         {
+                                             "name":  "auto_detect",
+                                             "label":  "Auto-detect categorical columns",
+                                             "description":  "Automatically include text columns that keep dummy width manageable.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "max_categories",
+                                             "label":  "Max categories",
+                                             "description":  "Upper bound on unique values when auto-detect is enabled (0 disables the cap).",
+                                             "type":  "number",
+                                             "default":  20,
+                                             "min":  0.0,
+                                             "max":  200.0,
+                                             "step":  1.0
+                                         },
+                                         {
+                                             "name":  "drop_first",
+                                             "label":  "Drop reference level",
+                                             "description":  "Always drop the first dummy column per feature to mitigate multicollinearity.",
+                                             "type":  "boolean",
+                                             "default":  true
+                                         },
+                                         {
+                                             "name":  "include_missing",
+                                             "label":  "Encode missing values",
+                                             "description":  "Include a dedicated dummy column for missing values.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "drop_original",
+                                             "label":  "Replace original column",
+                                             "description":  "Remove the source column after dummy expansion.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "prefix_separator",
+                                             "label":  "Dummy prefix separator",
+                                             "description":  "Separator between the column name and category when naming dummy columns.",
+                                             "type":  "text",
+                                             "default":  "_"
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "columns":  [
+
+                                                         ],
+                                             "auto_detect":  false,
+                                             "max_categories":  20,
+                                             "drop_first":  true,
+                                             "include_missing":  false,
+                                             "drop_original":  false,
+                                             "prefix_separator":  "_",
+                                             "skipped_columns":  [
+
+                                                                 ]
+                                         }
+                  },
+                  {
+                      "type":  "one_hot_encoding",
+                      "label":  "One-hot encode categories",
+                      "description":  "Expand categorical columns into binary indicator features.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "Categorical Encoding",
+                      "tags":  [
+                                   "categorical",
+                                   "encoding",
+                                   "feature_engineering"
+                               ],
+                      "parameters":  [
+                                         {
+                                             "name":  "columns",
+                                             "label":  "Columns to encode",
+                                             "description":  "Choose categorical columns or rely on auto-detection to keep configs light.",
+                                             "type":  "multi_select",
+                                             "source":  {
+                                                 "type":  "one_hot_encoding_recommendations",
+                                                 "endpoint":  "/ml-workflow/api/recommendations/one-hot-encoding",
+                                                 "value_key":  "columns"
+                                             }
+                                         },
+                                         {
+                                             "name":  "auto_detect",
+                                             "label":  "Auto-detect categorical columns",
+                                             "description":  "Automatically include text columns when their dummy expansion stays within the max category limit.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "max_categories",
+                                             "label":  "Max categories",
+                                             "description":  "Upper bound on unique values when auto-detect is enabled (0 disables the cap).",
+                                             "type":  "number",
+                                             "default":  20,
+                                             "min":  0.0,
+                                             "max":  200.0,
+                                             "step":  1.0
+                                         },
+                                         {
+                                             "name":  "drop_first",
+                                             "label":  "Drop first dummy",
+                                             "description":  "Avoid multicollinearity by dropping the first dummy column per feature.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "include_missing",
+                                             "label":  "Encode missing values",
+                                             "description":  "Include a dedicated dummy column for missing values.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "drop_original",
+                                             "label":  "Replace original column",
+                                             "description":  "Remove the source column after dummy expansion.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "prefix_separator",
+                                             "label":  "Dummy prefix separator",
+                                             "description":  "Separator between the column name and category value when naming dummy columns.",
+                                             "type":  "text",
+                                             "default":  "_"
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "columns":  [
+
+                                                         ],
+                                             "auto_detect":  false,
+                                             "max_categories":  20,
+                                             "drop_first":  false,
+                                             "include_missing":  false,
+                                             "drop_original":  false,
+                                             "prefix_separator":  "_",
+                                             "skipped_columns":  [
+
+                                                                 ]
+                                         }
+                  },
+                  {
+                      "type":  "scale_numeric_features",
+                      "label":  "Scale numeric features",
+                      "description":  "Standardize or normalize numeric columns with recommended scalers.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "preprocessing",
+                      "tags":  [
+                                   "numeric",
+                                   "scaling",
+                                   "normalization"
+                               ],
+                      "parameters":  [
+                                         {
+                                             "name":  "columns",
+                                             "label":  "Columns to scale",
+                                             "description":  "Select numeric columns manually or leave blank to rely on auto-detection.",
+                                             "type":  "multi_select"
+                                         },
+                                         {
+                                             "name":  "default_method",
+                                             "label":  "Default scaling method",
+                                             "description":  "Fallback scaler applied whenever a column override is not configured.",
+                                             "type":  "text",
+                                             "default":  "standard"
+                                         },
+                                         {
+                                             "name":  "auto_detect",
+                                             "label":  "Auto-detect numeric columns",
+                                             "description":  "Automatically include continuous numeric columns that pass quality checks.",
+                                             "type":  "boolean",
+                                             "default":  true
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "columns":  [
+
+                                                         ],
+                                             "default_method":  "standard",
+                                             "column_methods":  {
+
+                                                                 },
+                                             "auto_detect":  true
+                                         }
+                  },
+                  {
+                      "type":  "polynomial_features",
+                      "label":  "Polynomial features",
+                      "description":  "Generate polynomial and interaction terms for numeric columns.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "preprocessing",
+                      "tags":  [
+                                   "numeric",
+                                   "feature_engineering",
+                                   "transformation"
+                               ],
+                      "parameters":  [
+                                         {
+                                             "name":  "columns",
+                                             "label":  "Columns to expand",
+                                             "description":  "Select numeric columns manually or leave blank to auto-detect.",
+                                             "type":  "multi_select"
+                                         },
+                                         {
+                                             "name":  "auto_detect",
+                                             "label":  "Auto-detect numeric columns",
+                                             "description":  "Automatically include numeric columns detected at runtime.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "degree",
+                                             "label":  "Maximum degree",
+                                             "description":  "Upper polynomial degree to generate (higher degrees create more features).",
+                                             "type":  "number",
+                                             "default":  2,
+                                             "min":  2.0,
+                                             "max":  5.0,
+                                             "step":  1.0
+                                         },
+                                         {
+                                             "name":  "include_bias",
+                                             "label":  "Add bias column",
+                                             "description":  "Include a constant bias column when enabled.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "interaction_only",
+                                             "label":  "Interaction only",
+                                             "description":  "Generate only interaction features without power terms.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "include_input_features",
+                                             "label":  "Include original features",
+                                             "description":  "Retain degree-1 terms alongside the generated features.",
+                                             "type":  "boolean",
+                                             "default":  false
+                                         },
+                                         {
+                                             "name":  "output_prefix",
+                                             "label":  "Feature prefix",
+                                             "description":  "Prefix applied to generated feature columns.",
+                                             "type":  "text",
+                                             "default":  "poly"
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "columns":  [
+
+                                                         ],
+                                             "auto_detect":  false,
+                                             "degree":  2,
+                                             "include_bias":  false,
+                                             "interaction_only":  false,
+                                             "include_input_features":  false,
+                                             "output_prefix":  "poly"
+                                         }
+                  },
+                  {
+                      "type":  "feature_selection",
+                      "label":  "Feature selection",
+                      "description":  "Score features and retain the most informative columns using univariate tests or model-based selectors.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "preprocessing",
+                      "tags":  [
+                                   "feature_selection",
+                                   "numeric",
+                                   "modeling"
+                               ],
+                      "parameters":  [
+                                         {
+                                             "name":  "columns",
+                                             "label":  "Candidate columns",
+                                             "description":  "Select columns to score or leave blank to rely on auto-detection.",
+                                             "type":  "multi_select"
+                                         },
+                                         {
+                                             "name":  "auto_detect",
+                                             "label":  "Auto-detect numeric columns",
+                                             "description":  "Automatically include numeric columns detected at runtime.",
+                                             "type":  "boolean",
+                                             "default":  true
+                                         },
+                                         {
+                                             "name":  "target_column",
+                                             "label":  "Target column",
+                                             "description":  "Supervised selectors require a target column for scoring (e.g., regression/classification target).",
+                                             "type":  "text",
+                                             "placeholder":  "target"
+                                         },
+                                         {
+                                             "name":  "method",
+                                             "label":  "Selection method",
+                                             "description":  "Choose the feature selection strategy to apply.",
+                                             "type":  "select",
+                                             "default":  "select_k_best",
+                                             "options":  [
+                                                              {
+                                                                  "value":  "select_k_best",
+                                                                  "label":  "Select K Best"
+                                                              },
+                                                              {
+                                                                  "value":  "select_percentile",
+                                                                  "label":  "Select Percentile"
+                                                              },
+                                                              {
+                                                                  "value":  "generic_univariate_select",
+                                                                  "label":  "Generic univariate (mode driven)"
+                                                              },
+                                                              {
+                                                                  "value":  "select_fpr",
+                                                                  "label":  "Select FPR"
+                                                              },
+                                                              {
+                                                                  "value":  "select_fdr",
+                                                                  "label":  "Select FDR"
+                                                              },
+                                                              {
+                                                                  "value":  "select_fwe",
+                                                                  "label":  "Select FWE"
+                                                              },
+                                                              {
+                                                                  "value":  "select_from_model",
+                                                                  "label":  "Select From Model"
+                                                              },
+                                                              {
+                                                                  "value":  "variance_threshold",
+                                                                  "label":  "Variance Threshold"
+                                                              },
+                                                              {
+                                                                  "value":  "rfe",
+                                                                  "label":  "Recursive Feature Elimination"
+                                                              }
+                                                          ]
+                                         },
+                                         {
+                                             "name":  "score_func",
+                                             "label":  "Scoring function",
+                                             "description":  "Statistical test used for univariate selectors.",
+                                             "type":  "select",
+                                             "default":  "f_classif",
+                                             "options":  [
+                                                              {
+                                                                  "value":  "f_classif",
+                                                                  "label":  "ANOVA F-value (classification)"
+                                                              },
+                                                              {
+                                                                  "value":  "f_regression",
+                                                                  "label":  "F-value (regression)"
+                                                              },
+                                                              {
+                                                                  "value":  "mutual_info_classif",
+                                                                  "label":  "Mutual information (classification)"
+                                                              },
+                                                              {
+                                                                  "value":  "mutual_info_regression",
+                                                                  "label":  "Mutual information (regression)"
+                                                              },
+                                                              {
+                                                                  "value":  "chi2",
+                                                                  "label":  "Chi-squared (non-negative features)"
+                                                              },
+                                                              {
+                                                                  "value":  "r_regression",
+                                                                  "label":  "Pearson r"
+                                                              }
+                                                          ]
+                                         },
+                                         {
+                                             "name":  "problem_type",
+                                             "label":  "Problem type",
+                                             "description":  "Guides default scoring function and estimator selection.",
+                                             "type":  "select",
+                                             "default":  "auto",
+                                             "options":  [
+                                                              {
+                                                                  "value":  "auto",
+                                                                  "label":  "Auto detect"
+                                                              },
+                                                              {
+                                                                  "value":  "classification",
+                                                                  "label":  "Classification"
+                                                              },
+                                                              {
+                                                                  "value":  "regression",
+                                                                  "label":  "Regression"
+                                                              }
+                                                          ]
+                                         },
+                                         {
+                                             "name":  "k",
+                                             "label":  "Top K features",
+                                             "description":  "Number of features to keep when using K-based strategies.",
+                                             "type":  "number",
+                                             "default":  10,
+                                             "min":  1.0,
+                                             "step":  1.0
+                                         },
+                                         {
+                                             "name":  "percentile",
+                                             "label":  "Percentile",
+                                             "description":  "Percentile of features to retain when using percentile strategies.",
+                                             "type":  "number",
+                                             "default":  10.0,
+                                             "min":  0.0,
+                                             "max":  100.0,
+                                             "step":  1.0
+                                         },
+                                         {
+                                             "name":  "alpha",
+                                             "label":  "Alpha",
+                                             "description":  "Significance threshold for FPR/FDR/FWE modes.",
+                                             "type":  "number",
+                                             "default":  0.05,
+                                             "min":  0.0,
+                                             "step":  0.001
+                                         },
+                                         {
+                                             "name":  "threshold",
+                                             "label":  "Threshold",
+                                             "description":  "Threshold for variance or model-based selectors (leave blank for defaults).",
+                                             "type":  "number"
+                                         },
+                                         {
+                                             "name":  "mode",
+                                             "label":  "Generic mode",
+                                             "description":  "Mode parameter for GenericUnivariateSelect (k_best, percentile, fpr, fdr, fwe).",
+                                             "type":  "select",
+                                             "default":  "k_best",
+                                             "options":  [
+                                                              {
+                                                                  "value":  "k_best",
+                                                                  "label":  "K Best"
+                                                              },
+                                                              {
+                                                                  "value":  "percentile",
+                                                                  "label":  "Percentile"
+                                                              },
+                                                              {
+                                                                  "value":  "fpr",
+                                                                  "label":  "FPR"
+                                                              },
+                                                              {
+                                                                  "value":  "fdr",
+                                                                  "label":  "FDR"
+                                                              },
+                                                              {
+                                                                  "value":  "fwe",
+                                                                  "label":  "FWE"
+                                                              }
+                                                          ]
+                                         },
+                                         {
+                                             "name":  "estimator",
+                                             "label":  "Estimator",
+                                             "description":  "Base estimator used for model-based selectors (SelectFromModel / RFE).",
+                                             "type":  "select",
+                                             "default":  "auto",
+                                             "options":  [
+                                                              {
+                                                                  "value":  "auto",
+                                                                  "label":  "Auto"
+                                                              },
+                                                              {
+                                                                  "value":  "logistic_regression",
+                                                                  "label":  "Logistic regression"
+                                                              },
+                                                              {
+                                                                  "value":  "random_forest",
+                                                                  "label":  "Random forest"
+                                                              },
+                                                              {
+                                                                  "value":  "linear_regression",
+                                                                  "label":  "Linear regression"
+                                                              }
+                                                          ]
+                                         },
+                                         {
+                                             "name":  "step",
+                                             "label":  "RFE step",
+                                             "description":  "Number (or fraction) of features to remove at each RFE iteration.",
+                                             "type":  "number",
+                                             "default":  1.0,
+                                             "step":  0.1
+                                         },
+                                         {
+                                             "name":  "min_features",
+                                             "label":  "Minimum features",
+                                             "description":  "Optional lower bound on features to keep (used by some estimators).",
+                                             "type":  "number"
+                                         },
+                                         {
+                                             "name":  "max_features",
+                                             "label":  "Maximum features",
+                                             "description":  "Optional upper bound on features to keep (used by some estimators).",
+                                             "type":  "number"
+                                         },
+                                         {
+                                             "name":  "drop_unselected",
+                                             "label":  "Drop unselected columns",
+                                             "description":  "Remove columns that fail the selection criteria from the dataset.",
+                                             "type":  "boolean",
+                                             "default":  true
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "columns":  [
+
+                                                         ],
+                                             "auto_detect":  true,
+                                             "target_column":  "",
+                                             "method":  "select_k_best",
+                                             "score_func":  "f_classif",
+                                             "problem_type":  "auto",
+                                             "k":  10,
+                                             "percentile":  10.0,
+                                             "alpha":  0.05,
+                                             "threshold":  null,
+                                             "mode":  "k_best",
+                                             "estimator":  "auto",
+                                             "step":  1.0,
+                                             "min_features":  null,
+                                             "max_features":  null,
+                                             "drop_unselected":  true
+                                         }
+                  },
+                  {
+                      "type":  "skewness_transform",
+                      "label":  "Fix skewed columns",
+                      "description":  "Surface skewness diagnostics and apply variance-stabilizing transforms.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "preprocessing",
+                      "tags":  [
+                                   "skewness",
+                                   "transformation",
+                                   "numeric"
+                               ],
+                      "parameters":  [
+                                         {
+                                             "name":  "transformations",
+                                             "label":  "Column transformations",
+                                             "description":  "Pick recommended transforms per column to reduce skewness.",
+                                             "type":  "text",
+                                             "source":  {
+                                                            "type":  "skewness_recommendations",
+                                                            "endpoint":  "/ml-workflow/api/recommendations/skewness",
+                                                            "value_key":  "columns"
+                                                        }
+                                         }
+                                     ],
+                      "default_config":  {
+                                             "transformations":  [
+
+                                                                 ]
+                                         }
+                  },
+                                          {
+                                              "type":  "train_model_draft",
+                                              "label":  "Train model",
+                                              "description":  "Validate pipeline readiness and launch background training jobs via Celery.",
+                                              "inputs":  [
+                                                             "dataset"
+                                                         ],
+                                              "outputs":  [
+                                                              "dataset"
+                                                          ],
+                                              "category":  "modeling",
+                                              "tags":  [
+                                                           "modeling",
+                                                           "training",
+                                                           "celery"
+                                                       ],
+                                              "parameters":  [
+                                                                 {
+                                                                     "name":  "target_column",
+                                                                     "label":  "Target column",
+                                                                     "description":  "Response variable used for downstream modeling.",
+                                                                     "type":  "text",
+                                                                     "placeholder":  "target"
+                                                                 },
+                                                                 {
+                                                                     "name":  "problem_type",
+                                                                     "label":  "Problem type",
+                                                                     "description":  "Select the modeling task for downstream training.",
+                                                                     "type":  "select",
+                                                                     "default":  "classification",
+                                                                     "options":  [
+                                                                                     {
+                                                                                         "value":  "classification",
+                                                                                         "label":  "Classification"
+                                                                                     },
+                                                                                     {
+                                                                                         "value":  "regression",
+                                                                                         "label":  "Regression"
+                                                                                     }
+                                                                                 ]
+                                                                 },
+                                                                 {
+                                                                     "name":  "model_type",
+                                                                     "label":  "Model template",
+                                                                     "description":  "Registered estimator used when enqueuing training jobs.",
+                                                                     "type":  "select",
+                                                                     "default":  "logistic_regression",
+                                                                     "options":  [
+                                                                                     {
+                                                                                         "value":  "logistic_regression",
+                                                                                         "label":  "Logistic Regression"
+                                                                                     },
+                                                                                     {
+                                                                                         "value":  "random_forest_classifier",
+                                                                                         "label":  "Random Forest Classifier"
+                                                                                     },
+                                                                                     {
+                                                                                         "value":  "random_forest_regressor",
+                                                                                         "label":  "Random Forest Regressor"
+                                                                                     },
+                                                                                     {
+                                                                                         "value":  "ridge_regression",
+                                                                                         "label":  "Ridge Regression"
+                                                                                     }
+                                                                                 ]
+                                                                 },
+                                                                 {
+                                                                     "name":  "hyperparameters",
+                                                                     "label":  "Hyperparameters (JSON)",
+                                                                     "description":  "Optional JSON object merged with the model template defaults.",
+                                                                     "type":  "textarea",
+                                                                     "placeholder":  "{\n  \"n_estimators\": 200\n}"
+                                                                 }
+                                                             ],
+                                              "default_config":  {
+                                                                     "target_column":  "",
+                                                                     "problem_type":  "classification",
+                                                                     "model_type":  "logistic_regression",
+                                                                     "hyperparameters":  ""
+                                                                 }
+                                          },
+                  {
+                      "type":  "binned_distribution",
+                      "label":  "Binned column distributions",
+                      "description":  "Visualize category counts for columns generated by binning.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "inspection",
+                      "tags":  [
+                                   "binning",
+                                   "visualization"
+                               ],
+                      "parameters":  [
+
+                                     ],
+                      "default_config":  {
+
+                                         }
+                  },
+                  {
+                      "type":  "skewness_distribution",
+                      "label":  "Skewness distributions",
+                      "description":  "Visualize distributions for skewed numeric columns.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "inspection",
+                      "tags":  [
+                                   "skewness",
+                                   "visualization"
+                               ],
+                      "parameters":  [
+
+                                     ],
+                      "default_config":  {
+
+                                         }
+                  },
+                  {
+                      "type":  "data_preview",
+                      "label":  "Data snapshot",
+                      "description":  "Inspect a sample of the dataset after upstream transforms.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "inspection",
+                      "tags":  [
+                                   "preview",
+                                   "validation"
+                               ],
+                      "parameters":  [
+
+                                     ],
+                      "default_config":  {
+
+                                         }
+                  },
+                  {
+                      "type":  "feature_target_split",
+                      "label":  "Separate features & target",
+                      "description":  "Designate the supervised target column. All remaining columns are treated as features (X).",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "modeling",
+                      "tags":  [
+                                   "modeling",
+                                   "features",
+                                   "target"
+                               ],
+                      "parameters":  [
+                                     {
+                                         "name":  "target_column",
+                                         "label":  "Target column",
+                                         "description":  "Column treated as the target (y) for downstream modeling.",
+                                         "type":  "text",
+                                         "placeholder":  "target"
+                                     }
+                                  ],
+                      "default_config":  {
+                                             "target_column":  ""
+                                         }
+                  },
+                  {
+                      "type":  "train_test_split",
+                      "label":  "Train/Test Split",
+                      "description":  "Split dataset into training, testing, and optionally validation sets. Supports stratification.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "train",
+                                      "test",
+                                      "validation"
+                                  ],
+                      "category":  "modeling",
+                      "tags":  [
+                                   "modeling",
+                                   "split",
+                                   "train_test"
+                               ],
+                      "parameters":  [
+                                     {
+                                         "name":  "test_size",
+                                         "label":  "Test size",
+                                         "description":  "Proportion of the dataset to include in the test split.",
+                                         "type":  "number",
+                                         "default":  0.2,
+                                         "min":  0.0,
+                                         "max":  1.0,
+                                         "step":  0.05
+                                     },
+                                     {
+                                         "name":  "validation_size",
+                                         "label":  "Validation size",
+                                         "description":  "Proportion of the dataset to include in the validation split (optional).",
+                                         "type":  "number",
+                                         "default":  0.0,
+                                         "min":  0.0,
+                                         "max":  1.0,
+                                         "step":  0.05
+                                     },
+                                     {
+                                         "name":  "random_state",
+                                         "label":  "Random state",
+                                         "description":  "Seed for reproducible splits. Leave empty for random.",
+                                         "type":  "number",
+                                         "default":  42,
+                                         "min":  0,
+                                         "step":  1
+                                     },
+                                     {
+                                         "name":  "shuffle",
+                                         "label":  "Shuffle",
+                                         "description":  "Whether to shuffle the data before splitting.",
+                                         "type":  "boolean",
+                                         "default":  true
+                                     },
+                                     {
+                                         "name":  "stratify",
+                                         "label":  "Stratify",
+                                         "description":  "Preserve class distribution in splits using the target column.",
+                                         "type":  "boolean",
+                                         "default":  false
+                                     },
+                                     {
+                                         "name":  "target_column",
+                                         "label":  "Target column (for stratification)",
+                                         "description":  "Column to use for stratified splitting (required if stratify is enabled).",
+                                         "type":  "text",
+                                         "placeholder":  "target"
+                                     }
+                                  ],
+                      "default_config":  {
+                                             "test_size":  0.2,
+                                             "validation_size":  0.0,
+                                             "random_state":  42,
+                                             "shuffle":  true,
+                                             "stratify":  false,
+                                             "target_column":  ""
+                                         }
+                  },
+                  {
+                      "type":  "transformer_audit",
+                      "label":  "Transformer audit",
+                      "description":  "Inspect transformer fit/transform activity across train, test, and validation splits.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "inspection",
+                      "tags":  [
+                                   "monitoring",
+                                   "transformers",
+                                   "splits"
+                               ],
+                      "parameters":  [
+
+                                     ],
+                      "default_config":  {
+
+                                         }
+                  },
+                  {
+                      "type":  "dataset_profile",
+                      "label":  "Dataset profile",
+                      "description":  "Generate a lightweight dataset profile with summary statistics.",
+                      "inputs":  [
+                                     "dataset"
+                                 ],
+                      "outputs":  [
+                                      "dataset"
+                                  ],
+                      "category":  "inspection",
+                      "tags":  [
+                                   "profiling",
+                                   "eda",
+                                   "quality"
+                               ],
+                      "parameters":  [
+
+                                     ],
+                      "default_config":  {
+
+                                         }
+                  }
+              ],
+    "Count":  18
+}

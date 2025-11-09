@@ -1,0 +1,117 @@
+# © 2025 Murat Unsal — Skyulf Project
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# === roadmap ===
+.roadmap/
+.roadmap.md
+ROADMAP.md
+
+# === todo ===
+.todo/
+.todo
+
+# === Virtual Environments ===
+.venv/
+venv/
+ENV/
+env/
+.env/
+
+# === Node.js / Frontend ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# === Database ===
+.mlops_database.db/
+.mlops_database.db
+mlops_database.db
+*.db
+*.sqlite
+*.sqlite3
+
+# === Environment Variables (CRITICAL - keep secrets out!) ===
+.env
+.env.*
+!.env.example
+
+# === Editor / IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# === Logs & Caches ===
+*.log
+*.pot
+*.pyc
+*.pkl
+*.cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# === Jupyter Notebooks ===
+.ipynb_checkpoints
+ipynb_checkpoints/
+
+# === OS files ===
+Thumbs.db
+desktop.ini
+.DS_Store
+*.swp
+
+# === Data files (usually too large or sensitive) ===
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.arrow
+*.feather
+
+# === Application Data & Uploads ===
+cache/
+exports/
+logs/
+temp/
+uploads/
+data/
+data_science_examples/
+app_data/
+backups/
+
+# === Documentation (build artifacts) ===
+docs/_build/
+docs/.doctrees/
+docs/
+
+# === Local library bundle ===
+skyulf-mlflow/
+.skyulf-mlflow
+
+# === Misc ===
+.tools/
+
+#=== Tests ===
+#tests/
+#.tests
+testingdb/
+.testingdb

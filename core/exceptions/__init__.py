@@ -1,0 +1,1 @@
+# Exception handlers for FastAPI application

@@ -1,0 +1,91 @@
+# FastAPI MLops Application Requirements
+# This file contains dependencies specific to the FastAPI implementation
+# NOTE: Geospatial stack requires Python >= 3.10 (see libpysal constraint)
+
+# === CORE FASTAPI DEPENDENCIES ===
+fastapi>=0.104.0,<1.0.0
+uvicorn[standard]>=0.24.0,<1.0.0
+pydantic>=2.4.0,<3.0.0
+pydantic-settings>=2.0.0,<3.0.0
+email-validator>=2.0.0              # Required for EmailStr validation in Pydantic
+python-dotenv>=1.0.0,<2.0.0        # Environment variable loading
+
+# === ASYNC DATABASE SUPPORT ===
+sqlalchemy[asyncio]>=2.0.0,<3.0.0
+aiosqlite>=0.19.0,<1.0.0  # Async SQLite support
+asyncpg>=0.29.0,<1.0.0    # Async PostgreSQL support (optional)
+
+# === AUTHENTICATION & SECURITY ===
+python-jose[cryptography]>=3.3.0,<4.0.0  # JWT token handling
+passlib[bcrypt]>=1.7.4,<2.0.0             # Password hashing
+python-multipart>=0.0.6,<1.0.0            # Form data support
+bcrypt==4.0.1                              # Pin bcrypt to a compatible version for passlib
+
+# === TEMPLATE SUPPORT ===
+jinja2>=3.1.0,<4.0.0                      # Template engine
+
+# === HTTP CLIENT (ASYNC) ===
+httpx>=0.25.0,<1.0.0      # Async HTTP client (replacement for requests)
+
+# === SYSTEM MONITORING ===
+psutil>=5.9.0,<6.0.0      # System and process utilities
+
+# === DATA PROCESSING ===
+pandas>=2.0.0,<3.0.0      # Data analysis and manipulation
+numpy>=1.24.0,<2.0.0      # Numerical computing
+scikit-learn>=1.4.0,<2.0.0 # Model selection utilities
+optuna>=3.6.0,<4.5.0       # Bayesian/early-stopping hyperparameter search
+imbalanced-learn>=0.12.0,<1.0.0  # Sampling strategies for imbalanced datasets
+rapidfuzz>=3.6.1,<4.0.0   # Efficient string similarity metrics for feature math
+geopandas>=0.14.0,<0.15.0 # Geospatial dataframe operations
+shapely>=2.0.2,<2.1.0     # Geometry operations
+pyproj>=3.6.0,<3.7.0      # Coordinate reference transforms
+rtree>=1.3.0,<2.0.0       # Spatial indexes for faster spatial joins
+libpysal>=4.10.0,<5.0.0   # Spatial weights
+esda>=2.5.0,<3.0.0        # Spatial autocorrelation statistics
+# Optional performance dependencies for pandas
+# Numba enables faster compute paths in pandas (used when compute.use_numba=True)
+numba>=0.62.0,<1.0.0
+llvmlite>=0.45.0,<1.0.0
+
+# === NLP ANALYTICS ===
+vaderSentiment>=3.3.2,<4.0.0 # Sentiment scoring utilities
+
+# === EXISTING DEPENDENCIES (SHARED WITH FLASK) ===
+# These are already in the main requirements.txt, but listed here for clarity
+# when setting up the FastAPI environment separately
+
+# Data processing
+# pandas>=2.2.0,<2.3.0
+# numpy>=1.26.0,<2.0.0
+
+# External services
+# snowflake-connector-python>=3.7.0,<4.0.0
+# psycopg2-binary>=2.9.9,<3.0.0
+
+# File formats
+# openpyxl>=3.1.2,<4.0.0
+# pyarrow>=15.0.0,<16.0.0
+
+# Web scraping (if needed)
+# beautifulsoup4>=4.12.3,<5.0.0
+# selenium>=4.18.0,<5.0.0
+
+# ML libraries (if needed)
+# scikit-learn>=1.4.0,<2.0.0
+# matplotlib>=3.8.0,<4.0.0
+
+# === DEVELOPMENT DEPENDENCIES ===
+# Only install these in development environment
+pytest>=7.4.0,<8.0.0
+pytest-asyncio>=0.21.0,<1.0.0
+pytest-cov>=4.1.0,<5.0.0
+httpx>=0.25.0,<1.0.0  # For testing async endpoints
+black>=23.0.0,<24.0.0
+isort>=5.12.0,<6.0.0
+flake8>=6.0.0,<7.0.0
+mypy>=1.6.0,<2.0.0
+
+# Testing utilities
+factory-boy>=3.3.0,<4.0.0
+faker>=19.0.0,<20.0.0

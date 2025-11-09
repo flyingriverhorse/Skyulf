@@ -1,0 +1,24 @@
+* text=auto
+
+# Use LF for code and docs across platforms
+*.py  text eol=lf
+*.sh  text eol=lf
+*.md  text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js  text eol=lf
+
+# Windows-specific scripts
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary

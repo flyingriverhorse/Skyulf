@@ -1,0 +1,58 @@
+# © 2025 Murat Unsal — Skyulf Project
+# Docker Compose configuration for local development
+
+name: skyulf-dev
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  api:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment:
+      FASTAPI_ENV: development
+      HOST: 0.0.0.0
+      PORT: 8000
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: sqlite+aiosqlite:///./mlops_database.db
+    command: >-
+      bash -lc "pip install --upgrade pip && 
+      pip install -r requirements-fastapi.txt && 
+      uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  worker:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment:
+      FASTAPI_ENV: development
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    command: >-
+      bash -lc "pip install --upgrade pip && 
+      pip install -r requirements-fastapi.txt && 
+      python -m celery -A celery_worker.celery_app worker --pool=solo --loglevel=info --queues mlops-training"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+profiles:
+  - dev
+
+networks:
+  default:
+    name: skyulf-net

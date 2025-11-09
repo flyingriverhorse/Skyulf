@@ -1,0 +1,57 @@
+# © 2025 Murat Unsal — Skyulf Project
+
+name: Bug report
+description: File a bug/issue
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill in the details below.
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: A clear and concise description of the bug
+      placeholder: e.g. "EDA preview fails on CSV with Unicode column names"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide minimal steps to reproduce the issue
+      render: bash
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and logs
+      description: Paste relevant logs/tracebacks (redact sensitive info)
+      render: text
+  - type: dropdown
+    id: env
+    attributes:
+      label: Environment
+      options:
+        - Windows
+        - Linux
+        - macOS
+        - Docker Compose
+  - type: input
+    id: versions
+    attributes:
+      label: Version info
+      description: Python version, commit SHA or release tag, browser version if UI-related
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Anything else we should know

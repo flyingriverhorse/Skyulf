@@ -1,0 +1,59 @@
+# © 2025 Murat Unsal — Skyulf Project
+
+name: CI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ matrix.python-version }}-${{ hashFiles('requirements-ci.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-${{ matrix.python-version }}-
+
+      - name: Install dependencies (uv)
+        run: |
+          uv pip install --system -r requirements-ci.txt
+
+      - name: Lint (flake8)
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --max-complexity=22 --max-line-length=120 --statistics
+
+      - name: Type check (mypy)
+        run: |
+          mypy \
+            core/feature_engineering/routes.py \
+            core/feature_engineering/nodes/modeling/model_training_tasks.py \
+            core/feature_engineering/nodes/modeling/hyperparameter_tuning_tasks.py \
+            core/feature_engineering/nodes/modeling/model_evaluation.py
+
+      - name: Run tests
+        run: pytest -q --maxfail=1 --disable-warnings --cov --cov-report=term-missing

@@ -1,0 +1,131 @@
+# © 2025 Murat Unsal — Skyulf Project
+
+[project]
+name = "skyulf"
+version = "0.0.1"
+description = "MLOps web application for privacy-preserving ML workflows"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Framework :: FastAPI",
+]
+dependencies = [
+    "aiofiles>=24.1.0",
+    "aiohttp>=3.12.15",
+    "aiosqlite>=0.19.0",
+    "alembic>=1.16.5",
+    "asyncpg>=0.29.0,<1.0.0",
+    "bcrypt==4.0.1",
+    "beautifulsoup4>=4.13.5",
+    "celery>=5.4.0",
+    "dask[complete]>=2024.8.0",
+    "email-validator>=2.3.0",
+    "fastapi>=0.104.0,<1.0.0",
+    "flower>=2.0.0,<3.0.0",
+    "geopandas>=0.14.0,<0.15.0",
+    "httpx>=0.25.0,<1.0.0",
+    "jinja2>=3.1.0,<4.0.0",
+    "kaggle>=1.7.4.5",
+    "matplotlib>=3.9.4",
+    "numba>=0.60.0",
+    "numpy>=1.24.0,<2.0.0",
+    "openml>=0.15.1",
+    "pandas>=2.0.0",
+    "pyproj>=3.6.0,<3.7.0",
+    "passlib[bcrypt]>=1.7.4,<2.0.0",
+    "plotly>=6.3.0",
+    "psutil>=5.9.0,<6.0.0",
+    "psycopg2-binary>=2.9.10",
+    "libpysal>=4.10.0,<5.0.0",
+    "esda>=2.5.0,<3.0.0",
+    "pydantic>=2.4.0,<3.0.0",
+    "pydantic-settings>=2.0.0,<3.0.0",
+    "python-dotenv>=1.0.0",
+    "python-jose[cryptography]>=3.3.0,<4.0.0",
+    "python-multipart>=0.0.6,<1.0.0",
+    "redis>=5.0.0,<6.0.0",
+    "langid>=1.1.6",
+    "vadersentiment>=3.3.2",
+    "scikit-learn>=1.4.0",
+    "imbalanced-learn>=0.12.0",
+    "scipy>=1.13.1",
+    "seaborn>=0.13.2",
+    "shapely>=2.0.2,<2.1.0",
+    "rtree>=1.3.0,<2.0.0",
+    "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
+    "tqdm>=4.67.1",
+    "uvicorn[standard]>=0.24.0,<1.0.0",
+    "xgboost>=2.1.4",
+    "rapidfuzz>=3.6.1",
+    "cookiecutter>=2.6.0",
+    "optuna>=4.0,<5",
+    "optuna-integration>=4.0,<5",
+    "pytest>=7.4.4",
+    "pytest-asyncio>=0.23.8",
+]
+
+[dependency-groups]
+dev = [
+    # Test stack
+    "pytest>=7.4.0,<8.0.0",
+    "pytest-asyncio>=0.21.0,<1.0.0",
+    "pytest-cov>=4.1.0,<5.0.0",
+
+    # Linters/formatters/typecheckers
+    "black>=23.0.0,<24.0.0",
+    "flake8>=6.0.0,<7.0.0",
+    "isort>=5.12.0,<6.0.0",
+    "mypy>=1.6.0,<2.0.0",
+
+    # Dev helpers
+    "factory-boy>=3.3.0,<4.0.0",
+    "faker>=19.0.0,<20.0.0",
+    "pre-commit>=3.4.0",
+    "ipython>=8.18.1",
+    "jupyter>=1.1.1",
+]
+
+[tool.mypy]
+python_version = "3.10"
+exclude = ["^skyulf/"]
+explicit_package_bases = true
+namespace_packages = true
+
+[[tool.mypy.overrides]]
+module = [
+    "pandas",
+    "pandas.*",
+    "sklearn",
+    "sklearn.*",
+    "joblib",
+    "celery",
+    "celery.*",
+    "optuna",
+    "optuna.*",
+    "optuna_integration",
+    "optuna_integration.*",
+    "imblearn",
+    "imblearn.*",
+    "aiofiles",
+    "psutil",
+    "passlib",
+    "passlib.*",
+    "jose",
+    "jose.*",
+    "aiomysql",
+    "motor",
+    "motor.*",
+    "snowflake",
+    "snowflake.*",
+    "rapidfuzz",
+    "rapidfuzz.*",
+]
+ignore_missing_imports = true
+
