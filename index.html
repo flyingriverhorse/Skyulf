@@ -709,7 +709,7 @@
             <div class="text-center mb-16" data-aos="fade-up">
                 <h2 class="text-4xl font-bold mb-4">Drag-and-drop ML pipeline builder</h2>
                 <p class="text-xl text-gray-300 max-w-3xl mx-auto">
-                    Wire up your ML workflows with visual nodes—from data cleaning to model training. Each node is a reusable component running locally on your infrastructure.
+                    Wire up your ML workflows with visual nodes—from data cleaning to model training. Each node is a reusable component running locally on your infrastructure. Skyulf ships with 39 node types across preprocessing, encoding, modeling, and inspection.
                 </p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -718,16 +718,17 @@
                         <i data-feather="filter" class="w-8 h-8 text-blue-400"></i>
                     </div>
                     <h3 class="text-xl font-semibold mb-4">Preprocessing</h3>
-                    <p class="text-xs text-blue-300 uppercase tracking-wide mb-2">18+ nodes available</p>
+                    <p class="text-xs text-blue-300 uppercase tracking-wide mb-2">Extensive toolkit</p>
                     <ul class="space-y-2 text-gray-400">
                         <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>Drop missing rows/columns</li>
                         <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>Imputation strategies</li>
                         <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>Train/val/test splits</li>
                     </ul>
                     <div class="mt-4 pt-4 border-t border-white/10">
-                        <p class="text-xs text-blue-300 uppercase tracking-wide mb-2">Coming soon</p>
-                        <ul class="space-y-2 text-gray-500">
-                            <li class="flex items-center"><span class="w-2 h-2 bg-blue-400/60 rounded-full mr-3"></span>Outlier detection</li>
+                        <p class="text-xs text-blue-300 uppercase tracking-wide mb-2">Highlights</p>
+                        <ul class="space-y-2 text-gray-400">
+                            <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>Outlier removal & skewness fixes</li>
+                            <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>Class imbalance handling (under/oversample)</li>
                         </ul>
                     </div>
                 </div>
@@ -743,9 +744,9 @@
                         <li class="flex items-center"><span class="w-2 h-2 bg-purple-400 rounded-full mr-3"></span>Ordinal & frequency encoding</li>
                     </ul>
                     <div class="mt-4 pt-4 border-t border-white/10">
-                        <p class="text-xs text-purple-300 uppercase tracking-wide mb-2">Coming soon</p>
-                        <ul class="space-y-2 text-gray-500">
-                            <li class="flex items-center"><span class="w-2 h-2 bg-purple-400/60 rounded-full mr-3"></span>Feature hashing</li>
+                        <p class="text-xs text-purple-300 uppercase tracking-wide mb-2">Highlights</p>
+                        <ul class="space-y-2 text-gray-400">
+                            <li class="flex items-center"><span class="w-2 h-2 bg-purple-400 rounded-full mr-3"></span>Feature hashing with configurable buckets</li>
                         </ul>
                     </div>
                 </div>
@@ -880,7 +881,7 @@
                         </div>
                     </div>
                     <ul class="space-y-3 text-gray-300">
-                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>18+ preprocessing nodes:</strong> Drop missing data, impute values, split datasets with stratification support.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>39 workflow nodes:</strong> Preprocessing, encoding, modeling, and inspection blocks that stay on your infra.</span></li>
                         <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Categorical encoding suite:</strong> One-hot, target, ordinal, and frequency encoding with automatic column detection.</span></li>
                         <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Async model training:</strong> Scikit-learn trainers with Celery-powered grid/random/halving search running in background.</span></li>
                         <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Visual pipeline builder:</strong> Drag-and-drop canvas with real-time node connections and EDA previews.</span></li>
