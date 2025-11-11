@@ -95,6 +95,13 @@ export const TrainModelDraftSection: React.FC<TrainModelDraftSectionProps> = ({
     : [];
   const metrics = preview?.metrics ?? null;
 
+  const previewColumnNames = useMemo(() => {
+    if (!Array.isArray(preview?.columns)) {
+      return [] as string[];
+    }
+    return preview.columns.filter((name): name is string => typeof name === 'string' && name.trim().length > 0);
+  }, [preview?.columns]);
+
   const effectiveSchemaColumns = useMemo(() => {
     if (schemaColumns.length) {
       return schemaColumns;
@@ -102,8 +109,17 @@ export const TrainModelDraftSection: React.FC<TrainModelDraftSectionProps> = ({
     if (Array.isArray(preview?.schema?.columns)) {
       return preview.schema.columns as PipelinePreviewColumnSchema[];
     }
+    if (previewColumnNames.length > 0) {
+      // Fallback to raw column names when the backend omits the schema payload for lightweight previews.
+      return previewColumnNames.map((name) => ({
+        name,
+        pandas_dtype: null,
+        logical_family: 'unknown' as const,
+        nullable: true,
+      }));
+    }
     return [] as PipelinePreviewColumnSchema[];
-  }, [preview?.schema?.columns, schemaColumns]);
+  }, [preview?.schema?.columns, previewColumnNames, schemaColumns]);
 
   const schemaByName = useMemo(() => {
     const map = new Map<string, PipelinePreviewColumnSchema>();
@@ -122,6 +138,7 @@ export const TrainModelDraftSection: React.FC<TrainModelDraftSectionProps> = ({
     ? columnStats.find((stat) => stat?.name === targetColumn) ?? null
     : null;
   const targetSchema = targetColumn ? schemaByName.get(targetColumn) ?? null : null;
+  const targetPresentInSchema = Boolean(targetSchema);
 
   const featureNames = useMemo(() => {
     const names = new Set<string>();
@@ -189,7 +206,7 @@ export const TrainModelDraftSection: React.FC<TrainModelDraftSectionProps> = ({
 
     // If target column is not in preview but we have features, it might have been split upstream
     // Only warn if we have no features at all
-    if (!targetStat && !featureNames.length) {
+    if (!targetStat && !targetPresentInSchema && !featureNames.length) {
       issues.push(`Target column "${targetColumn}" is not present in the preview output, and no feature columns were found.`);
       return issues;
     }
@@ -230,6 +247,7 @@ export const TrainModelDraftSection: React.FC<TrainModelDraftSectionProps> = ({
     targetColumn,
     targetDistinctCount,
     targetStat,
+    targetPresentInSchema,
   ]);
 
   const detectionLabel = useMemo(() => PROBLEM_TYPE_LABEL[selectedProblemType], [selectedProblemType]);
@@ -241,12 +259,6 @@ export const TrainModelDraftSection: React.FC<TrainModelDraftSectionProps> = ({
     ];
 
     if (previewStatus === 'success') {
-      if (previewRowCount !== null) {
-        items.push({ label: 'Preview rows', value: formatMetricValue(previewRowCount) });
-      }
-      items.push({ label: 'Feature columns', value: formatMetricValue(featureNames.length) });
-      items.push({ label: 'Numeric features', value: formatMetricValue(numericFeatureNames.length) });
-      items.push({ label: 'Non-numeric features', value: formatMetricValue(nonNumericFeatureNames.length) });
       if (targetDistinctCount !== null) {
         items.push({ label: 'Target distinct values', value: formatMetricValue(targetDistinctCount) });
       }
@@ -271,13 +283,9 @@ export const TrainModelDraftSection: React.FC<TrainModelDraftSectionProps> = ({
   }, [
     detectionLabel,
     featureMissingNames.length,
-    featureNames.length,
     formatMetricValue,
     formatMissingPercentage,
     missingTargetCount,
-    nonNumericFeatureNames.length,
-    numericFeatureNames.length,
-    previewRowCount,
     previewStatus,
     targetColumn,
     targetDistinctCount,

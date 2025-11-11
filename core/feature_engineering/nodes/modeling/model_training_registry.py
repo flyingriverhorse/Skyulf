@@ -25,7 +25,6 @@ _MODEL_REGISTRY: Dict[str, ModelSpec] = {
         default_params={
             "max_iter": 1000,
             "solver": "lbfgs",
-            "multi_class": "auto",
         },
     ),
     "random_forest_classifier": ModelSpec(

@@ -31,7 +31,7 @@ def _build_frame():
 def test_prepare_training_data_with_split_classification():
     frame = _build_frame()
 
-    X_train, y_train, X_test, y_test, feature_columns, target_meta = _prepare_training_data(frame, "target")
+    X_train, y_train, X_validation, y_validation, X_test, y_test, feature_columns, target_meta = _prepare_training_data(frame, "target")
 
     assert list(feature_columns) == ["feature_numeric", "feature_categorical"]
     assert X_train.shape == (2, 2)
@@ -46,7 +46,7 @@ def test_prepare_training_data_with_split_classification():
 def test_prepare_training_data_without_split_builds_test_none():
     frame = _build_frame().drop(columns=[SPLIT_TYPE_COLUMN])
 
-    X_train, y_train, X_test, y_test, feature_columns, _ = _prepare_training_data(frame, "target")
+    X_train, y_train, X_validation, y_validation, X_test, y_test, feature_columns, _ = _prepare_training_data(frame, "target")
 
     assert X_train.shape == (4, 2)
     assert y_train.tolist() == [1, 0, 1, 0]
@@ -84,7 +84,7 @@ def test_hyperparameter_tuning_results_applied_in_training():
         }
     )
 
-    X_train, y_train, *_ = _prepare_training_data(frame, "target")
+    X_train, y_train, X_validation, y_validation, X_test, y_test, *_ = _prepare_training_data(frame, "target")
 
     spec = get_model_spec("random_forest_classifier")
 

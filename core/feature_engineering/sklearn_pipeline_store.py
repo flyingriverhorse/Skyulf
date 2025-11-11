@@ -384,11 +384,20 @@ class SklearnPipelineStore:
         return f"{pipeline_id}:{node_id}:{pipeline_name}"
 
 
-_pipeline_store = SklearnPipelineStore()
-
-
 def get_pipeline_store() -> SklearnPipelineStore:
-    return _pipeline_store
+    """Delegate to the canonical singleton owner in
+    ``core.feature_engineering.pipeline_store_singleton``.
+
+    This keeps the class and instance creation separate: tests or code that
+    need the concrete ``SklearnPipelineStore`` class can still import it
+    from this module, while runtime callers that need the shared instance
+    should call this function which will return the single object owned
+    by the canonical module.
+    """
+    # Local import to avoid circular import at module import time.
+    from core.feature_engineering.pipeline_store_singleton import get_pipeline_store as _canonical_get
+
+    return _canonical_get()
 
 
 __all__ = [

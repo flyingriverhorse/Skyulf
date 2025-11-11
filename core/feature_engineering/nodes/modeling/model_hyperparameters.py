@@ -79,7 +79,7 @@ LOGISTIC_REGRESSION_PARAMS = [
         label="Solver",
         type="select",
         default="lbfgs",
-        description="Algorithm for optimization",
+        description="Algorithm for optimization; standardize features when using SAG or SAGA to help convergence",
         options=[
             {"value": "lbfgs", "label": "LBFGS"},
             {"value": "liblinear", "label": "Liblinear"},
@@ -106,12 +106,13 @@ LOGISTIC_REGRESSION_PARAMS = [
         label="Multi-class Strategy",
         type="select",
         default="auto",
-        description="Strategy for multi-class classification",
+        description="Strategy for multi-class classification; leave at the estimator default (auto) unless a specific scheme is required",
         options=[
-            {"value": "auto", "label": "Auto"},
+            {"value": "auto", "label": "Estimator default (auto)"},
             {"value": "ovr", "label": "One-vs-Rest"},
             {"value": "multinomial", "label": "Multinomial"},
         ],
+        nullable=True,
     ),
 ]
 

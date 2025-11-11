@@ -31,7 +31,7 @@ except Exception:  # pragma: no cover - defensive guard
     MaxAbsScaler = None  # type: ignore[assignment]
     RobustScaler = None  # type: ignore[assignment]
 
-from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
+from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
 
 from .binning import _detect_numeric_columns, _is_binary_numeric

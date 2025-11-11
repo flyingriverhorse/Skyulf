@@ -260,7 +260,7 @@ def _build_context(
     pipeline_id: Optional[str],
     node_id: Optional[str],
 ) -> OneHotEncodingContext:
-    from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
+    from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
     from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
 
     has_splits = SPLIT_TYPE_COLUMN in frame.columns

@@ -2,7 +2,7 @@ import pandas as pd
 
 from core.feature_engineering.nodes.feature_eng.ordinal_encoding import apply_ordinal_encoding
 from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
-from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
+from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
 
 def _build_node(config):

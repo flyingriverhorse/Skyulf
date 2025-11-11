@@ -37,9 +37,7 @@ def test_create_optuna_searcher_attaches_sampler_when_supported(monkeypatch):
 
     from core.feature_engineering.nodes.modeling import hyperparameter_tuning_tasks as tasks_module
 
-    monkeypatch.setattr(tasks_module, "OptunaSearchCV", DummySearchCV)
-    monkeypatch.setattr(tasks_module, "TPESampler", DummySampler)
-    monkeypatch.setattr(tasks_module, "_optuna_accepts_sampler", lambda: True)
+    # Use injection to ensure deterministic behavior in tests
     monkeypatch.setattr(tasks_module, "_HAS_OPTUNA", True)
 
     search_config = _make_search_configuration(random_state=11)
@@ -55,7 +53,14 @@ def test_create_optuna_searcher_attaches_sampler_when_supported(monkeypatch):
         "n_jobs": 1,
     }
 
-    _create_optuna_searcher(optuna_kwargs, search_config)
+    # Call with explicit injection of the dummy classes and accepts function.
+    _create_optuna_searcher(
+        optuna_kwargs,
+        search_config,
+        _search_cls=DummySearchCV,
+        _sampler_cls=DummySampler,
+        _accepts_sampler_fn=lambda: True,
+    )
 
     assert "sampler" in captured_kwargs
     assert captured_kwargs["sampler_seed"] == 11
@@ -77,9 +82,6 @@ def test_create_optuna_searcher_retries_without_sampler(monkeypatch):
 
     from core.feature_engineering.nodes.modeling import hyperparameter_tuning_tasks as tasks_module
 
-    monkeypatch.setattr(tasks_module, "OptunaSearchCV", DummySearchCV)
-    monkeypatch.setattr(tasks_module, "TPESampler", DummySampler)
-    monkeypatch.setattr(tasks_module, "_optuna_accepts_sampler", lambda: True)
     monkeypatch.setattr(tasks_module, "_HAS_OPTUNA", True)
 
     search_config = _make_search_configuration(random_state=13)
@@ -95,7 +97,15 @@ def test_create_optuna_searcher_retries_without_sampler(monkeypatch):
         "n_jobs": 1,
     }
 
-    searcher = _create_optuna_searcher(optuna_kwargs, search_config)
+    # Inject DummySearchCV which raises when 'sampler' is passed so we can
+    # verify the retry behavior.
+    searcher = _create_optuna_searcher(
+        optuna_kwargs,
+        search_config,
+        _search_cls=DummySearchCV,
+        _sampler_cls=DummySampler,
+        _accepts_sampler_fn=lambda: True,
+    )
 
     assert isinstance(searcher, DummySearchCV)
     assert len(call_kwargs) == 2
