@@ -19,7 +19,7 @@ from core.feature_engineering.nodes.feature_eng.skewness import (
 from core.feature_engineering.nodes.feature_eng.target_encoding import apply_target_encoding
 from core.feature_engineering.nodes.feature_eng.transformer_audit import apply_transformer_audit
 from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
-from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
+from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
 
 @pytest.fixture

@@ -298,10 +298,36 @@ def _sanitize_logistic_regression_hyperparameters(
     base_params["penalty"] = normalized_penalty
     base_params.pop("l1_ratio", None)
 
+    multi_class_value = base_params.get("multi_class")
+    allowed_multi_classes = {"ovr", "multinomial"}
+    if isinstance(multi_class_value, str):
+        lowered_multi = multi_class_value.strip().lower()
+        if lowered_multi in allowed_multi_classes:
+            base_params["multi_class"] = lowered_multi
+        else:
+            base_params.pop("multi_class", None)
+    else:
+        base_params.pop("multi_class", None)
+
     if "solver" in search_space:
         search_space["solver"] = _sanitize_candidates(search_space["solver"], safe_solvers, normalized_solver)
     if "penalty" in search_space:
         search_space["penalty"] = _sanitize_candidates(search_space["penalty"], safe_penalties, normalized_penalty)
+
+    if "multi_class" in search_space:
+        multi_candidates = [
+            candidate.strip().lower()
+            for candidate in search_space["multi_class"]
+            if isinstance(candidate, str) and candidate.strip().lower() in allowed_multi_classes
+        ]
+        deduped_multi = []
+        for candidate in multi_candidates:
+            if candidate not in deduped_multi:
+                deduped_multi.append(candidate)
+        if deduped_multi:
+            search_space["multi_class"] = deduped_multi
+        else:
+            search_space.pop("multi_class", None)
 
     # Elastic net combinations require l1_ratio. Remove unsupported parameters to avoid estimator failures.
     search_space.pop("l1_ratio", None)
@@ -338,26 +364,44 @@ def _build_optuna_distributions(search_space: Dict[str, List[Any]]) -> Dict[str,
     return distributions
 
 
-def _create_optuna_searcher(optuna_kwargs: Dict[str, Any], search_config: SearchConfiguration):
-    if not _HAS_OPTUNA or OptunaSearchCV is None:  # pragma: no cover - guarded by caller
+def _create_optuna_searcher(
+    optuna_kwargs: Dict[str, Any],
+    search_config: SearchConfiguration,
+    # Injection points for testing — if provided these will be used
+    # instead of the module-level OptunaSearchCV/TPESampler bindings.
+    _search_cls: Any = None,
+    _sampler_cls: Any = None,
+    _accepts_sampler_fn: Optional[Any] = None,
+):
+    """
+    Create an Optuna-backed searcher. The three underscore-prefixed
+    parameters are intended for tests to inject dummy classes or
+    callbacks to avoid brittle monkeypatching of module-level symbols.
+    """
+    # Resolve runtime bindings (prefer explicit injections)
+    search_cls = _search_cls if _search_cls is not None else OptunaSearchCV
+    sampler_cls = _sampler_cls if _sampler_cls is not None else TPESampler
+    accepts_sampler = _accepts_sampler_fn if _accepts_sampler_fn is not None else _optuna_accepts_sampler
+
+    if not _HAS_OPTUNA or search_cls is None:  # pragma: no cover - guarded by caller
         raise RuntimeError(_OPTUNA_INTEGRATION_GUIDANCE)
 
     kwargs: Dict[str, Any] = dict(optuna_kwargs)
     sampler_added = False
 
-    if TPESampler is not None and _optuna_accepts_sampler():
-        kwargs["sampler"] = TPESampler(
+    if sampler_cls is not None and accepts_sampler():
+        kwargs["sampler"] = sampler_cls(
             seed=search_config.random_state if search_config.random_state is not None else None
         )
         sampler_added = True
 
     try:
-        return OptunaSearchCV(**kwargs)
+        return search_cls(**kwargs)
     except TypeError as exc:
         if sampler_added and "sampler" in str(exc):
             logger.debug("OptunaSearchCV rejected 'sampler'; retrying without sampler. Error: %s", exc)
             kwargs.pop("sampler", None)
-            return OptunaSearchCV(**kwargs)
+            return search_cls(**kwargs)
         raise
 
 
@@ -586,6 +630,10 @@ def _prepare_search_parameters(
 
     if spec.key == "logistic_regression":
         _sanitize_logistic_regression_hyperparameters(base_params, filtered_search_space)
+        if not filtered_search_space:
+            raise ValueError(
+                "Search space is empty after normalizing logistic regression parameters. Use 'ovr' or 'multinomial' for multi_class."
+            )
 
     return base_params, filtered_search_space
 
@@ -847,6 +895,57 @@ async def _run_hyperparameter_tuning_workflow(job_id: str) -> None:
             training_data = _build_training_data_bundle(inputs.frame, target_column)
             search_config = _build_search_configuration(job, inputs.node_config)
             resolved_problem_type = _determine_problem_type(problem_type_hint, spec)
+
+            # Adjust scoring for multiclass classification when users select
+            # metrics that default to binary averaging (e.g. 'f1', 'precision', 'recall').
+            # For multiclass targets we prefer the weighted variant to avoid
+            # scorer errors during cross-validation.
+            scoring_override = search_config.scoring
+            if (
+                resolved_problem_type == "classification"
+                and isinstance(scoring_override, str)
+                and scoring_override.strip()
+            ):
+                normalized_scoring = scoring_override.strip()
+                # determine number of classes from target metadata if available
+                n_classes = None
+                try:
+                    if isinstance(training_data.target_meta, dict):
+                        cats = training_data.target_meta.get("categories")
+                        if isinstance(cats, (list, tuple)):
+                            n_classes = len(cats)
+                except Exception:
+                    n_classes = None
+                if n_classes is None:
+                    try:
+                        n_classes = int(len(training_data.y_train.astype(int).unique()))
+                    except Exception:
+                        n_classes = None
+
+                if n_classes is not None and n_classes > 2:
+                    mapping = {
+                        "f1": "f1_weighted",
+                        "precision": "precision_weighted",
+                        "recall": "recall_weighted",
+                    }
+                    lower = normalized_scoring.lower()
+                    if lower in mapping and normalized_scoring != mapping[lower]:
+                        logger.info(
+                            "Adjusting scoring metric '%s' -> '%s' for multiclass target (%s classes)",
+                            normalized_scoring,
+                            mapping[lower],
+                            n_classes,
+                        )
+                        # create a new SearchConfiguration with adjusted scoring
+                        search_config = SearchConfiguration(
+                            strategy=search_config.strategy,
+                            selected_strategy=search_config.selected_strategy,
+                            search_space=search_config.search_space,
+                            n_iterations=search_config.n_iterations,
+                            scoring=mapping[lower],
+                            random_state=search_config.random_state,
+                            cross_validation=search_config.cross_validation,
+                        )
 
             base_params, filtered_search_space = _prepare_search_parameters(
                 job,

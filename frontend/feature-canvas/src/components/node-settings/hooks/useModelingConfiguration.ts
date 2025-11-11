@@ -404,7 +404,7 @@ export const useModelingConfiguration = ({
   }, [configState?.hyperparameters, configState?.model_type, isModelingNode]);
 
   useEffect(() => {
-    if (!(isTrainTestSplitNode || isTrainModelDraftNode)) {
+    if (!(isTrainTestSplitNode || isTrainModelDraftNode || isHyperparameterTuningNode)) {
       return;
     }
 
@@ -430,6 +430,7 @@ export const useModelingConfiguration = ({
     });
   }, [
     configState?.stratify,
+    isHyperparameterTuningNode,
     isTrainModelDraftNode,
     isTrainTestSplitNode,
     nodeId,

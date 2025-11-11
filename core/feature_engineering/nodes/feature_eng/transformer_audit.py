@@ -18,7 +18,7 @@ from core.feature_engineering.schemas import (
     TransformerAuditNodeSignal,
     TransformerSplitActivitySignal,
 )
-from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
+from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
 logger = logging.getLogger(__name__)
 

@@ -26,6 +26,7 @@ import {
 import { formatRelativeTime } from '../../utils/formatters';
 import type { TrainModelDraftConfig } from './TrainModelDraftSection';
 import type { TrainModelCVConfig } from '../../hooks/useModelingConfiguration';
+import { BestHyperparamsModal, type HyperparamPreset } from './BestHyperparamsModal';
 
 export type TrainModelRuntimeConfig = {
 	modelType: string | null;
@@ -89,21 +90,81 @@ const filterHyperparametersByFields = (
 	return filtered;
 };
 
+const valuesEqual = (first: any, second: any): boolean => {
+	if (first === second) {
+		return true;
+	}
+	if (typeof first === 'number' && typeof second === 'number' && Number.isNaN(first) && Number.isNaN(second)) {
+		return true;
+	}
+	if (Array.isArray(first) && Array.isArray(second)) {
+		if (first.length !== second.length) {
+			return false;
+		}
+		return first.every((item, index) => valuesEqual(item, second[index]));
+	}
+	if (first && second && typeof first === 'object' && typeof second === 'object') {
+		try {
+			return JSON.stringify(first) === JSON.stringify(second);
+		} catch (error) {
+			return false;
+		}
+	}
+	return false;
+};
+
 const sanitizeHyperparametersForPayload = (
 	values: Record<string, any> | null | undefined,
-	fieldNames: Set<string>
+	fieldNames: Set<string>,
+	fieldMap?: Record<string, ModelHyperparameterField>
 ): Record<string, any> => {
 	if (!values) {
 		return {};
 	}
 	const sanitized: Record<string, any> = {};
-	Object.entries(values).forEach(([key, value]) => {
+	Object.entries(values).forEach(([key, rawValue]) => {
 		if (!fieldNames.has(key)) {
 			return;
 		}
-		if (value === '' || value === null || value === undefined) {
+		if (rawValue === '' || rawValue === null || rawValue === undefined) {
 			return;
 		}
+		const field = fieldMap?.[key];
+		let value = rawValue;
+		if (field) {
+			if (typeof value === 'string') {
+				const trimmedValue = value.trim();
+				if (!trimmedValue) {
+					return;
+				}
+				if (field.type === 'select') {
+					value = trimmedValue;
+				}
+			}
+
+			if (field.name === 'multi_class' && typeof value === 'string') {
+				const normalizedMulti = value.trim().toLowerCase();
+				if (normalizedMulti === 'auto') {
+					return;
+				}
+				if (normalizedMulti === 'ovr' || normalizedMulti === 'multinomial') {
+					value = normalizedMulti;
+				}
+			}
+
+			if (field.default !== undefined) {
+				if (typeof field.default === 'string' && typeof value === 'string') {
+					const defaultTrimmed = field.default.trim();
+					const valueTrimmed = value.trim();
+					if (defaultTrimmed === valueTrimmed) {
+						return;
+					}
+				} else if (valuesEqual(field.default, value)) {
+					return;
+				}
+			}
+		}
+
 		sanitized[key] = value;
 	});
 	return sanitized;
@@ -230,7 +291,8 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 	const advancedInitializedRef = useRef(false);
 	const [pipelineIdFromSavedConfig, setPipelineIdFromSavedConfig] = useState<string | null>(null);
 	const [hasDraftChanges, setHasDraftChanges] = useState(false);
-	const [lastAppliedTuningJobId, setLastAppliedTuningJobId] = useState<string | null>(null);
+	const [isPresetModalOpen, setPresetModalOpen] = useState(false);
+	const [lastAppliedPresetId, setLastAppliedPresetId] = useState<string | null>(null);
 	const [applyStatus, setApplyStatus] = useState<{ message: string; tone: 'info' | 'warning' | 'success' } | null>(null);
 
 	const targetColumn = (config?.targetColumn ?? '').trim();
@@ -285,6 +347,17 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 			return new Set<string>();
 		}
 		return new Set<string>(hyperparamFields.map((field) => field.name));
+	}, [hyperparamFields]);
+	const hyperparamFieldMap = useMemo(() => {
+		if (!hyperparamFields.length) {
+			return {} as Record<string, ModelHyperparameterField>;
+		}
+		return hyperparamFields.reduce((acc, field) => {
+			if (field?.name) {
+				acc[field.name] = field;
+			}
+			return acc;
+		}, {} as Record<string, ModelHyperparameterField>);
 	}, [hyperparamFields]);
 	const filteredRuntimeHyperparams = useMemo(() => {
 		if (!modelType || !hyperparameters) {
@@ -354,7 +427,11 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 		if (allowedHyperparamNames.size === 0) {
 			return null;
 		}
-		const sanitized = sanitizeHyperparametersForPayload(hyperparamValues, allowedHyperparamNames);
+		const sanitized = sanitizeHyperparametersForPayload(
+			hyperparamValues,
+			allowedHyperparamNames,
+			hyperparamFieldMap
+		);
 		return Object.keys(sanitized).length > 0 ? sanitized : null;
 	}, [allowedHyperparamNames, hyperparamValues]);
 
@@ -490,7 +567,6 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 		queryFn: async () => {
 			const baseParams: FetchHyperparameterTuningJobsOptions = {
 				datasetSourceId: sourceId || undefined,
-				nodeId,
 				limit: 5,
 			};
 
@@ -574,135 +650,277 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 	const tuningJobsError = tuningJobsQuery.error as Error | null;
 	const isTuningJobsLoading = tuningJobsQuery.isLoading || tuningJobsQuery.isFetching;
 	const tuningJobs: HyperparameterTuningJobSummary[] = tuningJobsQuery.data?.jobs ?? [];
-	
-	// Get best parameters from the new dedicated API endpoint
+
 	const bestParamsData = bestParamsQuery.data;
-	const hasBestParams = Boolean(bestParamsData?.available && bestParamsData?.best_params);
-	
-	const bestParamsFromAPI = useMemo<Record<string, any> | null>(() => {
-		if (!hasBestParams || !bestParamsData?.best_params) {
-			return null;
-		}
-		if (allowedHyperparamNames.size === 0) {
-			return null;
-		}
-		const filtered = filterHyperparametersByFields(bestParamsData.best_params, allowedHyperparamNames);
-		return Object.keys(filtered).length ? filtered : null;
-	}, [allowedHyperparamNames, bestParamsData, hasBestParams]);
-	
-	const latestTuningJob = useMemo<HyperparameterTuningJobSummary | null>(() => {
-		if (!tuningJobs.length) {
-			return null;
-		}
-		const succeeded = tuningJobs.filter((job) => job.status === 'succeeded');
-		if (!succeeded.length) {
-			return null;
-		}
-		return succeeded
-			.slice()
-			.sort((a, b) => {
-				const aTime = Date.parse(a.updated_at || a.created_at || '0');
-				const bTime = Date.parse(b.updated_at || b.created_at || '0');
-				return bTime - aTime;
-			})[0];
-	}, [tuningJobs]);
 
-	const bestParamsFromLatestTuning = useMemo<Record<string, any> | null>(() => {
-		if (!latestTuningJob || !latestTuningJob.best_params) {
-			return null;
-		}
-		if (allowedHyperparamNames.size === 0) {
-			return null;
-		}
-		const filtered = filterHyperparametersByFields(latestTuningJob.best_params, allowedHyperparamNames);
-		return Object.keys(filtered).length ? filtered : null;
-	}, [allowedHyperparamNames, latestTuningJob]);
-
-	// Use best params from API if available, otherwise fall back to latest tuning job
-	const bestParamsToUse = bestParamsFromAPI || bestParamsFromLatestTuning;
-	
-	// Check if the best params are for the current model type
-	const tuningModelMatches = Boolean(
-		modelType && (
-			(bestParamsData?.available && bestParamsData?.model_type === modelType) ||
-			(latestTuningJob && latestTuningJob.model_type === modelType)
-		)
+	const buildPresetParams = useCallback(
+		(rawParams: Record<string, any> | null | undefined) => {
+			if (!rawParams) {
+				return null;
+			}
+			const rawKeys = Object.keys(rawParams);
+			if (rawKeys.length === 0) {
+				return null;
+			}
+			if (allowedHyperparamNames.size === 0) {
+				return { params: rawParams, hasUnmapped: false };
+			}
+			const filtered = filterHyperparametersByFields(rawParams, allowedHyperparamNames);
+			const filteredKeys = Object.keys(filtered);
+			if (filteredKeys.length > 0) {
+				return {
+					params: filtered,
+					hasUnmapped: filteredKeys.length !== rawKeys.length,
+				};
+			}
+			return {
+				params: rawParams,
+				hasUnmapped: true,
+			};
+		},
+		[allowedHyperparamNames],
 	);
 
-	const canApplyBestParams = Boolean(bestParamsToUse && tuningModelMatches);
+	const succeededTuningJobs = useMemo(() => {
+		if (!tuningJobs.length) {
+			return [] as HyperparameterTuningJobSummary[];
+		}
+		return tuningJobs.filter((job) => job.status === 'succeeded');
+	}, [tuningJobs]);
 
-	const applyButtonDisabled = !canApplyBestParams;
+	const hyperparamPresets = useMemo<HyperparamPreset[]>(() => {
+		if (!modelType) {
+			return [];
+		}
+		const presets: HyperparamPreset[] = [];
+		const seenJobIds = new Set<string>();
+		const normalizedTarget = targetColumn ? targetColumn.trim().toLowerCase() : '';
+		const matchesTarget = (candidateTarget?: string | null) => {
+			if (!normalizedTarget) {
+				return true;
+			}
+			if (!candidateTarget) {
+				return true;
+			}
+			return candidateTarget.trim().toLowerCase() === normalizedTarget;
+		};
 
-	// Use best params data if available, otherwise fall back to latest tuning job for display
-	const displayJobInfo = bestParamsData?.available ? bestParamsData : latestTuningJob;
-	const latestTuningTimestamp = displayJobInfo 
-		? ('finished_at' in displayJobInfo 
-			? displayJobInfo.finished_at 
-			: ('updated_at' in displayJobInfo 
-				? (displayJobInfo.updated_at || displayJobInfo.created_at) 
-				: null))
+		if (bestParamsData?.available && bestParamsData.best_params && (!bestParamsData.model_type || bestParamsData.model_type === modelType)) {
+			const paramInfo = buildPresetParams(bestParamsData.best_params);
+			if (paramInfo) {
+				const jobId = bestParamsData.job_id ?? null;
+				if (!jobId || !seenJobIds.has(jobId)) {
+					const labelSegments: string[] = ['Most recent tuned run'];
+					if (bestParamsData.run_number) {
+						labelSegments.push(`#${bestParamsData.run_number}`);
+					}
+					const presetId = `best-api-${jobId ?? modelType}`;
+					presets.push({
+						id: presetId,
+						label: labelSegments.join(' '),
+						source: 'best-api',
+						modelType: bestParamsData.model_type ?? modelType,
+						params: paramInfo.params,
+						jobId,
+						nodeId: bestParamsData.node_id ?? null,
+						runNumber: bestParamsData.run_number ?? null,
+						score: bestParamsData.best_score ?? null,
+						scoring: bestParamsData.scoring ?? null,
+						finishedAt: bestParamsData.finished_at ?? null,
+						searchStrategy: bestParamsData.search_strategy ?? null,
+						nIterations: bestParamsData.n_iterations ?? null,
+						targetColumn: targetColumn || null,
+						pipelineId: bestParamsData.pipeline_id ?? null,
+						datasetSourceId: sourceId ?? null,
+						description: paramInfo.hasUnmapped
+							? 'Includes parameters outside the current template. They will be stored as custom overrides.'
+							: null,
+					});
+					if (jobId) {
+						seenJobIds.add(jobId);
+					}
+				}
+			}
+		}
+
+		succeededTuningJobs.forEach((job) => {
+			if (!job.best_params) {
+				return;
+			}
+			if (job.model_type !== modelType) {
+				return;
+			}
+			if (sourceId && job.dataset_source_id && job.dataset_source_id !== sourceId) {
+				return;
+			}
+			if (seenJobIds.has(job.id)) {
+				return;
+			}
+			const paramInfo = buildPresetParams(job.best_params);
+			if (!paramInfo) {
+				return;
+			}
+			const metadataTarget = typeof job.metadata?.target_column === 'string'
+				? job.metadata.target_column
+				: typeof job.metadata?.targetColumn === 'string'
+				? job.metadata.targetColumn
+				: null;
+			if (!matchesTarget(metadataTarget)) {
+				return;
+			}
+			const presetId = `job-${job.id}`;
+			const label = (() => {
+				const rawLabel = typeof job.metadata?.label === 'string' ? job.metadata.label.trim() : '';
+				if (rawLabel) {
+					return rawLabel;
+				}
+				if (job.run_number) {
+					return `Run ${job.run_number}`;
+				}
+				return `Job ${job.id.slice(0, 6)}`;
+			})();
+			const scoringMetric = typeof job.metadata?.scoring === 'string'
+				? job.metadata.scoring
+				: typeof job.metrics?.scoring === 'string'
+				? job.metrics.scoring
+				: null;
+			const iterationCount = typeof job.metadata?.n_iterations === 'number'
+				? job.metadata.n_iterations
+				: null;
+			presets.push({
+				id: presetId,
+				label,
+				source: 'tuning-job',
+				modelType: job.model_type,
+				params: paramInfo.params,
+				jobId: job.id,
+				nodeId: job.node_id,
+				runNumber: job.run_number ?? null,
+				score: job.best_score ?? null,
+				scoring: scoringMetric,
+				finishedAt: job.updated_at ?? job.created_at ?? null,
+				searchStrategy: job.search_strategy ?? null,
+				nIterations: iterationCount,
+				targetColumn: metadataTarget ?? (targetColumn || null),
+				pipelineId: job.pipeline_id ?? null,
+				datasetSourceId: job.dataset_source_id ?? null,
+				description: paramInfo.hasUnmapped
+					? 'Some tuned parameters fall outside the current template and will be saved as custom overrides.'
+					: null,
+			});
+			seenJobIds.add(job.id);
+		});
+
+		presets.sort((a, b) => {
+			const aTime = a.finishedAt ? Date.parse(a.finishedAt) : 0;
+			const bTime = b.finishedAt ? Date.parse(b.finishedAt) : 0;
+			if (aTime !== bTime) {
+				return bTime - aTime;
+			}
+			return (b.runNumber ?? 0) - (a.runNumber ?? 0);
+		});
+
+		return presets;
+	}, [
+		bestParamsData,
+		buildPresetParams,
+		modelType,
+		sourceId,
+		targetColumn,
+		succeededTuningJobs,
+	]);
+
+	const primaryPreset = hyperparamPresets[0] ?? null;
+	const hasPresetOptions = hyperparamPresets.length > 0;
+	const applyButtonDisabled = !primaryPreset;
+	const browsePresetsDisabled = !hasPresetOptions;
+
+	const latestTuningJob = useMemo<HyperparameterTuningJobSummary | null>(() => {
+		if (succeededTuningJobs.length) {
+			return succeededTuningJobs
+				.slice()
+				.sort((a, b) => {
+					const aTime = Date.parse(a.updated_at || a.created_at || '0');
+					const bTime = Date.parse(b.updated_at || b.created_at || '0');
+					return bTime - aTime;
+				})[0];
+		}
+		if (tuningJobs.length) {
+			return tuningJobs
+				.slice()
+				.sort((a, b) => {
+					const aTime = Date.parse(a.updated_at || a.created_at || '0');
+					const bTime = Date.parse(b.updated_at || b.created_at || '0');
+					return bTime - aTime;
+				})[0];
+		}
+		return null;
+	}, [succeededTuningJobs, tuningJobs]);
+
+	const latestTuningTimestamp = latestTuningJob
+		? latestTuningJob.updated_at || latestTuningJob.created_at || null
 		: null;
 	const latestTuningRelative = latestTuningTimestamp ? formatRelativeTime(latestTuningTimestamp) : null;
-	const latestTuningRunNumber = displayJobInfo
-		? ('run_number' in displayJobInfo ? displayJobInfo.run_number : null)
-		: null;
-	const latestTuningJobId = displayJobInfo
-		? ('job_id' in displayJobInfo 
-			? displayJobInfo.job_id 
-			: ('id' in displayJobInfo ? displayJobInfo.id : null))
+	const latestTuningRunNumber = latestTuningJob?.run_number ?? null;
+	const primaryPresetRelative = primaryPreset?.finishedAt ? formatRelativeTime(primaryPreset.finishedAt) : null;
+	const primaryPresetScoreLabel = primaryPreset && primaryPreset.scoring && typeof primaryPreset.score === 'number' && Number.isFinite(primaryPreset.score)
+		? `${primaryPreset.scoring}: ${formatMetricValue(primaryPreset.score)}`
 		: null;
 
 	useEffect(() => {
-		if (!latestTuningJobId) {
-			setLastAppliedTuningJobId(null);
-			setApplyStatus(null);
+		if (!hyperparamPresets.length) {
+			if (lastAppliedPresetId) {
+				setLastAppliedPresetId(null);
+			}
+			if (applyStatus?.tone === 'success') {
+				setApplyStatus(null);
+			}
 			return;
 		}
-		if (lastAppliedTuningJobId && latestTuningJobId !== lastAppliedTuningJobId) {
+		if (lastAppliedPresetId && !hyperparamPresets.some((preset) => preset.id === lastAppliedPresetId)) {
+			setLastAppliedPresetId(null);
 			setApplyStatus(null);
 		}
-	}, [lastAppliedTuningJobId, latestTuningJobId]);
+	}, [applyStatus, hyperparamPresets, lastAppliedPresetId]);
 
-	const handleApplyBestParams = useCallback(() => {
-		if (!latestTuningJob) {
-			setApplyStatus({
-				message: 'No tuning job results available to apply.',
-				tone: 'warning',
-			});
-			return;
-		}
-		if (!bestParamsFromLatestTuning) {
+	const applyPreset = useCallback(
+		(preset: HyperparamPreset, messageOverride?: string) => {
+			if (!preset || Object.keys(preset.params ?? {}).length === 0) {
+				setApplyStatus({
+					message: 'Selected preset does not include any hyperparameters to apply.',
+					tone: 'warning',
+				});
+				return;
+			}
+			setHyperparamValues(() => cloneJson(preset.params));
+			setShowAdvanced(true);
+			advancedInitializedRef.current = true;
+			setLastAppliedPresetId(preset.id);
 			setApplyStatus({
 				message:
-					'Latest tuning run did not produce compatible hyperparameters for this model template.',
-				tone: 'warning',
+					messageOverride ?? `Applied tuned parameters from ${preset.label}.`,
+				tone: 'success',
 			});
-			return;
-		}
-		if (!tuningModelMatches) {
-			setApplyStatus({
-				message: `Latest tuning run targeted “${latestTuningJob.model_type}”. Switch the model template to apply its parameters.`,
-				tone: 'warning',
-			});
-			return;
-		}
+		},
+		[setHyperparamValues, setShowAdvanced, setApplyStatus, setLastAppliedPresetId],
+	);
 
-		setHyperparamValues(() => cloneJson(bestParamsToUse));
-		setShowAdvanced(true);
-		advancedInitializedRef.current = true;
-		setLastAppliedTuningJobId(latestTuningJobId || '');
-		setApplyStatus({
-			message: `Applied best parameters from tuning run${latestTuningRunNumber ? ` ${latestTuningRunNumber}` : ''}.`,
-			tone: 'success',
-		});
-	}, [
-		bestParamsToUse,
-		bestParamsData,
-		latestTuningJob,
-		latestTuningJobId,
-		latestTuningRunNumber,
-		tuningModelMatches,
-	]);
+	const handleApplyBestParams = useCallback(() => {
+		if (!primaryPreset) {
+			const message = latestTuningJob && latestTuningJob.model_type && latestTuningJob.model_type !== modelType
+				? `Latest tuning run targeted “${latestTuningJob.model_type}”. Switch the model template to reuse its parameters.`
+				: 'No tuning job results available to apply.';
+			setApplyStatus({
+				message,
+				tone: 'warning',
+			});
+			return;
+		}
+		const successMessage = primaryPreset.runNumber
+			? `Applied tuned parameters from run ${primaryPreset.runNumber}.`
+			: `Applied tuned parameters from ${primaryPreset.label}.`;
+		applyPreset(primaryPreset, successMessage);
+	}, [applyPreset, latestTuningJob, modelType, primaryPreset, setApplyStatus]);
 
 	const applyStatusColor = useMemo(() => {
 		if (!applyStatus) {
@@ -1122,25 +1340,23 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 										? 'Fine-tune hyperparameters or use defaults for quick training'
 										: 'Using default hyperparameters — toggle Advanced to customize'}
 								</p>
-								{displayJobInfo && (
+								{(primaryPreset || latestTuningJob) && (
 									<p style={{ margin: '0.5rem 0 0 0', fontSize: '0.8rem', color: 'rgba(148, 163, 184, 0.8)' }}>
-										{hasBestParams ? (
+										{primaryPreset ? (
 											<>
-												✓ Tuned parameters available for <strong>{modelType}</strong>
-												{latestTuningRunNumber && ` (run ${latestTuningRunNumber})`}
-												{latestTuningRelative && ` • ${latestTuningRelative}`}
+												✓ Tuned parameters available for <strong>{primaryPreset.modelType}</strong>
+												{primaryPreset.runNumber ? ` (run ${primaryPreset.runNumber})` : ''}
+												{primaryPresetRelative ? ` • ${primaryPresetRelative}` : ''}
+												{primaryPreset.targetColumn ? ` • Target: ${primaryPreset.targetColumn}` : ''}
+												{primaryPresetScoreLabel ? ` • ${primaryPresetScoreLabel}` : ''}
 											</>
 										) : (
 											<>
 												Latest tuning run {latestTuningRunNumber || 'N/A'}
 												{latestTuningRelative ? ` • ${latestTuningRelative}` : ''}
-												{tuningModelMatches
-													? ' matches the current model template.'
-													: displayJobInfo && 'model_type' in displayJobInfo 
-													? ` targeted ${displayJobInfo.model_type}.`
-													: latestTuningJob
+												{latestTuningJob?.model_type && latestTuningJob.model_type !== modelType
 													? ` targeted ${latestTuningJob.model_type}.`
-													: ''}
+													: ' did not produce reusable parameters for this configuration yet.'}
 											</>
 										)}
 									</p>
@@ -1160,28 +1376,45 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 									justifyContent: 'flex-end'
 								}}
 							>
-								{displayJobInfo && (
-									<button
-										type="button"
-										onClick={handleApplyBestParams}
-										disabled={applyButtonDisabled}
-										style={{
-											padding: '0.5rem 1rem',
-											fontSize: '0.875rem',
-											fontWeight: 500,
-											color: applyButtonDisabled ? 'rgba(148, 163, 184, 0.55)' : '#0c4a6e',
-											background: applyButtonDisabled ? 'rgba(15, 23, 42, 0.35)' : 'rgba(191, 219, 254, 0.9)',
-											border: applyButtonDisabled ? '1px solid rgba(148, 163, 184, 0.35)' : '1px solid rgba(147, 197, 253, 0.9)',
-											borderRadius: '4px',
-											cursor: applyButtonDisabled ? 'not-allowed' : 'pointer',
-											transition: 'all 0.2s ease',
-											minWidth: '130px',
-											boxShadow: applyButtonDisabled ? 'none' : '0 3px 10px rgba(14, 116, 144, 0.25)'
-										}}
-									>
-										Apply best params
-									</button>
-								)}
+								<button
+									type="button"
+									onClick={handleApplyBestParams}
+									disabled={applyButtonDisabled}
+									style={{
+										padding: '0.5rem 1rem',
+										fontSize: '0.875rem',
+										fontWeight: 500,
+										color: applyButtonDisabled ? 'rgba(148, 163, 184, 0.55)' : '#0c4a6e',
+										background: applyButtonDisabled ? 'rgba(15, 23, 42, 0.35)' : 'rgba(191, 219, 254, 0.9)',
+										border: applyButtonDisabled ? '1px solid rgba(148, 163, 184, 0.35)' : '1px solid rgba(147, 197, 253, 0.9)',
+										borderRadius: '4px',
+										cursor: applyButtonDisabled ? 'not-allowed' : 'pointer',
+										transition: 'all 0.2s ease',
+										minWidth: '130px',
+										boxShadow: applyButtonDisabled ? 'none' : '0 3px 10px rgba(14, 116, 144, 0.25)'
+									}}
+								>
+									Apply tuned params
+								</button>
+								<button
+									type="button"
+									onClick={() => setPresetModalOpen(true)}
+									disabled={browsePresetsDisabled}
+									style={{
+										padding: '0.5rem 1rem',
+										fontSize: '0.875rem',
+										fontWeight: 500,
+										color: browsePresetsDisabled ? 'rgba(148, 163, 184, 0.55)' : 'rgba(168, 85, 247, 0.95)',
+										background: browsePresetsDisabled ? 'rgba(15, 23, 42, 0.35)' : 'rgba(76, 29, 149, 0.18)',
+										border: browsePresetsDisabled ? '1px solid rgba(148, 163, 184, 0.35)' : '1px solid rgba(168, 85, 247, 0.45)',
+										borderRadius: '4px',
+										cursor: browsePresetsDisabled ? 'not-allowed' : 'pointer',
+										transition: 'all 0.2s ease',
+										minWidth: '150px'
+									}}
+								>
+									Browse tuned params
+								</button>
 								<button
 									type="button"
 									onClick={handleToggleAdvanced}
@@ -1304,6 +1537,18 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 						<p className="canvas-modal__note canvas-modal__note--muted">No training jobs found for this node.</p>
 					)}
 					{filteredJobs.length > 0 && <ul className="canvas-modal__note-list">{filteredJobs.map(renderJobSummary)}</ul>}
-		</section>
+
+						<BestHyperparamsModal
+							presets={hyperparamPresets}
+							isOpen={isPresetModalOpen}
+							onClose={() => setPresetModalOpen(false)}
+							onApply={(preset) => {
+								applyPreset(preset);
+								setPresetModalOpen(false);
+							}}
+							activePresetId={lastAppliedPresetId}
+							fieldMetadata={hyperparamFieldMap}
+						/>
+			</section>
 	);
 };

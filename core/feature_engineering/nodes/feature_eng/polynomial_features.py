@@ -15,7 +15,7 @@ from core.feature_engineering.schemas import (
     PolynomialFeaturesNodeSignal,
     PolynomialGeneratedFeature,
 )
-from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
+from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
 from .utils import (
     _auto_detect_numeric_columns,

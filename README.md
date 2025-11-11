@@ -11,7 +11,7 @@
 
 > ⚠️ **Early Alpha (v0.0.1)**: This is a passion project in active development. Expect bugs, incomplete features, and visual inconsistencies. Use at your own risk and please report issues on GitHub!
 
-Skyulf is a self‑hosted, privacy‑first MLOps web application. It runs locally by default (SQLite) and scales to PostgreSQL without requiring Kubernetes or cloud services.
+Skyulf is a self‑hosted, privacy‑first MLOps web application. It runs locally by default (SQLite) and scales to PostgreSQL if needed and aims to make machine learning operations more approachable by providing a low‑code web UI for data ingestion, feature engineering, and model training.
 
 What you get out of the box:
 - A web UI for data ingestion

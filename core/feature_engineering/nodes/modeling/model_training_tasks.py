@@ -37,7 +37,7 @@ from config import get_settings
 from core.database.engine import create_tables, init_db
 from core.database.models import get_database_session
 from core.feature_engineering.schemas import TrainingJobStatus
-from core.feature_engineering.sklearn_pipeline_store import get_pipeline_store
+from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
 from .dataset_split import SPLIT_TYPE_COLUMN
 from .model_training_jobs import get_training_job, update_job_status
@@ -997,6 +997,36 @@ def _merge_model_params(
     return params
 
 
+def _normalize_model_params(spec, params: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(params)
+
+    if spec.key == "logistic_regression":
+        max_iter_default = int(spec.default_params.get("max_iter", 1000))
+        solver_value = normalized.get("solver")
+        solver_normalized = str(solver_value).strip().lower() if isinstance(solver_value, str) else None
+        requires_longer_runs = solver_normalized in {"lbfgs", "sag", "saga", "newton-cg"}
+
+        max_iter_value = normalized.get("max_iter")
+        if isinstance(max_iter_value, (int, float)) and max_iter_value > 0:
+            coerced_iter = int(max_iter_value)
+            if requires_longer_runs and coerced_iter < max_iter_default:
+                normalized["max_iter"] = max_iter_default
+            else:
+                normalized["max_iter"] = coerced_iter
+        else:
+            normalized["max_iter"] = max_iter_default
+
+        multi_class_value = normalized.get("multi_class")
+        if isinstance(multi_class_value, str):
+            lowered_multi = multi_class_value.strip().lower()
+            if lowered_multi in {"ovr", "multinomial"}:
+                normalized["multi_class"] = lowered_multi
+            else:
+                normalized.pop("multi_class", None)
+
+    return normalized
+
+
 def _prepare_refit_dataset(
     X_train: pd.DataFrame,
     y_train: pd.Series,
@@ -1264,6 +1294,7 @@ def _train_and_save_model(
     spec = get_model_spec(model_type)
     resolved_problem_type = _resolve_problem_type(problem_type_hint, spec.problem_type)
     params = _merge_model_params(spec.default_params, hyperparameters)
+    params = _normalize_model_params(spec, params)
 
     cv_summary = _run_cross_validation(spec, params, resolved_problem_type, X_train, y_train, cv_config)
 
@@ -1362,6 +1393,58 @@ async def _resolve_training_inputs(session, job) -> Tuple[pd.DataFrame, Dict[str
             collect_signals=False,
             preserve_split_column=True,
         )
+
+    # Attempt to infer a target column from upstream node configs when the
+    # training node doesn't explicitly provide one. This mirrors the UI
+    # behaviour which prefers a `feature_target_split` node, falling back
+    # to `train_test_split` if present upstream.
+    try:
+        resolved_config = (node_map.get(job.node_id, {}).get("data") or {}).get("config") or {}
+    except Exception:
+        resolved_config = {}
+
+    job_metadata = job.job_metadata or {}
+    has_explicit_target = bool(
+        resolved_config.get("target_column")
+        or resolved_config.get("targetColumn")
+        or job_metadata.get("target_column")
+    )
+
+    if not has_explicit_target and upstream_order:
+        feature_target_col: Optional[str] = None
+        train_test_col: Optional[str] = None
+        for upstream_id in upstream_order:
+            upstream_node = node_map.get(upstream_id)
+            if not upstream_node:
+                continue
+            data = upstream_node.get("data") or {}
+            catalog = str(data.get("catalogType") or "").lower().strip()
+            cfg = data.get("config") or {}
+            if catalog == "feature_target_split":
+                tc = cfg.get("target_column") or cfg.get("targetColumn")
+                if isinstance(tc, str) and tc.strip():
+                    # mirror frontend: keep the last occurrence if multiple
+                    feature_target_col = tc.strip()
+            elif catalog == "train_test_split":
+                tc = cfg.get("target_column") or cfg.get("targetColumn")
+                if isinstance(tc, str) and tc.strip():
+                    train_test_col = tc.strip()
+
+        inferred = feature_target_col or train_test_col
+        if inferred:
+            # ensure node_config is a dict and set the inferred value so
+            # downstream code (training/tuning) can pick it up from node_config
+            try:
+                node_config_obj = (node_map.get(job.node_id, {}).get("data") or {}).get("config")
+                if isinstance(node_config_obj, dict):
+                    node_config_obj.setdefault("target_column", inferred)
+                else:
+                    # fallback: ensure returned node_config contains the inferred value
+                    resolved_config = resolved_config if isinstance(resolved_config, dict) else {}
+                    resolved_config["target_column"] = inferred
+            except Exception:
+                # best-effort only; don't fail training resolution on logging
+                logger.debug("Failed to attach inferred target column to node_config")
 
     training_node = node_map.get(job.node_id)
     if training_node is None:
