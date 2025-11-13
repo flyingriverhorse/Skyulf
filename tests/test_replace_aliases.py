@@ -1,5 +1,5 @@
 import pandas as pd
-from core.feature_engineering.nodes.data_consistency.replace_aliases import (
+from core.feature_engineering.preprocessing.cleaning.replace_aliases import (
     apply_replace_aliases_typos,
 )
 

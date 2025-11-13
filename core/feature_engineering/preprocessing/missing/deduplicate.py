@@ -7,8 +7,7 @@ from typing import Any, Dict, List, Tuple, Union
 import pandas as pd
 
 from core.feature_engineering.schemas import RemoveDuplicatesNodeSignal
-
-from ...shared.utils import _normalize_remove_duplicates_config
+from core.feature_engineering.shared.utils import _normalize_remove_duplicates_config
 
 
 def apply_remove_duplicates(

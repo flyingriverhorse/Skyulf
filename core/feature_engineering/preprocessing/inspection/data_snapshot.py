@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import math
-from typing import Any, List, Optional, Literal
-
 import hashlib
 import json
+import math
+from typing import Any, List, Literal, Optional
 
 import pandas as pd
 
@@ -22,7 +21,15 @@ from core.feature_engineering.schemas import (
     TrainModelDraftReadinessSnapshot,
 )
 
-PipelineLogicalFamily = Literal["numeric", "integer", "categorical", "string", "datetime", "boolean", "unknown"]
+PipelineLogicalFamily = Literal[
+    "numeric",
+    "integer",
+    "categorical",
+    "string",
+    "datetime",
+    "boolean",
+    "unknown",
+]
 
 
 def _infer_logical_family(series: pd.Series) -> PipelineLogicalFamily:

@@ -41,7 +41,7 @@ from .preprocessing.bucketing import (
     _build_binning_recommendations,
     _normalize_binning_config,
 )
-from .preprocessing.distribution import (
+from .preprocessing.statistics import (
     DEFAULT_METHOD_PARAMETERS,
     OUTLIER_DEFAULT_METHOD,
     SKEWNESS_METHODS,
@@ -52,6 +52,7 @@ from .preprocessing.distribution import (
     _build_skewness_recommendations,
     _outlier_method_details,
     _skewness_method_details,
+    apply_imputation_methods as _apply_imputation_methods,
 )
 from .nodes.feature_eng.scaling import (
     SCALING_DEFAULT_METHOD,
@@ -59,9 +60,13 @@ from .nodes.feature_eng.scaling import (
     _build_scaling_recommendations,
     _scaling_method_details,
 )
-from .nodes.feature_eng.polynomial_features import apply_polynomial_features
+from .preprocessing.feature_generation import apply_feature_math, apply_polynomial_features
 from .nodes.feature_eng.feature_selection import apply_feature_selection
-from .nodes.feature_eng.transformer_audit import apply_transformer_audit
+from .preprocessing.inspection import (
+    apply_transformer_audit,
+    build_data_snapshot_response,
+    build_quick_profile_payload,
+)
 from .preprocessing.encoding.label_encoding import (
     LABEL_ENCODING_DEFAULT_MAX_UNIQUE,
     LABEL_ENCODING_DEFAULT_SUFFIX,
@@ -112,7 +117,6 @@ from .preprocessing.encoding.target_encoding import (
     TARGET_ENCODING_DEFAULT_HANDLE_UNKNOWN,
     apply_target_encoding,
 )
-from .nodes.feature_eng.feature_math import apply_feature_math
 from .preprocessing.encoding.one_hot_encoding import (
     ONE_HOT_ENCODING_DEFAULT_MAX_CATEGORIES,
     ONE_HOT_ENCODING_DEFAULT_PREFIX_SEPARATOR,
@@ -126,7 +130,7 @@ from .preprocessing.encoding.dummy_encoding import (
     apply_dummy_encoding,
 )
 from .nodes.feature_eng.casting import _apply_cast_column_types
-from .nodes.data_consistency import (
+from .preprocessing.cleaning import (
     apply_normalize_text_case,
     apply_regex_cleanup,
     apply_remove_special_characters,
@@ -135,12 +139,12 @@ from .nodes.data_consistency import (
     apply_standardize_date_formats,
     apply_trim_whitespace,
 )
-from .nodes.feature_eng.data_snapshot import build_data_snapshot_response
-from .nodes.feature_eng.dataset_profile import build_quick_profile_payload
-from .nodes.feature_eng.deduplicate import apply_remove_duplicates
-from .nodes.feature_eng.drop_missing import apply_drop_missing_columns, apply_drop_missing_rows
-from .nodes.feature_eng.imputation import apply_imputation_methods as _apply_imputation_methods
-from .nodes.feature_eng.missing_indicator import apply_missing_value_flags
+from .preprocessing.missing import (
+    apply_drop_missing_columns,
+    apply_drop_missing_rows,
+    apply_missing_value_flags,
+    apply_remove_duplicates,
+)
 from core.feature_engineering.shared.utils import _is_node_pending
 from .nodes.modeling.train_model_draft import apply_train_model_draft
 from .nodes.modeling.model_evaluation import (

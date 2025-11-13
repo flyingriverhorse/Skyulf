@@ -1,4 +1,4 @@
-"""Distribution-shaping preprocessing modules (outliers, skewness)."""
+"""Statistics-focused preprocessing modules (outliers, skewness, imputation)."""
 
 from .outliers_removal import (
     DEFAULT_METHOD_PARAMETERS,
@@ -15,6 +15,12 @@ from .skewness import (
     _build_skewness_recommendations,
     _skewness_method_details,
 )
+from .imputation import (
+    METHOD_LABELS,
+    SIMPLE_METHODS,
+    ADVANCED_METHODS,
+    apply_imputation_methods,
+)
 
 __all__ = [
     "DEFAULT_METHOD_PARAMETERS",
@@ -28,4 +34,8 @@ __all__ = [
     "_apply_skewness_transformations",
     "_build_skewness_recommendations",
     "_skewness_method_details",
+    "METHOD_LABELS",
+    "SIMPLE_METHODS",
+    "ADVANCED_METHODS",
+    "apply_imputation_methods",
 ]
