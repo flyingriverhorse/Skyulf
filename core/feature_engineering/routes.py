@@ -41,11 +41,16 @@ from .preprocessing.bucketing import (
     _build_binning_recommendations,
     _normalize_binning_config,
 )
-from .nodes.feature_eng.skewness import (
+from .preprocessing.distribution import (
+    DEFAULT_METHOD_PARAMETERS,
+    OUTLIER_DEFAULT_METHOD,
     SKEWNESS_METHODS,
     SKEWNESS_THRESHOLD,
+    _apply_outlier_removal,
     _apply_skewness_transformations,
+    _build_outlier_recommendations,
     _build_skewness_recommendations,
+    _outlier_method_details,
     _skewness_method_details,
 )
 from .nodes.feature_eng.scaling import (
@@ -57,13 +62,6 @@ from .nodes.feature_eng.scaling import (
 from .nodes.feature_eng.polynomial_features import apply_polynomial_features
 from .nodes.feature_eng.feature_selection import apply_feature_selection
 from .nodes.feature_eng.transformer_audit import apply_transformer_audit
-from .nodes.feature_eng.outliers_removal import (
-    OUTLIER_DEFAULT_METHOD,
-    DEFAULT_METHOD_PARAMETERS,
-    _apply_outlier_removal,
-    _build_outlier_recommendations,
-    _outlier_method_details,
-)
 from .preprocessing.encoding.label_encoding import (
     LABEL_ENCODING_DEFAULT_MAX_UNIQUE,
     LABEL_ENCODING_DEFAULT_SUFFIX,
