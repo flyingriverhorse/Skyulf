@@ -79,7 +79,7 @@ def execute_pipeline_with_auto_splits(
             )
 
         elif catalog_type == "one_hot_encoding":
-            from core.feature_engineering.nodes.feature_eng.one_hot_encoding import (  # type: ignore[import]
+            from core.feature_engineering.preprocessing.encoding.one_hot_encoding import (  # type: ignore[import]
                 apply_one_hot_encoding
             )
             working_frame, summary, signal = apply_one_hot_encoding(

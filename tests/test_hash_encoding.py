@@ -1,6 +1,6 @@
 import pandas as pd
 
-from core.feature_engineering.nodes.feature_eng.hash_encoding import apply_hash_encoding
+from core.feature_engineering.preprocessing.encoding.hash_encoding import apply_hash_encoding
 from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 

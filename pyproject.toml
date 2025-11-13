@@ -75,11 +75,7 @@ dependencies = [
 dev = [
     # Test stack
     "pytest>=7.4.0,<10.0.0",
-<<<<<<< HEAD
     "pytest-asyncio>=0.21.0,<2.0.0",
-=======
-    "pytest-asyncio>=0.21.0,<1.0.0",
->>>>>>> 2e7e1151a68cb7198e22022191c98a0975bc4458
     "pytest-cov>=4.1.0,<5.0.0",
 
     # Linters/formatters/typecheckers

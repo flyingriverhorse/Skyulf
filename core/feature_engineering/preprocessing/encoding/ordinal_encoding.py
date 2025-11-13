@@ -24,7 +24,7 @@ from core.feature_engineering.schemas import (
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
 
-from .utils import _auto_detect_text_columns, _coerce_config_boolean, _coerce_string_list
+from ...shared.utils import _auto_detect_text_columns, _coerce_config_boolean, _coerce_string_list
 
 ORDINAL_ENCODING_DEFAULT_SUFFIX = "_ordinal"
 ORDINAL_ENCODING_DEFAULT_MAX_CATEGORIES = 50

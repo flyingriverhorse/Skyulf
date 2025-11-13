@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import numpy as np
 import pandas as pd
 
-from .utils import _coerce_boolean_value, _coerce_config_boolean
+from ...shared.utils import _coerce_boolean_value, _coerce_config_boolean
 from core.feature_engineering.schemas import CastColumnAttemptSignal, CastColumnTypesNodeSignal
 
 COLUMN_CAST_ALIASES: Dict[str, Tuple[str, str]] = {
