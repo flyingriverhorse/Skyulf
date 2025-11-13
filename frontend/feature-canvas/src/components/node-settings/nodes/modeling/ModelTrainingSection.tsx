@@ -27,6 +27,7 @@ import { formatRelativeTime } from '../../utils/formatters';
 import type { TrainModelDraftConfig } from './TrainModelDraftSection';
 import type { TrainModelCVConfig } from '../../hooks/useModelingConfiguration';
 import { BestHyperparamsModal, type HyperparamPreset } from './BestHyperparamsModal';
+import { useScalingWarning, detectScalingConvergenceFromJob, hasScalingConvergenceMessage } from './useScalingWarning';
 
 export type TrainModelRuntimeConfig = {
 	modelType: string | null;
@@ -52,7 +53,7 @@ type ModelTrainingSectionProps = {
 	cvShuffleParameter: FeatureNodeParameter | null;
 	cvRandomStateParameter: FeatureNodeParameter | null;
 	cvRefitStrategyParameter: FeatureNodeParameter | null;
-	onSaveDraftConfig?: () => void;
+	onSaveDraftConfig?: (options?: { closeModal?: boolean }) => void | Promise<void>;
 };
 
 type PrimaryMetric = {
@@ -294,6 +295,7 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 	const [isPresetModalOpen, setPresetModalOpen] = useState(false);
 	const [lastAppliedPresetId, setLastAppliedPresetId] = useState<string | null>(null);
 	const [applyStatus, setApplyStatus] = useState<{ message: string; tone: 'info' | 'warning' | 'success' } | null>(null);
+	const [showScalingDetails, setShowScalingDetails] = useState(false);
 
 	const targetColumn = (config?.targetColumn ?? '').trim();
 	const problemType = config?.problemType === 'regression' ? 'regression' : 'classification';
@@ -992,6 +994,37 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 		});
 	}, [jobs, problemType]);
 
+	const hasScalingConvergenceSignals = useMemo(() => {
+		if (createJobError instanceof Error && hasScalingConvergenceMessage(createJobError.message)) {
+			return true;
+		}
+		if (lastCreatedJob && detectScalingConvergenceFromJob(lastCreatedJob)) {
+			return true;
+		}
+		if (jobs.some((job) => detectScalingConvergenceFromJob(job))) {
+			return true;
+		}
+		if (tuningJobs.some((job) => detectScalingConvergenceFromJob(job))) {
+			return true;
+		}
+		return false;
+	}, [createJobError, jobs, lastCreatedJob, tuningJobs]);
+
+	const scalingWarning = useScalingWarning({
+		graph,
+		nodeId,
+		modelType,
+		problemType,
+		modelTypeOptions,
+		enabled: hasScalingConvergenceSignals,
+	});
+
+	useEffect(() => {
+		if (!scalingWarning) {
+			setShowScalingDetails(false);
+		}
+	}, [scalingWarning]);
+
 	const hiddenJobCount = Math.max(jobs.length - filteredJobs.length, 0);
 	const isJobsLoading = trainingJobsQuery.isLoading || trainingJobsQuery.isFetching;
 	const jobsError = trainingJobsQuery.error as Error | null;
@@ -1088,7 +1121,15 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 
 		// Auto-save draft config before enqueueing to stabilize pipeline ID
 		if (hasDraftChanges && onSaveDraftConfig) {
-			onSaveDraftConfig();
+			try {
+				const maybeResult = onSaveDraftConfig({ closeModal: false });
+				if (maybeResult && typeof (maybeResult as Promise<unknown>).then === 'function') {
+					await (maybeResult as Promise<unknown>);
+				}
+				setHasDraftChanges(false);
+			} catch (error) {
+				// Ignore save errors here; job enqueue will surface actionable issues.
+			}
 			// Small delay to allow state propagation
 			await new Promise((resolve) => setTimeout(resolve, 100));
 		}
@@ -1512,6 +1553,56 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 					Cross-validation runs {cvFolds} folds before refitting on{' '}
 					{cvRefitStrategy === 'train_plus_validation' ? 'training plus validation data.' : 'training data only.'}
 				</p>
+			)}
+
+			{scalingWarning && (
+				<div
+					className="canvas-modal__note canvas-modal__note--warning"
+					style={{
+						margin: '0.75rem 0',
+						borderLeft: '3px solid rgba(251, 191, 36, 0.9)',
+						background: 'rgba(251, 191, 36, 0.12)',
+						padding: '0.75rem 1rem',
+					}}
+				>
+					<div
+						style={{
+							display: 'flex',
+							justifyContent: 'space-between',
+							alignItems: 'flex-start',
+							gap: '0.75rem',
+						}}
+					>
+						<div>
+							<strong>⚠️ {scalingWarning.headline}</strong>
+							<p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem' }}>{scalingWarning.summary}</p>
+						</div>
+						<button
+							type="button"
+							className="btn btn-outline-secondary"
+							onClick={() => setShowScalingDetails((previous) => !previous)}
+							style={{ whiteSpace: 'nowrap' }}
+						>
+							{showScalingDetails ? 'Hide tips' : 'Show tips'}
+						</button>
+					</div>
+					{showScalingDetails && (
+						<ul
+							style={{
+								margin: '0.75rem 0 0 1rem',
+								padding: 0,
+								listStyle: 'disc',
+								fontSize: '0.85rem',
+							}}
+						>
+							{scalingWarning.details.map((tip, index) => (
+								<li key={`scaling-tip-${index}`} style={{ marginBottom: '0.35rem' }}>
+									{tip}
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
 			)}
 
 			<div className="canvas-modal__actions">

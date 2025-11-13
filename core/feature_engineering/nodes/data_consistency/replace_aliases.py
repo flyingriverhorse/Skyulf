@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from pandas.api import types as pd_types
 
-from ..feature_eng.utils import (
+from ...shared.utils import (
     ALIAS_PUNCTUATION_TABLE,
     COMMON_BOOLEAN_ALIASES,
     COUNTRY_ALIAS_MAP,

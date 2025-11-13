@@ -9,15 +9,21 @@ import json
 import logging
 import math
 import pickle
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, cast
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, cast
 
 import joblib
 import numpy as np
 import pandas as pd
 from celery import Celery
 from pandas.api import types as pd_types
+try:  # pragma: no cover - ensure workers start even if sklearn adjusts exports
+    from sklearn.exceptions import ConvergenceWarning  # type: ignore
+except Exception:  # pragma: no cover - fallback when import path changes
+    ConvergenceWarning = Warning  # type: ignore
+
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
@@ -54,6 +60,26 @@ if _imblearn_metrics is not None:
     geometric_mean_score = getattr(_imblearn_metrics, "geometric_mean_score", None)
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_warning_messages(caught: Optional[Iterable[warnings.WarningMessage]]) -> List[str]:
+    messages: List[str] = []
+    if not caught:
+        return messages
+
+    seen: set[str] = set()
+    for entry in caught:
+        text = str(getattr(entry, "message", "")).strip()
+        if not text:
+            continue
+        category = getattr(entry, "category", None)
+        category_name = getattr(category, "__name__", None) if category else None
+        formatted = f"{category_name}: {text}" if category_name else text
+        if formatted in seen:
+            continue
+        seen.add(formatted)
+        messages.append(formatted)
+    return messages
 
 
 def _safe_float(value: Any) -> Any:
@@ -1288,74 +1314,82 @@ def _train_and_save_model(
     version: int,
     cv_config: CrossValidationConfig,
     upstream_node_order: Optional[List[str]] = None,
-) -> Tuple[str, Dict[str, Any], str]:
-    """Fit model synchronously and persist artifact/metrics."""
+) -> Tuple[str, Dict[str, Any], str, List[str]]:
+    """Fit model synchronously, persist artifacts/metrics, and collect warnings."""
 
-    spec = get_model_spec(model_type)
-    resolved_problem_type = _resolve_problem_type(problem_type_hint, spec.problem_type)
-    params = _merge_model_params(spec.default_params, hyperparameters)
-    params = _normalize_model_params(spec, params)
+    with warnings.catch_warnings(record=True) as caught_warnings:
+        warnings.simplefilter("always")
+        warnings.simplefilter("always", ConvergenceWarning)
 
-    cv_summary = _run_cross_validation(spec, params, resolved_problem_type, X_train, y_train, cv_config)
+        spec = get_model_spec(model_type)
+        resolved_problem_type = _resolve_problem_type(problem_type_hint, spec.problem_type)
+        params = _merge_model_params(spec.default_params, hyperparameters)
+        params = _normalize_model_params(spec, params)
 
-    fit_features, fit_target, used_validation = _prepare_refit_dataset(
-        X_train,
-        y_train,
-        X_validation,
-        y_validation,
-        cv_config,
-    )
+        cv_summary = _run_cross_validation(spec, params, resolved_problem_type, X_train, y_train, cv_config)
 
-    final_model = spec.factory(**params)
-    fit_target_array = _prepare_target_array(fit_target, resolved_problem_type)
-    final_model.fit(fit_features, fit_target_array)
+        fit_features, fit_target, used_validation = _prepare_refit_dataset(
+            X_train,
+            y_train,
+            X_validation,
+            y_validation,
+            cv_config,
+        )
 
-    metrics = _initialize_metrics(
-        feature_columns,
-        target_column,
-        spec.key,
-        version,
-        cv_config.refit_strategy,
-        used_validation,
-        cv_summary,
-    )
-    metrics["row_counts"]["train"] = int(fit_target_array.shape[0])
-    metrics["train"] = (
-        _classification_metrics(final_model, fit_features, fit_target_array)
-        if resolved_problem_type == "classification"
-        else _regression_metrics(final_model, fit_features, fit_target_array)
-    )
+        final_model = spec.factory(**params)
+        fit_target_array = _prepare_target_array(fit_target, resolved_problem_type)
+        final_model.fit(fit_features, fit_target_array)
 
-    _add_split_metrics(metrics, "validation", final_model, X_validation, y_validation, resolved_problem_type)
-    _add_split_metrics(metrics, "test", final_model, X_test, y_test, resolved_problem_type)
+        metrics = _initialize_metrics(
+            feature_columns,
+            target_column,
+            spec.key,
+            version,
+            cv_config.refit_strategy,
+            used_validation,
+            cv_summary,
+        )
+        metrics["row_counts"]["train"] = int(fit_target_array.shape[0])
+        metrics["train"] = (
+            _classification_metrics(final_model, fit_features, fit_target_array)
+            if resolved_problem_type == "classification"
+            else _regression_metrics(final_model, fit_features, fit_target_array)
+        )
 
-    transformers = _collect_transformers(pipeline_id)
-    transformer_plan = _build_transformer_plan(transformers, upstream_node_order)
+        _add_split_metrics(metrics, "validation", final_model, X_validation, y_validation, resolved_problem_type)
+        _add_split_metrics(metrics, "test", final_model, X_test, y_test, resolved_problem_type)
 
-    artifact_data = {
-        "model": final_model,
-        "model_type": spec.key,
-        "problem_type": resolved_problem_type,
-        "feature_columns": feature_columns,
-        "transformers": transformers,
-        "transformer_plan": transformer_plan,
-        "transformer_bundle_version": 1,
-        "version": version,
-    }
+        transformers = _collect_transformers(pipeline_id)
+        transformer_plan = _build_transformer_plan(transformers, upstream_node_order)
 
-    _dump_fitted_params_debug(transformers, transformer_plan)
+        artifact_data = {
+            "model": final_model,
+            "model_type": spec.key,
+            "problem_type": resolved_problem_type,
+            "feature_columns": feature_columns,
+            "transformers": transformers,
+            "transformer_plan": transformer_plan,
+            "transformer_bundle_version": 1,
+            "version": version,
+        }
 
-    artifact_path = _persist_artifact(
-        artifact_root,
-        pipeline_id,
-        job_id,
-        version,
-        artifact_data,
-    )
+        _dump_fitted_params_debug(transformers, transformer_plan)
 
-    metrics["artifact_uri"] = str(artifact_path)
+        artifact_path = _persist_artifact(
+            artifact_root,
+            pipeline_id,
+            job_id,
+            version,
+            artifact_data,
+        )
 
-    return str(artifact_path), metrics, resolved_problem_type
+        metrics["artifact_uri"] = str(artifact_path)
+
+    warning_messages = _extract_warning_messages(caught_warnings)
+    if warning_messages:
+        metrics.setdefault("warnings", warning_messages)
+
+    return str(artifact_path), metrics, resolved_problem_type, warning_messages
 
 
 async def _resolve_training_inputs(session, job) -> Tuple[pd.DataFrame, Dict[str, Any], Dict[str, Any], List[str]]:
@@ -1529,7 +1563,7 @@ async def _run_training_workflow(job_id: str) -> None:
             cv_config = _parse_cross_validation_config(node_config)
 
             artifact_root = _settings.TRAINING_ARTIFACT_DIR
-            artifact_uri, metrics, resolved_problem_type = _train_and_save_model(
+            artifact_uri, metrics, resolved_problem_type, training_warnings = _train_and_save_model(
                 model_type=model_type_value,
                 hyperparameters=hyperparameters or None,
                 problem_type_hint=problem_type_hint,
@@ -1571,6 +1605,9 @@ async def _run_training_workflow(job_id: str) -> None:
             }
             if dataset_meta:
                 metadata_update["dataset"] = dataset_meta
+
+            if training_warnings:
+                metadata_update["warnings"] = training_warnings
 
             job = await update_job_status(
                 session,
