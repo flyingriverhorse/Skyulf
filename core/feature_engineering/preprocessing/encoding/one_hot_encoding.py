@@ -23,7 +23,7 @@ from core.feature_engineering.schemas import (
     OneHotEncodingNodeSignal,
 )
 
-from .utils import _auto_detect_text_columns, _coerce_config_boolean, _coerce_string_list
+from ...shared.utils import _auto_detect_text_columns, _coerce_config_boolean, _coerce_string_list
 
 ONE_HOT_ENCODING_DEFAULT_MAX_CATEGORIES = 20
 ONE_HOT_ENCODING_MAX_CARDINALITY_LIMIT = 200

@@ -23,7 +23,7 @@ from core.feature_engineering.schemas import (
 )
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
-from .utils import _coerce_config_boolean, _format_interval_value
+from ...shared.utils import _coerce_config_boolean, _format_interval_value
 
 logger = logging.getLogger(__name__)
 

@@ -17,7 +17,7 @@ from core.feature_engineering.schemas import (
     FeatureMathOperationResult,
 )
 
-from .utils import _coerce_config_boolean, _coerce_string_list
+from ...shared.utils import _coerce_config_boolean, _coerce_string_list
 
 fuzz: Any
 try:  # pragma: no cover - optional dependency

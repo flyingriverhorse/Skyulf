@@ -1,6 +1,6 @@
 import pandas as pd
 
-from core.feature_engineering.nodes.feature_eng.ordinal_encoding import apply_ordinal_encoding
+from core.feature_engineering.preprocessing.encoding.ordinal_encoding import apply_ordinal_encoding
 from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 

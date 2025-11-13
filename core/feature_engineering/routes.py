@@ -64,12 +64,12 @@ from .nodes.feature_eng.outliers_removal import (
     _build_outlier_recommendations,
     _outlier_method_details,
 )
-from .nodes.feature_eng.label_encoding import (
+from .preprocessing.encoding.label_encoding import (
     LABEL_ENCODING_DEFAULT_MAX_UNIQUE,
     LABEL_ENCODING_DEFAULT_SUFFIX,
     apply_label_encoding,
 )
-from .nodes.feature_eng.hash_encoding import (
+from .preprocessing.encoding.hash_encoding import (
     HASH_ENCODING_DEFAULT_BUCKETS,
     HASH_ENCODING_DEFAULT_MAX_CATEGORIES,
     HASH_ENCODING_DEFAULT_SUFFIX,
@@ -95,7 +95,7 @@ from .nodes.feature_eng.over_resampling import (
 from .nodes.feature_eng.feature_target_split import apply_feature_target_split
 from .nodes.modeling.dataset_split import apply_train_test_split, SPLIT_TYPE_COLUMN
 from .split_handler import detect_splits, log_split_processing, remove_split_column
-from .nodes.feature_eng.ordinal_encoding import (
+from .preprocessing.encoding.ordinal_encoding import (
     ORDINAL_ENCODING_DEFAULT_MAX_CATEGORIES,
     ORDINAL_ENCODING_DEFAULT_SUFFIX,
     ORDINAL_ENCODING_MAX_CARDINALITY_LIMIT,
@@ -106,7 +106,7 @@ from .nodes.modeling.hyperparameter_tuning_registry import (
     get_default_strategy_value,
     get_strategy_choices_for_ui,
 )
-from .nodes.feature_eng.target_encoding import (
+from .preprocessing.encoding.target_encoding import (
     TARGET_ENCODING_DEFAULT_MAX_CATEGORIES,
     TARGET_ENCODING_DEFAULT_SUFFIX,
     TARGET_ENCODING_DEFAULT_SMOOTHING,
@@ -115,13 +115,13 @@ from .nodes.feature_eng.target_encoding import (
     apply_target_encoding,
 )
 from .nodes.feature_eng.feature_math import apply_feature_math
-from .nodes.feature_eng.one_hot_encoding import (
+from .preprocessing.encoding.one_hot_encoding import (
     ONE_HOT_ENCODING_DEFAULT_MAX_CATEGORIES,
     ONE_HOT_ENCODING_DEFAULT_PREFIX_SEPARATOR,
     ONE_HOT_ENCODING_MAX_CARDINALITY_LIMIT,
     apply_one_hot_encoding,
 )
-from .nodes.feature_eng.dummy_encoding import (
+from .preprocessing.encoding.dummy_encoding import (
     DUMMY_ENCODING_DEFAULT_MAX_CATEGORIES,
     DUMMY_ENCODING_DEFAULT_PREFIX_SEPARATOR,
     DUMMY_ENCODING_MAX_CARDINALITY_LIMIT,
@@ -143,7 +143,7 @@ from .nodes.feature_eng.deduplicate import apply_remove_duplicates
 from .nodes.feature_eng.drop_missing import apply_drop_missing_columns, apply_drop_missing_rows
 from .nodes.feature_eng.imputation import apply_imputation_methods as _apply_imputation_methods
 from .nodes.feature_eng.missing_indicator import apply_missing_value_flags
-from .shared.utils import _is_node_pending
+from core.feature_engineering.shared.utils import _is_node_pending
 from .nodes.modeling.train_model_draft import apply_train_model_draft
 from .nodes.modeling.model_evaluation import (
     apply_model_evaluation,

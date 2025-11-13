@@ -17,7 +17,7 @@ from core.feature_engineering.schemas import (
 )
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
-from .utils import (
+from ...shared.utils import (
     _auto_detect_numeric_columns,
     _coerce_config_boolean,
     _coerce_string_list,

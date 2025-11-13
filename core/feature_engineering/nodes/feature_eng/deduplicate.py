@@ -8,7 +8,7 @@ import pandas as pd
 
 from core.feature_engineering.schemas import RemoveDuplicatesNodeSignal
 
-from .utils import _normalize_remove_duplicates_config
+from ...shared.utils import _normalize_remove_duplicates_config
 
 
 def apply_remove_duplicates(

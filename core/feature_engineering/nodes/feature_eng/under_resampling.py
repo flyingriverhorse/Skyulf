@@ -10,7 +10,7 @@ import math
 import pandas as pd
 from imblearn.under_sampling import RandomUnderSampler
 
-from .utils import _coerce_config_boolean
+from ...shared.utils import _coerce_config_boolean
 from core.feature_engineering.schemas import ClassUndersamplingNodeSignal
 from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
 

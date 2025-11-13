@@ -10,7 +10,7 @@ import math
 import pandas as pd
 from pandas.api import types as pd_types
 
-from core.feature_engineering.nodes.feature_eng.hash_encoding import (
+from core.feature_engineering.preprocessing.encoding.hash_encoding import (
     HASH_ENCODING_DEFAULT_BUCKETS,
     HASH_ENCODING_MAX_CARDINALITY_LIMIT,
 )
