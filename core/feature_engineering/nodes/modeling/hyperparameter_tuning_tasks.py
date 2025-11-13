@@ -6,6 +6,7 @@ import asyncio
 import inspect
 import json
 import logging
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, cast
@@ -24,9 +25,11 @@ from .hyperparameter_tuning_registry import get_default_strategy_value, resolve_
 from .model_training_registry import get_model_spec
 from .model_training_tasks import (
     CrossValidationConfig,
+    ConvergenceWarning,
     _build_cv_splitter,
     _classification_metrics,
     _ensure_database_ready,
+    _extract_warning_messages,
     _parse_cross_validation_config,
     _prepare_training_data,
     _regression_metrics,
@@ -119,6 +122,7 @@ class SearchExecutionResult:
     summary: List[Dict[str, Any]]
     metrics: Dict[str, Any]
     best_estimator: Any
+    warnings: List[str]
 
 
 def _safe_json_loads(value: Any) -> Any:
@@ -739,7 +743,12 @@ def _execute_search(
     search_config: SearchConfiguration,
     cv_config: CrossValidationConfig,
 ) -> SearchExecutionResult:
-    searcher.fit(training_data.X_train, training_data.y_train)
+    with warnings.catch_warnings(record=True) as caught_warnings:
+        warnings.simplefilter("always")
+        warnings.simplefilter("always", ConvergenceWarning)
+        searcher.fit(training_data.X_train, training_data.y_train)
+
+    warning_messages = _extract_warning_messages(caught_warnings)
     summary = _summarize_results(searcher.cv_results_)
     metrics = _build_search_metrics(
         searcher,
@@ -750,11 +759,14 @@ def _execute_search(
         search_config,
         cv_config,
     )
+    if warning_messages:
+        metrics.setdefault("warnings", warning_messages)
     return SearchExecutionResult(
         searcher=searcher,
         summary=summary,
         metrics=metrics,
         best_estimator=searcher.best_estimator_,
+        warnings=warning_messages,
     )
 
 
@@ -986,6 +998,9 @@ async def _run_hyperparameter_tuning_workflow(job_id: str) -> None:
                 cv_config,
                 inputs.dataset_meta,
             )
+
+            if search_result.warnings:
+                metadata_update["warnings"] = search_result.warnings
 
             await update_tuning_job_status(
                 session,

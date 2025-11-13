@@ -143,7 +143,7 @@ from .nodes.feature_eng.deduplicate import apply_remove_duplicates
 from .nodes.feature_eng.drop_missing import apply_drop_missing_columns, apply_drop_missing_rows
 from .nodes.feature_eng.imputation import apply_imputation_methods as _apply_imputation_methods
 from .nodes.feature_eng.missing_indicator import apply_missing_value_flags
-from .nodes.feature_eng.utils import _is_node_pending
+from .shared.utils import _is_node_pending
 from .nodes.modeling.train_model_draft import apply_train_model_draft
 from .nodes.modeling.model_evaluation import (
     apply_model_evaluation,

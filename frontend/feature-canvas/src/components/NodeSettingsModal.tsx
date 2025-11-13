@@ -5286,7 +5286,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     onResetConfig?.(nodeId, template);
   }, [canResetNode, defaultConfigTemplate, isTargetEncodingNode, nodeId, onResetConfig, targetEncodingFallbackAppliedRef]);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback((options?: { closeModal?: boolean }) => {
     let payload = cloneConfig(configState);
     
     if (isBinningNode) {
@@ -5344,7 +5344,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     }
 
     onUpdateConfig(node.id, payload);
-    onClose();
+    if (options?.closeModal !== false) {
+      onClose();
+    }
     
     // Trigger full dataset execution in background after saving
     // This pre-loads the full dataset for this node's transformations

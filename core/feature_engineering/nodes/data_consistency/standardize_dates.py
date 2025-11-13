@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from pandas.api import types as pd_types
 
-from ..feature_eng.utils import (
+from ...shared.utils import (
     _auto_detect_datetime_columns,
     _auto_detect_text_columns,
     _coerce_string_list,

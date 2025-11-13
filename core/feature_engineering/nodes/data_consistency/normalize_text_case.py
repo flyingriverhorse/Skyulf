@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from pandas.api import types as pd_types
 
-from ..feature_eng.utils import _auto_detect_text_columns, _coerce_string_list
+from ...shared.utils import _auto_detect_text_columns, _coerce_string_list
 from core.feature_engineering.schemas import (
     NormalizeTextCaseAppliedColumnSignal,
     NormalizeTextCaseNodeSignal,
