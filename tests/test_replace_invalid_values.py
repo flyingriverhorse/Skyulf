@@ -1,6 +1,6 @@
 import pandas as pd
 
-from core.feature_engineering.nodes.data_consistency.replace_invalid_values import (
+from core.feature_engineering.preprocessing.cleaning.replace_invalid_values import (
     apply_replace_invalid_values,
 )
 

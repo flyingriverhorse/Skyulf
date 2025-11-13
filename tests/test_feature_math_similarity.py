@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 
-from core.feature_engineering.nodes.feature_eng.feature_math import (
+from core.feature_engineering.preprocessing.feature_generation.feature_math import (
     FeatureMathConfig,
     FeatureMathOperation,
     _apply_similarity_operation,

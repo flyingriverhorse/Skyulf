@@ -5,19 +5,20 @@ from core.feature_engineering.preprocessing.bucketing import _apply_binning_disc
 from core.feature_engineering.preprocessing.encoding.dummy_encoding import apply_dummy_encoding
 from core.feature_engineering.nodes.feature_eng.feature_selection import apply_feature_selection
 from core.feature_engineering.preprocessing.encoding.hash_encoding import apply_hash_encoding
-from core.feature_engineering.nodes.feature_eng.imputation import apply_imputation_methods
+from core.feature_engineering.preprocessing.statistics import apply_imputation_methods
 from core.feature_engineering.preprocessing.encoding.label_encoding import apply_label_encoding
 from core.feature_engineering.preprocessing.encoding.one_hot_encoding import apply_one_hot_encoding
 from core.feature_engineering.preprocessing.encoding.ordinal_encoding import apply_ordinal_encoding
-from core.feature_engineering.preprocessing.distribution import _apply_outlier_removal
-from core.feature_engineering.nodes.feature_eng.polynomial_features import apply_polynomial_features
+from core.feature_engineering.preprocessing.statistics import _apply_outlier_removal
+from core.feature_engineering.preprocessing.feature_generation import apply_polynomial_features
 from core.feature_engineering.nodes.feature_eng.scaling import _apply_scale_numeric_features
-from core.feature_engineering.preprocessing.distribution import (
+from core.feature_engineering.preprocessing.statistics import (
     SKEWNESS_METHODS,
     _apply_skewness_transformations,
 )
 from core.feature_engineering.preprocessing.encoding.target_encoding import apply_target_encoding
-from core.feature_engineering.nodes.feature_eng.transformer_audit import apply_transformer_audit
+from core.feature_engineering.preprocessing.inspection import apply_transformer_audit
+from core.feature_engineering.preprocessing.feature_generation import apply_feature_math
 from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 

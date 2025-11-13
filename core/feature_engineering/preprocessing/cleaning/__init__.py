@@ -1,4 +1,6 @@
-"""Data consistency nodes for feature engineering."""
+"""Cleaning-focused preprocessing utilities."""
+
+# Consolidate re-exports so higher-level modules can import from this package.
 
 from .normalize_text_case import apply_normalize_text_case
 from .regex_cleanup import apply_regex_cleanup

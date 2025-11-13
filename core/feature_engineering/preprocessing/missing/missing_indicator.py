@@ -1,4 +1,4 @@
-"""Missing value indicator feature node."""
+"""Missing value indicator preprocessing helpers."""
 
 from __future__ import annotations
 

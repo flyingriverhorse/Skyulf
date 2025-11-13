@@ -1,4 +1,4 @@
-"""Imputation helpers for feature engineering nodes."""
+"""Imputation helpers for statistics-focused preprocessing workflows."""
 
 from __future__ import annotations
 
