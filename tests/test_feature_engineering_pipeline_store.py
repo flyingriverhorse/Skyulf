@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from core.feature_engineering.nodes.feature_eng.binning import _apply_binning_discretization
+from core.feature_engineering.preprocessing.bucketing import _apply_binning_discretization
 from core.feature_engineering.preprocessing.encoding.dummy_encoding import apply_dummy_encoding
 from core.feature_engineering.nodes.feature_eng.feature_selection import apply_feature_selection
 from core.feature_engineering.preprocessing.encoding.hash_encoding import apply_hash_encoding

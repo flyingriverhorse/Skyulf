@@ -181,6 +181,60 @@ def _auto_detect_datetime_columns(frame: pd.DataFrame) -> List[str]:
     return detected
 
 
+def _is_binary_numeric(series: pd.Series) -> bool:
+    """Check whether a numeric-like series encodes only 0/1 values."""
+
+    unique_values: Set[float] = set()
+    for value in series.unique():
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return False
+        if not math.isfinite(numeric):
+            return False
+        if abs(numeric) < 1e-9:
+            numeric = 0.0
+        elif abs(numeric - 1.0) < 1e-9:
+            numeric = 1.0
+        unique_values.add(numeric)
+        if len(unique_values) > 2:
+            return False
+    return unique_values.issubset({0.0, 1.0})
+
+
+def _detect_numeric_columns(frame: pd.DataFrame) -> List[str]:
+    """Find numeric-like columns that have more than one non-binary value."""
+
+    detected: List[str] = []
+    seen: Set[str] = set()
+
+    for column in frame.columns:
+        column_name = str(column)
+        if not column_name or column_name in seen:
+            continue
+
+        series = frame[column]
+        dtype = series.dtype
+        if pd_types.is_bool_dtype(dtype):
+            continue
+
+        numeric_series = pd.to_numeric(series, errors="coerce")
+        valid = numeric_series.dropna()
+        if valid.empty:
+            continue
+
+        if _is_binary_numeric(valid):
+            continue
+
+        if valid.nunique(dropna=True) < 2:
+            continue
+
+        detected.append(column_name)
+        seen.add(column_name)
+
+    return detected
+
+
 def _is_node_pending(node: Dict[str, Any]) -> bool:
     data = node.get("data") or {}
     config = data.get("config")

@@ -28,7 +28,7 @@ from core.feature_engineering.schemas import (
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
 
-from .binning import _is_binary_numeric
+from ...shared.utils import _is_binary_numeric
 
 SkewnessDirection = Literal["right", "left"]
 SkewnessMagnitude = Literal["moderate", "substantial", "extreme"]
