@@ -9,10 +9,10 @@ from core.feature_engineering.nodes.feature_eng.imputation import apply_imputati
 from core.feature_engineering.preprocessing.encoding.label_encoding import apply_label_encoding
 from core.feature_engineering.preprocessing.encoding.one_hot_encoding import apply_one_hot_encoding
 from core.feature_engineering.preprocessing.encoding.ordinal_encoding import apply_ordinal_encoding
-from core.feature_engineering.nodes.feature_eng.outliers_removal import _apply_outlier_removal
+from core.feature_engineering.preprocessing.distribution import _apply_outlier_removal
 from core.feature_engineering.nodes.feature_eng.polynomial_features import apply_polynomial_features
 from core.feature_engineering.nodes.feature_eng.scaling import _apply_scale_numeric_features
-from core.feature_engineering.nodes.feature_eng.skewness import (
+from core.feature_engineering.preprocessing.distribution import (
     SKEWNESS_METHODS,
     _apply_skewness_transformations,
 )
