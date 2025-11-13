@@ -30,7 +30,7 @@ from core.feature_engineering.eda_fast import FeatureEngineeringEDAService
 from core.feature_engineering.eda_fast.service import DEFAULT_SAMPLE_CAP
 from core.feature_engineering.full_capture import FullDatasetCaptureService
 
-from .nodes.feature_eng.binning import (
+from .preprocessing.bucketing import (
     BINNING_DEFAULT_EQUAL_FREQUENCY_BINS,
     BINNING_DEFAULT_EQUAL_WIDTH_BINS,
     BINNING_DEFAULT_MISSING_LABEL,

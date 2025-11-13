@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from core.feature_engineering.nodes.feature_eng.binning import (
+from core.feature_engineering.preprocessing.bucketing import (
     _apply_binning_discretization,
     _normalize_binning_config,
 )

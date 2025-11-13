@@ -34,8 +34,11 @@ except Exception:  # pragma: no cover - defensive guard
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
 
-from .binning import _detect_numeric_columns, _is_binary_numeric
-from ...shared.utils import _coerce_config_boolean
+from ...shared.utils import (
+    _coerce_config_boolean,
+    _detect_numeric_columns,
+    _is_binary_numeric,
+)
 
 logger = logging.getLogger(__name__)
 
