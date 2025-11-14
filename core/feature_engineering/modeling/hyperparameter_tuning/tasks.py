@@ -20,10 +20,10 @@ from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, HalvingGri
 from config import get_settings
 from core.database.models import get_database_session
 
-from .hyperparameter_tuning_jobs import get_tuning_job, update_tuning_job_status
-from .hyperparameter_tuning_registry import get_default_strategy_value, resolve_strategy_selection
-from .model_training_registry import get_model_spec
-from .model_training_tasks import (
+from .jobs import get_tuning_job, update_tuning_job_status
+from .registry import get_default_strategy_value, resolve_strategy_selection
+from ..training.registry import get_model_spec
+from ..training.tasks import (
     CrossValidationConfig,
     ConvergenceWarning,
     _build_cv_splitter,
@@ -37,7 +37,7 @@ from .model_training_tasks import (
     celery_app,
 )
 from core.feature_engineering.schemas import HyperparameterTuningJobStatus
-from .model_hyperparameters import get_hyperparameters_for_model
+from ..config.hyperparameters import get_hyperparameters_for_model
 
 CategoricalDistribution: Any
 TPESampler: Any

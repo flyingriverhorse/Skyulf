@@ -46,8 +46,8 @@ from core.feature_engineering.schemas import TrainingJobStatus
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
 from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
-from .model_training_jobs import get_training_job, update_job_status
-from .model_training_registry import get_model_spec
+from .jobs import get_training_job, update_job_status
+from .registry import get_model_spec
 
 _imblearn_metrics = None
 try:
@@ -1636,7 +1636,7 @@ async def _run_training_workflow(job_id: str) -> None:
             )
 
 
-@celery_app.task(name="core.feature_engineering.modeling.model_training.train_model")
+@celery_app.task(name="core.feature_engineering.modeling.training.train_model")
 def train_model(job_id: str) -> None:
     """Celery entrypoint for training jobs."""
 
