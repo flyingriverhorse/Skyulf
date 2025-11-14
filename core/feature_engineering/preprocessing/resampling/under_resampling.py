@@ -12,7 +12,7 @@ from imblearn.under_sampling import RandomUnderSampler
 
 from ...shared.utils import _coerce_config_boolean
 from core.feature_engineering.schemas import ClassUndersamplingNodeSignal
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 
 RESAMPLING_METHOD_RANDOM_UNDER = "random_under_sampling"
 RESAMPLING_METHOD_LABELS: Dict[str, str] = {
@@ -301,3 +301,4 @@ __all__ = [
     "RESAMPLING_DEFAULT_REPLACEMENT",
     "apply_resampling",
 ]
+

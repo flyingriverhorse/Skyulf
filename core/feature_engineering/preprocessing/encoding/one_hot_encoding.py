@@ -261,7 +261,7 @@ def _build_context(
     node_id: Optional[str],
 ) -> OneHotEncodingContext:
     from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
-    from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+    from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 
     has_splits = SPLIT_TYPE_COLUMN in frame.columns
     storage = get_pipeline_store() if pipeline_id and has_splits else None
@@ -902,3 +902,4 @@ __all__ = [
     "ONE_HOT_ENCODING_DEFAULT_MAX_CATEGORIES",
     "apply_one_hot_encoding",
 ]
+

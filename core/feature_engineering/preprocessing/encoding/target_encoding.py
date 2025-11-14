@@ -17,7 +17,7 @@ from core.feature_engineering.schemas import (
     TargetEncodingNodeSignal,
 )
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 
 from ...shared.utils import _auto_detect_text_columns, _coerce_config_boolean, _coerce_string_list
 
@@ -903,3 +903,4 @@ def apply_target_encoding(
         summary = f"{summary}; skipped {preview}"
 
     return working_frame, summary, signal
+

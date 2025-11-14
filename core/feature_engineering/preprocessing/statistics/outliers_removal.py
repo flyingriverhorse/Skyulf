@@ -24,7 +24,7 @@ from core.feature_engineering.schemas import (
 )
 
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 
 from ...shared.utils import (
     _coerce_config_boolean,
@@ -1501,3 +1501,4 @@ __all__ = [
     "_apply_outlier_removal",
     "_normalize_outlier_config",
 ]
+

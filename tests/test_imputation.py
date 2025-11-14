@@ -1,7 +1,7 @@
 import pandas as pd
 
 from core.feature_engineering.preprocessing.statistics import apply_imputation_methods
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
 
@@ -50,3 +50,4 @@ def test_imputation_knn_with_pipeline_store_records_metadata():
     assert metadata.get("method_label") == "KNN"
 
     store.clear_all()
+

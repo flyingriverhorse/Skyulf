@@ -26,7 +26,7 @@ from core.feature_engineering.schemas import (
 )
 
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 
 from ...shared.utils import _is_binary_numeric
 
@@ -1006,3 +1006,4 @@ __all__ = [
     "_build_skewness_recommendations",
     "_skewness_method_details",
 ]
+

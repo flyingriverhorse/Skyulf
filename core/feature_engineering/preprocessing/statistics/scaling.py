@@ -1,4 +1,4 @@
-﻿"""Scaling helpers for statistics-focused preprocessing."""
+"""Scaling helpers for statistics-focused preprocessing."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ except Exception:  # pragma: no cover - defensive guard
     RobustScaler = None  # type: ignore[assignment]
 
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 
 from ...shared.utils import (
     _coerce_config_boolean,
@@ -908,3 +908,4 @@ __all__ = [
     "_build_scaling_recommendations",
     "_scaling_method_details",
 ]
+

@@ -1,7 +1,7 @@
 import pandas as pd
 
 from core.feature_engineering.preprocessing.encoding.hash_encoding import apply_hash_encoding
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
 
@@ -85,3 +85,4 @@ def test_hash_encoding_stores_method_label_for_transformer_audit():
     assert metadata.get("method_label", "").startswith("Hash Encoding (")
 
     store.clear_all()
+

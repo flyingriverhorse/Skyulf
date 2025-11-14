@@ -1026,7 +1026,7 @@ async def _run_hyperparameter_tuning_workflow(job_id: str) -> None:
             )
 
 
-@celery_app.task(name="core.feature_engineering.nodes.modeling.hyperparameter_tuning.run")
+@celery_app.task(name="core.feature_engineering.modeling.hyperparameter_tuning.run")
 def run_hyperparameter_tuning(job_id: str) -> None:
     """Celery entrypoint for hyperparameter tuning jobs."""
 
@@ -1037,3 +1037,4 @@ def dispatch_hyperparameter_tuning_job(job_id: str) -> None:
     """Queue a hyperparameter tuning job via Celery."""
 
     run_hyperparameter_tuning.delay(job_id)
+

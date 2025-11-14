@@ -1,7 +1,7 @@
 import pandas as pd
 
 from core.feature_engineering.preprocessing.encoding.one_hot_encoding import apply_one_hot_encoding
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
 
@@ -114,3 +114,4 @@ def test_one_hot_encoding_stores_and_reuses_encoder_with_splits():
     assert signal_inference.encoded_columns[0].replaced_original is True
 
     store.clear_all()
+

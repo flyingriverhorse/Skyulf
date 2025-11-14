@@ -10,7 +10,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, TYPE_CH
 import numpy as np
 import pandas as pd
 
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 from core.feature_engineering.schemas import (
     PolynomialFeaturesNodeSignal,
     PolynomialGeneratedFeature,
@@ -642,3 +642,4 @@ def apply_polynomial_features(
     signal.notes.append(summary)
 
     return working_frame, summary, signal
+
