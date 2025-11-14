@@ -2,13 +2,13 @@
 
 This document describes the modeling-node modules that power background training:
 
-- `model_training_registry.py`
-- `model_training_jobs.py`
-- `model_training_tasks.py`
+- `training/registry.py`
+- `training/jobs.py`
+- `training/tasks.py`
 
-Keeping these files together under `core/feature_engineering/nodes/modeling/` makes it easier to reason about the entire training workflow directly from the node package.
+Keeping these files together under `core/feature_engineering/modeling/training/` makes it easier to reason about the entire training workflow directly from the node package.
 
-## `model_training_registry.py`
+## `training/registry.py`
 
 Purpose: central registry of supported estimators and their sane defaults.
 
@@ -18,7 +18,7 @@ Highlights:
 - Exposes `get_model_spec(model_type)` for lookups and `list_registered_models()` for discovery.
 - Used by the Celery task to instantiate models with consistent defaults when the node omits explicit hyperparameters.
 
-## `model_training_jobs.py`
+## `training/jobs.py`
 
 Purpose: database-facing helpers for the `training_jobs` table.
 
@@ -28,7 +28,7 @@ Highlights:
 - `get_training_job(...)`, `list_training_jobs(...)`, and `bulk_mark_cancelled(...)` support API endpoints and operational scripts.
 - `update_job_status(...)` centralises status transitions, timestamp updates, metric storage, and error messaging.
 
-## `model_training_tasks.py`
+## `training/tasks.py`
 
 Purpose: Celery worker entry points plus the orchestration logic that executes training asynchronously.
 
@@ -43,7 +43,7 @@ Highlights:
 ## Data Flow Summary
 
 1. A client posts to `POST /ml-workflow/api/training-jobs` with the graph and node configuration.
-2. The API stores the job via `model_training_jobs.create_training_job(...)`.
+2. The API stores the job via `training.jobs.create_training_job(...)`.
 3. When `run_training=True`, it calls `dispatch_training_job(job_id)`.
 4. Celery picks up the task, runs `_run_training_workflow(...)`, and updates the record through the job helpers.
 5. Clients poll `/ml-workflow/api/training-jobs/{job_id}` for live status, metrics, and artifact locations.

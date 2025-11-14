@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import AliasChoices, BaseModel, Field, computed_field, field_validator, model_validator
 
-from core.feature_engineering.modeling.hyperparameter_tuning_registry import (
+from core.feature_engineering.modeling.hyperparameter_tuning.registry import (
     get_default_strategy_value,
     normalize_strategy_value,
 )
