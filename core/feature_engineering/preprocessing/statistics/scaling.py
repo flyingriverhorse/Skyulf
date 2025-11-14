@@ -1,4 +1,4 @@
-"""Scaling helpers for feature engineering nodes."""
+﻿"""Scaling helpers for statistics-focused preprocessing."""
 
 from __future__ import annotations
 

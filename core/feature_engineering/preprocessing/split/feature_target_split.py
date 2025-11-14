@@ -1,4 +1,4 @@
-"""Feature/target separation helpers for feature engineering nodes."""
+"""Feature/target separation helpers for preprocessing nodes."""
 
 from __future__ import annotations
 

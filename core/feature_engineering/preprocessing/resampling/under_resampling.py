@@ -1,4 +1,4 @@
-"""Class undersampling helpers for feature engineering nodes."""
+"""Class undersampling helpers for feature engineering preprocessing."""
 
 from __future__ import annotations
 
@@ -239,60 +239,61 @@ def apply_resampling(
         signal.warnings.append("Unsupported undersampling method.")
         return frame, message, signal
 
-    sampler = RandomUnderSampler(
-        sampling_strategy=config.sampling_strategy,
-        random_state=config.random_state,
-        replacement=config.replacement,
-    )
-
     try:
-        sampler.fit_resample(features, labels)
-    except ValueError as exc:  # pragma: no cover - imblearn validation feedback
+        sampler = RandomUnderSampler(
+            sampling_strategy=config.sampling_strategy,
+            random_state=config.random_state,
+            replacement=config.replacement,
+        )
+        resampled_features, resampled_labels = sampler.fit_resample(features, labels)
+    except ValueError as exc:
+        lowered = str(exc).lower()
+        if "nan" in lowered or "missing" in lowered:
+            signal.warnings.append("Missing values detected in feature columns.")
+            message = (
+                "Class undersampling: missing values detected in feature columns. "
+                "Impute or drop rows with NaNs before running undersampling."
+            )
+            return frame, message, signal
         signal.warnings.append(str(exc))
         return frame, f"Class undersampling: unable to apply sampling ({exc})", signal
 
-    indices = getattr(sampler, "sample_indices_", None)
-    if indices is None:  # pragma: no cover - fallback guard
-        resampled_valid = valid_frame.copy()
-    else:
-        resampled_valid = valid_frame.iloc[indices].copy()
+    resampled_valid = pd.DataFrame(resampled_features, columns=feature_columns)
+    resampled_valid[config.target_column] = resampled_labels
+
+    if SPLIT_TYPE_COLUMN in frame.columns:
+        resampled_valid[SPLIT_TYPE_COLUMN] = split_value
+
+    resampled_frame = resampled_valid.reset_index(drop=True)
 
     if not missing_rows.empty:
-        resampled_frame = pd.concat(
-            [resampled_valid, missing_rows.copy()], axis=0, ignore_index=True
-        )
-    else:
-        resampled_frame = resampled_valid.reset_index(drop=True)
+        resampled_frame = pd.concat([resampled_frame, missing_rows], axis=0, ignore_index=True)
 
-    resampled_frame = resampled_frame.loc[:, frame.columns]
-    resampled_target = resampled_frame[config.target_column]
-    after_counts = resampled_target.value_counts(dropna=False).to_dict()
-    after_total = int(resampled_frame.shape[0])
+    after_counts = resampled_frame[config.target_column].value_counts(dropna=False).to_dict()
 
     signal.class_counts_after = _normalize_counts_for_signal(after_counts)
-    signal.total_rows_after = after_total
+    signal.total_rows_after = int(resampled_frame.shape[0])
 
-    method_label = RESAMPLING_METHOD_LABELS.get(config.method, config.method.replace("_", " "))
-    summary = (
-        f"{method_label}: rows {original_total}→{after_total}; "
-        f"{config.target_column} counts {_format_class_counts(before_counts)} → "
-        f"{_format_class_counts(after_counts)}"
-    )
+    summary_parts = [
+        f"{method_label}: rows {original_total}→{signal.total_rows_after}",
+        (
+            f"{config.target_column} counts "
+            f"{_format_class_counts(before_counts)} → {_format_class_counts(after_counts)}"
+        ),
+    ]
 
     if split_value is not None:
-        summary = f"{summary}; split={split_value}"
-
-    if split_value is not None and str(split_value).lower() == "train":
-        signal.notes.append("Applied undersampling to training split only; test/validation unchanged.")
+        summary_parts.append(f"split={split_value}")
 
     if missing_count:
-        summary = f"{summary}; preserved {missing_count} row(s) with missing target"
+        summary_parts.append(f"preserved {missing_count} row(s) with missing target")
 
-    return resampled_frame.reset_index(drop=True), summary, signal
+    summary = "; ".join(summary_parts)
+
+    return resampled_frame, summary, signal
 
 
 __all__ = [
-    "RESAMPLING_METHOD_RANDOM_UNDER",
     "RESAMPLING_METHOD_LABELS",
     "RESAMPLING_DEFAULT_METHOD",
     "RESAMPLING_DEFAULT_SAMPLING_STRATEGY",
