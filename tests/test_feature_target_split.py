@@ -1,6 +1,6 @@
 import pandas as pd
 
-from core.feature_engineering.nodes.feature_eng.feature_target_split import apply_feature_target_split
+from core.feature_engineering.preprocessing.split import apply_feature_target_split
 
 
 def _build_node(config):

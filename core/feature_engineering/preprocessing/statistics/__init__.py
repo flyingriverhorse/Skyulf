@@ -1,4 +1,4 @@
-"""Statistics-focused preprocessing modules (outliers, skewness, imputation)."""
+"""Statistics-focused preprocessing modules (scaling, outliers, skewness, imputation)."""
 
 from .outliers_removal import (
     DEFAULT_METHOD_PARAMETERS,
@@ -21,6 +21,15 @@ from .imputation import (
     ADVANCED_METHODS,
     apply_imputation_methods,
 )
+from .scaling import (
+    SCALING_DEFAULT_METHOD,
+    SCALING_METHODS,
+    SCALING_METHOD_ORDER,
+    NormalizedScalingConfig,
+    _apply_scale_numeric_features,
+    _build_scaling_recommendations,
+    _scaling_method_details,
+)
 
 __all__ = [
     "DEFAULT_METHOD_PARAMETERS",
@@ -38,4 +47,11 @@ __all__ = [
     "SIMPLE_METHODS",
     "ADVANCED_METHODS",
     "apply_imputation_methods",
+    "SCALING_DEFAULT_METHOD",
+    "SCALING_METHODS",
+    "SCALING_METHOD_ORDER",
+    "NormalizedScalingConfig",
+    "_apply_scale_numeric_features",
+    "_build_scaling_recommendations",
+    "_scaling_method_details",
 ]

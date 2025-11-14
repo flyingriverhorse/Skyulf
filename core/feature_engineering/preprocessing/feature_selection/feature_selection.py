@@ -1,9 +1,9 @@
-"""Feature selection node helpers."""
+"""Feature selection preprocessing helpers."""
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
@@ -670,17 +670,32 @@ def _build_selection_inputs(
     if error:
         return None, error
 
-    numeric_frame, error = _prepare_numeric_matrix(frame, valid_columns, config, signal)
+    total_features = len(valid_columns)
+    adjusted_config = config
+    if (
+        total_features > 0
+        and config.k is not None
+        and config.k > total_features
+        and config.method in {"select_k_best", "generic_univariate_select", "rfe"}
+        and (config.method != "generic_univariate_select" or (config.mode in {None, "k_best"}))
+    ):
+        adjusted_config = replace(config, k=total_features)
+        signal.notes.append(
+            f"Clamped k from {config.k} to {total_features} based on available features."
+        )
+        signal.k = total_features
+
+    numeric_frame, error = _prepare_numeric_matrix(frame, valid_columns, adjusted_config, signal)
     if error:
         return None, error
     assert numeric_frame is not None
 
-    target_vector, problem_type, y_metadata, error = _resolve_target_vector(frame, config, signal)
+    target_vector, problem_type, y_metadata, error = _resolve_target_vector(frame, adjusted_config, signal)
     if error:
         return None, error
 
-    score_function, score_name = _resolve_score_function(config.score_func, problem_type)
-    selector, method_label = _build_selector(config, problem_type, score_function, score_name)
+    score_function, score_name = _resolve_score_function(adjusted_config.score_func, problem_type)
+    selector, method_label = _build_selector(adjusted_config, problem_type, score_function, score_name)
 
     if selector is None:
         message = "Feature selection: unsupported configuration or missing dependencies"
@@ -691,7 +706,7 @@ def _build_selection_inputs(
     signal.score_func = score_name
 
     return SelectionInputs(
-        config=config,
+        config=adjusted_config,
         numeric_frame=numeric_frame,
         valid_columns=list(valid_columns),
         target_vector=target_vector,

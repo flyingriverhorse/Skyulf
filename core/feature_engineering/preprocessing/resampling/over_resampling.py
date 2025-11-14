@@ -1,4 +1,4 @@
-"""Class oversampling helpers for feature engineering nodes."""
+"""Class oversampling helpers for feature engineering preprocessing."""
 
 from __future__ import annotations
 

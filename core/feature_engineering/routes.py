@@ -44,24 +44,22 @@ from .preprocessing.bucketing import (
 from .preprocessing.statistics import (
     DEFAULT_METHOD_PARAMETERS,
     OUTLIER_DEFAULT_METHOD,
+    SCALING_DEFAULT_METHOD,
     SKEWNESS_METHODS,
     SKEWNESS_THRESHOLD,
     _apply_outlier_removal,
+    _apply_scale_numeric_features,
     _apply_skewness_transformations,
     _build_outlier_recommendations,
+    _build_scaling_recommendations,
     _build_skewness_recommendations,
     _outlier_method_details,
+    _scaling_method_details,
     _skewness_method_details,
     apply_imputation_methods as _apply_imputation_methods,
 )
-from .nodes.feature_eng.scaling import (
-    SCALING_DEFAULT_METHOD,
-    _apply_scale_numeric_features,
-    _build_scaling_recommendations,
-    _scaling_method_details,
-)
 from .preprocessing.feature_generation import apply_feature_math, apply_polynomial_features
-from .nodes.feature_eng.feature_selection import apply_feature_selection
+from .preprocessing.feature_selection import apply_feature_selection
 from .preprocessing.inspection import (
     apply_transformer_audit,
     build_data_snapshot_response,
@@ -80,22 +78,20 @@ from .preprocessing.encoding.hash_encoding import (
     HASH_ENCODING_MAX_BUCKETS,
     apply_hash_encoding,
 )
-from .nodes.feature_eng.under_resampling import (
+from .preprocessing.resampling import (
+    OVERSAMPLING_DEFAULT_K_NEIGHBORS,
+    OVERSAMPLING_DEFAULT_METHOD,
+    OVERSAMPLING_DEFAULT_RANDOM_STATE,
+    OVERSAMPLING_DEFAULT_REPLACEMENT,
+    OVERSAMPLING_METHOD_LABELS,
     RESAMPLING_DEFAULT_METHOD as UNDERSAMPLING_DEFAULT_METHOD,
     RESAMPLING_DEFAULT_RANDOM_STATE as UNDERSAMPLING_DEFAULT_RANDOM_STATE,
     RESAMPLING_DEFAULT_REPLACEMENT as UNDERSAMPLING_DEFAULT_REPLACEMENT,
     RESAMPLING_METHOD_LABELS as UNDERSAMPLING_METHOD_LABELS,
+    apply_oversampling,
     apply_resampling,
 )
-from .nodes.feature_eng.over_resampling import (
-    OVERSAMPLING_DEFAULT_METHOD,
-    OVERSAMPLING_DEFAULT_RANDOM_STATE,
-    OVERSAMPLING_DEFAULT_REPLACEMENT,
-    OVERSAMPLING_DEFAULT_K_NEIGHBORS,
-    OVERSAMPLING_METHOD_LABELS,
-    apply_oversampling,
-)
-from .nodes.feature_eng.feature_target_split import apply_feature_target_split
+from .preprocessing.split import apply_feature_target_split
 from .nodes.modeling.dataset_split import apply_train_test_split, SPLIT_TYPE_COLUMN
 from .split_handler import detect_splits, log_split_processing, remove_split_column
 from .preprocessing.encoding.ordinal_encoding import (
@@ -129,7 +125,7 @@ from .preprocessing.encoding.dummy_encoding import (
     DUMMY_ENCODING_MAX_CARDINALITY_LIMIT,
     apply_dummy_encoding,
 )
-from .nodes.feature_eng.casting import _apply_cast_column_types
+from .preprocessing.casting import _apply_cast_column_types
 from .preprocessing.cleaning import (
     apply_normalize_text_case,
     apply_regex_cleanup,
@@ -139,7 +135,7 @@ from .preprocessing.cleaning import (
     apply_standardize_date_formats,
     apply_trim_whitespace,
 )
-from .preprocessing.missing import (
+from .preprocessing.drop_and_missing import (
     apply_drop_missing_columns,
     apply_drop_missing_rows,
     apply_missing_value_flags,

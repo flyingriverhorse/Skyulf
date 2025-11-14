@@ -1,4 +1,4 @@
-"""Column casting helpers for feature engineering nodes."""
+"""Column casting helpers for preprocessing pipeline."""
 
 from __future__ import annotations
 
@@ -192,7 +192,7 @@ def _cast_series_to_dtype(
         if target_dtype != "datetime64[ns]":
             try:
                 return converted.astype(target_dtype)
-            except Exception:
+            except Exception:  # pragma: no cover - defensive
                 return converted
         return converted
 
@@ -398,13 +398,5 @@ def _apply_cast_column_types(
     )
 
     _update_signal_with_result(signal, preparation, result)
-    signal.candidate_columns = list(config.candidate_columns)
 
     return result.frame, summary, signal
-
-
-__all__ = [
-    "COLUMN_CAST_ALIASES",
-    "_apply_cast_column_types",
-    "_cast_series_to_dtype",
-]
