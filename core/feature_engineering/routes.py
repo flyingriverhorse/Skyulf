@@ -92,7 +92,7 @@ from .preprocessing.resampling import (
     apply_resampling,
 )
 from .preprocessing.split import apply_feature_target_split
-from .nodes.modeling.dataset_split import apply_train_test_split, SPLIT_TYPE_COLUMN
+from .preprocessing.split import apply_train_test_split, SPLIT_TYPE_COLUMN
 from .split_handler import detect_splits, log_split_processing, remove_split_column
 from .preprocessing.encoding.ordinal_encoding import (
     ORDINAL_ENCODING_DEFAULT_MAX_CATEGORIES,
@@ -101,7 +101,7 @@ from .preprocessing.encoding.ordinal_encoding import (
     ORDINAL_ENCODING_DEFAULT_UNKNOWN_VALUE,
     apply_ordinal_encoding,
 )
-from .nodes.modeling.hyperparameter_tuning_registry import (
+from .modeling.hyperparameter_tuning_registry import (
     get_default_strategy_value,
     get_strategy_choices_for_ui,
 )
@@ -142,13 +142,13 @@ from .preprocessing.drop_and_missing import (
     apply_remove_duplicates,
 )
 from core.feature_engineering.shared.utils import _is_node_pending
-from .nodes.modeling.train_model_draft import apply_train_model_draft
-from .nodes.modeling.model_evaluation import (
+from .modeling.train_model_draft import apply_train_model_draft
+from .modeling.model_evaluation import (
     apply_model_evaluation,
     build_classification_split_report,
     build_regression_split_report,
 )
-from .nodes.modeling.model_training_registry import list_registered_models
+from .modeling.model_training_registry import list_registered_models
 
 from .schemas import (
     BinnedColumnDistribution,
@@ -210,24 +210,24 @@ from core.feature_engineering.recommendations import (
     build_hash_encoding_suggestions,
 )
 
-from .nodes.modeling.model_training_jobs import (
+from .modeling.model_training_jobs import (
     create_training_job as create_training_job_record,
     get_training_job as fetch_training_job,
     list_training_jobs as fetch_training_jobs,
     update_job_status,
 )
-from .nodes.modeling.model_training_tasks import (
+from .modeling.model_training_tasks import (
     dispatch_training_job,
     _prepare_training_data,
     _resolve_training_inputs,
 )
-from .nodes.modeling.hyperparameter_tuning_jobs import (
+from .modeling.hyperparameter_tuning_jobs import (
     create_tuning_job as create_hyperparameter_tuning_job_record,
     get_tuning_job as fetch_hyperparameter_tuning_job,
     list_tuning_jobs as fetch_hyperparameter_tuning_jobs,
     update_tuning_job_status,
 )
-from .nodes.modeling.hyperparameter_tuning_tasks import dispatch_hyperparameter_tuning_job
+from .modeling.hyperparameter_tuning_tasks import dispatch_hyperparameter_tuning_job
 
 
 DROP_COLUMN_FILTER_LABELS: Dict[str, Dict[str, Optional[str]]] = {
@@ -6560,7 +6560,7 @@ async def get_model_hyperparameters(
     model_type: str,
 ) -> Dict[str, Any]:
     """Return hyperparameter configuration for a specific model type."""
-    from core.feature_engineering.nodes.modeling.model_hyperparameters import (
+    from core.feature_engineering.modeling.model_hyperparameters import (
         get_hyperparameters_for_model,
         get_default_hyperparameters,
     )
@@ -6636,3 +6636,4 @@ async def get_best_hyperparameters_for_model(
         "search_strategy": job.search_strategy,
         "n_iterations": job.n_iterations,
     }
+

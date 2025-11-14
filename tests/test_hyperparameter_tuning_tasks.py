@@ -7,13 +7,13 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 try:
-    from core.feature_engineering.nodes.modeling import hyperparameter_tuning_tasks as tuning_tasks
-    from core.feature_engineering.nodes.modeling.model_training_tasks import CrossValidationConfig
+    from core.feature_engineering.modeling import hyperparameter_tuning_tasks as tuning_tasks
+    from core.feature_engineering.modeling.model_training_tasks import CrossValidationConfig
 except ImportError:  # pragma: no cover - allow running without installation
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
-    from core.feature_engineering.nodes.modeling import hyperparameter_tuning_tasks as tuning_tasks
-    from core.feature_engineering.nodes.modeling.model_training_tasks import CrossValidationConfig
+    from core.feature_engineering.modeling import hyperparameter_tuning_tasks as tuning_tasks
+    from core.feature_engineering.modeling.model_training_tasks import CrossValidationConfig
 
 
 class _StubSpec:
@@ -93,3 +93,4 @@ def test_prepare_search_parameters_raises_when_space_empty():
             _StubSpec(),
             _search_config(search_space),
         )
+

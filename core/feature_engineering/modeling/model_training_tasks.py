@@ -45,7 +45,7 @@ from core.database.models import get_database_session
 from core.feature_engineering.schemas import TrainingJobStatus
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
-from .dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 from .model_training_jobs import get_training_job, update_job_status
 from .model_training_registry import get_model_spec
 
@@ -1636,7 +1636,7 @@ async def _run_training_workflow(job_id: str) -> None:
             )
 
 
-@celery_app.task(name="core.feature_engineering.nodes.modeling.model_training.train_model")
+@celery_app.task(name="core.feature_engineering.modeling.model_training.train_model")
 def train_model(job_id: str) -> None:
     """Celery entrypoint for training jobs."""
 
@@ -1647,3 +1647,4 @@ def dispatch_training_job(job_id: str) -> None:
     """Queue a Celery task for the given job identifier."""
 
     train_model.delay(job_id)
+

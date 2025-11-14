@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 import numpy as np
 import pandas as pd
 
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 from core.feature_engineering.schemas import (
     FeatureSelectionFeatureSummary,
     FeatureSelectionNodeSignal,
@@ -1098,3 +1098,4 @@ def _load_feature_summaries_from_metadata(metadata: Optional[Dict[str, Any]]) ->
 
 
 __all__ = ["apply_feature_selection"]
+

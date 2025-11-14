@@ -19,7 +19,7 @@ from core.feature_engineering.preprocessing.statistics import (
 from core.feature_engineering.preprocessing.encoding.target_encoding import apply_target_encoding
 from core.feature_engineering.preprocessing.inspection import apply_transformer_audit
 from core.feature_engineering.preprocessing.feature_generation import apply_feature_math
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
 
@@ -359,3 +359,4 @@ def test_transformer_audit_reflects_pipeline_store(sample_frame: pd.DataFrame) -
     assert summary.startswith("Transformer audit:")
     transformer_names = {entry.transformer_name for entry in signal.transformers}
     assert {"scaler", "label_encoder"} <= transformer_names
+

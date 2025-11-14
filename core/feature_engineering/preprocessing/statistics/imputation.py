@@ -22,7 +22,7 @@ from core.feature_engineering.schemas import (
     ImputationMethodName,
     ImputationNodeSignal,
 )
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
 from ...shared.utils import _auto_detect_numeric_columns, _coerce_string_list
@@ -637,3 +637,4 @@ def apply_imputation_methods(
     summary = _compose_summary(accumulator)
 
     return working_frame, summary, signal
+

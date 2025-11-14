@@ -14,7 +14,7 @@ from imblearn.over_sampling import ADASYN, BorderlineSMOTE, KMeansSMOTE, SMOTE, 
 from imblearn.combine import SMOTETomek
 
 from core.feature_engineering.schemas import ClassOversamplingNodeSignal
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 
 ResamplingSamplingStrategy = Union[str, float]
 
@@ -529,3 +529,4 @@ __all__ = [
     "OVERSAMPLING_DEFAULT_K_NEIGHBORS",
     "apply_oversampling",
 ]
+

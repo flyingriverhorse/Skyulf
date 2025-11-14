@@ -4,14 +4,14 @@ import pandas as pd
 import pytest
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
-from core.feature_engineering.nodes.modeling.hyperparameter_tuning_tasks import (
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.modeling.hyperparameter_tuning_tasks import (
     _coerce_search_space,
     _filter_supported_parameters,
     _sanitize_logistic_regression_hyperparameters,
 )
-from core.feature_engineering.nodes.modeling.model_training_registry import get_model_spec
-from core.feature_engineering.nodes.modeling.model_training_tasks import (
+from core.feature_engineering.modeling.model_training_registry import get_model_spec
+from core.feature_engineering.modeling.model_training_tasks import (
     _classification_metrics,
     _prepare_training_data,
 )
@@ -148,3 +148,4 @@ def test_logistic_regression_hyperparameters_are_sanitized():
     assert set(search_space["solver"]).issubset({"lbfgs", "saga"})
     assert set(search_space["penalty"]).issubset({"l2", "none"})
     assert "l1_ratio" not in search_space
+

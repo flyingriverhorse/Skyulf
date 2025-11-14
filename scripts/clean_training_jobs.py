@@ -10,8 +10,8 @@ from typing import Iterable, List, Optional, Sequence, Type
 
 from core.database.engine import close_db, init_db
 from core.database.models import get_database_session
-from core.feature_engineering.nodes.modeling.model_training_jobs import purge_training_jobs
-from core.feature_engineering.nodes.modeling.hyperparameter_tuning_jobs import purge_tuning_jobs
+from core.feature_engineering.modeling.model_training_jobs import purge_training_jobs
+from core.feature_engineering.modeling.hyperparameter_tuning_jobs import purge_tuning_jobs
 from core.feature_engineering.schemas import TrainingJobStatus
 from core.feature_engineering.schemas import HyperparameterTuningJobStatus
 
@@ -231,3 +231,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
