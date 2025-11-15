@@ -71,7 +71,7 @@ def execute_pipeline_with_auto_splits(
         # The framework handles split routing automatically
 
         if catalog_type == "scale_numeric_features":
-            from core.feature_engineering.nodes.feature_eng.scaling import (  # type: ignore[import]
+            from core.feature_engineering.preprocessing.statistics import (  # type: ignore[import]
                 _apply_scale_numeric_features as apply_scale_numeric_features
             )
             working_frame, summary, signal = apply_scale_numeric_features(
@@ -79,7 +79,7 @@ def execute_pipeline_with_auto_splits(
             )
 
         elif catalog_type == "one_hot_encoding":
-            from core.feature_engineering.nodes.feature_eng.one_hot_encoding import (  # type: ignore[import]
+            from core.feature_engineering.preprocessing.encoding.one_hot_encoding import (  # type: ignore[import]
                 apply_one_hot_encoding
             )
             working_frame, summary, signal = apply_one_hot_encoding(
@@ -87,7 +87,7 @@ def execute_pipeline_with_auto_splits(
             )
 
         elif catalog_type == "remove_duplicates":
-            from core.feature_engineering.nodes.cleaning.duplicates import (  # type: ignore[import]
+            from core.feature_engineering.preprocessing.drop_and_missing.deduplicate import (  # type: ignore[import]
                 apply_remove_duplicates
             )
             working_frame, summary, signal = apply_remove_duplicates(
@@ -120,7 +120,7 @@ def example_wrap_existing_node():
     to add automatic split handling.
     """
     from core.feature_engineering.split_handler import create_split_aware_wrapper
-    from core.feature_engineering.nodes.feature_eng.scaling import (  # type: ignore[import]
+    from core.feature_engineering.preprocessing.statistics import (  # type: ignore[import]
         _apply_scale_numeric_features as apply_scale_numeric_features
     )
 

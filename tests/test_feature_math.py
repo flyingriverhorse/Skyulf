@@ -1,6 +1,5 @@
-import importlib.util
+import importlib
 import sys
-import types
 from pathlib import Path
 
 import pandas as pd
@@ -9,60 +8,31 @@ import pytest
 
 TESTS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = TESTS_DIR.parent
-FEATURE_MODULE_NAME = "core.feature_engineering.nodes.feature_eng.feature_math"
-
-
-def _load_module_from_path(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Unable to load module specification for {name} from {path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
+FEATURE_MODULE_NAME = "core.feature_engineering.preprocessing.feature_generation.feature_math"
 
 
 @pytest.fixture(scope="module")
 def feature_math_module():
-    """Load feature_math without requiring core package installation."""
-    for key in list(sys.modules):
-        if key.startswith("core.feature_engineering"):
-            sys.modules.pop(key, None)
-    sys.modules.pop("core", None)
+    """Load feature_math from the repository path regardless of installation state."""
+    repo_path = str(REPO_ROOT)
+    added_to_path = False
+    if repo_path not in sys.path:
+        sys.path.insert(0, repo_path)
+        added_to_path = True
 
-    core_pkg = types.ModuleType("core")
-    core_pkg.__path__ = [str(REPO_ROOT / "core")]  # type: ignore[attr-defined]
-    sys.modules["core"] = core_pkg
+    module = importlib.import_module(FEATURE_MODULE_NAME)
 
-    feature_eng_pkg = types.ModuleType("core.feature_engineering")
-    feature_eng_pkg.__path__ = [str(REPO_ROOT / "core" / "feature_engineering")]  # type: ignore[attr-defined]
-    sys.modules["core.feature_engineering"] = feature_eng_pkg
-    core_pkg.feature_engineering = feature_eng_pkg
-
-    schemas_module = _load_module_from_path(
-        "core.feature_engineering.schemas",
-        REPO_ROOT / "core" / "feature_engineering" / "schemas.py",
-    )
-    feature_eng_pkg.schemas = schemas_module
-
-    nodes_pkg = types.ModuleType("core.feature_engineering.nodes")
-    nodes_pkg.__path__ = [str(REPO_ROOT / "core" / "feature_engineering" / "nodes")]  # type: ignore[attr-defined]
-    sys.modules["core.feature_engineering.nodes"] = nodes_pkg
-    feature_eng_pkg.nodes = nodes_pkg
-
-    feature_eng_subpkg = types.ModuleType("core.feature_engineering.nodes.feature_eng")
-    feature_eng_subpkg.__path__ = [
-        str(REPO_ROOT / "core" / "feature_engineering" / "nodes" / "feature_eng")
-    ]  # type: ignore[attr-defined]
-    sys.modules["core.feature_engineering.nodes.feature_eng"] = feature_eng_subpkg
-    nodes_pkg.feature_eng = feature_eng_subpkg
-
-    module = _load_module_from_path(
-        FEATURE_MODULE_NAME,
-        REPO_ROOT / "core" / "feature_engineering" / "nodes" / "feature_eng" / "feature_math.py",
-    )
-
-    return module
+    try:
+        yield module
+    finally:
+        sys.modules.pop(FEATURE_MODULE_NAME, None)
+        # Allow other tests to import the canonical package implementation
+        sys.modules.pop("core.feature_engineering.preprocessing.feature_generation", None)
+        if added_to_path:
+            try:
+                sys.path.remove(repo_path)
+            except ValueError:
+                pass
 
 
 @pytest.fixture()

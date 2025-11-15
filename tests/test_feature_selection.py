@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from core.feature_engineering.nodes.feature_eng.feature_selection import apply_feature_selection
+from core.feature_engineering.preprocessing.feature_selection import apply_feature_selection
 
 
 def _build_node(config):

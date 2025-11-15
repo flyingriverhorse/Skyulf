@@ -3,13 +3,13 @@
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)]()
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)](LICENSE)
 [![Commercial](https://img.shields.io/badge/commercial-license-blueviolet)](COMMERCIAL-LICENSE.md)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue)](#quick-start)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](#quick-start)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](.pre-commit-config.yaml)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![DCO](https://img.shields.io/badge/DCO-required-green)](DCO.txt)
 ![](https://img.shields.io/badge/tagline-MLOps%20%3A%20FastAPI%20%2B%20Celery-blue)
 
-> ⚠️ **Early Alpha (v0.0.1)**: This is a passion project in active development. Expect bugs, incomplete features, and visual inconsistencies. Use at your own risk and please report issues on GitHub!
+> ⚠️ This is a passion project in active development. Expect bugs, incomplete features, and visual inconsistencies. Use at your own risk and please report issues on GitHub!
 
 Skyulf is a self‑hosted, privacy‑first MLOps web application. It runs locally by default (SQLite) and scales to PostgreSQL if needed and aims to make machine learning operations more approachable by providing a low‑code web UI for data ingestion, feature engineering, and model training.
 

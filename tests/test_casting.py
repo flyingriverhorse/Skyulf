@@ -1,6 +1,6 @@
 import pandas as pd
 
-from core.feature_engineering.nodes.feature_eng.casting import _apply_cast_column_types
+from core.feature_engineering.preprocessing.casting import _apply_cast_column_types
 
 
 def test_apply_cast_column_types_casts_to_float_and_tracks_signal():

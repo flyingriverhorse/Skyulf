@@ -1,7 +1,7 @@
 import asyncio
 from core.feature_engineering.schemas import TrainingJobCreate, FeatureGraph
-from core.feature_engineering.nodes.modeling.model_training_jobs import create_training_job
-from core.feature_engineering.nodes.modeling.model_training_tasks import dispatch_training_job
+from core.feature_engineering.modeling.training.jobs import create_training_job
+from core.feature_engineering.modeling.training.tasks import dispatch_training_job
 from core.database.engine import init_db, create_tables
 from core.database.models import get_database_session
 
@@ -99,3 +99,4 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
+

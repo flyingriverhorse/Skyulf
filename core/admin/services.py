@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from config import get_settings
 from core.data_ingestion.service import DataIngestionService
 from core.database.engine import get_async_session, health_check
+from core.utils.datetime import utcnow
 from sqlalchemy import func, or_, select
 
 logger = logging.getLogger(__name__)
@@ -286,14 +287,14 @@ class AsyncAdminUserService:
                 admin_users = admin_users_result.scalar() or 0
 
                 # Get users who have logged in recently (last 24 hours)
-                yesterday = datetime.utcnow() - timedelta(hours=24)
+                yesterday = utcnow() - timedelta(hours=24)
                 recent_logins_result = await db.execute(
                     select(func.count(User.id)).where(User.last_login >= yesterday)
                 )
                 last_24h_logins = recent_logins_result.scalar() or 0
 
                 # Get users created this month
-                first_day_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                first_day_of_month = utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
                 new_users_result = await db.execute(
                     select(func.count(User.id)).where(User.created_at >= first_day_of_month)
                 )
@@ -440,7 +441,7 @@ class AsyncAdminUserService:
                     })
 
                 # Calculate online users (last 30 minutes)
-                thirty_minutes_ago = datetime.utcnow() - timedelta(minutes=30)
+                thirty_minutes_ago = utcnow() - timedelta(minutes=30)
                 online_users_query = select(func.count(DBUser.id)).where(
                     DBUser.is_active.is_(True),
                     DBUser.last_login >= thirty_minutes_ago

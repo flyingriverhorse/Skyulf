@@ -51,9 +51,9 @@ jobs:
         run: |
           mypy \
             core/feature_engineering/routes.py \
-            core/feature_engineering/nodes/modeling/model_training_tasks.py \
-            core/feature_engineering/nodes/modeling/hyperparameter_tuning_tasks.py \
-            core/feature_engineering/nodes/modeling/model_evaluation.py
+            core/feature_engineering/modeling/training/tasks.py \
+            core/feature_engineering/modeling/hyperparameter_tuning/tasks.py \
+            core/feature_engineering/modeling/training/evaluation.py
 
       - name: Run tests
         run: pytest -q --maxfail=1 --disable-warnings --cov --cov-report=term-missing

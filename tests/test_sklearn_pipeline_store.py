@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from sklearn.preprocessing import StandardScaler
 
-from core.feature_engineering.nodes.feature_eng.transformer_audit import apply_transformer_audit
+from core.feature_engineering.preprocessing.inspection import apply_transformer_audit
 from core.feature_engineering.sklearn_pipeline_store import (
     SklearnPipelineStore,
     get_pipeline_store,

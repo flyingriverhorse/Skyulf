@@ -1,4 +1,4 @@
-from core.feature_engineering.nodes.feature_eng.utils import _coerce_string_list
+from core.feature_engineering.shared.utils import _coerce_string_list
 
 
 def test_coerce_string_list_handles_nested_sequences():

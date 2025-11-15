@@ -167,9 +167,10 @@ const NODE_HANDLE_CONFIG: Record<string, NodeConnectionInfo> = {
   },
   model_evaluation: {
     inputs: [
-      { key: 'validation-in', label: 'Validation Split', position: 30, required: false, accepts: ['validation'] },
-      { key: 'test-in', label: 'Test Split', position: 50, required: false, accepts: ['test'] },
-      { key: 'models-in', label: 'Model', position: 70, required: true, accepts: ['model'] },
+      { key: 'train-in', label: 'Train Split', position: 20, required: false, accepts: ['train'] },
+      { key: 'test-in', label: 'Test Split', position: 40, required: false, accepts: ['test'] },
+      { key: 'validation-in', label: 'Validation Split', position: 60, required: false, accepts: ['validation'] },
+      { key: 'models-in', label: 'Model', position: 80, required: true, accepts: ['model'] },
     ],
   },
   model_registry_overview: {

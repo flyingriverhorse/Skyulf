@@ -125,4 +125,4 @@ We can reuse Alembic migrations; ensure Celery workers have DB access.
 - Do we allow multiple concurrent jobs per node/pipeline or enforce one-at-a-time with an explicit rerun button?
 - Notification strategy: polling vs. websockets? Minimal viable approach is polling.
 
-Keeping this document in `core/feature_engineering/doc/training_node_architecture.md` lets us revisit and refine as design discussions proceed.
+Keeping this document in `core/feature_engineering/doc/training_node_architecture.md` lets revisit and refine as design discussions proceed.

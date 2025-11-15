@@ -11,11 +11,12 @@ from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import HTMLResponse, RedirectResponse
+from core.utils.datetime import utcnow
 
 from .auth_core import (
+    User,
     UserLogin,
     Token,
-    User,
     authenticate_user,
     create_tokens,
     verify_token,
@@ -416,7 +417,7 @@ async def auth_health() -> Dict[str, Any]:
     return {
         "status": "healthy",
         "service": "authentication",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": utcnow().isoformat(),
         "users_loaded": len(USERS_DB),
         "token_algorithm": "HS256"
     }
@@ -425,7 +426,6 @@ async def auth_health() -> Dict[str, Any]:
 # =============================================================================
 # HTML Template Endpoints (Login/Logout Pages)
 # =============================================================================
-
 @auth_template_router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     """Login page template"""

@@ -11,12 +11,10 @@ from sklearn.model_selection import (
     HalvingGridSearchCV,
 )
 
-from core.feature_engineering.nodes.modeling.hyperparameter_tuning_tasks import (
-    _build_optuna_distributions,
-    _coerce_search_space,
-)
-from core.feature_engineering.nodes.modeling.model_training_registry import get_model_spec
-from core.feature_engineering.nodes.modeling.model_training_tasks import _classification_metrics
+from core.feature_engineering.modeling.hyperparameter_tuning.tasks import _build_optuna_distributions
+from core.feature_engineering.modeling.shared import _coerce_search_space
+from core.feature_engineering.modeling.training.registry import get_model_spec
+from core.feature_engineering.modeling.training.tasks import _classification_metrics
 
 
 def _build_frame():
@@ -173,3 +171,4 @@ def test_optuna_search_if_available():
 
     optuna_search.fit(X_train, y_train)
     assert hasattr(optuna_search, "best_params_")
+

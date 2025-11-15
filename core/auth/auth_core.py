@@ -373,7 +373,7 @@ async def authenticate_user(username: str, password: str, users_db: Dict[str, Us
 
     # Check if account is locked
     if user.account_locked and user.locked_until:
-        if datetime.utcnow() < user.locked_until:
+        if datetime.now(timezone.utc) < user.locked_until:
             logger.warning(f"Authentication failed: account '{username}' is locked")
             return None
         else:
@@ -393,7 +393,7 @@ async def authenticate_user(username: str, password: str, users_db: Dict[str, Us
         # Lock account if max attempts reached
         if user.failed_attempts >= security_config["MAX_LOGIN_ATTEMPTS"]:
             user.account_locked = True
-            user.locked_until = datetime.utcnow() + security_config["ACCOUNT_LOCKOUT_DURATION"]
+            user.locked_until = datetime.now(timezone.utc) + security_config["ACCOUNT_LOCKOUT_DURATION"]
             logger.warning(f"Account '{username}' locked due to too many failed attempts")
 
         logger.warning(f"Authentication failed: invalid password for user '{username}'")
@@ -408,7 +408,7 @@ async def authenticate_user(username: str, password: str, users_db: Dict[str, Us
     user.failed_attempts = 0
     user.account_locked = False
     user.locked_until = None
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc)
 
     if user.id:
         try:
