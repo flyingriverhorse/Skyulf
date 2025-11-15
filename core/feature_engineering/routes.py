@@ -26,11 +26,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import core.database.engine as db_engine
 from core.database.engine import get_async_session
 from core.database.models import DataSource, FeatureEngineeringPipeline, HyperparameterTuningJob, TrainingJob
+from core.utils.datetime import utcnow
 from core.feature_engineering.eda_fast import FeatureEngineeringEDAService
 from core.feature_engineering.eda_fast.service import DEFAULT_SAMPLE_CAP
 from core.feature_engineering.full_capture import FullDatasetCaptureService
 
-from .nodes.feature_eng.binning import (
+from .preprocessing.bucketing import (
     BINNING_DEFAULT_EQUAL_FREQUENCY_BINS,
     BINNING_DEFAULT_EQUAL_WIDTH_BINS,
     BINNING_DEFAULT_MISSING_LABEL,
@@ -41,35 +42,36 @@ from .nodes.feature_eng.binning import (
     _build_binning_recommendations,
     _normalize_binning_config,
 )
-from .nodes.feature_eng.skewness import (
+from .preprocessing.statistics import (
+    DEFAULT_METHOD_PARAMETERS,
+    OUTLIER_DEFAULT_METHOD,
+    SCALING_DEFAULT_METHOD,
     SKEWNESS_METHODS,
     SKEWNESS_THRESHOLD,
-    _apply_skewness_transformations,
-    _build_skewness_recommendations,
-    _skewness_method_details,
-)
-from .nodes.feature_eng.scaling import (
-    SCALING_DEFAULT_METHOD,
-    _apply_scale_numeric_features,
-    _build_scaling_recommendations,
-    _scaling_method_details,
-)
-from .nodes.feature_eng.polynomial_features import apply_polynomial_features
-from .nodes.feature_eng.feature_selection import apply_feature_selection
-from .nodes.feature_eng.transformer_audit import apply_transformer_audit
-from .nodes.feature_eng.outliers_removal import (
-    OUTLIER_DEFAULT_METHOD,
-    DEFAULT_METHOD_PARAMETERS,
     _apply_outlier_removal,
+    _apply_scale_numeric_features,
+    _apply_skewness_transformations,
     _build_outlier_recommendations,
+    _build_scaling_recommendations,
+    _build_skewness_recommendations,
     _outlier_method_details,
+    _scaling_method_details,
+    _skewness_method_details,
+    apply_imputation_methods as _apply_imputation_methods,
 )
-from .nodes.feature_eng.label_encoding import (
+from .preprocessing.feature_generation import apply_feature_math, apply_polynomial_features
+from .preprocessing.feature_selection import apply_feature_selection
+from .preprocessing.inspection import (
+    apply_transformer_audit,
+    build_data_snapshot_response,
+    build_quick_profile_payload,
+)
+from .preprocessing.encoding.label_encoding import (
     LABEL_ENCODING_DEFAULT_MAX_UNIQUE,
     LABEL_ENCODING_DEFAULT_SUFFIX,
     apply_label_encoding,
 )
-from .nodes.feature_eng.hash_encoding import (
+from .preprocessing.encoding.hash_encoding import (
     HASH_ENCODING_DEFAULT_BUCKETS,
     HASH_ENCODING_DEFAULT_MAX_CATEGORIES,
     HASH_ENCODING_DEFAULT_SUFFIX,
@@ -77,36 +79,34 @@ from .nodes.feature_eng.hash_encoding import (
     HASH_ENCODING_MAX_BUCKETS,
     apply_hash_encoding,
 )
-from .nodes.feature_eng.under_resampling import (
+from .preprocessing.resampling import (
+    OVERSAMPLING_DEFAULT_K_NEIGHBORS,
+    OVERSAMPLING_DEFAULT_METHOD,
+    OVERSAMPLING_DEFAULT_RANDOM_STATE,
+    OVERSAMPLING_DEFAULT_REPLACEMENT,
+    OVERSAMPLING_METHOD_LABELS,
     RESAMPLING_DEFAULT_METHOD as UNDERSAMPLING_DEFAULT_METHOD,
     RESAMPLING_DEFAULT_RANDOM_STATE as UNDERSAMPLING_DEFAULT_RANDOM_STATE,
     RESAMPLING_DEFAULT_REPLACEMENT as UNDERSAMPLING_DEFAULT_REPLACEMENT,
     RESAMPLING_METHOD_LABELS as UNDERSAMPLING_METHOD_LABELS,
+    apply_oversampling,
     apply_resampling,
 )
-from .nodes.feature_eng.over_resampling import (
-    OVERSAMPLING_DEFAULT_METHOD,
-    OVERSAMPLING_DEFAULT_RANDOM_STATE,
-    OVERSAMPLING_DEFAULT_REPLACEMENT,
-    OVERSAMPLING_DEFAULT_K_NEIGHBORS,
-    OVERSAMPLING_METHOD_LABELS,
-    apply_oversampling,
-)
-from .nodes.feature_eng.feature_target_split import apply_feature_target_split
-from .nodes.modeling.dataset_split import apply_train_test_split, SPLIT_TYPE_COLUMN
+from .preprocessing.split import apply_feature_target_split
+from .preprocessing.split import apply_train_test_split, SPLIT_TYPE_COLUMN
 from .split_handler import detect_splits, log_split_processing, remove_split_column
-from .nodes.feature_eng.ordinal_encoding import (
+from .preprocessing.encoding.ordinal_encoding import (
     ORDINAL_ENCODING_DEFAULT_MAX_CATEGORIES,
     ORDINAL_ENCODING_DEFAULT_SUFFIX,
     ORDINAL_ENCODING_MAX_CARDINALITY_LIMIT,
     ORDINAL_ENCODING_DEFAULT_UNKNOWN_VALUE,
     apply_ordinal_encoding,
 )
-from .nodes.modeling.hyperparameter_tuning_registry import (
+from .modeling.hyperparameter_tuning.registry import (
     get_default_strategy_value,
     get_strategy_choices_for_ui,
 )
-from .nodes.feature_eng.target_encoding import (
+from .preprocessing.encoding.target_encoding import (
     TARGET_ENCODING_DEFAULT_MAX_CATEGORIES,
     TARGET_ENCODING_DEFAULT_SUFFIX,
     TARGET_ENCODING_DEFAULT_SMOOTHING,
@@ -114,21 +114,20 @@ from .nodes.feature_eng.target_encoding import (
     TARGET_ENCODING_DEFAULT_HANDLE_UNKNOWN,
     apply_target_encoding,
 )
-from .nodes.feature_eng.feature_math import apply_feature_math
-from .nodes.feature_eng.one_hot_encoding import (
+from .preprocessing.encoding.one_hot_encoding import (
     ONE_HOT_ENCODING_DEFAULT_MAX_CATEGORIES,
     ONE_HOT_ENCODING_DEFAULT_PREFIX_SEPARATOR,
     ONE_HOT_ENCODING_MAX_CARDINALITY_LIMIT,
     apply_one_hot_encoding,
 )
-from .nodes.feature_eng.dummy_encoding import (
+from .preprocessing.encoding.dummy_encoding import (
     DUMMY_ENCODING_DEFAULT_MAX_CATEGORIES,
     DUMMY_ENCODING_DEFAULT_PREFIX_SEPARATOR,
     DUMMY_ENCODING_MAX_CARDINALITY_LIMIT,
     apply_dummy_encoding,
 )
-from .nodes.feature_eng.casting import _apply_cast_column_types
-from .nodes.data_consistency import (
+from .preprocessing.casting import _apply_cast_column_types
+from .preprocessing.cleaning import (
     apply_normalize_text_case,
     apply_regex_cleanup,
     apply_remove_special_characters,
@@ -137,20 +136,20 @@ from .nodes.data_consistency import (
     apply_standardize_date_formats,
     apply_trim_whitespace,
 )
-from .nodes.feature_eng.data_snapshot import build_data_snapshot_response
-from .nodes.feature_eng.dataset_profile import build_quick_profile_payload
-from .nodes.feature_eng.deduplicate import apply_remove_duplicates
-from .nodes.feature_eng.drop_missing import apply_drop_missing_columns, apply_drop_missing_rows
-from .nodes.feature_eng.imputation import apply_imputation_methods as _apply_imputation_methods
-from .nodes.feature_eng.missing_indicator import apply_missing_value_flags
-from .nodes.feature_eng.utils import _is_node_pending
-from .nodes.modeling.train_model_draft import apply_train_model_draft
-from .nodes.modeling.model_evaluation import (
+from .preprocessing.drop_and_missing import (
+    apply_drop_missing_columns,
+    apply_drop_missing_rows,
+    apply_missing_value_flags,
+    apply_remove_duplicates,
+)
+from core.feature_engineering.shared.utils import _is_node_pending
+from .modeling.training.train_model_draft import apply_train_model_draft
+from .modeling.training.evaluation import (
     apply_model_evaluation,
     build_classification_split_report,
     build_regression_split_report,
 )
-from .nodes.modeling.model_training_registry import list_registered_models
+from .modeling.training.registry import list_registered_models
 
 from .schemas import (
     BinnedColumnDistribution,
@@ -212,24 +211,24 @@ from core.feature_engineering.recommendations import (
     build_hash_encoding_suggestions,
 )
 
-from .nodes.modeling.model_training_jobs import (
+from .modeling.training.jobs import (
     create_training_job as create_training_job_record,
     get_training_job as fetch_training_job,
     list_training_jobs as fetch_training_jobs,
     update_job_status,
 )
-from .nodes.modeling.model_training_tasks import (
+from .modeling.training.tasks import (
     dispatch_training_job,
     _prepare_training_data,
     _resolve_training_inputs,
 )
-from .nodes.modeling.hyperparameter_tuning_jobs import (
+from .modeling.hyperparameter_tuning.jobs import (
     create_tuning_job as create_hyperparameter_tuning_job_record,
     get_tuning_job as fetch_hyperparameter_tuning_job,
     list_tuning_jobs as fetch_hyperparameter_tuning_jobs,
     update_tuning_job_status,
 )
-from .nodes.modeling.hyperparameter_tuning_tasks import dispatch_hyperparameter_tuning_job
+from .modeling.hyperparameter_tuning.tasks import dispatch_hyperparameter_tuning_job
 
 
 DROP_COLUMN_FILTER_LABELS: Dict[str, Dict[str, Optional[str]]] = {
@@ -357,8 +356,8 @@ class FullExecutionJob:
     graph_nodes: List[Dict[str, Any]] = field(default_factory=list)
     graph_edges: List[Dict[str, Any]] = field(default_factory=list)
     signal_data: Dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utcnow)
+    updated_at: datetime = field(default_factory=utcnow)
     status: FullExecutionJobStatus = "queued"
     task: Optional[asyncio.Task] = None
 
@@ -428,7 +427,7 @@ class FullExecutionJobStore:
                 )
                 active.signal_data["reason"] = " ".join(part for part in reason_parts if part)
                 active.signal_data["poll_after_seconds"] = 5
-                active.updated_at = datetime.utcnow()
+                active.updated_at = utcnow()
                 return active, active.to_signal(), False
 
             job_id = uuid.uuid4().hex
@@ -473,7 +472,7 @@ class FullExecutionJobStore:
                 job.status = status
             if signal_updates:
                 job.signal_data.update(signal_updates)
-            job.updated_at = datetime.utcnow()
+            job.updated_at = utcnow()
             return job
 
     async def mark_running(
@@ -5547,7 +5546,7 @@ async def get_quick_profile(
 
     return QuickProfileResponse(
         dataset_source_id=normalized_id,
-        generated_at=datetime.utcnow(),
+        generated_at=utcnow(),
         sample_size=effective_sample_size,
         rows_analyzed=int(frame.shape[0]),
         columns_analyzed=int(frame.shape[1]),
@@ -5668,7 +5667,7 @@ def _build_full_preview_signal(
         processed_rows=int(working_frame.shape[0]),
         applied_steps=list(applied_steps),
         dataset_source_id=dataset_source_id,
-        last_updated=datetime.utcnow(),
+        last_updated=utcnow(),
     )
     return signal, total_rows_actual
 
@@ -5746,7 +5745,7 @@ async def _run_full_dataset_execution(
         processed_rows=processed_rows,
         applied_steps=full_applied_steps,
         dataset_source_id=dataset_source_id,
-        last_updated=datetime.utcnow(),
+        last_updated=utcnow(),
     )
 
     if total_rows_full:
@@ -5779,7 +5778,7 @@ def _build_failed_full_execution_signal(
         total_rows=total_rows_estimate,
         warnings=warnings or [],
         dataset_source_id=dataset_source_id,
-        last_updated=datetime.utcnow(),
+        last_updated=utcnow(),
     )
 
 
@@ -6422,7 +6421,7 @@ async def evaluate_trained_model(
 
         splits_payload[split_name] = split_report
 
-    generated_at = datetime.utcnow()
+    generated_at = utcnow()
     resolved_problem_type: Literal["classification", "regression"] = (
         "classification" if problem_type != "regression" else "regression"
     )
@@ -6562,7 +6561,7 @@ async def get_model_hyperparameters(
     model_type: str,
 ) -> Dict[str, Any]:
     """Return hyperparameter configuration for a specific model type."""
-    from core.feature_engineering.nodes.modeling.model_hyperparameters import (
+    from core.feature_engineering.modeling.config.hyperparameters import (
         get_hyperparameters_for_model,
         get_default_hyperparameters,
     )
@@ -6638,3 +6637,4 @@ async def get_best_hyperparameters_for_model(
         "search_strategy": job.search_strategy,
         "n_iterations": job.n_iterations,
     }
+

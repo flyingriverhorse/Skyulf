@@ -1,8 +1,5 @@
-from core.feature_engineering.nodes.modeling.hyperparameter_tuning_tasks import (
-    _create_optuna_searcher,
-    SearchConfiguration,
-)
-from core.feature_engineering.nodes.modeling.model_training_tasks import CrossValidationConfig
+from core.feature_engineering.modeling.hyperparameter_tuning.tasks import _create_optuna_searcher
+from core.feature_engineering.modeling.shared import CrossValidationConfig, SearchConfiguration
 
 
 def _make_search_configuration(random_state: int | None = 7) -> SearchConfiguration:
@@ -35,7 +32,7 @@ def test_create_optuna_searcher_attaches_sampler_when_supported(monkeypatch):
         def __init__(self, seed=None):
             captured_kwargs["sampler_seed"] = seed
 
-    from core.feature_engineering.nodes.modeling import hyperparameter_tuning_tasks as tasks_module
+    from core.feature_engineering.modeling.hyperparameter_tuning import tasks as tasks_module
 
     # Use injection to ensure deterministic behavior in tests
     monkeypatch.setattr(tasks_module, "_HAS_OPTUNA", True)
@@ -80,7 +77,7 @@ def test_create_optuna_searcher_retries_without_sampler(monkeypatch):
         def __init__(self, seed=None):
             self.seed = seed
 
-    from core.feature_engineering.nodes.modeling import hyperparameter_tuning_tasks as tasks_module
+    from core.feature_engineering.modeling.hyperparameter_tuning import tasks as tasks_module
 
     monkeypatch.setattr(tasks_module, "_HAS_OPTUNA", True)
 
@@ -111,3 +108,4 @@ def test_create_optuna_searcher_retries_without_sampler(monkeypatch):
     assert len(call_kwargs) == 2
     assert "sampler" in call_kwargs[0]
     assert "sampler" not in call_kwargs[1]
+

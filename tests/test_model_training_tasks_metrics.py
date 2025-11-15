@@ -6,11 +6,11 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 try:
-    from core.feature_engineering.nodes.modeling import model_training_tasks as training_tasks
+    from core.feature_engineering.modeling.training import tasks as training_tasks
 except ImportError:  # pragma: no cover - allow running without installation
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
-    from core.feature_engineering.nodes.modeling import model_training_tasks as training_tasks
+    from core.feature_engineering.modeling.training import tasks as training_tasks
 
 
 class _PredictiveModel:
@@ -41,3 +41,4 @@ def test_regression_metrics_handles_metric_exceptions(monkeypatch):
     assert metrics["rmse"] > 0
     assert np.isnan(metrics["r2"])
     assert np.isnan(metrics["mape"])
+

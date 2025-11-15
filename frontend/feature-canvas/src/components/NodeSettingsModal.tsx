@@ -480,14 +480,14 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
       return undefined;
     }
     let hasRelevant = false;
-    const mapping: Partial<Record<'validation' | 'test', boolean>> = {};
+    const mapping: Partial<Record<'train' | 'validation' | 'test', boolean>> = {};
     connectionInfo.inputs.forEach((handle) => {
       if (!Array.isArray(handle.accepts) || handle.accepts.length === 0) {
         return;
       }
       const isConnected = connectedHandleKeys.has(handle.key);
       handle.accepts.forEach((acceptKey) => {
-        if (acceptKey === 'validation' || acceptKey === 'test') {
+        if (acceptKey === 'train' || acceptKey === 'validation' || acceptKey === 'test') {
           mapping[acceptKey] = isConnected;
           hasRelevant = true;
         }
@@ -2414,6 +2414,82 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
       : null;
     return matching ?? rawSignals[0] ?? null;
   }, [isFeatureSelectionNode, nodeId, previewState.data?.signals?.feature_selection]);
+
+  useEffect(() => {
+    if (!isFeatureSelectionNode) {
+      return;
+    }
+
+    const normalizedSignalTarget =
+      typeof featureSelectionSignal?.target_column === 'string'
+        ? featureSelectionSignal.target_column.trim()
+        : '';
+    const fallbackTarget = typeof upstreamTargetColumn === 'string' ? upstreamTargetColumn.trim() : '';
+    const resolvedTarget = normalizedSignalTarget || fallbackTarget;
+
+    if (!resolvedTarget) {
+      return;
+    }
+
+    setConfigState((previous) => {
+      const currentTarget =
+        typeof previous?.target_column === 'string' ? previous.target_column.trim() : '';
+      if (currentTarget) {
+        return previous;
+      }
+      return {
+        ...previous,
+        target_column: resolvedTarget,
+      };
+    });
+  }, [featureSelectionSignal?.target_column, isFeatureSelectionNode, setConfigState, upstreamTargetColumn]);
+
+  useEffect(() => {
+    if (!isFeatureSelectionNode) {
+      return;
+    }
+
+    const backendK =
+      typeof featureSelectionSignal?.k === 'number' && Number.isFinite(featureSelectionSignal.k)
+        ? Math.max(0, Math.trunc(featureSelectionSignal.k))
+        : null;
+    const selectedCount = Array.isArray(featureSelectionSignal?.selected_columns)
+      ? featureSelectionSignal.selected_columns.length
+      : null;
+
+    const candidate = (backendK ?? selectedCount) ?? null;
+    if (candidate === null || candidate <= 0) {
+      return;
+    }
+
+    setConfigState((previous) => {
+      const rawValue = previous?.k;
+      let normalizedCurrent: number | null = null;
+
+      if (typeof rawValue === 'number' && Number.isFinite(rawValue)) {
+        normalizedCurrent = Math.trunc(rawValue);
+      } else if (typeof rawValue === 'string') {
+        const parsed = Number(rawValue);
+        if (Number.isFinite(parsed)) {
+          normalizedCurrent = Math.trunc(parsed);
+        }
+      }
+
+      if (normalizedCurrent !== null && normalizedCurrent <= candidate) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        k: candidate,
+      };
+    });
+  }, [
+    featureSelectionSignal?.k,
+    featureSelectionSignal?.selected_columns,
+    isFeatureSelectionNode,
+    setConfigState,
+  ]);
 
   const featureMathSummaries = useMemo(
     () => (isFeatureMathNode ? buildFeatureMathSummaries(featureMathOperations, featureMathSignals) : []),
@@ -5286,7 +5362,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     onResetConfig?.(nodeId, template);
   }, [canResetNode, defaultConfigTemplate, isTargetEncodingNode, nodeId, onResetConfig, targetEncodingFallbackAppliedRef]);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback((options?: { closeModal?: boolean }) => {
     let payload = cloneConfig(configState);
     
     if (isBinningNode) {
@@ -5344,7 +5420,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     }
 
     onUpdateConfig(node.id, payload);
-    onClose();
+    if (options?.closeModal !== false) {
+      onClose();
+    }
     
     // Trigger full dataset execution in background after saving
     // This pre-loads the full dataset for this node's transformations

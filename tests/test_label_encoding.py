@@ -1,7 +1,7 @@
 import pandas as pd
 
-from core.feature_engineering.nodes.feature_eng.label_encoding import apply_label_encoding
-from core.feature_engineering.nodes.modeling.dataset_split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.preprocessing.encoding.label_encoding import apply_label_encoding
+from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 
 
@@ -85,3 +85,4 @@ def test_label_encoding_stores_method_label_for_transformer_audit():
     assert label.startswith("Label Encoding (")
 
     store.clear_all()
+
