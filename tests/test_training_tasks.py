@@ -5,7 +5,7 @@ import pytest
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 
 from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
-from core.feature_engineering.modeling.hyperparameter_tuning.tasks import (
+from core.feature_engineering.modeling.shared import (
     _coerce_search_space,
     _filter_supported_parameters,
     _sanitize_logistic_regression_hyperparameters,

@@ -1,50 +1,22 @@
-"""Utilities for managing hyperparameter tuning jobs."""
+"""Service-layer helpers for hyperparameter tuning jobs."""
 
 from __future__ import annotations
 
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Iterable, List, Optional, Sequence, Union, cast
+from typing import Any, List, Optional, Sequence, Union, cast
 
-from sqlalchemy import Select, delete, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql.elements import ColumnElement
+from sqlalchemy import ColumnElement, delete, select
 from sqlalchemy.engine import CursorResult
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database.models import HyperparameterTuningJob
 from core.feature_engineering.schemas import HyperparameterTuningJobCreate, HyperparameterTuningJobStatus
 
+from .repository import _resolve_next_run_number
+
 logger = logging.getLogger(__name__)
-
-
-def _set_job_attribute(job: HyperparameterTuningJob, attr: str, value: Any) -> None:
-    """Assign a value to a SQLAlchemy model attribute without mypy issues."""
-
-    setattr(job, attr, value)
-
-
-async def _resolve_next_run_number(
-    session: AsyncSession,
-    *,
-    dataset_source_id: str,
-    node_id: str,
-    model_type: Optional[str] = None,
-) -> int:
-    """Return the next sequential run number for a dataset/node/model-type trio."""
-
-    filters = [
-        HyperparameterTuningJob.dataset_source_id == dataset_source_id,
-        HyperparameterTuningJob.node_id == node_id,
-    ]
-
-    if model_type:
-        filters.append(HyperparameterTuningJob.model_type == model_type)
-
-    query: Select[tuple[int]] = select(func.max(HyperparameterTuningJob.run_number)).where(*filters)
-    result = await session.execute(query)
-    current_max: Optional[int] = result.scalar()
-    return (current_max or 0) + 1
 
 
 async def create_tuning_job(
@@ -111,106 +83,6 @@ async def create_tuning_job(
     return job
 
 
-async def get_tuning_job(session: AsyncSession, job_id: str) -> Optional[HyperparameterTuningJob]:
-    """Fetch a single tuning job by identifier."""
-
-    return await session.get(HyperparameterTuningJob, job_id)
-
-
-async def list_tuning_jobs(
-    session: AsyncSession,
-    *,
-    user_id: Optional[int] = None,
-    dataset_source_id: Optional[str] = None,
-    pipeline_id: Optional[str] = None,
-    node_id: Optional[str] = None,
-    limit: int = 20,
-) -> List[HyperparameterTuningJob]:
-    """Return recent tuning jobs filtered by optional parameters."""
-
-    stmt = select(HyperparameterTuningJob).order_by(HyperparameterTuningJob.created_at.desc()).limit(limit)
-
-    if user_id is not None:
-        stmt = stmt.where(HyperparameterTuningJob.user_id == user_id)
-    if dataset_source_id is not None:
-        stmt = stmt.where(HyperparameterTuningJob.dataset_source_id == dataset_source_id)
-    if pipeline_id is not None:
-        stmt = stmt.where(HyperparameterTuningJob.pipeline_id == pipeline_id)
-    if node_id is not None:
-        stmt = stmt.where(HyperparameterTuningJob.node_id == node_id)
-
-    results = await session.execute(stmt)
-    return list(results.scalars().all())
-
-
-async def update_tuning_job_status(
-    session: AsyncSession,
-    job: HyperparameterTuningJob,
-    *,
-    status: HyperparameterTuningJobStatus,
-    metrics: Optional[dict] = None,
-    results: Optional[List[dict]] = None,
-    best_params: Optional[dict] = None,
-    best_score: Optional[float] = None,
-    artifact_uri: Optional[str] = None,
-    error_message: Optional[str] = None,
-    metadata: Optional[dict] = None,
-) -> HyperparameterTuningJob:
-    """Persist status transitions for a tuning job."""
-
-    now = datetime.utcnow()
-    _set_job_attribute(job, "status", status.value)
-
-    if status == HyperparameterTuningJobStatus.RUNNING:
-        _set_job_attribute(job, "started_at", now)
-    if status in {
-        HyperparameterTuningJobStatus.SUCCEEDED,
-        HyperparameterTuningJobStatus.FAILED,
-        HyperparameterTuningJobStatus.CANCELLED,
-    }:
-        _set_job_attribute(job, "finished_at", now)
-
-    if metrics is not None:
-        _set_job_attribute(job, "metrics", metrics)
-    if results is not None:
-        _set_job_attribute(job, "results", results)
-    if best_params is not None:
-        _set_job_attribute(job, "best_params", best_params)
-    if best_score is not None:
-        _set_job_attribute(job, "best_score", best_score)
-    if artifact_uri is not None:
-        _set_job_attribute(job, "artifact_uri", artifact_uri)
-    if error_message is not None:
-        _set_job_attribute(job, "error_message", error_message)
-    if metadata is not None:
-        merged = dict(job.job_metadata or {})
-        merged.update(metadata)
-        _set_job_attribute(job, "job_metadata", merged)
-
-    await session.commit()
-    await session.refresh(job)
-    return job
-
-
-async def bulk_mark_tuning_cancelled(
-    session: AsyncSession,
-    job_ids: Iterable[str],
-) -> None:
-    """Convenience helper to mark tuning jobs as cancelled."""
-
-    if not job_ids:
-        return
-
-    stmt = select(HyperparameterTuningJob).where(HyperparameterTuningJob.id.in_(list(job_ids)))
-    results = await session.execute(stmt)
-    jobs = list(results.scalars().all())
-
-    for job in jobs:
-        await update_tuning_job_status(session, job, status=HyperparameterTuningJobStatus.CANCELLED)
-
-    logger.info("Cancelled %s tuning job(s)", len(jobs))
-
-
 async def purge_tuning_jobs(
     session: AsyncSession,
     *,
@@ -275,3 +147,9 @@ async def purge_tuning_jobs(
     deleted_count = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else len(job_ids)
     logger.info("Deleted %s tuning job(s)", deleted_count)
     return deleted_count
+
+
+__all__ = [
+    "create_tuning_job",
+    "purge_tuning_jobs",
+]

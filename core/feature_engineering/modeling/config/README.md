@@ -8,9 +8,9 @@ Short reference for shared configuration helpers across modeling modules.
 - Offer helpers for reading/writing persisted modeling configuration artifacts.
 
 ## Key Modules
-- `defaults.py` (or similarly named files) – constants for batch sizes, seeds, cross-validation folds.
-- `schemas.py` – Pydantic models describing request/response payloads for modeling routes.
-- `io.py` / `storage.py` – load/save utilities for job configs and fitted parameter bundles.
+- `hyperparameters/base.py` – defines the reusable `HyperparameterField` descriptor.
+- `hyperparameters/<model>.py` – model-specific field lists kept in isolated files (e.g., logistic_regression, random_forest_classifier).
+- `hyperparameters/registry.py` – aggregates all models and exposes lookup helpers consumed by APIs/tasks.
 
 ## Tips
 - Keep new config knobs here first, then wire them into training/tuning modules to avoid duplicated literals.

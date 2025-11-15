@@ -11,10 +11,8 @@ from sklearn.model_selection import (
     HalvingGridSearchCV,
 )
 
-from core.feature_engineering.modeling.hyperparameter_tuning.tasks import (
-    _build_optuna_distributions,
-    _coerce_search_space,
-)
+from core.feature_engineering.modeling.hyperparameter_tuning.tasks import _build_optuna_distributions
+from core.feature_engineering.modeling.shared import _coerce_search_space
 from core.feature_engineering.modeling.training.registry import get_model_spec
 from core.feature_engineering.modeling.training.tasks import _classification_metrics
 

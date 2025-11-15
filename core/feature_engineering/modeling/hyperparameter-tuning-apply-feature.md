@@ -46,11 +46,11 @@ Previously, even after running hyperparameter tuning and finding optimal paramet
 ```
 
 **Implementation Details**:
-- Queries the `hyperparameter_tuning_jobs` table
-- Filters by model_type and SUCCESS status
+- Queries the `hyperparameter_tuning_jobs` table through the new `core.feature_engineering.modeling.hyperparameter_tuning.jobs` package (service layer builds on `jobs/repository.py`).
+- Filters by `model_type` and `SUCCEEDED` status
 - Orders by most recent `finished_at` timestamp
 - Returns the best parameters from the most recent successful run
-- File: `core/feature_engineering/routes.py` (line ~5320)
+- Implemented inside `core/feature_engineering/routes.py` under the hyperparameter-tuning API group
 
 ### 2. Frontend API Integration
 

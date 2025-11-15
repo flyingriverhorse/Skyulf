@@ -1,8 +1,5 @@
-from core.feature_engineering.modeling.hyperparameter_tuning.tasks import (
-    _create_optuna_searcher,
-    SearchConfiguration,
-)
-from core.feature_engineering.modeling.training.tasks import CrossValidationConfig
+from core.feature_engineering.modeling.hyperparameter_tuning.tasks import _create_optuna_searcher
+from core.feature_engineering.modeling.shared import CrossValidationConfig, SearchConfiguration
 
 
 def _make_search_configuration(random_state: int | None = 7) -> SearchConfiguration:
