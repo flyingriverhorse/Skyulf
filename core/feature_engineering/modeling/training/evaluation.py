@@ -28,7 +28,7 @@ from core.feature_engineering.schemas import (
     ModelEvaluationSplitPayload,
 )
 
-from .tasks import _classification_metrics, _regression_metrics
+from ..shared import _classification_metrics, _regression_metrics
 
 logger = logging.getLogger(__name__)
 

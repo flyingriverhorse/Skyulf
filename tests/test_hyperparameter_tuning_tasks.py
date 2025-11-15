@@ -8,12 +8,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 try:
     from core.feature_engineering.modeling.hyperparameter_tuning import tasks as tuning_tasks
-    from core.feature_engineering.modeling.training.tasks import CrossValidationConfig
+    from core.feature_engineering.modeling.shared import CrossValidationConfig, SearchConfiguration
 except ImportError:  # pragma: no cover - allow running without installation
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
     from core.feature_engineering.modeling.hyperparameter_tuning import tasks as tuning_tasks
-    from core.feature_engineering.modeling.training.tasks import CrossValidationConfig
+    from core.feature_engineering.modeling.shared import CrossValidationConfig, SearchConfiguration
 
 
 class _StubSpec:
@@ -39,8 +39,8 @@ class _StubJob:
     node_id = "node"
 
 
-def _search_config(search_space: dict[str, list[object]]) -> tuning_tasks.SearchConfiguration:
-    return tuning_tasks.SearchConfiguration(
+def _search_config(search_space: dict[str, list[object]]) -> SearchConfiguration:
+    return SearchConfiguration(
         strategy="grid",
         selected_strategy="grid",
         search_space=search_space,

@@ -8,6 +8,10 @@ This document describes the modeling-node modules that power background training
 
 Keeping these files together under `core/feature_engineering/modeling/training/` makes it easier to reason about the entire training workflow directly from the node package.
 
+## Shared primitives live under `shared/`
+
+The recent refactor lifted common data prep, metric, CV, and artifact helpers into `core/feature_engineering/modeling/shared/`. Both training and hyperparameter-tuning flows now import utilities such as `_prepare_training_data`, `_classification_metrics`, `_regression_metrics`, `_build_metadata_update`, and `_persist_best_estimator` from this package instead of defining them locally. If you need to tweak how frames are assembled or how metrics are calculated, update the shared modules (and corresponding `tests/test_shared_*.py`) so every workflow benefits.
+
 ## `training/registry.py`
 
 Purpose: central registry of supported estimators and their sane defaults.

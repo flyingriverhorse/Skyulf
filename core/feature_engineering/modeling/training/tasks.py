@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import importlib
-import json
 import logging
 import math
 import pickle
@@ -14,7 +13,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, cast
 
-import joblib
 import numpy as np
 import pandas as pd
 from celery import Celery
@@ -44,6 +42,12 @@ from core.database.engine import create_tables, init_db
 from core.database.models import get_database_session
 from core.feature_engineering.schemas import TrainingJobStatus
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
+from core.feature_engineering.modeling.shared import (
+    _build_metadata_update,
+    _persist_training_artifact,
+    _resolve_problem_type_hint,
+    _write_transformer_debug_snapshot,
+)
 
 from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
 from .jobs import get_training_job, update_job_status
@@ -1005,14 +1009,6 @@ def _regression_metrics(model, X: np.ndarray, y: np.ndarray) -> Dict[str, float]
         metrics["mape"] = float("nan")
 
     return metrics
-
-
-def _resolve_problem_type(problem_type_hint: Optional[str], default: str) -> str:
-    if problem_type_hint in {"classification", "regression"}:
-        return problem_type_hint
-    return default
-
-
 def _merge_model_params(
     default_params: Dict[str, Any],
     overrides: Optional[Dict[str, Any]],
@@ -1240,62 +1236,6 @@ def _build_transformer_plan(
             transformer_plan.append({"node_id": node_id, "transformers": step_transformers})
 
     return transformer_plan
-
-
-def _dump_fitted_params_debug(
-    transformers: List[Dict[str, Any]],
-    transformer_plan: List[Dict[str, Any]],
-) -> None:
-    try:
-        debug_dir = Path("logs")
-        debug_dir.mkdir(parents=True, exist_ok=True)
-        debug_file = debug_dir / "fitted_params_debug_latest.json"
-        with debug_file.open("w", encoding="utf-8") as fh:
-            json.dump(
-                {
-                    "transformer_plan": transformer_plan,
-                    "transformers_overview": [
-                        {
-                            "node_id": (t.get("node_id") if isinstance(t, dict) else None),
-                            "transformer_name": (
-                                t.get("transformer_name") if isinstance(t, dict) else None
-                            ),
-                            "column_name": (
-                                t.get("column_name") if isinstance(t, dict) else None
-                            ),
-                            "transformer_type": (
-                                t.get("transformer").__class__.__name__
-                                if isinstance(t, dict) and t.get("transformer") is not None
-                                else None
-                            ),
-                            "metadata": (t.get("metadata") if isinstance(t, dict) else {}),
-                        }
-                        for t in transformers
-                    ],
-                },
-                fh,
-                indent=2,
-                default=str,
-            )
-        logger.info("Wrote fitted-params debug file: %s", debug_file)
-    except Exception:
-        logger.exception("Failed to write fitted-params debug file")
-
-
-def _persist_artifact(
-    artifact_root: str,
-    pipeline_id: str,
-    job_id: str,
-    version: int,
-    artifact_data: Dict[str, Any],
-) -> Path:
-    artifact_dir = Path(artifact_root) / pipeline_id
-    artifact_dir.mkdir(parents=True, exist_ok=True)
-    artifact_path = artifact_dir / f"{job_id}_v{version}.joblib"
-    joblib.dump(artifact_data, artifact_path, compress=("gzip", 3))
-    return artifact_path
-
-
 def _train_and_save_model(
     model_type: str,
     hyperparameters: Optional[Dict[str, Any]],
@@ -1322,7 +1262,7 @@ def _train_and_save_model(
         warnings.simplefilter("always", ConvergenceWarning)
 
         spec = get_model_spec(model_type)
-        resolved_problem_type = _resolve_problem_type(problem_type_hint, spec.problem_type)
+        resolved_problem_type = _resolve_problem_type_hint(problem_type_hint, spec.problem_type)
         params = _merge_model_params(spec.default_params, hyperparameters)
         params = _normalize_model_params(spec, params)
 
@@ -1373,9 +1313,9 @@ def _train_and_save_model(
             "version": version,
         }
 
-        _dump_fitted_params_debug(transformers, transformer_plan)
+        _write_transformer_debug_snapshot(transformers, transformer_plan)
 
-        artifact_path = _persist_artifact(
+        artifact_path = _persist_training_artifact(
             artifact_root,
             pipeline_id,
             job_id,
@@ -1589,22 +1529,14 @@ async def _run_training_workflow(job_id: str) -> None:
                     metrics.setdefault("dataset", {}).update(dataset_meta)
                 except AttributeError:
                     metrics["dataset"] = dataset_meta
-            metadata_update = {
-                "resolved_problem_type": resolved_problem_type,
-                "target_column": target_column,
-                "target_encoding": target_meta,
-                "feature_columns": feature_columns,
-                "cross_validation": {
-                    "enabled": cv_config.enabled,
-                    "strategy": cv_config.strategy,
-                    "folds": cv_config.folds,
-                    "shuffle": cv_config.shuffle,
-                    "random_state": cv_config.random_state,
-                    "refit_strategy": cv_config.refit_strategy,
-                },
-            }
-            if dataset_meta:
-                metadata_update["dataset"] = dataset_meta
+            metadata_update = _build_metadata_update(
+                resolved_problem_type=resolved_problem_type,
+                target_column=target_column,
+                feature_columns=feature_columns,
+                cv_config=cv_config,
+                dataset_meta=dataset_meta,
+            )
+            metadata_update["target_encoding"] = target_meta
 
             if training_warnings:
                 metadata_update["warnings"] = training_warnings
