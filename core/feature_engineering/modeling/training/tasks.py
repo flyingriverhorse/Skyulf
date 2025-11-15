@@ -1,4 +1,4 @@
-"""Celery tasks that execute long-running model training jobs."""
+"""Redundant placeholder."""
 
 from __future__ import annotations
 

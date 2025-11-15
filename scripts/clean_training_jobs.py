@@ -14,6 +14,7 @@ from core.feature_engineering.modeling.training.jobs import purge_training_jobs
 from core.feature_engineering.modeling.hyperparameter_tuning.jobs import purge_tuning_jobs
 from core.feature_engineering.schemas import TrainingJobStatus
 from core.feature_engineering.schemas import HyperparameterTuningJobStatus
+from core.utils.datetime import utcnow
 
 DEFAULT_STATUS_FILTER: List[str] = [
     TrainingJobStatus.SUCCEEDED.value,
@@ -58,7 +59,7 @@ def _parse_timestamp(older_than: Optional[str], older_than_days: Optional[int]) 
     if older_than_days is not None:
         if older_than_days < 0:
             raise SystemExit("--older-than-days must be zero or a positive integer")
-        return datetime.utcnow() - timedelta(days=older_than_days)
+        return utcnow() - timedelta(days=older_than_days)
 
     return None
 

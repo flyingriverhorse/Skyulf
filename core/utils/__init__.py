@@ -7,8 +7,9 @@ from .file_utils import (
     extract_file_path_from_source,
     cleanup_empty_directories,
     cleanup_uploads_directory,
-    cleanup_old_files
+    cleanup_old_files,
 )
+from .datetime import utcnow
 
 __all__ = [
     "log_data_action",
@@ -16,5 +17,6 @@ __all__ = [
     "extract_file_path_from_source",
     "cleanup_empty_directories",
     "cleanup_uploads_directory",
-    "cleanup_old_files"
+    "cleanup_old_files",
+    "utcnow",
 ]

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import Any, Iterable, List, Optional
 
 from sqlalchemy import select
@@ -11,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database.models import HyperparameterTuningJob
 from core.feature_engineering.schemas import HyperparameterTuningJobStatus
+from core.utils.datetime import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ async def update_tuning_job_status(
 ) -> HyperparameterTuningJob:
     """Persist status transitions for a tuning job."""
 
-    now = datetime.utcnow()
+    now = utcnow()
     _set_job_attribute(job, "status", status.value)
 
     if status == HyperparameterTuningJobStatus.RUNNING:

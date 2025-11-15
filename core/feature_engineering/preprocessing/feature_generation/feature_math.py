@@ -16,6 +16,7 @@ from core.feature_engineering.schemas import (
     FeatureMathNodeSignal,
     FeatureMathOperationResult,
 )
+from core.utils.datetime import utcnow
 
 from ...shared.utils import _coerce_config_boolean, _coerce_string_list
 
@@ -837,7 +838,7 @@ def apply_feature_math(
 
     signal = FeatureMathNodeSignal(
         node_id=node_id or None,
-        generated_at=datetime.utcnow(),
+        generated_at=utcnow(),
     )
 
     if not config.operations:

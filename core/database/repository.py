@@ -13,6 +13,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from core.utils.datetime import utcnow
 from .engine import Base
 from .models import User, DataSource
 
@@ -221,13 +222,11 @@ class UserRepository(BaseRepository[User]):
 
     async def update_last_login(self, user_id: int) -> bool:
         """Update user's last login timestamp."""
-        from datetime import datetime
-
         result = await self.session.execute(
             update(User)
             .where(User.id == user_id)
             .values(
-                last_login=datetime.utcnow(),
+                last_login=utcnow(),
                 login_count=User.login_count + 1
             )
         )

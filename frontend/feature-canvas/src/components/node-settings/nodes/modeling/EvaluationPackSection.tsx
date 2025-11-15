@@ -37,18 +37,20 @@ import { normalizeConfigBoolean } from '../../utils/configParsers';
 type FormatMetricFn = (value?: number | null, precision?: number) => string;
 
 const SPLIT_OPTIONS = [
-	{ value: 'validation', label: 'Validation', accent: 'validation' },
+	{ value: 'train', label: 'Train', accent: 'train' },
 	{ value: 'test', label: 'Test', accent: 'test' },
+	{ value: 'validation', label: 'Validation', accent: 'validation' },
 ] as const;
 
 type SplitValue = (typeof SPLIT_OPTIONS)[number]['value'];
 
 const SPLIT_PRIORITY: Record<SplitValue, number> = {
-	validation: 0,
+	train: 0,
 	test: 1,
+	validation: 2,
 };
 
-const DEFAULT_SPLITS: SplitValue[] = ['validation', 'test'];
+const DEFAULT_SPLITS: SplitValue[] = ['train', 'test', 'validation'];
 
 const ensureStringArray = (value: unknown): string[] => {
 	if (Array.isArray(value)) {
@@ -73,9 +75,8 @@ const normalizeSplits = (splits: string[]): SplitValue[] => {
 		if (!entry) {
 			return;
 		}
-		// Skip train/training splits - not supported in evaluation
-		if (entry === 'training' || entry === 'train') {
-			return;
+		if (entry === 'training') {
+			entry = 'train';
 		}
 		if (entry === 'valid' || entry === 'val') {
 			next.push('validation');
@@ -377,7 +378,11 @@ const EvaluationPackSection: React.FC<EvaluationPackSectionProps> = ({
 		if (missingSplitLabels.length === 1) {
 			return missingSplitLabels[0];
 		}
-		return `${missingSplitLabels[0]} and ${missingSplitLabels[1]}`;
+		if (missingSplitLabels.length === 2) {
+			return `${missingSplitLabels[0]} and ${missingSplitLabels[1]}`;
+		}
+		const last = missingSplitLabels[missingSplitLabels.length - 1];
+		return `${missingSplitLabels.slice(0, -1).join(', ')}, and ${last}`;
 	}, [missingSplitLabels]);
 
 	const hasSelectableSplits = selectedSplits.length > 0;
@@ -390,6 +395,7 @@ const EvaluationPackSection: React.FC<EvaluationPackSectionProps> = ({
 	const lastEvaluatedAt = typeof config?.last_evaluated_at === 'string' ? config.last_evaluated_at : null;
 
 	const [report, setReport] = useState<ModelEvaluationReport | null>(null);
+	const [activeResultsTab, setActiveResultsTab] = useState<'details' | 'comparison'>('details');
 	const userModifiedSplitsRef = useRef(false);
 
 	useEffect(() => {
@@ -397,6 +403,10 @@ const EvaluationPackSection: React.FC<EvaluationPackSectionProps> = ({
 		setReport(null);
 		userModifiedSplitsRef.current = false;
 	}, [selectedJobId]);
+
+	useEffect(() => {
+		setActiveResultsTab('details');
+	}, [report?.job_id]);
 
 	const trainingJobsQueryKey = useMemo(
 		() => [
@@ -672,6 +682,54 @@ const EvaluationPackSection: React.FC<EvaluationPackSectionProps> = ({
 		});
 	}, [report]);
 
+	const comparisonMatrix = useMemo(() => {
+		if (!report || !orderedSplitEntries.length) {
+			return null;
+		}
+		const splits = orderedSplitEntries.map(([splitKey, splitPayload]) => {
+			const metrics = extractNumericMetrics(splitPayload.metrics).reduce<Record<string, number>>((acc, entry) => {
+				acc[entry.key] = entry.value;
+				return acc;
+			}, {});
+			return {
+				key: splitKey,
+				label: friendlySplitLabel(splitKey),
+				rowCount: typeof splitPayload.row_count === 'number' ? splitPayload.row_count : null,
+				metrics,
+			};
+		});
+		const metricKeys = Array.from(
+			new Set(splits.flatMap((split) => Object.keys(split.metrics)))
+		).sort((a, b) => a.localeCompare(b));
+		return { splits, metricKeys };
+	}, [orderedSplitEntries, report]);
+
+	const comparisonDisabledReason = useMemo(() => {
+		if (!comparisonMatrix) {
+			return 'Run an evaluation to compare metrics.';
+		}
+		if (comparisonMatrix.splits.length <= 1) {
+			return 'Connect at least two splits to compare results.';
+		}
+		if (!comparisonMatrix.metricKeys.length) {
+			return 'No numeric metrics available for comparison yet.';
+		}
+		return null;
+	}, [comparisonMatrix]);
+
+	useEffect(() => {
+		if (activeResultsTab === 'comparison' && comparisonDisabledReason) {
+			setActiveResultsTab('details');
+		}
+	}, [activeResultsTab, comparisonDisabledReason]);
+
+	const handleSelectTab = useCallback((tab: 'details' | 'comparison') => {
+		if (tab === 'comparison' && comparisonDisabledReason) {
+			return;
+		}
+		setActiveResultsTab(tab);
+	}, [comparisonDisabledReason]);
+
 	return (
 		<div className="node-settings__section node-settings__evaluation">
 			<div className="node-settings__section-header">
@@ -764,7 +822,7 @@ const EvaluationPackSection: React.FC<EvaluationPackSectionProps> = ({
 					)}
 					{!hasSelectableSplits && (
 						<span className="evaluation-hint evaluation-hint--warning">
-							No dataset splits are available. Attach a validation or test split to run evaluation.
+							No dataset splits are available. Attach a train, validation, or test split to run evaluation.
 						</span>
 					)}
 				</div>
@@ -856,15 +914,46 @@ const EvaluationPackSection: React.FC<EvaluationPackSectionProps> = ({
 						</div>
 					</div>
 
-					{orderedSplitEntries.map(([splitKey, splitPayload]) => (
-						<EvaluationSplitCard
-							key={splitKey}
-							splitKey={splitKey}
-							payload={splitPayload}
-							problemType={report.problem_type}
+					<div className="evaluation-tabs" role="tablist" aria-label="Evaluation views">
+						<button
+							type="button"
+							className={`evaluation-tab ${activeResultsTab === 'details' ? 'evaluation-tab--active' : ''}`}
+							role="tab"
+							aria-selected={activeResultsTab === 'details'}
+							onClick={() => handleSelectTab('details')}
+						>
+							Split details
+						</button>
+						<button
+							type="button"
+							className={`evaluation-tab ${activeResultsTab === 'comparison' ? 'evaluation-tab--active' : ''}`}
+							role="tab"
+							aria-selected={activeResultsTab === 'comparison'}
+							aria-disabled={Boolean(comparisonDisabledReason)}
+							disabled={Boolean(comparisonDisabledReason)}
+							title={comparisonDisabledReason ?? undefined}
+							onClick={() => handleSelectTab('comparison')}
+						>
+							Split comparison
+						</button>
+					</div>
+
+					{activeResultsTab === 'comparison' && comparisonMatrix ? (
+						<EvaluationComparisonPanel
+							comparison={comparisonMatrix}
 							formatMetricValue={formatMetricValue}
 						/>
-					))}
+					) : (
+						orderedSplitEntries.map(([splitKey, splitPayload]) => (
+							<EvaluationSplitCard
+								key={splitKey}
+								splitKey={splitKey}
+								payload={splitPayload}
+								problemType={report.problem_type}
+								formatMetricValue={formatMetricValue}
+							/>
+						))
+					)}
 				</div>
 			) : (
 				<div className="evaluation-placeholder">
@@ -876,6 +965,63 @@ const EvaluationPackSection: React.FC<EvaluationPackSectionProps> = ({
 				</div>
 			)}
 		</div>
+	);
+};
+
+type EvaluationComparisonPanelProps = {
+	comparison: {
+		splits: Array<{ key: string; label: string; rowCount: number | null; metrics: Record<string, number> }>;
+		metricKeys: string[];
+	};
+	formatMetricValue: FormatMetricFn;
+};
+
+const EvaluationComparisonPanel: React.FC<EvaluationComparisonPanelProps> = ({ comparison, formatMetricValue }) => {
+	if (!comparison.metricKeys.length) {
+		return (
+			<div className="evaluation-placeholder">
+				<p>No numeric metrics were reported across splits for comparison.</p>
+			</div>
+		);
+	}
+
+	return (
+		<section className="evaluation-comparison">
+			<div className="evaluation-comparison__table-wrapper">
+				<table className="evaluation-comparison__table">
+					<thead>
+						<tr>
+							<th>Metric</th>
+							{comparison.splits.map((split) => (
+								<th key={split.key}>{split.label}</th>
+							))}
+						</tr>
+					</thead>
+					<tbody>
+						<tr className="evaluation-comparison__row evaluation-comparison__row--muted">
+							<td>Rows evaluated</td>
+							{comparison.splits.map((split) => (
+								<td key={`${split.key}-rows`}>
+									{typeof split.rowCount === 'number' ? split.rowCount.toLocaleString() : '—'}
+								</td>
+							))}
+						</tr>
+						{comparison.metricKeys.map((metric) => (
+							<tr key={metric} className="evaluation-comparison__row">
+								<td>{metric}</td>
+								{comparison.splits.map((split) => (
+									<td key={`${split.key}-${metric}`}>
+										{typeof split.metrics[metric] === 'number'
+											? formatMetricValue(split.metrics[metric])
+											: '—'}
+									</td>
+								))}
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+		</section>
 	);
 };
 

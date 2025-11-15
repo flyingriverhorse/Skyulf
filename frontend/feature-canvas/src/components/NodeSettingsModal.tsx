@@ -480,14 +480,14 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
       return undefined;
     }
     let hasRelevant = false;
-    const mapping: Partial<Record<'validation' | 'test', boolean>> = {};
+    const mapping: Partial<Record<'train' | 'validation' | 'test', boolean>> = {};
     connectionInfo.inputs.forEach((handle) => {
       if (!Array.isArray(handle.accepts) || handle.accepts.length === 0) {
         return;
       }
       const isConnected = connectedHandleKeys.has(handle.key);
       handle.accepts.forEach((acceptKey) => {
-        if (acceptKey === 'validation' || acceptKey === 'test') {
+        if (acceptKey === 'train' || acceptKey === 'validation' || acceptKey === 'test') {
           mapping[acceptKey] = isConnected;
           hasRelevant = true;
         }
