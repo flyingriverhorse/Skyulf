@@ -1,12 +1,10 @@
-"""Model evaluation diagnostics node and helpers."""
+"""Classification split evaluation helpers."""
 
 from __future__ import annotations
 
 import logging
-import math
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -17,24 +15,20 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
+
 from core.feature_engineering.schemas import (
     ModelEvaluationConfusionMatrix,
-    ModelEvaluationNodeSignal,
     ModelEvaluationPrecisionRecallCurve,
-    ModelEvaluationResidualHistogram,
-    ModelEvaluationResidualPoint,
-    ModelEvaluationResiduals,
     ModelEvaluationRocCurve,
     ModelEvaluationSplitPayload,
 )
 
-from ..shared import _classification_metrics, _regression_metrics
+from ...shared import _classification_metrics
+from .common import _align_thresholds, _downsample_indices, _sanitize_structure
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_SPLITS: Tuple[str, ...] = ("train", "validation", "test")
 _MAX_CURVE_POINTS = 500
-_MAX_SCATTER_POINTS = 750
 
 
 @dataclass
@@ -44,103 +38,43 @@ class _ClassificationContext:
     notes: List[str]
 
 
-__all__ = [
-    "apply_model_evaluation",
-    "build_classification_split_report",
-    "build_regression_split_report",
-]
+def _clamp_non_finite_thresholds(
+    values: np.ndarray,
+    *,
+    split_name: str,
+    curve_name: str,
+) -> Tuple[np.ndarray, Optional[str]]:
+    if not values.size:
+        return values, None
 
+    sanitized = values.astype(float, copy=True)
+    finite_mask = np.isfinite(sanitized)
+    if np.all(finite_mask):
+        return sanitized, None
 
-def _parse_iso_datetime(value: Any) -> Optional[datetime]:
-    if isinstance(value, datetime):
-        return value
-    if isinstance(value, str):
-        text = value.strip()
-        if not text:
-            return None
-        try:
-            return datetime.fromisoformat(text)
-        except ValueError:
-            logger.debug("Failed to parse ISO datetime '%s'", value)
-    return None
+    finite_values = sanitized[finite_mask]
+    fallback_high = float(np.max(finite_values)) if finite_values.size else 0.0
+    fallback_low = float(np.min(finite_values)) if finite_values.size else 0.0
 
+    pos_inf_mask = np.isposinf(sanitized)
+    neg_inf_mask = np.isneginf(sanitized)
+    nan_mask = np.isnan(sanitized)
 
-def _normalize_splits(raw_value: Any) -> List[str]:
-    if not raw_value:
-        return []
-    if isinstance(raw_value, str):
-        parts = [entry.strip().lower() for entry in raw_value.split(",")]
-    elif isinstance(raw_value, Iterable):
-        parts = [str(entry).strip().lower() for entry in raw_value]
-    else:
-        return []
-    normalized: List[str] = []
-    for entry in parts:
-        if not entry:
-            continue
-        if entry in {"train", "training"}:
-            normalized.append("train")
-        elif entry in {"validation", "valid", "val"}:
-            normalized.append("validation")
-        elif entry in {"test", "testing"}:
-            normalized.append("test")
-    return normalized
+    if pos_inf_mask.any():
+        sanitized[pos_inf_mask] = fallback_high
+    if neg_inf_mask.any():
+        sanitized[neg_inf_mask] = fallback_low
+    if nan_mask.any():
+        sanitized[nan_mask] = fallback_low
 
+    note: Optional[str] = None
+    nan_replacements = int(np.count_nonzero(nan_mask))
+    if nan_replacements:
+        note = (
+            f"Clamped {nan_replacements} undefined {curve_name} threshold(s) while evaluating {split_name}."
+        )
 
-def _is_finite_number(value: Any) -> bool:
-    if isinstance(value, (float, np.floating)):
-        return math.isfinite(float(value))
-    if isinstance(value, (int, np.integer)):
-        return True
-    return False
-
-
-def _coerce_number(value: Any) -> Optional[float]:
-    if isinstance(value, (int, np.integer)):
-        return float(value)
-    if isinstance(value, (float, np.floating)):
-        numeric = float(value)
-        return numeric if math.isfinite(numeric) else None
-    return None
-
-
-def _sanitize_structure(value: Any, *, warnings: List[str], context: str) -> Any:
-    if isinstance(value, dict):
-        result: Dict[Any, Any] = {}
-        for key, inner in value.items():
-            result[key] = _sanitize_structure(inner, warnings=warnings, context=context)
-        return result
-    if isinstance(value, (list, tuple)):
-        sanitized_items = [
-            _sanitize_structure(item, warnings=warnings, context=context) for item in value
-        ]
-        return type(value)(sanitized_items)
-    if isinstance(value, (float, np.floating, int, np.integer)):
-        if _is_finite_number(value):
-            return float(value) if isinstance(value, (float, np.floating)) else int(value)
-        warnings.append(f"Removed non-finite numeric value from {context}.")
-        return None
-    return value
-
-
-def _downsample_indices(length: int, limit: int) -> np.ndarray:
-    if length <= limit:
-        return np.arange(length, dtype=int)
-    indices = np.linspace(0, length - 1, num=limit, dtype=int)
-    return np.unique(indices)
-
-
-def _align_thresholds(thresholds: np.ndarray, target_size: int) -> np.ndarray:
-    if thresholds.size == target_size:
-        return thresholds
-    if thresholds.size == 0:
-        return np.zeros(target_size, dtype=float)
-    if thresholds.size == target_size - 1:
-        return np.append(thresholds, thresholds[-1])
-    if thresholds.size > target_size:
-        return thresholds[:target_size]
-    pad_size = target_size - thresholds.size
-    return np.append(thresholds, np.full(pad_size, thresholds[-1]))
+    return sanitized, note
 
 
 def _build_confusion_matrix_payload(
@@ -262,18 +196,19 @@ def _resolve_probability_outputs(model, feature_frame: pd.DataFrame) -> Tuple[Op
         try:
             decision = model.decision_function(feature_frame)
             if decision.ndim == 1:
-                proba = 1 / (1 + np.exp(-decision))
-                proba = np.vstack([1 - proba, proba]).T
+                probabilities = 1 / (1 + np.exp(-decision))
+                proba = np.vstack([1 - probabilities, probabilities]).T
         except Exception:
             logger.debug("decision_function unavailable for evaluation.")
     return proba, notes
 
 
-def _prepare_positive_class_context(
+def _prepare_positive_class_contexts(
     proba: np.ndarray,
-    target_array: np.ndarray,
+    encoded_targets: np.ndarray,
+    effective_labels: Sequence[str],
     split_name: str,
-) -> Tuple[Optional[int], Optional[np.ndarray], Optional[np.ndarray], List[str]]:
+) -> Tuple[List[Tuple[int, np.ndarray, np.ndarray]], List[str]]:
     notes: List[str] = []
     probability_matrix = proba
     if probability_matrix.ndim == 1:
@@ -282,17 +217,68 @@ def _prepare_positive_class_context(
     class_count = probability_matrix.shape[1]
     if class_count <= 1:
         notes.append("Model returned a single class; ROC/PR curves skipped.")
-        return None, None, None, notes
-    if class_count > 2:
-        notes.append("Multi-class curves are not yet supported; showing top-one-vs-rest metrics only.")
+        return [], notes
 
-    positive_index = class_count - 1
-    if class_count > 2:
-        positive_index = int(np.argmax(probability_matrix.mean(axis=0)))
+    contexts: List[Tuple[int, np.ndarray, np.ndarray]] = []
+    class_indices = range(class_count)
+    if class_count == 2:
+        class_indices = [class_count - 1]
 
-    positive_scores = probability_matrix[:, positive_index]
-    positive_mask = (target_array == positive_index).astype(int)
-    return positive_index, positive_scores, positive_mask, notes
+    for class_idx in class_indices:
+        scores = probability_matrix[:, class_idx]
+        mask = (encoded_targets == class_idx).astype(int)
+        positive_total = int(mask.sum())
+        negative_total = int(mask.size - positive_total)
+        if positive_total == 0:
+            label = effective_labels[class_idx] if class_idx < len(effective_labels) else f"Class {class_idx}"
+            notes.append(f"No samples for {label}; skipped ROC/PR for that class.")
+            continue
+        if negative_total == 0:
+            label = effective_labels[class_idx] if class_idx < len(effective_labels) else f"Class {class_idx}"
+            notes.append(f"All samples belonged to {label}; skipped ROC/PR for that class.")
+            continue
+
+        contexts.append((class_idx, scores, mask))
+
+    if not contexts:
+        notes.append("ROC/PR curves skipped because no class had both positive and negative samples.")
+
+    return contexts, notes
+
+
+def _encode_targets_for_probability_curves(
+    target_array: np.ndarray,
+    model_classes: Optional[Sequence[Any]],
+) -> Tuple[Optional[np.ndarray], List[str]]:
+    notes: List[str] = []
+
+    if model_classes is None or not len(model_classes):
+        try:
+            encoded = target_array.astype(int)
+            return encoded, notes
+        except Exception:
+            notes.append(
+                "Model classes unavailable and target labels are non-numeric; ROC/PR curves skipped."
+            )
+            return None, notes
+
+    class_to_index = {value: idx for idx, value in enumerate(model_classes)}
+    encoded = np.full(target_array.shape[0], -1, dtype=int)
+
+    missing = 0
+    for idx, value in enumerate(target_array):
+        mapped = class_to_index.get(value)
+        if mapped is None:
+            missing += 1
+            continue
+        encoded[idx] = mapped
+
+    if missing:
+        notes.append(
+            f"{missing} sample(s) had labels absent from the model class list; treated as negatives for curves."
+        )
+
+    return encoded, notes
 
 
 def _build_roc_curve_payload(
@@ -321,20 +307,29 @@ def _build_roc_curve_payload(
     tpr_array = np.asarray(tpr, dtype=float)
     thresholds_array = np.asarray(aligned_thresholds, dtype=float)
 
-    valid_mask = np.isfinite(fpr_array) & np.isfinite(tpr_array) & np.isfinite(thresholds_array)
+    valid_mask = np.isfinite(fpr_array) & np.isfinite(tpr_array)
     if not np.all(valid_mask):
         removed = int(np.count_nonzero(~valid_mask))
         if np.any(valid_mask):
             fpr_array = fpr_array[valid_mask]
             tpr_array = tpr_array[valid_mask]
-            thresholds_array = thresholds_array[valid_mask]
             notes.append(f"Removed {removed} non-finite ROC points while evaluating {split_name}.")
         else:
             notes.append(f"ROC curve skipped for {split_name} because all points were non-finite.")
             return None, notes
 
+        thresholds_array = thresholds_array[valid_mask]
+
     if not (fpr_array.size and tpr_array.size):
         return None, notes
+
+    thresholds_array, clamp_note = _clamp_non_finite_thresholds(
+        thresholds_array,
+        split_name=split_name,
+        curve_name="ROC",
+    )
+    if clamp_note:
+        notes.append(clamp_note)
 
     idx = _downsample_indices(fpr_array.size, max_curve_points)
     thresholds_list = thresholds_array[idx].tolist()
@@ -356,9 +351,11 @@ def _build_roc_curve_payload(
 
     return (
         ModelEvaluationRocCurve(
-            label=effective_labels[positive_index]
-            if positive_index < len(effective_labels)
-            else f"Class {positive_index}",
+            label=(
+                effective_labels[positive_index]
+                if positive_index < len(effective_labels)
+                else f"Class {positive_index}"
+            ),
             fpr=fpr_list,
             tpr=tpr_list,
             thresholds=sanitized_thresholds,
@@ -394,24 +391,29 @@ def _build_pr_curve_payload(
     recall_array = np.asarray(recall, dtype=float)
     thresholds_array = np.asarray(aligned_pr_thresholds, dtype=float)
 
-    valid_mask = (
-        np.isfinite(precision_array)
-        & np.isfinite(recall_array)
-        & np.isfinite(thresholds_array)
-    )
+    valid_mask = np.isfinite(precision_array) & np.isfinite(recall_array)
     if not np.all(valid_mask):
         removed = int(np.count_nonzero(~valid_mask))
         if np.any(valid_mask):
             precision_array = precision_array[valid_mask]
             recall_array = recall_array[valid_mask]
-            thresholds_array = thresholds_array[valid_mask]
             notes.append(f"Removed {removed} non-finite PR points while evaluating {split_name}.")
         else:
             notes.append(f"PR curve skipped for {split_name} because all points were non-finite.")
             return None, notes
 
+        thresholds_array = thresholds_array[valid_mask]
+
     if not (precision_array.size and recall_array.size):
         return None, notes
+
+    thresholds_array, clamp_note = _clamp_non_finite_thresholds(
+        thresholds_array,
+        split_name=split_name,
+        curve_name="PR",
+    )
+    if clamp_note:
+        notes.append(clamp_note)
 
     idx = _downsample_indices(precision_array.size, max_curve_points)
     thresholds_list = thresholds_array[idx].tolist()
@@ -470,41 +472,51 @@ def _build_classification_curves(
     if proba is None:
         curve_notes.append("Probability outputs unavailable; ROC/PR curves skipped.")
         return roc_payloads, pr_payloads, curve_notes
-    positive_index, positive_scores, positive_mask, context_notes = _prepare_positive_class_context(
+
+    classes_attr = getattr(model, "classes_", None)
+    encoded_targets, encoding_notes = _encode_targets_for_probability_curves(target_array, classes_attr)
+    if encoding_notes:
+        curve_notes.extend(encoding_notes)
+    if encoded_targets is None:
+        return roc_payloads, pr_payloads, curve_notes
+
+    contexts, context_notes = _prepare_positive_class_contexts(
         proba,
-        target_array,
+        encoded_targets,
+        effective_labels,
         split_name,
     )
     if context_notes:
         curve_notes.extend(context_notes)
-    if positive_index is None or positive_scores is None or positive_mask is None:
+    if not contexts:
         return roc_payloads, pr_payloads, curve_notes
 
-    roc_payload, roc_notes = _build_roc_curve_payload(
-        positive_mask,
-        positive_scores,
-        effective_labels,
-        positive_index,
-        max_curve_points=max_curve_points,
-        split_name=split_name,
-    )
-    if roc_payload is not None:
-        roc_payloads.append(roc_payload)
-    if roc_notes:
-        curve_notes.extend(roc_notes)
+    for positive_index, positive_scores, positive_mask in contexts:
+        roc_payload, roc_notes = _build_roc_curve_payload(
+            positive_mask,
+            positive_scores,
+            effective_labels,
+            positive_index,
+            max_curve_points=max_curve_points,
+            split_name=split_name,
+        )
+        if roc_payload is not None:
+            roc_payloads.append(roc_payload)
+        if roc_notes:
+            curve_notes.extend(roc_notes)
 
-    pr_payload, pr_notes = _build_pr_curve_payload(
-        positive_mask,
-        positive_scores,
-        effective_labels,
-        positive_index,
-        max_curve_points=max_curve_points,
-        split_name=split_name,
-    )
-    if pr_payload is not None:
-        pr_payloads.append(pr_payload)
-    if pr_notes:
-        curve_notes.extend(pr_notes)
+        pr_payload, pr_notes = _build_pr_curve_payload(
+            positive_mask,
+            positive_scores,
+            effective_labels,
+            positive_index,
+            max_curve_points=max_curve_points,
+            split_name=split_name,
+        )
+        if pr_payload is not None:
+            pr_payloads.append(pr_payload)
+        if pr_notes:
+            curve_notes.extend(pr_notes)
 
     return roc_payloads, pr_payloads, curve_notes
 
@@ -571,149 +583,4 @@ def build_classification_split_report(
     )
 
 
-def build_regression_split_report(
-    model,
-    *,
-    split_name: str,
-    features: Optional[pd.DataFrame],
-    target: Optional[pd.Series],
-    include_residuals: bool = True,
-    max_scatter_points: int = _MAX_SCATTER_POINTS,
-) -> ModelEvaluationSplitPayload:
-    """Compute evaluation artefacts for a regression split."""
-
-    notes: List[str] = []
-
-    if features is None or target is None or target.empty:
-        return ModelEvaluationSplitPayload(
-            split=split_name,
-            row_count=0,
-            metrics={},
-            confusion_matrix=None,
-            roc_curves=[],
-            pr_curves=[],
-            residuals=None,
-            notes=["Split has no rows available for evaluation."],
-        )
-
-    feature_frame = features
-    y_array = target.to_numpy(dtype=float)
-
-    try:
-        predictions = model.predict(feature_frame)
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.exception("Model predictions failed during regression evaluation: %s", exc)
-        return ModelEvaluationSplitPayload(
-            split=split_name,
-            row_count=int(y_array.shape[0]),
-            metrics={},
-            confusion_matrix=None,
-            roc_curves=[],
-            pr_curves=[],
-            residuals=None,
-            notes=["Model predictions failed; see server logs for details."],
-        )
-
-    metrics = _regression_metrics(model, feature_frame, y_array)
-    metric_warnings: List[str] = []
-    metrics = _sanitize_structure(metrics, warnings=metric_warnings, context=f"{split_name} metrics")
-    if metric_warnings:
-        notes.extend(metric_warnings)
-    residual_payload: Optional[ModelEvaluationResiduals] = None
-
-    if include_residuals:
-        residuals = y_array - predictions
-        bin_count = min(30, max(10, residuals.shape[0] // 3))
-        hist_counts, bin_edges = np.histogram(residuals, bins=bin_count)
-        histogram = ModelEvaluationResidualHistogram(
-            bin_edges=[float(value) for value in bin_edges.tolist()],
-            counts=[int(value) for value in hist_counts.tolist()],
-        )
-
-        scatter_indices = _downsample_indices(residuals.shape[0], max_scatter_points)
-        scatter_points = [
-            ModelEvaluationResidualPoint(
-                actual=float(y_array[idx]),
-                predicted=float(predictions[idx]),
-            )
-            for idx in scatter_indices
-        ]
-
-        summary_raw = {
-            "residual_min": float(np.min(residuals)),
-            "residual_max": float(np.max(residuals)),
-            "residual_mean": float(np.mean(residuals)),
-            "residual_std": float(np.std(residuals)),
-        }
-        summary_warnings: List[str] = []
-        summary = _sanitize_structure(summary_raw, warnings=summary_warnings, context=f"{split_name} residual summary")
-        if summary_warnings:
-            notes.extend(summary_warnings)
-
-        residual_payload = ModelEvaluationResiduals(
-            histogram=histogram,
-            scatter=scatter_points,
-            summary=summary,
-        )
-
-    return ModelEvaluationSplitPayload(
-        split=split_name,
-        row_count=int(y_array.shape[0]),
-        metrics=metrics,
-        confusion_matrix=None,
-        roc_curves=[],
-        pr_curves=[],
-        residuals=residual_payload,
-        notes=notes,
-    )
-
-
-def apply_model_evaluation(
-    frame: pd.DataFrame,
-    node: Dict[str, Any],
-    *,
-    pipeline_id: Optional[str] = None,
-) -> Tuple[pd.DataFrame, str, ModelEvaluationNodeSignal]:
-    """Return unchanged frame alongside light-weight node diagnostics."""
-
-    node_id = node.get("id")
-    node_id_str = str(node_id) if node_id is not None else None
-
-    config = (node.get("data") or {}).get("config") or {}
-    raw_job_id = config.get("training_job_id")
-    training_job_id: Optional[str] = None
-    if isinstance(raw_job_id, str):
-        stripped = raw_job_id.strip()
-        training_job_id = stripped or None
-    elif raw_job_id is not None:
-        training_job_id = str(raw_job_id)
-
-    raw_splits = config.get("splits")
-    splits = _normalize_splits(raw_splits)
-    if not splits and training_job_id:
-        splits = list(_DEFAULT_SPLITS)
-
-    last_evaluated = _parse_iso_datetime(config.get("last_evaluated_at"))
-
-    signal = ModelEvaluationNodeSignal(
-        node_id=node_id_str,
-        training_job_id=training_job_id,
-        splits=splits,
-        has_evaluation=bool(last_evaluated),
-        last_evaluated_at=last_evaluated,
-        notes=[],
-    )
-
-    if not training_job_id:
-        signal.notes.append("Select a training job from the sidebar to unlock evaluation diagnostics.")
-        summary = "Model evaluation: waiting for training job selection"
-        return frame, summary, signal
-
-    if not splits:
-        signal.notes.append("No dataset splits selected; configure at least one to run diagnostics.")
-        summary = f"Model evaluation for job {training_job_id}: no splits selected"
-        return frame, summary, signal
-
-    split_label = ", ".join(splits)
-    summary = f"Model evaluation configured for job {training_job_id} on {split_label}"
-    return frame, summary, signal
+__all__ = ["build_classification_split_report"]

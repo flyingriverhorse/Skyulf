@@ -12,12 +12,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database.models import User as DBUser, get_database_session
+from core.utils.datetime import utcnow
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from .auth_core import UserInDB
 
 logger = logging.getLogger(__name__)
-
 
 @asynccontextmanager
 async def _session_scope(session: Optional[AsyncSession] = None):
@@ -49,7 +49,7 @@ def _map_user(db_user: DBUser) -> "UserInDB":
             ad_groups.append(AD_GROUPS["Admin"])
 
     created_at_raw = cast(Optional[datetime], getattr(db_user, "created_at", None))
-    created_at = created_at_raw or datetime.utcnow()
+    created_at = created_at_raw or utcnow()
     last_login_value = cast(Optional[datetime], getattr(db_user, "last_login", None))
     is_active_value = bool(getattr(db_user, "is_active", False))
     is_admin_value = bool(getattr(db_user, "is_admin", False))
@@ -143,7 +143,7 @@ async def record_successful_login(
             update(DBUser)
             .where(DBUser.id == user_id)
             .values(
-                last_login=datetime.utcnow(),
+                last_login=utcnow(),
                 login_count=DBUser.login_count + 1,
             )
         )
@@ -159,7 +159,7 @@ async def record_failed_login(
             await scoped_session.execute(
                 update(DBUser)
                 .where(DBUser.id == user_id)
-                .values(last_login=datetime.utcnow())
+                .values(last_login=utcnow())
             )
     except SQLAlchemyError as exc:  # pragma: no cover - telemetry only
         logger.debug("Failed login audit skip for user %s: %s", user_id, exc)

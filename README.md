@@ -3,7 +3,7 @@
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)]()
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)](LICENSE)
 [![Commercial](https://img.shields.io/badge/commercial-license-blueviolet)](COMMERCIAL-LICENSE.md)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue)](#quick-start)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](#quick-start)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](.pre-commit-config.yaml)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![DCO](https://img.shields.io/badge/DCO-required-green)](DCO.txt)

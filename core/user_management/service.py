@@ -5,14 +5,16 @@ This module provides service layer functions for user management operations.
 It handles business logic, database interactions, and data validation.
 """
 
-from passlib.context import CryptContext
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional, List
+
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
 from fastapi import HTTPException, status
 
 from core.database.models import User
+from core.utils.datetime import utcnow
 from .models import (
     UserCreate, UserUpdate, UserPasswordUpdate,
     UserResponse, UserListResponse, UserStatsResponse
@@ -20,8 +22,6 @@ from .models import (
 
 # Password hashing context using passlib
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
 class UserService:
     """Service class for user management operations."""
 
@@ -171,7 +171,7 @@ class UserService:
         for field, value in update_data.items():
             setattr(user, field, value)
 
-        user.updated_at = datetime.utcnow()
+        user.updated_at = utcnow()
         db.commit()
         db.refresh(user)
         return user
@@ -195,7 +195,7 @@ class UserService:
 
         # Update password
         user.password_hash = UserService.hash_password(password_update.new_password)
-        user.updated_at = datetime.utcnow()
+        user.updated_at = utcnow()
         db.commit()
         db.refresh(user)
         return user
@@ -211,7 +211,7 @@ class UserService:
             )
 
         user.is_active = not user.is_active
-        user.updated_at = datetime.utcnow()
+        user.updated_at = utcnow()
         db.commit()
         db.refresh(user)
         return user
@@ -228,7 +228,7 @@ class UserService:
 
         # Soft delete by deactivating
         user.is_active = False
-        user.updated_at = datetime.utcnow()
+        user.updated_at = utcnow()
         db.commit()
         return True
 
@@ -249,7 +249,7 @@ class UserService:
     @staticmethod
     def get_user_stats(db: Session) -> UserStatsResponse:
         """Get user statistics."""
-        now = datetime.utcnow()
+        now = utcnow()
         thirty_days_ago = now - timedelta(days=30)
         twenty_four_hours_ago = now - timedelta(hours=24)
 
@@ -277,7 +277,7 @@ class UserService:
         """Update user's last login timestamp."""
         user = UserService.get_user_by_id(db, user_id)
         if user:
-            user.last_login = datetime.utcnow()
+            user.last_login = utcnow()
             user.login_count += 1
             db.commit()
             db.refresh(user)

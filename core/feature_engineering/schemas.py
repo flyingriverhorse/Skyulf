@@ -12,6 +12,7 @@ from core.feature_engineering.modeling.hyperparameter_tuning.registry import (
     get_default_strategy_value,
     normalize_strategy_value,
 )
+from core.utils.datetime import utcnow
 
 
 class DropColumnCandidate(BaseModel):
@@ -40,7 +41,7 @@ class DropColumnRecommendations(BaseModel):
     dataset_source_id: str
     suggested_threshold: Optional[float] = None
     candidates: List[DropColumnCandidate] = Field(default_factory=list)
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utcnow)
     available_filters: List[DropColumnRecommendationFilter] = Field(default_factory=list)
     all_columns: List[str] = Field(default_factory=list)
     column_missing_map: Dict[str, float] = Field(default_factory=dict)
@@ -73,7 +74,7 @@ class LabelEncodingRecommendationsResponse(BaseModel):
     """Response payload for label encoding suggestions."""
 
     dataset_source_id: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utcnow)
     sample_size: int
     total_text_columns: int = 0
     recommended_count: int = 0
@@ -111,7 +112,7 @@ class OrdinalEncodingRecommendationsResponse(BaseModel):
     """Response payload for ordinal encoding suggestions."""
 
     dataset_source_id: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utcnow)
     sample_size: int
     total_text_columns: int = 0
     recommended_count: int = 0
@@ -150,7 +151,7 @@ class TargetEncodingRecommendationsResponse(BaseModel):
     """Response payload for target encoding suggestions."""
 
     dataset_source_id: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utcnow)
     sample_size: int
     total_text_columns: int = 0
     recommended_count: int = 0
@@ -189,7 +190,7 @@ class HashEncodingRecommendationsResponse(BaseModel):
     """Response payload for hash encoding suggestions."""
 
     dataset_source_id: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utcnow)
     sample_size: int
     total_text_columns: int = 0
     recommended_count: int = 0
@@ -229,7 +230,7 @@ class OneHotEncodingRecommendationsResponse(BaseModel):
     """Response payload for one-hot encoding suggestions."""
 
     dataset_source_id: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utcnow)
     sample_size: int
     total_text_columns: int = 0
     recommended_count: int = 0
@@ -268,7 +269,7 @@ class DummyEncodingRecommendationsResponse(BaseModel):
     """Response payload for dummy encoding suggestions."""
 
     dataset_source_id: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utcnow)
     sample_size: int
     total_text_columns: int = 0
     recommended_count: int = 0
@@ -331,7 +332,7 @@ class SkewnessRecommendationsResponse(BaseModel):
     """Response payload for skewness-driven transformation suggestions."""
 
     dataset_source_id: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utcnow)
     sample_size: int
     skewness_threshold: float
     methods: List[SkewnessMethodDetail] = Field(default_factory=list)
@@ -406,7 +407,7 @@ class BinnedDistributionResponse(BaseModel):
     """Response payload summarising distributions for binned columns."""
 
     dataset_source_id: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utcnow)
     sample_size: int
     columns: List[BinnedColumnDistribution] = Field(default_factory=list)
 
@@ -613,7 +614,7 @@ class QuickProfileResponse(BaseModel):
     """Response payload for the lightweight profile endpoint."""
 
     dataset_source_id: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utcnow)
     sample_size: int
     rows_analyzed: int
     columns_analyzed: int
@@ -673,7 +674,7 @@ class ScalingRecommendationsResponse(BaseModel):
     """Response payload for scaling method insights."""
 
     dataset_source_id: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utcnow)
     sample_size: int
     methods: List[ScalingMethodDetail] = Field(default_factory=list)
     columns: List[ScalingColumnRecommendation] = Field(default_factory=list)
@@ -721,7 +722,7 @@ class BinningRecommendationsResponse(BaseModel):
     """Response payload for binning guidance."""
 
     dataset_source_id: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utcnow)
     sample_size: int
     columns: List[BinningColumnRecommendation] = Field(default_factory=list)
     excluded_columns: List[BinningExcludedColumn] = Field(default_factory=list)
@@ -1343,7 +1344,7 @@ class FeatureMathNodeSignal(BaseModel):
     failed_operations: int = 0
     operations: List[FeatureMathOperationResult] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utcnow)
     encoded_columns: List[TargetEncodingAppliedColumnSignal] = Field(default_factory=list)
     skipped_columns: List[str] = Field(default_factory=list)
 

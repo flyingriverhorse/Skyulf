@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import core.database.engine as db_engine
 from core.database.engine import get_async_session
 from core.database.models import DataSource, FeatureEngineeringPipeline, HyperparameterTuningJob, TrainingJob
+from core.utils.datetime import utcnow
 from core.feature_engineering.eda_fast import FeatureEngineeringEDAService
 from core.feature_engineering.eda_fast.service import DEFAULT_SAMPLE_CAP
 from core.feature_engineering.full_capture import FullDatasetCaptureService
@@ -355,8 +356,8 @@ class FullExecutionJob:
     graph_nodes: List[Dict[str, Any]] = field(default_factory=list)
     graph_edges: List[Dict[str, Any]] = field(default_factory=list)
     signal_data: Dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utcnow)
+    updated_at: datetime = field(default_factory=utcnow)
     status: FullExecutionJobStatus = "queued"
     task: Optional[asyncio.Task] = None
 
@@ -426,7 +427,7 @@ class FullExecutionJobStore:
                 )
                 active.signal_data["reason"] = " ".join(part for part in reason_parts if part)
                 active.signal_data["poll_after_seconds"] = 5
-                active.updated_at = datetime.utcnow()
+                active.updated_at = utcnow()
                 return active, active.to_signal(), False
 
             job_id = uuid.uuid4().hex
@@ -471,7 +472,7 @@ class FullExecutionJobStore:
                 job.status = status
             if signal_updates:
                 job.signal_data.update(signal_updates)
-            job.updated_at = datetime.utcnow()
+            job.updated_at = utcnow()
             return job
 
     async def mark_running(
@@ -5545,7 +5546,7 @@ async def get_quick_profile(
 
     return QuickProfileResponse(
         dataset_source_id=normalized_id,
-        generated_at=datetime.utcnow(),
+        generated_at=utcnow(),
         sample_size=effective_sample_size,
         rows_analyzed=int(frame.shape[0]),
         columns_analyzed=int(frame.shape[1]),
@@ -5666,7 +5667,7 @@ def _build_full_preview_signal(
         processed_rows=int(working_frame.shape[0]),
         applied_steps=list(applied_steps),
         dataset_source_id=dataset_source_id,
-        last_updated=datetime.utcnow(),
+        last_updated=utcnow(),
     )
     return signal, total_rows_actual
 
@@ -5744,7 +5745,7 @@ async def _run_full_dataset_execution(
         processed_rows=processed_rows,
         applied_steps=full_applied_steps,
         dataset_source_id=dataset_source_id,
-        last_updated=datetime.utcnow(),
+        last_updated=utcnow(),
     )
 
     if total_rows_full:
@@ -5777,7 +5778,7 @@ def _build_failed_full_execution_signal(
         total_rows=total_rows_estimate,
         warnings=warnings or [],
         dataset_source_id=dataset_source_id,
-        last_updated=datetime.utcnow(),
+        last_updated=utcnow(),
     )
 
 
@@ -6420,7 +6421,7 @@ async def evaluate_trained_model(
 
         splits_payload[split_name] = split_report
 
-    generated_at = datetime.utcnow()
+    generated_at = utcnow()
     resolved_problem_type: Literal["classification", "regression"] = (
         "classification" if problem_type != "regression" else "regression"
     )
