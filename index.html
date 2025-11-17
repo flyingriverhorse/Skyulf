@@ -7,15 +7,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Skyulf is a local-first MLOps workspace with a FastAPI backend, drag-and-drop feature canvas, and Celery-powered model training so teams can own every step without third-party clouds.">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://www.skyulf.com/">
     <title>Skyulf - Own Your ML Pipeline</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Skyulf · Self-hosted MLOps on your infrastructure">
+    <meta property="og:description" content="Use Skyulf to ingest data, engineer features, and train models locally with FastAPI, Celery, and a drag-and-drop canvas." />
+    <meta property="og:url" content="https://www.skyulf.com/">
+    <meta property="og:image" content="https://www.skyulf.com/static/img/image.png">
+    <meta property="og:image:alt" content="Skyulf feature canvas mockup with nodes connecting data ingestion to training">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Skyulf · Own Your ML Pipeline Locally">
+    <meta name="twitter:description" content="A self-hosted FastAPI + Celery workspace that keeps your ML experiments private and reproducible." />
+    <meta name="twitter:image" content="https://www.skyulf.com/static/img/image.png">
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "Organization",
+                "name": "Skyulf",
+                "url": "https://www.skyulf.com/",
+                "logo": "https://www.skyulf.com/static/img/image.png",
+                "sameAs": [
+                    "https://github.com/flyingriverhorse/skyulf",
+                    "https://github.com/flyingriverhorse/skyulf/discussions"
+                ]
+            },
+            {
+                "@type": "SoftwareApplication",
+                "name": "Skyulf MLOps Workspace",
+                "description": "A self-hosted FastAPI and Celery-based platform for ingesting data, engineering features, and running background model training without sending data to third-party clouds.",
+                "url": "https://www.skyulf.com/",
+                "applicationCategory": "BusinessApplication",
+                "operatingSystem": "Any",
+                "offers": {
+                    "@type": "Offer",
+                    "name": "Self-hosted ML pipeline workspace",
+                    "price": "0.00",
+                    "priceCurrency": "USD"
+                },
+                "feature": [
+                    "Drag-and-drop feature canvas",
+                    "FastAPI backend with SQLite default",
+                    "Celery-powered async training",
+                    "LLM helper integrations planned"
+                ]
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "What is Skyulf?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Skyulf is a local-first MLOps workspace that lets teams build data ingestion, feature engineering, and model training flows on their own infrastructure without uploading sensitive data."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Why build locally with Skyulf?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Skyulf keeps experiments private while still providing a UI for nodes, Celery workers, and export-ready MLflow exports to stay reproducible and compliant."
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/animejs/lib/anime.iife.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        .sr-only:focus-within,
+        .sr-only:focus-visible {
+            position: static;
+            width: auto;
+            height: auto;
+            margin: 0;
+            padding: 0.5rem 1rem;
+            clip: auto;
+            background: rgba(15, 23, 42, 0.8);
+            color: #f8fafc;
+            border-radius: 8px;
+            box-shadow: 0 12px 50px rgba(15, 23, 42, 0.4);
+        }
         * {
             margin: 0;
             padding: 0;
@@ -398,8 +494,9 @@
     </style>
 </head>
 <body class="min-h-screen">
+    <a href="#main-content" class="sr-only" aria-label="Skip to main content">Skip to main content</a>
     <!-- Navigation -->
-    <nav class="fixed w-full z-50 glass-effect">
+    <nav class="fixed w-full z-50 glass-effect" aria-label="Primary navigation">
         <div class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center">
@@ -431,8 +528,10 @@
         </div>
     </nav>
 
-    <!-- Hero Section -->
-    <section class="pt-32 pb-16 px-4 sm:px-6 lg:px-8">
+    <main id="main-content">
+        <!-- Hero Section -->
+        <section class="pt-32 pb-16 px-4 sm:px-6 lg:px-8">
+            <!-- When you add hero mockups or screenshots, give each image/visual a descriptive alt text that highlights the local-first canvas and FastAPI workflow. -->
         <div class="max-w-[1400px] mx-auto">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                 <div class="text-center lg:text-left">
@@ -782,7 +881,7 @@
                             <div class="relative w-full aspect-[16/9] overflow-hidden rounded-xl">
                                 <div class="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-purple-500/10 to-transparent"></div>
                                 <div class="absolute inset-0 opacity-40 blur-3xl scale-110" style="background-image: url('/static/app-preview.gif'); background-size: cover; background-position: center;"></div>
-                                <video id="product-tour-video" class="relative z-10 w-full h-full object-cover rounded-xl opacity-0 transition-opacity duration-500" controls preload="auto" playsinline poster="/static/app-preview.gif">
+                                <video id="product-tour-video" class="relative z-10 w-full h-full object-cover rounded-xl opacity-0 transition-opacity duration-500" controls preload="auto" playsinline poster="/static/app-preview.gif" aria-label="Skyulf product tour video showcasing local-first feature engineering, encoding, and training">
                                     <source src="/static/video/skyulf-product-tour.mp4" type="video/mp4">
                                     <source src="static/video/skyulf-product-tour.mp4" type="video/mp4">
                                     Your browser does not support the video tag.
@@ -871,7 +970,7 @@
                         </div>
                         <div>
                             <p class="text-sm uppercase tracking-wide text-blue-300">Now shipping</p>
-                            <h3 class="text-2xl font-semibold text-white">v0.0.1 · Alpha</h3>
+                            <h3 class="text-2xl font-semibold text-white">v0.0.3</h3>
                         </div>
                     </div>
                     <ul class="space-y-3 text-gray-300">
@@ -1027,8 +1126,22 @@
     <section id="faq" class="py-16 px-4 sm:px-6 lg:px-8">
         <div class="max-w-[1400px] mx-auto">
             <div class="text-center mb-12" data-aos="fade-up">
-                <h2 class="text-4xl md:text-5xl font-bold mb-4">Frequently Asked Questions</h2>
-                <p class="text-xl text-gray-400">Everything you need to know about Skyulf</p>
+                <h2 class="text-4xl md:text-5xl font-bold mb-4">Frequently Asked Questions for Local-first MLOps &amp; Self-hosted Workflows</h2>
+                <p class="text-xl text-gray-400">
+                    Everything you need to understand how Skyulf keeps feature engineering, automation, and training entirely on your infrastructure.
+                </p>
+            </div>
+
+            <div class="max-w-3xl mx-auto mb-10 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl px-6 py-6" data-aos="fade-up" data-aos-delay="80">
+                <h3 class="text-xl font-semibold text-white mb-3">FAQ Snapshot</h3>
+                <p class="text-gray-300 mb-3">
+                    Answers in this section boil down to one promise: everything you build with Skyulf stays on your turf, stays private, and stays under your control.
+                </p>
+                <ul class="space-y-2 text-gray-300 text-sm">
+                    <li class="flex items-start gap-2"><span class="w-2 h-2 bg-blue-400 rounded-full mt-1"></span>Local-first workflows that keep datasets on-premises and out of third-party clouds.</li>
+                    <li class="flex items-start gap-2"><span class="w-2 h-2 bg-purple-400 rounded-full mt-1"></span>Drag-and-drop nodes plus code-friendly hooks so you can compose ingestion, transformation, and training steps however you like.</li>
+                    <li class="flex items-start gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full mt-1"></span>Background jobs that run once you hit play, leaving you to focus on experiments while the stack saves reproducible outputs.</li>
+                </ul>
             </div>
 
             <!-- Search Box -->
@@ -1190,7 +1303,7 @@
                     <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
                         <div class="px-6 pb-5 pt-0">
                             <p class="text-gray-300">
-                                Yes. Skyulf is 100% open source under the AGPL-3.0 license. Free to use, modify, and deploy. If you offer it as a network service, you must provide the source. No hidden costs, no premium tiers. 
+                                Yes. Skyulf is 100% open source under the Apache-2.0 license. Free to use, modify, embed, and deploy—no copyleft clauses, no hidden costs, no premium tiers. 
                                 If you find it useful, consider <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">starring the repo</a> 
                                 or contributing back to the project.
                             </p>
@@ -1209,9 +1322,9 @@
                     <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
                         <div class="px-6 pb-5 pt-0">
                             <p class="text-gray-300">
-                                Yes. If your organization cannot comply with the AGPL’s reciprocal and network-use requirements (for example, embedding Skyulf into a closed-source product), you can request a commercial license. 
-                                See <a href="https://github.com/flyingriverhorse/skyulf/blob/master/COMMERCIAL-LICENSE.md" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">COMMERCIAL-LICENSE.md</a> for an overview. 
-                                To start a commercial license conversation, open a “Commercial License Request” issue, discussion on GitHub or contact.
+                                Apache-2.0 already covers commercial and closed-source use. If you need SLAs, indemnification, or a partnership agreement, check 
+                                <a href="https://github.com/flyingriverhorse/skyulf/blob/master/COMMERCIAL-LICENSE.md" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">COMMERCIAL-LICENSE.md</a>. 
+                                Open a “Commercial Partnership Request” discussion or contact us via the README links to start the conversation.
                             </p>
                         </div>
                     </div>
@@ -1219,8 +1332,8 @@
             </div>
         </div>
     </section>
+    </main>
 
-    <!-- Footer -->
     <footer class="py-12 px-4 sm:px-6 lg:px-8 border-t border-gray-800">
         <div class="max-w-[1400px] mx-auto">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-8">

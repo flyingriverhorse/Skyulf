@@ -1,31 +1,22 @@
-Skyulf Commercial License (Overview)
+Skyulf Commercial Terms (Overview)
 
-This project is dual-licensed:
+Skyulf is licensed under the Apache License, Version 2.0. You may use it freely for open-source, commercial, on-prem, or hosted products without a separate copyleft exception.
 
-- Open Source: GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
-- Commercial License: Available for organizations that cannot comply with the AGPL’s copyleft and network-use obligations
+When would you still contact us?
 
-Summary (non-legal)
+- **Enterprise support:** If you need SLAs, roadmap commitments, or long-term maintenance guarantees.
+- **Custom licensing:** If your legal/compliance team requires bespoke terms (e.g., indemnification, audit clauses, or private amendments built on top of Apache-2.0).
+- **Partnerships:** If you’d like co-marketing, joint roadmap planning, or early access to unreleased capabilities.
 
-The AGPL remains the default license for all use. If you want to integrate Skyulf into a proprietary/closed-source product or service without the reciprocal obligations of the AGPL (including the network-use clause), you can obtain a separate commercial license from the copyright holder.
+How to start the conversation
 
-Key points of the commercial license (indicative only):
+1. Open a GitHub Discussion or issue titled “Commercial Partnership Request,” or
+2. Reach out via the contact channels listed in `README.md`.
 
-- Scope: Use, modify, and distribute Skyulf within closed-source applications or services without AGPL obligations.
-- No copyleft: You are not required to release your application’s source code, even when offering it over a network.
-- Compliance: You must comply with license terms, attribution, and any usage limits or seat/server terms specified in your commercial agreement.
-- Support and warranty: Optional support, SLAs, and warranties can be included as part of a commercial agreement.
-- Termination: Rights terminate if you breach the license terms and fail to cure within a defined period.
-
-How to get a commercial license
-
-- Create a GitHub Discussion or issue titled “Commercial License Request,” or
-- Contact the project maintainer via the channels listed in the repository (e.g., README or project website).
-
-We’ll follow up with next steps, including a short questionnaire about your use case and an appropriate license agreement.
+Please share your intended use, deployment model, and any contractual requirements so we can scope the right agreement.
 
 Notes
 
-- This file is an overview for convenience and is not a substitute for a signed commercial agreement.
-- The AGPL-3.0-or-later license continues to apply unless and until a commercial license is executed.
-- If you have already received a signed commercial agreement, its terms control your use.
+- Apache-2.0 remains the default license for all use unless a separate support/partnership contract is executed.
+- Existing commercial agreements remain valid; if you want to migrate to Apache-only terms, contact us and we’ll coordinate.
+- This page is informational and does not itself create any contractual rights.
