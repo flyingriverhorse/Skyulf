@@ -1,9 +1,9 @@
 {
   "name": "feature-canvas",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "private": true,
   "author": "Murat Unsal",
-  "license": "AGPL-3.0-or-later",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -127,7 +127,7 @@ class Settings(BaseSettings):
 
     # === CORE APPLICATION METADATA ===
     APP_NAME: str = "Skyulf"
-    APP_VERSION: str = "0.0.1"
+    APP_VERSION: str = "0.0.3"
     APP_SUMMARY: str = "Skyulf MLops service surface for data, experimentation, and automation."
     APP_DESCRIPTION: str = (
         "Programmatic interface for Skyulf's MLops platform covering data ingestion, model lifecycle, "

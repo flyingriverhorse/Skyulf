@@ -2,13 +2,13 @@
 
 [project]
 name = "skyulf"
-version = "0.0.1"
+version = "0.0.3"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 classifiers = [
-    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.10",

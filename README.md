@@ -1,8 +1,8 @@
 # Skyulf
 
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)]()
-[![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)](LICENSE)
-[![Commercial](https://img.shields.io/badge/commercial-license-blueviolet)](COMMERCIAL-LICENSE.md)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Commercial](https://img.shields.io/badge/enterprise-support-blueviolet)](COMMERCIAL-LICENSE.md)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](#quick-start)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](.pre-commit-config.yaml)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -101,10 +101,8 @@ The high-level flow from dataset to model training inside Skyulf:
 
 ## License
 
-Open Source: AGPL-3.0-or-later. See `LICENSE` for full terms.
-Commercial: A commercial license is available for closed-source integrations that cannot comply with AGPL’s reciprocal and network-use obligations. See `COMMERCIAL-LICENSE.md` for an overview and how to request terms.
-
-If you run Skyulf as a network service and modify it, AGPL requires you to make your modified source available to users interacting with it over the network.
+Open Source: Apache-2.0. See `LICENSE` for full terms.
+Commercial: No separate commercial license is required. If you need SLAs, indemnification, or custom terms, see `COMMERCIAL-LICENSE.md` for partnership/support options.
 
 ---
 
@@ -119,5 +117,5 @@ Thank you for checking out Skyulf. Whether you’re here to experiment, contribu
 ---
 
 © 2025 Murat Unsal — Skyulf Project  
-SPDX-License-Identifier: AGPL-3.0-or-later
+SPDX-License-Identifier: Apache-2.0
 
