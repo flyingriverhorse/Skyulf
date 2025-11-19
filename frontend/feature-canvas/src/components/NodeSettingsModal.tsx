@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, useId } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Node } from 'react-flow-renderer';
 import {
   FeatureMathNodeSignal,
@@ -170,8 +170,25 @@ import { useDummyEncodingRecommendations } from './node-settings/hooks/useDummyE
 import { useOneHotEncodingRecommendations } from './node-settings/hooks/useOneHotEncodingRecommendations';
 import { formatCellValue, formatColumnType, formatRelativeTime } from './node-settings/utils/formatters';
 import { DATA_CONSISTENCY_GUIDANCE } from './node-settings/utils/guidance';
+import { HistogramSparkline } from './node-settings/utils/HistogramSparkline';
+import {
+  sanitizeConstantsList,
+  sanitizeDatetimeFeaturesList,
+  sanitizeIntegerValue,
+  sanitizeNumberValue,
+  sanitizeStringList,
+  sanitizeTimezoneValue,
+} from './node-settings/utils/sanitizers';
 import { OutlierInsightsSection } from './node-settings/nodes/outlier/OutlierInsightsSection';
 import { OUTLIER_METHOD_ORDER } from './node-settings/nodes/outlier/outlierSettings';
+import { useNodeMetadata } from './node-settings/hooks/useNodeMetadata';
+import { ConnectionRequirementsSection } from './node-settings/layout/ConnectionRequirementsSection';
+import { useConnectionReadiness } from './node-settings/hooks/useConnectionReadiness';
+import { useParameterCatalog } from './node-settings/hooks/useParameterCatalog';
+import { useFilteredParameters } from './node-settings/hooks/useFilteredParameters';
+import { useNodeConfigState } from './node-settings/hooks/useNodeConfigState';
+import { useParameterHandlers } from './node-settings/hooks/useParameterHandlers';
+import { useTargetEncodingDefaults } from './node-settings/hooks/useTargetEncodingDefaults';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -188,140 +205,6 @@ type NodeSettingsModalProps = {
   isResetAvailable?: boolean;
 };
 
-type MetadataEntry = {
-  label: string;
-  value: string;
-};
-
-type HistogramSparklineProps = {
-  counts: number[];
-  binEdges: number[];
-  className?: string;
-};
-
-type ConnectionHandleDescriptor = {
-  key: string;
-  label: string;
-  position?: number;
-  required?: boolean;
-  accepts?: string[];
-};
-
-type ConnectionInfoSnapshot = {
-  inputs?: ConnectionHandleDescriptor[];
-  outputs?: ConnectionHandleDescriptor[];
-};
-
-const toHandleKey = (nodeId: string, handleId?: string | null): string | null => {
-  if (!handleId || typeof handleId !== 'string') {
-    return null;
-  }
-  const prefix = `${nodeId}-`;
-  if (handleId.startsWith(prefix)) {
-    return handleId.slice(prefix.length);
-  }
-  const parts = handleId.split('-');
-  if (parts.length >= 2) {
-    return parts.slice(-2).join('-');
-  }
-  return handleId;
-};
-
-const HistogramSparkline: React.FC<HistogramSparklineProps> = ({ counts, binEdges, className }) => {
-  const gradientId = useId();
-  const wrapperClass = className ?? 'canvas-skewness__histogram';
-  if (!counts || counts.length === 0 || !binEdges || binEdges.length !== counts.length + 1) {
-    return <div className={wrapperClass} aria-hidden="true" />;
-  }
-
-  const maxCount = counts.reduce((acc, value) => Math.max(acc, value), 0);
-  const safeMax = maxCount > 0 ? maxCount : 1;
-  const binWidth = 100 / counts.length;
-
-  return (
-    <div className={wrapperClass} role="img" aria-label="Histogram sparkline">
-      <svg viewBox="0 0 100 60">
-        <line x1="0" y1="58" x2="100" y2="58" stroke="rgba(148, 163, 184, 0.35)" strokeWidth="0.75" />
-        {counts.map((count, index) => {
-          const height = (count / safeMax) * 52;
-          const x = index * binWidth;
-          const y = 58 - height;
-          const width = Math.max(binWidth - 2, 1);
-          return (
-            <rect
-              key={`hist-bin-${index}`}
-              x={x + 1}
-              y={y}
-              width={width}
-              height={height}
-              rx={1.2}
-              ry={1.2}
-              fill={`url(#${gradientId})`}
-            />
-          );
-        })}
-        <defs>
-          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="rgba(165, 180, 252, 0.95)" />
-            <stop offset="100%" stopColor="rgba(129, 140, 248, 0.35)" />
-          </linearGradient>
-        </defs>
-      </svg>
-    </div>
-  );
-};
-
-const FEATURE_MATH_DATETIME_KEYS = new Set(DATETIME_FEATURE_OPTIONS.map((option) => option.value));
-
-const sanitizeStringList = (values: string[] | undefined): string[] => {
-  if (!values || !values.length) {
-    return [];
-  }
-  return Array.from(
-    new Set(values.map((value) => value.trim()).filter((value) => value.length > 0)),
-  ).sort((a, b) => a.localeCompare(b));
-};
-
-const sanitizeConstantsList = (values: number[] | undefined): number[] => {
-  if (!values || !values.length) {
-    return [];
-  }
-  return values.filter((value) => Number.isFinite(value));
-};
-
-const sanitizeDatetimeFeaturesList = (values: string[] | undefined): string[] => {
-  const sanitized = sanitizeStringList(values);
-  const filtered = sanitized.filter((value) => FEATURE_MATH_DATETIME_KEYS.has(value));
-  if (!filtered.length) {
-    return ['year', 'month', 'day'];
-  }
-  return filtered;
-};
-
-const sanitizeNumberValue = (value: number | null | undefined): number | null => {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  return Number.isFinite(value) ? value : null;
-};
-
-const sanitizeIntegerValue = (value: number | null | undefined): number | null => {
-  const numeric = sanitizeNumberValue(value);
-  if (numeric === null) {
-    return null;
-  }
-  const rounded = Math.round(numeric);
-  return Number.isFinite(rounded) ? rounded : null;
-};
-
-const sanitizeTimezoneValue = (value: string | undefined): string => {
-  if (typeof value !== 'string') {
-    return 'UTC';
-  }
-  const trimmed = value.trim();
-  return trimmed || 'UTC';
-};
-
 export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   node,
   onClose,
@@ -333,40 +216,17 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   defaultConfigTemplate,
   isResetAvailable = false,
 }) => {
-  const metadata = useMemo<MetadataEntry[]>(() => {
-    const entries: MetadataEntry[] = [];
+  const { metadata, title } = useNodeMetadata(node);
 
-    if (node?.data?.label) {
-      entries.push({ label: 'Label', value: String(node.data.label) });
-    }
-
-    if (node?.data?.description) {
-      entries.push({ label: 'Description', value: String(node.data.description) });
-    }
-
-    if (node?.data?.category) {
-      entries.push({ label: 'Category', value: String(node.data.category) });
-    }
-
-    if (node?.data?.catalogType) {
-      entries.push({ label: 'Node type', value: String(node.data.catalogType) });
-    }
-
-    if (node?.data?.inputs && Array.isArray(node.data.inputs) && node.data.inputs.length) {
-      entries.push({ label: 'Inputs', value: node.data.inputs.join(', ') });
-    }
-
-    if (node?.data?.outputs && Array.isArray(node.data.outputs) && node.data.outputs.length) {
-      entries.push({ label: 'Outputs', value: node.data.outputs.join(', ') });
-    }
-
-    return entries;
-  }, [node]);
-
-  const title = useMemo(() => {
-    const raw = node?.data?.label ?? node?.id;
-    return typeof raw === 'string' && raw.trim() ? raw : `Node ${node?.id ?? ''}`;
-  }, [node]);
+  const {
+    connectionInfo,
+    connectedHandleKeys,
+    connectedOutputHandleKeys,
+    evaluationSplitConnectivity,
+    connectionReady,
+    gatedSectionStyle,
+    gatedAriaDisabled,
+  } = useConnectionReadiness(node, graphSnapshot ?? null);
 
   const {
     catalogType,
@@ -432,919 +292,178 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
       .map((parameter) => ({ ...parameter }));
   }, [node]);
 
+  const getParameter = useParameterCatalog(parameters);
+  const getParameterIf = (condition: boolean, name: string) => (condition ? getParameter(name) : null);
+
   const dataConsistencyHint = useMemo(
     () => DATA_CONSISTENCY_GUIDANCE[catalogType] ?? null,
     [catalogType]
   );
 
   const nodeId = typeof node?.id === 'string' ? node.id : '';
-  const connectionInfo = useMemo<ConnectionInfoSnapshot | null>(() => {
-    const rawInfo = node?.data?.connectionInfo as ConnectionInfoSnapshot | undefined;
-    if (!rawInfo) {
-      return null;
-    }
-    const cloneHandles = (handles?: ConnectionHandleDescriptor[]) =>
-      Array.isArray(handles) ? handles.map((handle) => ({ ...handle })) : [];
-    return {
-      inputs: cloneHandles(rawInfo.inputs),
-      outputs: cloneHandles(rawInfo.outputs),
-    };
-  }, [node]);
-
-  const hasRequiredConnections = node?.data?.hasRequiredConnections !== false;
-
-  const connectedHandleKeys = useMemo(() => {
-    if (!nodeId || !graphSnapshot || !Array.isArray(graphSnapshot.edges)) {
-      return new Set<string>();
-    }
-    const keys = graphSnapshot.edges
-      .filter((edge: any) => edge?.target === nodeId)
-      .map((edge: any) => toHandleKey(nodeId, edge?.targetHandle))
-      .filter((value): value is string => Boolean(value));
-    return new Set(keys);
-  }, [graphSnapshot, nodeId]);
-
-  const connectedOutputHandleKeys = useMemo(() => {
-    if (!nodeId || !graphSnapshot || !Array.isArray(graphSnapshot.edges)) {
-      return new Set<string>();
-    }
-    const keys = graphSnapshot.edges
-      .filter((edge: any) => edge?.source === nodeId)
-      .map((edge: any) => toHandleKey(nodeId, edge?.sourceHandle))
-      .filter((value): value is string => Boolean(value));
-    return new Set(keys);
-  }, [graphSnapshot, nodeId]);
-
-  const evaluationSplitConnectivity = useMemo(() => {
-    if (!connectionInfo?.inputs || connectionInfo.inputs.length === 0) {
-      return undefined;
-    }
-    let hasRelevant = false;
-    const mapping: Partial<Record<'train' | 'validation' | 'test', boolean>> = {};
-    connectionInfo.inputs.forEach((handle) => {
-      if (!Array.isArray(handle.accepts) || handle.accepts.length === 0) {
-        return;
-      }
-      const isConnected = connectedHandleKeys.has(handle.key);
-      handle.accepts.forEach((acceptKey) => {
-        if (acceptKey === 'train' || acceptKey === 'validation' || acceptKey === 'test') {
-          mapping[acceptKey] = isConnected;
-          hasRelevant = true;
-        }
-      });
-    });
-    return hasRelevant ? mapping : undefined;
-  }, [connectionInfo?.inputs, connectedHandleKeys]);
-
-  const requiredInputHandles = useMemo(() => {
-    if (!connectionInfo?.inputs?.length) {
-      return [] as ConnectionHandleDescriptor[];
-    }
-    return connectionInfo.inputs.filter((handle) => handle.required !== false);
-  }, [connectionInfo?.inputs]);
-
-  const missingRequiredInputs = useMemo(() => {
-    if (!requiredInputHandles.length) {
-      return [] as ConnectionHandleDescriptor[];
-    }
-    return requiredInputHandles.filter((handle) => !connectedHandleKeys.has(handle.key));
-  }, [connectedHandleKeys, requiredInputHandles]);
-
-  const connectionReady = hasRequiredConnections && missingRequiredInputs.length === 0;
-  const gatedSectionStyle = useMemo<React.CSSProperties | undefined>(() => {
-    if (connectionReady) {
-      return undefined;
-    }
-    return {
-      opacity: 0.45,
-      pointerEvents: 'none',
-      userSelect: 'none',
-    };
-  }, [connectionReady]);
-  const gatedAriaDisabled = connectionReady ? undefined : true;
   const canResetNode = useMemo(
     () => Boolean(isResetAvailable && !isDataset && defaultConfigTemplate),
     [defaultConfigTemplate, isDataset, isResetAvailable]
   );
 
-  const binningColumnsParameter = useMemo(() => {
-    if (!isBinningNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isBinningNode, parameters]);
-
-  const scalingColumnsParameter = useMemo(() => {
-    if (!isScalingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isScalingNode, parameters]);
-
-  const removeDuplicatesColumnsParameter = useMemo(() => {
-    if (!isRemoveDuplicatesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isRemoveDuplicatesNode, parameters]);
-
-  const removeDuplicatesKeepParameter = useMemo(() => {
-    if (!isRemoveDuplicatesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'keep') ?? null;
-  }, [isRemoveDuplicatesNode, parameters]);
-
-  const replaceAliasesCustomPairsParameter = useMemo(() => {
-    if (!isReplaceAliasesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'custom_pairs') ?? null;
-  }, [isReplaceAliasesNode, parameters]);
-
-  const trimWhitespaceColumnsParameter = useMemo(() => {
-    if (!isTrimWhitespaceNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isTrimWhitespaceNode, parameters]);
-
-  const trimWhitespaceModeParameter = useMemo(() => {
-    if (!isTrimWhitespaceNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'mode') ?? null;
-  }, [isTrimWhitespaceNode, parameters]);
-
-  const removeSpecialColumnsParameter = useMemo(() => {
-    if (!isRemoveSpecialCharsNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isRemoveSpecialCharsNode, parameters]);
-
-  const removeSpecialModeParameter = useMemo(() => {
-    if (!isRemoveSpecialCharsNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'mode') ?? null;
-  }, [isRemoveSpecialCharsNode, parameters]);
-
-  const removeSpecialReplacementParameter = useMemo(() => {
-    if (!isRemoveSpecialCharsNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'replacement') ?? null;
-  }, [isRemoveSpecialCharsNode, parameters]);
-
-  const replaceInvalidColumnsParameter = useMemo(() => {
-    if (!isReplaceInvalidValuesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isReplaceInvalidValuesNode, parameters]);
-
-  const replaceInvalidModeParameter = useMemo(() => {
-    if (!isReplaceInvalidValuesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'mode') ?? null;
-  }, [isReplaceInvalidValuesNode, parameters]);
-
-  const replaceInvalidMinValueParameter = useMemo(() => {
-    if (!isReplaceInvalidValuesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'min_value') ?? null;
-  }, [isReplaceInvalidValuesNode, parameters]);
-
-  const replaceInvalidMaxValueParameter = useMemo(() => {
-    if (!isReplaceInvalidValuesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'max_value') ?? null;
-  }, [isReplaceInvalidValuesNode, parameters]);
-
-  const regexCleanupColumnsParameter = useMemo(() => {
-    if (!isRegexCleanupNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isRegexCleanupNode, parameters]);
-
-  const regexCleanupModeParameter = useMemo(() => {
-    if (!isRegexCleanupNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'mode') ?? null;
-  }, [isRegexCleanupNode, parameters]);
-
-  const regexCleanupPatternParameter = useMemo(() => {
-    if (!isRegexCleanupNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'pattern') ?? null;
-  }, [isRegexCleanupNode, parameters]);
-
-  const regexCleanupReplacementParameter = useMemo(() => {
-    if (!isRegexCleanupNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'replacement') ?? null;
-  }, [isRegexCleanupNode, parameters]);
-
-  const normalizeCaseColumnsParameter = useMemo(() => {
-    if (!isNormalizeTextCaseNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isNormalizeTextCaseNode, parameters]);
-
-  const normalizeCaseModeParameter = useMemo(() => {
-    if (!isNormalizeTextCaseNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'mode') ?? null;
-  }, [isNormalizeTextCaseNode, parameters]);
-
-  const labelEncodingColumnsParameter = useMemo(() => {
-    if (!isLabelEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isLabelEncodingNode, parameters]);
-
-  const labelEncodingAutoDetectParameter = useMemo(() => {
-    if (!isLabelEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'auto_detect') ?? null;
-  }, [isLabelEncodingNode, parameters]);
-
-  const labelEncodingMaxUniqueParameter = useMemo(() => {
-    if (!isLabelEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'max_unique_values') ?? null;
-  }, [isLabelEncodingNode, parameters]);
-
-  const labelEncodingOutputSuffixParameter = useMemo(() => {
-    if (!isLabelEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'output_suffix') ?? null;
-  }, [isLabelEncodingNode, parameters]);
-
-  const labelEncodingDropOriginalParameter = useMemo(() => {
-    if (!isLabelEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'drop_original') ?? null;
-  }, [isLabelEncodingNode, parameters]);
-
-  const labelEncodingMissingStrategyParameter = useMemo(() => {
-    if (!isLabelEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'missing_strategy') ?? null;
-  }, [isLabelEncodingNode, parameters]);
-
-  const labelEncodingMissingCodeParameter = useMemo(() => {
-    if (!isLabelEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'missing_code') ?? null;
-  }, [isLabelEncodingNode, parameters]);
-
-  const hashEncodingColumnsParameter = useMemo(() => {
-    if (!isHashEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isHashEncodingNode, parameters]);
-
-  const hashEncodingAutoDetectParameter = useMemo(() => {
-    if (!isHashEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'auto_detect') ?? null;
-  }, [isHashEncodingNode, parameters]);
-
-  const hashEncodingMaxCategoriesParameter = useMemo(() => {
-    if (!isHashEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'max_categories') ?? null;
-  }, [isHashEncodingNode, parameters]);
-
-  const hashEncodingBucketsParameter = useMemo(() => {
-    if (!isHashEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'n_buckets') ?? null;
-  }, [isHashEncodingNode, parameters]);
-
-  const hashEncodingOutputSuffixParameter = useMemo(() => {
-    if (!isHashEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'output_suffix') ?? null;
-  }, [isHashEncodingNode, parameters]);
-
-  const hashEncodingDropOriginalParameter = useMemo(() => {
-    if (!isHashEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'drop_original') ?? null;
-  }, [isHashEncodingNode, parameters]);
-
-  const hashEncodingEncodeMissingParameter = useMemo(() => {
-    if (!isHashEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'encode_missing') ?? null;
-  }, [isHashEncodingNode, parameters]);
-
-  const polynomialColumnsParameter = useMemo(() => {
-    if (!isPolynomialFeaturesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isPolynomialFeaturesNode, parameters]);
-
-  const polynomialAutoDetectParameter = useMemo(() => {
-    if (!isPolynomialFeaturesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'auto_detect') ?? null;
-  }, [isPolynomialFeaturesNode, parameters]);
-
-  const polynomialDegreeParameter = useMemo(() => {
-    if (!isPolynomialFeaturesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'degree') ?? null;
-  }, [isPolynomialFeaturesNode, parameters]);
-
-  const polynomialIncludeBiasParameter = useMemo(() => {
-    if (!isPolynomialFeaturesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'include_bias') ?? null;
-  }, [isPolynomialFeaturesNode, parameters]);
-
-  const polynomialInteractionOnlyParameter = useMemo(() => {
-    if (!isPolynomialFeaturesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'interaction_only') ?? null;
-  }, [isPolynomialFeaturesNode, parameters]);
-
-  const polynomialIncludeInputFeaturesParameter = useMemo(() => {
-    if (!isPolynomialFeaturesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'include_input_features') ?? null;
-  }, [isPolynomialFeaturesNode, parameters]);
-
-  const polynomialOutputPrefixParameter = useMemo(() => {
-    if (!isPolynomialFeaturesNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'output_prefix') ?? null;
-  }, [isPolynomialFeaturesNode, parameters]);
-
-  const featureSelectionColumnsParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionAutoDetectParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'auto_detect') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionTargetColumnParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'target_column') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionMethodParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'method') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionScoreFuncParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'score_func') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionProblemTypeParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'problem_type') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionKParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'k') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionPercentileParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'percentile') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionAlphaParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'alpha') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionThresholdParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'threshold') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionModeParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'mode') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionEstimatorParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'estimator') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionStepParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'step') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionMinFeaturesParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'min_features') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionMaxFeaturesParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'max_features') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureSelectionDropUnselectedParameter = useMemo(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'drop_unselected') ?? null;
-  }, [isFeatureSelectionNode, parameters]);
-
-  const featureMathErrorHandlingParameter = useMemo(() => {
-    if (!isFeatureMathNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'error_handling') ?? null;
-  }, [isFeatureMathNode, parameters]);
-
-  const featureMathAllowOverwriteParameter = useMemo(() => {
-    if (!isFeatureMathNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'allow_overwrite') ?? null;
-  }, [isFeatureMathNode, parameters]);
-
-  const featureMathDefaultTimezoneParameter = useMemo(() => {
-    if (!isFeatureMathNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'default_timezone') ?? null;
-  }, [isFeatureMathNode, parameters]);
-
-  const featureMathEpsilonParameter = useMemo(() => {
-    if (!isFeatureMathNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'epsilon') ?? null;
-  }, [isFeatureMathNode, parameters]);
-
-  const resamplingMethodParameter = useMemo(() => {
-    if (!isClassResamplingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'method') ?? null;
-  }, [isClassResamplingNode, parameters]);
-
-  const resamplingTargetColumnParameter = useMemo(() => {
-    if (!isClassResamplingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'target_column') ?? null;
-  }, [isClassResamplingNode, parameters]);
-
-  const resamplingSamplingStrategyParameter = useMemo(() => {
-    if (!isClassResamplingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'sampling_strategy') ?? null;
-  }, [isClassResamplingNode, parameters]);
-
-  const resamplingRandomStateParameter = useMemo(() => {
-    if (!isClassResamplingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'random_state') ?? null;
-  }, [isClassResamplingNode, parameters]);
-
-  const resamplingKNeighborsParameter = useMemo(() => {
-    if (!isClassOversamplingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'k_neighbors') ?? null;
-  }, [isClassOversamplingNode, parameters]);
-
-  const resamplingReplacementParameter = useMemo(() => {
-    if (!isClassUndersamplingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'replacement') ?? null;
-  }, [isClassUndersamplingNode, parameters]);
-
-  const featureTargetSplitTargetColumnParameter = useMemo(() => {
-    if (!isFeatureTargetSplitNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'target_column') ?? null;
-  }, [isFeatureTargetSplitNode, parameters]);
-
-  const trainModelTargetColumnParameter = useMemo(() => {
-    if (!(isTrainModelDraftNode || isHyperparameterTuningNode)) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'target_column') ?? null;
-  }, [isHyperparameterTuningNode, isTrainModelDraftNode, parameters]);
-
-  const trainModelProblemTypeParameter = useMemo(() => {
-    if (!(isTrainModelDraftNode || isHyperparameterTuningNode)) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'problem_type') ?? null;
-  }, [isHyperparameterTuningNode, isTrainModelDraftNode, parameters]);
-
-  const trainModelModelTypeParameter = useMemo(() => {
-    if (!(isTrainModelDraftNode || isHyperparameterTuningNode)) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'model_type') ?? null;
-  }, [isHyperparameterTuningNode, isTrainModelDraftNode, parameters]);
-
-  const trainModelHyperparametersParameter = useMemo(() => {
-    if (!isTrainModelDraftNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'hyperparameters') ?? null;
-  }, [isTrainModelDraftNode, parameters]);
-
-  const hyperparameterTuningSearchStrategyParameter = useMemo(() => {
-    if (!isHyperparameterTuningNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'search_strategy') ?? null;
-  }, [isHyperparameterTuningNode, parameters]);
-
-  const hyperparameterTuningSearchIterationsParameter = useMemo(() => {
-    if (!isHyperparameterTuningNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'search_iterations') ?? null;
-  }, [isHyperparameterTuningNode, parameters]);
-
-  const hyperparameterTuningSearchRandomStateParameter = useMemo(() => {
-    if (!isHyperparameterTuningNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'search_random_state') ?? null;
-  }, [isHyperparameterTuningNode, parameters]);
-
-  const hyperparameterTuningScoringMetricParameter = useMemo(() => {
-    if (!isHyperparameterTuningNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'scoring_metric') ?? null;
-  }, [isHyperparameterTuningNode, parameters]);
-
-  const trainModelCvEnabledParameter = useMemo(() => {
-    if (!(isTrainModelDraftNode || isHyperparameterTuningNode)) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'cv_enabled') ?? null;
-  }, [isHyperparameterTuningNode, isTrainModelDraftNode, parameters]);
-
-  const trainModelCvStrategyParameter = useMemo(() => {
-    if (!(isTrainModelDraftNode || isHyperparameterTuningNode)) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'cv_strategy') ?? null;
-  }, [isHyperparameterTuningNode, isTrainModelDraftNode, parameters]);
-
-  const trainModelCvFoldsParameter = useMemo(() => {
-    if (!(isTrainModelDraftNode || isHyperparameterTuningNode)) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'cv_folds') ?? null;
-  }, [isHyperparameterTuningNode, isTrainModelDraftNode, parameters]);
-
-  const trainModelCvShuffleParameter = useMemo(() => {
-    if (!(isTrainModelDraftNode || isHyperparameterTuningNode)) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'cv_shuffle') ?? null;
-  }, [isHyperparameterTuningNode, isTrainModelDraftNode, parameters]);
-
-  const trainModelCvRandomStateParameter = useMemo(() => {
-    if (!(isTrainModelDraftNode || isHyperparameterTuningNode)) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'cv_random_state') ?? null;
-  }, [isHyperparameterTuningNode, isTrainModelDraftNode, parameters]);
-
-  const trainModelCvRefitStrategyParameter = useMemo(() => {
-    if (!isTrainModelDraftNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'cv_refit_strategy') ?? null;
-  }, [isTrainModelDraftNode, parameters]);
-
-  const targetEncodingColumnsParameter = useMemo(() => {
-    if (!isTargetEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isTargetEncodingNode, parameters]);
-
-  const targetEncodingTargetColumnParameter = useMemo(() => {
-    if (!isTargetEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'target_column') ?? null;
-  }, [isTargetEncodingNode, parameters]);
-
-  const targetEncodingAutoDetectParameter = useMemo(() => {
-    if (!isTargetEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'auto_detect') ?? null;
-  }, [isTargetEncodingNode, parameters]);
-
-  const targetEncodingMaxCategoriesParameter = useMemo(() => {
-    if (!isTargetEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'max_categories') ?? null;
-  }, [isTargetEncodingNode, parameters]);
-
-  const targetEncodingOutputSuffixParameter = useMemo(() => {
-    if (!isTargetEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'output_suffix') ?? null;
-  }, [isTargetEncodingNode, parameters]);
-
-  const targetEncodingDropOriginalParameter = useMemo(() => {
-    if (!isTargetEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'drop_original') ?? null;
-  }, [isTargetEncodingNode, parameters]);
-
-  const targetEncodingSmoothingParameter = useMemo(() => {
-    if (!isTargetEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'smoothing') ?? null;
-  }, [isTargetEncodingNode, parameters]);
-
-  const targetEncodingEncodeMissingParameter = useMemo(() => {
-    if (!isTargetEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'encode_missing') ?? null;
-  }, [isTargetEncodingNode, parameters]);
-
-  const targetEncodingHandleUnknownParameter = useMemo(() => {
-    if (!isTargetEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'handle_unknown') ?? null;
-  }, [isTargetEncodingNode, parameters]);
-
-  const ordinalEncodingColumnsParameter = useMemo(() => {
-    if (!isOrdinalEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isOrdinalEncodingNode, parameters]);
-
-  const ordinalEncodingAutoDetectParameter = useMemo(() => {
-    if (!isOrdinalEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'auto_detect') ?? null;
-  }, [isOrdinalEncodingNode, parameters]);
-
-  const ordinalEncodingMaxCategoriesParameter = useMemo(() => {
-    if (!isOrdinalEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'max_categories') ?? null;
-  }, [isOrdinalEncodingNode, parameters]);
-
-  const ordinalEncodingOutputSuffixParameter = useMemo(() => {
-    if (!isOrdinalEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'output_suffix') ?? null;
-  }, [isOrdinalEncodingNode, parameters]);
-
-  const ordinalEncodingDropOriginalParameter = useMemo(() => {
-    if (!isOrdinalEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'drop_original') ?? null;
-  }, [isOrdinalEncodingNode, parameters]);
-
-  const ordinalEncodingEncodeMissingParameter = useMemo(() => {
-    if (!isOrdinalEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'encode_missing') ?? null;
-  }, [isOrdinalEncodingNode, parameters]);
-
-  const ordinalEncodingHandleUnknownParameter = useMemo(() => {
-    if (!isOrdinalEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'handle_unknown') ?? null;
-  }, [isOrdinalEncodingNode, parameters]);
-
-  const ordinalEncodingUnknownValueParameter = useMemo(() => {
-    if (!isOrdinalEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'unknown_value') ?? null;
-  }, [isOrdinalEncodingNode, parameters]);
-
-  const dummyEncodingColumnsParameter = useMemo(() => {
-    if (!isDummyEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isDummyEncodingNode, parameters]);
-
-  const dummyEncodingAutoDetectParameter = useMemo(() => {
-    if (!isDummyEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'auto_detect') ?? null;
-  }, [isDummyEncodingNode, parameters]);
-
-  const dummyEncodingMaxCategoriesParameter = useMemo(() => {
-    if (!isDummyEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'max_categories') ?? null;
-  }, [isDummyEncodingNode, parameters]);
-
-  const dummyEncodingDropFirstParameter = useMemo(() => {
-    if (!isDummyEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'drop_first') ?? null;
-  }, [isDummyEncodingNode, parameters]);
-
-  const dummyEncodingIncludeMissingParameter = useMemo(() => {
-    if (!isDummyEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'include_missing') ?? null;
-  }, [isDummyEncodingNode, parameters]);
-
-  const dummyEncodingDropOriginalParameter = useMemo(() => {
-    if (!isDummyEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'drop_original') ?? null;
-  }, [isDummyEncodingNode, parameters]);
-
-  const dummyEncodingPrefixSeparatorParameter = useMemo(() => {
-    if (!isDummyEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'prefix_separator') ?? null;
-  }, [isDummyEncodingNode, parameters]);
-
-  const oneHotEncodingColumnsParameter = useMemo(() => {
-    if (!isOneHotEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isOneHotEncodingNode, parameters]);
-
-  const oneHotEncodingAutoDetectParameter = useMemo(() => {
-    if (!isOneHotEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'auto_detect') ?? null;
-  }, [isOneHotEncodingNode, parameters]);
-
-  const oneHotEncodingMaxCategoriesParameter = useMemo(() => {
-    if (!isOneHotEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'max_categories') ?? null;
-  }, [isOneHotEncodingNode, parameters]);
-
-  const oneHotEncodingDropFirstParameter = useMemo(() => {
-    if (!isOneHotEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'drop_first') ?? null;
-  }, [isOneHotEncodingNode, parameters]);
-
-  const oneHotEncodingIncludeMissingParameter = useMemo(() => {
-    if (!isOneHotEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'include_missing') ?? null;
-  }, [isOneHotEncodingNode, parameters]);
-
-  const oneHotEncodingDropOriginalParameter = useMemo(() => {
-    if (!isOneHotEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'drop_original') ?? null;
-  }, [isOneHotEncodingNode, parameters]);
-
-  const oneHotEncodingPrefixSeparatorParameter = useMemo(() => {
-    if (!isOneHotEncodingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'prefix_separator') ?? null;
-  }, [isOneHotEncodingNode, parameters]);
-
-  const missingIndicatorColumnsParameter = useMemo(() => {
-    if (!isMissingIndicatorNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'columns') ?? null;
-  }, [isMissingIndicatorNode, parameters]);
-
-  const missingIndicatorSuffixParameter = useMemo(() => {
-    if (!isMissingIndicatorNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'flag_suffix') ?? null;
-  }, [isMissingIndicatorNode, parameters]);
-
-  const scalingDefaultMethodParameter = useMemo(() => {
-    if (!isScalingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'default_method') ?? null;
-  }, [isScalingNode, parameters]);
-
-  const scalingAutoDetectParameter = useMemo(() => {
-    if (!isScalingNode) {
-      return null;
-    }
-    return parameters.find((parameter) => parameter.name === 'auto_detect') ?? null;
-  }, [isScalingNode, parameters]);
+  const binningColumnsParameter = getParameterIf(isBinningNode, 'columns');
+  const scalingColumnsParameter = getParameterIf(isScalingNode, 'columns');
+  const removeDuplicatesColumnsParameter = getParameterIf(isRemoveDuplicatesNode, 'columns');
+  const removeDuplicatesKeepParameter = getParameterIf(isRemoveDuplicatesNode, 'keep');
+  const replaceAliasesCustomPairsParameter = getParameterIf(isReplaceAliasesNode, 'custom_pairs');
+  const trimWhitespaceColumnsParameter = getParameterIf(isTrimWhitespaceNode, 'columns');
+  const trimWhitespaceModeParameter = getParameterIf(isTrimWhitespaceNode, 'mode');
+  const removeSpecialColumnsParameter = getParameterIf(isRemoveSpecialCharsNode, 'columns');
+  const removeSpecialModeParameter = getParameterIf(isRemoveSpecialCharsNode, 'mode');
+  const removeSpecialReplacementParameter = getParameterIf(isRemoveSpecialCharsNode, 'replacement');
+  const replaceInvalidColumnsParameter = getParameterIf(isReplaceInvalidValuesNode, 'columns');
+  const replaceInvalidModeParameter = getParameterIf(isReplaceInvalidValuesNode, 'mode');
+  const replaceInvalidMinValueParameter = getParameterIf(isReplaceInvalidValuesNode, 'min_value');
+  const replaceInvalidMaxValueParameter = getParameterIf(isReplaceInvalidValuesNode, 'max_value');
+  const regexCleanupColumnsParameter = getParameterIf(isRegexCleanupNode, 'columns');
+  const regexCleanupModeParameter = getParameterIf(isRegexCleanupNode, 'mode');
+  const regexCleanupPatternParameter = getParameterIf(isRegexCleanupNode, 'pattern');
+  const regexCleanupReplacementParameter = getParameterIf(isRegexCleanupNode, 'replacement');
+  const normalizeCaseColumnsParameter = getParameterIf(isNormalizeTextCaseNode, 'columns');
+  const normalizeCaseModeParameter = getParameterIf(isNormalizeTextCaseNode, 'mode');
+
+  const labelEncodingColumnsParameter = isLabelEncodingNode ? getParameter('columns') : null;
+  const labelEncodingAutoDetectParameter = isLabelEncodingNode ? getParameter('auto_detect') : null;
+  const labelEncodingMaxUniqueParameter = isLabelEncodingNode ? getParameter('max_unique_values') : null;
+  const labelEncodingOutputSuffixParameter = isLabelEncodingNode ? getParameter('output_suffix') : null;
+  const labelEncodingDropOriginalParameter = isLabelEncodingNode ? getParameter('drop_original') : null;
+  const labelEncodingMissingStrategyParameter = isLabelEncodingNode ? getParameter('missing_strategy') : null;
+  const labelEncodingMissingCodeParameter = isLabelEncodingNode ? getParameter('missing_code') : null;
+
+  const hashEncodingColumnsParameter = isHashEncodingNode ? getParameter('columns') : null;
+  const hashEncodingAutoDetectParameter = isHashEncodingNode ? getParameter('auto_detect') : null;
+  const hashEncodingMaxCategoriesParameter = isHashEncodingNode ? getParameter('max_categories') : null;
+  const hashEncodingBucketsParameter = isHashEncodingNode ? getParameter('n_buckets') : null;
+  const hashEncodingOutputSuffixParameter = isHashEncodingNode ? getParameter('output_suffix') : null;
+  const hashEncodingDropOriginalParameter = isHashEncodingNode ? getParameter('drop_original') : null;
+  const hashEncodingEncodeMissingParameter = isHashEncodingNode ? getParameter('encode_missing') : null;
+
+  const polynomialColumnsParameter = getParameterIf(isPolynomialFeaturesNode, 'columns');
+  const polynomialAutoDetectParameter = getParameterIf(isPolynomialFeaturesNode, 'auto_detect');
+  const polynomialDegreeParameter = getParameterIf(isPolynomialFeaturesNode, 'degree');
+  const polynomialIncludeBiasParameter = getParameterIf(isPolynomialFeaturesNode, 'include_bias');
+  const polynomialInteractionOnlyParameter = getParameterIf(isPolynomialFeaturesNode, 'interaction_only');
+  const polynomialIncludeInputFeaturesParameter = getParameterIf(
+    isPolynomialFeaturesNode,
+    'include_input_features'
+  );
+  const polynomialOutputPrefixParameter = getParameterIf(isPolynomialFeaturesNode, 'output_prefix');
+
+  const featureSelectionColumnsParameter = getParameterIf(isFeatureSelectionNode, 'columns');
+  const featureSelectionAutoDetectParameter = getParameterIf(isFeatureSelectionNode, 'auto_detect');
+  const featureSelectionTargetColumnParameter = getParameterIf(isFeatureSelectionNode, 'target_column');
+  const featureSelectionMethodParameter = getParameterIf(isFeatureSelectionNode, 'method');
+  const featureSelectionScoreFuncParameter = getParameterIf(isFeatureSelectionNode, 'score_func');
+  const featureSelectionProblemTypeParameter = getParameterIf(isFeatureSelectionNode, 'problem_type');
+  const featureSelectionKParameter = getParameterIf(isFeatureSelectionNode, 'k');
+  const featureSelectionPercentileParameter = getParameterIf(isFeatureSelectionNode, 'percentile');
+  const featureSelectionAlphaParameter = getParameterIf(isFeatureSelectionNode, 'alpha');
+  const featureSelectionThresholdParameter = getParameterIf(isFeatureSelectionNode, 'threshold');
+  const featureSelectionModeParameter = getParameterIf(isFeatureSelectionNode, 'mode');
+  const featureSelectionEstimatorParameter = getParameterIf(isFeatureSelectionNode, 'estimator');
+  const featureSelectionStepParameter = getParameterIf(isFeatureSelectionNode, 'step');
+  const featureSelectionMinFeaturesParameter = getParameterIf(isFeatureSelectionNode, 'min_features');
+  const featureSelectionMaxFeaturesParameter = getParameterIf(isFeatureSelectionNode, 'max_features');
+  const featureSelectionDropUnselectedParameter = getParameterIf(
+    isFeatureSelectionNode,
+    'drop_unselected'
+  );
+
+  const featureMathErrorHandlingParameter = getParameterIf(isFeatureMathNode, 'error_handling');
+  const featureMathAllowOverwriteParameter = getParameterIf(isFeatureMathNode, 'allow_overwrite');
+  const featureMathDefaultTimezoneParameter = getParameterIf(isFeatureMathNode, 'default_timezone');
+  const featureMathEpsilonParameter = getParameterIf(isFeatureMathNode, 'epsilon');
+  const resamplingMethodParameter = getParameterIf(isClassResamplingNode, 'method');
+  const resamplingTargetColumnParameter = getParameterIf(isClassResamplingNode, 'target_column');
+  const resamplingSamplingStrategyParameter = getParameterIf(
+    isClassResamplingNode,
+    'sampling_strategy'
+  );
+  const resamplingRandomStateParameter = getParameterIf(isClassResamplingNode, 'random_state');
+  const resamplingKNeighborsParameter = getParameterIf(isClassOversamplingNode, 'k_neighbors');
+  const resamplingReplacementParameter = getParameterIf(isClassUndersamplingNode, 'replacement');
+  const featureTargetSplitTargetColumnParameter = getParameterIf(
+    isFeatureTargetSplitNode,
+    'target_column'
+  );
+  const hasTrainOrTuningNode = isTrainModelDraftNode || isHyperparameterTuningNode;
+  const trainModelTargetColumnParameter = getParameterIf(hasTrainOrTuningNode, 'target_column');
+  const trainModelProblemTypeParameter = getParameterIf(hasTrainOrTuningNode, 'problem_type');
+  const trainModelModelTypeParameter = getParameterIf(hasTrainOrTuningNode, 'model_type');
+  const trainModelHyperparametersParameter = getParameterIf(
+    isTrainModelDraftNode,
+    'hyperparameters'
+  );
+  const hyperparameterTuningSearchStrategyParameter = getParameterIf(
+    isHyperparameterTuningNode,
+    'search_strategy'
+  );
+  const hyperparameterTuningSearchIterationsParameter = getParameterIf(
+    isHyperparameterTuningNode,
+    'search_iterations'
+  );
+  const hyperparameterTuningSearchRandomStateParameter = getParameterIf(
+    isHyperparameterTuningNode,
+    'search_random_state'
+  );
+  const hyperparameterTuningScoringMetricParameter = getParameterIf(
+    isHyperparameterTuningNode,
+    'scoring_metric'
+  );
+  const trainModelCvEnabledParameter = getParameterIf(hasTrainOrTuningNode, 'cv_enabled');
+  const trainModelCvStrategyParameter = getParameterIf(hasTrainOrTuningNode, 'cv_strategy');
+  const trainModelCvFoldsParameter = getParameterIf(hasTrainOrTuningNode, 'cv_folds');
+  const trainModelCvShuffleParameter = getParameterIf(hasTrainOrTuningNode, 'cv_shuffle');
+  const trainModelCvRandomStateParameter = getParameterIf(hasTrainOrTuningNode, 'cv_random_state');
+  const trainModelCvRefitStrategyParameter = getParameterIf(
+    isTrainModelDraftNode,
+    'cv_refit_strategy'
+  );
+
+  const targetEncodingColumnsParameter = isTargetEncodingNode ? getParameter('columns') : null;
+  const targetEncodingTargetColumnParameter = isTargetEncodingNode ? getParameter('target_column') : null;
+  const targetEncodingAutoDetectParameter = isTargetEncodingNode ? getParameter('auto_detect') : null;
+  const targetEncodingMaxCategoriesParameter = isTargetEncodingNode ? getParameter('max_categories') : null;
+  const targetEncodingOutputSuffixParameter = isTargetEncodingNode ? getParameter('output_suffix') : null;
+  const targetEncodingDropOriginalParameter = isTargetEncodingNode ? getParameter('drop_original') : null;
+  const targetEncodingSmoothingParameter = isTargetEncodingNode ? getParameter('smoothing') : null;
+  const targetEncodingEncodeMissingParameter = isTargetEncodingNode ? getParameter('encode_missing') : null;
+  const targetEncodingHandleUnknownParameter = isTargetEncodingNode ? getParameter('handle_unknown') : null;
+
+  const ordinalEncodingColumnsParameter = isOrdinalEncodingNode ? getParameter('columns') : null;
+  const ordinalEncodingAutoDetectParameter = isOrdinalEncodingNode ? getParameter('auto_detect') : null;
+  const ordinalEncodingMaxCategoriesParameter = isOrdinalEncodingNode ? getParameter('max_categories') : null;
+  const ordinalEncodingOutputSuffixParameter = isOrdinalEncodingNode ? getParameter('output_suffix') : null;
+  const ordinalEncodingDropOriginalParameter = isOrdinalEncodingNode ? getParameter('drop_original') : null;
+  const ordinalEncodingEncodeMissingParameter = isOrdinalEncodingNode ? getParameter('encode_missing') : null;
+  const ordinalEncodingHandleUnknownParameter = isOrdinalEncodingNode ? getParameter('handle_unknown') : null;
+  const ordinalEncodingUnknownValueParameter = isOrdinalEncodingNode ? getParameter('unknown_value') : null;
+
+  const dummyEncodingColumnsParameter = isDummyEncodingNode ? getParameter('columns') : null;
+  const dummyEncodingAutoDetectParameter = isDummyEncodingNode ? getParameter('auto_detect') : null;
+  const dummyEncodingMaxCategoriesParameter = isDummyEncodingNode ? getParameter('max_categories') : null;
+  const dummyEncodingDropFirstParameter = isDummyEncodingNode ? getParameter('drop_first') : null;
+  const dummyEncodingIncludeMissingParameter = isDummyEncodingNode ? getParameter('include_missing') : null;
+  const dummyEncodingDropOriginalParameter = isDummyEncodingNode ? getParameter('drop_original') : null;
+  const dummyEncodingPrefixSeparatorParameter = isDummyEncodingNode ? getParameter('prefix_separator') : null;
+
+  const oneHotEncodingColumnsParameter = isOneHotEncodingNode ? getParameter('columns') : null;
+  const oneHotEncodingAutoDetectParameter = isOneHotEncodingNode ? getParameter('auto_detect') : null;
+  const oneHotEncodingMaxCategoriesParameter = isOneHotEncodingNode ? getParameter('max_categories') : null;
+  const oneHotEncodingDropFirstParameter = isOneHotEncodingNode ? getParameter('drop_first') : null;
+  const oneHotEncodingIncludeMissingParameter = isOneHotEncodingNode ? getParameter('include_missing') : null;
+  const oneHotEncodingDropOriginalParameter = isOneHotEncodingNode ? getParameter('drop_original') : null;
+  const oneHotEncodingPrefixSeparatorParameter = isOneHotEncodingNode ? getParameter('prefix_separator') : null;
+
+  const missingIndicatorColumnsParameter = getParameterIf(isMissingIndicatorNode, 'columns');
+  const missingIndicatorSuffixParameter = getParameterIf(isMissingIndicatorNode, 'flag_suffix');
+  const scalingDefaultMethodParameter = getParameterIf(isScalingNode, 'default_method');
+  const scalingAutoDetectParameter = getParameterIf(isScalingNode, 'auto_detect');
 
   const requiresColumnCatalog = useMemo(
     () =>
@@ -1360,157 +479,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     [parameters],
   );
 
-  const dropRowsAnyParameter = useMemo(
-    () => parameters.find((parameter) => parameter.name === 'drop_if_any_missing') ?? null,
-    [parameters],
-  );
-
-  const filteredParameters = useMemo(() => {
-    let result = parameters;
-    result = result.filter((parameter) => parameter?.source?.type !== 'drop_column_recommendations');
-    if (isDropMissingColumnsNode || isDropMissingRowsNode) {
-      result = result.filter((parameter) => parameter.name !== 'missing_threshold');
-    }
-    if (isDropMissingRowsNode) {
-      result = result.filter((parameter) => parameter.name !== 'drop_if_any_missing');
-    }
-    if (isImputerNode) {
-      result = result.filter((parameter) => parameter.name !== 'strategies');
-    }
-    if (isSkewnessNode) {
-      result = result.filter((parameter) => parameter.name !== 'transformations');
-    }
-    if (isCastNode) {
-      result = result.filter((parameter) => parameter.name !== 'column_overrides');
-    }
-    if (isBinningNode) {
-      result = result.filter((parameter) => parameter.name !== 'columns');
-    }
-    if (isScalingNode) {
-      result = result.filter(
-        (parameter) => !['columns', 'default_method', 'auto_detect'].includes(parameter.name)
-      );
-    }
-    if (isRemoveDuplicatesNode) {
-      result = result.filter((parameter) => parameter.name !== 'columns' && parameter.name !== 'keep');
-    }
-    if (isMissingIndicatorNode) {
-      result = result.filter((parameter) => parameter.name !== 'columns' && parameter.name !== 'flag_suffix');
-    }
-    if (isReplaceAliasesNode) {
-      result = result.filter(
-        (parameter) => !['columns', 'mode', 'custom_pairs'].includes(parameter.name),
-      );
-    }
-    if (isTrimWhitespaceNode) {
-      result = result.filter((parameter) => !['columns', 'mode'].includes(parameter.name));
-    }
-    if (isRemoveSpecialCharsNode) {
-      result = result.filter((parameter) => !['columns', 'mode', 'replacement'].includes(parameter.name));
-    }
-    if (isReplaceInvalidValuesNode) {
-      result = result.filter(
-        (parameter) => !['columns', 'mode', 'min_value', 'max_value'].includes(parameter.name),
-      );
-    }
-    if (isRegexCleanupNode) {
-      result = result.filter((parameter) => !['columns', 'mode', 'pattern', 'replacement'].includes(parameter.name));
-    }
-    if (isNormalizeTextCaseNode) {
-      result = result.filter((parameter) => !['columns', 'mode'].includes(parameter.name));
-    }
-    if (isStandardizeDatesNode) {
-      result = result.filter((parameter) => !['columns', 'mode'].includes(parameter.name));
-    }
-    if (isClassUndersamplingNode) {
-      result = result.filter(
-        (parameter) =>
-          !['method', 'target_column', 'sampling_strategy', 'random_state', 'replacement'].includes(parameter.name),
-      );
-    }
-    if (isTrainModelDraftNode) {
-      result = result.filter(
-        (parameter) =>
-          ![
-            'target_column',
-            'problem_type',
-            'cv_enabled',
-            'cv_strategy',
-            'cv_folds',
-            'cv_shuffle',
-            'cv_random_state',
-            'cv_refit_strategy',
-          ].includes(parameter.name),
-      );
-    }
-    if (isClassOversamplingNode) {
-      result = result.filter(
-        (parameter) =>
-          !['method', 'target_column', 'sampling_strategy', 'random_state'].includes(parameter.name),
-      );
-    }
-    if (isFeatureTargetSplitNode) {
-      result = result.filter((parameter) => parameter.name !== 'target_column');
-    }
-    if (isLabelEncodingNode) {
-      result = result.filter(
-        (parameter) =>
-          ![
-            'columns',
-            'auto_detect',
-            'max_unique_values',
-            'output_suffix',
-            'drop_original',
-            'missing_strategy',
-            'missing_code',
-          ].includes(parameter.name),
-      );
-    }
-    if (isOrdinalEncodingNode) {
-      result = result.filter(
-        (parameter) =>
-          ![
-            'columns',
-            'auto_detect',
-            'max_categories',
-            'output_suffix',
-            'drop_original',
-            'encode_missing',
-            'handle_unknown',
-            'unknown_value',
-          ].includes(parameter.name),
-      );
-    }
-    if (isDummyEncodingNode) {
-      result = result.filter(
-        (parameter) =>
-          ![
-            'columns',
-            'auto_detect',
-            'max_categories',
-            'drop_first',
-            'include_missing',
-            'drop_original',
-            'prefix_separator',
-          ].includes(parameter.name),
-      );
-    }
-    if (isOneHotEncodingNode) {
-      result = result.filter(
-        (parameter) =>
-          ![
-            'columns',
-            'auto_detect',
-            'max_categories',
-            'drop_first',
-            'include_missing',
-            'drop_original',
-            'prefix_separator',
-          ].includes(parameter.name),
-      );
-    }
-    return result;
-  }, [
+  const dropRowsAnyParameter = getParameterIf(isDropMissingRowsNode, 'drop_if_any_missing');
+  const filteredParameters = useFilteredParameters(parameters, {
     isBinningNode,
     isCastNode,
     isDropMissingColumnsNode,
@@ -1524,6 +494,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isRegexCleanupNode,
     isNormalizeTextCaseNode,
     isStandardizeDatesNode,
+    isScalingNode,
     isClassUndersamplingNode,
     isClassOversamplingNode,
     isTrainModelDraftNode,
@@ -1534,8 +505,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isRemoveDuplicatesNode,
     isSkewnessNode,
     isFeatureTargetSplitNode,
-    parameters,
-  ]);
+  });
 
   const dataConsistencyParameters = useMemo(
     () => (isDataConsistencyNode ? filteredParameters : []),
@@ -1544,21 +514,21 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
   const shouldLoadSkewnessInsights = isSkewnessNode || isSkewnessDistributionNode;
 
-  const initialConfig = useMemo(() => {
-    const base = cloneConfig(node?.data?.config ?? {});
-    if (!base || typeof base !== 'object' || Array.isArray(base)) {
-      return {};
-    }
-    if (!base.column_overrides || typeof base.column_overrides !== 'object' || Array.isArray(base.column_overrides)) {
-      base.column_overrides = {};
-    }
-    return base;
-  }, [node?.id, node?.data?.config]);
-  const [configState, setConfigState] = useState<Record<string, any>>(initialConfig);
+  const {
+    configState,
+    setConfigState,
+    stableInitialConfig,
+    stableCurrentConfig,
+    nodeChangeVersion,
+  } = useNodeConfigState({ node });
 
-  const targetEncodingFallbackAppliedRef = useRef(false);
-  const stableInitialConfig = useMemo(() => stableStringify(initialConfig), [initialConfig]);
-  const stableCurrentConfig = useMemo(() => stableStringify(configState), [configState]);
+  const {
+    handleParameterChange,
+    handleNumberChange,
+    handlePercentileChange,
+    handleBooleanChange,
+    handleTextChange,
+  } = useParameterHandlers({ setConfigState });
 
   const modelRegistryConfig = useMemo(() => {
     if (!isModelRegistryNode) {
@@ -1947,6 +917,15 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     targetNodeId: node?.id ?? null,
   });
 
+  useTargetEncodingDefaults({
+    isTargetEncodingNode,
+    enableGlobalFallbackDefault: targetEncodingMetadata.enableGlobalFallbackDefault,
+    encodeMissing: configState?.encode_missing,
+    handleUnknown: configState?.handle_unknown,
+    setConfigState,
+    nodeChangeVersion,
+  });
+
   const {
     isFetching: isFetchingHashEncoding,
     error: hashEncodingError,
@@ -2233,19 +1212,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
   }, [hasReachableSource, isImputerNode, requiresColumnCatalog, sourceId]);
 
-  // Only reset config state when the node ID changes (i.e., when switching to a different node)
-  // Don't reset when the node object reference changes due to other updates
-  const currentNodeId = node?.id;
-  const lastNodeIdRef = useRef<string | undefined>(currentNodeId);
-  
-  useEffect(() => {
-    if (lastNodeIdRef.current !== currentNodeId) {
-      lastNodeIdRef.current = currentNodeId;
-      setConfigState(initialConfig);
-      targetEncodingFallbackAppliedRef.current = false;
-    }
-  }, [currentNodeId]); // Removed initialConfig from dependencies!
-
   useEffect(() => {
     setImputerMissingFilter(0);
   }, [isImputerNode, node?.id]);
@@ -2259,59 +1225,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     setCollapsedStrategies(new Set());
   }, [stableInitialConfig]);
 
-  useEffect(() => {
-    if (!isTargetEncodingNode) {
-      targetEncodingFallbackAppliedRef.current = false;
-      return;
-    }
-    if (!targetEncodingMetadata.enableGlobalFallbackDefault) {
-      return;
-    }
-    if (targetEncodingFallbackAppliedRef.current) {
-      return;
-    }
-
-    const encodeMissingActive = typeof configState?.encode_missing === 'boolean' ? configState.encode_missing : null;
-    const currentHandleUnknown = typeof configState?.handle_unknown === 'string'
-      ? configState.handle_unknown.trim().toLowerCase()
-      : '';
-
-    if (encodeMissingActive === true && currentHandleUnknown === 'global_mean') {
-      targetEncodingFallbackAppliedRef.current = true;
-      return;
-    }
-
-    setConfigState((previous) => {
-      const previousEncodeMissing = typeof previous?.encode_missing === 'boolean' ? previous.encode_missing : null;
-      const previousHandleUnknown = typeof previous?.handle_unknown === 'string'
-        ? previous.handle_unknown.trim().toLowerCase()
-        : '';
-
-      if (previousEncodeMissing === true && previousHandleUnknown === 'global_mean') {
-        targetEncodingFallbackAppliedRef.current = true;
-        return previous;
-      }
-
-      const next: Record<string, any> = { ...previous };
-
-      if (previousEncodeMissing !== true) {
-        next.encode_missing = true;
-      }
-
-      if (previousHandleUnknown !== 'global_mean') {
-        next.handle_unknown = 'global_mean';
-      }
-
-      targetEncodingFallbackAppliedRef.current = true;
-      return next;
-    });
-  }, [
-    configState?.encode_missing,
-    configState?.handle_unknown,
-    isTargetEncodingNode,
-    setConfigState,
-    targetEncodingMetadata.enableGlobalFallbackDefault,
-  ]);
 
   const isPreviewNode = useMemo(() => node?.data?.catalogType === 'data_preview', [node?.data?.catalogType]);
   const isDatasetProfileNode = useMemo(
@@ -3224,10 +2137,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     imputerMissingFilter,
   });
 
-  const thresholdParameter = useMemo(
-    () => parameters.find((parameter) => parameter.name === 'missing_threshold'),
-    [parameters]
-  );
+  const thresholdParameter = getParameter('missing_threshold');
   const thresholdParameterName = thresholdParameter?.name ?? null;
 
   const normalizedSuggestedThreshold = useMemo(() => {
@@ -3248,58 +2158,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
   const showDropMissingRowsSection =
     isDropMissingRowsNode && Boolean(thresholdParameter || dropRowsAnyParameter);
-
-  const handleParameterChange = useCallback((name: string, value: any) => {
-    if (!name) {
-      return;
-    }
-    setConfigState((previous) => {
-      const next = { ...previous };
-      if (value === undefined) {
-        delete next[name];
-      } else {
-        next[name] = value;
-      }
-      return next;
-    });
-  }, []);
-
-  const handleNumberChange = useCallback(
-    (name: string, rawValue: string) => {
-      if (!name) {
-        return;
-      }
-      if (rawValue === '') {
-        handleParameterChange(name, undefined);
-        return;
-      }
-      const numericValue = Number(rawValue);
-      if (Number.isNaN(numericValue)) {
-        return;
-      }
-      handleParameterChange(name, numericValue);
-    },
-    [handleParameterChange]
-  );
-
-  const handlePercentileChange = useCallback(
-    (name: 'lower_percentile' | 'upper_percentile', rawValue: string) => {
-      if (!name) {
-        return;
-      }
-      if (rawValue === '') {
-        handleParameterChange(name, undefined);
-        return;
-      }
-      const numericValue = Number(rawValue);
-      if (!Number.isFinite(numericValue)) {
-        return;
-      }
-      const clamped = Math.min(Math.max(numericValue, 0), 100);
-      handleParameterChange(name, clamped);
-    },
-    [handleParameterChange]
-  );
 
   const handleManualBoundChange = useCallback(
     (column: string, bound: 'lower' | 'upper', rawValue: string) => {
@@ -3380,20 +2238,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
       };
     });
   }, []);
-
-  const handleBooleanChange = useCallback(
-    (name: string, checked: boolean) => {
-      handleParameterChange(name, checked);
-    },
-    [handleParameterChange]
-  );
-
-  const handleTextChange = useCallback(
-    (name: string, nextValue: string) => {
-      handleParameterChange(name, nextValue);
-    },
-    [handleParameterChange]
-  );
 
   const handleBinningIntegerChange = useCallback(
     (
@@ -4231,7 +3075,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
         };
 
         if (shouldEnableFallback) {
-          targetEncodingFallbackAppliedRef.current = true;
           result.encode_missing = true;
           result.handle_unknown = 'global_mean';
         }
@@ -4239,7 +3082,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
         return result;
       });
     },
-    [targetEncodingSuggestions],
+    [setConfigState, targetEncodingSuggestions],
   );
 
   const handleApplyHashEncodingRecommended = useCallback(
@@ -5355,12 +4198,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
       return;
     }
     const template = cloneConfig(defaultConfigTemplate ?? {});
-    if (isTargetEncodingNode) {
-      targetEncodingFallbackAppliedRef.current = false;
-    }
     setConfigState(template);
     onResetConfig?.(nodeId, template);
-  }, [canResetNode, defaultConfigTemplate, isTargetEncodingNode, nodeId, onResetConfig, targetEncodingFallbackAppliedRef]);
+  }, [canResetNode, defaultConfigTemplate, nodeId, onResetConfig, setConfigState]);
 
   const handleSave = useCallback((options?: { closeModal?: boolean }) => {
     let payload = cloneConfig(configState);
@@ -7082,59 +5922,12 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
         <div className="canvas-modal__body">
           {connectionInfo && (
-            <section className="canvas-modal__section">
-              <div className="canvas-modal__section-header">
-                <h3>Connection requirements</h3>
-              </div>
-              <p
-                className={
-                  connectionReady
-                    ? 'canvas-modal__note'
-                    : 'canvas-modal__note canvas-modal__note--warning'
-                }
-              >
-                <strong>{connectionReady ? 'Ready to execute.' : 'Missing required connections.'}</strong>{' '}
-                {connectionReady
-                  ? 'All required inputs are connected; you can continue configuring this node.'
-                  : 'Connect the required inputs listed below before running training or evaluation workflows.'}
-              </p>
-              {connectionInfo.inputs && connectionInfo.inputs.length > 0 && (
-                <div className="canvas-modal__note">
-                  <strong>Inputs</strong>
-                  <ul>
-                    {connectionInfo.inputs.map((handle) => {
-                      const isConnected = connectedHandleKeys.has(handle.key);
-                      const isRequired = handle.required !== false;
-                      return (
-                        <li key={`inputs-${handle.key}`}>
-                          <span>{handle.label}</span>
-                          <span>{' - '}</span>
-                          <span>{isConnected ? 'Connected' : isRequired ? 'Missing' : 'Optional'}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
-              {connectionInfo.outputs && connectionInfo.outputs.length > 0 && (
-                <div className="canvas-modal__note">
-                  <strong>Outputs</strong>
-                  <ul>
-                    {connectionInfo.outputs.map((handle) => {
-                      const isConnected = connectedOutputHandleKeys.has(handle.key);
-                      const isRequired = handle.required !== false;
-                      return (
-                        <li key={`outputs-${handle.key}`}>
-                          <span>{handle.label}</span>
-                          <span>{' - '}</span>
-                          <span>{isConnected ? 'Connected' : isRequired ? 'Unlinked' : 'Optional'}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
-            </section>
+            <ConnectionRequirementsSection
+              connectionInfo={connectionInfo}
+              connectedInputHandles={connectedHandleKeys}
+              connectedOutputHandles={connectedOutputHandleKeys}
+              connectionReady={connectionReady}
+            />
           )}
           {showDropMissingRowsSection && (
             <DropMissingRowsSection
