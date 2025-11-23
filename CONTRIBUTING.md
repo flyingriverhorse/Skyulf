@@ -38,40 +38,6 @@ Branch names:
 
 Open a Draft PR early if helpful; CI runs on PRs for Python 3.10 and 3.11.
 
-## Developer Certificate of Origin (DCO)
-
-All commits must include a `Signed-off-by` line to certify that you wrote or otherwise have the right to submit the code under the project's license (see [Developer Certificate of Origin](https://developercertificate.org/)).
-
-**How to sign off your commits:**
-
-Use the `-s` or `--signoff` flag when committing:
-
-```bash
-git commit -s -m "feat: add new feature"
-```
-
-This automatically adds a `Signed-off-by: Your Name <your.email@example.com>` line to your commit message.
-
-**For existing commits without sign-off:**
-
-If you forgot to sign off previous commits, you can amend or rebase:
-
-```bash
-# Amend the last commit
-git commit --amend --signoff
-
-# Sign off the last N commits (interactive rebase)
-git rebase HEAD~N --signoff
-```
-
-**Why DCO?**
-
-The DCO is a lightweight way for contributors to certify that they have the right to contribute their code. When you sign off a commit, you're agreeing to the terms at https://developercertificate.org/.
-
-**Enforcement:**
-
-All pull requests are automatically checked for DCO sign-off. PRs will fail CI if any commit is missing the `Signed-off-by` line.
-
 ## Issue triage
 - Include environment, steps to reproduce, expected vs actual.
 - Label runtime issues vs. feature requests.

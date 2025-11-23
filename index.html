@@ -752,7 +752,7 @@
                         <i data-feather="upload" class="w-8 h-8 text-blue-400"></i>
                     </div>
                     <h3 class="text-xl font-semibold mb-4">Data Ingestion</h3>
-                    <p class="text-xs text-blue-300 uppercase tracking-wide mb-2">Alpha · Available now</p>
+                    <p class="text-xs text-blue-300 uppercase tracking-wide mb-2">Available now</p>
                     <p class="text-gray-400">
                         Load CSV, Excel, Parquet, or SQL data. Schema gets detected automatically and results are cached so experiments stay reproducible. 
                     </p>
@@ -772,19 +772,19 @@
                         <i data-feather="cpu" class="w-8 h-8 text-emerald-400"></i>
                     </div>
                     <h3 class="text-xl font-semibold mb-4">Async Training</h3>
-                    <p class="text-xs text-emerald-300 uppercase tracking-wide mb-2">Alpha · Available now</p>
+                    <p class="text-xs text-emerald-300 uppercase tracking-wide mb-2">Available now</p>
                     <p class="text-gray-400">
                         Kick off grid searches, random sweeps, or halving trials in the background with Celery workers. Hook in Optuna if you want fancier hyperparameter tuning.
                     </p>
                 </div>
                 <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="250">
                     <div class="w-14 h-14 bg-pink-500/20 rounded-xl flex items-center justify-center mb-6">
-                        <i data-feather="shield" class="w-8 h-8 text-pink-400"></i>
+                        <i data-feather="cpu" class="w-8 h-8 text-pink-400"></i>
                     </div>
-                    <h3 class="text-xl font-semibold mb-4">LLM Helpers</h3>
+                    <h3 class="text-xl font-semibold mb-4">GenAI & LangChain</h3>
                     <p class="text-xs text-pink-300 uppercase tracking-wide mb-2">Planned · Roadmap</p>
                     <p class="text-gray-400">
-                        Connect OpenAI, Anthropic, DeepSeek, or run Ollama locally. Built-in guardrails help keep LLM outputs tied to your actual data.
+                        Visual LLM Builder to drag-and-drop prompts and chains. RAG workflows to chat with your documents locally.
                     </p>
                 </div>
                 <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="300">
@@ -802,7 +802,7 @@
                         <i data-feather="git-merge" class="w-8 h-8 text-indigo-400"></i>
                     </div>
                     <h3 class="text-xl font-semibold mb-4">Self-hosted DevEx</h3>
-                    <p class="text-xs text-indigo-300 uppercase tracking-wide mb-2">Alpha · Available now</p>
+                    <p class="text-xs text-indigo-300 uppercase tracking-wide mb-2">Available now</p>
                     <p class="text-gray-400">
                         Configure once via `config.py`, run on SQLite by default, and graduate to PostgreSQL or Docker when you’re ready.
                     </p>
@@ -972,28 +972,26 @@
     <section id="roadmap" class="py-16 px-4 sm:px-6 lg:px-8">
         <div class="max-w-[1400px] mx-auto">
             <div class="text-center mb-16" data-aos="fade-up">
-                <h2 class="text-4xl font-bold mb-4">Release snapshot</h2>
+                <h2 class="text-4xl font-bold mb-4">The Vision</h2>
                 <p class="text-xl text-gray-300 max-w-3xl mx-auto">
-                    Skyulf is evolving in the open. Track what’s shipping now and what the community is rallying around next.
+                    Skyulf is evolving from a tool into a complete "App Hub" for AI. Here is where we are going.
                 </p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
                 <div class="glass-effect rounded-3xl p-8 border border-white/10" data-aos="fade-up" data-aos-delay="100">
                     <div class="flex items-center gap-3 mb-4">
                         <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                            <i data-feather="tag" class="w-5 h-5 text-blue-400"></i>
+                            <i data-feather="check-circle" class="w-5 h-5 text-blue-400"></i>
                         </div>
                         <div>
-                            <p class="text-sm uppercase tracking-wide text-blue-300">Now shipping</p>
-                            <h3 class="text-2xl font-semibold text-white">v0.0.3</h3>
+                            <p class="text-sm uppercase tracking-wide text-blue-300">Phase 1: Polish & Stability</p>
+                            <h3 class="text-2xl font-semibold text-white">Current Focus</h3>
                         </div>
                     </div>
                     <ul class="space-y-3 text-gray-300">
-                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>39 workflow nodes:</strong> Preprocessing, encoding, modeling, and inspection blocks that stay on your infra.</span></li>
-                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Categorical encoding suite:</strong> One-hot, target, ordinal, and frequency encoding with automatic column detection.</span></li>
-                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Async model training:</strong> Scikit-learn trainers with Celery-powered grid/random/halving search running in background.</span></li>
-                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Visual pipeline builder:</strong> Drag-and-drop canvas with real-time node connections and EDA previews.</span></li>
-                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Self-hosted auth:</strong> Local user management, admin panel, and health monitoring—no cloud dependencies.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Full React Migration:</strong> Moving to a unified Single Page Application for a buttery-smooth experience.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Robustness:</strong> Enhanced type checking, test coverage, and error handling.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Documentation:</strong> The "Skyulf Book" and interactive project templates.</span></li>
                     </ul>
                 </div>
                 <div class="glass-effect rounded-3xl p-8 border border-white/10" data-aos="fade-up" data-aos-delay="150">
@@ -1002,17 +1000,23 @@
                             <i data-feather="compass" class="w-5 h-5 text-purple-400"></i>
                         </div>
                         <div>
-                            <p class="text-sm uppercase tracking-wide text-purple-300">In discovery</p>
-                            <h3 class="text-2xl font-semibold text-white">v0.1.0 · Community beta</h3>
+                            <p class="text-sm uppercase tracking-wide text-purple-300">Phase 2 & 3: The Future</p>
+                            <h3 class="text-2xl font-semibold text-white">Coming Soon</h3>
                         </div>
                     </div>
                     <ul class="space-y-3 text-gray-300">
-                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span>Expanded node library: scheduling, notifications, and evaluation drift monitors.</span></li>
-                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span>Improved experiment tracking with richer dashboards and export presets.</span></li>
-                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span>Contributor experience upgrades: CLI scaffolding, templated test harnesses, and docs revamp.</span></li>
-                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span><strong>More features will be coming.</strong></span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span><strong>Deep Data Science:</strong> Ethics checks, Synthetic Data, and Advanced EDA.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span><strong>App Hub:</strong> Plugin system, Visual LLM Builder, and One-Click Deployments.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span><strong>Collaboration:</strong> Real-time multiplayer editing ("Figma for ML").</span></li>
                     </ul>
                 </div>
+            </div>
+            
+            <div class="mt-12 text-center" data-aos="fade-up" data-aos-delay="200">
+                <a href="https://github.com/flyingriverhorse/skyulf/blob/master/ROADMAP.md" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-8 py-3 rounded-full transition-all border border-white/10 hover:border-white/30">
+                    <span>View Full Roadmap</span>
+                    <i data-feather="arrow-right" class="w-4 h-4"></i>
+                </a>
             </div>
         </div>
     </section>
@@ -1187,7 +1191,7 @@
                     <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
                         <div class="px-6 pb-5 pt-0">
                             <p class="text-gray-300">
-                                Skyulf is a self-hosted MLOps platform that lets you build, train, and monitor machine learning pipelines entirely on your infrastructure. 
+                                Skyulf is a self-hosted MLOps platform. It lets you build, train, and monitor machine learning pipelines entirely on your infrastructure.
                                 Unlike cloud-based solutions, your data never leaves your servers—perfect for privacy-sensitive or regulated environments.
                             </p>
                         </div>
@@ -1241,7 +1245,7 @@
                     <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
                         <div class="px-6 pb-5 pt-0">
                             <p class="text-gray-300">
-                                Skyulf is in (version 0.0.3). Core features like the drag-and-drop Feature Canvas, 
+                                Skyulf is in <strong>Active Alpha</strong>. Core features like the drag-and-drop Feature Canvas, 
                                 experiment tracking, and model monitoring are functional but actively evolving. Expect breaking changes as we refine the platform. 
                                 Check our <a href="https://github.com/flyingriverhorse/skyulf/blob/master/ROADMAP.md" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">roadmap</a> for what's coming next.
                             </p>
@@ -1260,8 +1264,8 @@
                     <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
                         <div class="px-6 pb-5 pt-0">
                             <p class="text-gray-300">
-                                Yes. Skyulf is production-ready. 
-                                Use it for experimentation, learning, and contributing. 
+                                Skyulf is currently in <strong>Active Alpha</strong>. It is perfect for internal tools, research, and experimentation. 
+                                We are working towards a stable v1.0 for critical production workloads.
                                 We'll announce production readiness clearly in the docs and releases.
                             </p>
                         </div>
@@ -1299,8 +1303,11 @@
                     <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
                         <div class="px-6 pb-5 pt-0">
                             <p class="text-gray-300">
-                                To make MLOps accessible, transparent, and privacy-first. We want data scientists and ML engineers to own their entire workflow—from 
-                                data ingestion to model deployment—without compromising on tools or privacy. Skyulf aims to be the go-to self-hosted MLOps stack for teams 
+                                To democratize AI development. We are building an "App Hub" where anyone can drag-and-drop to create powerful AI tools—from traditional ML to GenAI agents—without needing a PhD or a cloud budget.
+                                Skyulf aims to be the go-to self-hosted MLOps stack for teams who value privacy and control.
+                            </p>
+                        </div>
+                    </div> 
                                 who value data sovereignty and open-source principles.
                             </p>
                         </div>

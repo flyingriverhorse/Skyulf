@@ -1,50 +1,35 @@
-# Skyulf
+# Skyulf 🐺
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Commercial](https://img.shields.io/badge/enterprise-support-blueviolet)](COMMERCIAL-LICENSE.md)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](#quick-start)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](.pre-commit-config.yaml)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![DCO](https://img.shields.io/badge/DCO-required-green)](DCO.txt)
 ![](https://img.shields.io/badge/tagline-MLOps%20%3A%20FastAPI%20%2B%20Celery-blue)
 
-> ⚠️ This is a passion project in active development. Expect bugs, incomplete features, and visual inconsistencies. Use at your own risk and please report issues on GitHub!
+> ⚠️ **Status:** Active Development. Expect bugs, but also expect rapid progress. Use at your own risk and please report issues on GitHub!
 
-Skyulf is a self‑hosted, privacy‑first MLOps web application. It runs locally by default (SQLite) and scales to PostgreSQL if needed and aims to make machine learning operations more approachable by providing a low‑code web UI for data ingestion, feature engineering, and model training.
+**Machine Learning Operations (MLOps) shouldn't be this hard.**
 
-What you get out of the box:
-- A web UI for data ingestion
-- A low‑code Feature Canvas for feature engineering
-- Built‑in model training and hyperparameter search (Grid/Random/Halving; Optuna optional)
-- Background jobs with Celery/Redis
-- LLM helpers that can run locally (Ollama) or via APIs, with dataset‑aware guardrails - if configured (Planned).
+Skyulf is a self-hosted, privacy-first **MLOps Hub**. It is designed to be the "glue" that holds your data science workflow together—without the glue code. Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
+
+Built with a modern stack: **FastAPI** (Backend), **React** (Frontend), **Celery** (Async Jobs), and **Redis**.
 
 ## Table of Contents
 
-- [Contributing](#contributing)
-- [Quick start](#quick-start)
-- [Features](#features)
-- [Workflow overview](#workflow-overview)
+- [Quick Start](#quick-start)
+- [Key Features](#key-features)
+- [Roadmap](#roadmap)
+- [Workflow Overview](#workflow-overview)
 - [Development](#development)
+- [Contributing](#contributing)
 - [License](#license)
 
-## Contributing
+## Quick Start
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow guidance, and read our [Code of Conduct](CODE_OF_CONDUCT.md). 
+Prerequisites: **Python 3.10+**
 
-**Important:** All commits must include a DCO sign-off (`git commit -s`). See [DCO.txt](DCO.txt) for details.
-
-## Quick start
-
-Prerequisites
-- Python 3.10+
-
-Steps
-- Create and activate a virtualenv
-- Install minimal runtime deps
-- Run the API and visit http://127.0.0.1:8000/health
-
-On Windows PowerShell
+### On Windows PowerShell
 
 ```powershell
 python -m venv .venv
@@ -60,29 +45,36 @@ Optional: start the Celery worker (Redis required)
 .\.venv\Scripts\python.exe -m celery -A celery_worker.celery_app worker --pool=solo --loglevel=info --queues mlops-training
 ```
 
-Or with Docker Compose (recommended for a 1‑command dev run)
+### With Docker Compose (Recommended)
 
 ```powershell
 docker compose up --pull=always --build
 ```
 
-Open:
+**Open:**
 - API health — http://127.0.0.1:8000/health
 - Docs (dev mode) — http://127.0.0.1:8000/docs
 
-Health endpoints
-- GET /health — basic health
-- GET /health/detailed — DB/cache checks
+## Key Features
 
-## Features
-- Data ingestion (CSV/Excel/JSON/Parquet/SQL)
-- Feature engineering (math, binning, selection)
-- Model training and hyperparameter search (Grid/Random/Halving; optional Optuna integration)
-- Task queue for background training with Celery
-- Authentication scaffolding and admin pages
-- LLM helpers (OpenAI, Anthropic, DeepSeek, or local Ollama) - Not integrated yet
+*   **🎨 Visual Feature Canvas:** A node-based editor to clean, transform, and engineer features without writing spaghetti code. (30+ built-in nodes).
+*   **🚀 Modern Backend:** Built on FastAPI for high performance and easy API extension.
+*   **⚡ Async by Default:** Heavy training jobs run in the background via Celery & Redis—your UI never freezes.
+*   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or SQL. Start with SQLite (zero-config) and scale to PostgreSQL.
+*   **🧠 Model Training:** Built-in support for Scikit-Learn models with hyperparameter search (Grid/Random/Halving) and optional Optuna integration.
 
-## Workflow overview
+## Roadmap
+
+We have a clear vision to turn Skyulf into a complete **App Hub** for AI.
+
+*   **Phase 1: Polish & Stability** (Current Focus) - Full React migration, type safety, and documentation.
+*   **Phase 2: Deepening Data Science** - Advanced EDA, Ethics/Fairness checks, Synthetic Data, and Public Data Hubs.
+*   **Phase 3: The "App Hub" Vision** - Plugin system, GenAI/LLM Builders, and Deployment.
+*   **Phase 4: Expansion** - Real-time collaboration, Edge/IoT export, and Audio support.
+
+👉 **[View the full ROADMAP.md](./ROADMAP.md)** for details.
+
+## Workflow Overview
 
 The high-level flow from dataset to model training inside Skyulf:
 
@@ -98,6 +90,10 @@ The high-level flow from dataset to model training inside Skyulf:
 - Tests under `tests/` cover core feature engineering and training helpers
 - `docker-compose.yml` to run API + Redis (+ Celery worker)
 
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow guidance, and read our [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## License
 
 Open Source: Apache-2.0. See `LICENSE` for full terms.
@@ -109,7 +105,14 @@ If you'd like to contribute, sponsor, or request a commercial license, please st
 
 ---
 
-Thank you for checking out Skyulf. Whether you’re here to experiment, contribute, or run private models for your team, I hope this project makes MLOps more approachable.
+## 🤝 Join the Journey
+
+I'm building this because I love it, but I can't do it alone forever.
+*   **Try it out:** Clone the repo, run it, break it.
+*   **Give Feedback:** Tell me what sucks. Tell me what you love.
+*   **Contribute:** Even a typo fix in the README helps.
+
+Let's build the simplest, most powerful MLOps hub together.
 
 > "Not all those who wander are lost." — J.R.R. Tolkien <img src="static/images/lotr-ring.svg" alt="ring" width="20" height="20" style="vertical-align:middle;margin-left:6px;">
 

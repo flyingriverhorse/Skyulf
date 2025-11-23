@@ -12,11 +12,6 @@ __pycache__/
 dist/
 build/
 
-# === roadmap ===
-.roadmap/
-.roadmap.md
-ROADMAP.md
-
 # === todo ===
 .todo/
 .todo
