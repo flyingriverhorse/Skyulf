@@ -59,9 +59,19 @@ Since I am building this solo, I am prioritizing **stability and user experience
 *   **Data Quality (Great Expectations):** Integrate **Great Expectations** to automatically validate data (e.g., "Age must be > 0") and generate beautiful quality reports.
 *   **Ethics & Fairness:** Detect bias in datasets (e.g., "Is this model unfair to a specific demographic?") and calculate fairness metrics.
 *   **Synthetic Data:** Generate synthetic rows to augment small datasets or create anonymized replicas for safe sharing.
-*   **Monte Carlo analysis** and more robust cross-validation strategies.
+*   **Advanced Validation & Simulation:**
+    *   **Repeated Stratified K-Fold (Monte Carlo CV):** Run cross-validation multiple times with different random splits to ensure stability.
+    *   **Bootstrapping:** Estimate confidence intervals for model performance metrics.
+    *   **Sensitivity Analysis:** Understand how changes in specific features impact predictions.
+    *   **Adversarial Validation:** Check if training and test data come from the same distribution.
+    *   **Feature Stability Analysis:** Run feature selection on random subsets to identify robust features vs noise.
+    *   **Permutation Importance (with CI):** Shuffle features multiple times to measure importance stability with confidence intervals.
+    *   **Monte Carlo Dropout:** For neural networks, estimate prediction uncertainty by keeping dropout active during inference.
 *   **Data drift checks** between training data and new incoming data.
-*   **Explainability:** Add SHAP/LIME nodes to explain *why* a model made a specific prediction.
+*   **Explainability & Interpretation:**
+    *   **Global Feature Importance:** Visual rankings of top features (Gain, Split, Permutation).
+    *   **SHAP/LIME:** Explain *why* a model made a specific prediction for a single row.
+    *   **Partial Dependence Plots (PDP):** Visualize how a feature affects predictions.
 *   Richer visualizations directly in the Canvas (distributions, correlations, target leakage warnings).
 *   **Lightweight Data Labeling:** A simple interface to label raw text or images for classification tasks.
 
@@ -109,7 +119,7 @@ Since I am building this solo, I am prioritizing **stability and user experience
 *   **Pipeline export:** Generate a self-contained Python package (or Docker image) that includes feature engineering + model + simple API, so it can run on any cloud (Azure, AWS, GCP, on-prem).
 *   **Notebook Export:** "Export to Jupyter Notebook" button that generates a clean, runnable notebook with all your pipeline steps, so you can tweak the code manually.
 *   **ONNX export:** For supported models, export to ONNX so they can be served in non-Python environments.
-*   **Data Sinks:** Nodes to export *processed* data back to CSV, Parquet, or SQL (not just training models).
+*   **Data Export Nodes (ETL Mode):** Ability to save processed data to CSV, Parquet, or SQL, allowing Skyulf to be used for pure data transformation pipelines without model training.
 *   **MLflow Integration:** Deep integration with MLflow for experiment tracking (charts, run comparison) and model registry.
     *   *Strategy:* Use Skyulf's simple UI for day-to-day work, but back it with MLflow so power users can access the full professional dashboard.
 
