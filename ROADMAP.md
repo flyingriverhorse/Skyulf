@@ -36,6 +36,7 @@ Since I am building this solo, I am prioritizing **stability and user experience
 *Goal: Make the current experience smooth, predictable, and enjoyable.*
 
 #### UI/UX Consistency & Architecture
+*   **Extract Core Library (`skyulf-core`):** Separate the pure ML logic (transformers, pipeline utils) from the web application. This allows deployed models to run with a lightweight `pip install skyulf-core` instead of the full platform.
 *   **Full React Migration:** Gradually replace all Jinja2 server-rendered pages with a single React SPA. Keep FastAPI focused on clean JSON APIs.
 *   Unify layout, typography, and theming between the Canvas and the rest of the app.
 *   Make node interactions feel "buttery" (dragging, zooming, connecting edges).
@@ -96,6 +97,10 @@ Since I am building this solo, I am prioritizing **stability and user experience
 *   **GPU Acceleration:** Optional support for CUDA-enabled training for Deep Learning nodes.
 *   Optimize caches and intermediate storage so even bigger datasets stay responsive.
 
+#### Deployment & Export (Early Access)
+*   **Export Standalone API (ZIP):** Generate a lightweight, self-contained ZIP file containing the trained model, preprocessing pipeline, and a ready-to-run FastAPI/Flask app. Users can unzip and run `python main.py` to serve their model anywhere.
+*   **Notebook Export:** "Export to Jupyter Notebook" button that generates a clean, runnable notebook with all your pipeline steps, so you can tweak the code manually.
+
 ---
 
 ### Phase 3: The "App Hub" Vision (Long-Term)
@@ -116,8 +121,7 @@ Since I am building this solo, I am prioritizing **stability and user experience
 #### Deployment & Export
 *   **Python SDK:** A developer-friendly Python library (`import skyulf`) to interact with the platform programmatically, trigger pipelines, or fetch predictions.
 *   **One-Click App (Streamlit/Gradio):** Automatically generate a simple web app from trained model so you can demo it to stakeholders instantly.
-*   **Pipeline export:** Generate a self-contained Python package (or Docker image) that includes feature engineering + model + simple API, so it can run on any cloud (Azure, AWS, GCP, on-prem).
-*   **Notebook Export:** "Export to Jupyter Notebook" button that generates a clean, runnable notebook with all your pipeline steps, so you can tweak the code manually.
+*   **Docker Export:** Generate a Dockerfile and build script to containerize the standalone API for cloud deployment (AWS/Azure/GCP).
 *   **ONNX export:** For supported models, export to ONNX so they can be served in non-Python environments.
 *   **Data Export Nodes (ETL Mode):** Ability to save processed data to CSV, Parquet, or SQL, allowing Skyulf to be used for pure data transformation pipelines without model training.
 *   **MLflow Integration:** Deep integration with MLflow for experiment tracking (charts, run comparison) and model registry.
