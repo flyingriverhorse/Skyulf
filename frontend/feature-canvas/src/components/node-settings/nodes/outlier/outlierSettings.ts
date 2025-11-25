@@ -6,6 +6,8 @@ import type {
 	OutlierMethodSummary,
 } from '../../../../api';
 
+export type { OutlierMethodName };
+
 export type NormalizedOutlierConfig = {
 	columns: string[];
 	defaultMethod: OutlierMethodName;
