@@ -11,6 +11,8 @@ type SkewnessDistributionSectionProps = {
   skewnessDistributionCards: SkewnessDistributionCard[];
   skewnessDistributionView: SkewnessDistributionView;
   setSkewnessDistributionView: (view: SkewnessDistributionView) => void;
+  onRefresh: () => void;
+  canRefresh: boolean;
 };
 
 export const SkewnessDistributionSection: React.FC<SkewnessDistributionSectionProps> = ({
@@ -20,6 +22,8 @@ export const SkewnessDistributionSection: React.FC<SkewnessDistributionSectionPr
   skewnessDistributionCards,
   skewnessDistributionView,
   setSkewnessDistributionView,
+  onRefresh,
+  canRefresh,
 }) => {
   const renderDistributionSection = (
     distribution: SkewnessColumnDistribution,
@@ -100,6 +104,14 @@ export const SkewnessDistributionSection: React.FC<SkewnessDistributionSectionPr
               After
             </button>
           </div>
+          <button
+            type="button"
+            className="btn btn-outline-secondary"
+            onClick={onRefresh}
+            disabled={isFetchingSkewness || !canRefresh}
+          >
+            {isFetchingSkewness ? 'Refreshing…' : 'Refresh'}
+          </button>
         </div>
       </div>
       {skewnessThreshold !== null && (

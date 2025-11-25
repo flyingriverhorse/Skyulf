@@ -7,7 +7,6 @@ import {
   TransformerAuditNodeSignal,
   PipelinePreviewSchema,
   SkewnessColumnDistribution,
-  triggerFullDatasetExecution,
 } from '../api';
 import {
   DropMissingColumnsSection,
@@ -32,7 +31,6 @@ import {
 } from './node-settings/formatting';
 import {
   BINNED_SAMPLE_PRESETS,
-  normalizeBinningConfigValue,
   type BinnedDistributionBin,
   type BinnedDistributionCard,
   type BinnedSamplePresetValue,
@@ -58,7 +56,7 @@ import {
   type ImputationStrategyOptions,
 } from './node-settings/nodes/imputation/imputationSettings';
 import { ImputationStrategiesSection, type ImputationSchemaDiagnostics } from './node-settings/nodes/imputation/ImputationStrategiesSection';
-import { SCALING_METHOD_ORDER, normalizeScalingConfigValue } from './node-settings/nodes/scaling/scalingSettings';
+import { SCALING_METHOD_ORDER } from './node-settings/nodes/scaling/scalingSettings';
 import { ScalingInsightsSection } from './node-settings/nodes/scaling/ScalingInsightsSection';
 import { SkewnessInsightsSection } from './node-settings/nodes/skewness/SkewnessInsightsSection';
 import {
@@ -141,7 +139,6 @@ import {
 } from './node-settings/hooks/useSkewnessConfiguration';
 import {
   arraysAreEqual,
-  cloneConfig,
   normalizeConfigBoolean,
   pickAutoDetectValue,
   stableStringify,
@@ -176,6 +173,7 @@ import { usePreviewColumnTypes, usePreviewAvailableColumns } from './node-settin
 import { usePreviewSignals } from './node-settings/hooks/usePreviewSignals';
 import { useFeatureSelectionAutoConfig } from './node-settings/hooks/useFeatureSelectionAutoConfig';
 import { useColumnSelectionHandlers } from './node-settings/hooks/useColumnSelectionHandlers';
+import { useNodeSaveHandlers } from './node-settings/hooks/useNodeSaveHandlers';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -292,6 +290,43 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     () => Boolean(isResetAvailable && !isDataset && defaultConfigTemplate),
     [defaultConfigTemplate, isDataset, isResetAvailable]
   );
+
+  const footerOnlyResetNodes = [
+    isFeatureMathNode,
+    isFeatureTargetSplitNode,
+    isTrainTestSplitNode,
+    isModelEvaluationNode,
+    isHashEncodingNode,
+    isPolynomialFeaturesNode,
+    isFeatureSelectionNode,
+    isDataConsistencyNode,
+    isTrainModelDraftNode,
+    isHyperparameterTuningNode,
+    isClassResamplingNode,
+    isLabelEncodingNode,
+    isTargetEncodingNode,
+    isDummyEncodingNode,
+    isOneHotEncodingNode,
+    isOrdinalEncodingNode,
+    isImputerNode,
+    isMissingIndicatorNode,
+    isReplaceAliasesNode,
+    isTrimWhitespaceNode,
+    isRemoveSpecialCharsNode,
+    isReplaceInvalidValuesNode,
+    isRegexCleanupNode,
+    isNormalizeTextCaseNode,
+    isStandardizeDatesNode,
+    isCastNode,
+    isRemoveDuplicatesNode,
+    isDropMissingNode,
+    isOutlierNode,
+  ].some(Boolean);
+
+  const disableAllGlobalResets = isBinnedDistributionNode || isSkewnessDistributionNode;
+  const headerResetDisabled = disableAllGlobalResets || isScalingNode || isBinningNode || footerOnlyResetNodes;
+  const headerCanResetNode = canResetNode && !headerResetDisabled;
+  const footerCanResetNode = canResetNode && !disableAllGlobalResets;
 
   const binningColumnsParameter = getParameterIf(isBinningNode, 'columns');
   const scalingColumnsParameter = getParameterIf(isScalingNode, 'columns');
@@ -1037,6 +1072,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     return previewState.data.sample_rows;
   }, [previewState.data?.sample_rows]);
 
+  const canRefreshSkewnessDistributions = Boolean(sourceId) && hasReachableSource;
+
   const nodeColumns = useMemo(() => ensureArrayOfString(node?.data?.columns), [node?.data?.columns]);
 
   const {
@@ -1381,127 +1418,29 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     recommendations,
   });
 
+  const { handleSave, handleResetNode } = useNodeSaveHandlers({
+    configState,
+    isBinningNode,
+    isScalingNode,
+    nodeId,
+    onUpdateConfig,
+    onClose,
+    sourceId,
+    graphSnapshot: graphSnapshot ?? null,
+    isInspectionNode,
+    onUpdateNodeData,
+    setConfigState,
+    canResetNode,
+    defaultConfigTemplate,
+    onResetConfig,
+  });
+
   const handleApplySuggestedThreshold = useCallback(() => {
     if (normalizedSuggestedThreshold === null || !thresholdParameterName) {
       return;
     }
     handleParameterChange(thresholdParameterName, normalizedSuggestedThreshold);
   }, [handleParameterChange, normalizedSuggestedThreshold, thresholdParameterName]);
-
-  const handleResetNode = useCallback(() => {
-    if (!canResetNode || !nodeId) {
-      return;
-    }
-    const template = cloneConfig(defaultConfigTemplate ?? {});
-    setConfigState(template);
-    onResetConfig?.(nodeId, template);
-  }, [canResetNode, defaultConfigTemplate, nodeId, onResetConfig, setConfigState]);
-
-  const handleSave = useCallback((options?: { closeModal?: boolean }) => {
-    let payload = cloneConfig(configState);
-    
-    if (isBinningNode) {
-      const normalized = normalizeBinningConfigValue(payload);
-      payload = {
-        ...payload,
-        strategy: normalized.strategy,
-        columns: normalized.columns,
-        equal_width_bins: normalized.equalWidthBins,
-        equal_frequency_bins: normalized.equalFrequencyBins,
-        include_lowest: normalized.includeLowest,
-        precision: normalized.precision,
-        duplicates: normalized.duplicates,
-        output_suffix: normalized.outputSuffix,
-        drop_original: normalized.dropOriginal,
-        label_format: normalized.labelFormat,
-        missing_strategy: normalized.missingStrategy,
-      };
-
-      if (normalized.missingStrategy === 'label') {
-        payload.missing_label = normalized.missingLabel;
-      } else if (Object.prototype.hasOwnProperty.call(payload, 'missing_label')) {
-        delete payload.missing_label;
-      }
-
-      if (Object.keys(normalized.customBins).length) {
-        payload.custom_bins = normalized.customBins;
-      } else if (Object.prototype.hasOwnProperty.call(payload, 'custom_bins')) {
-        delete payload.custom_bins;
-      }
-
-      if (Object.keys(normalized.customLabels).length) {
-        payload.custom_labels = normalized.customLabels;
-      } else if (Object.prototype.hasOwnProperty.call(payload, 'custom_labels')) {
-        delete payload.custom_labels;
-      }
-    }
-
-    if (isScalingNode) {
-      const normalized = normalizeScalingConfigValue(payload);
-      payload = {
-        ...payload,
-        columns: normalized.columns,
-        default_method: normalized.defaultMethod,
-        auto_detect: normalized.autoDetect,
-        skipped_columns: normalized.skippedColumns,
-      };
-      
-      // Only include column_methods if there are overrides
-      if (Object.keys(normalized.columnMethods).length > 0) {
-        payload.column_methods = normalized.columnMethods;
-      } else if (Object.prototype.hasOwnProperty.call(payload, 'column_methods')) {
-        delete payload.column_methods;
-      }
-    }
-
-    onUpdateConfig(node.id, payload);
-    if (options?.closeModal !== false) {
-      onClose();
-    }
-    
-    // Trigger full dataset execution in background after saving
-    // This pre-loads the full dataset for this node's transformations
-    // Skip for inspection nodes (they only view data, don't transform it)
-    if (sourceId && graphSnapshot && !isInspectionNode) {
-      // Set loading status immediately
-      if (onUpdateNodeData) {
-        onUpdateNodeData(node.id, { backgroundExecutionStatus: 'loading' });
-      }
-      
-      triggerFullDatasetExecution({
-        dataset_source_id: sourceId,
-        graph: {
-          nodes: graphSnapshot.nodes || [],
-          edges: graphSnapshot.edges || [],
-        },
-        target_node_id: node.id,
-      })
-        .then(() => {
-          // Update to success when complete
-          if (onUpdateNodeData) {
-            onUpdateNodeData(node.id, { backgroundExecutionStatus: 'success' });
-          }
-        })
-        .catch((error) => {
-          // Update to error on failure
-          if (onUpdateNodeData) {
-            onUpdateNodeData(node.id, { backgroundExecutionStatus: 'error' });
-          }
-          // Silent fail - this is a background optimization, not critical
-          console.warn('Background full dataset execution failed:', error);
-        });
-    }
-  }, [
-    configState,
-    isBinningNode,
-    node.id,
-    onClose,
-    onUpdateConfig,
-    onUpdateNodeData,
-    sourceId,
-    graphSnapshot,
-    isInspectionNode,
-  ]);
 
   const canApplySuggestedThreshold =
     normalizedSuggestedThreshold !== null && !thresholdMatchesSuggestion;
@@ -3110,7 +3049,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
           title={title}
           isDataset={datasetBadge}
           onClose={onClose}
-          canResetNode={canResetNode}
+          canResetNode={headerCanResetNode}
           onResetNode={handleResetNode}
         />
 
@@ -3281,8 +3220,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               defaultTimezoneParameter={featureMathDefaultTimezoneParameter}
               epsilonParameter={featureMathEpsilonParameter}
               renderParameterField={renderParameterField}
-              canResetNode={canResetNode}
-              onResetNode={handleResetNode}
             />
           )}
           {isOrdinalEncodingNode && (
@@ -3388,8 +3325,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               renderParameterField={renderParameterField}
               formatMetricValue={formatMetricValue}
               formatMissingPercentage={formatMissingPercentage}
-              canResetNode={canResetNode}
-              onResetNode={handleResetNode}
             />
           )}
           {isTrainTestSplitNode && (
@@ -3403,8 +3338,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               parameters={parameters}
               renderParameterField={renderParameterField}
               formatMetricValue={formatMetricValue}
-              canResetNode={canResetNode}
-              onResetNode={handleResetNode}
             />
           )}
           {isClassResamplingNode && (
@@ -3477,8 +3410,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                 renderParameterField={renderParameterField}
                 formatMetricValue={formatMetricValue}
                 connectedSplitHandles={evaluationSplitConnectivity}
-                canResetNode={canResetNode}
-                onResetNode={handleResetNode}
               />
             </div>
           )}
@@ -3557,8 +3488,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               renderParameterField={renderParameterField}
               onToggleColumn={handleToggleColumn}
               onApplyRecommended={handleApplyHashEncodingRecommended}
-              canResetNode={canResetNode}
-              onResetNode={handleResetNode}
               formatMissingPercentage={formatMissingPercentage}
             />
           )}
@@ -3573,8 +3502,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               outputPrefixParameter={polynomialOutputPrefixParameter}
               renderParameterField={renderParameterField}
               signal={polynomialSignal}
-              canResetNode={canResetNode}
-              onResetNode={handleResetNode}
             />
           )}
           {isFeatureSelectionNode && (
@@ -3597,8 +3524,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               dropUnselectedParameter={featureSelectionDropUnselectedParameter}
               renderParameterField={renderParameterField}
               signal={featureSelectionSignal}
-              canResetNode={canResetNode}
-              onResetNode={handleResetNode}
             />
           )}
           {isStandardizeDatesNode && (
@@ -3823,6 +3748,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               skewnessDistributionCards={skewnessDistributionCards}
               skewnessDistributionView={skewnessDistributionView}
               setSkewnessDistributionView={setSkewnessDistributionView}
+              onRefresh={refreshSkewness}
+              canRefresh={canRefreshSkewnessDistributions}
             />
           )}
           {isBinnedDistributionNode && (
@@ -3854,17 +3781,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <section className="canvas-modal__section">
               <div className="canvas-modal__section-header">
                 <h3>Data consistency settings</h3>
-                {canResetNode && (
-                  <div className="canvas-modal__section-actions">
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary"
-                      onClick={handleResetNode}
-                    >
-                      Reset node
-                    </button>
-                  </div>
-                )}
               </div>
               <div className="canvas-modal__parameter-list">
                 {dataConsistencyParameters.map((parameter) => renderParameterField(parameter))}
@@ -3900,7 +3816,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
         <NodeSettingsFooter
           onClose={onClose}
-          canResetNode={canResetNode}
+          canResetNode={footerCanResetNode}
           onResetNode={handleResetNode}
           showSaveButton={showSaveButton}
           canSave={canSave}

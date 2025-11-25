@@ -11,8 +11,6 @@ type PolynomialFeaturesSectionProps = {
   outputPrefixParameter: FeatureNodeParameter | null;
   renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
   signal: PolynomialFeaturesNodeSignal | null;
-  canResetNode?: boolean;
-  onResetNode?: () => void;
 };
 
 export const PolynomialFeaturesSection: React.FC<PolynomialFeaturesSectionProps> = ({
@@ -25,8 +23,6 @@ export const PolynomialFeaturesSection: React.FC<PolynomialFeaturesSectionProps>
   outputPrefixParameter,
   renderParameterField,
   signal,
-  canResetNode = false,
-  onResetNode,
 }) => {
   const parameterList = useMemo(() => {
     return [
@@ -68,16 +64,6 @@ export const PolynomialFeaturesSection: React.FC<PolynomialFeaturesSectionProps>
     <section className="canvas-modal__section">
       <div className="canvas-modal__section-header">
         <h3>Polynomial feature settings</h3>
-        {canResetNode && (
-          <button
-            type="button"
-            className="btn btn-outline-secondary"
-            onClick={onResetNode}
-            disabled={!onResetNode}
-          >
-            Reset node
-          </button>
-        )}
       </div>
       <p className="canvas-modal__note">
         Expand numeric features with polynomial powers and interaction terms to capture non-linear relations. Preview the

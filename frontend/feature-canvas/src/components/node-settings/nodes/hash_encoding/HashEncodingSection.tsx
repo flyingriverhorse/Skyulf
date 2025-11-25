@@ -32,8 +32,6 @@ type HashEncodingSectionProps = {
   renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
   onToggleColumn: (column: string) => void;
   onApplyRecommended: (columns: string[]) => void;
-  canResetNode?: boolean;
-  onResetNode?: () => void;
   formatMissingPercentage: (value?: number | null) => string;
 };
 
@@ -80,8 +78,6 @@ export const HashEncodingSection: React.FC<HashEncodingSectionProps> = ({
   renderParameterField,
   onToggleColumn,
   onApplyRecommended,
-  canResetNode = false,
-  onResetNode,
   formatMissingPercentage,
 }) => {
   const recommendedColumns = useMemo(() => {
@@ -126,16 +122,6 @@ export const HashEncodingSection: React.FC<HashEncodingSectionProps> = ({
           >
             Add recommended
           </button>
-          {canResetNode && (
-            <button
-              type="button"
-              className="btn btn-outline-secondary"
-              onClick={onResetNode}
-              disabled={!onResetNode}
-            >
-              Reset node
-            </button>
-          )}
         </div>
       </div>
       <p className="canvas-modal__note">

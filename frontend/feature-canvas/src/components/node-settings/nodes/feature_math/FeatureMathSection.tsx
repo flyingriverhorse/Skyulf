@@ -557,8 +557,6 @@ type FeatureMathSectionProps = {
   defaultTimezoneParameter: FeatureNodeParameter | null;
   epsilonParameter: FeatureNodeParameter | null;
   renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
-  canResetNode?: boolean;
-  onResetNode?: () => void;
 };
 
 export const FeatureMathSection: React.FC<FeatureMathSectionProps> = ({
@@ -579,8 +577,6 @@ export const FeatureMathSection: React.FC<FeatureMathSectionProps> = ({
   defaultTimezoneParameter,
   epsilonParameter,
   renderParameterField,
-  canResetNode = false,
-  onResetNode,
 }) => {
   const [pendingType, setPendingType] = useState<FeatureMathOperationType>('arithmetic');
   const summaryMap = useMemo(() => {
@@ -625,16 +621,6 @@ export const FeatureMathSection: React.FC<FeatureMathSectionProps> = ({
           <button type="button" className="btn btn-outline-secondary" onClick={handleAddOperation}>
             Add operation
           </button>
-          {canResetNode && (
-            <button
-              type="button"
-              className="btn btn-outline-secondary"
-              onClick={onResetNode}
-              disabled={!onResetNode}
-            >
-              Reset node
-            </button>
-          )}
         </div>
       </div>
 
