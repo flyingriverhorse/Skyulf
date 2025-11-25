@@ -214,8 +214,6 @@ type EvaluationPackSectionProps = {
 	renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
 	formatMetricValue: FormatMetricFn;
 	connectedSplitHandles?: Partial<Record<SplitValue, boolean>>;
-	canResetNode?: boolean;
-	onResetNode?: () => void;
 };
 
 const EvaluationPackSection: React.FC<EvaluationPackSectionProps> = ({
@@ -227,8 +225,6 @@ const EvaluationPackSection: React.FC<EvaluationPackSectionProps> = ({
 	renderParameterField: _renderParameterField,
 	formatMetricValue,
 	connectedSplitHandles,
-	canResetNode = false,
-	onResetNode,
 }) => {
 		void _renderParameterField;
 	const queryClient = useQueryClient();
@@ -736,17 +732,6 @@ const EvaluationPackSection: React.FC<EvaluationPackSectionProps> = ({
 				<h3>Model Evaluation</h3>
 				<div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
 					{lastRunRelative && <span className="evaluation-status">Last ran {lastRunRelative}</span>}
-					{canResetNode && (
-						<button
-							type="button"
-							className="btn btn-outline-secondary btn-sm"
-							onClick={onResetNode}
-							disabled={!onResetNode}
-							title="Reset evaluation node to defaults"
-						>
-							Reset node
-						</button>
-					)}
 				</div>
 			</div>
 

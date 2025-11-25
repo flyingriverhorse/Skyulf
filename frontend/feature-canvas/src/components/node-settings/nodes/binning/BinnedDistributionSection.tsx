@@ -54,7 +54,6 @@ export const BinnedDistributionSection: React.FC<BinnedDistributionSectionProps>
               ))}
             </div>
           </div>
-          {relativeGeneratedAt && <span className="canvas-modal__meta">Updated {relativeGeneratedAt}</span>}
           <button
             type="button"
             className="btn btn-outline-secondary"
@@ -72,6 +71,9 @@ export const BinnedDistributionSection: React.FC<BinnedDistributionSectionProps>
             ? `Summaries computed from the full dataset (${sampleSize.toLocaleString()} rows).`
             : `Summaries computed from ${sampleSize.toLocaleString()} sampled rows.`}
         </p>
+      )}
+      {relativeGeneratedAt && (
+        <p className="canvas-modal__note">Updated {relativeGeneratedAt}</p>
       )}
       {isFetching && <p className="canvas-modal__note">Loading binned distributions…</p>}
       {!isFetching && error && <p className="canvas-modal__note canvas-modal__note--error">{error}</p>}

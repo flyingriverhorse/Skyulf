@@ -20,8 +20,6 @@ type FeatureSelectionSectionProps = {
   dropUnselectedParameter: FeatureNodeParameter | null;
   renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
   signal: FeatureSelectionNodeSignal | null;
-  canResetNode?: boolean;
-  onResetNode?: () => void;
 };
 
 const isDefinedParameter = (
@@ -84,8 +82,6 @@ export const FeatureSelectionSection: React.FC<FeatureSelectionSectionProps> = (
   dropUnselectedParameter,
   renderParameterField,
   signal,
-  canResetNode = false,
-  onResetNode,
 }) => {
   const primaryParameters = useMemo(() => {
     return [
@@ -201,16 +197,6 @@ export const FeatureSelectionSection: React.FC<FeatureSelectionSectionProps> = (
     <section className="canvas-modal__section">
       <div className="canvas-modal__section-header">
         <h3>Feature selection settings</h3>
-        {canResetNode && (
-          <button
-            type="button"
-            className="btn btn-outline-secondary"
-            onClick={onResetNode}
-            disabled={!onResetNode}
-          >
-            Reset node
-          </button>
-        )}
       </div>
       <p className="canvas-modal__note">
         Score candidate predictors and retain the most informative columns using statistical tests or model-based selectors.

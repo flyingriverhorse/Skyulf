@@ -36,8 +36,6 @@ type TrainTestSplitSectionProps = {
   parameters: FeatureNodeParameter[];
   renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
   formatMetricValue: (value?: number | null, precision?: number) => string;
-  canResetNode: boolean;
-  onResetNode?: () => void;
 };
 
 const resolveSignal = (
@@ -68,8 +66,6 @@ export const TrainTestSplitSection: React.FC<TrainTestSplitSectionProps> = ({
   parameters,
   renderParameterField,
   formatMetricValue,
-  canResetNode,
-  onResetNode,
 }) => {
   const preview = previewState.data;
   const previewStatus = previewState.status;
@@ -127,16 +123,6 @@ export const TrainTestSplitSection: React.FC<TrainTestSplitSectionProps> = ({
     <div className="node-settings__section">
       <div className="node-settings__section-header">
         <h3>Train/Test Split Configuration</h3>
-        {canResetNode && onResetNode && (
-          <button
-            type="button"
-            onClick={onResetNode}
-            className="node-settings__reset-button"
-            title="Reset node configuration"
-          >
-            Reset
-          </button>
-        )}
       </div>
 
       <div className="node-settings__field-group">

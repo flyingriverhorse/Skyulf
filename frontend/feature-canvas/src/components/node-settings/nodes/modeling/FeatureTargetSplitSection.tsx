@@ -22,8 +22,6 @@ type FeatureTargetSplitSectionProps = {
   renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
   formatMetricValue: (value?: number | null, precision?: number) => string;
   formatMissingPercentage: (value?: number | null) => string;
-  canResetNode: boolean;
-  onResetNode?: () => void;
 };
 
 const summarizeList = (values: string[], limit = 5): string => {
@@ -76,8 +74,6 @@ export const FeatureTargetSplitSection: React.FC<FeatureTargetSplitSectionProps>
   renderParameterField,
   formatMetricValue,
   formatMissingPercentage,
-  canResetNode,
-  onResetNode,
 }) => {
   const preview = previewState.data;
   const previewStatus = previewState.status;
@@ -214,16 +210,6 @@ export const FeatureTargetSplitSection: React.FC<FeatureTargetSplitSectionProps>
       <div className="canvas-modal__section-header">
         <h3>Feature/target separation</h3>
         <div className="canvas-modal__section-actions">
-          {canResetNode && (
-            <button
-              type="button"
-              className="btn btn-outline-secondary"
-              onClick={onResetNode}
-              disabled={!onResetNode}
-            >
-              Reset node
-            </button>
-          )}
           <button
             type="button"
             className="btn btn-outline-secondary"
