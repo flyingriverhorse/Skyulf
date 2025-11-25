@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Node } from 'react-flow-renderer';
 import {
-  FeatureMathNodeSignal,
   FeatureNodeParameter,
   OutlierMethodName,
   OutlierNodeSignal,
@@ -9,8 +8,6 @@ import {
   PipelinePreviewSchema,
   SkewnessColumnDistribution,
   ScalingMethodName,
-  PolynomialFeaturesNodeSignal,
-  FeatureSelectionNodeSignal,
   triggerFullDatasetExecution,
 } from '../api';
 import {
@@ -177,6 +174,8 @@ import { useDataCleaningState } from './node-settings/hooks/useDataCleaningState
 import { useGraphTopology } from './node-settings/hooks/useGraphTopology';
 import { useNodePreview } from './node-settings/hooks/useNodePreview';
 import { useColumnCatalogState } from './node-settings/hooks/useColumnCatalogState';
+import { usePreviewSignals } from './node-settings/hooks/usePreviewSignals';
+import { useFeatureSelectionAutoConfig } from './node-settings/hooks/useFeatureSelectionAutoConfig';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -856,117 +855,24 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isTransformerAuditNode,
   });
 
-  const featureMathSignals = useMemo<FeatureMathNodeSignal[]>(() => {
-    if (!isFeatureMathNode) {
-      return [];
-    }
-    const rawSignals = previewState.data?.signals?.feature_math;
-    return Array.isArray(rawSignals) ? rawSignals : [];
-  }, [isFeatureMathNode, previewState.data?.signals?.feature_math]);
-
-  const polynomialSignal = useMemo<PolynomialFeaturesNodeSignal | null>(() => {
-    if (!isPolynomialFeaturesNode) {
-      return null;
-    }
-    const rawSignals = previewState.data?.signals?.polynomial_features;
-    if (!Array.isArray(rawSignals) || rawSignals.length === 0) {
-      return null;
-    }
-    const matching = nodeId
-      ? rawSignals.find((entry) => entry && typeof entry.node_id === 'string' && entry.node_id === nodeId)
-      : null;
-    return matching ?? rawSignals[0] ?? null;
-  }, [isPolynomialFeaturesNode, nodeId, previewState.data?.signals?.polynomial_features]);
-
-  const featureSelectionSignal = useMemo<FeatureSelectionNodeSignal | null>(() => {
-    if (!isFeatureSelectionNode) {
-      return null;
-    }
-    const rawSignals = previewState.data?.signals?.feature_selection;
-    if (!Array.isArray(rawSignals) || rawSignals.length === 0) {
-      return null;
-    }
-    const matching = nodeId
-      ? rawSignals.find((entry) => entry && typeof entry.node_id === 'string' && entry.node_id === nodeId)
-      : null;
-    return matching ?? rawSignals[0] ?? null;
-  }, [isFeatureSelectionNode, nodeId, previewState.data?.signals?.feature_selection]);
-
-  useEffect(() => {
-    if (!isFeatureSelectionNode) {
-      return;
-    }
-
-    const normalizedSignalTarget =
-      typeof featureSelectionSignal?.target_column === 'string'
-        ? featureSelectionSignal.target_column.trim()
-        : '';
-    const fallbackTarget = typeof upstreamTargetColumn === 'string' ? upstreamTargetColumn.trim() : '';
-    const resolvedTarget = normalizedSignalTarget || fallbackTarget;
-
-    if (!resolvedTarget) {
-      return;
-    }
-
-    setConfigState((previous) => {
-      const currentTarget =
-        typeof previous?.target_column === 'string' ? previous.target_column.trim() : '';
-      if (currentTarget) {
-        return previous;
-      }
-      return {
-        ...previous,
-        target_column: resolvedTarget,
-      };
-    });
-  }, [featureSelectionSignal?.target_column, isFeatureSelectionNode, setConfigState, upstreamTargetColumn]);
-
-  useEffect(() => {
-    if (!isFeatureSelectionNode) {
-      return;
-    }
-
-    const backendK =
-      typeof featureSelectionSignal?.k === 'number' && Number.isFinite(featureSelectionSignal.k)
-        ? Math.max(0, Math.trunc(featureSelectionSignal.k))
-        : null;
-    const selectedCount = Array.isArray(featureSelectionSignal?.selected_columns)
-      ? featureSelectionSignal.selected_columns.length
-      : null;
-
-    const candidate = (backendK ?? selectedCount) ?? null;
-    if (candidate === null || candidate <= 0) {
-      return;
-    }
-
-    setConfigState((previous) => {
-      const rawValue = previous?.k;
-      let normalizedCurrent: number | null = null;
-
-      if (typeof rawValue === 'number' && Number.isFinite(rawValue)) {
-        normalizedCurrent = Math.trunc(rawValue);
-      } else if (typeof rawValue === 'string') {
-        const parsed = Number(rawValue);
-        if (Number.isFinite(parsed)) {
-          normalizedCurrent = Math.trunc(parsed);
-        }
-      }
-
-      if (normalizedCurrent !== null && normalizedCurrent <= candidate) {
-        return previous;
-      }
-
-      return {
-        ...previous,
-        k: candidate,
-      };
-    });
-  }, [
-    featureSelectionSignal?.k,
-    featureSelectionSignal?.selected_columns,
+  const {
+    featureMathSignals,
+    polynomialSignal,
+    featureSelectionSignal,
+  } = usePreviewSignals({
+    previewState,
+    nodeId,
+    isFeatureMathNode,
+    isPolynomialFeaturesNode,
     isFeatureSelectionNode,
+  });
+
+  useFeatureSelectionAutoConfig({
+    isFeatureSelectionNode,
+    featureSelectionSignal,
+    upstreamTargetColumn,
     setConfigState,
-  ]);
+  });
 
   const featureMathSummaries = useMemo(
     () => (isFeatureMathNode ? buildFeatureMathSummaries(featureMathOperations, featureMathSignals) : []),
