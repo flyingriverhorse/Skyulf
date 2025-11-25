@@ -12,8 +12,6 @@ import {
   PolynomialFeaturesNodeSignal,
   FeatureSelectionNodeSignal,
   triggerFullDatasetExecution,
-  type BinningColumnRecommendation,
-  type BinningExcludedColumn,
 } from '../api';
 import {
   DropMissingColumnsSection,
@@ -140,14 +138,9 @@ import { useDropColumnRecommendations } from './node-settings/hooks/useDropColum
 import { useAliasConfiguration } from './node-settings/hooks/useAliasConfiguration';
 import { useOutlierRecommendations } from './node-settings/hooks/useOutlierRecommendations';
 import { useNumericColumnAnalysis } from './node-settings/hooks/useNumericColumnAnalysis';
-import { useNumericRangeSummaries } from './node-settings/hooks/useNumericRangeSummaries';
-import { usePruneColumnSelections } from './node-settings/hooks/usePruneColumnSelections';
 import { useTextCleanupConfiguration } from './node-settings/hooks/useTextCleanupConfiguration';
 import { useReplaceInvalidConfiguration } from './node-settings/hooks/useReplaceInvalidConfiguration';
 import { useStandardizeDatesConfiguration } from './node-settings/hooks/useStandardizeDatesConfiguration';
-import { useScalingConfiguration } from './node-settings/hooks/useScalingConfiguration';
-import { useOutlierConfiguration } from './node-settings/hooks/useOutlierConfiguration';
-import { useBinningConfiguration } from './node-settings/hooks/useBinningConfiguration';
 import { useImputationConfiguration } from './node-settings/hooks/useImputationConfiguration';
 import { useModelingConfiguration } from './node-settings/hooks/useModelingConfiguration';
 import {
@@ -162,12 +155,6 @@ import {
   pickAutoDetectValue,
   stableStringify,
 } from './node-settings/utils/configParsers';
-import { useLabelEncodingRecommendations } from './node-settings/hooks/useLabelEncodingRecommendations';
-import { useTargetEncodingRecommendations } from './node-settings/hooks/useTargetEncodingRecommendations';
-import { useHashEncodingRecommendations } from './node-settings/hooks/useHashEncodingRecommendations';
-import { useOrdinalEncodingRecommendations } from './node-settings/hooks/useOrdinalEncodingRecommendations';
-import { useDummyEncodingRecommendations } from './node-settings/hooks/useDummyEncodingRecommendations';
-import { useOneHotEncodingRecommendations } from './node-settings/hooks/useOneHotEncodingRecommendations';
 import { formatCellValue, formatColumnType, formatRelativeTime } from './node-settings/utils/formatters';
 import { DATA_CONSISTENCY_GUIDANCE } from './node-settings/utils/guidance';
 import { HistogramSparkline } from './node-settings/utils/HistogramSparkline';
@@ -188,7 +175,8 @@ import { useParameterCatalog } from './node-settings/hooks/useParameterCatalog';
 import { useFilteredParameters } from './node-settings/hooks/useFilteredParameters';
 import { useNodeConfigState } from './node-settings/hooks/useNodeConfigState';
 import { useParameterHandlers } from './node-settings/hooks/useParameterHandlers';
-import { useTargetEncodingDefaults } from './node-settings/hooks/useTargetEncodingDefaults';
+import { useEncodingRecommendationsState } from './node-settings/hooks/useEncodingRecommendationsState';
+import { useNumericAnalysisState } from './node-settings/hooks/useNumericAnalysisState';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -892,308 +880,51 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   });
 
   const {
-    isFetching: isFetchingLabelEncoding,
-    error: labelEncodingError,
-    suggestions: labelEncodingSuggestions,
-    metadata: labelEncodingMetadata,
-  } = useLabelEncodingRecommendations({
+    isFetchingLabelEncoding,
+    labelEncodingError,
+    labelEncodingSuggestions,
+    labelEncodingMetadata,
+    isFetchingTargetEncoding,
+    targetEncodingError,
+    targetEncodingSuggestions,
+    targetEncodingMetadata,
+    isFetchingHashEncoding,
+    hashEncodingError,
+    hashEncodingSuggestions,
+    hashEncodingMetadata,
+    isFetchingOrdinalEncoding,
+    ordinalEncodingError,
+    ordinalEncodingSuggestions,
+    ordinalEncodingMetadata,
+    isFetchingDummyEncoding,
+    dummyEncodingError,
+    dummyEncodingSuggestions,
+    dummyEncodingMetadata,
+    isFetchingOneHotEncoding,
+    oneHotEncodingError,
+    oneHotEncodingSuggestions,
+    oneHotEncodingMetadata,
+    handleApplyLabelEncodingRecommended,
+    handleApplyTargetEncodingRecommended,
+    handleApplyHashEncodingRecommended,
+    handleApplyOrdinalEncodingRecommended,
+    handleApplyDummyEncodingRecommended,
+    handleApplyOneHotEncodingRecommended,
+  } = useEncodingRecommendationsState({
     isLabelEncodingNode,
-    sourceId,
-    hasReachableSource,
-    graphContext,
-    targetNodeId: node?.id ?? null,
-  });
-
-  const {
-    isFetching: isFetchingTargetEncoding,
-    error: targetEncodingError,
-    suggestions: targetEncodingSuggestions,
-    metadata: targetEncodingMetadata,
-  } = useTargetEncodingRecommendations({
     isTargetEncodingNode,
-    sourceId,
-    hasReachableSource,
-    graphContext,
-    targetNodeId: node?.id ?? null,
-  });
-
-  useTargetEncodingDefaults({
-    isTargetEncodingNode,
-    enableGlobalFallbackDefault: targetEncodingMetadata.enableGlobalFallbackDefault,
-    encodeMissing: configState?.encode_missing,
-    handleUnknown: configState?.handle_unknown,
-    setConfigState,
-    nodeChangeVersion,
-  });
-
-  const {
-    isFetching: isFetchingHashEncoding,
-    error: hashEncodingError,
-    suggestions: hashEncodingSuggestions,
-    metadata: hashEncodingMetadata,
-  } = useHashEncodingRecommendations({
     isHashEncodingNode,
-    sourceId,
-    hasReachableSource,
-    graphContext,
-    targetNodeId: node?.id ?? null,
-  });
-
-  const {
-    isFetching: isFetchingOrdinalEncoding,
-    error: ordinalEncodingError,
-    suggestions: ordinalEncodingSuggestions,
-    metadata: ordinalEncodingMetadata,
-  } = useOrdinalEncodingRecommendations({
     isOrdinalEncodingNode,
-    sourceId,
-    hasReachableSource,
-    graphContext,
-    targetNodeId: node?.id ?? null,
-  });
-
-  const {
-    isFetching: isFetchingDummyEncoding,
-    error: dummyEncodingError,
-    suggestions: dummyEncodingSuggestions,
-    metadata: dummyEncodingMetadata,
-  } = useDummyEncodingRecommendations({
     isDummyEncodingNode,
-    sourceId,
-    hasReachableSource,
-    graphContext,
-    targetNodeId: node?.id ?? null,
-  });
-
-  const {
-    isFetching: isFetchingOneHotEncoding,
-    error: oneHotEncodingError,
-    suggestions: oneHotEncodingSuggestions,
-    metadata: oneHotEncodingMetadata,
-  } = useOneHotEncodingRecommendations({
     isOneHotEncodingNode,
     sourceId,
     hasReachableSource,
     graphContext,
-    targetNodeId: node?.id ?? null,
-  });
-
-  useEffect(() => {
-    if (!isLabelEncodingNode) {
-      return;
-    }
-    if (!labelEncodingMetadata.autoDetectDefault) {
-      return;
-    }
-    if (configState?.auto_detect === true) {
-      return;
-    }
-    if (configState?.auto_detect === false) {
-      return;
-    }
-    setConfigState((previous) => {
-      if (previous?.auto_detect !== undefined && previous.auto_detect !== null) {
-        return previous;
-      }
-      return {
-        ...previous,
-        auto_detect: true,
-      };
-    });
-  }, [configState?.auto_detect, isLabelEncodingNode, labelEncodingMetadata.autoDetectDefault, setConfigState]);
-
-  useEffect(() => {
-    if (!isTargetEncodingNode) {
-      return;
-    }
-    if (!targetEncodingMetadata.autoDetectDefault) {
-      return;
-    }
-    if (configState?.auto_detect === true) {
-      return;
-    }
-    if (configState?.auto_detect === false) {
-      return;
-    }
-    setConfigState((previous) => {
-      if (previous?.auto_detect !== undefined && previous.auto_detect !== null) {
-        return previous;
-      }
-      return {
-        ...previous,
-        auto_detect: true,
-      };
-    });
-  }, [configState?.auto_detect, isTargetEncodingNode, setConfigState, targetEncodingMetadata.autoDetectDefault]);
-
-  useEffect(() => {
-    if (!isHashEncodingNode) {
-      return;
-    }
-    if (!hashEncodingMetadata.autoDetectDefault) {
-      return;
-    }
-    if (configState?.auto_detect === true) {
-      return;
-    }
-    if (configState?.auto_detect === false) {
-      return;
-    }
-    setConfigState((previous) => {
-      if (previous?.auto_detect !== undefined && previous.auto_detect !== null) {
-        return previous;
-      }
-      return {
-        ...previous,
-        auto_detect: true,
-      };
-    });
-  }, [configState?.auto_detect, hashEncodingMetadata.autoDetectDefault, isHashEncodingNode, setConfigState]);
-
-  useEffect(() => {
-    if (!isHashEncodingNode) {
-      return;
-    }
-    const suggestedBuckets = hashEncodingMetadata.suggestedBucketDefault;
-    if (!suggestedBuckets || !Number.isFinite(suggestedBuckets)) {
-      return;
-    }
-    const numericBuckets = Math.max(2, Math.round(suggestedBuckets));
-    setConfigState((previous) => {
-      if (!previous || typeof previous !== 'object' || Array.isArray(previous)) {
-        return previous;
-      }
-      const current = previous.n_buckets;
-      if (current !== undefined && current !== null) {
-        const numericCurrent = Number(current);
-        if (Number.isFinite(numericCurrent) && Math.round(numericCurrent) > 0) {
-          return previous;
-        }
-      }
-      return {
-        ...previous,
-        n_buckets: numericBuckets,
-      };
-    });
-  }, [hashEncodingMetadata.suggestedBucketDefault, isHashEncodingNode, setConfigState]);
-
-  useEffect(() => {
-    if (!isTargetEncodingNode) {
-      return;
-    }
-    if (!targetEncodingMetadata.enableGlobalFallbackDefault) {
-      return;
-    }
-
-    const encodeMissingActive = typeof configState?.encode_missing === 'boolean' ? configState.encode_missing : null;
-    const currentHandleUnknown = typeof configState?.handle_unknown === 'string'
-      ? configState.handle_unknown.trim().toLowerCase()
-      : '';
-
-    if (encodeMissingActive === true && currentHandleUnknown === 'global_mean') {
-      return;
-    }
-
-    setConfigState((previous) => {
-      const previousEncodeMissing = typeof previous?.encode_missing === 'boolean' ? previous.encode_missing : null;
-      const previousHandleUnknown = typeof previous?.handle_unknown === 'string'
-        ? previous.handle_unknown.trim().toLowerCase()
-        : '';
-
-      if (previousEncodeMissing === true && previousHandleUnknown === 'global_mean') {
-        return previous;
-      }
-
-      const next: Record<string, any> = { ...previous };
-
-      if (previousEncodeMissing !== true) {
-        next.encode_missing = true;
-      }
-
-      if (previousHandleUnknown !== 'global_mean') {
-        next.handle_unknown = 'global_mean';
-      }
-
-      return next;
-    });
-  }, [
-    configState?.encode_missing,
-    configState?.handle_unknown,
-    isTargetEncodingNode,
+    node,
+    configState,
     setConfigState,
-    targetEncodingMetadata.enableGlobalFallbackDefault,
-  ]);
-
-  useEffect(() => {
-    if (!isOrdinalEncodingNode) {
-      return;
-    }
-    if (!ordinalEncodingMetadata.autoDetectDefault) {
-      return;
-    }
-    if (configState?.auto_detect === true) {
-      return;
-    }
-    if (configState?.auto_detect === false) {
-      return;
-    }
-    setConfigState((previous) => {
-      if (previous?.auto_detect !== undefined && previous.auto_detect !== null) {
-        return previous;
-      }
-      return {
-        ...previous,
-        auto_detect: true,
-      };
-    });
-  }, [configState?.auto_detect, isOrdinalEncodingNode, ordinalEncodingMetadata.autoDetectDefault, setConfigState]);
-
-  useEffect(() => {
-    if (!isOrdinalEncodingNode) {
-      return;
-    }
-    if (!ordinalEncodingMetadata.enableUnknownDefault) {
-      return;
-    }
-    const raw = typeof configState?.handle_unknown === 'string' ? configState.handle_unknown.trim().toLowerCase() : '';
-    if (raw) {
-      return;
-    }
-    setConfigState((previous) => {
-      const current = typeof previous?.handle_unknown === 'string' ? previous.handle_unknown.trim().toLowerCase() : '';
-      if (current) {
-        return previous;
-      }
-      return {
-        ...previous,
-        handle_unknown: 'use_encoded_value',
-      };
-    });
-  }, [configState?.handle_unknown, isOrdinalEncodingNode, ordinalEncodingMetadata.enableUnknownDefault, setConfigState]);
-
-  useEffect(() => {
-    if (!isDummyEncodingNode) {
-      return;
-    }
-    if (!dummyEncodingMetadata.autoDetectDefault) {
-      return;
-    }
-    if (configState?.auto_detect === true) {
-      return;
-    }
-    if (configState?.auto_detect === false) {
-      return;
-    }
-    setConfigState((previous) => {
-      if (previous?.auto_detect !== undefined && previous.auto_detect !== null) {
-        return previous;
-      }
-      return {
-        ...previous,
-        auto_detect: true,
-      };
-    });
-  }, [configState?.auto_detect, dummyEncodingMetadata.autoDetectDefault, isDummyEncodingNode, setConfigState]);
+    nodeChangeVersion,
+  });
 
   useEffect(() => {
     if (!requiresColumnCatalog && !isImputerNode) {
@@ -1698,14 +1429,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     scalingHasRecommendations,
     scalingStatusMessage,
     scalingOverrideExampleSummary,
-  } = useScalingConfiguration({
-    isScalingNode,
-    configState,
-    numericExcludedColumns,
-    scalingData,
-  });
-
-  const {
     outlierConfig,
     outlierExcludedColumns,
     outlierMethodLabelMap,
@@ -1722,127 +1445,48 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     outlierHasRecommendations,
     outlierStatusMessage,
     outlierOverrideExampleSummary,
-  } = useOutlierConfiguration({
-    isOutlierNode,
-    configState,
-    numericExcludedColumns,
-    outlierData,
-  });
-  const outlierSampleSize = typeof outlierData?.sample_size === 'number' ? outlierData.sample_size : null;
-  const relativeOutlierGeneratedAt = null;
-  const outlierHasOverrides = outlierOverrideCount > 0 || outlierParameterOverrideCount > 0;
-  const outlierOverrideSummaryDisplay = useMemo(() => {
-    if (outlierOverrideCount > 0) {
-      return outlierOverrideExampleSummary;
-    }
-    if (outlierParameterOverrideCount > 0) {
-      return `${outlierParameterOverrideCount} column${outlierParameterOverrideCount === 1 ? '' : 's'} with parameter overrides`;
-    }
-    return null;
-  }, [outlierOverrideCount, outlierParameterOverrideCount, outlierOverrideExampleSummary]);
-
-  const {
+    outlierSampleSize,
+    relativeOutlierGeneratedAt,
+    outlierHasOverrides,
+    outlierOverrideSummaryDisplay,
     binningConfig,
     binningSelectedCount,
     binningDefaultLabel,
     binningOverrideColumns,
     binningOverrideCount,
     binningOverrideSummary,
-    fieldIds: binningFieldIds,
-    customEdgeDrafts: binningCustomEdgeDrafts,
-    setCustomEdgeDrafts: setBinningCustomEdgeDrafts,
-    customLabelDrafts: binningCustomLabelDrafts,
-    setCustomLabelDrafts: setBinningCustomLabelDrafts,
-  } = useBinningConfiguration({
+    binningFieldIds,
+    binningCustomEdgeDrafts,
+    setBinningCustomEdgeDrafts,
+    binningCustomLabelDrafts,
+    setBinningCustomLabelDrafts,
+    selectedColumns,
+    binningInsightsRecommendations,
+    binningRecommendedColumnSet,
+    binningAllNumericColumns,
+    binningNumericColumnsNotSelected,
+    canApplyAllBinningNumeric,
+    binningExcludedColumns,
+    binningColumnPreviewMap,
+    manualBoundColumns,
+    manualRangeFallbackMap,
+    binningInsightsExcludedColumns,
+  } = useNumericAnalysisState({
+    isScalingNode,
+    isOutlierNode,
+    isBinningNode,
     configState,
+    setConfigState,
     nodeId,
+    numericExcludedColumns,
+    scalingData,
+    outlierData,
+    binningData,
+    availableColumns,
+    previewSampleRows,
   });
+
   const removeDuplicatesKeepSelectId = `${nodeId || 'node'}-remove-duplicates-keep`;
-
-  const selectedColumns = useMemo(() => {
-    if (isScalingNode) {
-      return scalingConfig.columns;
-    }
-    if (isBinningNode) {
-      return binningConfig.columns;
-    }
-    if (isOutlierNode) {
-      return outlierConfig.columns;
-    }
-    return ensureArrayOfString(configState?.columns);
-  }, [binningConfig.columns, configState, isBinningNode, isOutlierNode, isScalingNode, outlierConfig.columns, scalingConfig.columns]);
-
-  const binningInsightsRecommendations = useMemo<BinningColumnRecommendation[]>(() => {
-    const rows = binningData?.columns;
-    if (!Array.isArray(rows)) {
-      return [];
-    }
-    return rows.filter((entry): entry is BinningColumnRecommendation => {
-      if (!entry || typeof entry.column !== 'string') {
-        return false;
-      }
-      return Boolean(entry.column.trim());
-    });
-  }, [binningData?.columns]);
-
-  const binningRecommendedColumnSet = useMemo(() => {
-    if (!binningInsightsRecommendations.length) {
-      return new Set<string>();
-    }
-    const normalized = new Set<string>();
-    binningInsightsRecommendations.forEach((entry) => {
-      const columnName = typeof entry.column === 'string' ? entry.column.trim() : '';
-      if (!columnName) {
-        return;
-      }
-      normalized.add(columnName);
-    });
-    return normalized;
-  }, [binningInsightsRecommendations]);
-
-  const binningAllNumericColumns = useMemo(() => {
-    if (!isBinningNode) {
-      return [] as string[];
-    }
-    const normalized = new Set<string>();
-    availableColumns.forEach((column) => {
-      if (numericExcludedColumns.has(column)) {
-        return;
-      }
-      const trimmed = column.trim();
-      if (trimmed) {
-        normalized.add(trimmed);
-      }
-    });
-    binningInsightsRecommendations.forEach((entry) => {
-      const columnName = typeof entry.column === 'string' ? entry.column.trim() : '';
-      if (!columnName) {
-        return;
-      }
-      if (!numericExcludedColumns.has(columnName) || binningRecommendedColumnSet.has(columnName)) {
-        normalized.add(columnName);
-      }
-    });
-    selectedColumns.forEach((column) => {
-      const columnName = typeof column === 'string' ? column.trim() : '';
-      if (!columnName) {
-        return;
-      }
-      if (!numericExcludedColumns.has(columnName) || binningRecommendedColumnSet.has(columnName)) {
-        normalized.add(columnName);
-      }
-    });
-    return Array.from(normalized).sort((a, b) => a.localeCompare(b));
-  }, [availableColumns, binningInsightsRecommendations, binningRecommendedColumnSet, isBinningNode, numericExcludedColumns, selectedColumns]);
-
-  const binningNumericColumnsNotSelected = useMemo(() => {
-    if (!isBinningNode || !binningAllNumericColumns.length) {
-      return [] as string[];
-    }
-    return binningAllNumericColumns.filter((column) => !selectedColumns.includes(column));
-  }, [binningAllNumericColumns, isBinningNode, selectedColumns]);
-
-  const canApplyAllBinningNumeric = binningNumericColumnsNotSelected.length > 0;
 
   const removeDuplicatesKeep = useMemo<KeepStrategy>(() => {
     const raw = typeof configState?.keep === 'string' ? configState.keep.trim().toLowerCase() : '';
@@ -1851,43 +1495,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     }
     return DEFAULT_KEEP_STRATEGY;
   }, [configState?.keep]);
-
-  const {
-    binningExcludedColumns,
-    binningColumnPreviewMap,
-    manualBoundColumns,
-    manualRangeFallbackMap,
-  } = useNumericRangeSummaries({
-    isBinningNode,
-    numericExcludedColumns,
-    selectedColumns,
-    previewSampleRows,
-    availableColumns,
-    recommendedColumns: binningRecommendedColumnSet,
-  });
-
-  const binningInsightsExcludedColumns = useMemo<BinningExcludedColumn[]>(() => {
-    const rows = binningData?.excluded_columns;
-    if (!Array.isArray(rows)) {
-      return [];
-    }
-    return rows.filter((entry): entry is BinningExcludedColumn => {
-      if (!entry || typeof entry.column !== 'string') {
-        return false;
-      }
-      return Boolean(entry.column.trim());
-    });
-  }, [binningData?.excluded_columns]);
-
-  usePruneColumnSelections({
-    isScalingNode,
-    isBinningNode,
-    isOutlierNode,
-    scalingExcludedColumns,
-    binningExcludedColumns,
-    outlierExcludedColumns,
-    setConfigState,
-  });
 
   const outlierPreviewSignal = useMemo<OutlierNodeSignal | null>(() => {
     if (!isOutlierNode) {
@@ -3023,232 +2630,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
       };
     });
   }, [recommendations]);
-
-  const handleApplyLabelEncodingRecommended = useCallback((columns: string[]) => {
-    if (!columns.length) {
-      return;
-    }
-    setConfigState((previous) => {
-      const next = new Set(ensureArrayOfString(previous.columns));
-      columns.forEach((column) => {
-        const normalized = String(column ?? '').trim();
-        if (normalized) {
-          next.add(normalized);
-        }
-      });
-      const ordered = Array.from(next).sort((a, b) => a.localeCompare(b));
-      return {
-        ...previous,
-        columns: ordered,
-      };
-    });
-  }, []);
-
-  const handleApplyTargetEncodingRecommended = useCallback(
-    (columns: string[]) => {
-      if (!columns.length) {
-        return;
-      }
-
-      setConfigState((previous) => {
-        const next = new Set(ensureArrayOfString(previous.columns));
-        let shouldEnableFallback = false;
-
-        columns.forEach((column) => {
-          const normalized = String(column ?? '').trim();
-          if (!normalized) {
-            return;
-          }
-          next.add(normalized);
-          if (!shouldEnableFallback) {
-            const suggestion = targetEncodingSuggestions.find((entry) => entry.column === normalized);
-            if (suggestion?.recommended_use_global_fallback) {
-              shouldEnableFallback = true;
-            }
-          }
-        });
-
-        const ordered = Array.from(next).sort((a, b) => a.localeCompare(b));
-        const result: Record<string, any> = {
-          ...previous,
-          columns: ordered,
-        };
-
-        if (shouldEnableFallback) {
-          result.encode_missing = true;
-          result.handle_unknown = 'global_mean';
-        }
-
-        return result;
-      });
-    },
-    [setConfigState, targetEncodingSuggestions],
-  );
-
-  const handleApplyHashEncodingRecommended = useCallback(
-    (columns: string[]) => {
-      if (!columns.length) {
-        return;
-      }
-
-      setConfigState((previous) => {
-        const next = new Set(ensureArrayOfString(previous.columns));
-        let recommendedBuckets = 0;
-
-        columns.forEach((column) => {
-          const normalized = String(column ?? '').trim();
-          if (!normalized) {
-            return;
-          }
-          next.add(normalized);
-          const suggestion = hashEncodingSuggestions.find((entry) => entry.column === normalized);
-          if (suggestion && suggestion.recommended_bucket_count > recommendedBuckets) {
-            recommendedBuckets = suggestion.recommended_bucket_count;
-          }
-        });
-
-        const ordered = Array.from(next).sort((a, b) => a.localeCompare(b));
-        const result: Record<string, any> = {
-          ...previous,
-          columns: ordered,
-        };
-
-        if (recommendedBuckets > 0) {
-          const currentBuckets = Number(previous?.n_buckets);
-          if (!Number.isFinite(currentBuckets) || currentBuckets <= 0) {
-            result.n_buckets = recommendedBuckets;
-          }
-        }
-
-        return result;
-      });
-    },
-    [hashEncodingSuggestions],
-  );
-
-  const handleApplyOrdinalEncodingRecommended = useCallback(
-    (columns: string[]) => {
-      if (!columns.length) {
-        return;
-      }
-      setConfigState((previous) => {
-        const next = new Set(ensureArrayOfString(previous.columns));
-        let shouldEnableUnknown = false;
-        let shouldEncodeMissing = false;
-
-        columns.forEach((column) => {
-          const normalized = String(column ?? '').trim();
-          if (!normalized) {
-            return;
-          }
-          next.add(normalized);
-          if (!shouldEnableUnknown || !shouldEncodeMissing) {
-            const suggestion = ordinalEncodingSuggestions.find((entry) => entry.column === normalized);
-            if (suggestion?.recommended_handle_unknown) {
-              shouldEnableUnknown = true;
-            }
-            if ((suggestion?.missing_percentage ?? 0) > 0) {
-              shouldEncodeMissing = true;
-            }
-          }
-        });
-
-        const ordered = Array.from(next).sort((a, b) => a.localeCompare(b));
-        const result: Record<string, any> = {
-          ...previous,
-          columns: ordered,
-        };
-
-        if (shouldEnableUnknown) {
-          result.handle_unknown = 'use_encoded_value';
-        }
-        if (shouldEncodeMissing) {
-          result.encode_missing = true;
-        }
-
-        return result;
-      });
-    },
-    [ordinalEncodingSuggestions],
-  );
-
-  const handleApplyDummyEncodingRecommended = useCallback(
-    (columns: string[]) => {
-      if (!columns.length) {
-        return;
-      }
-      setConfigState((previous) => {
-        const next = new Set(ensureArrayOfString(previous.columns));
-        let enforceDropFirst = previous?.drop_first === true;
-
-        columns.forEach((column) => {
-          const normalized = String(column ?? '').trim();
-          if (!normalized) {
-            return;
-          }
-          next.add(normalized);
-          if (!enforceDropFirst) {
-            const suggestion = dummyEncodingSuggestions.find((entry) => entry.column === normalized);
-            if (suggestion?.recommended_drop_first) {
-              enforceDropFirst = true;
-            }
-          }
-        });
-
-        const ordered = Array.from(next).sort((a, b) => a.localeCompare(b));
-        const result: Record<string, any> = {
-          ...previous,
-          columns: ordered,
-        };
-
-        if (enforceDropFirst) {
-          result.drop_first = true;
-        }
-
-        return result;
-      });
-    },
-    [dummyEncodingSuggestions]
-  );
-
-  const handleApplyOneHotEncodingRecommended = useCallback(
-    (columns: string[]) => {
-      if (!columns.length) {
-        return;
-      }
-      setConfigState((previous) => {
-        const next = new Set(ensureArrayOfString(previous.columns));
-        let shouldEnableDropFirst = false;
-
-        columns.forEach((column) => {
-          const normalized = String(column ?? '').trim();
-          if (!normalized) {
-            return;
-          }
-          next.add(normalized);
-          if (!shouldEnableDropFirst) {
-            const suggestion = oneHotEncodingSuggestions.find((entry) => entry.column === normalized);
-            if (suggestion?.recommended_drop_first) {
-              shouldEnableDropFirst = true;
-            }
-          }
-        });
-
-        const ordered = Array.from(next).sort((a, b) => a.localeCompare(b));
-        const result: Record<string, any> = {
-          ...previous,
-          columns: ordered,
-        };
-
-        if (shouldEnableDropFirst) {
-          result.drop_first = true;
-        }
-
-        return result;
-      });
-    },
-    [oneHotEncodingSuggestions]
-  );
 
   const handleSelectAllColumns = useCallback(() => {
     if (!availableColumns.length) {
