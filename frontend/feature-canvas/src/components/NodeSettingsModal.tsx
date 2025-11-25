@@ -175,6 +175,7 @@ import { useParameterHandlers } from './node-settings/hooks/useParameterHandlers
 import { useEncodingRecommendationsState } from './node-settings/hooks/useEncodingRecommendationsState';
 import { useNumericAnalysisState } from './node-settings/hooks/useNumericAnalysisState';
 import { useDataCleaningState } from './node-settings/hooks/useDataCleaningState';
+import { useGraphTopology } from './node-settings/hooks/useGraphTopology';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -534,80 +535,18 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     [configState?.transformations],
   );
 
-  const graphContext = useMemo(() => {
-    if (!graphSnapshot) {
-      return null;
-    }
-    const nodes = Array.isArray(graphSnapshot.nodes) ? graphSnapshot.nodes : [];
-    const edges = Array.isArray(graphSnapshot.edges) ? graphSnapshot.edges : [];
-    return { nodes, edges };
-  }, [graphSnapshot]);
-
-  const graphNodes = useMemo(() => (graphSnapshot && Array.isArray(graphSnapshot.nodes) ? graphSnapshot.nodes : []), [graphSnapshot]);
-  const graphEdges = useMemo(() => (graphSnapshot && Array.isArray(graphSnapshot.edges) ? graphSnapshot.edges : []), [graphSnapshot]);
-  const graphNodeCount = graphNodes.length;
-
-  const upstreamNodeIds = useMemo(() => {
-    if (!nodeId || !graphEdges.length) {
-      return [] as string[];
-    }
-    const visited = new Set<string>();
-    const stack: string[] = [nodeId];
-    while (stack.length) {
-      const current = stack.pop();
-      if (!current) {
-        continue;
-      }
-      graphEdges.forEach((edge: any) => {
-        const sourceRaw = edge && typeof edge.source === 'string' ? edge.source.trim() : '';
-        const targetRaw = edge && typeof edge.target === 'string' ? edge.target.trim() : '';
-        if (!sourceRaw || !targetRaw) {
-          return;
-        }
-        if (targetRaw === current && !visited.has(sourceRaw)) {
-          visited.add(sourceRaw);
-          stack.push(sourceRaw);
-        }
-      });
-    }
-    const ordered = Array.from(visited);
-    ordered.sort();
-    return ordered;
-  }, [graphEdges, nodeId]);
-
-  const upstreamTargetColumn = useMemo(() => {
-    if (!upstreamNodeIds.length) {
-      return '';
-    }
-
-    // Prioritize feature_target_split over train_test_split
-    let featureTargetSplitColumn = '';
-    let trainTestSplitColumn = '';
-
-    for (const upstreamId of upstreamNodeIds) {
-      const upstreamNode = graphNodes.find((n: any) => n?.id === upstreamId);
-      if (!upstreamNode) {
-        continue;
-      }
-
-      const catalogType = String(upstreamNode?.data?.catalogType ?? '').toLowerCase().trim();
-      
-      if (catalogType === 'feature_target_split') {
-        const targetCol = upstreamNode?.data?.config?.target_column;
-        if (typeof targetCol === 'string' && targetCol.trim()) {
-          featureTargetSplitColumn = targetCol.trim();
-        }
-      } else if (catalogType === 'train_test_split') {
-        const targetCol = upstreamNode?.data?.config?.target_column;
-        if (typeof targetCol === 'string' && targetCol.trim()) {
-          trainTestSplitColumn = targetCol.trim();
-        }
-      }
-    }
-
-    // Return feature_target_split column if available, otherwise train_test_split
-    return featureTargetSplitColumn || trainTestSplitColumn || '';
-  }, [graphNodes, upstreamNodeIds]);
+  const {
+    graphContext,
+    graphNodes,
+    graphNodeCount,
+    upstreamNodeIds,
+    upstreamTargetColumn,
+    hasReachableSource,
+  } = useGraphTopology({
+    graphSnapshot: graphSnapshot ?? null,
+    nodeId,
+    isDataset,
+  });
 
   const {
     featureTargetSplitConfig,
@@ -668,79 +607,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   const [cachedPreviewSchema, setCachedPreviewSchema] = useState<PipelinePreviewSchema | null>(null);
 
   const cachedSchemaColumns = useMemo(() => cachedPreviewSchema?.columns ?? [], [cachedPreviewSchema]);
-
-  const datasetNodeIds = useMemo(() => {
-    const result = new Set<string>();
-    graphNodes.forEach((entry: any) => {
-      if (!entry) {
-        return;
-      }
-      const entryId = typeof entry.id === 'string' ? entry.id.trim() : String(entry?.id ?? '').trim();
-      if (!entryId) {
-        return;
-      }
-      const entryData = entry?.data ?? {};
-      if (entryId === 'dataset-source' || entryData?.isDataset === true || entryData?.catalogType === 'dataset') {
-        result.add(entryId);
-      }
-    });
-    if (!result.size) {
-      result.add('dataset-source');
-    }
-    return Array.from(result);
-  }, [graphNodes]);
-
-  const hasReachableSource = useMemo(() => {
-    if (!nodeId) {
-      return false;
-    }
-
-    if (isDataset) {
-      return true;
-    }
-
-    if (!graphEdges.length) {
-      return datasetNodeIds.includes(nodeId);
-    }
-
-    const adjacency = new Map<string, string[]>();
-    graphEdges.forEach((edge: any) => {
-      const rawSource = edge?.source;
-      const rawTarget = edge?.target;
-      const source = typeof rawSource === 'string' ? rawSource.trim() : String(rawSource ?? '').trim();
-      const target = typeof rawTarget === 'string' ? rawTarget.trim() : String(rawTarget ?? '').trim();
-      if (!source || !target) {
-        return;
-      }
-      const list = adjacency.get(source);
-      if (list) {
-        list.push(target);
-      } else {
-        adjacency.set(source, [target]);
-      }
-    });
-
-    const visited = new Set<string>();
-    const stack = [...datasetNodeIds];
-
-    while (stack.length) {
-      const current = stack.pop();
-      if (!current || visited.has(current)) {
-        continue;
-      }
-      visited.add(current);
-      const neighbors = adjacency.get(current);
-      if (neighbors) {
-        neighbors.forEach((neighbor) => {
-          if (neighbor && !visited.has(neighbor)) {
-            stack.push(neighbor);
-          }
-        });
-      }
-    }
-
-    return visited.has(nodeId);
-  }, [datasetNodeIds, graphEdges, isDataset, nodeId]);
 
   const oversamplingSchemaGuard = useMemo<ResamplingSchemaGuard | null>(() => {
     if (!isClassOversamplingNode) {
