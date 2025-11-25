@@ -5,6 +5,8 @@ import type {
   ScalingMethodName,
 } from '../../../../api';
 
+export type { ScalingMethodName };
+
 export type NormalizedScalingConfig = {
   columns: string[];
   defaultMethod: ScalingMethodName;

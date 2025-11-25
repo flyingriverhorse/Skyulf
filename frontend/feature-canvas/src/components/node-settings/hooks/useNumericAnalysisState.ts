@@ -9,6 +9,15 @@ import {
   useBinningConfiguration,
 } from './useBinningConfiguration';
 import {
+  useBinningHandlers,
+} from './useBinningHandlers';
+import {
+  useOutlierHandlers,
+} from './useOutlierHandlers';
+import {
+  useScalingHandlers,
+} from './useScalingHandlers';
+import {
   useNumericRangeSummaries,
 } from './useNumericRangeSummaries';
 import {
@@ -209,6 +218,67 @@ export const useNumericAnalysisState = ({
   const canApplyAllBinningNumeric = binningNumericColumnsNotSelected.length > 0;
 
   const {
+    handleBinningIntegerChange,
+    handleBinningBooleanToggle,
+    handleBinningSuffixChange,
+    handleBinningLabelFormatChange,
+    handleBinningMissingStrategyChange,
+    handleBinningMissingLabelChange,
+    handleBinningCustomBinsChange,
+    handleBinningCustomLabelsChange,
+    handleBinningClearCustomColumn,
+    updateBinningColumnOverride,
+    handleBinningOverrideStrategyChange,
+    handleBinningOverrideNumberChange,
+    handleBinningOverrideKbinsEncodeChange,
+    handleBinningOverrideKbinsStrategyChange,
+    handleBinningClearOverride,
+    handleBinningClearOverrides,
+    handleBinningApplyStrategies,
+    handleBinningApplyColumns,
+    handleApplyAllBinningNumeric,
+  } = useBinningHandlers({
+    setConfigState,
+    setBinningCustomEdgeDrafts,
+    setBinningCustomLabelDrafts,
+    binningConfig,
+    binningInsightsRecommendations,
+    binningAllNumericColumns,
+  });
+
+  const {
+    handleOutlierDefaultMethodChange,
+    handleOutlierAutoDetectToggle,
+    setOutlierColumnMethod,
+    handleOutlierClearOverrides,
+    handleOutlierApplyAllRecommendations,
+    handleOutlierSkipColumn,
+    handleOutlierUnskipColumn,
+    handleOutlierOverrideSelect,
+    handleOutlierMethodParameterChange,
+    handleOutlierColumnParameterChange,
+  } = useOutlierHandlers({
+    setConfigState,
+    outlierRecommendationRows,
+    outlierExcludedColumns,
+    outlierConfig,
+  });
+
+  const {
+    handleScalingDefaultMethodChange,
+    handleScalingAutoDetectToggle,
+    setScalingColumnMethod,
+    handleScalingClearOverrides,
+    handleScalingApplyAllRecommendations,
+    handleScalingSkipColumn,
+    handleScalingUnskipColumn,
+    handleScalingOverrideSelect,
+  } = useScalingHandlers({
+    setConfigState,
+    scalingRecommendations,
+  });
+
+  const {
     binningExcludedColumns,
     binningColumnPreviewMap,
     manualBoundColumns,
@@ -301,6 +371,43 @@ export const useNumericAnalysisState = ({
     binningColumnPreviewMap,
     manualBoundColumns,
     manualRangeFallbackMap,
+    handleOutlierDefaultMethodChange,
+    handleOutlierAutoDetectToggle,
+    setOutlierColumnMethod,
+    handleOutlierClearOverrides,
+    handleOutlierApplyAllRecommendations,
+    handleOutlierSkipColumn,
+    handleOutlierUnskipColumn,
+    handleOutlierOverrideSelect,
+    handleOutlierMethodParameterChange,
+    handleOutlierColumnParameterChange,
+    handleScalingDefaultMethodChange,
+    handleScalingAutoDetectToggle,
+    setScalingColumnMethod,
+    handleScalingClearOverrides,
+    handleScalingApplyAllRecommendations,
+    handleScalingSkipColumn,
+    handleScalingUnskipColumn,
+    handleScalingOverrideSelect,
     binningInsightsExcludedColumns,
+    handleBinningIntegerChange,
+    handleBinningBooleanToggle,
+    handleBinningSuffixChange,
+    handleBinningLabelFormatChange,
+    handleBinningMissingStrategyChange,
+    handleBinningMissingLabelChange,
+    handleBinningCustomBinsChange,
+    handleBinningCustomLabelsChange,
+    handleBinningClearCustomColumn,
+    updateBinningColumnOverride,
+    handleBinningOverrideStrategyChange,
+    handleBinningOverrideNumberChange,
+    handleBinningOverrideKbinsEncodeChange,
+    handleBinningOverrideKbinsStrategyChange,
+    handleBinningClearOverride,
+    handleBinningClearOverrides,
+    handleBinningApplyStrategies,
+    handleBinningApplyColumns,
+    handleApplyAllBinningNumeric,
   };
 };
