@@ -135,12 +135,8 @@ import { useSkewnessInsights } from './node-settings/hooks/useSkewnessInsights';
 import { useBinnedDistribution } from './node-settings/hooks/useBinnedDistribution';
 import { usePipelinePreview } from './node-settings/hooks/usePipelinePreview';
 import { useDropColumnRecommendations } from './node-settings/hooks/useDropColumnRecommendations';
-import { useAliasConfiguration } from './node-settings/hooks/useAliasConfiguration';
 import { useOutlierRecommendations } from './node-settings/hooks/useOutlierRecommendations';
 import { useNumericColumnAnalysis } from './node-settings/hooks/useNumericColumnAnalysis';
-import { useTextCleanupConfiguration } from './node-settings/hooks/useTextCleanupConfiguration';
-import { useReplaceInvalidConfiguration } from './node-settings/hooks/useReplaceInvalidConfiguration';
-import { useStandardizeDatesConfiguration } from './node-settings/hooks/useStandardizeDatesConfiguration';
 import { useImputationConfiguration } from './node-settings/hooks/useImputationConfiguration';
 import { useModelingConfiguration } from './node-settings/hooks/useModelingConfiguration';
 import {
@@ -177,6 +173,7 @@ import { useNodeConfigState } from './node-settings/hooks/useNodeConfigState';
 import { useParameterHandlers } from './node-settings/hooks/useParameterHandlers';
 import { useEncodingRecommendationsState } from './node-settings/hooks/useEncodingRecommendationsState';
 import { useNumericAnalysisState } from './node-settings/hooks/useNumericAnalysisState';
+import { useDataCleaningState } from './node-settings/hooks/useDataCleaningState';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -1329,75 +1326,40 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     aliasCustomPairSummary,
     aliasSampleMap,
     aliasColumnOptions,
-  } = useAliasConfiguration({
+    trimWhitespaceColumnSummary,
+    trimWhitespaceSampleMap,
+    trimWhitespaceModeDetails,
+    removeSpecialColumnSummary,
+    removeSpecialSampleMap,
+    removeSpecialModeDetails,
+    removeSpecialMode,
+    regexCleanupColumnSummary,
+    regexCleanupSampleMap,
+    regexCleanupModeDetails,
+    regexCleanupMode,
+    regexCleanupReplacementValue,
+    normalizeCaseColumnSummary,
+    normalizeCaseSampleMap,
+    normalizeCaseModeDetails,
+    normalizeCaseMode,
+    replaceInvalidMode,
+    replaceInvalidModeDetails,
+    replaceInvalidSampleMap,
+    replaceInvalidColumnSummary,
+    replaceInvalidMinValue,
+    replaceInvalidMaxValue,
+    standardizeDatesMode,
+    dateStrategies,
+    standardizeDatesSampleMap,
+    standardizeDatesColumnSummary,
+    dateColumnOptions,
+  } = useDataCleaningState({
     isReplaceAliasesNode,
-    configState,
-    nodeConfig: node?.data?.config ?? null,
-    availableColumns,
-    columnTypeMap,
-    previewSampleRows,
-  });
-
-  const {
-    trimWhitespace: {
-      columnSummary: trimWhitespaceColumnSummary,
-      sampleMap: trimWhitespaceSampleMap,
-      modeDetails: trimWhitespaceModeDetails,
-    },
-    removeSpecial: {
-      columnSummary: removeSpecialColumnSummary,
-      sampleMap: removeSpecialSampleMap,
-      modeDetails: removeSpecialModeDetails,
-      selectedMode: removeSpecialMode,
-    },
-    regexCleanup: {
-      columnSummary: regexCleanupColumnSummary,
-      sampleMap: regexCleanupSampleMap,
-      modeDetails: regexCleanupModeDetails,
-      selectedMode: regexCleanupMode,
-      replacementValue: regexCleanupReplacementValue,
-    },
-    normalizeCase: {
-      columnSummary: normalizeCaseColumnSummary,
-      sampleMap: normalizeCaseSampleMap,
-      modeDetails: normalizeCaseModeDetails,
-      selectedMode: normalizeCaseMode,
-    },
-  } = useTextCleanupConfiguration({
     isTrimWhitespaceNode,
     isRemoveSpecialCharsNode,
     isRegexCleanupNode,
     isNormalizeTextCaseNode,
-    configState,
-    nodeConfig: node?.data?.config ?? null,
-    availableColumns,
-    columnTypeMap,
-    previewSampleRows,
-  });
-
-  const {
-    selectedMode: replaceInvalidMode,
-    modeDetails: replaceInvalidModeDetails,
-    sampleMap: replaceInvalidSampleMap,
-    columnSummary: replaceInvalidColumnSummary,
-    minValue: replaceInvalidMinValue,
-    maxValue: replaceInvalidMaxValue,
-  } = useReplaceInvalidConfiguration({
     isReplaceInvalidValuesNode,
-    configState,
-    nodeConfig: node?.data?.config ?? null,
-    availableColumns,
-    columnTypeMap,
-    previewSampleRows,
-  });
-
-  const {
-    selectedMode: standardizeDatesMode,
-    strategies: dateStrategies,
-    sampleMap: standardizeDatesSampleMap,
-    columnSummary: standardizeDatesColumnSummary,
-    columnOptions: dateColumnOptions,
-  } = useStandardizeDatesConfiguration({
     isStandardizeDatesNode,
     configState,
     nodeConfig: node?.data?.config ?? null,
