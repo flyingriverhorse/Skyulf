@@ -134,7 +134,6 @@ import { useScalingInsights } from './node-settings/hooks/useScalingInsights';
 import { useBinningInsights } from './node-settings/hooks/useBinningInsights';
 import { useSkewnessInsights } from './node-settings/hooks/useSkewnessInsights';
 import { useBinnedDistribution } from './node-settings/hooks/useBinnedDistribution';
-import { usePipelinePreview } from './node-settings/hooks/usePipelinePreview';
 import { useDropColumnRecommendations } from './node-settings/hooks/useDropColumnRecommendations';
 import { useOutlierRecommendations } from './node-settings/hooks/useOutlierRecommendations';
 import { useNumericColumnAnalysis } from './node-settings/hooks/useNumericColumnAnalysis';
@@ -176,6 +175,8 @@ import { useEncodingRecommendationsState } from './node-settings/hooks/useEncodi
 import { useNumericAnalysisState } from './node-settings/hooks/useNumericAnalysisState';
 import { useDataCleaningState } from './node-settings/hooks/useDataCleaningState';
 import { useGraphTopology } from './node-settings/hooks/useGraphTopology';
+import { useNodePreview } from './node-settings/hooks/useNodePreview';
+import { useColumnCatalogState } from './node-settings/hooks/useColumnCatalogState';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -607,7 +608,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   const [cachedPreviewSchema, setCachedPreviewSchema] = useState<PipelinePreviewSchema | null>(null);
 
   const cachedSchemaColumns = useMemo(() => cachedPreviewSchema?.columns ?? [], [cachedPreviewSchema]);
-
   const oversamplingSchemaGuard = useMemo<ResamplingSchemaGuard | null>(() => {
     if (!isClassOversamplingNode) {
       return null;
@@ -697,12 +697,26 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
   const skipPreview = Boolean(oversamplingSchemaGuard?.blocked || imputationSchemaDiagnostics?.blocked);
 
-  const [availableColumns, setAvailableColumns] = useState<string[]>([]);
-  const [columnSearch, setColumnSearch] = useState('');
-  const [columnMissingMap, setColumnMissingMap] = useState<Record<string, number>>({});
-  const [columnTypeMap, setColumnTypeMap] = useState<Record<string, string>>({});
-  const [columnSuggestions, setColumnSuggestions] = useState<Record<string, string[]>>({});
-  const [imputerMissingFilter, setImputerMissingFilter] = useState(0);
+  const {
+    availableColumns,
+    setAvailableColumns,
+    columnSearch,
+    setColumnSearch,
+    columnMissingMap,
+    setColumnMissingMap,
+    columnTypeMap,
+    setColumnTypeMap,
+    columnSuggestions,
+    setColumnSuggestions,
+    imputerMissingFilter,
+    setImputerMissingFilter,
+  } = useColumnCatalogState({
+    requiresColumnCatalog,
+    isImputerNode,
+    nodeId,
+    sourceId,
+    hasReachableSource,
+  });
 
   const hasDropColumnParameter = Boolean(dropColumnParameter);
 
@@ -790,27 +804,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     nodeChangeVersion,
   });
 
-  useEffect(() => {
-    if (!requiresColumnCatalog && !isImputerNode) {
-      return;
-    }
-
-    if (sourceId && hasReachableSource) {
-      return;
-    }
-
-    setAvailableColumns([]);
-    setColumnMissingMap({});
-    setColumnTypeMap({});
-    setColumnSuggestions({});
-    setColumnSearch('');
-
-  }, [hasReachableSource, isImputerNode, requiresColumnCatalog, sourceId]);
-
-  useEffect(() => {
-    setImputerMissingFilter(0);
-  }, [isImputerNode, node?.id]);
-
   const [binnedSamplePreset, setBinnedSamplePreset] = useState<BinnedSamplePresetValue>('500');
 
   const [collapsedStrategies, setCollapsedStrategies] = useState<Set<number>>(() => new Set());
@@ -838,52 +831,29 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   });
   const { profileState } = datasetProfileController;
 
-  const shouldFetchPreview = useMemo(() => {
-    if (!graphSnapshot) {
-      return false;
-    }
-    if (!graphNodeCount) {
-      return false;
-    }
-    if (!hasReachableSource) {
-      return false;
-    }
-    return true;
-  }, [graphNodeCount, graphSnapshot, hasReachableSource, sourceId]);
-
-  const canTriggerPreview = useMemo(() => {
-    if (!graphSnapshot) {
-      return false;
-    }
-    if (!sourceId) {
-      return false;
-    }
-    if (!hasReachableSource) {
-      return false;
-    }
-    return graphNodeCount > 0;
-  }, [graphNodeCount, graphSnapshot, hasReachableSource, sourceId]);
-
-  const shouldIncludeSignals =
-    isPreviewNode ||
-    isFeatureMathNode ||
-    isPolynomialFeaturesNode ||
-    isFeatureSelectionNode ||
-    isTrainTestSplitNode ||
-    isOutlierNode ||
-    isTransformerAuditNode;
-
-  const { previewState, refreshPreview } = usePipelinePreview({
-    shouldFetchPreview,
-    sourceId,
+  const {
+    previewState,
+    refreshPreview,
+    clearCachedPreviewSchema,
     canTriggerPreview,
+  } = useNodePreview({
     graphSnapshot: graphSnapshot ?? null,
-    isPreviewNode,
-    targetNodeId: node?.id ?? null,
+    graphNodeCount,
+    hasReachableSource,
+    sourceId,
+    node,
+    nodeId,
     previewSignature,
     skipPreview,
-    requestPreviewRows: isPreviewNode,
-    includeSignals: shouldIncludeSignals,
+    cachedPreviewSchema,
+    setCachedPreviewSchema,
+    isPreviewNode,
+    isFeatureMathNode,
+    isPolynomialFeaturesNode,
+    isFeatureSelectionNode,
+    isTrainTestSplitNode,
+    isOutlierNode,
+    isTransformerAuditNode,
   });
 
   const featureMathSignals = useMemo<FeatureMathNodeSignal[]>(() => {
@@ -1063,7 +1033,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   });
 
   const handleRefreshPreview = useCallback(() => {
-    setCachedPreviewSchema(null);
+    clearCachedPreviewSchema();
     refreshPreview();
     if (isScalingNode) {
       refreshScaling();
@@ -1080,30 +1050,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isScalingNode,
     refreshBinning,
     refreshOutliers,
+    clearCachedPreviewSchema,
     refreshPreview,
     refreshScaling,
   ]);
-
-  useEffect(() => {
-    const nextSchema = previewState.data?.schema ?? null;
-    if (!nextSchema) {
-      return;
-    }
-    setCachedPreviewSchema((previous) => {
-      if (previous?.signature && nextSchema.signature && previous.signature === nextSchema.signature) {
-        return previous;
-      }
-      return nextSchema;
-    });
-  }, [previewState.data?.schema]);
-
-  useEffect(() => {
-    setCachedPreviewSchema(null);
-  }, [sourceId]);
-
-  useEffect(() => {
-    setCachedPreviewSchema(null);
-  }, [previewSignature]);
 
   const {
     binnedDistributionData,
