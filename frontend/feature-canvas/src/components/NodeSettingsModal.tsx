@@ -10,8 +10,8 @@ import {
 } from '../api';
 import {
   DropMissingColumnsSection,
-  useDropMissingColumns,
 } from './node-settings/nodes/drop_col_rows/DropMissingColumnsSection';
+import { useDropMissingColumns } from './node-settings/hooks/useDropMissingColumns';
 import { DropMissingRowsSection } from './node-settings/nodes/drop_col_rows/DropMissingRowsSection';
 import { RemoveDuplicatesSection } from './node-settings/nodes/remove_duplicates/RemoveDuplicatesSection';
 import { DEFAULT_KEEP_STRATEGY, type KeepStrategy } from './node-settings/nodes/remove_duplicates/removeDuplicatesSettings';
@@ -74,18 +74,12 @@ import { ReplaceAliasesSection } from './node-settings/nodes/replace_aliases/Rep
 import {
   ALIAS_MODE_OPTIONS,
   DEFAULT_ALIAS_MODE,
-  normalizeAliasStrategies,
-  resolveAliasMode,
-  serializeAliasStrategies,
   type AliasMode,
   type AliasStrategyConfig,
 } from './node-settings/nodes/replace_aliases/replaceAliasesSettings';
 import { StandardizeDatesSection } from './node-settings/nodes/standardize_date/StandardizeDatesSection';
 import {
   DATE_MODE_OPTIONS,
-  normalizeDateFormatStrategies,
-  resolveDateMode,
-  serializeDateFormatStrategies,
   type DateMode,
   type DateFormatStrategyConfig,
 } from './node-settings/nodes/standardize_date/standardizeDateSettings';
@@ -96,14 +90,9 @@ import { RegexCleanupSection } from './node-settings/nodes/regex_node/RegexClean
 import { ReplaceInvalidValuesSection } from './node-settings/nodes/replace_invalid_values/ReplaceInvalidValuesSection';
 import { FeatureMathSection } from './node-settings/nodes/feature_math/FeatureMathSection';
 import {
-  DATETIME_FEATURE_OPTIONS,
   buildFeatureMathSummaries,
-  createFeatureMathOperation,
   FeatureMathOperationDraft,
-  FeatureMathOperationType,
-  getMethodOptions,
   normalizeFeatureMathOperations,
-  serializeFeatureMathOperations,
 } from './node-settings/nodes/feature_math/featureMathSettings';
 import { LabelEncodingSection } from './node-settings/nodes/label_encoding/LabelEncodingSection';
 import { TargetEncodingSection } from './node-settings/nodes/target_encoding/TargetEncodingSection';
@@ -145,14 +134,7 @@ import {
 import { formatCellValue, formatColumnType, formatRelativeTime } from './node-settings/utils/formatters';
 import { DATA_CONSISTENCY_GUIDANCE } from './node-settings/utils/guidance';
 import { HistogramSparkline } from './node-settings/utils/HistogramSparkline';
-import {
-  sanitizeConstantsList,
-  sanitizeDatetimeFeaturesList,
-  sanitizeIntegerValue,
-  sanitizeNumberValue,
-  sanitizeStringList,
-  sanitizeTimezoneValue,
-} from './node-settings/utils/sanitizers';
+
 import { OutlierInsightsSection } from './node-settings/nodes/outlier/OutlierInsightsSection';
 import { OUTLIER_METHOD_ORDER } from './node-settings/nodes/outlier/outlierSettings';
 import { useNodeMetadata } from './node-settings/hooks/useNodeMetadata';
@@ -183,6 +165,9 @@ import { useDatasetProfiling } from './node-settings/hooks/useDatasetProfiling';
 import { NodeSettingsParameterField } from './node-settings/fields/NodeSettingsParameterField';
 import { NodeSettingsMultiSelectField } from './node-settings/fields/NodeSettingsMultiSelectField';
 import { useImputationStrategyHandlers } from './node-settings/hooks/useImputationStrategyHandlers';
+import { useAliasStrategyHandlers } from './node-settings/hooks/useAliasStrategyHandlers';
+import { useDateStrategyHandlers } from './node-settings/hooks/useDateStrategyHandlers';
+import { useFeatureMathHandlers } from './node-settings/hooks/useFeatureMathHandlers';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -1371,123 +1356,57 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     setImputerMissingFilter,
   });
 
-  const updateAliasStrategies = useCallback(
-    (updater: (current: AliasStrategyConfig[]) => AliasStrategyConfig[]) => {
-      if (!isReplaceAliasesNode) {
-        return;
-      }
+  const {
+    updateAliasStrategies,
+    handleAddAliasStrategy,
+    handleRemoveAliasStrategy,
+    toggleAliasStrategySection,
+    handleAliasModeChange,
+    handleAliasColumnToggle,
+    handleAliasColumnsChange,
+    handleAliasAutoDetectToggle,
+  } = useAliasStrategyHandlers({
+    isReplaceAliasesNode,
+    node,
+    setConfigState,
+    setCollapsedStrategies,
+    aliasColumnSummary,
+    aliasStrategyCount,
+  });
 
-      setConfigState((previous) => {
-        if (!isReplaceAliasesNode) {
-          return previous;
-        }
+  const {
+    updateDateStrategies,
+    handleAddDateStrategy,
+    handleRemoveDateStrategy,
+    toggleDateStrategySection,
+    handleDateStrategyModeChange,
+    handleDateStrategyColumnsChange,
+    handleDateStrategyColumnToggle,
+    handleDateStrategyAutoDetectToggle,
+  } = useDateStrategyHandlers({
+    isStandardizeDatesNode,
+    node,
+    setConfigState,
+    setCollapsedStrategies,
+    dateStrategies,
+    standardizeDatesColumnSummary,
+    standardizeDatesMode,
+  });
 
-        const fallbackColumns = ensureArrayOfString(previous?.columns ?? node?.data?.config?.columns);
-        const fallbackMode = resolveAliasMode(previous?.mode, node?.data?.config?.mode);
+  const {
+    updateFeatureMathOperations,
+    handleAddFeatureMathOperation,
+    handleDuplicateFeatureMathOperation,
+    handleRemoveFeatureMathOperation,
+    handleReorderFeatureMathOperation,
+    handleToggleFeatureMathOperation,
+    handleFeatureMathOperationChange,
+  } = useFeatureMathHandlers({
+    isFeatureMathNode,
+    setConfigState,
+    setCollapsedFeatureMath,
+  });
 
-        const fallbackAutoDetect = (() => {
-          const localValue = pickAutoDetectValue(previous as Record<string, unknown>);
-          if (localValue !== undefined) {
-            const normalized = normalizeConfigBoolean(localValue);
-            if (normalized !== null) {
-              return normalized;
-            }
-          }
-          const nodeValue = pickAutoDetectValue(node?.data?.config as Record<string, unknown> | undefined);
-          if (nodeValue !== undefined) {
-            const normalized = normalizeConfigBoolean(nodeValue);
-            if (normalized !== null) {
-              return normalized;
-            }
-          }
-          return fallbackColumns.length === 0;
-        })();
-
-        const rawStrategies =
-          previous?.alias_strategies ??
-          previous?.strategies ??
-          node?.data?.config?.alias_strategies ??
-          node?.data?.config?.strategies;
-
-        const currentStrategies = normalizeAliasStrategies(rawStrategies, {
-          mode: fallbackMode,
-          columns: fallbackColumns,
-          autoDetect: fallbackAutoDetect,
-        });
-
-        const nextStrategies = updater(currentStrategies).map((strategy) => ({
-          mode: resolveAliasMode(strategy.mode, fallbackMode),
-          columns: Array.from(
-            new Set(strategy.columns.map((column) => column.trim()).filter(Boolean)),
-          ).sort((a, b) => a.localeCompare(b)),
-          autoDetect: Boolean(strategy.autoDetect),
-        }));
-
-        const serialized = serializeAliasStrategies(nextStrategies);
-        const unionColumns = Array.from(
-          new Set(
-            nextStrategies.flatMap((strategy) => strategy.columns),
-          ),
-        ).sort((a, b) => a.localeCompare(b));
-
-        const primaryMode = nextStrategies[0]?.mode ?? fallbackMode;
-        const autoDetectAny = nextStrategies.length
-          ? nextStrategies.some((strategy) => strategy.autoDetect)
-          : fallbackAutoDetect;
-
-        return {
-          ...previous,
-          alias_strategies: serialized,
-          columns: unionColumns,
-          mode: primaryMode,
-          auto_detect: autoDetectAny,
-        };
-      });
-    },
-    [isReplaceAliasesNode, node?.data?.config]
-  );
-
-  const updateDateStrategies = useCallback(
-    (updater: (current: DateFormatStrategyConfig[]) => DateFormatStrategyConfig[]) => {
-      setConfigState((previous) => {
-        if (!isStandardizeDatesNode) {
-          return previous;
-        }
-
-        const fallbackColumns = ensureArrayOfString(previous?.columns ?? node?.data?.config?.columns);
-        const fallbackMode = resolveDateMode(previous?.mode, node?.data?.config?.mode);
-        const fallbackAutoDetect = fallbackColumns.length === 0;
-
-        const currentStrategies = normalizeDateFormatStrategies(
-          previous?.format_strategies ?? node?.data?.config?.format_strategies,
-          {
-            columns: fallbackColumns,
-            mode: fallbackMode,
-            autoDetect: fallbackAutoDetect,
-          },
-        );
-
-        const nextStrategies = updater(currentStrategies);
-        const serialized = serializeDateFormatStrategies(nextStrategies);
-        const unionColumns = Array.from(
-          new Set(
-            nextStrategies.flatMap((strategy) =>
-              strategy.columns.map((column) => column.trim()).filter(Boolean),
-            ),
-          ),
-        ).sort((a, b) => a.localeCompare(b));
-        const primaryMode = nextStrategies[0]?.mode ?? fallbackMode;
-
-        return {
-          ...previous,
-          format_strategies: serialized,
-          columns: unionColumns,
-          mode: primaryMode,
-        };
-      });
-    },
-    [isStandardizeDatesNode, node?.data?.config?.columns, node?.data?.config?.format_strategies, node?.data?.config?.mode],
-  );
   const handleRefreshBinnedDistribution = useCallback(() => {
     if (!sourceId) {
       return;
@@ -1619,500 +1538,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
 
 
-  const handleAddDateStrategy = useCallback(() => {
-    const nextIndex = dateStrategies.length;
-    updateDateStrategies((current) => {
-      const assigned = new Set<string>();
-      current.forEach((strategy) => {
-        strategy.columns.forEach((column) => {
-          const normalized = column.trim();
-          if (normalized) {
-            assigned.add(normalized);
-          }
-        });
-      });
-      const suggested = standardizeDatesColumnSummary.recommendedColumns.find((column) => !assigned.has(column));
-      const defaultMode = current.length
-        ? current[current.length - 1].mode
-        : DATE_MODE_OPTIONS[0]?.value ?? standardizeDatesMode;
-      const nextStrategy: DateFormatStrategyConfig = {
-        mode: defaultMode,
-        columns: suggested ? [suggested] : [],
-        autoDetect: !suggested,
-      };
-      return [...current, nextStrategy];
-    });
-    setCollapsedStrategies((previous) => {
-      const next = new Set(previous);
-      next.delete(nextIndex);
-      return next;
-    });
-  }, [dateStrategies.length, setCollapsedStrategies, standardizeDatesColumnSummary.recommendedColumns, standardizeDatesMode, updateDateStrategies]);
 
-  const handleRemoveDateStrategy = useCallback(
-    (index: number) => {
-      updateDateStrategies((current) => current.filter((_, idx) => idx !== index));
-      setCollapsedStrategies((previous) => {
-        const next = new Set<number>();
-        previous.forEach((value) => {
-          if (value === index) {
-            return;
-          }
-          next.add(value > index ? value - 1 : value);
-        });
-        return next;
-      });
-    },
-    [setCollapsedStrategies, updateDateStrategies],
-  );
-
-  const toggleDateStrategySection = useCallback((index: number) => {
-    setCollapsedStrategies((previous) => {
-      const next = new Set(previous);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
-  }, []);
-
-  const handleDateStrategyModeChange = useCallback(
-    (index: number, mode: DateMode) => {
-      updateDateStrategies((current) =>
-        current.map((strategy, idx) => (idx === index ? { ...strategy, mode } : strategy)),
-      );
-    },
-    [updateDateStrategies],
-  );
-
-  const handleDateStrategyColumnsChange = useCallback(
-    (index: number, value: string) => {
-      const normalized = value
-        .split(',')
-        .map((column) => column.trim())
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b));
-      updateDateStrategies((current) =>
-        current.map((strategy, idx) => (idx === index ? { ...strategy, columns: normalized } : strategy)),
-      );
-    },
-    [updateDateStrategies],
-  );
-
-  const handleDateStrategyColumnToggle = useCallback(
-    (index: number, column: string) => {
-      const normalized = column.trim();
-      if (!normalized) {
-        return;
-      }
-      updateDateStrategies((current) =>
-        current.map((strategy, idx) => {
-          if (idx !== index) {
-            return strategy;
-          }
-          const hasColumn = strategy.columns.includes(normalized);
-          const nextColumns = hasColumn
-            ? strategy.columns.filter((entry) => entry !== normalized)
-            : [...strategy.columns, normalized];
-          nextColumns.sort((a, b) => a.localeCompare(b));
-          return {
-            ...strategy,
-            columns: nextColumns,
-          };
-        }),
-      );
-    },
-    [updateDateStrategies],
-  );
-
-  const handleDateStrategyAutoDetectToggle = useCallback(
-    (index: number, enabled: boolean) => {
-      updateDateStrategies((current) =>
-        current.map((strategy, idx) => (idx === index ? { ...strategy, autoDetect: enabled } : strategy)),
-      );
-    },
-    [updateDateStrategies],
-  );
-
-  const updateFeatureMathOperations = useCallback(
-    (updater: (operations: FeatureMathOperationDraft[]) => FeatureMathOperationDraft[]) => {
-      setConfigState((previous) => {
-        if (!isFeatureMathNode) {
-          return previous;
-        }
-        const baseConfig =
-          previous && typeof previous === 'object' && !Array.isArray(previous) ? { ...previous } : {};
-        const existingOperations = normalizeFeatureMathOperations(
-          Array.isArray((previous as any)?.operations) ? (previous as any).operations : [],
-        );
-        const nextOperations = updater(existingOperations);
-        baseConfig.operations = serializeFeatureMathOperations(nextOperations);
-        return baseConfig;
-      });
-    },
-    [isFeatureMathNode, setConfigState],
-  );
-
-  const handleAddFeatureMathOperation = useCallback(
-    (operationType: FeatureMathOperationType) => {
-      if (!isFeatureMathNode) {
-        return;
-      }
-      let createdOperationId = '';
-      updateFeatureMathOperations((current) => {
-        const existingIds = new Set(current.map((operation) => operation.id));
-        const draft = createFeatureMathOperation(operationType, existingIds);
-        createdOperationId = draft.id;
-        return [...current, draft];
-      });
-      if (createdOperationId) {
-        setCollapsedFeatureMath((previous) => {
-          const next = new Set(previous);
-          next.delete(createdOperationId);
-          return next;
-        });
-      }
-    },
-    [isFeatureMathNode, setCollapsedFeatureMath, updateFeatureMathOperations],
-  );
-
-  const handleDuplicateFeatureMathOperation = useCallback(
-    (operationId: string) => {
-      if (!isFeatureMathNode) {
-        return;
-      }
-      let createdOperationId = '';
-      updateFeatureMathOperations((current) => {
-        const index = current.findIndex((operation) => operation.id === operationId);
-        if (index === -1) {
-          return current;
-        }
-        const source = current[index];
-        const existingIds = new Set(current.map((operation) => operation.id));
-        const seed = createFeatureMathOperation(source.type, existingIds);
-        createdOperationId = seed.id;
-        const duplicate: FeatureMathOperationDraft = {
-          ...source,
-          id: seed.id,
-          inputColumns: [...source.inputColumns],
-          secondaryColumns: [...source.secondaryColumns],
-          constants: [...source.constants],
-          datetimeFeatures: [...source.datetimeFeatures],
-          outputColumn: source.outputColumn ? `${source.outputColumn}_copy` : '',
-        };
-        const next = [...current];
-        next.splice(index + 1, 0, duplicate);
-        return next;
-      });
-      if (createdOperationId) {
-        setCollapsedFeatureMath((previous) => {
-          const next = new Set(previous);
-          next.delete(createdOperationId);
-          return next;
-        });
-      }
-    },
-    [isFeatureMathNode, setCollapsedFeatureMath, updateFeatureMathOperations],
-  );
-
-  const handleRemoveFeatureMathOperation = useCallback(
-    (operationId: string) => {
-      if (!isFeatureMathNode) {
-        return;
-      }
-      updateFeatureMathOperations((current) => current.filter((operation) => operation.id !== operationId));
-      setCollapsedFeatureMath((previous) => {
-        const next = new Set(previous);
-        next.delete(operationId);
-        return next;
-      });
-    },
-    [isFeatureMathNode, setCollapsedFeatureMath, updateFeatureMathOperations],
-  );
-
-  const handleReorderFeatureMathOperation = useCallback(
-    (operationId: string, direction: 'up' | 'down') => {
-      if (!isFeatureMathNode) {
-        return;
-      }
-      updateFeatureMathOperations((current) => {
-        const index = current.findIndex((operation) => operation.id === operationId);
-        if (index === -1) {
-          return current;
-        }
-        const targetIndex = direction === 'up' ? index - 1 : index + 1;
-        if (targetIndex < 0 || targetIndex >= current.length) {
-          return current;
-        }
-        const next = [...current];
-        const [moved] = next.splice(index, 1);
-        next.splice(targetIndex, 0, moved);
-        return next;
-      });
-    },
-    [isFeatureMathNode, updateFeatureMathOperations],
-  );
-
-  const handleToggleFeatureMathOperation = useCallback((operationId: string) => {
-    setCollapsedFeatureMath((previous) => {
-      const next = new Set(previous);
-      if (next.has(operationId)) {
-        next.delete(operationId);
-      } else {
-        next.add(operationId);
-      }
-      return next;
-    });
-  }, []);
-
-  const handleFeatureMathOperationChange = useCallback(
-    (operationId: string, updates: Partial<FeatureMathOperationDraft>) => {
-      if (!isFeatureMathNode) {
-        return;
-      }
-      updateFeatureMathOperations((current) =>
-        current.map((operation) => {
-          if (operation.id !== operationId) {
-            return operation;
-          }
-
-          let next: FeatureMathOperationDraft = { ...operation };
-
-          if (updates.type) {
-            next.type = updates.type;
-          }
-
-          if (updates.method !== undefined) {
-            next.method = updates.method;
-          }
-
-          if (updates.inputColumns !== undefined) {
-            next.inputColumns = sanitizeStringList(updates.inputColumns);
-          }
-
-          if (updates.secondaryColumns !== undefined) {
-            next.secondaryColumns = sanitizeStringList(updates.secondaryColumns);
-          }
-
-          if (updates.constants !== undefined) {
-            next.constants = sanitizeConstantsList(updates.constants);
-          }
-
-          if (updates.outputColumn !== undefined) {
-            next.outputColumn = updates.outputColumn.trim();
-          }
-
-          if (updates.outputPrefix !== undefined) {
-            next.outputPrefix = updates.outputPrefix.trim();
-          }
-
-          if (updates.datetimeFeatures !== undefined) {
-            next.datetimeFeatures = sanitizeDatetimeFeaturesList(updates.datetimeFeatures);
-          }
-
-          if (updates.timezone !== undefined) {
-            next.timezone = sanitizeTimezoneValue(updates.timezone);
-          }
-
-          if (updates.fillna !== undefined) {
-            next.fillna = sanitizeNumberValue(updates.fillna);
-          }
-
-          if (updates.roundDigits !== undefined) {
-            next.roundDigits = sanitizeIntegerValue(updates.roundDigits);
-          }
-
-          if (updates.normalize !== undefined) {
-            next.normalize = updates.normalize;
-          }
-
-          if (updates.epsilon !== undefined) {
-            next.epsilon = sanitizeNumberValue(updates.epsilon);
-          }
-
-          if (updates.allowOverwrite !== undefined) {
-            next.allowOverwrite = updates.allowOverwrite;
-          }
-
-          if (updates.description !== undefined) {
-            const trimmed = typeof updates.description === 'string' ? updates.description.trim() : '';
-            next.description = trimmed ? trimmed : undefined;
-          }
-
-          const resolvedType = next.type;
-          const methodChoices = getMethodOptions(resolvedType);
-          if (methodChoices.length) {
-            const allowed = new Set(methodChoices.map((option) => option.value));
-            if (!allowed.has(next.method)) {
-              next.method = methodChoices[0].value;
-            }
-          } else if (resolvedType === 'ratio') {
-            next.method = 'ratio';
-          } else if (resolvedType === 'datetime_extract') {
-            next.method = 'datetime_extract';
-          }
-
-          next.inputColumns = sanitizeStringList(next.inputColumns);
-          if (resolvedType === 'ratio' || resolvedType === 'similarity') {
-            next.secondaryColumns = sanitizeStringList(next.secondaryColumns);
-          } else {
-            next.secondaryColumns = [];
-          }
-
-          next.constants = sanitizeConstantsList(next.constants);
-          next.fillna = sanitizeNumberValue(next.fillna);
-          next.roundDigits = sanitizeIntegerValue(next.roundDigits);
-          next.epsilon = sanitizeNumberValue(next.epsilon);
-
-          if (resolvedType === 'datetime_extract') {
-            next.datetimeFeatures = sanitizeDatetimeFeaturesList(next.datetimeFeatures);
-            next.timezone = sanitizeTimezoneValue(next.timezone);
-          } else {
-            next.datetimeFeatures = [];
-            next.timezone = 'UTC';
-          }
-
-          if (resolvedType !== 'similarity') {
-            next.normalize = false;
-          } else {
-            next.normalize = Boolean(next.normalize);
-          }
-
-          if (typeof next.allowOverwrite !== 'boolean') {
-            next.allowOverwrite = null;
-          }
-
-          next.outputColumn = next.outputColumn.trim();
-          next.outputPrefix = next.outputPrefix.trim();
-
-          return next;
-        }),
-      );
-    },
-    [isFeatureMathNode, updateFeatureMathOperations],
-  );
-
-  const handleAddAliasStrategy = useCallback(() => {
-    if (!isReplaceAliasesNode) {
-      return;
-    }
-    const nextIndex = aliasStrategyCount;
-    updateAliasStrategies((current) => {
-      const assigned = new Set<string>();
-      current.forEach((strategy) => {
-        strategy.columns.forEach((column) => {
-          const normalized = column.trim();
-          if (normalized) {
-            assigned.add(normalized);
-          }
-        });
-      });
-      const suggested = aliasColumnSummary.recommendedColumns.find((column) => !assigned.has(column));
-      const defaultMode = current.length
-        ? current[current.length - 1].mode
-        : ALIAS_MODE_OPTIONS[0]?.value ?? DEFAULT_ALIAS_MODE;
-      const nextStrategy: AliasStrategyConfig = {
-        mode: defaultMode,
-        columns: suggested ? [suggested] : [],
-        autoDetect: !suggested,
-      };
-      return [...current, nextStrategy];
-    });
-    setCollapsedStrategies((previous) => {
-      const next = new Set(previous);
-      next.delete(nextIndex);
-      return next;
-    });
-  }, [aliasColumnSummary.recommendedColumns, aliasStrategyCount, isReplaceAliasesNode, setCollapsedStrategies, updateAliasStrategies]);
-
-  const handleRemoveAliasStrategy = useCallback(
-    (index: number) => {
-      updateAliasStrategies((current) => current.filter((_, idx) => idx !== index));
-      setCollapsedStrategies((previous) => {
-        const next = new Set<number>();
-        previous.forEach((value) => {
-          if (value === index) {
-            return;
-          }
-          next.add(value > index ? value - 1 : value);
-        });
-        return next;
-      });
-    },
-    [setCollapsedStrategies, updateAliasStrategies],
-  );
-
-  const toggleAliasStrategySection = useCallback((index: number) => {
-    setCollapsedStrategies((previous) => {
-      const next = new Set(previous);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
-  }, []);
-
-  const handleAliasModeChange = useCallback(
-    (index: number, mode: AliasMode) => {
-      updateAliasStrategies((current) =>
-        current.map((strategy, idx) => (idx === index ? { ...strategy, mode } : strategy)),
-      );
-    },
-    [updateAliasStrategies],
-  );
-
-  const handleAliasColumnToggle = useCallback(
-    (index: number, column: string) => {
-      const normalized = column.trim();
-      if (!normalized) {
-        return;
-      }
-      updateAliasStrategies((current) =>
-        current.map((strategy, idx) => {
-          if (idx !== index) {
-            return strategy;
-          }
-          const hasColumn = strategy.columns.includes(normalized);
-          const nextColumns = hasColumn
-            ? strategy.columns.filter((entry) => entry !== normalized)
-            : [...strategy.columns, normalized];
-          nextColumns.sort((a, b) => a.localeCompare(b));
-          return {
-            ...strategy,
-            columns: nextColumns,
-          };
-        }),
-      );
-    },
-    [updateAliasStrategies],
-  );
-
-  const handleAliasColumnsChange = useCallback(
-    (index: number, value: string) => {
-      const entries = value
-        .split(',')
-        .map((column) => column.trim())
-        .filter(Boolean);
-      const nextColumns = Array.from(new Set(entries)).sort((a, b) => a.localeCompare(b));
-      updateAliasStrategies((current) =>
-        current.map((strategy, idx) => (idx === index ? { ...strategy, columns: nextColumns } : strategy)),
-      );
-    },
-    [updateAliasStrategies],
-  );
-
-  const handleAliasAutoDetectToggle = useCallback(
-    (index: number, enabled: boolean) => {
-      updateAliasStrategies((current) =>
-        current.map((strategy, idx) => (idx === index ? { ...strategy, autoDetect: enabled } : strategy)),
-      );
-    },
-    [updateAliasStrategies],
-  );
 
   const renderMultiSelectField = useCallback(
     (parameter: FeatureNodeParameter) => {
