@@ -4,6 +4,7 @@ import {
   BOOLEAN_FALSE_TOKENS,
   BOOLEAN_TRUE_TOKENS,
 } from '../utils/configParsers';
+import { type CatalogFlagMap } from './useCatalogFlags';
 
 // Type tokens for numeric column detection
 const NUMERIC_TYPE_TOKENS = [
@@ -22,7 +23,7 @@ const TEMPORAL_TYPE_TOKENS = ['datetime', 'date', 'time', 'timestamp'] as const;
 const TEXTUAL_TYPE_TOKENS = ['object', 'string', 'text', 'category', 'categorical', 'char'] as const;
 
 type UseNumericColumnAnalysisParams = {
-  shouldAnalyze: boolean;
+  catalogFlags: CatalogFlagMap;
   availableColumns: string[];
   columnTypeMap: Record<string, string>;
   previewSampleRows: Array<Record<string, any>>;
@@ -34,11 +35,14 @@ type NumericColumnAnalysisResult = {
 };
 
 export const useNumericColumnAnalysis = ({
-  shouldAnalyze,
+  catalogFlags,
   availableColumns,
   columnTypeMap,
   previewSampleRows,
 }: UseNumericColumnAnalysisParams): NumericColumnAnalysisResult => {
+  const { isBinningNode, isScalingNode, isOutlierNode } = catalogFlags;
+  const shouldAnalyze = isBinningNode || isScalingNode || isOutlierNode;
+
   const analysis = useMemo(() => {
     if (!shouldAnalyze) {
       return {

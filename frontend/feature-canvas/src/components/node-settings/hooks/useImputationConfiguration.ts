@@ -4,9 +4,10 @@ import type {
   ImputationStrategyConfig,
   ImputerColumnOption,
 } from '../nodes/imputation/imputationSettings';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 export type UseImputationConfigurationArgs = {
-  isImputerNode: boolean;
+  catalogFlags: CatalogFlagMap;
   imputerStrategies: ImputationStrategyConfig[];
   availableColumns: string[];
   columnMissingMap: Record<string, number>;
@@ -24,7 +25,7 @@ export type UseImputationConfigurationResult = {
 };
 
 export const useImputationConfiguration = ({
-  isImputerNode,
+  catalogFlags,
   imputerStrategies,
   availableColumns,
   columnMissingMap,
@@ -33,6 +34,8 @@ export const useImputationConfiguration = ({
   nodeColumns,
   imputerMissingFilter,
 }: UseImputationConfigurationArgs): UseImputationConfigurationResult => {
+  const { isImputerNode } = catalogFlags;
+
   const imputerColumnOptions = useMemo<ImputerColumnOption[]>(() => {
     if (!isImputerNode) {
       return [];

@@ -3,13 +3,15 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { fetchDropColumnRecommendations } from '../../../api';
 
+import { type CatalogFlagMap } from './useCatalogFlags';
+
 type GraphContext = {
   nodes: any[];
   edges: any[];
 } | null;
 
 type UseDropColumnRecommendationsArgs = {
-  shouldLoad: boolean;
+  catalogFlags: CatalogFlagMap;
   sourceId?: string | null;
   hasReachableSource: boolean;
   graphContext: GraphContext;
@@ -25,7 +27,7 @@ type UseDropColumnRecommendationsResult = {
 };
 
 export const useDropColumnRecommendations = ({
-  shouldLoad,
+  catalogFlags,
   sourceId,
   hasReachableSource,
   graphContext,
@@ -33,6 +35,8 @@ export const useDropColumnRecommendations = ({
   setAvailableColumns,
   setColumnMissingMap,
 }: UseDropColumnRecommendationsArgs): UseDropColumnRecommendationsResult => {
+  const { isImputerNode } = catalogFlags;
+  const shouldLoad = isImputerNode;
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [requestId, setRequestId] = useState(0);

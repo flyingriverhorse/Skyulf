@@ -342,7 +342,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   } = useGraphTopology({
     graphSnapshot: graphSnapshot ?? null,
     nodeId,
-    isDataset,
+    catalogFlags,
   });
 
   const {
@@ -451,7 +451,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   });
 
   useDropColumnRecommendations({
-    shouldLoad: isImputerNode,
+    catalogFlags,
     sourceId,
     hasReachableSource,
     graphContext,
@@ -530,7 +530,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   });
 
   useFeatureSelectionAutoConfig({
-    isFeatureSelectionNode,
+    catalogFlags,
     featureSelectionSignal,
     upstreamTargetColumn,
     setConfigState,
@@ -549,7 +549,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isFetchingOutliers,
     refreshOutliers,
   } = useOutlierRecommendations({
-    isOutlierNode,
+    catalogFlags,
     sourceId,
     hasReachableSource,
     graphContext,
@@ -562,7 +562,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isFetchingScaling,
     refreshScaling,
   } = useScalingInsights({
-    isScalingNode,
+    catalogFlags,
     sourceId,
     hasReachableSource,
     graphContext,
@@ -575,7 +575,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isFetchingBinning,
     refreshBinning,
   } = useBinningInsights({
-    isBinningNode,
+    catalogFlags,
     sourceId,
     hasReachableSource,
     graphContext,
@@ -611,7 +611,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isFetchingBinnedDistribution,
     refreshBinnedDistribution,
   } = useBinnedDistribution({
-    isBinnedDistributionNode,
+    catalogFlags,
     sourceId,
     hasReachableSource,
     graphContext,
@@ -625,7 +625,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isFetchingSkewness,
     refreshSkewness,
   } = useSkewnessInsights({
-    shouldLoad: shouldLoadSkewnessInsights,
+    catalogFlags,
     sourceId,
     graphContext,
     targetNodeId: node?.id ?? null,
@@ -659,13 +659,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     replaceInvalid,
     standardizeDates,
   } = useDataCleaningState({
-    isReplaceAliasesNode,
-    isTrimWhitespaceNode,
-    isRemoveSpecialCharsNode,
-    isRegexCleanupNode,
-    isNormalizeTextCaseNode,
-    isReplaceInvalidValuesNode,
-    isStandardizeDatesNode,
+    catalogFlags,
     configState,
     nodeConfig: node?.data?.config ?? null,
     availableColumns,
@@ -675,7 +669,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
   const shouldAnalyzeNumericColumns = isBinningNode || isScalingNode || isOutlierNode;
   const { numericExcludedColumns } = useNumericColumnAnalysis({
-    shouldAnalyze: shouldAnalyzeNumericColumns,
+    catalogFlags,
     availableColumns,
     columnTypeMap,
     previewSampleRows,
@@ -687,9 +681,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     binning,
     selectedColumns,
   } = useNumericAnalysisState({
-    isScalingNode,
-    isOutlierNode,
-    isBinningNode,
+    catalogFlags,
     configState,
     setConfigState,
     nodeId,
@@ -755,8 +747,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   );
 
   const skewness = useSkewnessConfiguration({
+    catalogFlags,
     skewnessData,
-    shouldLoadInsights: shouldLoadSkewnessInsights,
     skewnessTransformations,
     availableColumns,
     previewColumns,
@@ -770,7 +762,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     imputerFilteredOptionCount,
     imputerMissingFilterActive,
   } = useImputationConfiguration({
-    isImputerNode,
+    catalogFlags,
     imputerStrategies,
     availableColumns,
     columnMissingMap,
@@ -806,8 +798,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     handleClearColumns,
     handleRemoveColumn,
   } = useColumnSelectionHandlers({
-    isBinningNode,
-    isScalingNode,
+    catalogFlags,
     setConfigState,
     binningExcludedColumns: binning.state.excludedColumns,
     scalingExcludedColumns: scaling.state.excludedColumns,
@@ -817,14 +808,12 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
   const { handleSave, handleResetNode } = useNodeSaveHandlers({
     configState,
-    isBinningNode,
-    isScalingNode,
+    catalogFlags,
     nodeId,
     onUpdateConfig,
     onClose,
     sourceId,
     graphSnapshot: graphSnapshot ?? null,
-    isInspectionNode,
     onUpdateNodeData,
     setConfigState,
     canResetNode,
@@ -943,10 +932,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     refreshBinnedDistribution();
   }, [refreshBinnedDistribution, sourceId]);
 
-  const binnedDistributionCards = useBinnedDistributionCards(
-    isBinnedDistributionNode,
-    binnedDistributionData
-  );
+  const binnedDistributionCards = useBinnedDistributionCards({
+    catalogFlags,
+    binnedDistributionData,
+  });
 
 
 

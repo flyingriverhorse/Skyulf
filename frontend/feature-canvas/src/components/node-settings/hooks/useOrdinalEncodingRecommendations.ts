@@ -6,6 +6,7 @@ import {
   type OrdinalEncodingRecommendationsResponse,
   type OrdinalEncodingSuggestionStatus,
 } from '../../../api';
+import { type CatalogFlagMap } from './useCatalogFlags';
 
 type OrdinalEncodingRecommendationMetadata = {
   sampleSize: number | null;
@@ -19,7 +20,7 @@ type OrdinalEncodingRecommendationMetadata = {
 };
 
 type UseOrdinalEncodingRecommendationsArgs = {
-  isOrdinalEncodingNode: boolean;
+  catalogFlags: CatalogFlagMap;
   sourceId?: string | null;
   hasReachableSource: boolean;
   graphContext?: FeatureGraph | { nodes: any[]; edges: any[] } | null;
@@ -158,12 +159,13 @@ const extractMetadata = (
 };
 
 export const useOrdinalEncodingRecommendations = ({
-  isOrdinalEncodingNode,
+  catalogFlags,
   sourceId,
   hasReachableSource,
   graphContext,
   targetNodeId,
 }: UseOrdinalEncodingRecommendationsArgs): UseOrdinalEncodingRecommendationsResult => {
+  const { isOrdinalEncodingNode } = catalogFlags;
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<OrdinalEncodingColumnSuggestion[]>([]);

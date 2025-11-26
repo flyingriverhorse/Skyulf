@@ -4,6 +4,7 @@ import {
   fetchScalingRecommendations,
   type ScalingRecommendationsResponse,
 } from '../../../api';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 type GraphContext = {
   nodes: any[];
@@ -11,7 +12,7 @@ type GraphContext = {
 } | null;
 
 type UseScalingInsightsArgs = {
-  isScalingNode: boolean;
+  catalogFlags: CatalogFlagMap;
   sourceId?: string | null;
   hasReachableSource: boolean;
   graphContext: GraphContext;
@@ -26,12 +27,13 @@ type UseScalingInsightsResult = {
 };
 
 export const useScalingInsights = ({
-  isScalingNode,
+  catalogFlags,
   sourceId,
   hasReachableSource,
   graphContext,
   targetNodeId,
 }: UseScalingInsightsArgs): UseScalingInsightsResult => {
+  const { isScalingNode } = catalogFlags;
   const [scalingData, setScalingData] = useState<ScalingRecommendationsResponse | null>(null);
   const [scalingError, setScalingError] = useState<string | null>(null);
   const [isFetchingScaling, setIsFetchingScaling] = useState(false);

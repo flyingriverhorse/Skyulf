@@ -6,13 +6,15 @@ import {
 } from '../../../api';
 import { BINNED_SAMPLE_PRESETS, type BinnedSamplePresetValue } from '../nodes/binning/binningSettings';
 
+import { type CatalogFlagMap } from './useCatalogFlags';
+
 type GraphContext = {
   nodes: any[];
   edges: any[];
 } | null;
 
 type UseBinnedDistributionArgs = {
-  isBinnedDistributionNode: boolean;
+  catalogFlags: CatalogFlagMap;
   sourceId?: string | null;
   hasReachableSource: boolean;
   graphContext: GraphContext;
@@ -28,13 +30,14 @@ type UseBinnedDistributionResult = {
 };
 
 export const useBinnedDistribution = ({
-  isBinnedDistributionNode,
+  catalogFlags,
   sourceId,
   hasReachableSource,
   graphContext,
   targetNodeId,
   samplePreset,
 }: UseBinnedDistributionArgs): UseBinnedDistributionResult => {
+  const { isBinnedDistributionNode } = catalogFlags;
   const [binnedDistributionData, setBinnedDistributionData] = useState<BinnedDistributionResponse | null>(null);
   const [binnedDistributionError, setBinnedDistributionError] = useState<string | null>(null);
   const [isFetchingBinnedDistribution, setIsFetchingBinnedDistribution] = useState(false);

@@ -46,7 +46,7 @@ export const useEncodingRecommendationsState = ({
     suggestions: labelEncodingSuggestions,
     metadata: labelEncodingMetadata,
   } = useLabelEncodingRecommendations({
-    isLabelEncodingNode,
+    catalogFlags,
     sourceId,
     hasReachableSource,
     graphContext,
@@ -59,7 +59,7 @@ export const useEncodingRecommendationsState = ({
     suggestions: targetEncodingSuggestions,
     metadata: targetEncodingMetadata,
   } = useTargetEncodingRecommendations({
-    isTargetEncodingNode,
+    catalogFlags,
     sourceId,
     hasReachableSource,
     graphContext,
@@ -67,7 +67,7 @@ export const useEncodingRecommendationsState = ({
   });
 
   useTargetEncodingDefaults({
-    isTargetEncodingNode,
+    catalogFlags,
     enableGlobalFallbackDefault: targetEncodingMetadata.enableGlobalFallbackDefault,
     encodeMissing: configState?.encode_missing,
     handleUnknown: configState?.handle_unknown,
@@ -81,7 +81,7 @@ export const useEncodingRecommendationsState = ({
     suggestions: hashEncodingSuggestions,
     metadata: hashEncodingMetadata,
   } = useHashEncodingRecommendations({
-    isHashEncodingNode,
+    catalogFlags,
     sourceId,
     hasReachableSource,
     graphContext,
@@ -94,7 +94,7 @@ export const useEncodingRecommendationsState = ({
     suggestions: ordinalEncodingSuggestions,
     metadata: ordinalEncodingMetadata,
   } = useOrdinalEncodingRecommendations({
-    isOrdinalEncodingNode,
+    catalogFlags,
     sourceId,
     hasReachableSource,
     graphContext,
@@ -107,7 +107,7 @@ export const useEncodingRecommendationsState = ({
     suggestions: dummyEncodingSuggestions,
     metadata: dummyEncodingMetadata,
   } = useDummyEncodingRecommendations({
-    isDummyEncodingNode,
+    catalogFlags,
     sourceId,
     hasReachableSource,
     graphContext,
@@ -120,7 +120,7 @@ export const useEncodingRecommendationsState = ({
     suggestions: oneHotEncodingSuggestions,
     metadata: oneHotEncodingMetadata,
   } = useOneHotEncodingRecommendations({
-    isOneHotEncodingNode,
+    catalogFlags,
     sourceId,
     hasReachableSource,
     graphContext,

@@ -1,11 +1,18 @@
 import { useMemo } from 'react';
 import type { BinnedDistributionResponse, BinnedColumnDistribution, BinnedColumnBin } from '../../../api';
 import type { BinnedDistributionBin, BinnedDistributionCard } from '../nodes/binning/binningSettings';
+import { type CatalogFlagMap } from './useCatalogFlags';
 
-export const useBinnedDistributionCards = (
-  isBinnedDistributionNode: boolean,
-  binnedDistributionData: BinnedDistributionResponse | null
-): BinnedDistributionCard[] => {
+type UseBinnedDistributionCardsArgs = {
+  catalogFlags: CatalogFlagMap;
+  binnedDistributionData: BinnedDistributionResponse | null;
+};
+
+export const useBinnedDistributionCards = ({
+  catalogFlags,
+  binnedDistributionData,
+}: UseBinnedDistributionCardsArgs): BinnedDistributionCard[] => {
+  const { isBinnedDistributionNode } = catalogFlags;
   return useMemo<BinnedDistributionCard[]>(() => {
     if (!isBinnedDistributionNode) {
       return [];

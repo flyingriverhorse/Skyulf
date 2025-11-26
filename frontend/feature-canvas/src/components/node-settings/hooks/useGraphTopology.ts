@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { type CatalogFlagMap } from './useCatalogFlags';
 
 type GraphSnapshot = {
   nodes?: any[];
@@ -13,7 +14,7 @@ type GraphContext = {
 type UseGraphTopologyArgs = {
   graphSnapshot: GraphSnapshot;
   nodeId: string;
-  isDataset: boolean;
+  catalogFlags: CatalogFlagMap;
 };
 
 type UseGraphTopologyResult = {
@@ -29,8 +30,9 @@ type UseGraphTopologyResult = {
 export const useGraphTopology = ({
   graphSnapshot,
   nodeId,
-  isDataset,
+  catalogFlags,
 }: UseGraphTopologyArgs): UseGraphTopologyResult => {
+  const { isDataset } = catalogFlags;
   const graphContext = useMemo<GraphContext>(() => {
     if (!graphSnapshot) {
       return null;

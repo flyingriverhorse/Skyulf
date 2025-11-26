@@ -5,13 +5,15 @@ import {
   type BinningRecommendationsResponse,
 } from '../../../api';
 
+import { type CatalogFlagMap } from './useCatalogFlags';
+
 type GraphContext = {
   nodes: any[];
   edges: any[];
 } | null;
 
 type UseBinningInsightsArgs = {
-  isBinningNode: boolean;
+  catalogFlags: CatalogFlagMap;
   sourceId?: string | null;
   hasReachableSource: boolean;
   graphContext: GraphContext;
@@ -26,12 +28,13 @@ type UseBinningInsightsResult = {
 };
 
 export const useBinningInsights = ({
-  isBinningNode,
+  catalogFlags,
   sourceId,
   hasReachableSource,
   graphContext,
   targetNodeId,
 }: UseBinningInsightsArgs): UseBinningInsightsResult => {
+  const { isBinningNode } = catalogFlags;
   const [binningData, setBinningData] = useState<BinningRecommendationsResponse | null>(null);
   const [binningError, setBinningError] = useState<string | null>(null);
   const [isFetchingBinning, setIsFetchingBinning] = useState(false);

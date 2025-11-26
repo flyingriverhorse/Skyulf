@@ -1,6 +1,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import { ensureArrayOfString } from '../sharedUtils';
 import { SCALING_METHOD_ORDER } from '../nodes/scaling/scalingSettings';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 export type ColumnRecommendation = {
   name?: string | null;
@@ -9,8 +10,7 @@ export type ColumnRecommendation = {
 export type ColumnSelectionState = Record<string, any>;
 
 export type UseColumnSelectionHandlersArgs = {
-  isBinningNode: boolean;
-  isScalingNode: boolean;
+  catalogFlags: CatalogFlagMap;
   setConfigState: Dispatch<SetStateAction<ColumnSelectionState>>;
   binningExcludedColumns: Set<string>;
   scalingExcludedColumns: Set<string>;
@@ -21,14 +21,15 @@ export type UseColumnSelectionHandlersArgs = {
 const sanitizeColumnName = (column: string) => String(column ?? '').trim();
 
 export const useColumnSelectionHandlers = ({
-  isBinningNode,
-  isScalingNode,
+  catalogFlags,
   setConfigState,
   binningExcludedColumns,
   scalingExcludedColumns,
   availableColumns,
   recommendations,
 }: UseColumnSelectionHandlersArgs) => {
+  const { isBinningNode, isScalingNode } = catalogFlags;
+
   const handleManualBoundChange = useCallback(
     (column: string, bound: 'lower' | 'upper', rawValue: string) => {
       const normalizedColumn = sanitizeColumnName(column);
