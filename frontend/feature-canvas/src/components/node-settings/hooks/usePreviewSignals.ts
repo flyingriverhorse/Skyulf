@@ -3,6 +3,8 @@ import type {
   FeatureMathNodeSignal,
   PolynomialFeaturesNodeSignal,
   FeatureSelectionNodeSignal,
+  OutlierNodeSignal,
+  TransformerAuditNodeSignal,
 } from '../../../api';
 import type { PreviewState } from '../nodes/dataset/DataSnapshotSection';
 
@@ -12,12 +14,16 @@ type UsePreviewSignalsArgs = {
   isFeatureMathNode: boolean;
   isPolynomialFeaturesNode: boolean;
   isFeatureSelectionNode: boolean;
+  isOutlierNode: boolean;
+  isTransformerAuditNode: boolean;
 };
 
 type UsePreviewSignalsResult = {
   featureMathSignals: FeatureMathNodeSignal[];
   polynomialSignal: PolynomialFeaturesNodeSignal | null;
   featureSelectionSignal: FeatureSelectionNodeSignal | null;
+  outlierPreviewSignal: OutlierNodeSignal | null;
+  transformerAuditSignal: TransformerAuditNodeSignal | null;
 };
 
 export const usePreviewSignals = ({
@@ -26,6 +32,8 @@ export const usePreviewSignals = ({
   isFeatureMathNode,
   isPolynomialFeaturesNode,
   isFeatureSelectionNode,
+  isOutlierNode,
+  isTransformerAuditNode,
 }: UsePreviewSignalsArgs): UsePreviewSignalsResult => {
   const featureMathSignals = useMemo<FeatureMathNodeSignal[]>(() => {
     if (!isFeatureMathNode) {
@@ -63,9 +71,41 @@ export const usePreviewSignals = ({
     return matching ?? rawSignals[0] ?? null;
   }, [isFeatureSelectionNode, nodeId, previewState.data?.signals?.feature_selection]);
 
+  const outlierPreviewSignal = useMemo<OutlierNodeSignal | null>(() => {
+    if (!isOutlierNode) {
+      return null;
+    }
+    const signals = previewState.data?.signals?.outlier_removal;
+    if (!Array.isArray(signals) || !signals.length) {
+      return null;
+    }
+    if (!nodeId) {
+      return (signals[signals.length - 1] as OutlierNodeSignal | undefined) ?? null;
+    }
+    const match = signals.find((signal: any) => signal && signal.node_id === nodeId);
+    return (match as OutlierNodeSignal | undefined) ?? ((signals[signals.length - 1] as OutlierNodeSignal | undefined) ?? null);
+  }, [isOutlierNode, nodeId, previewState.data?.signals?.outlier_removal]);
+
+  const transformerAuditSignal = useMemo<TransformerAuditNodeSignal | null>(() => {
+    if (!isTransformerAuditNode) {
+      return null;
+    }
+    const signals = previewState.data?.signals?.transformer_audit;
+    if (!Array.isArray(signals) || !signals.length) {
+      return null;
+    }
+    if (!nodeId) {
+      return (signals[signals.length - 1] as TransformerAuditNodeSignal | undefined) ?? null;
+    }
+    const match = signals.find((signal: any) => signal && signal.node_id === nodeId);
+    return (match as TransformerAuditNodeSignal | undefined) ?? ((signals[signals.length - 1] as TransformerAuditNodeSignal | undefined) ?? null);
+  }, [isTransformerAuditNode, nodeId, previewState.data?.signals?.transformer_audit]);
+
   return {
     featureMathSignals,
     polynomialSignal,
     featureSelectionSignal,
+    outlierPreviewSignal,
+    transformerAuditSignal,
   };
 };

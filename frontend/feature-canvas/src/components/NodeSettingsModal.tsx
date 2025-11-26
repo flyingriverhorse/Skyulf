@@ -163,6 +163,8 @@ import { usePreviewData } from './node-settings/hooks/usePreviewData';
 import { useAsyncBusyLabel } from './node-settings/hooks/useAsyncBusyLabel';
 import { useInsightSummaries } from './node-settings/hooks/useInsightSummaries';
 import { useThresholdRecommendations } from './node-settings/hooks/useThresholdRecommendations';
+import { useFeatureMathState } from './node-settings/hooks/useFeatureMathState';
+import { useMissingIndicatorState } from './node-settings/hooks/useMissingIndicatorState';
 import { useDatasetProfiling } from './node-settings/hooks/useDatasetProfiling';
 import { NodeSettingsParameterField } from './node-settings/fields/NodeSettingsParameterField';
 import { NodeSettingsMultiSelectField } from './node-settings/fields/NodeSettingsMultiSelectField';
@@ -544,13 +546,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     modelTypeOptions: trainModelModelTypeParameter?.options ?? null,
   });
 
-  const featureMathOperations = useMemo<FeatureMathOperationDraft[]>(() => {
-    if (!isFeatureMathNode) {
-      return [];
-    }
-    return normalizeFeatureMathOperations(configState?.operations ?? []);
-  }, [configState?.operations, isFeatureMathNode]);
-
   const upstreamConfigFingerprints = useMemo(() => {
     if (!upstreamNodeIds.length) {
       return {} as Record<string, any>;
@@ -702,7 +697,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   const [binnedSamplePreset, setBinnedSamplePreset] = useState<BinnedSamplePresetValue>('500');
 
   const [collapsedStrategies, setCollapsedStrategies] = useState<Set<number>>(() => new Set());
-  const [collapsedFeatureMath, setCollapsedFeatureMath] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     setCollapsedStrategies(new Set());
@@ -750,12 +744,16 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     featureMathSignals,
     polynomialSignal,
     featureSelectionSignal,
+    outlierPreviewSignal,
+    transformerAuditSignal,
   } = usePreviewSignals({
     previewState,
     nodeId,
     isFeatureMathNode,
     isPolynomialFeaturesNode,
     isFeatureSelectionNode,
+    isOutlierNode,
+    isTransformerAuditNode,
   });
 
   useFeatureSelectionAutoConfig({
@@ -765,30 +763,12 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     setConfigState,
   });
 
-  const featureMathSummaries = useMemo(
-    () => (isFeatureMathNode ? buildFeatureMathSummaries(featureMathOperations, featureMathSignals) : []),
-    [featureMathOperations, featureMathSignals, isFeatureMathNode],
-  );
-
-  useEffect(() => {
-    if (!isFeatureMathNode) {
-      setCollapsedFeatureMath(() => new Set());
-      return;
-    }
-    setCollapsedFeatureMath((previous) => {
-      if (!previous.size) {
-        return previous;
-      }
-      const validIds = new Set(featureMathOperations.map((operation) => operation.id));
-      const next = new Set<string>();
-      previous.forEach((id) => {
-        if (validIds.has(id)) {
-          next.add(id);
-        }
-      });
-      return next.size === previous.size ? previous : next;
-    });
-  }, [featureMathOperations, isFeatureMathNode]);
+  const {
+    featureMathOperations,
+    featureMathSummaries,
+    collapsedFeatureMath,
+    setCollapsedFeatureMath,
+  } = useFeatureMathState(isFeatureMathNode, configState, featureMathSignals);
 
   const {
     outlierData,
@@ -881,31 +861,17 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
   const { previewColumns, previewColumnStats, previewSampleRows } = usePreviewData(previewState);
 
-  const activeFlagSuffix = useMemo(() => {
-    if (!isMissingIndicatorNode) {
-      return '';
-    }
-    return resolveMissingIndicatorSuffix(configState?.flag_suffix, node?.data?.config?.flag_suffix);
-  }, [configState?.flag_suffix, isMissingIndicatorNode, node?.data?.config?.flag_suffix]);
-
-  const missingIndicatorColumns = useMemo(() => {
-    if (!isMissingIndicatorNode) {
-      return [] as string[];
-    }
-    return ensureArrayOfString(configState?.columns);
-  }, [configState?.columns, isMissingIndicatorNode]);
-
-  const missingIndicatorInsights = useMemo<MissingIndicatorInsights>(() => {
-    if (!isMissingIndicatorNode) {
-      return { rows: [], flaggedColumnsInDataset: [], conflictCount: 0 };
-    }
-    return buildMissingIndicatorInsights({
-      selectedColumns: missingIndicatorColumns,
-      availableColumns,
-      columnMissingMap,
-      suffix: activeFlagSuffix,
-    });
-  }, [activeFlagSuffix, availableColumns, columnMissingMap, isMissingIndicatorNode, missingIndicatorColumns]);
+  const {
+    activeFlagSuffix,
+    missingIndicatorColumns,
+    missingIndicatorInsights,
+  } = useMissingIndicatorState(
+    isMissingIndicatorNode,
+    configState,
+    node,
+    availableColumns,
+    columnMissingMap
+  );
 
   const canRefreshSkewnessDistributions = Boolean(sourceId) && hasReachableSource;
 
@@ -1109,39 +1075,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     }
     return DEFAULT_KEEP_STRATEGY;
   }, [configState?.keep]);
-
-  const outlierPreviewSignal = useMemo<OutlierNodeSignal | null>(() => {
-    if (!isOutlierNode) {
-      return null;
-    }
-    const signals = previewState.data?.signals?.outlier_removal;
-    if (!Array.isArray(signals) || !signals.length) {
-      return null;
-    }
-    if (!nodeId) {
-      return (signals[signals.length - 1] as OutlierNodeSignal | undefined) ?? null;
-    }
-    const match = signals.find((signal: any) => signal && signal.node_id === nodeId);
-    return (match as OutlierNodeSignal | undefined) ?? ((signals[signals.length - 1] as OutlierNodeSignal | undefined) ?? null);
-  }, [isOutlierNode, nodeId, previewState.data?.signals?.outlier_removal]);
-
-  const transformerAuditSignal = useMemo<TransformerAuditNodeSignal | null>(() => {
-    if (!isTransformerAuditNode) {
-      return null;
-    }
-    const signals = previewState.data?.signals?.transformer_audit;
-    if (!Array.isArray(signals) || !signals.length) {
-      return null;
-    }
-    if (!nodeId) {
-      return (signals[signals.length - 1] as TransformerAuditNodeSignal | undefined) ?? null;
-    }
-    const match = signals.find((signal: any) => signal && signal.node_id === nodeId);
-    return (
-      (match as TransformerAuditNodeSignal | undefined) ??
-      ((signals[signals.length - 1] as TransformerAuditNodeSignal | undefined) ?? null)
-    );
-  }, [isTransformerAuditNode, nodeId, previewState.data?.signals?.transformer_audit]);
   const normalizedColumnSearch = useMemo(() => columnSearch.trim().toLowerCase(), [columnSearch]);
 
   const filteredColumnOptions = useMemo(() => {
