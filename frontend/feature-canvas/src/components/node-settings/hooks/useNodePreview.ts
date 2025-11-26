@@ -105,7 +105,7 @@ export const useNodePreview = ({
     sourceId,
     canTriggerPreview,
     graphSnapshot,
-    isPreviewNode,
+    catalogFlags,
     targetNodeId: node?.id ?? null,
     previewSignature,
     skipPreview,

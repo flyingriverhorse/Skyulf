@@ -1,5 +1,6 @@
 // Used by NodeSettingsModal when configuring binning.
 import { useMemo } from 'react';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 export type NumericColumnPreview = {
   min: number | null;
@@ -13,7 +14,7 @@ export type ManualRangeFallback = {
 };
 
 type UseNumericRangeSummariesParams = {
-  isBinningNode: boolean;
+  catalogFlags: CatalogFlagMap;
   numericExcludedColumns: Set<string>;
   selectedColumns: string[];
   previewSampleRows: Array<Record<string, any>>;
@@ -42,13 +43,14 @@ const parseNumericCandidate = (value: unknown): number | null => {
 };
 
 export const useNumericRangeSummaries = ({
-  isBinningNode,
+  catalogFlags,
   numericExcludedColumns,
   selectedColumns,
   previewSampleRows,
   availableColumns,
   recommendedColumns,
 }: UseNumericRangeSummariesParams): UseNumericRangeSummariesResult => {
+  const { isBinningNode } = catalogFlags;
   const recommendedColumnSet = useMemo(() => {
     if (!recommendedColumns) {
       return null;

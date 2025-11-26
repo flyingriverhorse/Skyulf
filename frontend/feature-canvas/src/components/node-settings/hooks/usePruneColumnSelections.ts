@@ -5,11 +5,10 @@ import type { OutlierMethodName, ScalingMethodName } from '../../../api';
 import { ensureArrayOfString } from '../sharedUtils';
 import { SCALING_METHOD_ORDER } from '../nodes/scaling/scalingSettings';
 import { OUTLIER_METHOD_ORDER } from '../nodes/outlier/outlierSettings';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 type UsePruneColumnSelectionsParams = {
-  isScalingNode: boolean;
-  isBinningNode: boolean;
-  isOutlierNode: boolean;
+  catalogFlags: CatalogFlagMap;
   scalingExcludedColumns: Set<string>;
   binningExcludedColumns: Set<string>;
   outlierExcludedColumns: Set<string>;
@@ -17,14 +16,14 @@ type UsePruneColumnSelectionsParams = {
 };
 
 export const usePruneColumnSelections = ({
-  isScalingNode,
-  isBinningNode,
-  isOutlierNode,
+  catalogFlags,
   scalingExcludedColumns,
   binningExcludedColumns,
   outlierExcludedColumns,
   setConfigState,
 }: UsePruneColumnSelectionsParams): void => {
+  const { isScalingNode, isBinningNode, isOutlierNode } = catalogFlags;
+
   useEffect(() => {
     if (!isScalingNode || scalingExcludedColumns.size === 0) {
       return;

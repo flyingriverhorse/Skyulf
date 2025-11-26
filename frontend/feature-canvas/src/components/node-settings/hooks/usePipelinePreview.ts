@@ -5,6 +5,7 @@ import {
   type PipelinePreviewRequest,
 } from '../../../api';
 import { type PreviewState } from '../nodes/dataset/DataSnapshotSection';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 type GraphSnapshot = {
   nodes: any[];
@@ -16,7 +17,7 @@ type UsePipelinePreviewArgs = {
   sourceId?: string | null;
   canTriggerPreview: boolean;
   graphSnapshot: GraphSnapshot;
-  isPreviewNode: boolean;
+  catalogFlags: CatalogFlagMap;
   targetNodeId: string | null;
   previewSignature?: string | null;
   skipPreview?: boolean;
@@ -37,13 +38,14 @@ export const usePipelinePreview = ({
   sourceId,
   canTriggerPreview,
   graphSnapshot,
-  isPreviewNode,
+  catalogFlags,
   targetNodeId,
   previewSignature,
   skipPreview = false,
   requestPreviewRows,
   includeSignals,
 }: UsePipelinePreviewArgs): UsePipelinePreviewResult => {
+  const { isPreviewNode } = catalogFlags;
   const [previewState, setPreviewState] = useState<PreviewState>(idleState);
   const [requestId, setRequestId] = useState(0);
   const lastSignatureRef = useRef<string | null>(null);

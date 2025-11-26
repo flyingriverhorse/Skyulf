@@ -18,9 +18,10 @@ import {
   type OutlierMethodOption,
   type OutlierRecommendationRow,
 } from '../nodes/outlier/outlierSettings';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 export type UseOutlierConfigurationArgs = {
-  isOutlierNode: boolean;
+  catalogFlags: CatalogFlagMap;
   configState: Record<string, any>;
   numericExcludedColumns: Set<string>;
   outlierData: OutlierRecommendationsResponse | null;
@@ -46,11 +47,12 @@ export type UseOutlierConfigurationResult = {
 };
 
 export const useOutlierConfiguration = ({
-  isOutlierNode,
+  catalogFlags,
   configState,
   numericExcludedColumns,
   outlierData,
 }: UseOutlierConfigurationArgs): UseOutlierConfigurationResult => {
+  const { isOutlierNode } = catalogFlags;
   const outlierConfig = useMemo<NormalizedOutlierConfig>(
     () => normalizeOutlierConfigValue(configState),
     [configState],
