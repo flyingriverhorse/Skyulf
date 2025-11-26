@@ -4,7 +4,7 @@ import type {
   DropColumnCandidate,
   DropColumnRecommendationFilter,
 } from '../../../../api';
-import { useDropMissingColumns } from '../../hooks/useDropMissingColumns';
+import { useDropMissingColumns } from '../../hooks';
 
 export { useDropMissingColumns };
 

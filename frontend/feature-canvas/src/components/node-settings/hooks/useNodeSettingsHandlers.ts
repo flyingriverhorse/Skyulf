@@ -1,10 +1,10 @@
-import { useColumnSelectionHandlers } from './useColumnSelectionHandlers';
-import { useNodeSaveHandlers } from './useNodeSaveHandlers';
-import { useImputationStrategyHandlers } from './useImputationStrategyHandlers';
-import { useAliasStrategyHandlers } from './useAliasStrategyHandlers';
-import { useDateStrategyHandlers } from './useDateStrategyHandlers';
-import { useFeatureMathHandlers } from './useFeatureMathHandlers';
-import type { CatalogFlagMap } from './useCatalogFlags';
+import { useColumnSelectionHandlers } from './preview/useColumnSelectionHandlers';
+import { useNodeSaveHandlers } from './core/useNodeSaveHandlers';
+import { useImputationStrategyHandlers } from './imputation/useImputationStrategyHandlers';
+import { useAliasStrategyHandlers } from './cleaning/useAliasStrategyHandlers';
+import { useDateStrategyHandlers } from './cleaning/useDateStrategyHandlers';
+import { useFeatureMathHandlers } from './feature_math/useFeatureMathHandlers';
+import type { CatalogFlagMap } from './core/useCatalogFlags';
 
 type UseNodeSettingsHandlersArgs = {
   catalogFlags: CatalogFlagMap;

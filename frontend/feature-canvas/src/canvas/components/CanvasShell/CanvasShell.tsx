@@ -27,12 +27,12 @@ import { getDefaultEdges, getDefaultNodes } from '../../services/layout';
 import { isResettableCatalogEntry } from '../../services/nodeFactory';
 import { buildGraphSnapshot } from '../../services/graphSerialization';
 import type { CanvasShellHandle, CanvasShellProps } from '../../types/pipeline';
-import { useNodeCatalogDrawer } from '../../hooks/useNodeCatalogDrawer';
-import { useCanvasSidebar } from '../../hooks/useCanvasSidebar';
-import { useNodeEditor } from '../../hooks/useNodeEditor';
-import { usePipelineLoader } from '../../hooks/usePipelineLoader';
-import { useSplitPropagation } from '../../hooks/useSplitPropagation';
-import { useConnectionHandlers } from '../../hooks/useConnectionHandlers';
+import { useNodeCatalogDrawer } from '../../hooks';
+import { useCanvasSidebar } from '../../hooks';
+import { useNodeEditor } from '../../hooks';
+import { usePipelineLoader } from '../../hooks';
+import { useSplitPropagation } from '../../hooks';
+import { useConnectionHandlers } from '../../hooks';
 import { CanvasViewport } from '../CanvasViewport/CanvasViewport';
 
 const CanvasShell = forwardRef<CanvasShellHandle, CanvasShellProps>(

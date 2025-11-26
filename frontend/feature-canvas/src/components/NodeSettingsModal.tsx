@@ -55,24 +55,24 @@ import { EvaluationPackSection } from './node-settings/nodes/modeling/Evaluation
 import { ModelRegistrySection } from './node-settings/nodes/modeling/ModelRegistrySection';
 import { HyperparameterTuningSection } from './node-settings/nodes/modeling/HyperparameterTuningSection';
 import { ClassResamplingSection } from './node-settings/nodes/resampling/ClassResamplingSection';
-import { useCatalogFlags } from './node-settings/hooks/useCatalogFlags';
-import { useBinnedDistributionCards } from './node-settings/hooks/useBinnedDistributionCards';
+
+import { useBinnedDistributionCards } from './node-settings/hooks';
 import { formatCellValue, formatRelativeTime } from './node-settings/utils/formatters';
 
 import { OutlierInsightsSection } from './node-settings/nodes/outlier/OutlierInsightsSection';
 import { ConnectionRequirementsSection } from './node-settings/layout/ConnectionRequirementsSection';
-import { useDatasetProfiling } from './node-settings/hooks/useDatasetProfiling';
+import { useDatasetProfiling } from './node-settings/hooks';
 
 
-import { useNodeSettingsRenderers } from './node-settings/hooks/useNodeSettingsRenderers';
-import { useNodeSettingsPreview } from './node-settings/hooks/useNodeSettingsPreview';
-import { useNodeSettingsInsights } from './node-settings/hooks/useNodeSettingsInsights';
-import { useNodeSettingsEffects } from './node-settings/hooks/useNodeSettingsEffects';
-import { useNodeSettingsConfiguration } from './node-settings/hooks/useNodeSettingsConfiguration';
-import { useNodeSettingsHandlers } from './node-settings/hooks/useNodeSettingsHandlers';
-import { useNodeSettingsSummaries } from './node-settings/hooks/useNodeSettingsSummaries';
-import { useNodeSettingsData } from './node-settings/hooks/useNodeSettingsData';
-import { useNodeSettingsState } from './node-settings/hooks/useNodeSettingsState';
+import { useNodeSettingsRenderers } from './node-settings/hooks';
+import { useNodeSettingsPreview } from './node-settings/hooks';
+import { useNodeSettingsInsights } from './node-settings/hooks';
+import { useNodeSettingsEffects } from './node-settings/hooks';
+import { useNodeSettingsConfiguration } from './node-settings/hooks';
+import { useNodeSettingsHandlers } from './node-settings/hooks';
+import { useNodeSettingsSummaries } from './node-settings/hooks';
+import { useNodeSettingsData } from './node-settings/hooks';
+import { useNodeSettingsState } from './node-settings/hooks';
 import {
   type BinnedSamplePresetValue,
 } from './node-settings/nodes/binning/binningSettings';

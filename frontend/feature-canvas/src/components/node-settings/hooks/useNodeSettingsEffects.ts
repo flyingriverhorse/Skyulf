@@ -1,4 +1,4 @@
-import { usePreviewColumnTypes, usePreviewAvailableColumns } from './usePreviewColumnMetadata';
+import { usePreviewColumnTypes, usePreviewAvailableColumns } from './preview/usePreviewColumnMetadata';
 
 type UseNodeSettingsEffectsArgs = {
   previewState: any;

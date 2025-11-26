@@ -1,7 +1,7 @@
-import { useSkewnessConfiguration } from './useSkewnessConfiguration';
-import { useImputationConfiguration } from './useImputationConfiguration';
-import { useThresholdRecommendations } from './useThresholdRecommendations';
-import type { CatalogFlagMap } from './useCatalogFlags';
+import { useSkewnessConfiguration } from './skewness/useSkewnessConfiguration';
+import { useImputationConfiguration } from './imputation/useImputationConfiguration';
+import { useThresholdRecommendations } from './imputation/useThresholdRecommendations';
+import type { CatalogFlagMap } from './core/useCatalogFlags';
 
 type UseNodeSettingsConfigurationArgs = {
   catalogFlags: CatalogFlagMap;
