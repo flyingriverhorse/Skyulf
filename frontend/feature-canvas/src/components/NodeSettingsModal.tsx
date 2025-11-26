@@ -180,6 +180,8 @@ import { useAsyncBusyLabel } from './node-settings/hooks/useAsyncBusyLabel';
 import { useInsightSummaries } from './node-settings/hooks/useInsightSummaries';
 import { useThresholdRecommendations } from './node-settings/hooks/useThresholdRecommendations';
 import { useDatasetProfiling } from './node-settings/hooks/useDatasetProfiling';
+import { NodeSettingsParameterField } from './node-settings/fields/NodeSettingsParameterField';
+import { NodeSettingsMultiSelectField } from './node-settings/fields/NodeSettingsMultiSelectField';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -2249,324 +2251,49 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
   const renderMultiSelectField = useCallback(
     (parameter: FeatureNodeParameter) => {
-      const requiresRecommendations = parameter?.source?.type === 'drop_column_recommendations';
-      const isCatalogOnly = !requiresRecommendations;
-      const isCatalogLoading = isCatalogOnly && previewState.status === 'loading';
-      const isBinningColumnsParameter = isBinningNode && parameter.name === 'columns';
-      const isScalingColumnsParameter = isScalingNode && parameter.name === 'columns';
-
-      const binningCandidateColumns = (() => {
-        if (!isBinningColumnsParameter) {
-          return [] as string[];
-        }
-        const merged = [...binningAllNumericColumns];
-        if (binningRecommendedColumnSet.size > 0) {
-          binningRecommendedColumnSet.forEach((column) => {
-            if (!merged.includes(column)) {
-              merged.push(column);
-            }
-          });
-        }
-        selectedColumns.forEach((column) => {
-          if (column && !merged.includes(column)) {
-            merged.push(column);
-          }
-        });
-        return merged;
-      })();
-
-      const displayedColumns = (() => {
-        if (isBinningColumnsParameter) {
-          return binningCandidateColumns;
-        }
-        if (isScalingColumnsParameter) {
-          return availableColumns.filter((column) => !scalingExcludedColumns.has(column));
-        }
-        return availableColumns;
-      })();
-
-      const renderedColumnOptions = (() => {
-        if (isBinningColumnsParameter) {
-          if (!normalizedColumnSearch) {
-            return binningCandidateColumns;
-          }
-          return binningCandidateColumns.filter((column) =>
-            column.toLowerCase().includes(normalizedColumnSearch)
-          );
-        }
-        if (isScalingColumnsParameter) {
-          return filteredColumnOptions.filter((column) => !scalingExcludedColumns.has(column));
-        }
-        return filteredColumnOptions;
-      })();
-
-      const selectionDisplayCount = isBinningColumnsParameter
-        ? selectedColumns.filter((column) => !binningExcludedColumns.has(column)).length
-        : isScalingColumnsParameter
-          ? selectedColumns.filter((column) => !scalingExcludedColumns.has(column)).length
-          : selectionCount;
-
-      const allColumnsSelected =
-        isCatalogOnly && displayedColumns.length > 0 && selectionDisplayCount >= displayedColumns.length;
-      const showMissingMetric = requiresRecommendations || isImputerNode;
-      const availableColumnSet = new Set(displayedColumns);
-      const suggestionSummaries =
-        isCastNode && isCatalogOnly
-          ? Object.entries(columnSuggestions)
-              .filter(([name, suggestions]) => availableColumnSet.has(name) && suggestions.length > 0)
-              .map(([name, suggestions]) => `${name}: ${suggestions.join(', ')}`)
-              .slice(0, 4)
-          : [];
-      const binningExcludedPreview = isBinningColumnsParameter ? Array.from(binningExcludedColumns).slice(0, 4) : [];
-      const scalingExcludedPreview = isScalingColumnsParameter ? Array.from(scalingExcludedColumns).slice(0, 4) : [];
-      const hasBackendRecommendations = isBinningColumnsParameter && binningRecommendedColumnSet.size > 0;
-      const canAddRecommendedColumns = hasBackendRecommendations
-        ? Array.from(binningRecommendedColumnSet).some((column) => !selectedColumns.includes(column))
-        : false;
-
       return (
-        <div
-          key={parameter.name}
-          className="canvas-modal__parameter-field canvas-modal__parameter-field--multiselect"
-        >
-          <div className="canvas-modal__parameter-label">
-            <span>{parameter.label}</span>
-            {requiresRecommendations && sourceId && (
-              <div className="canvas-modal__parameter-actions">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={refreshRecommendations}
-                  disabled={isFetchingRecommendations || !hasReachableSource}
-                >
-                  {isFetchingRecommendations ? 'Refreshing…' : 'Refresh suggestions'}
-                </button>
-              </div>
-            )}
-          </div>
-          {parameter.description && (
-            <p className="canvas-modal__parameter-description">{parameter.description}</p>
-          )}
-
-          {suggestionSummaries.length > 0 && (
-            <p className="canvas-modal__note">
-              Smart suggestions: {suggestionSummaries.join('; ')}
-            </p>
-          )}
-
-          {isBinningColumnsParameter && binningExcludedColumns.size > 0 && (
-            <p className="canvas-modal__note">
-              Skipping {binningExcludedColumns.size} non-numeric column
-              {binningExcludedColumns.size === 1 ? '' : 's'}
-              {binningExcludedPreview.length
-                ? ` (examples: ${binningExcludedPreview.join(', ')}${binningExcludedColumns.size > binningExcludedPreview.length ? ', …' : ''})`
-                : ''}
-              — binning only supports numeric inputs.
-            </p>
-          )}
-
-          {isScalingColumnsParameter && scalingExcludedColumns.size > 0 && (
-            <p className="canvas-modal__note">
-              Skipping {scalingExcludedColumns.size} non-numeric column
-              {scalingExcludedColumns.size === 1 ? '' : 's'}
-              {scalingExcludedPreview.length
-                ? ` (examples: ${scalingExcludedPreview.join(', ')}${scalingExcludedColumns.size > scalingExcludedPreview.length ? ', …' : ''})`
-                : ''}
-              — scaling only supports numeric inputs.
-            </p>
-          )}
-
-          {requiresRecommendations && (
-            <DropMissingColumnsSection
-              sourceId={sourceId}
-              availableFilters={availableFilters}
-              activeFilterId={activeFilterId}
-              setActiveFilterId={setActiveFilterId}
-              recommendations={recommendations}
-              filteredRecommendations={filteredRecommendations}
-              isFetchingRecommendations={isFetchingRecommendations}
-              recommendationsError={recommendationsError}
-              relativeGeneratedAt={relativeGeneratedAt}
-              formatSignalName={formatSignalName}
-              formatMissingPercentage={formatMissingPercentage}
-              getPriorityClass={getPriorityClass}
-              getPriorityLabel={getPriorityLabel}
-              handleToggleColumn={handleToggleColumn}
-              selectedColumns={selectedColumns}
-            />
-          )}
-
-          <div className="canvas-modal__note">
-            Selected columns: <strong>{selectionDisplayCount}</strong>
-          </div>
-
-          {selectionDisplayCount > 0 && (
-            <div className="canvas-modal__selection-summary">
-              <h4>Selected columns</h4>
-              <div className="canvas-modal__selection-chips">
-                {selectedColumns.map((column) => (
-                  <span key={column} className="canvas-modal__selection-chip">
-                    {column}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveColumn(column)}
-                      aria-label={`Remove ${column}`}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="canvas-modal__multi-select-actions">
-            {requiresRecommendations && (
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={handleApplyAllRecommended}
-                disabled={!recommendations.length}
-              >
-                Use all recommendations
-              </button>
-            )}
-            {hasBackendRecommendations && (
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={() => handleBinningApplyColumns(binningRecommendedColumnSet)}
-                disabled={!canAddRecommendedColumns}
-              >
-                Add recommended columns
-              </button>
-            )}
-            {isCatalogOnly && (
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={handleSelectAllColumns}
-                disabled={!displayedColumns.length || allColumnsSelected}
-              >
-                Select all columns
-              </button>
-            )}
-            <button
-              type="button"
-              className="btn btn-outline-secondary"
-              onClick={handleClearColumns}
-              disabled={!selectionCount}
-            >
-              Clear selection
-            </button>
-          </div>
-
-          <div className="canvas-modal__all-columns">
-            <h4>All columns</h4>
-            <div className="canvas-modal__all-columns-search">
-              <input
-                type="text"
-                className="canvas-modal__custom-input"
-                value={columnSearch}
-                onChange={(event) => setColumnSearch(event.target.value)}
-                placeholder="Search columns"
-                aria-label="Search columns"
-              />
-            </div>
-            <div className="canvas-modal__all-columns-list" role="group" aria-label="All columns">
-              {renderedColumnOptions.length ? (
-                renderedColumnOptions.map((column) => {
-                  const isSelected = selectedColumns.includes(column);
-                  const missingValue = Object.prototype.hasOwnProperty.call(columnMissingMap, column)
-                    ? columnMissingMap[column]
-                    : undefined;
-                  const missingLabel = formatMissingPercentage(
-                    typeof missingValue === 'number' ? missingValue : null
-                  );
-                  const columnType = columnTypeMap[column] ?? null;
-                  const columnSuggestionList = columnSuggestions[column] ?? [];
-                  const rangeMeta: { min: number | null; max: number | null; distinct?: number | null } | undefined =
-                    isBinningColumnsParameter
-                      ? binningColumnPreviewMap[column]
-                      : undefined;
-                  const hasRangeMeta = Boolean(
-                    rangeMeta &&
-                      ((rangeMeta.min !== null && rangeMeta.min !== undefined) ||
-                        (rangeMeta.max !== null && rangeMeta.max !== undefined))
-                  );
-                  const distinctCount = isBinningColumnsParameter ? rangeMeta?.distinct ?? null : null;
-                  const hasDistinctMeta =
-                    isBinningColumnsParameter && distinctCount !== null && Number.isFinite(distinctCount);
-                  const distinctDisplayValue = hasDistinctMeta ? (distinctCount as number) : null;
-                  const showTypeMeta = !isBinningColumnsParameter;
-                  const shouldShowMetaRow = showTypeMeta || showMissingMetric || hasRangeMeta || hasDistinctMeta;
-                  const hasSuggestionHints = showTypeMeta && columnSuggestionList.length > 0;
-                  return (
-                    <label
-                      key={column}
-                      className={`canvas-modal__checkbox-item canvas-modal__checkbox-item--compact${
-                        isSelected ? ' canvas-modal__checkbox-item--selected' : ''
-                      }`}
-                    >
-                      <input type="checkbox" checked={isSelected} onChange={() => handleToggleColumn(column)} />
-                      <div className="canvas-modal__column-option">
-                        <span className="canvas-modal__column-option-name">{column}</span>
-                        {shouldShowMetaRow && (
-                          <div className="canvas-modal__column-option-meta">
-                            {showTypeMeta && (
-                              <span className="canvas-modal__column-option-metric">
-                                Type: {formatColumnType(columnType)}
-                              </span>
-                            )}
-                            {showMissingMetric && (
-                              <span className="canvas-modal__column-option-metric">Missing: {missingLabel}</span>
-                            )}
-                            {hasRangeMeta && (
-                              <span className="canvas-modal__column-option-metric">
-                                {isBinningColumnsParameter ? 'Sample range' : 'Range'}:{' '}
-                                {rangeMeta && rangeMeta.min !== null && rangeMeta.min !== undefined
-                                  ? formatNumericStat(rangeMeta.min)
-                                  : '—'}{' '}
-                                –{' '}
-                                {rangeMeta && rangeMeta.max !== null && rangeMeta.max !== undefined
-                                  ? formatNumericStat(rangeMeta.max)
-                                  : '—'}
-                              </span>
-                            )}
-                            {hasDistinctMeta && distinctDisplayValue !== null && (
-                              <span className="canvas-modal__column-option-metric">
-                                Distinct sample values: {formatMetricValue(distinctDisplayValue)}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        {hasSuggestionHints && (
-                          <span className="canvas-modal__column-option-hint">
-                            Suggested: {columnSuggestionList.join(', ')}
-                          </span>
-                        )}
-                      </div>
-                    </label>
-                  );
-                })
-              ) : (
-                <p className="canvas-modal__note">
-                  {availableColumns.length
-                    ? isBinningColumnsParameter && displayedColumns.length === 0
-                      ? 'No eligible columns for binning (non-numeric fields are skipped).'
-                      : 'No columns match your search.'
-                    : isCatalogLoading
-                      ? 'Loading column catalog…'
-                      : !sourceId
-                        ? 'Select a dataset to load column catalog.'
-                        : !hasReachableSource
-                          ? 'Connect this step to an upstream output to load column catalog.'
-                          : 'Column catalog unavailable for this dataset.'}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
+        <NodeSettingsMultiSelectField
+          parameter={parameter}
+          previewStateStatus={previewState.status}
+          isBinningNode={isBinningNode}
+          isScalingNode={isScalingNode}
+          binningAllNumericColumns={binningAllNumericColumns}
+          binningRecommendedColumnSet={binningRecommendedColumnSet}
+          selectedColumns={selectedColumns}
+          availableColumns={availableColumns}
+          scalingExcludedColumns={scalingExcludedColumns}
+          normalizedColumnSearch={normalizedColumnSearch}
+          filteredColumnOptions={filteredColumnOptions}
+          binningExcludedColumns={binningExcludedColumns}
+          selectionCount={selectionCount}
+          isCastNode={isCastNode}
+          columnSuggestions={columnSuggestions}
+          sourceId={sourceId}
+          isFetchingRecommendations={isFetchingRecommendations}
+          hasReachableSource={hasReachableSource}
+          refreshRecommendations={refreshRecommendations}
+          availableFilters={availableFilters}
+          activeFilterId={activeFilterId}
+          setActiveFilterId={setActiveFilterId}
+          recommendations={recommendations}
+          filteredRecommendations={filteredRecommendations}
+          recommendationsError={recommendationsError}
+          relativeGeneratedAt={relativeGeneratedAt}
+          formatSignalName={formatSignalName}
+          handleToggleColumn={handleToggleColumn}
+          handleRemoveColumn={handleRemoveColumn}
+          handleApplyAllRecommended={handleApplyAllRecommended}
+          handleBinningApplyColumns={handleBinningApplyColumns}
+          handleSelectAllColumns={handleSelectAllColumns}
+          handleClearColumns={handleClearColumns}
+          columnSearch={columnSearch}
+          setColumnSearch={setColumnSearch}
+          columnMissingMap={columnMissingMap}
+          columnTypeMap={columnTypeMap}
+          binningColumnPreviewMap={binningColumnPreviewMap}
+          isImputerNode={isImputerNode}
+          showRecommendations={showRecommendations}
+        />
       );
     },
     [
@@ -2577,13 +2304,13 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
       columnSearch,
       columnSuggestions,
       columnTypeMap,
-  binningAllNumericColumns,
-  numericExcludedColumns,
+      binningAllNumericColumns,
+      numericExcludedColumns,
       filteredColumnOptions,
       filteredRecommendations,
       formatSignalName,
       handleApplyAllRecommended,
-  handleBinningApplyColumns,
+      handleBinningApplyColumns,
       handleClearColumns,
       handleRemoveColumn,
       handleSelectAllColumns,
@@ -2592,7 +2319,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
       isCastNode,
       isFetchingRecommendations,
       isBinningNode,
-  binningRecommendedColumnSet,
+      binningRecommendedColumnSet,
       binningColumnPreviewMap,
       isImputerNode,
       isScalingNode,
@@ -2615,242 +2342,22 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
   const renderParameterField = useCallback(
     (parameter: FeatureNodeParameter) => {
-      if (!parameter?.name) {
-        return null;
-      }
-
-      if (parameter.type === 'multi_select') {
-        return renderMultiSelectField(parameter);
-      }
-
-      if (parameter.type === 'number') {
-        const inputId = `node-${node.id}-${parameter.name}`;
-        const value = configState?.[parameter.name];
-        const numericValue = typeof value === 'number' ? value : value ?? '';
-
-        return (
-          <div key={parameter.name} className="canvas-modal__parameter-field">
-            <label htmlFor={inputId} className="canvas-modal__parameter-label">
-              <span>{parameter.label}</span>
-              {parameter.unit && <span className="canvas-modal__parameter-unit">{parameter.unit}</span>}
-            </label>
-            {parameter.description && (
-              <p className="canvas-modal__parameter-description">{parameter.description}</p>
-            )}
-            <div className="canvas-modal__parameter-control">
-              <input
-                id={inputId}
-                type="number"
-                className="canvas-modal__input"
-                value={numericValue}
-                min={parameter.min !== undefined ? parameter.min : undefined}
-                max={parameter.max !== undefined ? parameter.max : undefined}
-                step={parameter.step !== undefined ? parameter.step : 'any'}
-                onChange={(event) => handleNumberChange(parameter.name, event.target.value)}
-              />
-              {parameter.unit && (
-                <span className="canvas-modal__parameter-unit">{parameter.unit}</span>
-              )}
-            </div>
-            {thresholdParameterName === parameter.name &&
-              normalizedSuggestedThreshold !== null &&
-              showRecommendations && (
-                <div className="canvas-modal__note">
-                  Suggested threshold from EDA:{' '}
-                  <strong>{formatMissingPercentage(normalizedSuggestedThreshold)}</strong>
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={handleApplySuggestedThreshold}
-                    disabled={!canApplySuggestedThreshold}
-                  >
-                    {thresholdMatchesSuggestion ? 'Applied' : 'Apply suggestion'}
-                  </button>
-                </div>
-              )}
-          </div>
-        );
-      }
-
-      if (parameter.type === 'boolean') {
-        const inputId = `node-${node.id}-${parameter.name}`;
-        const checked = Boolean(configState?.[parameter.name]);
-
-        return (
-          <div key={parameter.name} className="canvas-modal__parameter-field">
-            <div className="canvas-modal__parameter-label">
-              <label htmlFor={inputId}>{parameter.label}</label>
-            </div>
-            {parameter.description && (
-              <p className="canvas-modal__parameter-description">{parameter.description}</p>
-            )}
-            <label className="canvas-modal__boolean-control">
-              <input
-                id={inputId}
-                type="checkbox"
-                checked={checked}
-                onChange={(event) => handleBooleanChange(parameter.name, event.target.checked)}
-              />
-              <span>{checked ? 'Enabled' : 'Disabled'}</span>
-            </label>
-          </div>
-        );
-      }
-
-      if (parameter.type === 'select') {
-        const inputId = `node-${node.id}-${parameter.name}`;
-        const options = Array.isArray(parameter.options) ? parameter.options : [];
-        const currentValue = configState?.[parameter.name];
-        const defaultValue =
-          typeof parameter.default === 'string'
-            ? parameter.default
-            : options.find((option) => option && typeof option.value === 'string')?.value ?? '';
-        const value =
-          typeof currentValue === 'string' && currentValue.trim().length
-            ? currentValue
-            : defaultValue;
-
-        return (
-          <div key={parameter.name} className="canvas-modal__parameter-field">
-            <label htmlFor={inputId} className="canvas-modal__parameter-label">
-              {parameter.label}
-            </label>
-            {parameter.description && (
-              <p className="canvas-modal__parameter-description">{parameter.description}</p>
-            )}
-            <select
-              id={inputId}
-              className="canvas-modal__input"
-              value={value}
-              onChange={(event) => handleTextChange(parameter.name, event.target.value)}
-            >
-              {options.map((option) => (
-                <option key={option.value} value={option.value} title={option.description ?? undefined}>
-                  {option.label ?? option.value}
-                </option>
-              ))}
-            </select>
-          </div>
-        );
-      }
-
-      if (parameter.type === 'textarea') {
-        const inputId = `node-${node.id}-${parameter.name}`;
-        
-        // Special handling for hyperparameters - convert JSON to simple format
-        if (parameter.name === 'hyperparameters') {
-          let displayValue = '';
-          let internalValue = configState?.[parameter.name];
-          
-          // Convert JSON to simple key: value format for display
-          if (typeof internalValue === 'string' && internalValue.trim()) {
-            try {
-              const parsed = JSON.parse(internalValue);
-              if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                displayValue = Object.entries(parsed)
-                  .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
-                  .join('\n');
-              } else {
-                displayValue = internalValue;
-              }
-            } catch {
-              displayValue = internalValue;
-            }
-          } else if (internalValue && typeof internalValue === 'object' && !Array.isArray(internalValue)) {
-            displayValue = Object.entries(internalValue)
-              .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
-              .join('\n');
-          }
-
-          return (
-            <div key={parameter.name} className="canvas-modal__parameter-field">
-              <label htmlFor={inputId} className="canvas-modal__parameter-label">
-                {parameter.label}
-              </label>
-              <p className="canvas-modal__parameter-description">
-                {parameter.description || 'Enter parameters as key: value pairs (one per line)'}
-              </p>
-              <textarea
-                id={inputId}
-                className="canvas-modal__input canvas-modal__input--wide"
-                value={displayValue}
-                placeholder={'n_estimators: 100\nmax_depth: 10\nlearning_rate: 0.01'}
-                onChange={(event) => {
-                  const text = event.target.value;
-                  // Convert simple format to JSON
-                  const lines = text.split('\n').filter(line => line.trim());
-                  const params: Record<string, any> = {};
-                  
-                  for (const line of lines) {
-                    const colonIndex = line.indexOf(':');
-                    if (colonIndex === -1) continue;
-                    
-                    const key = line.substring(0, colonIndex).trim();
-                    const valueStr = line.substring(colonIndex + 1).trim();
-                    
-                    if (!key) continue;
-                    
-                    // Try to parse the value
-                    try {
-                      params[key] = JSON.parse(valueStr);
-                    } catch {
-                      // If parse fails, treat as string
-                      params[key] = valueStr;
-                    }
-                  }
-                  
-                  // Store as JSON string
-                  handleTextChange(parameter.name, JSON.stringify(params, null, 2));
-                }}
-                rows={6}
-              />
-            </div>
-          );
-        }
-
-        // Default textarea handling for non-hyperparameters
-        const value = typeof configState?.[parameter.name] === 'string' ? configState?.[parameter.name] : '';
-
-        return (
-          <div key={parameter.name} className="canvas-modal__parameter-field">
-            <label htmlFor={inputId} className="canvas-modal__parameter-label">
-              {parameter.label}
-            </label>
-            {parameter.description && (
-              <p className="canvas-modal__parameter-description">{parameter.description}</p>
-            )}
-            <textarea
-              id={inputId}
-              className="canvas-modal__input canvas-modal__input--wide"
-              value={value}
-              placeholder={parameter.placeholder ?? ''}
-              onChange={(event) => handleTextChange(parameter.name, event.target.value)}
-              rows={4}
-            />
-          </div>
-        );
-      }
-
-      const inputId = `node-${node.id}-${parameter.name}`;
-      const value = configState?.[parameter.name] ?? '';
-
       return (
-        <div key={parameter.name} className="canvas-modal__parameter-field">
-          <label htmlFor={inputId} className="canvas-modal__parameter-label">
-            {parameter.label}
-          </label>
-          {parameter.description && (
-            <p className="canvas-modal__parameter-description">{parameter.description}</p>
-          )}
-          <input
-            id={inputId}
-            type="text"
-            className="canvas-modal__input canvas-modal__input--wide"
-            value={value}
-            placeholder={parameter.placeholder ?? ''}
-            onChange={(event) => handleTextChange(parameter.name, event.target.value)}
-          />
-        </div>
+        <NodeSettingsParameterField
+          parameter={parameter}
+          nodeId={node.id}
+          configState={configState}
+          handleNumberChange={handleNumberChange}
+          handleBooleanChange={handleBooleanChange}
+          handleTextChange={handleTextChange}
+          thresholdParameterName={thresholdParameterName}
+          normalizedSuggestedThreshold={normalizedSuggestedThreshold}
+          showRecommendations={showRecommendations}
+          canApplySuggestedThreshold={canApplySuggestedThreshold}
+          thresholdMatchesSuggestion={thresholdMatchesSuggestion}
+          handleApplySuggestedThreshold={handleApplySuggestedThreshold}
+          renderMultiSelect={renderMultiSelectField}
+        />
       );
     },
     [
