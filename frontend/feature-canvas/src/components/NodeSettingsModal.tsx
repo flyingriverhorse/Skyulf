@@ -11,7 +11,7 @@ import {
 import {
   DropMissingColumnsSection,
 } from './node-settings/nodes/drop_col_rows/DropMissingColumnsSection';
-import { useDropMissingColumns } from './node-settings/hooks/useDropMissingColumns';
+
 import { DropMissingRowsSection } from './node-settings/nodes/drop_col_rows/DropMissingRowsSection';
 import { RemoveDuplicatesSection } from './node-settings/nodes/remove_duplicates/RemoveDuplicatesSection';
 import { DEFAULT_KEEP_STRATEGY, type KeepStrategy } from './node-settings/nodes/remove_duplicates/removeDuplicatesSettings';
@@ -98,18 +98,8 @@ import { ModelRegistrySection } from './node-settings/nodes/modeling/ModelRegist
 import { HyperparameterTuningSection } from './node-settings/nodes/modeling/HyperparameterTuningSection';
 import { ClassResamplingSection } from './node-settings/nodes/resampling/ClassResamplingSection';
 import { useCatalogFlags } from './node-settings/hooks/useCatalogFlags';
-import { useScalingInsights } from './node-settings/hooks/useScalingInsights';
-import { useBinningInsights } from './node-settings/hooks/useBinningInsights';
-import { useSkewnessInsights } from './node-settings/hooks/useSkewnessInsights';
-import { useBinnedDistribution } from './node-settings/hooks/useBinnedDistribution';
 import { useBinnedDistributionCards } from './node-settings/hooks/useBinnedDistributionCards';
-import { useDropColumnRecommendations } from './node-settings/hooks/useDropColumnRecommendations';
-import { useOutlierRecommendations } from './node-settings/hooks/useOutlierRecommendations';
-import { useNumericColumnAnalysis } from './node-settings/hooks/useNumericColumnAnalysis';
-import { useImputationConfiguration } from './node-settings/hooks/useImputationConfiguration';
-import { useModelingConfiguration } from './node-settings/hooks/useModelingConfiguration';
 import {
-  useSkewnessConfiguration,
   type SkewnessDistributionView,
 } from './node-settings/hooks/useSkewnessConfiguration';
 import {
@@ -123,43 +113,19 @@ import { HistogramSparkline } from './node-settings/utils/HistogramSparkline';
 
 import { OutlierInsightsSection } from './node-settings/nodes/outlier/OutlierInsightsSection';
 import { OUTLIER_METHOD_ORDER } from './node-settings/nodes/outlier/outlierSettings';
-import { useNodeMetadata } from './node-settings/hooks/useNodeMetadata';
 import { ConnectionRequirementsSection } from './node-settings/layout/ConnectionRequirementsSection';
-import { useConnectionReadiness } from './node-settings/hooks/useConnectionReadiness';
-import { useFilteredParameters } from './node-settings/hooks/useFilteredParameters';
-import { useNodeConfigState } from './node-settings/hooks/useNodeConfigState';
-import { useParameterHandlers } from './node-settings/hooks/useParameterHandlers';
-import { useEncodingRecommendationsState } from './node-settings/hooks/useEncodingRecommendationsState';
-import { useNumericAnalysisState } from './node-settings/hooks/useNumericAnalysisState';
-import { useDataCleaningState } from './node-settings/hooks/useDataCleaningState';
-import { useGraphTopology } from './node-settings/hooks/useGraphTopology';
-import { useNodePreview } from './node-settings/hooks/useNodePreview';
-import { useColumnCatalogState } from './node-settings/hooks/useColumnCatalogState';
-import { usePreviewColumnTypes, usePreviewAvailableColumns } from './node-settings/hooks/usePreviewColumnMetadata';
-import { usePreviewSignals } from './node-settings/hooks/usePreviewSignals';
-import { useFeatureSelectionAutoConfig } from './node-settings/hooks/useFeatureSelectionAutoConfig';
-import { useColumnSelectionHandlers } from './node-settings/hooks/useColumnSelectionHandlers';
-import { useNodeSaveHandlers } from './node-settings/hooks/useNodeSaveHandlers';
-import { useNodeParameters } from './node-settings/hooks/useNodeParameters';
-import { useNodeSpecificParameters } from './node-settings/hooks/useNodeSpecificParameters';
-import { useResetPermissions } from './node-settings/hooks/useResetPermissions';
-import { useSchemaDiagnostics } from './node-settings/hooks/useSchemaDiagnostics';
-import { usePreviewData } from './node-settings/hooks/usePreviewData';
-import { useAsyncBusyLabel } from './node-settings/hooks/useAsyncBusyLabel';
-import { useInsightSummaries } from './node-settings/hooks/useInsightSummaries';
-import { useThresholdRecommendations } from './node-settings/hooks/useThresholdRecommendations';
-import { useFeatureMathState } from './node-settings/hooks/useFeatureMathState';
-import { useMissingIndicatorState } from './node-settings/hooks/useMissingIndicatorState';
 import { useDatasetProfiling } from './node-settings/hooks/useDatasetProfiling';
-import { NodeSettingsParameterField } from './node-settings/fields/NodeSettingsParameterField';
-import { NodeSettingsMultiSelectField } from './node-settings/fields/NodeSettingsMultiSelectField';
-import { useImputationStrategyHandlers } from './node-settings/hooks/useImputationStrategyHandlers';
-import { useAliasStrategyHandlers } from './node-settings/hooks/useAliasStrategyHandlers';
-import { useDateStrategyHandlers } from './node-settings/hooks/useDateStrategyHandlers';
-import { useFeatureMathHandlers } from './node-settings/hooks/useFeatureMathHandlers';
-import { usePreviewSignature } from './node-settings/hooks/usePreviewSignature';
-import { useImputationStrategies } from './node-settings/hooks/useImputationStrategies';
-import { useSkewnessState } from './node-settings/hooks/useSkewnessState';
+
+
+import { useNodeSettingsRenderers } from './node-settings/hooks/useNodeSettingsRenderers';
+import { useNodeSettingsPreview } from './node-settings/hooks/useNodeSettingsPreview';
+import { useNodeSettingsInsights } from './node-settings/hooks/useNodeSettingsInsights';
+import { useNodeSettingsEffects } from './node-settings/hooks/useNodeSettingsEffects';
+import { useNodeSettingsConfiguration } from './node-settings/hooks/useNodeSettingsConfiguration';
+import { useNodeSettingsHandlers } from './node-settings/hooks/useNodeSettingsHandlers';
+import { useNodeSettingsSummaries } from './node-settings/hooks/useNodeSettingsSummaries';
+import { useNodeSettingsData } from './node-settings/hooks/useNodeSettingsData';
+import { useNodeSettingsState } from './node-settings/hooks/useNodeSettingsState';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -187,7 +153,34 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   defaultConfigTemplate,
   isResetAvailable = false,
 }) => {
-  const { metadata, title } = useNodeMetadata(node);
+  const {
+    metadata,
+    title,
+    connectionReadiness,
+    catalogFlags,
+    datasetBadge,
+    isClassResamplingNode,
+    parameters,
+    getParameter,
+    requiresColumnCatalog,
+    dropColumnParameter,
+    dataConsistencyHint,
+    nodeId,
+    resetPermissions,
+    nodeParams,
+    filteredParameters,
+    dataConsistencyParameters,
+    shouldLoadSkewnessInsights,
+    configStateResult,
+    parameterHandlers,
+    imputationStrategiesResult,
+    skewnessStateResult,
+  } = useNodeSettingsState({
+    node,
+    graphSnapshot: graphSnapshot ?? null,
+    isResetAvailable,
+    defaultConfigTemplate,
+  });
 
   const {
     connectionInfo,
@@ -197,9 +190,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     connectionReady,
     gatedSectionStyle,
     gatedAriaDisabled,
-  } = useConnectionReadiness(node, graphSnapshot ?? null);
+  } = connectionReadiness;
 
-  const catalogFlags = useCatalogFlags(node);
   const {
     catalogType,
     isDataset,
@@ -246,40 +238,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isPreviewNode,
     isDatasetProfileNode,
   } = catalogFlags;
-  const datasetBadge = isDataset;
-  const isClassResamplingNode = isClassUndersamplingNode || isClassOversamplingNode;
 
-
-
-  const {
-    parameters,
-    getParameter,
-    requiresColumnCatalog,
-    dropColumnParameter,
-  } = useNodeParameters(node);
-
-  const dataConsistencyHint = useMemo(
-    () => DATA_CONSISTENCY_GUIDANCE[catalogType] ?? null,
-    [catalogType]
-  );
-
-  const nodeId = typeof node?.id === 'string' ? node.id : '';
-
-  const { canResetNode, headerCanResetNode, footerCanResetNode } = useResetPermissions({
-    isResetAvailable,
-    defaultConfigTemplate,
-    catalogFlags,
-  });
-
-  const nodeParams = useNodeSpecificParameters(getParameter, catalogFlags);
-  const filteredParameters = useFilteredParameters(parameters, catalogFlags);
-
-  const dataConsistencyParameters = useMemo(
-    () => (isDataConsistencyNode ? filteredParameters : []),
-    [filteredParameters, isDataConsistencyNode],
-  );
-
-  const shouldLoadSkewnessInsights = isSkewnessNode || isSkewnessDistributionNode;
+  const { canResetNode, headerCanResetNode, footerCanResetNode } = resetPermissions;
 
   const {
     configState,
@@ -287,7 +247,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     stableInitialConfig,
     stableCurrentConfig,
     nodeChangeVersion,
-  } = useNodeConfigState({ node });
+  } = configStateResult;
 
   const {
     handleParameterChange,
@@ -295,7 +255,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     handlePercentileChange,
     handleBooleanChange,
     handleTextChange,
-  } = useParameterHandlers({ setConfigState });
+  } = parameterHandlers;
 
   const modelRegistryConfig = useMemo(() => {
     if (!isModelRegistryNode) {
@@ -309,9 +269,29 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     imputationMethodValues,
     imputerStrategies,
     imputerStrategyCount,
-  } = useImputationStrategies(configState);
+  } = imputationStrategiesResult;
 
-  const { skewnessTransformations, updateSkewnessTransformations } = useSkewnessState(configState, setConfigState);
+  const { skewnessTransformations, updateSkewnessTransformations } = skewnessStateResult;
+
+  const {
+    graphTopology,
+    modelingConfig,
+    previewSignatureResult,
+    cachedPreviewSchema,
+    setCachedPreviewSchema,
+    schemaDiagnostics,
+    columnCatalogState,
+  } = useNodeSettingsData({
+    graphSnapshot: graphSnapshot ?? null,
+    nodeId,
+    catalogFlags,
+    configState,
+    setConfigState,
+    nodeParams,
+    sourceId,
+    requiresColumnCatalog,
+    imputerStrategies,
+  });
 
   const {
     graphContext,
@@ -320,11 +300,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     upstreamNodeIds,
     upstreamTargetColumn,
     hasReachableSource,
-  } = useGraphTopology({
-    graphSnapshot: graphSnapshot ?? null,
-    nodeId,
-    catalogFlags,
-  });
+  } = graphTopology;
 
   const {
     featureTargetSplitConfig,
@@ -334,34 +310,16 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     trainModelRuntimeConfig,
     trainModelCVConfig,
     filteredModelTypeOptions,
-  } = useModelingConfiguration({
-    configState,
-    setConfigState,
-    catalogFlags,
-    upstreamTargetColumn,
-    nodeId,
-    modelTypeOptions: nodeParams.trainModel.modelType?.options ?? null,
-  });  const { upstreamConfigFingerprints, previewSignature } = usePreviewSignature({
-    nodeId,
-    sourceId,
-    configState,
-    upstreamNodeIds,
-    graphNodes,
-  });
+  } = modelingConfig;
 
-  const [cachedPreviewSchema, setCachedPreviewSchema] = useState<PipelinePreviewSchema | null>(null);
+  const { upstreamConfigFingerprints, previewSignature } = previewSignatureResult;
 
   const {
     cachedSchemaColumns,
     oversamplingSchemaGuard,
     imputationSchemaDiagnostics,
     skipPreview,
-  } = useSchemaDiagnostics({
-    cachedPreviewSchema,
-    catalogFlags,
-    resamplingTargetColumn: resamplingConfig?.targetColumn ?? null,
-    imputerStrategies,
-  });
+  } = schemaDiagnostics;
 
   const {
     availableColumns,
@@ -376,70 +334,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     setColumnSuggestions,
     imputerMissingFilter,
     setImputerMissingFilter,
-  } = useColumnCatalogState({
-    requiresColumnCatalog,
-    catalogFlags,
-    nodeId,
-    sourceId,
-    hasReachableSource,
-  });
+  } = columnCatalogState;
 
   const hasDropColumnParameter = Boolean(dropColumnParameter);
 
-  const {
-    hasDropColumnSource,
-    availableFilters,
-    activeFilterId,
-    setActiveFilterId,
-    recommendations,
-    filteredRecommendations,
-    formatSignalName,
-    isFetchingRecommendations,
-    recommendationsError,
-    recommendationsGeneratedAt,
-    suggestedThreshold,
-    refreshRecommendations,
-  } = useDropMissingColumns({
-    hasDropColumnSource: hasDropColumnParameter,
-    sourceId,
-    nodeId,
-    graphContext,
-    hasReachableSource,
-    columnTypeMap,
-    setAvailableColumns,
-    setColumnSearch,
-    setColumnMissingMap,
-    setColumnTypeMap,
-    setColumnSuggestions,
-  });
-
-  useDropColumnRecommendations({
-    catalogFlags,
-    sourceId,
-    hasReachableSource,
-    graphContext,
-    targetNodeId: node?.id ?? null,
-    setAvailableColumns,
-    setColumnMissingMap,
-  });
-
-  const {
-    labelEncoding,
-    targetEncoding,
-    hashEncoding,
-    ordinalEncoding,
-    dummyEncoding,
-    oneHotEncoding,
-  } = useEncodingRecommendationsState({
-    catalogFlags,
-    sourceId,
-    hasReachableSource,
-    graphContext,
-    node,
-    configState,
-    setConfigState,
-    nodeChangeVersion,
-  });
 
   const [binnedSamplePreset, setBinnedSamplePreset] = useState<BinnedSamplePresetValue>('500');
 
@@ -462,11 +360,11 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   });
 
   const {
-    previewState,
-    refreshPreview,
-    clearCachedPreviewSchema,
-    canTriggerPreview,
-  } = useNodePreview({
+    nodePreview,
+    previewSignals,
+    featureMathState,
+    previewData,
+  } = useNodeSettingsPreview({
     graphSnapshot: graphSnapshot ?? null,
     graphNodeCount,
     hasReachableSource,
@@ -478,7 +376,17 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     cachedPreviewSchema,
     setCachedPreviewSchema,
     catalogFlags,
+    upstreamTargetColumn,
+    setConfigState,
+    configState,
   });
+
+  const {
+    previewState,
+    refreshPreview,
+    clearCachedPreviewSchema,
+    canTriggerPreview,
+  } = nodePreview;
 
   const {
     featureMathSignals,
@@ -486,64 +394,98 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     featureSelectionSignal,
     outlierPreviewSignal,
     transformerAuditSignal,
-  } = usePreviewSignals({
-    previewState,
-    nodeId,
-    catalogFlags,
-  });
-
-  useFeatureSelectionAutoConfig({
-    catalogFlags,
-    featureSelectionSignal,
-    upstreamTargetColumn,
-    setConfigState,
-  });
+  } = previewSignals;
 
   const {
     featureMathOperations,
     featureMathSummaries,
     collapsedFeatureMath,
     setCollapsedFeatureMath,
-  } = useFeatureMathState(catalogFlags, configState, featureMathSignals);
+  } = featureMathState;
+
+  const { previewColumns, previewColumnStats, previewSampleRows } = previewData;
+
+
+  const {
+    dropMissingColumns,
+    encodingRecommendations,
+    outlierRecommendations,
+    scalingInsights,
+    binningInsights,
+    binnedDistribution,
+    skewnessInsights,
+    missingIndicatorState,
+    dataCleaningState,
+    numericColumnAnalysis,
+    numericAnalysisState,
+  } = useNodeSettingsInsights({
+    catalogFlags,
+    sourceId,
+    nodeId,
+    graphContext,
+    hasReachableSource,
+    columnTypeMap,
+    setAvailableColumns,
+    setColumnSearch,
+    setColumnMissingMap,
+    setColumnTypeMap,
+    setColumnSuggestions,
+    dropColumnParameter,
+    node,
+    configState,
+    setConfigState,
+    nodeChangeVersion,
+    binnedSamplePreset,
+    skewnessTransformations,
+    availableColumns,
+    columnMissingMap,
+    previewSampleRows,
+  });
+
+  const {
+    hasDropColumnSource,
+    availableFilters,
+    activeFilterId,
+    setActiveFilterId,
+    recommendations,
+    filteredRecommendations,
+    formatSignalName,
+    isFetchingRecommendations,
+    recommendationsError,
+    recommendationsGeneratedAt,
+    suggestedThreshold,
+    refreshRecommendations,
+  } = dropMissingColumns;
+
+  const {
+    labelEncoding,
+    targetEncoding,
+    hashEncoding,
+    ordinalEncoding,
+    dummyEncoding,
+    oneHotEncoding,
+  } = encodingRecommendations;
 
   const {
     outlierData,
     outlierError,
     isFetchingOutliers,
     refreshOutliers,
-  } = useOutlierRecommendations({
-    catalogFlags,
-    sourceId,
-    hasReachableSource,
-    graphContext,
-    targetNodeId: nodeId || null,
-  });
+  } = outlierRecommendations;
 
   const {
     scalingData,
     scalingError,
     isFetchingScaling,
     refreshScaling,
-  } = useScalingInsights({
-    catalogFlags,
-    sourceId,
-    hasReachableSource,
-    graphContext,
-    targetNodeId: node?.id ?? null,
-  });
+  } = scalingInsights;
 
   const {
     binningData,
     binningError,
     isFetchingBinning,
     refreshBinning,
-  } = useBinningInsights({
-    catalogFlags,
-    sourceId,
-    hasReachableSource,
-    graphContext,
-    targetNodeId: node?.id ?? null,
-  });
+  } = binningInsights;
 
   const handleRefreshPreview = useCallback(() => {
     clearCachedPreviewSchema();
@@ -573,41 +515,20 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     binnedDistributionError,
     isFetchingBinnedDistribution,
     refreshBinnedDistribution,
-  } = useBinnedDistribution({
-    catalogFlags,
-    sourceId,
-    hasReachableSource,
-    graphContext,
-    targetNodeId: node?.id ?? null,
-    samplePreset: binnedSamplePreset,
-  });
+  } = binnedDistribution;
 
   const {
     skewnessData,
     skewnessError,
     isFetchingSkewness,
     refreshSkewness,
-  } = useSkewnessInsights({
-    catalogFlags,
-    sourceId,
-    graphContext,
-    targetNodeId: node?.id ?? null,
-    transformations: skewnessTransformations,
-  });
-
-  const { previewColumns, previewColumnStats, previewSampleRows } = usePreviewData(previewState);
+  } = skewnessInsights;
 
   const {
     activeFlagSuffix,
     missingIndicatorColumns,
     missingIndicatorInsights,
-  } = useMissingIndicatorState({
-    catalogFlags,
-    configState,
-    node,
-    availableColumns,
-    columnMissingMap,
-  });
+  } = missingIndicatorState;
 
   const canRefreshSkewnessDistributions = Boolean(sourceId) && hasReachableSource;
 
@@ -621,52 +542,24 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     normalizeCase,
     replaceInvalid,
     standardizeDates,
-  } = useDataCleaningState({
-    catalogFlags,
-    configState,
-    nodeConfig: node?.data?.config ?? null,
-    availableColumns,
-    columnTypeMap,
-    previewSampleRows,
-  });
+  } = dataCleaningState;
 
   const shouldAnalyzeNumericColumns = isBinningNode || isScalingNode || isOutlierNode;
-  const { numericExcludedColumns } = useNumericColumnAnalysis({
-    catalogFlags,
-    availableColumns,
-    columnTypeMap,
-    previewSampleRows,
-  });
+  const { numericExcludedColumns } = numericColumnAnalysis;
   
   const {
     scaling,
     outlier,
     binning,
     selectedColumns,
-  } = useNumericAnalysisState({
-    catalogFlags,
-    configState,
-    setConfigState,
-    nodeId,
-    numericExcludedColumns,
-    scalingData,
-    outlierData,
-    binningData,
-    availableColumns,
-    previewSampleRows,
-  });
+  } = numericAnalysisState;
 
-  usePreviewColumnTypes({
+  useNodeSettingsEffects({
     previewState,
     previewSampleRows,
     activeFlagSuffix: activeFlagSuffix ?? '',
     setColumnTypeMap,
     setColumnSuggestions,
-  });
-
-  usePreviewAvailableColumns({
-    previewState,
-    activeFlagSuffix: activeFlagSuffix ?? '',
     hasReachableSource,
     requiresColumnCatalog,
     nodeColumns,
@@ -695,7 +588,13 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
 
 
-  const skewness = useSkewnessConfiguration({
+  const thresholdParameterName = nodeParams.dropMissing.threshold?.name ?? null;
+
+  const {
+    skewness,
+    imputationConfiguration,
+    thresholdRecommendations,
+  } = useNodeSettingsConfiguration({
     catalogFlags,
     skewnessData,
     skewnessTransformations,
@@ -703,6 +602,15 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     previewColumns,
     columnTypeMap,
     updateSkewnessTransformations,
+    imputerStrategies,
+    columnMissingMap,
+    previewColumnStats,
+    nodeColumns: node?.data?.columns,
+    imputerMissingFilter,
+    suggestedThreshold,
+    thresholdParameterName,
+    configState,
+    handleParameterChange,
   });
 
   const {
@@ -710,33 +618,55 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     imputerMissingSliderMax,
     imputerFilteredOptionCount,
     imputerMissingFilterActive,
-  } = useImputationConfiguration({
-    catalogFlags,
-    imputerStrategies,
-    availableColumns,
-    columnMissingMap,
-    previewColumns,
-    previewColumnStats,
-    nodeColumns: node?.data?.columns,
-    imputerMissingFilter,
-  });
-
-  const thresholdParameterName = nodeParams.dropMissing.threshold?.name ?? null;
+  } = imputationConfiguration;
 
   const {
     normalizedSuggestedThreshold,
     thresholdMatchesSuggestion,
     canApplySuggestedThreshold,
     handleApplySuggestedThreshold,
-  } = useThresholdRecommendations({
-    suggestedThreshold,
-    thresholdParameterName,
-    configState,
-    handleParameterChange,
-  });
+  } = thresholdRecommendations;
 
   const showDropMissingRowsSection =
     isDropMissingRowsNode && Boolean(nodeParams.dropMissing.threshold || nodeParams.dropRows.any);
+
+  const {
+    columnSelectionHandlers,
+    nodeSaveHandlers,
+    imputationStrategyHandlers,
+    aliasStrategyHandlers,
+    dateStrategyHandlers,
+    featureMathHandlers,
+  } = useNodeSettingsHandlers({
+    catalogFlags,
+    setConfigState,
+    binningExcludedColumns: binning.state.excludedColumns,
+    scalingExcludedColumns: scaling.state.excludedColumns,
+    availableColumns,
+    recommendations,
+    nodeId,
+    onUpdateConfig,
+    onClose,
+    sourceId: sourceId ?? null,
+    graphSnapshot: graphSnapshot ?? null,
+    onUpdateNodeData,
+    canResetNode,
+    defaultConfigTemplate,
+    onResetConfig,
+    imputationMethodValues,
+    imputationMethodOptions,
+    imputerStrategyCount,
+    setCollapsedStrategies,
+    setImputerMissingFilter,
+    node,
+    aliasColumnSummary: alias.columnSummary,
+    aliasStrategyCount: alias.strategyCount,
+    dateStrategies: standardizeDates.strategies,
+    standardizeDatesColumnSummary: standardizeDates.columnSummary,
+    standardizeDatesMode: standardizeDates.mode,
+    setCollapsedFeatureMath,
+    configState,
+  });
 
   const {
     handleManualBoundChange,
@@ -746,54 +676,27 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     handleSelectAllColumns,
     handleClearColumns,
     handleRemoveColumn,
-  } = useColumnSelectionHandlers({
-    catalogFlags,
-    setConfigState,
-    binningExcludedColumns: binning.state.excludedColumns,
-    scalingExcludedColumns: scaling.state.excludedColumns,
-    availableColumns,
-    recommendations,
-  });
+  } = columnSelectionHandlers;
 
-  const { handleSave, handleResetNode } = useNodeSaveHandlers({
-    configState,
-    catalogFlags,
-    nodeId,
-    onUpdateConfig,
-    onClose,
-    sourceId,
-    graphSnapshot: graphSnapshot ?? null,
-    onUpdateNodeData,
-    setConfigState,
-    canResetNode,
-    defaultConfigTemplate,
-    onResetConfig,
-  });
+  const { handleSave, handleResetNode } = nodeSaveHandlers;
 
   const selectionCount = selectedColumns.length;
-  const {
-    relativeGeneratedAt,
-    relativeScalingGeneratedAt,
-    relativeBinningGeneratedAt,
-    relativeBinnedGeneratedAt,
-    relativeOutlierGeneratedAt,
-    scalingSampleSize,
-    binningSampleSize,
-    binnedSampleSize,
-    outlierSampleSize,
-  } = useInsightSummaries({
-    recommendationsGeneratedAt,
-    scalingData,
-    binningData,
-    binnedDistributionData,
-    outlierData,
-  });
+
   const showRecommendations = hasDropColumnSource && Boolean(sourceId) && hasReachableSource;
   const showSaveButton = !datasetBadge && !isInspectionNode;
   const canSave = showSaveButton && stableInitialConfig !== stableCurrentConfig;
   const isProfileLoading = profileState.status === 'loading';
   const isPreviewLoading = previewState.status === 'loading';
-  const { hasActiveAsyncWork, busyLabel, footerBusyLabel } = useAsyncBusyLabel({
+
+  const {
+    insightSummaries,
+    asyncBusyLabel,
+  } = useNodeSettingsSummaries({
+    recommendationsGeneratedAt,
+    scalingData,
+    binningData,
+    binnedDistributionData,
+    outlierData,
     isProfileLoading,
     isPreviewLoading,
     isFetchingScaling,
@@ -805,6 +708,20 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   });
 
   const {
+    relativeGeneratedAt,
+    relativeScalingGeneratedAt,
+    relativeBinningGeneratedAt,
+    relativeBinnedGeneratedAt,
+    relativeOutlierGeneratedAt,
+    scalingSampleSize,
+    binningSampleSize,
+    binnedSampleSize,
+    outlierSampleSize,
+  } = insightSummaries;
+
+  const { hasActiveAsyncWork, busyLabel, footerBusyLabel } = asyncBusyLabel;
+
+  const {
     updateImputerStrategies,
     handleAddImputerStrategy,
     handleRemoveImputerStrategy,
@@ -814,14 +731,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     handleImputerColumnsChange,
     handleImputerColumnToggle,
     handleImputerMissingFilterChange,
-  } = useImputationStrategyHandlers({
-    setConfigState,
-    imputationMethodValues,
-    imputationMethodOptions,
-    imputerStrategyCount,
-    setCollapsedStrategies,
-    setImputerMissingFilter,
-  });
+  } = imputationStrategyHandlers;
 
   const {
     updateAliasStrategies,
@@ -832,14 +742,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     handleAliasColumnToggle,
     handleAliasColumnsChange,
     handleAliasAutoDetectToggle,
-  } = useAliasStrategyHandlers({
-    catalogFlags,
-    node,
-    setConfigState,
-    setCollapsedStrategies,
-    aliasColumnSummary: alias.columnSummary,
-    aliasStrategyCount: alias.strategyCount,
-  });
+  } = aliasStrategyHandlers;
 
   const {
     updateDateStrategies,
@@ -850,15 +753,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     handleDateStrategyColumnsChange,
     handleDateStrategyColumnToggle,
     handleDateStrategyAutoDetectToggle,
-  } = useDateStrategyHandlers({
-    catalogFlags,
-    node,
-    setConfigState,
-    setCollapsedStrategies,
-    dateStrategies: standardizeDates.strategies,
-    standardizeDatesColumnSummary: standardizeDates.columnSummary,
-    standardizeDatesMode: standardizeDates.mode,
-  });
+  } = dateStrategyHandlers;
 
   const {
     updateFeatureMathOperations,
@@ -868,11 +763,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     handleReorderFeatureMathOperation,
     handleToggleFeatureMathOperation,
     handleFeatureMathOperationChange,
-  } = useFeatureMathHandlers({
-    catalogFlags,
-    setConfigState,
-    setCollapsedFeatureMath,
-  });
+  } = featureMathHandlers;
 
   const handleRefreshBinnedDistribution = useCallback(() => {
     if (!sourceId) {
@@ -890,132 +781,59 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
 
 
-  const renderMultiSelectField = useCallback(
-    (parameter: FeatureNodeParameter) => {
-      return (
-        <NodeSettingsMultiSelectField
-          parameter={parameter}
-          previewStateStatus={previewState.status}
-          isBinningNode={isBinningNode}
-          isScalingNode={isScalingNode}
-          binningAllNumericColumns={binning.state.allNumericColumns}
-          binningRecommendedColumnSet={binning.state.recommendedColumnSet}
-          selectedColumns={selectedColumns}
-          availableColumns={availableColumns}
-          scalingExcludedColumns={scaling.state.excludedColumns}
-          normalizedColumnSearch={normalizedColumnSearch}
-          filteredColumnOptions={filteredColumnOptions}
-          binningExcludedColumns={binning.state.excludedColumns}
-          selectionCount={selectionCount}
-          isCastNode={isCastNode}
-          columnSuggestions={columnSuggestions}
-          sourceId={sourceId}
-          isFetchingRecommendations={isFetchingRecommendations}
-          hasReachableSource={hasReachableSource}
-          refreshRecommendations={refreshRecommendations}
-          availableFilters={availableFilters}
-          activeFilterId={activeFilterId}
-          setActiveFilterId={setActiveFilterId}
-          recommendations={recommendations}
-          filteredRecommendations={filteredRecommendations}
-          recommendationsError={recommendationsError}
-          relativeGeneratedAt={relativeGeneratedAt}
-          formatSignalName={formatSignalName}
-          handleToggleColumn={handleToggleColumn}
-          handleRemoveColumn={handleRemoveColumn}
-          handleApplyAllRecommended={handleApplyAllRecommended}
-          handleBinningApplyColumns={binning.handlers.handleApplyColumns}
-          handleSelectAllColumns={handleSelectAllColumns}
-          handleClearColumns={handleClearColumns}
-          columnSearch={columnSearch}
-          setColumnSearch={setColumnSearch}
-          columnMissingMap={columnMissingMap}
-          columnTypeMap={columnTypeMap}
-          binningColumnPreviewMap={binning.state.columnPreviewMap}
-          isImputerNode={isImputerNode}
-          showRecommendations={showRecommendations}
-        />
-      );
-    },
-    [
-      activeFilterId,
-      availableColumns,
+  const { renderMultiSelectField, renderParameterField } = useNodeSettingsRenderers({
+    nodeId,
+    catalogFlags,
+    configState,
+    previewState,
+    binning,
+    scaling,
+    selectedColumns,
+    availableColumns,
+    filteredColumnOptions,
+    normalizedColumnSearch,
+    columnSearch,
+    setColumnSearch,
+    columnSuggestions,
+    columnMissingMap,
+    columnTypeMap,
+    sourceId,
+    hasReachableSource,
+    recommendationsState: {
+      isFetching: isFetchingRecommendations,
       availableFilters,
-      columnMissingMap,
-      columnSearch,
-      columnSuggestions,
-      columnTypeMap,
-      binning.state.allNumericColumns,
-      numericExcludedColumns,
-      filteredColumnOptions,
-      filteredRecommendations,
-      formatSignalName,
-      handleApplyAllRecommended,
-      binning.handlers.handleApplyColumns,
-      handleClearColumns,
-      handleRemoveColumn,
-      handleSelectAllColumns,
-      handleToggleColumn,
-      hasReachableSource,
-      isCastNode,
-      isFetchingRecommendations,
-      isBinningNode,
-      binning.state.recommendedColumnSet,
-      binning.state.columnPreviewMap,
-      isImputerNode,
-      isScalingNode,
-      binning.state.excludedColumns,
-      previewState.status,
-      recommendations,
-      recommendationsError,
-      relativeGeneratedAt,
-      selectedColumns,
-      selectionCount,
+      activeFilterId,
       setActiveFilterId,
-      setColumnSearch,
-      scaling.state.excludedColumns,
-      showRecommendations,
-      sourceId,
-      refreshRecommendations,
-      normalizedColumnSearch,
-    ]
-  );
-
-  const renderParameterField = useCallback(
-    (parameter: FeatureNodeParameter) => {
-      return (
-        <NodeSettingsParameterField
-          parameter={parameter}
-          nodeId={node.id}
-          configState={configState}
-          handleNumberChange={handleNumberChange}
-          handleBooleanChange={handleBooleanChange}
-          handleTextChange={handleTextChange}
-          thresholdParameterName={thresholdParameterName}
-          normalizedSuggestedThreshold={normalizedSuggestedThreshold}
-          showRecommendations={showRecommendations}
-          canApplySuggestedThreshold={canApplySuggestedThreshold}
-          thresholdMatchesSuggestion={thresholdMatchesSuggestion}
-          handleApplySuggestedThreshold={handleApplySuggestedThreshold}
-          renderMultiSelect={renderMultiSelectField}
-        />
-      );
+      recommendations,
+      filteredRecommendations,
+      error: recommendationsError,
+      relativeGeneratedAt,
+      formatSignalName,
+      refresh: refreshRecommendations,
+      show: showRecommendations,
     },
-    [
-      canApplySuggestedThreshold,
-      configState,
-      handleApplySuggestedThreshold,
-      handleBooleanChange,
+    columnSelectionHandlers: {
+      handleToggleColumn,
+      handleRemoveColumn,
+      handleApplyAllRecommended,
+      handleSelectAllColumns,
+      handleClearColumns,
+    },
+    parameterHandlers: {
       handleNumberChange,
+      handleBooleanChange,
       handleTextChange,
-      node.id,
-      normalizedSuggestedThreshold,
-      renderMultiSelectField,
-      showRecommendations,
-      thresholdMatchesSuggestion,
+    },
+    thresholdRecommendations: {
       thresholdParameterName,
-    ]
-  );
+      normalizedSuggestedThreshold,
+      canApplySuggestedThreshold,
+      thresholdMatchesSuggestion,
+      handleApplySuggestedThreshold,
+    },
+    numericExcludedColumns,
+    selectionCount,
+  });
 
   const handleRemoveDuplicatesKeepChange = useCallback(
     (value: KeepStrategy) => {
@@ -1814,3 +1632,4 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     </div>
   );
 };
+// End of component
