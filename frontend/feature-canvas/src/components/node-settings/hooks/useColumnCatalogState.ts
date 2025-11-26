@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useState, useMemo, type Dispatch, type SetStateAction } from 'react';
 import type { CatalogFlagMap } from './useCatalogFlags';
 
 type UseColumnCatalogStateArgs = {
@@ -22,6 +22,8 @@ type UseColumnCatalogStateResult = {
   setColumnSuggestions: Dispatch<SetStateAction<Record<string, string[]>>>;
   imputerMissingFilter: number;
   setImputerMissingFilter: Dispatch<SetStateAction<number>>;
+  normalizedColumnSearch: string;
+  filteredColumnOptions: string[];
 };
 
 const resetColumnState = (
@@ -75,6 +77,15 @@ export const useColumnCatalogState = ({
     setImputerMissingFilter(0);
   }, [isImputerNode, nodeId]);
 
+  const normalizedColumnSearch = useMemo(() => columnSearch.trim().toLowerCase(), [columnSearch]);
+
+  const filteredColumnOptions = useMemo(() => {
+    if (!normalizedColumnSearch) {
+      return availableColumns;
+    }
+    return availableColumns.filter((column) => column.toLowerCase().includes(normalizedColumnSearch));
+  }, [availableColumns, normalizedColumnSearch]);
+
   return {
     availableColumns,
     setAvailableColumns,
@@ -88,5 +99,7 @@ export const useColumnCatalogState = ({
     setColumnSuggestions,
     imputerMissingFilter,
     setImputerMissingFilter,
+    normalizedColumnSearch,
+    filteredColumnOptions,
   };
 };

@@ -11,6 +11,7 @@ import { useNodeSpecificParameters } from './useNodeSpecificParameters';
 import { useFilteredParameters } from './useFilteredParameters';
 import { useImputationStrategies } from './useImputationStrategies';
 import { useSkewnessState } from './useSkewnessState';
+import { useNodeCatalog } from './useNodeCatalog';
 import { DATA_CONSISTENCY_GUIDANCE } from '../utils/guidance';
 
 type UseNodeSettingsStateArgs = {
@@ -26,8 +27,6 @@ export const useNodeSettingsState = ({
   isResetAvailable,
   defaultConfigTemplate,
 }: UseNodeSettingsStateArgs) => {
-  const { metadata, title } = useNodeMetadata(node);
-
   const connectionReadiness = useConnectionReadiness(node, graphSnapshot);
 
   const catalogFlags = useCatalogFlags(node);
@@ -44,12 +43,20 @@ export const useNodeSettingsState = ({
   const datasetBadge = isDataset;
   const isClassResamplingNode = isClassUndersamplingNode || isClassOversamplingNode;
 
+  const { catalogEntryMap } = useNodeCatalog();
+  const catalogEntry = useMemo(
+    () => (catalogType ? catalogEntryMap.get(catalogType) : null),
+    [catalogType, catalogEntryMap],
+  );
+
+  const { metadata, title } = useNodeMetadata(node, catalogEntry);
+
   const {
     parameters,
     getParameter,
     requiresColumnCatalog,
     dropColumnParameter,
-  } = useNodeParameters(node);
+  } = useNodeParameters(node, catalogEntry);
 
   const dataConsistencyHint = useMemo(
     () => DATA_CONSISTENCY_GUIDANCE[catalogType] ?? null,
@@ -104,5 +111,6 @@ export const useNodeSettingsState = ({
     parameterHandlers,
     imputationStrategiesResult,
     skewnessStateResult,
+    catalogEntry,
   };
 };

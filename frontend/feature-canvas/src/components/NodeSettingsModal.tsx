@@ -1,85 +1,42 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Node } from 'react-flow-renderer';
-import {
-  FeatureNodeParameter,
-  OutlierMethodName,
-  OutlierNodeSignal,
-  TransformerAuditNodeSignal,
-  PipelinePreviewSchema,
-  SkewnessColumnDistribution,
-} from '../api';
-import {
-  DropMissingColumnsSection,
-} from './node-settings/nodes/drop_col_rows/DropMissingColumnsSection';
+import { DropMissingSettingsSection } from './node-settings/nodes/drop_col_rows/DropMissingSettingsSection';
 
 import { DropMissingRowsSection } from './node-settings/nodes/drop_col_rows/DropMissingRowsSection';
 import { RemoveDuplicatesSection } from './node-settings/nodes/remove_duplicates/RemoveDuplicatesSection';
-import { DEFAULT_KEEP_STRATEGY, type KeepStrategy } from './node-settings/nodes/remove_duplicates/removeDuplicatesSettings';
+
 import { CastColumnTypesSection } from './node-settings/nodes/cast_column/CastColumnTypesSection';
 import { DataSnapshotSection } from './node-settings/nodes/dataset/DataSnapshotSection';
 import { DatasetProfileSection } from './node-settings/nodes/dataset/datasetProfile';
 import { NodeSettingsHeader } from './node-settings/layout/NodeSettingsHeader';
 import { NodeSettingsFooter } from './node-settings/layout/NodeSettingsFooter';
+import { NodeDetailsSection } from './node-settings/layout/NodeDetailsSection';
 import { ensureArrayOfString } from './node-settings/sharedUtils';
 import {
   formatMetricValue,
   formatMissingPercentage,
   formatNumericStat,
   formatModeStat,
-  getPriorityClass,
-  getPriorityLabel,
 } from './node-settings/formatting';
-import {
-  BINNED_SAMPLE_PRESETS,
-  type BinnedDistributionBin,
-  type BinnedDistributionCard,
-  type BinnedSamplePresetValue,
-  type BinningLabelFormat,
-  type BinningMissingStrategy,
-  type BinningStrategy,
-  type KBinsEncode,
-  type KBinsStrategy,
-} from './node-settings/nodes/binning/binningSettings';
 import { BinNumericColumnsSection } from './node-settings/nodes/binning/BinNumericColumnsSection';
 import { BinningInsightsSection } from './node-settings/nodes/binning/BinningInsightsSection';
 import { BinnedDistributionSection } from './node-settings/nodes/binning/BinnedDistributionSection';
 
 import { ImputationStrategiesSection } from './node-settings/nodes/imputation/ImputationStrategiesSection';
-import { SCALING_METHOD_ORDER } from './node-settings/nodes/scaling/scalingSettings';
 import { ScalingInsightsSection } from './node-settings/nodes/scaling/ScalingInsightsSection';
 import { SkewnessInsightsSection } from './node-settings/nodes/skewness/SkewnessInsightsSection';
 
 import { SkewnessDistributionSection } from './node-settings/nodes/skewness/SkewnessDistributionSection';
-import {
-  resolveMissingIndicatorSuffix,
-  buildMissingIndicatorInsights,
-  type MissingIndicatorInsights,
-} from './node-settings/nodes/missing_indicator/missingIndicatorSettings';
 import { MissingIndicatorInsightsSection } from './node-settings/nodes/missing_indicator/MissingIndicatorInsightsSection';
+import { MissingIndicatorSettingsSection } from './node-settings/nodes/missing_indicator/MissingIndicatorSettingsSection';
 import { ReplaceAliasesSection } from './node-settings/nodes/replace_aliases/ReplaceAliasesSection';
-import {
-  ALIAS_MODE_OPTIONS,
-  DEFAULT_ALIAS_MODE,
-  type AliasMode,
-  type AliasStrategyConfig,
-} from './node-settings/nodes/replace_aliases/replaceAliasesSettings';
 import { StandardizeDatesSection } from './node-settings/nodes/standardize_date/StandardizeDatesSection';
-import {
-  DATE_MODE_OPTIONS,
-  type DateMode,
-  type DateFormatStrategyConfig,
-} from './node-settings/nodes/standardize_date/standardizeDateSettings';
 import { TrimWhitespaceSection } from './node-settings/nodes/trim_white_space/TrimWhitespaceSection';
 import { RemoveSpecialCharactersSection } from './node-settings/nodes/remove_special_char/RemoveSpecialCharactersSection';
 import { NormalizeTextCaseSection } from './node-settings/nodes/normalize_text/NormalizeTextCaseSection';
 import { RegexCleanupSection } from './node-settings/nodes/regex_node/RegexCleanupSection';
 import { ReplaceInvalidValuesSection } from './node-settings/nodes/replace_invalid_values/ReplaceInvalidValuesSection';
 import { FeatureMathSection } from './node-settings/nodes/feature_math/FeatureMathSection';
-import {
-  buildFeatureMathSummaries,
-  FeatureMathOperationDraft,
-  normalizeFeatureMathOperations,
-} from './node-settings/nodes/feature_math/featureMathSettings';
 import { LabelEncodingSection } from './node-settings/nodes/label_encoding/LabelEncodingSection';
 import { TargetEncodingSection } from './node-settings/nodes/target_encoding/TargetEncodingSection';
 import { HashEncodingSection } from './node-settings/nodes/hash_encoding/HashEncodingSection';
@@ -89,6 +46,7 @@ import { OrdinalEncodingSection } from './node-settings/nodes/ordinal_encoding/O
 import { DummyEncodingSection } from './node-settings/nodes/dummy_encoding/DummyEncodingSection';
 import { OneHotEncodingSection } from './node-settings/nodes/one_hot_encoding/OneHotEncodingSection';
 import { TransformerAuditSection } from './node-settings/nodes/transformer_audit/TransformerAuditSection';
+import { DataConsistencySettingsSection } from './node-settings/nodes/data_consistency/DataConsistencySettingsSection';
 import { FeatureTargetSplitSection } from './node-settings/nodes/modeling/FeatureTargetSplitSection';
 import { TrainTestSplitSection } from './node-settings/nodes/modeling/TrainTestSplitSection';
 import { TrainModelDraftSection } from './node-settings/nodes/modeling/TrainModelDraftSection';
@@ -99,20 +57,9 @@ import { HyperparameterTuningSection } from './node-settings/nodes/modeling/Hype
 import { ClassResamplingSection } from './node-settings/nodes/resampling/ClassResamplingSection';
 import { useCatalogFlags } from './node-settings/hooks/useCatalogFlags';
 import { useBinnedDistributionCards } from './node-settings/hooks/useBinnedDistributionCards';
-import {
-  type SkewnessDistributionView,
-} from './node-settings/hooks/useSkewnessConfiguration';
-import {
-  arraysAreEqual,
-  normalizeConfigBoolean,
-  pickAutoDetectValue,
-} from './node-settings/utils/configParsers';
-import { formatCellValue, formatColumnType, formatRelativeTime } from './node-settings/utils/formatters';
-import { DATA_CONSISTENCY_GUIDANCE } from './node-settings/utils/guidance';
-import { HistogramSparkline } from './node-settings/utils/HistogramSparkline';
+import { formatCellValue, formatRelativeTime } from './node-settings/utils/formatters';
 
 import { OutlierInsightsSection } from './node-settings/nodes/outlier/OutlierInsightsSection';
-import { OUTLIER_METHOD_ORDER } from './node-settings/nodes/outlier/outlierSettings';
 import { ConnectionRequirementsSection } from './node-settings/layout/ConnectionRequirementsSection';
 import { useDatasetProfiling } from './node-settings/hooks/useDatasetProfiling';
 
@@ -126,6 +73,12 @@ import { useNodeSettingsHandlers } from './node-settings/hooks/useNodeSettingsHa
 import { useNodeSettingsSummaries } from './node-settings/hooks/useNodeSettingsSummaries';
 import { useNodeSettingsData } from './node-settings/hooks/useNodeSettingsData';
 import { useNodeSettingsState } from './node-settings/hooks/useNodeSettingsState';
+import {
+  type BinnedSamplePresetValue,
+} from './node-settings/nodes/binning/binningSettings';
+import {
+  DATE_MODE_OPTIONS,
+} from './node-settings/nodes/standardize_date/standardizeDateSettings';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -334,6 +287,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     setColumnSuggestions,
     imputerMissingFilter,
     setImputerMissingFilter,
+    normalizedColumnSearch,
+    filteredColumnOptions,
   } = columnCatalogState;
 
   const hasDropColumnParameter = Boolean(dropColumnParameter);
@@ -418,6 +373,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     dataCleaningState,
     numericColumnAnalysis,
     numericAnalysisState,
+    removeDuplicatesState,
   } = useNodeSettingsInsights({
     catalogFlags,
     sourceId,
@@ -568,23 +524,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     setColumnMissingMap,
   });
 
-  const removeDuplicatesKeepSelectId = `${nodeId || 'node'}-remove-duplicates-keep`;
 
-  const removeDuplicatesKeep = useMemo<KeepStrategy>(() => {
-    const raw = typeof configState?.keep === 'string' ? configState.keep.trim().toLowerCase() : '';
-    if (raw === 'last' || raw === 'none') {
-      return raw;
-    }
-    return DEFAULT_KEEP_STRATEGY;
-  }, [configState?.keep]);
-  const normalizedColumnSearch = useMemo(() => columnSearch.trim().toLowerCase(), [columnSearch]);
-
-  const filteredColumnOptions = useMemo(() => {
-    if (!normalizedColumnSearch) {
-      return availableColumns;
-    }
-    return availableColumns.filter((column) => column.toLowerCase().includes(normalizedColumnSearch));
-  }, [availableColumns, normalizedColumnSearch]);
 
 
 
@@ -835,15 +775,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     selectionCount,
   });
 
-  const handleRemoveDuplicatesKeepChange = useCallback(
-    (value: KeepStrategy) => {
-      setConfigState((previous) => ({
-        ...previous,
-        keep: value,
-      }));
-    },
-    [setConfigState],
-  );
+
 
   return (
     <div className="canvas-modal" role="dialog" aria-modal="true" aria-labelledby="node-settings-title">
@@ -874,13 +806,12 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             />
           )}
           {dropColumnParameter && (
-            <section className="canvas-modal__section">
-              <div className="canvas-modal__section-header">
-                <h3>Missingness recommendations</h3>
-              </div>
-              {nodeParams.dropMissing.threshold && renderParameterField(nodeParams.dropMissing.threshold)}
-              {renderMultiSelectField(dropColumnParameter)}
-            </section>
+            <DropMissingSettingsSection
+              thresholdParameter={nodeParams.dropMissing.threshold ?? null}
+              dropColumnParameter={dropColumnParameter}
+              renderParameterField={renderParameterField}
+              renderMultiSelectField={renderMultiSelectField}
+            />
           )}
           {isMissingIndicatorNode && (
             <>
@@ -889,17 +820,11 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                 insights={missingIndicatorInsights}
                 formatMissingPercentage={formatMissingPercentage}
               />
-              {(nodeParams.missingIndicator.columns || nodeParams.missingIndicator.suffix) && (
-                <section className="canvas-modal__section">
-                  <div className="canvas-modal__section-header">
-                    <h3>Missing indicator settings</h3>
-                  </div>
-                  <div className="canvas-modal__parameter-list">
-                    {nodeParams.missingIndicator.columns ? renderParameterField(nodeParams.missingIndicator.columns) : null}
-                    {nodeParams.missingIndicator.suffix ? renderParameterField(nodeParams.missingIndicator.suffix) : null}
-                  </div>
-                </section>
-              )}
+              <MissingIndicatorSettingsSection
+                columnsParameter={nodeParams.missingIndicator.columns}
+                suffixParameter={nodeParams.missingIndicator.suffix}
+                renderParameterField={renderParameterField}
+              />
             </>
           )}
           {isPreviewNode && (
@@ -1576,20 +1501,16 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               removeDuplicatesColumnsParameter={nodeParams.removeDuplicates.columns}
               removeDuplicatesKeepParameter={nodeParams.removeDuplicates.keep}
               renderMultiSelectField={renderMultiSelectField}
-              removeDuplicatesKeepSelectId={removeDuplicatesKeepSelectId}
-              removeDuplicatesKeep={removeDuplicatesKeep}
-              onKeepChange={handleRemoveDuplicatesKeepChange}
+              removeDuplicatesKeepSelectId={removeDuplicatesState.removeDuplicatesKeepSelectId}
+              removeDuplicatesKeep={removeDuplicatesState.removeDuplicatesKeep}
+              onKeepChange={removeDuplicatesState.handleRemoveDuplicatesKeepChange}
             />
           )}
-          {isDataConsistencyNode && dataConsistencyParameters.length > 0 && (
-            <section className="canvas-modal__section">
-              <div className="canvas-modal__section-header">
-                <h3>Data consistency settings</h3>
-              </div>
-              <div className="canvas-modal__parameter-list">
-                {dataConsistencyParameters.map((parameter) => renderParameterField(parameter))}
-              </div>
-            </section>
+          {isDataConsistencyNode && (
+            <DataConsistencySettingsSection
+              parameters={dataConsistencyParameters}
+              renderParameterField={renderParameterField}
+            />
           )}
           {isTransformerAuditNode && (
             <TransformerAuditSection
@@ -1600,21 +1521,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               onRefreshPreview={handleRefreshPreview}
             />
           )}
-          <section className="canvas-modal__section">
-            <h3>Node details</h3>
-            {metadata.length ? (
-              <dl className="canvas-modal__metadata">
-                {metadata.map((entry, index) => (
-                  <div key={`${entry.label}-${index}`} className="canvas-modal__metadata-row">
-                    <dt>{entry.label}</dt>
-                    <dd>{entry.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : (
-              <p className="canvas-modal__empty">No metadata available for this node.</p>
-            )}
-          </section>
+          <NodeDetailsSection metadata={metadata} />
 
         </div>
 

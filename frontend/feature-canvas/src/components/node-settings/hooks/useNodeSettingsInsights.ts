@@ -10,6 +10,7 @@ import { useMissingIndicatorState } from './useMissingIndicatorState';
 import { useDataCleaningState } from './useDataCleaningState';
 import { useNumericColumnAnalysis } from './useNumericColumnAnalysis';
 import { useNumericAnalysisState } from './useNumericAnalysisState';
+import { useRemoveDuplicatesState } from './useRemoveDuplicatesState';
 import type { CatalogFlagMap } from './useCatalogFlags';
 
 type UseNodeSettingsInsightsArgs = {
@@ -174,6 +175,13 @@ export const useNodeSettingsInsights = ({
     previewSampleRows,
   });
 
+  const removeDuplicatesState = useRemoveDuplicatesState({
+    node,
+    nodeId,
+    configState,
+    setConfigState,
+  });
+
   return {
     dropMissingColumns,
     encodingRecommendations,
@@ -186,5 +194,6 @@ export const useNodeSettingsInsights = ({
     dataCleaningState,
     numericColumnAnalysis,
     numericAnalysisState,
+    removeDuplicatesState,
   };
 };
