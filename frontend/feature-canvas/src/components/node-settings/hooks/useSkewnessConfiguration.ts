@@ -56,28 +56,32 @@ export type UseSkewnessConfigurationArgs = {
 };
 
 export type UseSkewnessConfigurationResult = {
-  skewnessThreshold: number | null;
-  skewnessViewMode: SkewnessViewMode;
-  setSkewnessViewMode: Dispatch<SetStateAction<SkewnessViewMode>>;
-  skewnessGroupByMethod: boolean;
-  setSkewnessGroupByMethod: Dispatch<SetStateAction<boolean>>;
-  skewnessDistributionView: SkewnessDistributionView;
-  setSkewnessDistributionView: Dispatch<SetStateAction<SkewnessDistributionView>>;
-  skewnessRecommendedCount: number;
-  skewnessNumericCount: number;
-  skewnessTransformationsCount: number;
-  hasSkewnessAutoRecommendations: boolean;
-  skewnessRows: SkewnessTableRow[];
-  skewnessTableGroups: SkewnessTableGroup[];
-  skewnessDistributionCards: SkewnessDistributionCard[];
-  getSkewnessMethodLabel: (method: SkewnessTransformationMethod) => string;
-  getSkewnessMethodStatus: (
-    column: string,
-    method: SkewnessTransformationMethod,
-  ) => SkewnessMethodStatus | { status: 'ready'; reason?: string };
-  applySkewnessRecommendations: () => void;
-  handleSkewnessOverrideChange: (column: string, nextValue: string) => void;
-  clearSkewnessTransformations: () => void;
+  state: {
+    threshold: number | null;
+    viewMode: SkewnessViewMode;
+    groupByMethod: boolean;
+    distributionView: SkewnessDistributionView;
+    recommendedCount: number;
+    numericCount: number;
+    transformationsCount: number;
+    hasAutoRecommendations: boolean;
+    rows: SkewnessTableRow[];
+    tableGroups: SkewnessTableGroup[];
+    distributionCards: SkewnessDistributionCard[];
+  };
+  handlers: {
+    setViewMode: Dispatch<SetStateAction<SkewnessViewMode>>;
+    setGroupByMethod: Dispatch<SetStateAction<boolean>>;
+    setDistributionView: Dispatch<SetStateAction<SkewnessDistributionView>>;
+    getMethodLabel: (method: SkewnessTransformationMethod) => string;
+    getMethodStatus: (
+      column: string,
+      method: SkewnessTransformationMethod,
+    ) => SkewnessMethodStatus | { status: 'ready'; reason?: string };
+    applyRecommendations: () => void;
+    handleOverrideChange: (column: string, nextValue: string) => void;
+    clearTransformations: () => void;
+  };
 };
 
 export const useSkewnessConfiguration = ({
@@ -379,24 +383,28 @@ export const useSkewnessConfiguration = ({
   );
 
   return {
-    skewnessThreshold,
-    skewnessViewMode,
-    setSkewnessViewMode,
-    skewnessGroupByMethod,
-    setSkewnessGroupByMethod,
-    skewnessDistributionView,
-    setSkewnessDistributionView,
-    skewnessRecommendedCount,
-    skewnessNumericCount,
-    skewnessTransformationsCount,
-    hasSkewnessAutoRecommendations,
-    skewnessRows,
-    skewnessTableGroups,
-    skewnessDistributionCards,
-    getSkewnessMethodLabel,
-    getSkewnessMethodStatus,
-    applySkewnessRecommendations,
-    handleSkewnessOverrideChange,
-    clearSkewnessTransformations,
+    state: {
+      threshold: skewnessThreshold,
+      viewMode: skewnessViewMode,
+      groupByMethod: skewnessGroupByMethod,
+      distributionView: skewnessDistributionView,
+      recommendedCount: skewnessRecommendedCount,
+      numericCount: skewnessNumericCount,
+      transformationsCount: skewnessTransformationsCount,
+      hasAutoRecommendations: hasSkewnessAutoRecommendations,
+      rows: skewnessRows,
+      tableGroups: skewnessTableGroups,
+      distributionCards: skewnessDistributionCards,
+    },
+    handlers: {
+      setViewMode: setSkewnessViewMode,
+      setGroupByMethod: setSkewnessGroupByMethod,
+      setDistributionView: setSkewnessDistributionView,
+      getMethodLabel: getSkewnessMethodLabel,
+      getMethodStatus: getSkewnessMethodStatus,
+      applyRecommendations: applySkewnessRecommendations,
+      handleOverrideChange: handleSkewnessOverrideChange,
+      clearTransformations: clearSkewnessTransformations,
+    },
   };
 };

@@ -322,126 +322,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isSkewnessDistributionNode,
   });
 
-  const {
-    binningColumnsParameter,
-    scalingColumnsParameter,
-    removeDuplicatesColumnsParameter,
-    removeDuplicatesKeepParameter,
-    replaceAliasesCustomPairsParameter,
-    trimWhitespaceColumnsParameter,
-    trimWhitespaceModeParameter,
-    removeSpecialColumnsParameter,
-    removeSpecialModeParameter,
-    removeSpecialReplacementParameter,
-    replaceInvalidColumnsParameter,
-    replaceInvalidModeParameter,
-    replaceInvalidMinValueParameter,
-    replaceInvalidMaxValueParameter,
-    regexCleanupColumnsParameter,
-    regexCleanupModeParameter,
-    regexCleanupPatternParameter,
-    regexCleanupReplacementParameter,
-    normalizeCaseColumnsParameter,
-    normalizeCaseModeParameter,
-    labelEncodingColumnsParameter,
-    labelEncodingAutoDetectParameter,
-    labelEncodingMaxUniqueParameter,
-    labelEncodingOutputSuffixParameter,
-    labelEncodingDropOriginalParameter,
-    labelEncodingMissingStrategyParameter,
-    labelEncodingMissingCodeParameter,
-    hashEncodingColumnsParameter,
-    hashEncodingAutoDetectParameter,
-    hashEncodingMaxCategoriesParameter,
-    hashEncodingBucketsParameter,
-    hashEncodingOutputSuffixParameter,
-    hashEncodingDropOriginalParameter,
-    hashEncodingEncodeMissingParameter,
-    polynomialColumnsParameter,
-    polynomialAutoDetectParameter,
-    polynomialDegreeParameter,
-    polynomialIncludeBiasParameter,
-    polynomialInteractionOnlyParameter,
-    polynomialIncludeInputFeaturesParameter,
-    polynomialOutputPrefixParameter,
-    featureSelectionColumnsParameter,
-    featureSelectionAutoDetectParameter,
-    featureSelectionTargetColumnParameter,
-    featureSelectionMethodParameter,
-    featureSelectionScoreFuncParameter,
-    featureSelectionProblemTypeParameter,
-    featureSelectionKParameter,
-    featureSelectionPercentileParameter,
-    featureSelectionAlphaParameter,
-    featureSelectionThresholdParameter,
-    featureSelectionModeParameter,
-    featureSelectionEstimatorParameter,
-    featureSelectionStepParameter,
-    featureSelectionMinFeaturesParameter,
-    featureSelectionMaxFeaturesParameter,
-    featureSelectionDropUnselectedParameter,
-    featureMathErrorHandlingParameter,
-    featureMathAllowOverwriteParameter,
-    featureMathDefaultTimezoneParameter,
-    featureMathEpsilonParameter,
-    resamplingMethodParameter,
-    resamplingTargetColumnParameter,
-    resamplingSamplingStrategyParameter,
-    resamplingRandomStateParameter,
-    resamplingKNeighborsParameter,
-    resamplingReplacementParameter,
-    featureTargetSplitTargetColumnParameter,
-    trainModelTargetColumnParameter,
-    trainModelProblemTypeParameter,
-    trainModelModelTypeParameter,
-    trainModelHyperparametersParameter,
-    hyperparameterTuningSearchStrategyParameter,
-    hyperparameterTuningSearchIterationsParameter,
-    hyperparameterTuningSearchRandomStateParameter,
-    hyperparameterTuningScoringMetricParameter,
-    trainModelCvEnabledParameter,
-    trainModelCvStrategyParameter,
-    trainModelCvFoldsParameter,
-    trainModelCvShuffleParameter,
-    trainModelCvRandomStateParameter,
-    trainModelCvRefitStrategyParameter,
-    targetEncodingColumnsParameter,
-    targetEncodingTargetColumnParameter,
-    targetEncodingAutoDetectParameter,
-    targetEncodingMaxCategoriesParameter,
-    targetEncodingOutputSuffixParameter,
-    targetEncodingDropOriginalParameter,
-    targetEncodingSmoothingParameter,
-    targetEncodingEncodeMissingParameter,
-    targetEncodingHandleUnknownParameter,
-    ordinalEncodingColumnsParameter,
-    ordinalEncodingAutoDetectParameter,
-    ordinalEncodingMaxCategoriesParameter,
-    ordinalEncodingOutputSuffixParameter,
-    ordinalEncodingDropOriginalParameter,
-    ordinalEncodingEncodeMissingParameter,
-    ordinalEncodingHandleUnknownParameter,
-    ordinalEncodingUnknownValueParameter,
-    dummyEncodingColumnsParameter,
-    dummyEncodingAutoDetectParameter,
-    dummyEncodingMaxCategoriesParameter,
-    dummyEncodingDropFirstParameter,
-    dummyEncodingIncludeMissingParameter,
-    dummyEncodingDropOriginalParameter,
-    dummyEncodingPrefixSeparatorParameter,
-    oneHotEncodingColumnsParameter,
-    oneHotEncodingAutoDetectParameter,
-    oneHotEncodingMaxCategoriesParameter,
-    oneHotEncodingDropFirstParameter,
-    oneHotEncodingIncludeMissingParameter,
-    oneHotEncodingDropOriginalParameter,
-    oneHotEncodingPrefixSeparatorParameter,
-    missingIndicatorColumnsParameter,
-    missingIndicatorSuffixParameter,
-    scalingDefaultMethodParameter,
-    scalingAutoDetectParameter,
-    dropRowsAnyParameter,
-  } = useNodeSpecificParameters(getParameter, catalogFlags);
+  const nodeParams = useNodeSpecificParameters(getParameter, catalogFlags);
   const filteredParameters = useFilteredParameters(parameters, {
     isBinningNode,
     isCastNode,
@@ -543,7 +424,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isClassUndersamplingNode,
     upstreamTargetColumn,
     nodeId,
-    modelTypeOptions: trainModelModelTypeParameter?.options ?? null,
+    modelTypeOptions: nodeParams.trainModel.modelType?.options ?? null,
   });
 
   const upstreamConfigFingerprints = useMemo(() => {
@@ -854,43 +735,13 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   const nodeColumns = useMemo(() => ensureArrayOfString(node?.data?.columns), [node?.data?.columns]);
 
   const {
-    aliasAutoDetectMeta,
-    aliasStrategies,
-    aliasStrategyCount,
-    aliasSelectedColumns,
-    aliasAutoDetectEnabled,
-    replaceAliasesCustomPairsValue,
-    aliasColumnSummary,
-    aliasCustomPairSummary,
-    aliasSampleMap,
-    aliasColumnOptions,
-    trimWhitespaceColumnSummary,
-    trimWhitespaceSampleMap,
-    trimWhitespaceModeDetails,
-    removeSpecialColumnSummary,
-    removeSpecialSampleMap,
-    removeSpecialModeDetails,
-    removeSpecialMode,
-    regexCleanupColumnSummary,
-    regexCleanupSampleMap,
-    regexCleanupModeDetails,
-    regexCleanupMode,
-    regexCleanupReplacementValue,
-    normalizeCaseColumnSummary,
-    normalizeCaseSampleMap,
-    normalizeCaseModeDetails,
-    normalizeCaseMode,
-    replaceInvalidMode,
-    replaceInvalidModeDetails,
-    replaceInvalidSampleMap,
-    replaceInvalidColumnSummary,
-    replaceInvalidMinValue,
-    replaceInvalidMaxValue,
-    standardizeDatesMode,
-    dateStrategies,
-    standardizeDatesSampleMap,
-    standardizeDatesColumnSummary,
-    dateColumnOptions,
+    alias,
+    trimWhitespace,
+    removeSpecial,
+    regexCleanup,
+    normalizeCase,
+    replaceInvalid,
+    standardizeDates,
   } = useDataCleaningState({
     isReplaceAliasesNode,
     isTrimWhitespaceNode,
@@ -915,99 +766,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   });
   
   const {
-    scalingConfig,
-    scalingExcludedColumns,
-    scalingMethodDetailMap,
-    scalingMethodOptions,
-    scalingRecommendations,
-    scalingRecommendationRows,
-    scalingSelectedCount,
-    scalingOverrideCount,
-    scalingDefaultDetail,
-    scalingDefaultLabel,
-    scalingAutoDetectEnabled,
-    scalingHasRecommendations,
-    scalingStatusMessage,
-    scalingOverrideExampleSummary,
-    outlierConfig,
-    outlierExcludedColumns,
-    outlierMethodLabelMap,
-    outlierMethodDetailMap,
-    outlierMethodOptions,
-    outlierRecommendations,
-    outlierRecommendationRows,
-    outlierSelectedCount,
-    outlierOverrideCount,
-    outlierParameterOverrideCount,
-    outlierDefaultDetail,
-    outlierDefaultLabel,
-    outlierAutoDetectEnabled,
-    outlierHasRecommendations,
-    outlierStatusMessage,
-    outlierOverrideExampleSummary,
-    outlierSampleSize,
-    relativeOutlierGeneratedAt,
-    outlierHasOverrides,
-    outlierOverrideSummaryDisplay,
-    binningConfig,
-    binningSelectedCount,
-    binningDefaultLabel,
-    binningOverrideColumns,
-    binningOverrideCount,
-    binningOverrideSummary,
-    binningFieldIds,
-    binningCustomEdgeDrafts,
-    setBinningCustomEdgeDrafts,
-    binningCustomLabelDrafts,
-    setBinningCustomLabelDrafts,
+    scaling,
+    outlier,
+    binning,
     selectedColumns,
-    binningInsightsRecommendations,
-    binningRecommendedColumnSet,
-    binningAllNumericColumns,
-    binningNumericColumnsNotSelected,
-    canApplyAllBinningNumeric,
-    binningExcludedColumns,
-    binningColumnPreviewMap,
-    manualBoundColumns,
-    manualRangeFallbackMap,
-    binningInsightsExcludedColumns,
-    handleScalingDefaultMethodChange,
-    handleScalingAutoDetectToggle,
-    setScalingColumnMethod,
-    handleScalingClearOverrides,
-    handleScalingApplyAllRecommendations,
-    handleScalingSkipColumn,
-    handleScalingUnskipColumn,
-    handleScalingOverrideSelect,
-    handleOutlierDefaultMethodChange,
-    handleOutlierAutoDetectToggle,
-    setOutlierColumnMethod,
-    handleOutlierClearOverrides,
-    handleOutlierApplyAllRecommendations,
-    handleOutlierSkipColumn,
-    handleOutlierUnskipColumn,
-    handleOutlierOverrideSelect,
-    handleOutlierMethodParameterChange,
-    handleOutlierColumnParameterChange,
-    handleBinningIntegerChange,
-    handleBinningBooleanToggle,
-    handleBinningSuffixChange,
-    handleBinningLabelFormatChange,
-    handleBinningMissingStrategyChange,
-    handleBinningMissingLabelChange,
-    handleBinningCustomBinsChange,
-    handleBinningCustomLabelsChange,
-    handleBinningClearCustomColumn,
-    updateBinningColumnOverride,
-    handleBinningOverrideStrategyChange,
-    handleBinningOverrideNumberChange,
-    handleBinningOverrideKbinsEncodeChange,
-    handleBinningOverrideKbinsStrategyChange,
-    handleBinningClearOverride,
-    handleBinningClearOverrides,
-    handleBinningApplyStrategies,
-    handleBinningApplyColumns,
-    handleApplyAllBinningNumeric,
   } = useNumericAnalysisState({
     isScalingNode,
     isOutlierNode,
@@ -1076,27 +838,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     []
   );
 
-  const {
-    skewnessThreshold,
-    skewnessViewMode,
-    setSkewnessViewMode,
-    skewnessGroupByMethod,
-    setSkewnessGroupByMethod,
-    skewnessDistributionView,
-    setSkewnessDistributionView,
-    skewnessRecommendedCount,
-    skewnessNumericCount,
-    skewnessTransformationsCount,
-    hasSkewnessAutoRecommendations,
-    skewnessRows,
-    skewnessTableGroups,
-    skewnessDistributionCards,
-    getSkewnessMethodLabel,
-    getSkewnessMethodStatus,
-    applySkewnessRecommendations: handleApplySkewnessRecommendations,
-    handleSkewnessOverrideChange,
-    clearSkewnessTransformations,
-  } = useSkewnessConfiguration({
+  const skewness = useSkewnessConfiguration({
     skewnessData,
     shouldLoadInsights: shouldLoadSkewnessInsights,
     skewnessTransformations,
@@ -1138,7 +880,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   });
 
   const showDropMissingRowsSection =
-    isDropMissingRowsNode && Boolean(thresholdParameter || dropRowsAnyParameter);
+    isDropMissingRowsNode && Boolean(thresholdParameter || nodeParams.dropRows.any);
 
   const {
     handleManualBoundChange,
@@ -1152,8 +894,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isBinningNode,
     isScalingNode,
     setConfigState,
-    binningExcludedColumns,
-    scalingExcludedColumns,
+    binningExcludedColumns: binning.state.excludedColumns,
+    scalingExcludedColumns: scaling.state.excludedColumns,
     availableColumns,
     recommendations,
   });
@@ -1181,14 +923,17 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     relativeScalingGeneratedAt,
     relativeBinningGeneratedAt,
     relativeBinnedGeneratedAt,
+    relativeOutlierGeneratedAt,
     scalingSampleSize,
     binningSampleSize,
     binnedSampleSize,
+    outlierSampleSize,
   } = useInsightSummaries({
     recommendationsGeneratedAt,
     scalingData,
     binningData,
     binnedDistributionData,
+    outlierData,
   });
   const showRecommendations = hasDropColumnSource && Boolean(sourceId) && hasReachableSource;
   const showSaveButton = !datasetBadge && !isInspectionNode;
@@ -1239,8 +984,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     node,
     setConfigState,
     setCollapsedStrategies,
-    aliasColumnSummary,
-    aliasStrategyCount,
+    aliasColumnSummary: alias.columnSummary,
+    aliasStrategyCount: alias.strategyCount,
   });
 
   const {
@@ -1257,9 +1002,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     node,
     setConfigState,
     setCollapsedStrategies,
-    dateStrategies,
-    standardizeDatesColumnSummary,
-    standardizeDatesMode,
+    dateStrategies: standardizeDates.strategies,
+    standardizeDatesColumnSummary: standardizeDates.columnSummary,
+    standardizeDatesMode: standardizeDates.mode,
   });
 
   const {
@@ -1300,14 +1045,14 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
           previewStateStatus={previewState.status}
           isBinningNode={isBinningNode}
           isScalingNode={isScalingNode}
-          binningAllNumericColumns={binningAllNumericColumns}
-          binningRecommendedColumnSet={binningRecommendedColumnSet}
+          binningAllNumericColumns={binning.state.allNumericColumns}
+          binningRecommendedColumnSet={binning.state.recommendedColumnSet}
           selectedColumns={selectedColumns}
           availableColumns={availableColumns}
-          scalingExcludedColumns={scalingExcludedColumns}
+          scalingExcludedColumns={scaling.state.excludedColumns}
           normalizedColumnSearch={normalizedColumnSearch}
           filteredColumnOptions={filteredColumnOptions}
-          binningExcludedColumns={binningExcludedColumns}
+          binningExcludedColumns={binning.state.excludedColumns}
           selectionCount={selectionCount}
           isCastNode={isCastNode}
           columnSuggestions={columnSuggestions}
@@ -1326,14 +1071,14 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
           handleToggleColumn={handleToggleColumn}
           handleRemoveColumn={handleRemoveColumn}
           handleApplyAllRecommended={handleApplyAllRecommended}
-          handleBinningApplyColumns={handleBinningApplyColumns}
+          handleBinningApplyColumns={binning.handlers.handleApplyColumns}
           handleSelectAllColumns={handleSelectAllColumns}
           handleClearColumns={handleClearColumns}
           columnSearch={columnSearch}
           setColumnSearch={setColumnSearch}
           columnMissingMap={columnMissingMap}
           columnTypeMap={columnTypeMap}
-          binningColumnPreviewMap={binningColumnPreviewMap}
+          binningColumnPreviewMap={binning.state.columnPreviewMap}
           isImputerNode={isImputerNode}
           showRecommendations={showRecommendations}
         />
@@ -1347,13 +1092,13 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
       columnSearch,
       columnSuggestions,
       columnTypeMap,
-      binningAllNumericColumns,
+      binning.state.allNumericColumns,
       numericExcludedColumns,
       filteredColumnOptions,
       filteredRecommendations,
       formatSignalName,
       handleApplyAllRecommended,
-      handleBinningApplyColumns,
+      binning.handlers.handleApplyColumns,
       handleClearColumns,
       handleRemoveColumn,
       handleSelectAllColumns,
@@ -1362,11 +1107,11 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
       isCastNode,
       isFetchingRecommendations,
       isBinningNode,
-      binningRecommendedColumnSet,
-      binningColumnPreviewMap,
+      binning.state.recommendedColumnSet,
+      binning.state.columnPreviewMap,
       isImputerNode,
       isScalingNode,
-      binningExcludedColumns,
+      binning.state.excludedColumns,
       previewState.status,
       recommendations,
       recommendationsError,
@@ -1375,7 +1120,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
       selectionCount,
       setActiveFilterId,
       setColumnSearch,
-      scalingExcludedColumns,
+      scaling.state.excludedColumns,
       showRecommendations,
       sourceId,
       refreshRecommendations,
@@ -1453,7 +1198,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
           {showDropMissingRowsSection && (
             <DropMissingRowsSection
               thresholdParameter={thresholdParameter ?? null}
-              dropIfAnyParameter={dropRowsAnyParameter}
+              dropIfAnyParameter={nodeParams.dropRows.any}
               renderParameterField={renderParameterField}
             />
           )}
@@ -1473,14 +1218,14 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                 insights={missingIndicatorInsights}
                 formatMissingPercentage={formatMissingPercentage}
               />
-              {(missingIndicatorColumnsParameter || missingIndicatorSuffixParameter) && (
+              {(nodeParams.missingIndicator.columns || nodeParams.missingIndicator.suffix) && (
                 <section className="canvas-modal__section">
                   <div className="canvas-modal__section-header">
                     <h3>Missing indicator settings</h3>
                   </div>
                   <div className="canvas-modal__parameter-list">
-                    {missingIndicatorColumnsParameter ? renderParameterField(missingIndicatorColumnsParameter) : null}
-                    {missingIndicatorSuffixParameter ? renderParameterField(missingIndicatorSuffixParameter) : null}
+                    {nodeParams.missingIndicator.columns ? renderParameterField(nodeParams.missingIndicator.columns) : null}
+                    {nodeParams.missingIndicator.suffix ? renderParameterField(nodeParams.missingIndicator.suffix) : null}
                   </div>
                 </section>
               )}
@@ -1517,76 +1262,76 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <TrimWhitespaceSection
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
-              columnsParameter={trimWhitespaceColumnsParameter}
-              modeParameter={trimWhitespaceModeParameter}
+              columnsParameter={nodeParams.trimWhitespace.columns}
+              modeParameter={nodeParams.trimWhitespace.mode}
               renderMultiSelectField={renderMultiSelectField}
               renderParameterField={renderParameterField}
-              columnSummary={trimWhitespaceColumnSummary}
-              modeDetails={trimWhitespaceModeDetails}
-              sampleMap={trimWhitespaceSampleMap}
+              columnSummary={trimWhitespace.columnSummary}
+              modeDetails={trimWhitespace.modeDetails}
+              sampleMap={trimWhitespace.sampleMap}
             />
           )}
           {isRemoveSpecialCharsNode && (
             <RemoveSpecialCharactersSection
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
-              columnsParameter={removeSpecialColumnsParameter}
-              modeParameter={removeSpecialModeParameter}
-              replacementParameter={removeSpecialReplacementParameter}
+              columnsParameter={nodeParams.removeSpecial.columns}
+              modeParameter={nodeParams.removeSpecial.mode}
+              replacementParameter={nodeParams.removeSpecial.replacement}
               renderMultiSelectField={renderMultiSelectField}
               renderParameterField={renderParameterField}
-              columnSummary={removeSpecialColumnSummary}
-              modeDetails={removeSpecialModeDetails}
-              sampleMap={removeSpecialSampleMap}
+              columnSummary={removeSpecial.columnSummary}
+              modeDetails={removeSpecial.modeDetails}
+              sampleMap={removeSpecial.sampleMap}
             />
           )}
           {isReplaceInvalidValuesNode && (
             <ReplaceInvalidValuesSection
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
-              columnsParameter={replaceInvalidColumnsParameter}
-              modeParameter={replaceInvalidModeParameter}
-              minValueParameter={replaceInvalidMinValueParameter}
-              maxValueParameter={replaceInvalidMaxValueParameter}
+              columnsParameter={nodeParams.replaceInvalid.columns}
+              modeParameter={nodeParams.replaceInvalid.mode}
+              minValueParameter={nodeParams.replaceInvalid.minValue}
+              maxValueParameter={nodeParams.replaceInvalid.maxValue}
               renderMultiSelectField={renderMultiSelectField}
               renderParameterField={renderParameterField}
-              columnSummary={replaceInvalidColumnSummary}
-              modeDetails={replaceInvalidModeDetails}
-              sampleMap={replaceInvalidSampleMap}
-              selectedMode={replaceInvalidMode}
-              minValue={replaceInvalidMinValue}
-              maxValue={replaceInvalidMaxValue}
+              columnSummary={replaceInvalid.columnSummary}
+              modeDetails={replaceInvalid.modeDetails}
+              sampleMap={replaceInvalid.sampleMap}
+              selectedMode={replaceInvalid.mode}
+              minValue={replaceInvalid.minValue}
+              maxValue={replaceInvalid.maxValue}
             />
           )}
           {isRegexCleanupNode && (
             <RegexCleanupSection
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
-              columnsParameter={regexCleanupColumnsParameter}
-              modeParameter={regexCleanupModeParameter}
-              patternParameter={regexCleanupPatternParameter}
-              replacementParameter={regexCleanupReplacementParameter}
+              columnsParameter={nodeParams.regexCleanup.columns}
+              modeParameter={nodeParams.regexCleanup.mode}
+              patternParameter={nodeParams.regexCleanup.pattern}
+              replacementParameter={nodeParams.regexCleanup.replacement}
               renderMultiSelectField={renderMultiSelectField}
               renderParameterField={renderParameterField}
-              columnSummary={regexCleanupColumnSummary}
-              modeDetails={regexCleanupModeDetails}
-              sampleMap={regexCleanupSampleMap}
-              selectedMode={regexCleanupMode}
-              replacementValue={regexCleanupReplacementValue}
+              columnSummary={regexCleanup.columnSummary}
+              modeDetails={regexCleanup.modeDetails}
+              sampleMap={regexCleanup.sampleMap}
+              selectedMode={regexCleanup.selectedMode}
+              replacementValue={regexCleanup.replacementValue}
             />
           )}
           {isNormalizeTextCaseNode && (
             <NormalizeTextCaseSection
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
-              columnsParameter={normalizeCaseColumnsParameter}
-              modeParameter={normalizeCaseModeParameter}
+              columnsParameter={nodeParams.normalizeCase.columns}
+              modeParameter={nodeParams.normalizeCase.mode}
               renderMultiSelectField={renderMultiSelectField}
               renderParameterField={renderParameterField}
-              columnSummary={normalizeCaseColumnSummary}
-              modeDetails={normalizeCaseModeDetails}
-              sampleMap={normalizeCaseSampleMap}
-              selectedMode={normalizeCaseMode}
+              columnSummary={normalizeCase.columnSummary}
+              modeDetails={normalizeCase.modeDetails}
+              sampleMap={normalizeCase.sampleMap}
+              selectedMode={normalizeCase.selectedMode}
             />
           )}
           {isFeatureMathNode && (
@@ -1603,10 +1348,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               availableColumns={availableColumns}
               signals={featureMathSignals}
               previewStatus={previewState.status}
-              errorHandlingParameter={featureMathErrorHandlingParameter}
-              allowOverwriteParameter={featureMathAllowOverwriteParameter}
-              defaultTimezoneParameter={featureMathDefaultTimezoneParameter}
-              epsilonParameter={featureMathEpsilonParameter}
+              errorHandlingParameter={nodeParams.featureMath.errorHandling}
+              allowOverwriteParameter={nodeParams.featureMath.allowOverwrite}
+              defaultTimezoneParameter={nodeParams.featureMath.defaultTimezone}
+              epsilonParameter={nodeParams.featureMath.epsilon}
               renderParameterField={renderParameterField}
             />
           )}
@@ -1618,14 +1363,14 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               error={ordinalEncoding.error}
               suggestions={ordinalEncoding.suggestions}
               metadata={ordinalEncoding.metadata}
-              columnsParameter={ordinalEncodingColumnsParameter}
-              autoDetectParameter={ordinalEncodingAutoDetectParameter}
-              maxCategoriesParameter={ordinalEncodingMaxCategoriesParameter}
-              outputSuffixParameter={ordinalEncodingOutputSuffixParameter}
-              dropOriginalParameter={ordinalEncodingDropOriginalParameter}
-              encodeMissingParameter={ordinalEncodingEncodeMissingParameter}
-              handleUnknownParameter={ordinalEncodingHandleUnknownParameter}
-              unknownValueParameter={ordinalEncodingUnknownValueParameter}
+              columnsParameter={nodeParams.ordinalEncoding.columns}
+              autoDetectParameter={nodeParams.ordinalEncoding.autoDetect}
+              maxCategoriesParameter={nodeParams.ordinalEncoding.maxCategories}
+              outputSuffixParameter={nodeParams.ordinalEncoding.outputSuffix}
+              dropOriginalParameter={nodeParams.ordinalEncoding.dropOriginal}
+              encodeMissingParameter={nodeParams.ordinalEncoding.encodeMissing}
+              handleUnknownParameter={nodeParams.ordinalEncoding.handleUnknown}
+              unknownValueParameter={nodeParams.ordinalEncoding.unknownValue}
               selectedColumns={selectedColumns}
               renderParameterField={renderParameterField}
               onToggleColumn={handleToggleColumn}
@@ -1641,15 +1386,15 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               error={targetEncoding.error}
               suggestions={targetEncoding.suggestions}
               metadata={targetEncoding.metadata}
-              columnsParameter={targetEncodingColumnsParameter}
-              targetColumnParameter={targetEncodingTargetColumnParameter}
-              autoDetectParameter={targetEncodingAutoDetectParameter}
-              maxCategoriesParameter={targetEncodingMaxCategoriesParameter}
-              outputSuffixParameter={targetEncodingOutputSuffixParameter}
-              dropOriginalParameter={targetEncodingDropOriginalParameter}
-              smoothingParameter={targetEncodingSmoothingParameter}
-              encodeMissingParameter={targetEncodingEncodeMissingParameter}
-              handleUnknownParameter={targetEncodingHandleUnknownParameter}
+              columnsParameter={nodeParams.targetEncoding.columns}
+              targetColumnParameter={nodeParams.targetEncoding.targetColumn}
+              autoDetectParameter={nodeParams.targetEncoding.autoDetect}
+              maxCategoriesParameter={nodeParams.targetEncoding.maxCategories}
+              outputSuffixParameter={nodeParams.targetEncoding.outputSuffix}
+              dropOriginalParameter={nodeParams.targetEncoding.dropOriginal}
+              smoothingParameter={nodeParams.targetEncoding.smoothing}
+              encodeMissingParameter={nodeParams.targetEncoding.encodeMissing}
+              handleUnknownParameter={nodeParams.targetEncoding.handleUnknown}
               selectedColumns={selectedColumns}
               renderParameterField={renderParameterField}
               onToggleColumn={handleToggleColumn}
@@ -1665,13 +1410,13 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               error={dummyEncoding.error}
               suggestions={dummyEncoding.suggestions}
               metadata={dummyEncoding.metadata}
-              columnsParameter={dummyEncodingColumnsParameter}
-              autoDetectParameter={dummyEncodingAutoDetectParameter}
-              maxCategoriesParameter={dummyEncodingMaxCategoriesParameter}
-              dropFirstParameter={dummyEncodingDropFirstParameter}
-              includeMissingParameter={dummyEncodingIncludeMissingParameter}
-              dropOriginalParameter={dummyEncodingDropOriginalParameter}
-              prefixSeparatorParameter={dummyEncodingPrefixSeparatorParameter}
+              columnsParameter={nodeParams.dummyEncoding.columns}
+              autoDetectParameter={nodeParams.dummyEncoding.autoDetect}
+              maxCategoriesParameter={nodeParams.dummyEncoding.maxCategories}
+              dropFirstParameter={nodeParams.dummyEncoding.dropFirst}
+              includeMissingParameter={nodeParams.dummyEncoding.includeMissing}
+              dropOriginalParameter={nodeParams.dummyEncoding.dropOriginal}
+              prefixSeparatorParameter={nodeParams.dummyEncoding.prefixSeparator}
               selectedColumns={selectedColumns}
               renderParameterField={renderParameterField}
               onToggleColumn={handleToggleColumn}
@@ -1687,13 +1432,13 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               error={oneHotEncoding.error}
               suggestions={oneHotEncoding.suggestions}
               metadata={oneHotEncoding.metadata}
-              columnsParameter={oneHotEncodingColumnsParameter}
-              autoDetectParameter={oneHotEncodingAutoDetectParameter}
-              maxCategoriesParameter={oneHotEncodingMaxCategoriesParameter}
-              dropFirstParameter={oneHotEncodingDropFirstParameter}
-              includeMissingParameter={oneHotEncodingIncludeMissingParameter}
-              dropOriginalParameter={oneHotEncodingDropOriginalParameter}
-              prefixSeparatorParameter={oneHotEncodingPrefixSeparatorParameter}
+              columnsParameter={nodeParams.oneHotEncoding.columns}
+              autoDetectParameter={nodeParams.oneHotEncoding.autoDetect}
+              maxCategoriesParameter={nodeParams.oneHotEncoding.maxCategories}
+              dropFirstParameter={nodeParams.oneHotEncoding.dropFirst}
+              includeMissingParameter={nodeParams.oneHotEncoding.includeMissing}
+              dropOriginalParameter={nodeParams.oneHotEncoding.dropOriginal}
+              prefixSeparatorParameter={nodeParams.oneHotEncoding.prefixSeparator}
               selectedColumns={selectedColumns}
               renderParameterField={renderParameterField}
               onToggleColumn={handleToggleColumn}
@@ -1709,7 +1454,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               previewState={previewState}
               onRefreshPreview={handleRefreshPreview}
               config={featureTargetSplitConfig}
-              targetColumnParameter={featureTargetSplitTargetColumnParameter}
+              targetColumnParameter={nodeParams.featureTargetSplit.targetColumn}
               renderParameterField={renderParameterField}
               formatMetricValue={formatMetricValue}
               formatMissingPercentage={formatMissingPercentage}
@@ -1736,12 +1481,12 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               previewState={previewState}
               onRefreshPreview={handleRefreshPreview}
               config={resamplingConfig}
-              methodParameter={resamplingMethodParameter}
-              targetColumnParameter={resamplingTargetColumnParameter}
-              samplingStrategyParameter={resamplingSamplingStrategyParameter}
-              randomStateParameter={resamplingRandomStateParameter}
-              kNeighborsParameter={isClassOversamplingNode ? resamplingKNeighborsParameter : null}
-              replacementParameter={isClassUndersamplingNode ? resamplingReplacementParameter : null}
+              methodParameter={nodeParams.resampling.method}
+              targetColumnParameter={nodeParams.resampling.targetColumn}
+              samplingStrategyParameter={nodeParams.resampling.samplingStrategy}
+              randomStateParameter={nodeParams.resampling.randomState}
+              kNeighborsParameter={isClassOversamplingNode ? nodeParams.resampling.kNeighbors : null}
+              replacementParameter={isClassUndersamplingNode ? nodeParams.resampling.replacement : null}
               renderParameterField={renderParameterField}
               formatMetricValue={formatMetricValue}
               formatMissingPercentage={formatMissingPercentage}
@@ -1755,8 +1500,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               previewState={previewState}
               onRefreshPreview={handleRefreshPreview}
               config={trainModelDraftConfig}
-              targetColumnParameter={trainModelTargetColumnParameter}
-              problemTypeParameter={trainModelProblemTypeParameter}
+              targetColumnParameter={nodeParams.trainModel.targetColumn}
+              problemTypeParameter={nodeParams.trainModel.problemType}
               renderParameterField={renderParameterField}
               formatMetricValue={formatMetricValue}
               formatMissingPercentage={formatMissingPercentage}
@@ -1774,15 +1519,15 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                 cvConfig={trainModelCVConfig}
                 draftConfigState={configState}
                 renderParameterField={renderParameterField}
-                modelTypeParameter={trainModelModelTypeParameter}
+                modelTypeParameter={nodeParams.trainModel.modelType}
                 modelTypeOptions={filteredModelTypeOptions}
-                hyperparametersParameter={trainModelHyperparametersParameter}
-                cvEnabledParameter={trainModelCvEnabledParameter}
-                cvStrategyParameter={trainModelCvStrategyParameter}
-                cvFoldsParameter={trainModelCvFoldsParameter}
-                cvShuffleParameter={trainModelCvShuffleParameter}
-                cvRandomStateParameter={trainModelCvRandomStateParameter}
-                cvRefitStrategyParameter={trainModelCvRefitStrategyParameter}
+                hyperparametersParameter={nodeParams.trainModel.hyperparameters}
+                cvEnabledParameter={nodeParams.trainModel.cvEnabled}
+                cvStrategyParameter={nodeParams.trainModel.cvStrategy}
+                cvFoldsParameter={nodeParams.trainModel.cvFolds}
+                cvShuffleParameter={nodeParams.trainModel.cvShuffle}
+                cvRandomStateParameter={nodeParams.trainModel.cvRandomState}
+                cvRefitStrategyParameter={nodeParams.trainModel.cvRefitStrategy}
                 onSaveDraftConfig={handleSave}
               />
             </div>
@@ -1824,12 +1569,12 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                 cvConfig={trainModelCVConfig}
                 draftConfigState={configState}
                 renderParameterField={renderParameterField}
-                modelTypeParameter={trainModelModelTypeParameter}
+                modelTypeParameter={nodeParams.trainModel.modelType}
                 modelTypeOptions={filteredModelTypeOptions}
-                searchStrategyParameter={hyperparameterTuningSearchStrategyParameter}
-                searchIterationsParameter={hyperparameterTuningSearchIterationsParameter}
-                searchRandomStateParameter={hyperparameterTuningSearchRandomStateParameter}
-                scoringMetricParameter={hyperparameterTuningScoringMetricParameter}
+                searchStrategyParameter={nodeParams.hyperparameterTuning.searchStrategy}
+                searchIterationsParameter={nodeParams.hyperparameterTuning.searchIterations}
+                searchRandomStateParameter={nodeParams.hyperparameterTuning.searchRandomState}
+                scoringMetricParameter={nodeParams.hyperparameterTuning.scoringMetric}
                 setDraftConfigState={setConfigState}
                 onSaveDraftConfig={handleSave}
               />
@@ -1843,13 +1588,13 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               error={labelEncoding.error}
               suggestions={labelEncoding.suggestions}
               metadata={labelEncoding.metadata}
-              columnsParameter={labelEncodingColumnsParameter}
-              autoDetectParameter={labelEncodingAutoDetectParameter}
-              maxUniqueParameter={labelEncodingMaxUniqueParameter}
-              outputSuffixParameter={labelEncodingOutputSuffixParameter}
-              dropOriginalParameter={labelEncodingDropOriginalParameter}
-              missingStrategyParameter={labelEncodingMissingStrategyParameter}
-              missingCodeParameter={labelEncodingMissingCodeParameter}
+              columnsParameter={nodeParams.labelEncoding.columns}
+              autoDetectParameter={nodeParams.labelEncoding.autoDetect}
+              maxUniqueParameter={nodeParams.labelEncoding.maxUnique}
+              outputSuffixParameter={nodeParams.labelEncoding.outputSuffix}
+              dropOriginalParameter={nodeParams.labelEncoding.dropOriginal}
+              missingStrategyParameter={nodeParams.labelEncoding.missingStrategy}
+              missingCodeParameter={nodeParams.labelEncoding.missingCode}
               selectedColumns={selectedColumns}
               renderParameterField={renderParameterField}
               onToggleColumn={handleToggleColumn}
@@ -1865,13 +1610,13 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               error={hashEncoding.error}
               suggestions={hashEncoding.suggestions}
               metadata={hashEncoding.metadata}
-              columnsParameter={hashEncodingColumnsParameter}
-              autoDetectParameter={hashEncodingAutoDetectParameter}
-              maxCategoriesParameter={hashEncodingMaxCategoriesParameter}
-              bucketsParameter={hashEncodingBucketsParameter}
-              outputSuffixParameter={hashEncodingOutputSuffixParameter}
-              dropOriginalParameter={hashEncodingDropOriginalParameter}
-              encodeMissingParameter={hashEncodingEncodeMissingParameter}
+              columnsParameter={nodeParams.hashEncoding.columns}
+              autoDetectParameter={nodeParams.hashEncoding.autoDetect}
+              maxCategoriesParameter={nodeParams.hashEncoding.maxCategories}
+              bucketsParameter={nodeParams.hashEncoding.buckets}
+              outputSuffixParameter={nodeParams.hashEncoding.outputSuffix}
+              dropOriginalParameter={nodeParams.hashEncoding.dropOriginal}
+              encodeMissingParameter={nodeParams.hashEncoding.encodeMissing}
               selectedColumns={selectedColumns}
               renderParameterField={renderParameterField}
               onToggleColumn={handleToggleColumn}
@@ -1881,35 +1626,35 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
           )}
           {isPolynomialFeaturesNode && (
             <PolynomialFeaturesSection
-              columnsParameter={polynomialColumnsParameter}
-              autoDetectParameter={polynomialAutoDetectParameter}
-              degreeParameter={polynomialDegreeParameter}
-              includeBiasParameter={polynomialIncludeBiasParameter}
-              interactionOnlyParameter={polynomialInteractionOnlyParameter}
-              includeInputFeaturesParameter={polynomialIncludeInputFeaturesParameter}
-              outputPrefixParameter={polynomialOutputPrefixParameter}
+              columnsParameter={nodeParams.polynomial.columns}
+              autoDetectParameter={nodeParams.polynomial.autoDetect}
+              degreeParameter={nodeParams.polynomial.degree}
+              includeBiasParameter={nodeParams.polynomial.includeBias}
+              interactionOnlyParameter={nodeParams.polynomial.interactionOnly}
+              includeInputFeaturesParameter={nodeParams.polynomial.includeInputFeatures}
+              outputPrefixParameter={nodeParams.polynomial.outputPrefix}
               renderParameterField={renderParameterField}
               signal={polynomialSignal}
             />
           )}
           {isFeatureSelectionNode && (
             <FeatureSelectionSection
-              columnsParameter={featureSelectionColumnsParameter}
-              autoDetectParameter={featureSelectionAutoDetectParameter}
-              targetColumnParameter={featureSelectionTargetColumnParameter}
-              methodParameter={featureSelectionMethodParameter}
-              scoreFuncParameter={featureSelectionScoreFuncParameter}
-              problemTypeParameter={featureSelectionProblemTypeParameter}
-              kParameter={featureSelectionKParameter}
-              percentileParameter={featureSelectionPercentileParameter}
-              alphaParameter={featureSelectionAlphaParameter}
-              thresholdParameter={featureSelectionThresholdParameter}
-              modeParameter={featureSelectionModeParameter}
-              estimatorParameter={featureSelectionEstimatorParameter}
-              stepParameter={featureSelectionStepParameter}
-              minFeaturesParameter={featureSelectionMinFeaturesParameter}
-              maxFeaturesParameter={featureSelectionMaxFeaturesParameter}
-              dropUnselectedParameter={featureSelectionDropUnselectedParameter}
+              columnsParameter={nodeParams.featureSelection.columns}
+              autoDetectParameter={nodeParams.featureSelection.autoDetect}
+              targetColumnParameter={nodeParams.featureSelection.targetColumn}
+              methodParameter={nodeParams.featureSelection.method}
+              scoreFuncParameter={nodeParams.featureSelection.scoreFunc}
+              problemTypeParameter={nodeParams.featureSelection.problemType}
+              kParameter={nodeParams.featureSelection.k}
+              percentileParameter={nodeParams.featureSelection.percentile}
+              alphaParameter={nodeParams.featureSelection.alpha}
+              thresholdParameter={nodeParams.featureSelection.threshold}
+              modeParameter={nodeParams.featureSelection.mode}
+              estimatorParameter={nodeParams.featureSelection.estimator}
+              stepParameter={nodeParams.featureSelection.step}
+              minFeaturesParameter={nodeParams.featureSelection.minFeatures}
+              maxFeaturesParameter={nodeParams.featureSelection.maxFeatures}
+              dropUnselectedParameter={nodeParams.featureSelection.dropUnselected}
               renderParameterField={renderParameterField}
               signal={featureSelectionSignal}
             />
@@ -1918,10 +1663,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <StandardizeDatesSection
               hasSource={Boolean(sourceId)}
               hasReachableSource={hasReachableSource}
-              strategies={dateStrategies}
-              columnSummary={standardizeDatesColumnSummary}
-              columnOptions={dateColumnOptions}
-              sampleMap={standardizeDatesSampleMap}
+              strategies={standardizeDates.strategies}
+              columnSummary={standardizeDates.columnSummary}
+              columnOptions={standardizeDates.columnOptions}
+              sampleMap={standardizeDates.sampleMap}
               collapsedStrategies={collapsedStrategies}
               onToggleStrategy={toggleDateStrategySection}
               onRemoveStrategy={handleRemoveDateStrategy}
@@ -1937,12 +1682,12 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <ReplaceAliasesSection
               hasSource={Boolean(sourceId)}
               hasReachableSource={hasReachableSource}
-              strategies={aliasStrategies}
-              columnSummary={aliasColumnSummary}
-              columnOptions={aliasColumnOptions}
-              sampleMap={aliasSampleMap}
-              customPairSummary={aliasCustomPairSummary}
-              customPairsParameter={replaceAliasesCustomPairsParameter}
+              strategies={alias.strategies}
+              columnSummary={alias.columnSummary}
+              columnOptions={alias.columnOptions}
+              sampleMap={alias.sampleMap}
+              customPairSummary={alias.customPairSummary}
+              customPairsParameter={nodeParams.replaceAliases.customPairs}
               collapsedStrategies={collapsedStrategies}
               onToggleStrategy={toggleAliasStrategySection}
               onRemoveStrategy={handleRemoveAliasStrategy}
@@ -1999,33 +1744,33 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
               isFetchingOutliers={isFetchingOutliers}
-              outlierConfig={outlierConfig}
-              outlierMethodOptions={outlierMethodOptions}
-              outlierMethodDetailMap={outlierMethodDetailMap}
-              outlierDefaultDetail={outlierDefaultDetail}
-              outlierAutoDetectEnabled={outlierAutoDetectEnabled}
-              outlierSelectedCount={outlierSelectedCount}
-              outlierDefaultLabel={outlierDefaultLabel}
-              outlierOverrideCount={outlierOverrideCount}
-              outlierParameterOverrideCount={outlierParameterOverrideCount}
-              outlierOverrideExampleSummary={outlierOverrideSummaryDisplay}
-              outlierHasOverrides={outlierHasOverrides}
-              outlierRecommendationRows={outlierRecommendationRows}
-              outlierHasRecommendations={outlierHasRecommendations}
-              outlierStatusMessage={outlierStatusMessage}
+              outlierConfig={outlier.config}
+              outlierMethodOptions={outlier.state.methodOptions}
+              outlierMethodDetailMap={outlier.state.methodDetailMap}
+              outlierDefaultDetail={outlier.state.defaultDetail}
+              outlierAutoDetectEnabled={outlier.state.autoDetectEnabled}
+              outlierSelectedCount={outlier.state.selectedCount}
+              outlierDefaultLabel={outlier.state.defaultLabel}
+              outlierOverrideCount={outlier.state.overrideCount}
+              outlierParameterOverrideCount={outlier.state.parameterOverrideCount}
+              outlierOverrideExampleSummary={outlier.state.overrideExampleSummary}
+              outlierHasOverrides={outlier.state.hasOverrides}
+              outlierRecommendationRows={outlier.state.recommendationRows}
+              outlierHasRecommendations={outlier.state.hasRecommendations}
+              outlierStatusMessage={outlier.state.statusMessage}
               outlierError={outlierError}
               outlierSampleSize={outlierSampleSize}
               relativeOutlierGeneratedAt={relativeOutlierGeneratedAt}
               outlierPreviewSignal={outlierPreviewSignal}
               formatMetricValue={formatMetricValue}
               formatNumericStat={formatNumericStat}
-              onApplyAllRecommendations={handleOutlierApplyAllRecommendations}
-              onClearOverrides={handleOutlierClearOverrides}
-              onDefaultMethodChange={handleOutlierDefaultMethodChange}
-              onAutoDetectToggle={handleOutlierAutoDetectToggle}
-              onOverrideSelect={handleOutlierOverrideSelect}
-              onMethodParameterChange={handleOutlierMethodParameterChange}
-              onColumnParameterChange={handleOutlierColumnParameterChange}
+              onApplyAllRecommendations={outlier.handlers.handleApplyAllRecommendations}
+              onClearOverrides={outlier.handlers.handleClearOverrides}
+              onDefaultMethodChange={outlier.handlers.handleDefaultMethodChange}
+              onAutoDetectToggle={outlier.handlers.handleAutoDetectToggle}
+              onOverrideSelect={outlier.handlers.handleOverrideSelect}
+              onMethodParameterChange={outlier.handlers.handleMethodParameterChange}
+              onColumnParameterChange={outlier.handlers.handleColumnParameterChange}
             />
           )}
           {isScalingNode && (
@@ -2033,29 +1778,29 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
               isFetchingScaling={isFetchingScaling}
-              scalingConfig={scalingConfig}
-              scalingMethodOptions={scalingMethodOptions}
-              scalingMethodDetailMap={scalingMethodDetailMap}
-              scalingDefaultDetail={scalingDefaultDetail}
-              scalingAutoDetectEnabled={scalingAutoDetectEnabled}
-              scalingSelectedCount={scalingSelectedCount}
-              scalingDefaultLabel={scalingDefaultLabel}
-              scalingOverrideCount={scalingOverrideCount}
-              scalingOverrideExampleSummary={scalingOverrideExampleSummary}
-              scalingRecommendationRows={scalingRecommendationRows}
-              scalingHasRecommendations={scalingHasRecommendations}
-              scalingStatusMessage={scalingStatusMessage}
+              scalingConfig={scaling.config}
+              scalingMethodOptions={scaling.state.methodOptions}
+              scalingMethodDetailMap={scaling.state.methodDetailMap}
+              scalingDefaultDetail={scaling.state.defaultDetail}
+              scalingAutoDetectEnabled={scaling.state.autoDetectEnabled}
+              scalingSelectedCount={scaling.state.selectedCount}
+              scalingDefaultLabel={scaling.state.defaultLabel}
+              scalingOverrideCount={scaling.state.overrideCount}
+              scalingOverrideExampleSummary={scaling.state.overrideExampleSummary}
+              scalingRecommendationRows={scaling.state.recommendationRows}
+              scalingHasRecommendations={scaling.state.hasRecommendations}
+              scalingStatusMessage={scaling.state.statusMessage}
               scalingError={scalingError}
               scalingSampleSize={scalingSampleSize}
               relativeScalingGeneratedAt={relativeScalingGeneratedAt}
               formatMetricValue={formatMetricValue}
               formatNumericStat={formatNumericStat}
               formatMissingPercentage={formatMissingPercentage}
-              onApplyAllRecommendations={handleScalingApplyAllRecommendations}
-              onClearOverrides={handleScalingClearOverrides}
-              onDefaultMethodChange={handleScalingDefaultMethodChange}
-              onAutoDetectToggle={handleScalingAutoDetectToggle}
-              onOverrideSelect={handleScalingOverrideSelect}
+              onApplyAllRecommendations={scaling.handlers.handleApplyAllRecommendations}
+              onClearOverrides={scaling.handlers.handleClearOverrides}
+              onDefaultMethodChange={scaling.handlers.handleDefaultMethodChange}
+              onAutoDetectToggle={scaling.handlers.handleAutoDetectToggle}
+              onOverrideSelect={scaling.handlers.handleOverrideSelect}
             />
           )}
           {isBinningNode && (
@@ -2067,39 +1812,39 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                 error={binningError}
                 relativeGeneratedAt={relativeBinningGeneratedAt}
                 sampleSize={binningSampleSize}
-                binningConfig={binningConfig}
-                binningDefaultLabel={binningDefaultLabel}
-                binningOverrideCount={binningOverrideCount}
-                binningOverrideSummary={binningOverrideSummary}
-                recommendations={binningInsightsRecommendations}
-                excludedColumns={binningInsightsExcludedColumns}
-                numericColumnCount={binningAllNumericColumns.length}
-                canApplyAllNumeric={canApplyAllBinningNumeric}
-                onApplyAllNumeric={handleApplyAllBinningNumeric}
-                onApplyStrategies={handleBinningApplyStrategies}
-                onClearOverrides={handleBinningClearOverrides}
-                customEdgeDrafts={binningCustomEdgeDrafts}
-                customLabelDrafts={binningCustomLabelDrafts}
-                onOverrideStrategyChange={handleBinningOverrideStrategyChange}
-                onOverrideNumberChange={handleBinningOverrideNumberChange}
-                onOverrideKbinsEncodeChange={handleBinningOverrideKbinsEncodeChange}
-                onOverrideKbinsStrategyChange={handleBinningOverrideKbinsStrategyChange}
-                onOverrideClear={handleBinningClearOverride}
-                onCustomBinsChange={handleBinningCustomBinsChange}
-                onCustomLabelsChange={handleBinningCustomLabelsChange}
-                onClearCustomColumn={handleBinningClearCustomColumn}
+                binningConfig={binning.config}
+                binningDefaultLabel={binning.state.defaultLabel}
+                binningOverrideCount={binning.state.overrideCount}
+                binningOverrideSummary={binning.state.overrideSummary}
+                recommendations={binning.state.insightsRecommendations}
+                excludedColumns={binning.state.insightsExcludedColumns}
+                numericColumnCount={binning.state.allNumericColumns.length}
+                canApplyAllNumeric={binning.state.canApplyAllNumeric}
+                onApplyAllNumeric={binning.handlers.handleApplyAllNumeric}
+                onApplyStrategies={binning.handlers.handleApplyStrategies}
+                onClearOverrides={binning.handlers.handleClearOverrides}
+                customEdgeDrafts={binning.state.customEdgeDrafts}
+                customLabelDrafts={binning.state.customLabelDrafts}
+                onOverrideStrategyChange={binning.handlers.handleOverrideStrategyChange}
+                onOverrideNumberChange={binning.handlers.handleOverrideNumberChange}
+                onOverrideKbinsEncodeChange={binning.handlers.handleOverrideKbinsEncodeChange}
+                onOverrideKbinsStrategyChange={binning.handlers.handleOverrideKbinsStrategyChange}
+                onOverrideClear={binning.handlers.handleClearOverride}
+                onCustomBinsChange={binning.handlers.handleCustomBinsChange}
+                onCustomLabelsChange={binning.handlers.handleCustomLabelsChange}
+                onClearCustomColumn={binning.handlers.handleClearCustomColumn}
                 formatMetricValue={formatMetricValue}
                 formatNumericStat={formatNumericStat}
               />
               <BinNumericColumnsSection
-                config={binningConfig}
-                fieldIds={binningFieldIds}
-                onIntegerChange={handleBinningIntegerChange}
-                onBooleanToggle={handleBinningBooleanToggle}
-                onSuffixChange={handleBinningSuffixChange}
-                onLabelFormatChange={handleBinningLabelFormatChange}
-                onMissingStrategyChange={handleBinningMissingStrategyChange}
-                onMissingLabelChange={handleBinningMissingLabelChange}
+                config={binning.config}
+                fieldIds={binning.state.fieldIds}
+                onIntegerChange={binning.handlers.handleIntegerChange}
+                onBooleanToggle={binning.handlers.handleBooleanToggle}
+                onSuffixChange={binning.handlers.handleSuffixChange}
+                onLabelFormatChange={binning.handlers.handleLabelFormatChange}
+                onMissingStrategyChange={binning.handlers.handleMissingStrategyChange}
+                onMissingLabelChange={binning.handlers.handleMissingLabelChange}
               />
             </>
           )}
@@ -2108,34 +1853,34 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
               isFetchingSkewness={isFetchingSkewness}
-              skewnessThreshold={skewnessThreshold}
+              skewnessThreshold={skewness.state.threshold}
               skewnessError={skewnessError}
-              skewnessViewMode={skewnessViewMode}
-              skewnessRecommendedCount={skewnessRecommendedCount}
-              skewnessNumericCount={skewnessNumericCount}
-              skewnessGroupByMethod={skewnessGroupByMethod}
-              skewnessRows={skewnessRows}
-              skewnessTableGroups={skewnessTableGroups}
-              hasSkewnessAutoRecommendations={hasSkewnessAutoRecommendations}
-              skewnessTransformationsCount={skewnessTransformationsCount}
+              skewnessViewMode={skewness.state.viewMode}
+              skewnessRecommendedCount={skewness.state.recommendedCount}
+              skewnessNumericCount={skewness.state.numericCount}
+              skewnessGroupByMethod={skewness.state.groupByMethod}
+              skewnessRows={skewness.state.rows}
+              skewnessTableGroups={skewness.state.tableGroups}
+              hasSkewnessAutoRecommendations={skewness.state.hasAutoRecommendations}
+              skewnessTransformationsCount={skewness.state.transformationsCount}
               isFetchingRecommendations={isFetchingRecommendations}
-              getSkewnessMethodLabel={getSkewnessMethodLabel}
-              getSkewnessMethodStatus={getSkewnessMethodStatus}
-              onApplyRecommendations={handleApplySkewnessRecommendations}
-              onViewModeChange={setSkewnessViewMode}
-              onGroupByToggle={setSkewnessGroupByMethod}
-              onOverrideChange={handleSkewnessOverrideChange}
-              onClearSelections={clearSkewnessTransformations}
+              getSkewnessMethodLabel={skewness.handlers.getMethodLabel}
+              getSkewnessMethodStatus={skewness.handlers.getMethodStatus}
+              onApplyRecommendations={skewness.handlers.applyRecommendations}
+              onViewModeChange={skewness.handlers.setViewMode}
+              onGroupByToggle={skewness.handlers.setGroupByMethod}
+              onOverrideChange={skewness.handlers.handleOverrideChange}
+              onClearSelections={skewness.handlers.clearTransformations}
             />
           )}
           {isSkewnessDistributionNode && (
             <SkewnessDistributionSection
-              skewnessThreshold={skewnessThreshold}
+              skewnessThreshold={skewness.state.threshold}
               isFetchingSkewness={isFetchingSkewness}
               skewnessError={skewnessError}
-              skewnessDistributionCards={skewnessDistributionCards}
-              skewnessDistributionView={skewnessDistributionView}
-              setSkewnessDistributionView={setSkewnessDistributionView}
+              skewnessDistributionCards={skewness.state.distributionCards}
+              skewnessDistributionView={skewness.state.distributionView}
+              setSkewnessDistributionView={skewness.handlers.setDistributionView}
               onRefresh={refreshSkewness}
               canRefresh={canRefreshSkewnessDistributions}
             />
@@ -2157,8 +1902,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <RemoveDuplicatesSection
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
-              removeDuplicatesColumnsParameter={removeDuplicatesColumnsParameter}
-              removeDuplicatesKeepParameter={removeDuplicatesKeepParameter}
+              removeDuplicatesColumnsParameter={nodeParams.removeDuplicates.columns}
+              removeDuplicatesKeepParameter={nodeParams.removeDuplicates.keep}
               renderMultiSelectField={renderMultiSelectField}
               removeDuplicatesKeepSelectId={removeDuplicatesKeepSelectId}
               removeDuplicatesKeep={removeDuplicatesKeep}
