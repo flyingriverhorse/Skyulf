@@ -159,7 +159,6 @@ import { OUTLIER_METHOD_ORDER } from './node-settings/nodes/outlier/outlierSetti
 import { useNodeMetadata } from './node-settings/hooks/useNodeMetadata';
 import { ConnectionRequirementsSection } from './node-settings/layout/ConnectionRequirementsSection';
 import { useConnectionReadiness } from './node-settings/hooks/useConnectionReadiness';
-import { useParameterCatalog } from './node-settings/hooks/useParameterCatalog';
 import { useFilteredParameters } from './node-settings/hooks/useFilteredParameters';
 import { useNodeConfigState } from './node-settings/hooks/useNodeConfigState';
 import { useParameterHandlers } from './node-settings/hooks/useParameterHandlers';
@@ -174,6 +173,8 @@ import { usePreviewSignals } from './node-settings/hooks/usePreviewSignals';
 import { useFeatureSelectionAutoConfig } from './node-settings/hooks/useFeatureSelectionAutoConfig';
 import { useColumnSelectionHandlers } from './node-settings/hooks/useColumnSelectionHandlers';
 import { useNodeSaveHandlers } from './node-settings/hooks/useNodeSaveHandlers';
+import { useNodeParameters } from './node-settings/hooks/useNodeParameters';
+import { useResetPermissions } from './node-settings/hooks/useResetPermissions';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -267,18 +268,13 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     [imputationMethodOptions]
   );
 
-  const parameters = useMemo<FeatureNodeParameter[]>(() => {
-    const raw = node?.data?.parameters;
-    if (!Array.isArray(raw)) {
-      return [];
-    }
-    return raw
-      .filter((parameter) => Boolean(parameter?.name))
-      .map((parameter) => ({ ...parameter }));
-  }, [node]);
-
-  const getParameter = useParameterCatalog(parameters);
-  const getParameterIf = (condition: boolean, name: string) => (condition ? getParameter(name) : null);
+  const {
+    parameters,
+    getParameter,
+    getParameterIf,
+    requiresColumnCatalog,
+    dropColumnParameter,
+  } = useNodeParameters(node);
 
   const dataConsistencyHint = useMemo(
     () => DATA_CONSISTENCY_GUIDANCE[catalogType] ?? null,
@@ -286,12 +282,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   );
 
   const nodeId = typeof node?.id === 'string' ? node.id : '';
-  const canResetNode = useMemo(
-    () => Boolean(isResetAvailable && !isDataset && defaultConfigTemplate),
-    [defaultConfigTemplate, isDataset, isResetAvailable]
-  );
-
-  const footerOnlyResetNodes = [
+  const footerResetFlags = [
     isFeatureMathNode,
     isFeatureTargetSplitNode,
     isTrainTestSplitNode,
@@ -321,12 +312,18 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isRemoveDuplicatesNode,
     isDropMissingNode,
     isOutlierNode,
-  ].some(Boolean);
+  ];
 
-  const disableAllGlobalResets = isBinnedDistributionNode || isSkewnessDistributionNode;
-  const headerResetDisabled = disableAllGlobalResets || isScalingNode || isBinningNode || footerOnlyResetNodes;
-  const headerCanResetNode = canResetNode && !headerResetDisabled;
-  const footerCanResetNode = canResetNode && !disableAllGlobalResets;
+  const { canResetNode, headerCanResetNode, footerCanResetNode } = useResetPermissions({
+    isResetAvailable,
+    isDataset,
+    defaultConfigTemplate,
+    footerResetFlags,
+    isScalingNode,
+    isBinningNode,
+    isBinnedDistributionNode,
+    isSkewnessDistributionNode,
+  });
 
   const binningColumnsParameter = getParameterIf(isBinningNode, 'columns');
   const scalingColumnsParameter = getParameterIf(isScalingNode, 'columns');
@@ -487,19 +484,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   const scalingDefaultMethodParameter = getParameterIf(isScalingNode, 'default_method');
   const scalingAutoDetectParameter = getParameterIf(isScalingNode, 'auto_detect');
 
-  const requiresColumnCatalog = useMemo(
-    () =>
-      parameters.some(
-        (parameter) =>
-          parameter?.type === 'multi_select' && parameter?.source?.type !== 'drop_column_recommendations'
-      ),
-    [parameters]
-  );
-
-  const dropColumnParameter = useMemo(
-    () => parameters.find((parameter) => parameter?.source?.type === 'drop_column_recommendations') ?? null,
-    [parameters],
-  );
+  // requiresColumnCatalog & dropColumnParameter provided by useNodeParameters
 
   const dropRowsAnyParameter = getParameterIf(isDropMissingRowsNode, 'drop_if_any_missing');
   const filteredParameters = useFilteredParameters(parameters, {
