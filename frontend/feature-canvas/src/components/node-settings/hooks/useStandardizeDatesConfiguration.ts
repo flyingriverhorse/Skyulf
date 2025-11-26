@@ -12,9 +12,10 @@ import {
   type DateSampleMap,
 } from '../nodes/standardize_date/standardizeDateSettings';
 import { ensureArrayOfString } from '../sharedUtils';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 export type StandardizeDatesHookParams = {
-  isStandardizeDatesNode: boolean;
+  catalogFlags: CatalogFlagMap;
   configState: Record<string, any>;
   nodeConfig?: Record<string, any> | null;
   availableColumns: string[];
@@ -33,13 +34,15 @@ export type StandardizeDatesHookResult = {
 const EMPTY_SAMPLE_MAP: DateSampleMap = {};
 
 export const useStandardizeDatesConfiguration = ({
-  isStandardizeDatesNode,
+  catalogFlags,
   configState,
   nodeConfig,
   availableColumns,
   columnTypeMap,
   previewSampleRows,
 }: StandardizeDatesHookParams): StandardizeDatesHookResult => {
+  const { isStandardizeDatesNode } = catalogFlags;
+
   const selectedMode = useMemo<DateMode>(
     () =>
       resolveDateMode(

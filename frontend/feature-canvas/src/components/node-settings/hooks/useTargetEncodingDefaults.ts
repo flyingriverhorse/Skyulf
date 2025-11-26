@@ -1,7 +1,8 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+import { type CatalogFlagMap } from './useCatalogFlags';
 
 interface UseTargetEncodingDefaultsArgs {
-  isTargetEncodingNode: boolean;
+  catalogFlags: CatalogFlagMap;
   enableGlobalFallbackDefault: boolean;
   encodeMissing: any;
   handleUnknown: any;
@@ -10,13 +11,14 @@ interface UseTargetEncodingDefaultsArgs {
 }
 
 export const useTargetEncodingDefaults = ({
-  isTargetEncodingNode,
+  catalogFlags,
   enableGlobalFallbackDefault,
   encodeMissing,
   handleUnknown,
   setConfigState,
   nodeChangeVersion,
 }: UseTargetEncodingDefaultsArgs) => {
+  const { isTargetEncodingNode } = catalogFlags;
   const fallbackAppliedRef = useRef(false);
 
   useEffect(() => {

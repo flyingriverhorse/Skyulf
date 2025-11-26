@@ -6,6 +6,7 @@ import {
   type DummyEncodingRecommendationsResponse,
   type DummyEncodingSuggestionStatus,
 } from '../../../api';
+import { type CatalogFlagMap } from './useCatalogFlags';
 
 type DummyEncodingRecommendationMetadata = {
   sampleSize: number | null;
@@ -19,7 +20,7 @@ type DummyEncodingRecommendationMetadata = {
 };
 
 type UseDummyEncodingRecommendationsArgs = {
-  isDummyEncodingNode: boolean;
+  catalogFlags: CatalogFlagMap;
   sourceId?: string | null;
   hasReachableSource: boolean;
   graphContext?: FeatureGraph | { nodes: any[]; edges: any[] } | null;
@@ -162,12 +163,13 @@ const extractMetadata = (
 };
 
 export const useDummyEncodingRecommendations = ({
-  isDummyEncodingNode,
+  catalogFlags,
   sourceId,
   hasReachableSource,
   graphContext,
   targetNodeId,
 }: UseDummyEncodingRecommendationsArgs): UseDummyEncodingRecommendationsResult => {
+  const { isDummyEncodingNode } = catalogFlags;
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<DummyEncodingColumnSuggestion[]>([]);

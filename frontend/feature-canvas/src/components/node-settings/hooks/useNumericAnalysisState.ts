@@ -25,11 +25,10 @@ import {
 } from './usePruneColumnSelections';
 import { ensureArrayOfString } from '../sharedUtils';
 import type { BinningColumnRecommendation, BinningExcludedColumn } from '../../../api';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 type UseNumericAnalysisStateProps = {
-  isScalingNode: boolean;
-  isOutlierNode: boolean;
-  isBinningNode: boolean;
+  catalogFlags: CatalogFlagMap;
   configState: any;
   setConfigState: (updater: any) => void;
   nodeId: string;
@@ -42,9 +41,7 @@ type UseNumericAnalysisStateProps = {
 };
 
 export const useNumericAnalysisState = ({
-  isScalingNode,
-  isOutlierNode,
-  isBinningNode,
+  catalogFlags,
   configState,
   setConfigState,
   nodeId,
@@ -55,6 +52,7 @@ export const useNumericAnalysisState = ({
   availableColumns,
   previewSampleRows,
 }: UseNumericAnalysisStateProps) => {
+  const { isScalingNode, isOutlierNode, isBinningNode } = catalogFlags;
   
   const {
     scalingConfig,

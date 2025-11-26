@@ -6,6 +6,7 @@ import {
   type HashEncodingRecommendationsResponse,
   type HashEncodingSuggestionStatus,
 } from '../../../api';
+import { type CatalogFlagMap } from './useCatalogFlags';
 
 type HashEncodingRecommendationMetadata = {
   sampleSize: number | null;
@@ -19,7 +20,7 @@ type HashEncodingRecommendationMetadata = {
 };
 
 type UseHashEncodingRecommendationsArgs = {
-  isHashEncodingNode: boolean;
+  catalogFlags: CatalogFlagMap;
   sourceId?: string | null;
   hasReachableSource: boolean;
   graphContext?: FeatureGraph | { nodes: any[]; edges: any[] } | null;
@@ -158,12 +159,13 @@ const extractMetadata = (
 };
 
 export const useHashEncodingRecommendations = ({
-  isHashEncodingNode,
+  catalogFlags,
   sourceId,
   hasReachableSource,
   graphContext,
   targetNodeId,
 }: UseHashEncodingRecommendationsArgs): UseHashEncodingRecommendationsResult => {
+  const { isHashEncodingNode } = catalogFlags;
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<HashEncodingColumnSuggestion[]>([]);

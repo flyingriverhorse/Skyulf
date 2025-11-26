@@ -2,15 +2,10 @@ import { useAliasConfiguration } from './useAliasConfiguration';
 import { useTextCleanupConfiguration } from './useTextCleanupConfiguration';
 import { useReplaceInvalidConfiguration } from './useReplaceInvalidConfiguration';
 import { useStandardizeDatesConfiguration } from './useStandardizeDatesConfiguration';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 type UseDataCleaningStateProps = {
-  isReplaceAliasesNode: boolean;
-  isTrimWhitespaceNode: boolean;
-  isRemoveSpecialCharsNode: boolean;
-  isRegexCleanupNode: boolean;
-  isNormalizeTextCaseNode: boolean;
-  isReplaceInvalidValuesNode: boolean;
-  isStandardizeDatesNode: boolean;
+  catalogFlags: CatalogFlagMap;
   configState: any;
   nodeConfig: any;
   availableColumns: string[];
@@ -19,19 +14,23 @@ type UseDataCleaningStateProps = {
 };
 
 export const useDataCleaningState = ({
-  isReplaceAliasesNode,
-  isTrimWhitespaceNode,
-  isRemoveSpecialCharsNode,
-  isRegexCleanupNode,
-  isNormalizeTextCaseNode,
-  isReplaceInvalidValuesNode,
-  isStandardizeDatesNode,
+  catalogFlags,
   configState,
   nodeConfig,
   availableColumns,
   columnTypeMap,
   previewSampleRows,
 }: UseDataCleaningStateProps) => {
+  const {
+    isReplaceAliasesNode,
+    isTrimWhitespaceNode,
+    isRemoveSpecialCharsNode,
+    isRegexCleanupNode,
+    isNormalizeTextCaseNode,
+    isReplaceInvalidValuesNode,
+    isStandardizeDatesNode,
+  } = catalogFlags;
+
   const {
     aliasAutoDetectMeta,
     aliasStrategies,
@@ -44,7 +43,7 @@ export const useDataCleaningState = ({
     aliasSampleMap,
     aliasColumnOptions,
   } = useAliasConfiguration({
-    isReplaceAliasesNode,
+    catalogFlags,
     configState,
     nodeConfig,
     availableColumns,
@@ -58,10 +57,7 @@ export const useDataCleaningState = ({
     regexCleanup,
     normalizeCase,
   } = useTextCleanupConfiguration({
-    isTrimWhitespaceNode,
-    isRemoveSpecialCharsNode,
-    isRegexCleanupNode,
-    isNormalizeTextCaseNode,
+    catalogFlags,
     configState,
     nodeConfig,
     availableColumns,
@@ -77,7 +73,7 @@ export const useDataCleaningState = ({
     minValue: replaceInvalidMinValue,
     maxValue: replaceInvalidMaxValue,
   } = useReplaceInvalidConfiguration({
-    isReplaceInvalidValuesNode,
+    catalogFlags,
     configState,
     nodeConfig,
     availableColumns,
@@ -92,7 +88,7 @@ export const useDataCleaningState = ({
     columnSummary: standardizeDatesColumnSummary,
     columnOptions: dateColumnOptions,
   } = useStandardizeDatesConfiguration({
-    isStandardizeDatesNode,
+    catalogFlags,
     configState,
     nodeConfig,
     availableColumns,

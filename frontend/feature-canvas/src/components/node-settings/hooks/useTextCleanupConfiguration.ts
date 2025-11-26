@@ -43,12 +43,10 @@ import {
   type CaseSampleMap,
 } from '../nodes/normalize_text/normalizeTextCaseSettings';
 import { ensureArrayOfString } from '../sharedUtils';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 export type TextCleanupHookParams = {
-  isTrimWhitespaceNode: boolean;
-  isRemoveSpecialCharsNode: boolean;
-  isRegexCleanupNode: boolean;
-  isNormalizeTextCaseNode: boolean;
+  catalogFlags: CatalogFlagMap;
   configState: Record<string, any>;
   nodeConfig?: Record<string, any> | null;
   availableColumns: string[];
@@ -84,16 +82,20 @@ export type TextCleanupHookResult = {
 };
 
 export const useTextCleanupConfiguration = ({
-  isTrimWhitespaceNode,
-  isRemoveSpecialCharsNode,
-  isRegexCleanupNode,
-  isNormalizeTextCaseNode,
+  catalogFlags,
   configState,
   nodeConfig,
   availableColumns,
   columnTypeMap,
   previewSampleRows,
 }: TextCleanupHookParams): TextCleanupHookResult => {
+  const {
+    isTrimWhitespaceNode,
+    isRemoveSpecialCharsNode,
+    isRegexCleanupNode,
+    isNormalizeTextCaseNode,
+  } = catalogFlags;
+
   const trimWhitespaceMode = useMemo(
     () =>
       resolveTrimMode(

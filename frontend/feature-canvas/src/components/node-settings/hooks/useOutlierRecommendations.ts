@@ -4,11 +4,12 @@ import {
 	type FeatureGraph,
 	type OutlierRecommendationsResponse,
 } from '../../../api';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 type GraphContext = FeatureGraph | null;
 
 type UseOutlierRecommendationsArgs = {
-	isOutlierNode: boolean;
+	catalogFlags: CatalogFlagMap;
 	sourceId?: string | null;
 	hasReachableSource: boolean;
 	graphContext: GraphContext;
@@ -23,12 +24,13 @@ type UseOutlierRecommendationsResult = {
 };
 
 export const useOutlierRecommendations = ({
-	isOutlierNode,
+	catalogFlags,
 	sourceId,
 	hasReachableSource,
 	graphContext,
 	targetNodeId,
 }: UseOutlierRecommendationsArgs): UseOutlierRecommendationsResult => {
+	const { isOutlierNode } = catalogFlags;
 	const [outlierData, setOutlierData] = useState<OutlierRecommendationsResponse | null>(null);
 	const [outlierError, setOutlierError] = useState<string | null>(null);
 	const [isFetchingOutliers, setIsFetchingOutliers] = useState(false);

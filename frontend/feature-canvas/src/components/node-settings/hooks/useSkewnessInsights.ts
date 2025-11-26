@@ -6,13 +6,15 @@ import {
   type SkewnessTransformationSelection,
 } from '../../../api';
 
+import { type CatalogFlagMap } from './useCatalogFlags';
+
 type GraphContext = {
   nodes: any[];
   edges: any[];
 } | null;
 
 type UseSkewnessInsightsArgs = {
-  shouldLoad: boolean;
+  catalogFlags: CatalogFlagMap;
   sourceId?: string | null;
   graphContext: GraphContext;
   targetNodeId: string | null;
@@ -27,12 +29,14 @@ type UseSkewnessInsightsResult = {
 };
 
 export const useSkewnessInsights = ({
-  shouldLoad,
+  catalogFlags,
   sourceId,
   graphContext,
   targetNodeId,
   transformations,
 }: UseSkewnessInsightsArgs): UseSkewnessInsightsResult => {
+  const { isSkewnessNode, isSkewnessDistributionNode } = catalogFlags;
+  const shouldLoad = isSkewnessNode || isSkewnessDistributionNode;
   const [skewnessData, setSkewnessData] = useState<SkewnessRecommendationsResponse | null>(null);
   const [skewnessError, setSkewnessError] = useState<string | null>(null);
   const [isFetchingSkewness, setIsFetchingSkewness] = useState(false);

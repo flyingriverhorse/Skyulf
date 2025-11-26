@@ -11,9 +11,10 @@ import {
   type InvalidValueSampleMap,
 } from '../nodes/replace_invalid_values/replaceInvalidValuesSettings';
 import { ensureArrayOfString } from '../sharedUtils';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 export type ReplaceInvalidHookParams = {
-  isReplaceInvalidValuesNode: boolean;
+  catalogFlags: CatalogFlagMap;
   configState: Record<string, any>;
   nodeConfig?: Record<string, any> | null;
   availableColumns: string[];
@@ -34,13 +35,15 @@ export type ReplaceInvalidHookResult = {
 const EMPTY_SAMPLE_MAP: InvalidValueSampleMap = {};
 
 export const useReplaceInvalidConfiguration = ({
-  isReplaceInvalidValuesNode,
+  catalogFlags,
   configState,
   nodeConfig,
   availableColumns,
   columnTypeMap,
   previewSampleRows,
 }: ReplaceInvalidHookParams): ReplaceInvalidHookResult => {
+  const { isReplaceInvalidValuesNode } = catalogFlags;
+
   const selectedMode = useMemo<InvalidValueMode>(
     () =>
       resolveInvalidValueMode(

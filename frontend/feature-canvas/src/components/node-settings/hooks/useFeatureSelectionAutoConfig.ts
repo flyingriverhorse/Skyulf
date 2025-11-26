@@ -1,20 +1,22 @@
 import { useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { FeatureSelectionNodeSignal } from '../../../api';
+import { type CatalogFlagMap } from './useCatalogFlags';
 
 type UseFeatureSelectionAutoConfigArgs = {
-  isFeatureSelectionNode: boolean;
+  catalogFlags: CatalogFlagMap;
   featureSelectionSignal: FeatureSelectionNodeSignal | null;
   upstreamTargetColumn: string;
   setConfigState: Dispatch<SetStateAction<Record<string, any>>>;
 };
 
 export const useFeatureSelectionAutoConfig = ({
-  isFeatureSelectionNode,
+  catalogFlags,
   featureSelectionSignal,
   upstreamTargetColumn,
   setConfigState,
 }: UseFeatureSelectionAutoConfigArgs) => {
+  const { isFeatureSelectionNode } = catalogFlags;
   useEffect(() => {
     if (!isFeatureSelectionNode) {
       return;

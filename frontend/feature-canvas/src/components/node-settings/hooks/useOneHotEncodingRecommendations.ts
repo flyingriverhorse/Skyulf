@@ -6,6 +6,7 @@ import {
   type OneHotEncodingRecommendationsResponse,
   type OneHotEncodingSuggestionStatus,
 } from '../../../api';
+import { type CatalogFlagMap } from './useCatalogFlags';
 
 type OneHotEncodingRecommendationMetadata = {
   sampleSize: number | null;
@@ -18,7 +19,7 @@ type OneHotEncodingRecommendationMetadata = {
 };
 
 type UseOneHotEncodingRecommendationsArgs = {
-  isOneHotEncodingNode: boolean;
+  catalogFlags: CatalogFlagMap;
   sourceId?: string | null;
   hasReachableSource: boolean;
   graphContext?: FeatureGraph | { nodes: any[]; edges: any[] } | null;
@@ -158,12 +159,13 @@ const extractMetadata = (
 };
 
 export const useOneHotEncodingRecommendations = ({
-  isOneHotEncodingNode,
+  catalogFlags,
   sourceId,
   hasReachableSource,
   graphContext,
   targetNodeId,
 }: UseOneHotEncodingRecommendationsArgs): UseOneHotEncodingRecommendationsResult => {
+  const { isOneHotEncodingNode } = catalogFlags;
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<OneHotEncodingColumnSuggestion[]>([]);

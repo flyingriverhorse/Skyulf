@@ -3,17 +3,16 @@ import { triggerFullDatasetExecution } from '../../../api';
 import { normalizeBinningConfigValue } from '../nodes/binning/binningSettings';
 import { normalizeScalingConfigValue } from '../nodes/scaling/scalingSettings';
 import { cloneConfig } from '../utils/configParsers';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 export type UseNodeSaveHandlersArgs = {
   configState: Record<string, any>;
-  isBinningNode: boolean;
-  isScalingNode: boolean;
+  catalogFlags: CatalogFlagMap;
   nodeId: string;
   onUpdateConfig: (nodeId: string, config: Record<string, any>) => void;
   onClose: () => void;
   sourceId?: string | null;
   graphSnapshot?: { nodes: any[]; edges: any[] } | null;
-  isInspectionNode: boolean;
   onUpdateNodeData?: (nodeId: string, dataUpdates: Record<string, any>) => void;
   setConfigState: Dispatch<SetStateAction<Record<string, any>>>;
   canResetNode: boolean;
@@ -23,20 +22,20 @@ export type UseNodeSaveHandlersArgs = {
 
 export const useNodeSaveHandlers = ({
   configState,
-  isBinningNode,
-  isScalingNode,
+  catalogFlags,
   nodeId,
   onUpdateConfig,
   onClose,
   sourceId,
   graphSnapshot,
-  isInspectionNode,
   onUpdateNodeData,
   setConfigState,
   canResetNode,
   defaultConfigTemplate,
   onResetConfig,
 }: UseNodeSaveHandlersArgs) => {
+  const { isBinningNode, isScalingNode, isInspectionNode } = catalogFlags;
+
   const handleSave = useCallback(
     (options?: { closeModal?: boolean }) => {
       if (!nodeId) {

@@ -6,6 +6,7 @@ import {
   type LabelEncodingRecommendationsResponse,
   type LabelEncodingSuggestionStatus,
 } from '../../../api';
+import { type CatalogFlagMap } from './useCatalogFlags';
 
 type LabelEncodingRecommendationMetadata = {
   sampleSize: number | null;
@@ -18,7 +19,7 @@ type LabelEncodingRecommendationMetadata = {
 };
 
 type UseLabelEncodingRecommendationsArgs = {
-  isLabelEncodingNode: boolean;
+  catalogFlags: CatalogFlagMap;
   sourceId?: string | null;
   hasReachableSource: boolean;
   graphContext?: FeatureGraph | { nodes: any[]; edges: any[] } | null;
@@ -148,12 +149,13 @@ const extractMetadata = (
 };
 
 export const useLabelEncodingRecommendations = ({
-  isLabelEncodingNode,
+  catalogFlags,
   sourceId,
   hasReachableSource,
   graphContext,
   targetNodeId,
 }: UseLabelEncodingRecommendationsArgs): UseLabelEncodingRecommendationsResult => {
+  const { isLabelEncodingNode } = catalogFlags;
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<LabelEncodingColumnSuggestion[]>([]);

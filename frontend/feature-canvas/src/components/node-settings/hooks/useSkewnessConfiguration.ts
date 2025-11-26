@@ -19,6 +19,8 @@ import {
   type SkewnessViewMode,
 } from '../nodes/skewness/skewnessSettings';
 
+import { type CatalogFlagMap } from './useCatalogFlags';
+
 const NUMERIC_TYPE_TOKENS = ['int', 'float', 'double', 'numeric', 'number'];
 
 const isNumericType = (dtype?: string | null): boolean => {
@@ -44,8 +46,8 @@ export type SkewnessDistributionCard = {
 };
 
 export type UseSkewnessConfigurationArgs = {
+  catalogFlags: CatalogFlagMap;
   skewnessData: SkewnessRecommendationsResponse | null;
-  shouldLoadInsights: boolean;
   skewnessTransformations: SkewnessTransformationConfig[];
   availableColumns: string[];
   previewColumns: string[];
@@ -85,14 +87,17 @@ export type UseSkewnessConfigurationResult = {
 };
 
 export const useSkewnessConfiguration = ({
+  catalogFlags,
   skewnessData,
-  shouldLoadInsights,
   skewnessTransformations,
   availableColumns,
   previewColumns,
   columnTypeMap,
   updateSkewnessTransformations,
 }: UseSkewnessConfigurationArgs): UseSkewnessConfigurationResult => {
+  const { isSkewnessNode, isSkewnessDistributionNode } = catalogFlags;
+  const shouldLoadInsights = isSkewnessNode || isSkewnessDistributionNode;
+
   const [skewnessViewMode, setSkewnessViewMode] = useState<SkewnessViewMode>('recommended');
   const [skewnessGroupByMethod, setSkewnessGroupByMethod] = useState(false);
   const [skewnessDistributionView, setSkewnessDistributionView] =

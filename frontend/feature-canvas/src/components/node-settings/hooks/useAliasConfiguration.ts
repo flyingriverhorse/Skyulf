@@ -14,6 +14,7 @@ import {
 } from '../nodes/replace_aliases/replaceAliasesSettings';
 import { ensureArrayOfString } from '../sharedUtils';
 import { normalizeConfigBoolean, pickAutoDetectValue } from '../utils/configParsers';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 type AliasAutoDetectMeta = {
   enabled: boolean;
@@ -21,7 +22,7 @@ type AliasAutoDetectMeta = {
 };
 
 type UseAliasConfigurationParams = {
-  isReplaceAliasesNode: boolean;
+  catalogFlags: CatalogFlagMap;
   configState: Record<string, any>;
   nodeConfig?: Record<string, any> | null;
   availableColumns: string[];
@@ -68,13 +69,15 @@ const EMPTY_SAMPLE_MAP: AliasSampleMap = {};
 const EMPTY_OPTIONS: AliasColumnOption[] = [];
 
 export const useAliasConfiguration = ({
-  isReplaceAliasesNode,
+  catalogFlags,
   configState,
   nodeConfig,
   availableColumns,
   columnTypeMap,
   previewSampleRows,
 }: UseAliasConfigurationParams): UseAliasConfigurationResult => {
+  const { isReplaceAliasesNode } = catalogFlags;
+
   const aliasAutoDetectMeta = useMemo<AliasAutoDetectMeta>(() => {
     if (!isReplaceAliasesNode) {
       return DEFAULT_META;
