@@ -10,9 +10,10 @@ import {
 } from '../nodes/replace_aliases/replaceAliasesSettings';
 import { ensureArrayOfString } from '../sharedUtils';
 import { pickAutoDetectValue, normalizeConfigBoolean } from '../utils/configParsers';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 interface UseAliasStrategyHandlersProps {
-  isReplaceAliasesNode: boolean;
+  catalogFlags: CatalogFlagMap;
   node: any;
   setConfigState: React.Dispatch<React.SetStateAction<any>>;
   setCollapsedStrategies: React.Dispatch<React.SetStateAction<Set<number>>>;
@@ -21,13 +22,14 @@ interface UseAliasStrategyHandlersProps {
 }
 
 export const useAliasStrategyHandlers = ({
-  isReplaceAliasesNode,
+  catalogFlags,
   node,
   setConfigState,
   setCollapsedStrategies,
   aliasColumnSummary,
   aliasStrategyCount,
 }: UseAliasStrategyHandlersProps) => {
+  const { isReplaceAliasesNode } = catalogFlags;
   const updateAliasStrategies = useCallback(
     (updater: (current: AliasStrategyConfig[]) => AliasStrategyConfig[]) => {
       if (!isReplaceAliasesNode) {

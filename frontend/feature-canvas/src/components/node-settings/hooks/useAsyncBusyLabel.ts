@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 interface UseAsyncBusyLabelOptions {
   isProfileLoading: boolean;
@@ -8,7 +9,7 @@ interface UseAsyncBusyLabelOptions {
   isFetchingHashEncoding: boolean;
   isFetchingBinnedDistribution: boolean;
   isFetchingRecommendations: boolean;
-  isPreviewNode: boolean;
+  catalogFlags: CatalogFlagMap;
 }
 
 interface UseAsyncBusyLabelResult {
@@ -29,8 +30,10 @@ export const useAsyncBusyLabel = ({
   isFetchingHashEncoding,
   isFetchingBinnedDistribution,
   isFetchingRecommendations,
-  isPreviewNode,
+  catalogFlags,
 }: UseAsyncBusyLabelOptions): UseAsyncBusyLabelResult => {
+  const { isPreviewNode } = catalogFlags;
+
   const hasActiveAsyncWork = useMemo(
     () =>
       isProfileLoading ||

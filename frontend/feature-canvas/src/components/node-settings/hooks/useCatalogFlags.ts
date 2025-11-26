@@ -45,6 +45,8 @@ export type CatalogFlagMap = {
   isDropMissingColumnsNode: boolean;
   isDropMissingRowsNode: boolean;
   isDropMissingNode: boolean;
+  isPreviewNode: boolean;
+  isDatasetProfileNode: boolean;
 };
 
 export const useCatalogFlags = (node: Node | null | undefined): CatalogFlagMap => {
@@ -52,6 +54,8 @@ export const useCatalogFlags = (node: Node | null | undefined): CatalogFlagMap =
 
   return useMemo<CatalogFlagMap>(() => {
     const isDataset = isDatasetNode(node);
+    const isPreviewNode = catalogType === 'data_preview';
+    const isDatasetProfileNode = catalogType === 'dataset_profile';
     const isImputerNode =
       catalogType === 'imputation_methods' ||
       catalogType === 'advanced_imputer' ||
@@ -139,6 +143,8 @@ export const useCatalogFlags = (node: Node | null | undefined): CatalogFlagMap =
       isDropMissingColumnsNode,
       isDropMissingRowsNode,
       isDropMissingNode,
+      isPreviewNode,
+      isDatasetProfileNode,
     };
   }, [catalogType, node]);
 };

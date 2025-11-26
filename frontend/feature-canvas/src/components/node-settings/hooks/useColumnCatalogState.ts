@@ -1,8 +1,9 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 type UseColumnCatalogStateArgs = {
   requiresColumnCatalog: boolean;
-  isImputerNode: boolean;
+  catalogFlags: CatalogFlagMap;
   nodeId: string;
   sourceId?: string | null;
   hasReachableSource: boolean;
@@ -39,11 +40,12 @@ const resetColumnState = (
 
 export const useColumnCatalogState = ({
   requiresColumnCatalog,
-  isImputerNode,
+  catalogFlags,
   nodeId,
   sourceId,
   hasReachableSource,
 }: UseColumnCatalogStateArgs): UseColumnCatalogStateResult => {
+  const { isImputerNode } = catalogFlags;
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
   const [columnSearch, setColumnSearch] = useState('');
   const [columnMissingMap, setColumnMissingMap] = useState<Record<string, number>>({});

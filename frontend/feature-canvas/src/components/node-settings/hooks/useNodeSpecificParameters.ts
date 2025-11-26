@@ -35,6 +35,7 @@ export const useNodeSpecificParameters = (
       isOneHotEncodingNode,
       isMissingIndicatorNode,
       isDropMissingRowsNode,
+      isDropMissingColumnsNode,
     } = flags;
 
     const isClassResamplingNode = isClassUndersamplingNode || isClassOversamplingNode;
@@ -206,6 +207,9 @@ export const useNodeSpecificParameters = (
       },
       dropRows: {
         any: getParameterIf(isDropMissingRowsNode, 'drop_if_any_missing'),
+      },
+      dropMissing: {
+        threshold: getParameterIf(isDropMissingColumnsNode || isDropMissingRowsNode, 'missing_threshold'),
       },
     };
   }, [flags, getParameter]);

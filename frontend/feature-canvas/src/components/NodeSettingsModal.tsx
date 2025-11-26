@@ -255,6 +255,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isDropMissingColumnsNode,
     isDropMissingRowsNode,
     isDropMissingNode,
+    isPreviewNode,
+    isDatasetProfileNode,
   } = catalogFlags;
   const datasetBadge = isDataset;
   const isClassResamplingNode = isClassUndersamplingNode || isClassOversamplingNode;
@@ -279,76 +281,15 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   );
 
   const nodeId = typeof node?.id === 'string' ? node.id : '';
-  const footerResetFlags = [
-    isFeatureMathNode,
-    isFeatureTargetSplitNode,
-    isTrainTestSplitNode,
-    isModelEvaluationNode,
-    isHashEncodingNode,
-    isPolynomialFeaturesNode,
-    isFeatureSelectionNode,
-    isDataConsistencyNode,
-    isTrainModelDraftNode,
-    isHyperparameterTuningNode,
-    isClassResamplingNode,
-    isLabelEncodingNode,
-    isTargetEncodingNode,
-    isDummyEncodingNode,
-    isOneHotEncodingNode,
-    isOrdinalEncodingNode,
-    isImputerNode,
-    isMissingIndicatorNode,
-    isReplaceAliasesNode,
-    isTrimWhitespaceNode,
-    isRemoveSpecialCharsNode,
-    isReplaceInvalidValuesNode,
-    isRegexCleanupNode,
-    isNormalizeTextCaseNode,
-    isStandardizeDatesNode,
-    isCastNode,
-    isRemoveDuplicatesNode,
-    isDropMissingNode,
-    isOutlierNode,
-  ];
 
   const { canResetNode, headerCanResetNode, footerCanResetNode } = useResetPermissions({
     isResetAvailable,
-    isDataset,
     defaultConfigTemplate,
-    footerResetFlags,
-    isScalingNode,
-    isBinningNode,
-    isBinnedDistributionNode,
-    isSkewnessDistributionNode,
+    catalogFlags,
   });
 
   const nodeParams = useNodeSpecificParameters(getParameter, catalogFlags);
-  const filteredParameters = useFilteredParameters(parameters, {
-    isBinningNode,
-    isCastNode,
-    isDropMissingColumnsNode,
-    isDropMissingRowsNode,
-    isImputerNode,
-    isMissingIndicatorNode,
-    isReplaceAliasesNode,
-    isTrimWhitespaceNode,
-    isRemoveSpecialCharsNode,
-    isReplaceInvalidValuesNode,
-    isRegexCleanupNode,
-    isNormalizeTextCaseNode,
-    isStandardizeDatesNode,
-    isScalingNode,
-    isClassUndersamplingNode,
-    isClassOversamplingNode,
-    isTrainModelDraftNode,
-    isLabelEncodingNode,
-    isOrdinalEncodingNode,
-    isDummyEncodingNode,
-    isOneHotEncodingNode,
-    isRemoveDuplicatesNode,
-    isSkewnessNode,
-    isFeatureTargetSplitNode,
-  });
+  const filteredParameters = useFilteredParameters(parameters, catalogFlags);
 
   const dataConsistencyParameters = useMemo(
     () => (isDataConsistencyNode ? filteredParameters : []),
@@ -415,19 +356,11 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   } = useModelingConfiguration({
     configState,
     setConfigState,
-    isFeatureTargetSplitNode,
-    isTrainTestSplitNode,
-    isTrainModelDraftNode,
-  isHyperparameterTuningNode,
-    isClassResamplingNode,
-    isClassOversamplingNode,
-    isClassUndersamplingNode,
+    catalogFlags,
     upstreamTargetColumn,
     nodeId,
     modelTypeOptions: nodeParams.trainModel.modelType?.options ?? null,
-  });
-
-  const upstreamConfigFingerprints = useMemo(() => {
+  });  const upstreamConfigFingerprints = useMemo(() => {
     if (!upstreamNodeIds.length) {
       return {} as Record<string, any>;
     }
@@ -462,9 +395,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     skipPreview,
   } = useSchemaDiagnostics({
     cachedPreviewSchema,
-    isClassOversamplingNode,
+    catalogFlags,
     resamplingTargetColumn: resamplingConfig?.targetColumn ?? null,
-    isImputerNode,
     imputerStrategies,
   });
 
@@ -483,7 +415,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     setImputerMissingFilter,
   } = useColumnCatalogState({
     requiresColumnCatalog,
-    isImputerNode,
+    catalogFlags,
     nodeId,
     sourceId,
     hasReachableSource,
@@ -536,12 +468,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     dummyEncoding,
     oneHotEncoding,
   } = useEncodingRecommendationsState({
-    isLabelEncodingNode,
-    isTargetEncodingNode,
-    isHashEncodingNode,
-    isOrdinalEncodingNode,
-    isDummyEncodingNode,
-    isOneHotEncodingNode,
+    catalogFlags,
     sourceId,
     hasReachableSource,
     graphContext,
@@ -560,8 +487,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   }, [stableInitialConfig]);
 
   const {
-    isPreviewNode,
-    isDatasetProfileNode,
     datasetProfileController,
     profileState,
   } = useDatasetProfiling({
@@ -570,6 +495,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     hasReachableSource,
     sourceId,
     formatRelativeTime,
+    catalogFlags,
   });
 
   const {
@@ -588,13 +514,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     skipPreview,
     cachedPreviewSchema,
     setCachedPreviewSchema,
-    isPreviewNode,
-    isFeatureMathNode,
-    isPolynomialFeaturesNode,
-    isFeatureSelectionNode,
-    isTrainTestSplitNode,
-    isOutlierNode,
-    isTransformerAuditNode,
+    catalogFlags,
   });
 
   const {
@@ -606,11 +526,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   } = usePreviewSignals({
     previewState,
     nodeId,
-    isFeatureMathNode,
-    isPolynomialFeaturesNode,
-    isFeatureSelectionNode,
-    isOutlierNode,
-    isTransformerAuditNode,
+    catalogFlags,
   });
 
   useFeatureSelectionAutoConfig({
@@ -625,7 +541,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     featureMathSummaries,
     collapsedFeatureMath,
     setCollapsedFeatureMath,
-  } = useFeatureMathState(isFeatureMathNode, configState, featureMathSignals);
+  } = useFeatureMathState(catalogFlags, configState, featureMathSignals);
 
   const {
     outlierData,
@@ -722,13 +638,13 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     activeFlagSuffix,
     missingIndicatorColumns,
     missingIndicatorInsights,
-  } = useMissingIndicatorState(
-    isMissingIndicatorNode,
+  } = useMissingIndicatorState({
+    catalogFlags,
     configState,
     node,
     availableColumns,
-    columnMissingMap
-  );
+    columnMissingMap,
+  });
 
   const canRefreshSkewnessDistributions = Boolean(sourceId) && hasReachableSource;
 
@@ -864,8 +780,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     imputerMissingFilter,
   });
 
-  const thresholdParameter = getParameter('missing_threshold');
-  const thresholdParameterName = thresholdParameter?.name ?? null;
+  const thresholdParameterName = nodeParams.dropMissing.threshold?.name ?? null;
 
   const {
     normalizedSuggestedThreshold,
@@ -880,7 +795,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   });
 
   const showDropMissingRowsSection =
-    isDropMissingRowsNode && Boolean(thresholdParameter || nodeParams.dropRows.any);
+    isDropMissingRowsNode && Boolean(nodeParams.dropMissing.threshold || nodeParams.dropRows.any);
 
   const {
     handleManualBoundChange,
@@ -948,7 +863,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isFetchingHashEncoding: hashEncoding.isFetching,
     isFetchingBinnedDistribution,
     isFetchingRecommendations,
-    isPreviewNode,
+    catalogFlags,
   });
 
   const {
@@ -980,7 +895,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     handleAliasColumnsChange,
     handleAliasAutoDetectToggle,
   } = useAliasStrategyHandlers({
-    isReplaceAliasesNode,
+    catalogFlags,
     node,
     setConfigState,
     setCollapsedStrategies,
@@ -998,7 +913,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     handleDateStrategyColumnToggle,
     handleDateStrategyAutoDetectToggle,
   } = useDateStrategyHandlers({
-    isStandardizeDatesNode,
+    catalogFlags,
     node,
     setConfigState,
     setCollapsedStrategies,
@@ -1016,7 +931,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     handleToggleFeatureMathOperation,
     handleFeatureMathOperationChange,
   } = useFeatureMathHandlers({
-    isFeatureMathNode,
+    catalogFlags,
     setConfigState,
     setCollapsedFeatureMath,
   });
@@ -1197,7 +1112,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
           )}
           {showDropMissingRowsSection && (
             <DropMissingRowsSection
-              thresholdParameter={thresholdParameter ?? null}
+              thresholdParameter={nodeParams.dropMissing.threshold ?? null}
               dropIfAnyParameter={nodeParams.dropRows.any}
               renderParameterField={renderParameterField}
             />
@@ -1207,7 +1122,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               <div className="canvas-modal__section-header">
                 <h3>Missingness recommendations</h3>
               </div>
-              {thresholdParameter && renderParameterField(thresholdParameter)}
+              {nodeParams.dropMissing.threshold && renderParameterField(nodeParams.dropMissing.threshold)}
               {renderMultiSelectField(dropColumnParameter)}
             </section>
           )}
