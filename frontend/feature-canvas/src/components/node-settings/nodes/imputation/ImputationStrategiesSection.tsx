@@ -1,4 +1,5 @@
 import React from 'react';
+import { FormField, SelectInput, NumberInput, TextInput, RangeInput } from '../../ui/FormFields';
 import {
   IMPUTER_MISSING_FILTER_PRESETS,
   isLikelyNumericColumn,
@@ -128,15 +129,13 @@ export const ImputationStrategiesSection: React.FC<ImputationStrategiesSectionPr
             </span>
           </div>
           <div className="canvas-imputer__filter-controls">
-            <input
+            <RangeInput
               id="imputer-missing-filter"
-              type="range"
               min={0}
               max={sliderMax}
               step={1}
               value={missingFilter}
               onChange={(event) => onMissingFilterChange(Number(event.target.value))}
-              className="canvas-imputer__filter-range"
             />
             <span className="canvas-imputer__filter-value">
               ≥<strong>{missingFilter}%</strong> missing
@@ -249,48 +248,36 @@ export const ImputationStrategiesSection: React.FC<ImputationStrategiesSectionPr
                 </div>
                 {!isCollapsed && (
                   <div className="canvas-imputer__card-body" id={`imputer-strategy-body-${index}`}>
-                    <div className="canvas-imputer__row">
-                      <label>Method</label>
-                      <select
+                    <FormField label="Method">
+                      <SelectInput
                         value={strategy.method}
                         onChange={(event) =>
                           onMethodChange(index, (event.target.value as ImputationStrategyMethod) ?? 'mean')
                         }
-                      >
-                        {methodOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                        options={methodOptions}
+                      />
+                    </FormField>
                     {strategy.method === 'knn' && (
-                      <div className="canvas-imputer__row">
-                        <label>Neighbors (k)</label>
-                        <input
-                          type="number"
-                          className="canvas-imputer__columns-input"
+                      <FormField label="Neighbors (k)">
+                        <NumberInput
                           min={1}
                           max={50}
                           step={1}
                           value={strategy.options?.neighbors ?? 5}
                           onChange={(event) => onOptionNumberChange(index, 'neighbors', event.target.value)}
                         />
-                      </div>
+                      </FormField>
                     )}
                     {(strategy.method === 'regression' || strategy.method === 'mice') && (
-                      <div className="canvas-imputer__row">
-                        <label>Max iterations</label>
-                        <input
-                          type="number"
-                          className="canvas-imputer__columns-input"
+                      <FormField label="Max iterations">
+                        <NumberInput
                           min={1}
                           max={100}
                           step={1}
                           value={strategy.options?.max_iter ?? 10}
                           onChange={(event) => onOptionNumberChange(index, 'max_iter', event.target.value)}
                         />
-                      </div>
+                      </FormField>
                     )}
                     {strategy.method === 'mice' && (
                       <p className="canvas-modal__note">
@@ -376,17 +363,14 @@ export const ImputationStrategiesSection: React.FC<ImputationStrategiesSectionPr
                         <span>No columns selected yet.</span>
                       )}
                     </div>
-                    <div className="canvas-imputer__row">
-                      <label>Manual columns (optional)</label>
-                      <input
-                        type="text"
-                        className="canvas-imputer__columns-input"
+                    <FormField label="Manual columns (optional)">
+                      <TextInput
                         value={columnsValue}
                         onChange={(event) => onColumnsChange(index, event.target.value)}
                         placeholder="Add custom columns, separated by commas"
                         aria-label="Manual column entry"
                       />
-                    </div>
+                    </FormField>
                     <p className="canvas-modal__note">
                       Tap columns above to toggle them. Missing % reflects the latest row-level preview, and manual entry lets you include custom fields.
                     </p>
