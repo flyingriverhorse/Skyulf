@@ -11,6 +11,7 @@ interface UseInsightSummariesArgs {
   scalingData: GeneratedDataLike | null | undefined;
   binningData: GeneratedDataLike | null | undefined;
   binnedDistributionData: GeneratedDataLike | null | undefined;
+  outlierData: GeneratedDataLike | null | undefined;
 }
 
 interface UseInsightSummariesResult {
@@ -18,9 +19,11 @@ interface UseInsightSummariesResult {
   relativeScalingGeneratedAt: string | null;
   relativeBinningGeneratedAt: string | null;
   relativeBinnedGeneratedAt: string | null;
+  relativeOutlierGeneratedAt: string | null;
   scalingSampleSize: number | null;
   binningSampleSize: number | null;
   binnedSampleSize: number | null;
+  outlierSampleSize: number | null;
 }
 
 const normalizeSampleSize = (value: string | number | null | undefined): number | null => {
@@ -36,6 +39,7 @@ export const useInsightSummaries = ({
   scalingData,
   binningData,
   binnedDistributionData,
+  outlierData,
 }: UseInsightSummariesArgs): UseInsightSummariesResult => {
   const relativeGeneratedAt = useMemo(
     () => formatRelativeTime(recommendationsGeneratedAt ?? null),
@@ -53,6 +57,10 @@ export const useInsightSummaries = ({
     () => formatRelativeTime(binnedDistributionData?.generated_at ?? null),
     [binnedDistributionData?.generated_at],
   );
+  const relativeOutlierGeneratedAt = useMemo(
+    () => formatRelativeTime(outlierData?.generated_at ?? null),
+    [outlierData?.generated_at],
+  );
 
   const scalingSampleSize = useMemo(
     () => normalizeSampleSize(scalingData?.sample_size ?? null),
@@ -66,14 +74,20 @@ export const useInsightSummaries = ({
     () => normalizeSampleSize(binnedDistributionData?.sample_size ?? null),
     [binnedDistributionData?.sample_size],
   );
+  const outlierSampleSize = useMemo(
+    () => normalizeSampleSize(outlierData?.sample_size ?? null),
+    [outlierData?.sample_size],
+  );
 
   return {
     relativeGeneratedAt,
     relativeScalingGeneratedAt,
     relativeBinningGeneratedAt,
     relativeBinnedGeneratedAt,
+    relativeOutlierGeneratedAt,
     scalingSampleSize,
     binningSampleSize,
     binnedSampleSize,
+    outlierSampleSize,
   };
 };
