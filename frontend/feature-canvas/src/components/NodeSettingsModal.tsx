@@ -648,36 +648,12 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   });
 
   const {
-    isFetchingLabelEncoding,
-    labelEncodingError,
-    labelEncodingSuggestions,
-    labelEncodingMetadata,
-    isFetchingTargetEncoding,
-    targetEncodingError,
-    targetEncodingSuggestions,
-    targetEncodingMetadata,
-    isFetchingHashEncoding,
-    hashEncodingError,
-    hashEncodingSuggestions,
-    hashEncodingMetadata,
-    isFetchingOrdinalEncoding,
-    ordinalEncodingError,
-    ordinalEncodingSuggestions,
-    ordinalEncodingMetadata,
-    isFetchingDummyEncoding,
-    dummyEncodingError,
-    dummyEncodingSuggestions,
-    dummyEncodingMetadata,
-    isFetchingOneHotEncoding,
-    oneHotEncodingError,
-    oneHotEncodingSuggestions,
-    oneHotEncodingMetadata,
-    handleApplyLabelEncodingRecommended,
-    handleApplyTargetEncodingRecommended,
-    handleApplyHashEncodingRecommended,
-    handleApplyOrdinalEncodingRecommended,
-    handleApplyDummyEncodingRecommended,
-    handleApplyOneHotEncodingRecommended,
+    labelEncoding,
+    targetEncoding,
+    hashEncoding,
+    ordinalEncoding,
+    dummyEncoding,
+    oneHotEncoding,
   } = useEncodingRecommendationsState({
     isLabelEncodingNode,
     isTargetEncodingNode,
@@ -1224,7 +1200,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isPreviewLoading,
     isFetchingScaling,
     isFetchingBinning,
-    isFetchingHashEncoding,
+    isFetchingHashEncoding: hashEncoding.isFetching,
     isFetchingBinnedDistribution,
     isFetchingRecommendations,
     isPreviewNode,
@@ -1638,10 +1614,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <OrdinalEncodingSection
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
-              isFetching={isFetchingOrdinalEncoding}
-              error={ordinalEncodingError}
-              suggestions={ordinalEncodingSuggestions}
-              metadata={ordinalEncodingMetadata}
+              isFetching={ordinalEncoding.isFetching}
+              error={ordinalEncoding.error}
+              suggestions={ordinalEncoding.suggestions}
+              metadata={ordinalEncoding.metadata}
               columnsParameter={ordinalEncodingColumnsParameter}
               autoDetectParameter={ordinalEncodingAutoDetectParameter}
               maxCategoriesParameter={ordinalEncodingMaxCategoriesParameter}
@@ -1653,7 +1629,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               selectedColumns={selectedColumns}
               renderParameterField={renderParameterField}
               onToggleColumn={handleToggleColumn}
-              onApplyRecommended={handleApplyOrdinalEncodingRecommended}
+              onApplyRecommended={ordinalEncoding.handleApplyRecommended}
               formatMissingPercentage={formatMissingPercentage}
             />
           )}
@@ -1661,10 +1637,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <TargetEncodingSection
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
-              isFetching={isFetchingTargetEncoding}
-              error={targetEncodingError}
-              suggestions={targetEncodingSuggestions}
-              metadata={targetEncodingMetadata}
+              isFetching={targetEncoding.isFetching}
+              error={targetEncoding.error}
+              suggestions={targetEncoding.suggestions}
+              metadata={targetEncoding.metadata}
               columnsParameter={targetEncodingColumnsParameter}
               targetColumnParameter={targetEncodingTargetColumnParameter}
               autoDetectParameter={targetEncodingAutoDetectParameter}
@@ -1677,7 +1653,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               selectedColumns={selectedColumns}
               renderParameterField={renderParameterField}
               onToggleColumn={handleToggleColumn}
-              onApplyRecommended={handleApplyTargetEncodingRecommended}
+              onApplyRecommended={targetEncoding.handleApplyRecommended}
               formatMissingPercentage={formatMissingPercentage}
             />
           )}
@@ -1685,10 +1661,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <DummyEncodingSection
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
-              isFetching={isFetchingDummyEncoding}
-              error={dummyEncodingError}
-              suggestions={dummyEncodingSuggestions}
-              metadata={dummyEncodingMetadata}
+              isFetching={dummyEncoding.isFetching}
+              error={dummyEncoding.error}
+              suggestions={dummyEncoding.suggestions}
+              metadata={dummyEncoding.metadata}
               columnsParameter={dummyEncodingColumnsParameter}
               autoDetectParameter={dummyEncodingAutoDetectParameter}
               maxCategoriesParameter={dummyEncodingMaxCategoriesParameter}
@@ -1699,7 +1675,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               selectedColumns={selectedColumns}
               renderParameterField={renderParameterField}
               onToggleColumn={handleToggleColumn}
-              onApplyRecommended={handleApplyDummyEncodingRecommended}
+              onApplyRecommended={dummyEncoding.handleApplyRecommended}
               formatMissingPercentage={formatMissingPercentage}
             />
           )}
@@ -1707,10 +1683,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <OneHotEncodingSection
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
-              isFetching={isFetchingOneHotEncoding}
-              error={oneHotEncodingError}
-              suggestions={oneHotEncodingSuggestions}
-              metadata={oneHotEncodingMetadata}
+              isFetching={oneHotEncoding.isFetching}
+              error={oneHotEncoding.error}
+              suggestions={oneHotEncoding.suggestions}
+              metadata={oneHotEncoding.metadata}
               columnsParameter={oneHotEncodingColumnsParameter}
               autoDetectParameter={oneHotEncodingAutoDetectParameter}
               maxCategoriesParameter={oneHotEncodingMaxCategoriesParameter}
@@ -1721,7 +1697,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               selectedColumns={selectedColumns}
               renderParameterField={renderParameterField}
               onToggleColumn={handleToggleColumn}
-              onApplyRecommended={handleApplyOneHotEncodingRecommended}
+              onApplyRecommended={oneHotEncoding.handleApplyRecommended}
               formatMissingPercentage={formatMissingPercentage}
             />
           )}
@@ -1863,10 +1839,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <LabelEncodingSection
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
-              isFetching={isFetchingLabelEncoding}
-              error={labelEncodingError}
-              suggestions={labelEncodingSuggestions}
-              metadata={labelEncodingMetadata}
+              isFetching={labelEncoding.isFetching}
+              error={labelEncoding.error}
+              suggestions={labelEncoding.suggestions}
+              metadata={labelEncoding.metadata}
               columnsParameter={labelEncodingColumnsParameter}
               autoDetectParameter={labelEncodingAutoDetectParameter}
               maxUniqueParameter={labelEncodingMaxUniqueParameter}
@@ -1877,7 +1853,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               selectedColumns={selectedColumns}
               renderParameterField={renderParameterField}
               onToggleColumn={handleToggleColumn}
-              onApplyRecommended={handleApplyLabelEncodingRecommended}
+              onApplyRecommended={labelEncoding.handleApplyRecommended}
               formatMissingPercentage={formatMissingPercentage}
             />
           )}
@@ -1885,10 +1861,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <HashEncodingSection
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
-              isFetching={isFetchingHashEncoding}
-              error={hashEncodingError}
-              suggestions={hashEncodingSuggestions}
-              metadata={hashEncodingMetadata}
+              isFetching={hashEncoding.isFetching}
+              error={hashEncoding.error}
+              suggestions={hashEncoding.suggestions}
+              metadata={hashEncoding.metadata}
               columnsParameter={hashEncodingColumnsParameter}
               autoDetectParameter={hashEncodingAutoDetectParameter}
               maxCategoriesParameter={hashEncodingMaxCategoriesParameter}
@@ -1899,7 +1875,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               selectedColumns={selectedColumns}
               renderParameterField={renderParameterField}
               onToggleColumn={handleToggleColumn}
-              onApplyRecommended={handleApplyHashEncodingRecommended}
+              onApplyRecommended={hashEncoding.handleApplyRecommended}
               formatMissingPercentage={formatMissingPercentage}
             />
           )}
