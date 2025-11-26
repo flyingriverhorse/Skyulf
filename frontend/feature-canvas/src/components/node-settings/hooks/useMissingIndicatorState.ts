@@ -6,14 +6,24 @@ import {
   buildMissingIndicatorInsights,
   type MissingIndicatorInsights,
 } from '../nodes/missing_indicator/missingIndicatorSettings';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
-export const useMissingIndicatorState = (
-  isMissingIndicatorNode: boolean,
-  configState: Record<string, any> | null,
-  node: Node,
-  availableColumns: string[],
-  columnMissingMap: Record<string, number>
-) => {
+interface UseMissingIndicatorStateOptions {
+  catalogFlags: CatalogFlagMap;
+  configState: Record<string, any> | null;
+  node: Node;
+  availableColumns: string[];
+  columnMissingMap: Record<string, number>;
+}
+
+export const useMissingIndicatorState = ({
+  catalogFlags,
+  configState,
+  node,
+  availableColumns,
+  columnMissingMap,
+}: UseMissingIndicatorStateOptions) => {
+  const { isMissingIndicatorNode } = catalogFlags;
   const activeFlagSuffix = useMemo(() => {
     if (!isMissingIndicatorNode) {
       return '';

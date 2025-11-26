@@ -6,14 +6,10 @@ import { useOrdinalEncodingRecommendations } from './useOrdinalEncodingRecommend
 import { useDummyEncodingRecommendations } from './useDummyEncodingRecommendations';
 import { useOneHotEncodingRecommendations } from './useOneHotEncodingRecommendations';
 import { useTargetEncodingDefaults } from './useTargetEncodingDefaults';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 type UseEncodingRecommendationsStateProps = {
-  isLabelEncodingNode: boolean;
-  isTargetEncodingNode: boolean;
-  isHashEncodingNode: boolean;
-  isOrdinalEncodingNode: boolean;
-  isDummyEncodingNode: boolean;
-  isOneHotEncodingNode: boolean;
+  catalogFlags: CatalogFlagMap;
   sourceId?: string | null;
   hasReachableSource: boolean;
   graphContext: any;
@@ -24,12 +20,7 @@ type UseEncodingRecommendationsStateProps = {
 };
 
 export const useEncodingRecommendationsState = ({
-  isLabelEncodingNode,
-  isTargetEncodingNode,
-  isHashEncodingNode,
-  isOrdinalEncodingNode,
-  isDummyEncodingNode,
-  isOneHotEncodingNode,
+  catalogFlags,
   sourceId,
   hasReachableSource,
   graphContext,
@@ -38,6 +29,15 @@ export const useEncodingRecommendationsState = ({
   setConfigState,
   nodeChangeVersion,
 }: UseEncodingRecommendationsStateProps) => {
+  const {
+    isLabelEncodingNode,
+    isTargetEncodingNode,
+    isHashEncodingNode,
+    isOrdinalEncodingNode,
+    isDummyEncodingNode,
+    isOneHotEncodingNode,
+  } = catalogFlags;
+
   const targetNodeId = node?.id ?? null;
 
   const {

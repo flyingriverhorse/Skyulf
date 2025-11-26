@@ -6,12 +6,14 @@ import {
   normalizeFeatureMathOperations,
   FeatureMathOperationSummary,
 } from '../nodes/feature_math/featureMathSettings';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 export const useFeatureMathState = (
-  isFeatureMathNode: boolean,
+  catalogFlags: CatalogFlagMap,
   configState: Record<string, any> | null,
   featureMathSignals: FeatureMathNodeSignal[]
 ) => {
+  const { isFeatureMathNode } = catalogFlags;
   const [collapsedFeatureMath, setCollapsedFeatureMath] = useState<Set<string>>(() => new Set());
 
   const featureMathOperations = useMemo<FeatureMathOperationDraft[]>(() => {

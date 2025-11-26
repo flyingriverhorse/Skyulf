@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, type Dispatch, type SetStateAction } f
 import type { Node } from 'react-flow-renderer';
 import type { PipelinePreviewSchema } from '../../../api';
 import { usePipelinePreview } from './usePipelinePreview';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 export type GraphSnapshot = {
   nodes: any[];
@@ -19,13 +20,7 @@ type UseNodePreviewArgs = {
   skipPreview: boolean;
   cachedPreviewSchema: PipelinePreviewSchema | null;
   setCachedPreviewSchema: Dispatch<SetStateAction<PipelinePreviewSchema | null>>;
-  isPreviewNode: boolean;
-  isFeatureMathNode: boolean;
-  isPolynomialFeaturesNode: boolean;
-  isFeatureSelectionNode: boolean;
-  isTrainTestSplitNode: boolean;
-  isOutlierNode: boolean;
-  isTransformerAuditNode: boolean;
+  catalogFlags: CatalogFlagMap;
 };
 
 type UseNodePreviewResult = {
@@ -45,16 +40,20 @@ export const useNodePreview = ({
   nodeId,
   previewSignature,
   skipPreview,
-  isPreviewNode,
-  isFeatureMathNode,
-  isPolynomialFeaturesNode,
-  isFeatureSelectionNode,
-  isTrainTestSplitNode,
-  isOutlierNode,
-  isTransformerAuditNode,
+  catalogFlags,
   cachedPreviewSchema,
   setCachedPreviewSchema,
 }: UseNodePreviewArgs): UseNodePreviewResult => {
+  const {
+    isPreviewNode,
+    isFeatureMathNode,
+    isPolynomialFeaturesNode,
+    isFeatureSelectionNode,
+    isTrainTestSplitNode,
+    isOutlierNode,
+    isTransformerAuditNode,
+  } = catalogFlags;
+
   const shouldFetchPreview = useMemo(() => {
     if (!graphSnapshot) {
       return false;

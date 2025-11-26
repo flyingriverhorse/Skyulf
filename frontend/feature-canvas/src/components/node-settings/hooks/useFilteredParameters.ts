@@ -1,36 +1,10 @@
 import { useMemo } from 'react';
 import type { FeatureNodeParameter } from '../../../api';
-
-type FilterFlags = {
-  isBinningNode: boolean;
-  isCastNode: boolean;
-  isDropMissingColumnsNode: boolean;
-  isDropMissingRowsNode: boolean;
-  isImputerNode: boolean;
-  isMissingIndicatorNode: boolean;
-  isReplaceAliasesNode: boolean;
-  isTrimWhitespaceNode: boolean;
-  isRemoveSpecialCharsNode: boolean;
-  isReplaceInvalidValuesNode: boolean;
-  isRegexCleanupNode: boolean;
-  isNormalizeTextCaseNode: boolean;
-  isStandardizeDatesNode: boolean;
-  isScalingNode: boolean;
-  isClassUndersamplingNode: boolean;
-  isClassOversamplingNode: boolean;
-  isTrainModelDraftNode: boolean;
-  isLabelEncodingNode: boolean;
-  isOrdinalEncodingNode: boolean;
-  isDummyEncodingNode: boolean;
-  isOneHotEncodingNode: boolean;
-  isRemoveDuplicatesNode: boolean;
-  isSkewnessNode: boolean;
-  isFeatureTargetSplitNode: boolean;
-};
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 export const useFilteredParameters = (
   parameters: FeatureNodeParameter[],
-  flags: FilterFlags,
+  flags: CatalogFlagMap,
 ): FeatureNodeParameter[] => {
   const {
     isBinningNode,

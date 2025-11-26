@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { Node } from 'react-flow-renderer';
 import { useDatasetProfileController } from '../nodes/dataset/datasetProfile';
 import { stableStringify } from '../utils/configParsers';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 type GraphContext = { nodes: any[]; edges: any[] } | null;
 
@@ -11,11 +12,10 @@ type UseDatasetProfilingArgs = {
   hasReachableSource: boolean;
   sourceId?: string | null;
   formatRelativeTime: (value?: string | null) => string | null;
+  catalogFlags: CatalogFlagMap;
 };
 
 type UseDatasetProfilingResult = {
-  isPreviewNode: boolean;
-  isDatasetProfileNode: boolean;
   datasetProfileController: ReturnType<typeof useDatasetProfileController>;
   profileState: ReturnType<typeof useDatasetProfileController>['profileState'];
 };
@@ -26,13 +26,9 @@ export const useDatasetProfiling = ({
   hasReachableSource,
   sourceId,
   formatRelativeTime,
+  catalogFlags,
 }: UseDatasetProfilingArgs): UseDatasetProfilingResult => {
-  const isPreviewNode = useMemo(() => node?.data?.catalogType === 'data_preview', [node?.data?.catalogType]);
-
-  const isDatasetProfileNode = useMemo(
-    () => node?.data?.catalogType === 'dataset_profile',
-    [node?.data?.catalogType],
-  );
+  const { isDatasetProfileNode } = catalogFlags;
 
   const profilingGraphSignature = useMemo(
     () => (graphContext ? stableStringify(graphContext) : ''),
@@ -52,8 +48,6 @@ export const useDatasetProfiling = ({
   const { profileState } = datasetProfileController;
 
   return {
-    isPreviewNode,
-    isDatasetProfileNode,
     datasetProfileController,
     profileState,
   };

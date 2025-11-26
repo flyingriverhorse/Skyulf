@@ -8,9 +8,10 @@ import {
   type DateMode,
 } from '../nodes/standardize_date/standardizeDateSettings';
 import { ensureArrayOfString } from '../sharedUtils';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 interface UseDateStrategyHandlersProps {
-  isStandardizeDatesNode: boolean;
+  catalogFlags: CatalogFlagMap;
   node: any;
   setConfigState: React.Dispatch<React.SetStateAction<any>>;
   setCollapsedStrategies: React.Dispatch<React.SetStateAction<Set<number>>>;
@@ -20,7 +21,7 @@ interface UseDateStrategyHandlersProps {
 }
 
 export const useDateStrategyHandlers = ({
-  isStandardizeDatesNode,
+  catalogFlags,
   node,
   setConfigState,
   setCollapsedStrategies,
@@ -28,6 +29,8 @@ export const useDateStrategyHandlers = ({
   standardizeDatesColumnSummary,
   standardizeDatesMode,
 }: UseDateStrategyHandlersProps) => {
+  const { isStandardizeDatesNode } = catalogFlags;
+
   const updateDateStrategies = useCallback(
     (updater: (current: DateFormatStrategyConfig[]) => DateFormatStrategyConfig[]) => {
       setConfigState((previous: any) => {

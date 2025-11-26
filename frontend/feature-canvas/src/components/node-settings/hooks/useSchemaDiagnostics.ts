@@ -6,12 +6,12 @@ import {
   type ImputationStrategyConfig,
 } from '../nodes/imputation/imputationSettings';
 import type { ImputationSchemaDiagnostics } from '../nodes/imputation/ImputationStrategiesSection';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 interface UseSchemaDiagnosticsOptions {
   cachedPreviewSchema: PipelinePreviewSchema | null;
-  isClassOversamplingNode: boolean;
+  catalogFlags: CatalogFlagMap;
   resamplingTargetColumn: string | null;
-  isImputerNode: boolean;
   imputerStrategies: ImputationStrategyConfig[];
 }
 
@@ -24,11 +24,12 @@ interface UseSchemaDiagnosticsResult {
 
 export const useSchemaDiagnostics = ({
   cachedPreviewSchema,
-  isClassOversamplingNode,
+  catalogFlags,
   resamplingTargetColumn,
-  isImputerNode,
   imputerStrategies,
 }: UseSchemaDiagnosticsOptions): UseSchemaDiagnosticsResult => {
+  const { isClassOversamplingNode, isImputerNode } = catalogFlags;
+
   const cachedSchemaColumns = useMemo(() => cachedPreviewSchema?.columns ?? [], [cachedPreviewSchema]);
 
   const oversamplingSchemaGuard = useMemo<ResamplingSchemaGuard | null>(() => {

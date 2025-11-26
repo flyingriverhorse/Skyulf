@@ -15,18 +15,21 @@ import {
   sanitizeStringList,
   sanitizeTimezoneValue,
 } from '../utils/sanitizers';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 interface UseFeatureMathHandlersProps {
-  isFeatureMathNode: boolean;
+  catalogFlags: CatalogFlagMap;
   setConfigState: React.Dispatch<React.SetStateAction<any>>;
   setCollapsedFeatureMath: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
 
 export const useFeatureMathHandlers = ({
-  isFeatureMathNode,
+  catalogFlags,
   setConfigState,
   setCollapsedFeatureMath,
 }: UseFeatureMathHandlersProps) => {
+  const { isFeatureMathNode } = catalogFlags;
+
   const updateFeatureMathOperations = useCallback(
     (updater: (operations: FeatureMathOperationDraft[]) => FeatureMathOperationDraft[]) => {
       setConfigState((previous: any) => {

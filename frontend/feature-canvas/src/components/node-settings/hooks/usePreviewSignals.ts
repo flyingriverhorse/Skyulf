@@ -7,15 +7,12 @@ import type {
   TransformerAuditNodeSignal,
 } from '../../../api';
 import type { PreviewState } from '../nodes/dataset/DataSnapshotSection';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 type UsePreviewSignalsArgs = {
   previewState: PreviewState;
   nodeId: string;
-  isFeatureMathNode: boolean;
-  isPolynomialFeaturesNode: boolean;
-  isFeatureSelectionNode: boolean;
-  isOutlierNode: boolean;
-  isTransformerAuditNode: boolean;
+  catalogFlags: CatalogFlagMap;
 };
 
 type UsePreviewSignalsResult = {
@@ -29,12 +26,16 @@ type UsePreviewSignalsResult = {
 export const usePreviewSignals = ({
   previewState,
   nodeId,
-  isFeatureMathNode,
-  isPolynomialFeaturesNode,
-  isFeatureSelectionNode,
-  isOutlierNode,
-  isTransformerAuditNode,
+  catalogFlags,
 }: UsePreviewSignalsArgs): UsePreviewSignalsResult => {
+  const {
+    isFeatureMathNode,
+    isPolynomialFeaturesNode,
+    isFeatureSelectionNode,
+    isOutlierNode,
+    isTransformerAuditNode,
+  } = catalogFlags;
+
   const featureMathSignals = useMemo<FeatureMathNodeSignal[]>(() => {
     if (!isFeatureMathNode) {
       return [];

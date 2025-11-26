@@ -7,6 +7,7 @@ import type { TrainTestSplitConfig } from '../nodes/modeling/TrainTestSplitSecti
 import type { TrainModelDraftConfig } from '../nodes/modeling/TrainModelDraftSection';
 import type { TrainModelRuntimeConfig } from '../nodes/modeling/ModelTrainingSection';
 import type { ClassResamplingConfig } from '../nodes/resampling/ClassResamplingSection';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 export type TrainModelCVConfig = {
   enabled: boolean;
@@ -20,13 +21,7 @@ export type TrainModelCVConfig = {
 export type UseModelingConfigurationArgs = {
   configState: Record<string, any>;
   setConfigState: Dispatch<SetStateAction<Record<string, any>>>;
-  isFeatureTargetSplitNode: boolean;
-  isTrainTestSplitNode: boolean;
-  isTrainModelDraftNode: boolean;
-  isHyperparameterTuningNode: boolean;
-  isClassResamplingNode: boolean;
-  isClassOversamplingNode: boolean;
-  isClassUndersamplingNode: boolean;
+  catalogFlags: CatalogFlagMap;
   upstreamTargetColumn: string;
   nodeId: string;
   modelTypeOptions?: FeatureNodeParameterOption[] | null;
@@ -45,17 +40,21 @@ export type UseModelingConfigurationResult = {
 export const useModelingConfiguration = ({
   configState,
   setConfigState,
-  isFeatureTargetSplitNode,
-  isTrainTestSplitNode,
-  isTrainModelDraftNode,
-  isHyperparameterTuningNode,
-  isClassResamplingNode,
-  isClassOversamplingNode,
-  isClassUndersamplingNode,
+  catalogFlags,
   upstreamTargetColumn,
   nodeId,
   modelTypeOptions,
 }: UseModelingConfigurationArgs): UseModelingConfigurationResult => {
+  const {
+    isFeatureTargetSplitNode,
+    isTrainTestSplitNode,
+    isTrainModelDraftNode,
+    isHyperparameterTuningNode,
+    isClassOversamplingNode,
+    isClassUndersamplingNode,
+  } = catalogFlags;
+
+  const isClassResamplingNode = isClassUndersamplingNode || isClassOversamplingNode;
   const isModelingNode = isTrainModelDraftNode || isHyperparameterTuningNode;
 
   const featureTargetSplitConfig = useMemo<FeatureTargetSplitConfig | null>(() => {

@@ -1,14 +1,10 @@
 import { useMemo } from 'react';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 interface ResetPermissionOptions {
   isResetAvailable?: boolean;
-  isDataset: boolean;
   defaultConfigTemplate?: Record<string, any> | null;
-  footerResetFlags: boolean[];
-  isScalingNode: boolean;
-  isBinningNode: boolean;
-  isBinnedDistributionNode: boolean;
-  isSkewnessDistributionNode: boolean;
+  catalogFlags: CatalogFlagMap;
 }
 
 interface ResetPermissionResult {
@@ -23,18 +19,85 @@ interface ResetPermissionResult {
  */
 export const useResetPermissions = ({
   isResetAvailable = false,
-  isDataset,
   defaultConfigTemplate,
-  footerResetFlags,
-  isScalingNode,
-  isBinningNode,
-  isBinnedDistributionNode,
-  isSkewnessDistributionNode,
+  catalogFlags,
 }: ResetPermissionOptions): ResetPermissionResult => {
+  const {
+    isDataset,
+    isScalingNode,
+    isBinningNode,
+    isBinnedDistributionNode,
+    isSkewnessDistributionNode,
+    isFeatureMathNode,
+    isFeatureTargetSplitNode,
+    isTrainTestSplitNode,
+    isModelEvaluationNode,
+    isHashEncodingNode,
+    isPolynomialFeaturesNode,
+    isFeatureSelectionNode,
+    isDataConsistencyNode,
+    isTrainModelDraftNode,
+    isHyperparameterTuningNode,
+    isClassUndersamplingNode,
+    isClassOversamplingNode,
+    isLabelEncodingNode,
+    isTargetEncodingNode,
+    isDummyEncodingNode,
+    isOneHotEncodingNode,
+    isOrdinalEncodingNode,
+    isImputerNode,
+    isMissingIndicatorNode,
+    isReplaceAliasesNode,
+    isTrimWhitespaceNode,
+    isRemoveSpecialCharsNode,
+    isReplaceInvalidValuesNode,
+    isRegexCleanupNode,
+    isNormalizeTextCaseNode,
+    isStandardizeDatesNode,
+    isCastNode,
+    isRemoveDuplicatesNode,
+    isDropMissingNode,
+    isOutlierNode,
+  } = catalogFlags;
+
   const canResetNode = useMemo(
     () => Boolean(isResetAvailable && !isDataset && defaultConfigTemplate),
     [defaultConfigTemplate, isDataset, isResetAvailable],
   );
+
+  const isClassResamplingNode = isClassUndersamplingNode || isClassOversamplingNode;
+
+  const footerResetFlags = [
+    isFeatureMathNode,
+    isFeatureTargetSplitNode,
+    isTrainTestSplitNode,
+    isModelEvaluationNode,
+    isHashEncodingNode,
+    isPolynomialFeaturesNode,
+    isFeatureSelectionNode,
+    isDataConsistencyNode,
+    isTrainModelDraftNode,
+    isHyperparameterTuningNode,
+    isClassResamplingNode,
+    isLabelEncodingNode,
+    isTargetEncodingNode,
+    isDummyEncodingNode,
+    isOneHotEncodingNode,
+    isOrdinalEncodingNode,
+    isImputerNode,
+    isMissingIndicatorNode,
+    isReplaceAliasesNode,
+    isTrimWhitespaceNode,
+    isRemoveSpecialCharsNode,
+    isReplaceInvalidValuesNode,
+    isRegexCleanupNode,
+    isNormalizeTextCaseNode,
+    isStandardizeDatesNode,
+    isCastNode,
+    isRemoveDuplicatesNode,
+    isDropMissingNode,
+    isOutlierNode,
+  ];
 
   const footerOnlyResetNodes = footerResetFlags.some(Boolean);
   const disableAllGlobalResets = isBinnedDistributionNode || isSkewnessDistributionNode;
