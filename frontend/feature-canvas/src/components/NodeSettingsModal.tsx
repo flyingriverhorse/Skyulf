@@ -17,7 +17,7 @@ import { RemoveDuplicatesSection } from './node-settings/nodes/remove_duplicates
 import { DEFAULT_KEEP_STRATEGY, type KeepStrategy } from './node-settings/nodes/remove_duplicates/removeDuplicatesSettings';
 import { CastColumnTypesSection } from './node-settings/nodes/cast_column/CastColumnTypesSection';
 import { DataSnapshotSection } from './node-settings/nodes/dataset/DataSnapshotSection';
-import { DatasetProfileSection, useDatasetProfileController } from './node-settings/nodes/dataset/datasetProfile';
+import { DatasetProfileSection } from './node-settings/nodes/dataset/datasetProfile';
 import { NodeSettingsHeader } from './node-settings/layout/NodeSettingsHeader';
 import { NodeSettingsFooter } from './node-settings/layout/NodeSettingsFooter';
 import { ensureArrayOfString } from './node-settings/sharedUtils';
@@ -177,6 +177,9 @@ import { useResetPermissions } from './node-settings/hooks/useResetPermissions';
 import { useSchemaDiagnostics } from './node-settings/hooks/useSchemaDiagnostics';
 import { usePreviewData } from './node-settings/hooks/usePreviewData';
 import { useAsyncBusyLabel } from './node-settings/hooks/useAsyncBusyLabel';
+import { useInsightSummaries } from './node-settings/hooks/useInsightSummaries';
+import { useThresholdRecommendations } from './node-settings/hooks/useThresholdRecommendations';
+import { useDatasetProfiling } from './node-settings/hooks/useDatasetProfiling';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -757,23 +760,18 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     setCollapsedStrategies(new Set());
   }, [stableInitialConfig]);
 
-  const isPreviewNode = useMemo(() => node?.data?.catalogType === 'data_preview', [node?.data?.catalogType]);
-  const isDatasetProfileNode = useMemo(
-    () => node?.data?.catalogType === 'dataset_profile',
-    [node?.data?.catalogType]
-  );
-  const profilingGraphSignature = useMemo(() => (graphContext ? stableStringify(graphContext) : ''), [graphContext]);
-
-  const datasetProfileController = useDatasetProfileController({
-    node,
+  const {
+    isPreviewNode,
     isDatasetProfileNode,
-    sourceId,
-    hasReachableSource,
+    datasetProfileController,
+    profileState,
+  } = useDatasetProfiling({
+    node,
     graphContext,
-    profilingGraphSignature,
+    hasReachableSource,
+    sourceId,
     formatRelativeTime,
   });
-  const { profileState } = datasetProfileController;
 
   const {
     previewState,
@@ -1270,21 +1268,17 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   const thresholdParameter = getParameter('missing_threshold');
   const thresholdParameterName = thresholdParameter?.name ?? null;
 
-  const normalizedSuggestedThreshold = useMemo(() => {
-    if (suggestedThreshold === null || Number.isNaN(Number(suggestedThreshold))) {
-      return null;
-    }
-    const numeric = Number(suggestedThreshold);
-    return Math.round(numeric * 10) / 10;
-  }, [suggestedThreshold]);
-
-  const thresholdMatchesSuggestion = useMemo(() => {
-    if (thresholdParameterName === null || normalizedSuggestedThreshold === null) {
-      return false;
-    }
-    const currentValue = Number(configState?.[thresholdParameterName]);
-    return !Number.isNaN(currentValue) && currentValue === normalizedSuggestedThreshold;
-  }, [configState, normalizedSuggestedThreshold, thresholdParameterName]);
+  const {
+    normalizedSuggestedThreshold,
+    thresholdMatchesSuggestion,
+    canApplySuggestedThreshold,
+    handleApplySuggestedThreshold,
+  } = useThresholdRecommendations({
+    suggestedThreshold,
+    thresholdParameterName,
+    configState,
+    handleParameterChange,
+  });
 
   const showDropMissingRowsSection =
     isDropMissingRowsNode && Boolean(thresholdParameter || dropRowsAnyParameter);
@@ -1324,32 +1318,21 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     onResetConfig,
   });
 
-  const handleApplySuggestedThreshold = useCallback(() => {
-    if (normalizedSuggestedThreshold === null || !thresholdParameterName) {
-      return;
-    }
-    handleParameterChange(thresholdParameterName, normalizedSuggestedThreshold);
-  }, [handleParameterChange, normalizedSuggestedThreshold, thresholdParameterName]);
-
-  const canApplySuggestedThreshold =
-    normalizedSuggestedThreshold !== null && !thresholdMatchesSuggestion;
   const selectionCount = selectedColumns.length;
-  const relativeGeneratedAt = formatRelativeTime(recommendationsGeneratedAt);
-  const relativeScalingGeneratedAt = formatRelativeTime(scalingData?.generated_at ?? null);
-  const relativeBinningGeneratedAt = formatRelativeTime(binningData?.generated_at ?? null);
-  const relativeBinnedGeneratedAt = formatRelativeTime(binnedDistributionData?.generated_at ?? null);
-  const scalingSampleSizeNumeric = Number(scalingData?.sample_size);
-  const scalingSampleSize = Number.isFinite(scalingSampleSizeNumeric)
-    ? Math.max(0, Math.round(scalingSampleSizeNumeric))
-    : null;
-  const binningSampleSizeNumeric = Number(binningData?.sample_size);
-  const binningSampleSize = Number.isFinite(binningSampleSizeNumeric)
-    ? Math.max(0, Math.round(binningSampleSizeNumeric))
-    : null;
-  const binnedSampleSizeNumeric = Number(binnedDistributionData?.sample_size);
-  const binnedSampleSize = Number.isFinite(binnedSampleSizeNumeric)
-    ? Math.max(0, Math.round(binnedSampleSizeNumeric))
-    : null;
+  const {
+    relativeGeneratedAt,
+    relativeScalingGeneratedAt,
+    relativeBinningGeneratedAt,
+    relativeBinnedGeneratedAt,
+    scalingSampleSize,
+    binningSampleSize,
+    binnedSampleSize,
+  } = useInsightSummaries({
+    recommendationsGeneratedAt,
+    scalingData,
+    binningData,
+    binnedDistributionData,
+  });
   const showRecommendations = hasDropColumnSource && Boolean(sourceId) && hasReachableSource;
   const showSaveButton = !datasetBadge && !isInspectionNode;
   const canSave = showSaveButton && stableInitialConfig !== stableCurrentConfig;
