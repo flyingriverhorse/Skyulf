@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import type { Node } from 'react-flow-renderer';
-import type { FeatureNodeParameter } from '../../../api';
+import type { FeatureNodeParameter, FeatureNodeCatalogEntry } from '../../../api';
 import { useParameterCatalog } from './useParameterCatalog';
 
 interface UseNodeParametersResult {
@@ -11,16 +11,24 @@ interface UseNodeParametersResult {
   dropColumnParameter: FeatureNodeParameter | null;
 }
 
-export const useNodeParameters = (node: Node | null | undefined): UseNodeParametersResult => {
+export const useNodeParameters = (
+  node: Node | null | undefined,
+  catalogEntry?: FeatureNodeCatalogEntry | null,
+): UseNodeParametersResult => {
   const parameters = useMemo<FeatureNodeParameter[]>(() => {
     const raw = node?.data?.parameters;
-    if (!Array.isArray(raw)) {
-      return [];
+    let sourceParams: FeatureNodeParameter[] = [];
+
+    if (Array.isArray(raw) && raw.length > 0) {
+      sourceParams = raw;
+    } else if (catalogEntry?.parameters) {
+      sourceParams = catalogEntry.parameters;
     }
-    return raw
+
+    return sourceParams
       .filter((parameter) => Boolean(parameter?.name))
       .map((parameter) => ({ ...parameter }));
-  }, [node]);
+  }, [node, catalogEntry]);
 
   const getParameter = useParameterCatalog(parameters);
 
