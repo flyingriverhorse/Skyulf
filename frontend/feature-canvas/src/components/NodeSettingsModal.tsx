@@ -46,7 +46,6 @@ import { BinnedDistributionSection } from './node-settings/nodes/binning/BinnedD
 import {
   IMPUTATION_METHOD_OPTIONS,
   buildDefaultOptionsForMethod,
-  isNumericImputationMethod,
   normalizeImputationStrategies,
   sanitizeOptionsForMethod,
   serializeImputationStrategies,
@@ -55,7 +54,7 @@ import {
   type ImputationStrategyMethod,
   type ImputationStrategyOptions,
 } from './node-settings/nodes/imputation/imputationSettings';
-import { ImputationStrategiesSection, type ImputationSchemaDiagnostics } from './node-settings/nodes/imputation/ImputationStrategiesSection';
+import { ImputationStrategiesSection } from './node-settings/nodes/imputation/ImputationStrategiesSection';
 import { SCALING_METHOD_ORDER } from './node-settings/nodes/scaling/scalingSettings';
 import { ScalingInsightsSection } from './node-settings/nodes/scaling/ScalingInsightsSection';
 import { SkewnessInsightsSection } from './node-settings/nodes/skewness/SkewnessInsightsSection';
@@ -122,7 +121,7 @@ import { ModelTrainingSection } from './node-settings/nodes/modeling/ModelTraini
 import { EvaluationPackSection } from './node-settings/nodes/modeling/EvaluationPackSection';
 import { ModelRegistrySection } from './node-settings/nodes/modeling/ModelRegistrySection';
 import { HyperparameterTuningSection } from './node-settings/nodes/modeling/HyperparameterTuningSection';
-import { ClassResamplingSection, type ResamplingSchemaGuard } from './node-settings/nodes/resampling/ClassResamplingSection';
+import { ClassResamplingSection } from './node-settings/nodes/resampling/ClassResamplingSection';
 import { useCatalogFlags } from './node-settings/hooks/useCatalogFlags';
 import { useScalingInsights } from './node-settings/hooks/useScalingInsights';
 import { useBinningInsights } from './node-settings/hooks/useBinningInsights';
@@ -175,6 +174,9 @@ import { useColumnSelectionHandlers } from './node-settings/hooks/useColumnSelec
 import { useNodeSaveHandlers } from './node-settings/hooks/useNodeSaveHandlers';
 import { useNodeParameters } from './node-settings/hooks/useNodeParameters';
 import { useResetPermissions } from './node-settings/hooks/useResetPermissions';
+import { useSchemaDiagnostics } from './node-settings/hooks/useSchemaDiagnostics';
+import { usePreviewData } from './node-settings/hooks/usePreviewData';
+import { useAsyncBusyLabel } from './node-settings/hooks/useAsyncBusyLabel';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -626,95 +628,18 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
   const [cachedPreviewSchema, setCachedPreviewSchema] = useState<PipelinePreviewSchema | null>(null);
 
-  const cachedSchemaColumns = useMemo(() => cachedPreviewSchema?.columns ?? [], [cachedPreviewSchema]);
-  const oversamplingSchemaGuard = useMemo<ResamplingSchemaGuard | null>(() => {
-    if (!isClassOversamplingNode) {
-      return null;
-    }
-    if (!cachedSchemaColumns.length) {
-      return null;
-    }
-    const targetColumn = resamplingConfig?.targetColumn;
-    if (!targetColumn) {
-      return null;
-    }
-
-    const allowedFamilies = new Set(['numeric', 'integer', 'boolean']);
-    const blockedDetails = cachedSchemaColumns
-      .filter((column) => column && column.name !== targetColumn)
-      .filter((column) => !allowedFamilies.has(String(column.logical_family ?? 'unknown')))
-      .map((column) => ({
-        name: column.name,
-        logical_family: String(column.logical_family ?? 'unknown'),
-      }));
-
-    if (!blockedDetails.length) {
-      return null;
-    }
-
-    return {
-      blocked: true,
-      message:
-        'Class oversampling requires numeric feature columns. Encode or cast the listed fields before refreshing the preview.',
-      columns: blockedDetails.map((detail) => detail.name),
-      details: blockedDetails,
-    };
-  }, [cachedSchemaColumns, isClassOversamplingNode, resamplingConfig?.targetColumn]);
-
-  const imputationSchemaDiagnostics = useMemo<ImputationSchemaDiagnostics | null>(() => {
-    if (!isImputerNode) {
-      return null;
-    }
-    if (!cachedSchemaColumns.length) {
-      return null;
-    }
-    if (!imputerStrategies.length) {
-      return null;
-    }
-
-    const numericFamilies = new Set(['numeric', 'integer']);
-    const columnLookup = new Map(cachedSchemaColumns.map((column) => [column.name, column]));
-    const entries: ImputationSchemaDiagnostics['entries'] = [];
-
-    imputerStrategies.forEach((strategy, index) => {
-      if (!isNumericImputationMethod(strategy.method)) {
-        return;
-      }
-      if (!Array.isArray(strategy.columns) || !strategy.columns.length) {
-        return;
-      }
-
-      const invalidDetails = strategy.columns
-        .map((columnName) => columnLookup.get(columnName))
-        .filter((column): column is NonNullable<(typeof cachedSchemaColumns)[number]> => Boolean(column))
-        .filter((column) => !numericFamilies.has(String(column.logical_family ?? 'unknown')))
-        .map((column) => ({
-          name: column.name,
-          logical_family: String(column.logical_family ?? 'unknown'),
-        }));
-
-      if (invalidDetails.length) {
-        entries.push({
-          index,
-          columns: invalidDetails.map((detail) => detail.name),
-          details: invalidDetails,
-        });
-      }
-    });
-
-    if (!entries.length) {
-      return null;
-    }
-
-    return {
-      blocked: true,
-      message:
-        'Numeric imputation methods can only target numeric columns. Recast or adjust the highlighted fields before running the preview.',
-      entries,
-    };
-  }, [cachedSchemaColumns, imputerStrategies, isImputerNode]);
-
-  const skipPreview = Boolean(oversamplingSchemaGuard?.blocked || imputationSchemaDiagnostics?.blocked);
+  const {
+    cachedSchemaColumns,
+    oversamplingSchemaGuard,
+    imputationSchemaDiagnostics,
+    skipPreview,
+  } = useSchemaDiagnostics({
+    cachedPreviewSchema,
+    isClassOversamplingNode,
+    resamplingTargetColumn: resamplingConfig?.targetColumn ?? null,
+    isImputerNode,
+    imputerStrategies,
+  });
 
   const {
     availableColumns,
@@ -1008,21 +933,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     transformations: skewnessTransformations,
   });
 
-  const previewColumns = useMemo(() => {
-    const rawColumns = previewState.data?.columns;
-    if (!Array.isArray(rawColumns)) {
-      return [] as string[];
-    }
-    return rawColumns.filter((column): column is string => typeof column === 'string');
-  }, [previewState.data?.columns]);
-
-  const previewColumnStats = useMemo(() => {
-    const stats = previewState.data?.column_stats;
-    if (!Array.isArray(stats)) {
-      return [] as any[];
-    }
-    return stats;
-  }, [previewState.data?.column_stats]);
+  const { previewColumns, previewColumnStats, previewSampleRows } = usePreviewData(previewState);
 
   const activeFlagSuffix = useMemo(() => {
     if (!isMissingIndicatorNode) {
@@ -1049,13 +960,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
       suffix: activeFlagSuffix,
     });
   }, [activeFlagSuffix, availableColumns, columnMissingMap, isMissingIndicatorNode, missingIndicatorColumns]);
-
-  const previewSampleRows = useMemo(() => {
-    if (!Array.isArray(previewState.data?.sample_rows)) {
-      return [] as Record<string, any>[];
-    }
-    return previewState.data.sample_rows;
-  }, [previewState.data?.sample_rows]);
 
   const canRefreshSkewnessDistributions = Boolean(sourceId) && hasReachableSource;
 
@@ -1451,50 +1355,16 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   const canSave = showSaveButton && stableInitialConfig !== stableCurrentConfig;
   const isProfileLoading = profileState.status === 'loading';
   const isPreviewLoading = previewState.status === 'loading';
-  const hasActiveAsyncWork =
-    isProfileLoading ||
-    isPreviewLoading ||
-    isFetchingScaling ||
-    isFetchingBinning ||
-    isFetchingHashEncoding ||
-    isFetchingBinnedDistribution ||
-    isFetchingRecommendations;
-
-  const busyLabel = useMemo(() => {
-    if (isProfileLoading) {
-      return 'Generating dataset profile…';
-    }
-    if (isFetchingScaling) {
-      return 'Loading scaling insights…';
-    }
-    if (isFetchingBinning) {
-      return 'Loading binning insights…';
-    }
-    if (isFetchingHashEncoding) {
-      return 'Loading hash encoding insights…';
-    }
-    if (isFetchingBinnedDistribution) {
-      return 'Computing binned distributions…';
-    }
-    if (isFetchingRecommendations) {
-      return 'Fetching column recommendations…';
-    }
-    if (isPreviewLoading) {
-      return isPreviewNode ? 'Loading dataset preview…' : 'Analyzing node outputs…';
-    }
-    return null;
-  }, [
-    isFetchingBinnedDistribution,
-    isFetchingRecommendations,
+  const { hasActiveAsyncWork, busyLabel, footerBusyLabel } = useAsyncBusyLabel({
+    isProfileLoading,
+    isPreviewLoading,
     isFetchingScaling,
     isFetchingBinning,
     isFetchingHashEncoding,
-    isFetchingSkewness,
-    isPreviewLoading,
-    isProfileLoading,
+    isFetchingBinnedDistribution,
+    isFetchingRecommendations,
     isPreviewNode,
-  ]);
-  const footerBusyLabel = busyLabel ?? (hasActiveAsyncWork ? 'Processing…' : null);
+  });
 
   const updateImputerStrategies = useCallback(
     (updater: (current: ImputationStrategyConfig[]) => ImputationStrategyConfig[]) => {
