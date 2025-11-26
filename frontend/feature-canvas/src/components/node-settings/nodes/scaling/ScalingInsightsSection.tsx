@@ -1,4 +1,5 @@
 import React from 'react';
+import { CheckboxInput } from '../../ui/FormFields';
 import type { ScalingMethodDetail, ScalingMethodName } from '../../../../api';
 import type {
   NormalizedScalingConfig,
@@ -138,22 +139,13 @@ export const ScalingInsightsSection: React.FC<ScalingInsightsSectionProps> = ({
             <p className="canvas-modal__parameter-description">{defaultDetail.description}</p>
           )}
         </div>
-        <div className="canvas-modal__parameter-field">
-          <div className="canvas-modal__parameter-label">
-            <span>Auto-detect numeric columns</span>
-          </div>
-          <label className="canvas-modal__boolean-control">
-            <input
-              type="checkbox"
-              checked={scalingAutoDetectEnabled}
-              onChange={(event) => onAutoDetectToggle(event.target.checked)}
-            />
-            <span>{scalingAutoDetectEnabled ? 'Enabled' : 'Disabled'}</span>
-          </label>
-          <p className="canvas-modal__parameter-description">
-            When enabled, recommended numeric features join this node automatically after each refresh.
-          </p>
-        </div>
+        <CheckboxInput
+          fieldLabel="Auto-detect numeric columns"
+          label={scalingAutoDetectEnabled ? 'Enabled' : 'Disabled'}
+          checked={scalingAutoDetectEnabled}
+          onChange={(event) => onAutoDetectToggle(event.target.checked)}
+          description="When enabled, recommended numeric features join this node automatically after each refresh."
+        />
       </div>
       <p className="canvas-modal__note">
         Tracking <strong>{scalingSelectedCount}</strong> column{scalingSelectedCount === 1 ? '' : 's'} in this node · Default method{' '}

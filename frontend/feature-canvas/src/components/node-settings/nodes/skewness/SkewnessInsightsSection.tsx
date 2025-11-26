@@ -7,6 +7,7 @@ import {
   type SkewnessTransformationMethod,
   type SkewnessViewMode,
 } from './skewnessSettings';
+import { CheckboxInput, SelectInput } from '../../ui/FormFields';
 
 type SkewnessInsightsSectionProps = {
   sourceId?: string | null;
@@ -105,14 +106,12 @@ export const SkewnessInsightsSection: React.FC<SkewnessInsightsSectionProps> = (
                 All numeric ({skewnessNumericCount})
               </button>
             </div>
-            <label className="canvas-skewness__toggle">
-              <input
-                type="checkbox"
-                checked={skewnessGroupByMethod}
-                onChange={(event) => onGroupByToggle(event.target.checked)}
-              />
-              Group columns by recommended action
-            </label>
+            <CheckboxInput
+              label="Group columns by recommended action"
+              checked={skewnessGroupByMethod}
+              onChange={(event) => onGroupByToggle(event.target.checked)}
+              className="canvas-skewness__toggle"
+            />
           </div>
           {skewnessRows.length === 0 ? (
             <p className="canvas-modal__note">
@@ -233,10 +232,11 @@ export const SkewnessInsightsSection: React.FC<SkewnessInsightsSectionProps> = (
                               </td>
                               <td>
                                 <div className="canvas-skewness__override">
-                                  <select
+                                  <SelectInput
                                     value={currentValue}
                                     onChange={(event) => onOverrideChange(row.column, event.target.value)}
                                     disabled={isFetchingRecommendations || !hasReachableSource}
+                                    options={[]}
                                   >
                                     {optionEntries.map((option) => {
                                       const labelWithReason = option.reason
@@ -253,7 +253,7 @@ export const SkewnessInsightsSection: React.FC<SkewnessInsightsSectionProps> = (
                                         </option>
                                       );
                                     })}
-                                  </select>
+                                  </SelectInput>
                                   {currentStatus && currentStatus.status !== 'ready' && currentStatus.reason && (
                                     <span className="canvas-skewness__status canvas-skewness__status--error">
                                       Selected transform may be incompatible: {currentStatus.reason}

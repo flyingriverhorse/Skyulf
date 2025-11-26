@@ -1,4 +1,5 @@
 import React from 'react';
+import { CheckboxInput, NumberInput } from '../../ui/FormFields';
 import type {
   OutlierMethodDetail,
   OutlierMethodName,
@@ -227,59 +228,46 @@ export const OutlierInsightsSection: React.FC<OutlierInsightsSectionProps> = ({
             <p className="canvas-modal__parameter-description">{outlierDefaultDetail.description}</p>
           )}
         </div>
-        <div className="canvas-modal__parameter-field">
-          <div className="canvas-modal__parameter-label">
-            <span>Auto-detect numeric columns</span>
-          </div>
-          <label className="canvas-modal__boolean-control">
-            <input
-              type="checkbox"
-              checked={outlierAutoDetectEnabled}
-              onChange={(event) => onAutoDetectToggle(event.target.checked)}
-            />
-            <span>{outlierAutoDetectEnabled ? 'Enabled' : 'Disabled'}</span>
-          </label>
-          <p className="canvas-modal__parameter-description">
-            Auto-detection tracks numeric features so newly profiled columns join the node automatically.
-          </p>
-        </div>
+        <CheckboxInput
+          fieldLabel="Auto-detect numeric columns"
+          label={outlierAutoDetectEnabled ? 'Enabled' : 'Disabled'}
+          checked={outlierAutoDetectEnabled}
+          onChange={(event) => onAutoDetectToggle(event.target.checked)}
+          description="Auto-detection tracks numeric features so newly profiled columns join the node automatically."
+        />
       </div>
 
-      <section className="canvas-modal__parameter-field">
-        <div className="canvas-modal__parameter-label">
-          <span>Global method parameters</span>
-        </div>
-        <p className="canvas-modal__parameter-description canvas-outlier__method-note">
-          Tune default thresholds for each strategy. Column overrides can refine these further.
-        </p>
-        <div className="canvas-outlier__method-grid">
-          {OUTLIER_METHOD_ORDER.map((method) => {
-            const detail = outlierMethodDetailMap.get(method) ?? null;
-            const parameters = OUTLIER_PARAMETER_KEYS[method];
-            if (!parameters.length) {
-              return null;
-            }
-            const label = detail?.label ?? OUTLIER_METHOD_FALLBACK_LABELS[method] ?? method;
-            return (
-              <article key={`outlier-method-${method}`} className="canvas-outlier__method-card">
-                <header className="canvas-outlier__method-header">
-                  <span className="canvas-outlier__method-title">{label}</span>
-                  {detail?.description && (
-                    <p className="canvas-outlier__method-summary">{detail.description}</p>
-                  )}
-                </header>
+      {(() => {
+        const method = outlierConfig.defaultMethod;
+        const parameters = OUTLIER_PARAMETER_KEYS[method] ?? [];
+
+        if (!parameters.length) {
+          return null;
+        }
+
+        const detail = outlierMethodDetailMap.get(method) ?? null;
+
+        return (
+          <section className="canvas-modal__parameter-field">
+            <div className="canvas-modal__parameter-label">
+              <span>Global method parameters</span>
+            </div>
+            <p className="canvas-modal__parameter-description canvas-outlier__method-note">
+              Tune default thresholds for the selected strategy. Column overrides can refine these further.
+            </p>
+            <div className="canvas-outlier__method-grid">
+              <article className="canvas-outlier__method-card">
                 <div className="canvas-outlier__parameter-list">
                   {parameters.map((parameter) => {
-                  const value = outlierConfig.methodParameters[method]?.[parameter] ?? null;
-                  const suffix = PARAMETER_SUFFIX[parameter] ?? '';
-                  return (
+                    const value = outlierConfig.methodParameters[method]?.[parameter] ?? null;
+                    const suffix = PARAMETER_SUFFIX[parameter] ?? '';
+                    return (
                       <label key={`${method}-${parameter}`} className="canvas-outlier__method-parameter">
                         <span className="canvas-outlier__parameter-label">
                           {formatParameterLabel(detail, parameter)}
                         </span>
                         <div className="canvas-outlier__method-input">
-                          <input
-                            type="number"
+                          <NumberInput
                             className="canvas-outlier__method-input-field"
                             value={typeof value === 'number' && Number.isFinite(value) ? value : ''}
                             placeholder={resolvePlaceholder(
@@ -306,10 +294,10 @@ export const OutlierInsightsSection: React.FC<OutlierInsightsSectionProps> = ({
                   })}
                 </div>
               </article>
-            );
-          })}
-        </div>
-      </section>
+            </div>
+          </section>
+        );
+      })()}
 
       <p className="canvas-modal__note">
         Tracking <strong>{outlierSelectedCount}</strong> column{outlierSelectedCount === 1 ? '' : 's'} · Default method{' '}
@@ -488,7 +476,7 @@ export const OutlierInsightsSection: React.FC<OutlierInsightsSectionProps> = ({
                                 ))}
                               </select>
                               <span className="canvas-cast__target-note">{overrideHelper}</span>
-                              {parameterKeys.length > 0 && !row.isExcluded && (
+                              {parameterKeys.length > 0 && !row.isExcluded && !row.isSkipped && (
                                 <div className="canvas-outlier__parameters">
                                   {parameterKeys.map((parameterKey) => {
                                     const { value, fallback } = resolveParameterValue(
@@ -502,8 +490,7 @@ export const OutlierInsightsSection: React.FC<OutlierInsightsSectionProps> = ({
                                     return (
                                       <label key={`${row.column}-${row.currentMethod}-${parameterKey}`}>
                                         <span>{parameterKey.replace(/_/g, ' ')}</span>
-                                        <input
-                                          type="number"
+                                        <NumberInput
                                           value={value}
                                           placeholder={resolvePlaceholder(fallback)}
                                           onChange={(event) => {

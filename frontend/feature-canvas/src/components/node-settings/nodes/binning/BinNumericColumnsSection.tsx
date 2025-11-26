@@ -1,4 +1,5 @@
 import React from 'react';
+import { FormField, TextInput, NumberInput, SelectInput, CheckboxInput } from '../../ui/FormFields';
 import {
   BINNING_LABEL_FORMAT_OPTIONS,
   BINNING_MISSING_OPTIONS,
@@ -56,90 +57,56 @@ export const BinNumericColumnsSection: React.FC<BinNumericColumnsSectionProps> =
           Applies to every selected column unless custom bins or labels override the defaults.
         </p>
         <div className="canvas-modal__parameter-grid">
-          <div className="canvas-modal__parameter-field">
-            <label htmlFor={fieldIds.suffix} className="canvas-modal__parameter-label">
-              Output suffix
-            </label>
-            <div className="canvas-modal__parameter-control">
-              <input
-                id={fieldIds.suffix}
-                type="text"
-                className="canvas-modal__input"
-                value={config.outputSuffix}
-                onChange={(event) => onSuffixChange(event.target.value)}
-                placeholder="e.g. _binned"
-              />
-            </div>
-          </div>
-          <div className="canvas-modal__parameter-field">
-            <label htmlFor={fieldIds.labelFormat} className="canvas-modal__parameter-label">
-              Label format
-            </label>
-            <div className="canvas-modal__parameter-control">
-              <select
-                id={fieldIds.labelFormat}
-                value={config.labelFormat}
-                onChange={(event) => onLabelFormatChange((event.target.value as BinningLabelFormat) ?? 'range')}
-              >
-                {BINNING_LABEL_FORMAT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="canvas-modal__parameter-description">
-              Controls how new bin values are named when custom labels aren’t provided.
-            </p>
-          </div>
-          <div className="canvas-modal__parameter-field">
-            <label htmlFor={fieldIds.precision} className="canvas-modal__parameter-label">
-              Decimal precision
-            </label>
-            <div className="canvas-modal__parameter-control">
-              <input
-                id={fieldIds.precision}
-                type="number"
-                className="canvas-modal__input"
-                min={0}
-                max={8}
-                step={1}
-                value={config.precision}
-                onChange={(event) => onIntegerChange('precision', event.target.value, 0, 8)}
-              />
-            </div>
-            <p className="canvas-modal__parameter-description">Sets rounding precision for interval labels.</p>
-          </div>
+          <FormField label="Output suffix" htmlFor={fieldIds.suffix}>
+            <TextInput
+              id={fieldIds.suffix}
+              value={config.outputSuffix}
+              onChange={(event) => onSuffixChange(event.target.value)}
+              placeholder="e.g. _binned"
+            />
+          </FormField>
+
+          <FormField
+            label="Label format"
+            htmlFor={fieldIds.labelFormat}
+            description="Controls how new bin values are named when custom labels aren’t provided."
+          >
+            <SelectInput
+              id={fieldIds.labelFormat}
+              value={config.labelFormat}
+              onChange={(event) => onLabelFormatChange((event.target.value as BinningLabelFormat) ?? 'range')}
+              options={BINNING_LABEL_FORMAT_OPTIONS}
+            />
+          </FormField>
+
+          <FormField
+            label="Decimal precision"
+            htmlFor={fieldIds.precision}
+            description="Sets rounding precision for interval labels."
+          >
+            <NumberInput
+              id={fieldIds.precision}
+              min={0}
+              max={8}
+              step={1}
+              value={config.precision}
+              onChange={(event) => onIntegerChange('precision', event.target.value, 0, 8)}
+            />
+          </FormField>
         </div>
         <div className="canvas-modal__parameter-grid">
-          <div className="canvas-modal__parameter-field">
-            <div className="canvas-modal__parameter-label">
-              <label htmlFor={fieldIds.includeLowest}>Include lowest edge</label>
-            </div>
-            <label className="canvas-modal__boolean-control">
-              <input
-                id={fieldIds.includeLowest}
-                type="checkbox"
-                checked={config.includeLowest}
-                onChange={(event) => onBooleanToggle('include_lowest', event.target.checked)}
-              />
-              Include the minimum value in the first bin
-            </label>
-          </div>
-          <div className="canvas-modal__parameter-field">
-            <div className="canvas-modal__parameter-label">
-              <label htmlFor={fieldIds.dropOriginal}>Drop original columns</label>
-            </div>
-            <label className="canvas-modal__boolean-control">
-              <input
-                id={fieldIds.dropOriginal}
-                type="checkbox"
-                checked={config.dropOriginal}
-                onChange={(event) => onBooleanToggle('drop_original', event.target.checked)}
-              />
-              Remove source columns after binning
-            </label>
-          </div>
+          <CheckboxInput
+            id={fieldIds.includeLowest}
+            label="Include the minimum value in the first bin"
+            checked={config.includeLowest}
+            onChange={(event) => onBooleanToggle('include_lowest', event.target.checked)}
+          />
+          <CheckboxInput
+            id={fieldIds.dropOriginal}
+            label="Remove source columns after binning"
+            checked={config.dropOriginal}
+            onChange={(event) => onBooleanToggle('drop_original', event.target.checked)}
+          />
         </div>
       </div>
       <div className="canvas-modal__subsection">

@@ -1,6 +1,7 @@
 import React from 'react';
 import { FeatureNodeParameter } from '../../../api';
 import { formatMissingPercentage } from '../formatting';
+import { FormField, TextInput, NumberInput, SelectInput, CheckboxInput, TextAreaInput } from '../ui/FormFields';
 
 type NodeSettingsParameterFieldProps = {
   parameter: FeatureNodeParameter;
@@ -56,10 +57,8 @@ export const NodeSettingsParameterField: React.FC<NodeSettingsParameterFieldProp
           <p className="canvas-modal__parameter-description">{parameter.description}</p>
         )}
         <div className="canvas-modal__parameter-control">
-          <input
+          <NumberInput
             id={inputId}
-            type="number"
-            className="canvas-modal__input"
             value={numericValue}
             min={parameter.min !== undefined ? parameter.min : undefined}
             max={parameter.max !== undefined ? parameter.max : undefined}
@@ -95,23 +94,15 @@ export const NodeSettingsParameterField: React.FC<NodeSettingsParameterFieldProp
     const checked = Boolean(configState?.[parameter.name]);
 
     return (
-      <div key={parameter.name} className="canvas-modal__parameter-field">
-        <div className="canvas-modal__parameter-label">
-          <label htmlFor={inputId}>{parameter.label}</label>
-        </div>
-        {parameter.description && (
-          <p className="canvas-modal__parameter-description">{parameter.description}</p>
-        )}
-        <label className="canvas-modal__boolean-control">
-          <input
-            id={inputId}
-            type="checkbox"
-            checked={checked}
-            onChange={(event) => handleBooleanChange(parameter.name, event.target.checked)}
-          />
-          <span>{checked ? 'Enabled' : 'Disabled'}</span>
-        </label>
-      </div>
+      <CheckboxInput
+        key={parameter.name}
+        id={inputId}
+        label={checked ? 'Enabled' : 'Disabled'}
+        fieldLabel={parameter.label}
+        description={parameter.description}
+        checked={checked}
+        onChange={(event) => handleBooleanChange(parameter.name, event.target.checked)}
+      />
     );
   }
 
@@ -129,26 +120,25 @@ export const NodeSettingsParameterField: React.FC<NodeSettingsParameterFieldProp
         : defaultValue;
 
     return (
-      <div key={parameter.name} className="canvas-modal__parameter-field">
-        <label htmlFor={inputId} className="canvas-modal__parameter-label">
-          {parameter.label}
-        </label>
-        {parameter.description && (
-          <p className="canvas-modal__parameter-description">{parameter.description}</p>
-        )}
-        <select
+      <FormField
+        key={parameter.name}
+        label={parameter.label}
+        htmlFor={inputId}
+        description={parameter.description}
+      >
+        <SelectInput
           id={inputId}
-          className="canvas-modal__input"
           value={value}
           onChange={(event) => handleTextChange(parameter.name, event.target.value)}
+          options={[]}
         >
           {options.map((option) => (
             <option key={option.value} value={option.value} title={option.description ?? undefined}>
               {option.label ?? option.value}
             </option>
           ))}
-        </select>
-      </div>
+        </SelectInput>
+      </FormField>
     );
   }
 
@@ -181,16 +171,15 @@ export const NodeSettingsParameterField: React.FC<NodeSettingsParameterFieldProp
       }
 
       return (
-        <div key={parameter.name} className="canvas-modal__parameter-field">
-          <label htmlFor={inputId} className="canvas-modal__parameter-label">
-            {parameter.label}
-          </label>
-          <p className="canvas-modal__parameter-description">
-            {parameter.description || 'Enter parameters as key: value pairs (one per line)'}
-          </p>
-          <textarea
+        <FormField
+          key={parameter.name}
+          label={parameter.label}
+          htmlFor={inputId}
+          description={parameter.description || 'Enter parameters as key: value pairs (one per line)'}
+        >
+          <TextAreaInput
             id={inputId}
-            className="canvas-modal__input canvas-modal__input--wide"
+            className="canvas-modal__input--wide"
             value={displayValue}
             placeholder={'n_estimators: 100\nmax_depth: 10\nlearning_rate: 0.01'}
             onChange={(event) => {
@@ -222,7 +211,7 @@ export const NodeSettingsParameterField: React.FC<NodeSettingsParameterFieldProp
             }}
             rows={6}
           />
-        </div>
+        </FormField>
       );
     }
 
@@ -230,22 +219,21 @@ export const NodeSettingsParameterField: React.FC<NodeSettingsParameterFieldProp
     const value = typeof configState?.[parameter.name] === 'string' ? configState?.[parameter.name] : '';
 
     return (
-      <div key={parameter.name} className="canvas-modal__parameter-field">
-        <label htmlFor={inputId} className="canvas-modal__parameter-label">
-          {parameter.label}
-        </label>
-        {parameter.description && (
-          <p className="canvas-modal__parameter-description">{parameter.description}</p>
-        )}
-        <textarea
+      <FormField
+        key={parameter.name}
+        label={parameter.label}
+        htmlFor={inputId}
+        description={parameter.description}
+      >
+        <TextAreaInput
           id={inputId}
-          className="canvas-modal__input canvas-modal__input--wide"
+          className="canvas-modal__input--wide"
           value={value}
           placeholder={parameter.placeholder ?? ''}
           onChange={(event) => handleTextChange(parameter.name, event.target.value)}
           rows={4}
         />
-      </div>
+      </FormField>
     );
   }
 
@@ -253,21 +241,19 @@ export const NodeSettingsParameterField: React.FC<NodeSettingsParameterFieldProp
   const value = configState?.[parameter.name] ?? '';
 
   return (
-    <div key={parameter.name} className="canvas-modal__parameter-field">
-      <label htmlFor={inputId} className="canvas-modal__parameter-label">
-        {parameter.label}
-      </label>
-      {parameter.description && (
-        <p className="canvas-modal__parameter-description">{parameter.description}</p>
-      )}
-      <input
+    <FormField
+      key={parameter.name}
+      label={parameter.label}
+      htmlFor={inputId}
+      description={parameter.description}
+    >
+      <TextInput
         id={inputId}
-        type="text"
-        className="canvas-modal__input canvas-modal__input--wide"
+        className="canvas-modal__input--wide"
         value={value}
         placeholder={parameter.placeholder ?? ''}
         onChange={(event) => handleTextChange(parameter.name, event.target.value)}
       />
-    </div>
+    </FormField>
   );
 };
