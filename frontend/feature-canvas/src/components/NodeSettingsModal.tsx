@@ -116,6 +116,7 @@ import { useScalingInsights } from './node-settings/hooks/useScalingInsights';
 import { useBinningInsights } from './node-settings/hooks/useBinningInsights';
 import { useSkewnessInsights } from './node-settings/hooks/useSkewnessInsights';
 import { useBinnedDistribution } from './node-settings/hooks/useBinnedDistribution';
+import { useBinnedDistributionCards } from './node-settings/hooks/useBinnedDistributionCards';
 import { useDropColumnRecommendations } from './node-settings/hooks/useDropColumnRecommendations';
 import { useOutlierRecommendations } from './node-settings/hooks/useOutlierRecommendations';
 import { useNumericColumnAnalysis } from './node-settings/hooks/useNumericColumnAnalysis';
@@ -155,6 +156,7 @@ import { useFeatureSelectionAutoConfig } from './node-settings/hooks/useFeatureS
 import { useColumnSelectionHandlers } from './node-settings/hooks/useColumnSelectionHandlers';
 import { useNodeSaveHandlers } from './node-settings/hooks/useNodeSaveHandlers';
 import { useNodeParameters } from './node-settings/hooks/useNodeParameters';
+import { useNodeSpecificParameters } from './node-settings/hooks/useNodeSpecificParameters';
 import { useResetPermissions } from './node-settings/hooks/useResetPermissions';
 import { useSchemaDiagnostics } from './node-settings/hooks/useSchemaDiagnostics';
 import { usePreviewData } from './node-settings/hooks/usePreviewData';
@@ -207,6 +209,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     gatedAriaDisabled,
   } = useConnectionReadiness(node, graphSnapshot ?? null);
 
+  const catalogFlags = useCatalogFlags(node);
   const {
     catalogType,
     isDataset,
@@ -250,7 +253,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isDropMissingColumnsNode,
     isDropMissingRowsNode,
     isDropMissingNode,
-  } = useCatalogFlags(node);
+  } = catalogFlags;
   const datasetBadge = isDataset;
   const isClassResamplingNode = isClassUndersamplingNode || isClassOversamplingNode;
 
@@ -264,7 +267,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   const {
     parameters,
     getParameter,
-    getParameterIf,
     requiresColumnCatalog,
     dropColumnParameter,
   } = useNodeParameters(node);
@@ -318,168 +320,126 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isSkewnessDistributionNode,
   });
 
-  const binningColumnsParameter = getParameterIf(isBinningNode, 'columns');
-  const scalingColumnsParameter = getParameterIf(isScalingNode, 'columns');
-  const removeDuplicatesColumnsParameter = getParameterIf(isRemoveDuplicatesNode, 'columns');
-  const removeDuplicatesKeepParameter = getParameterIf(isRemoveDuplicatesNode, 'keep');
-  const replaceAliasesCustomPairsParameter = getParameterIf(isReplaceAliasesNode, 'custom_pairs');
-  const trimWhitespaceColumnsParameter = getParameterIf(isTrimWhitespaceNode, 'columns');
-  const trimWhitespaceModeParameter = getParameterIf(isTrimWhitespaceNode, 'mode');
-  const removeSpecialColumnsParameter = getParameterIf(isRemoveSpecialCharsNode, 'columns');
-  const removeSpecialModeParameter = getParameterIf(isRemoveSpecialCharsNode, 'mode');
-  const removeSpecialReplacementParameter = getParameterIf(isRemoveSpecialCharsNode, 'replacement');
-  const replaceInvalidColumnsParameter = getParameterIf(isReplaceInvalidValuesNode, 'columns');
-  const replaceInvalidModeParameter = getParameterIf(isReplaceInvalidValuesNode, 'mode');
-  const replaceInvalidMinValueParameter = getParameterIf(isReplaceInvalidValuesNode, 'min_value');
-  const replaceInvalidMaxValueParameter = getParameterIf(isReplaceInvalidValuesNode, 'max_value');
-  const regexCleanupColumnsParameter = getParameterIf(isRegexCleanupNode, 'columns');
-  const regexCleanupModeParameter = getParameterIf(isRegexCleanupNode, 'mode');
-  const regexCleanupPatternParameter = getParameterIf(isRegexCleanupNode, 'pattern');
-  const regexCleanupReplacementParameter = getParameterIf(isRegexCleanupNode, 'replacement');
-  const normalizeCaseColumnsParameter = getParameterIf(isNormalizeTextCaseNode, 'columns');
-  const normalizeCaseModeParameter = getParameterIf(isNormalizeTextCaseNode, 'mode');
-
-  const labelEncodingColumnsParameter = isLabelEncodingNode ? getParameter('columns') : null;
-  const labelEncodingAutoDetectParameter = isLabelEncodingNode ? getParameter('auto_detect') : null;
-  const labelEncodingMaxUniqueParameter = isLabelEncodingNode ? getParameter('max_unique_values') : null;
-  const labelEncodingOutputSuffixParameter = isLabelEncodingNode ? getParameter('output_suffix') : null;
-  const labelEncodingDropOriginalParameter = isLabelEncodingNode ? getParameter('drop_original') : null;
-  const labelEncodingMissingStrategyParameter = isLabelEncodingNode ? getParameter('missing_strategy') : null;
-  const labelEncodingMissingCodeParameter = isLabelEncodingNode ? getParameter('missing_code') : null;
-
-  const hashEncodingColumnsParameter = isHashEncodingNode ? getParameter('columns') : null;
-  const hashEncodingAutoDetectParameter = isHashEncodingNode ? getParameter('auto_detect') : null;
-  const hashEncodingMaxCategoriesParameter = isHashEncodingNode ? getParameter('max_categories') : null;
-  const hashEncodingBucketsParameter = isHashEncodingNode ? getParameter('n_buckets') : null;
-  const hashEncodingOutputSuffixParameter = isHashEncodingNode ? getParameter('output_suffix') : null;
-  const hashEncodingDropOriginalParameter = isHashEncodingNode ? getParameter('drop_original') : null;
-  const hashEncodingEncodeMissingParameter = isHashEncodingNode ? getParameter('encode_missing') : null;
-
-  const polynomialColumnsParameter = getParameterIf(isPolynomialFeaturesNode, 'columns');
-  const polynomialAutoDetectParameter = getParameterIf(isPolynomialFeaturesNode, 'auto_detect');
-  const polynomialDegreeParameter = getParameterIf(isPolynomialFeaturesNode, 'degree');
-  const polynomialIncludeBiasParameter = getParameterIf(isPolynomialFeaturesNode, 'include_bias');
-  const polynomialInteractionOnlyParameter = getParameterIf(isPolynomialFeaturesNode, 'interaction_only');
-  const polynomialIncludeInputFeaturesParameter = getParameterIf(
-    isPolynomialFeaturesNode,
-    'include_input_features'
-  );
-  const polynomialOutputPrefixParameter = getParameterIf(isPolynomialFeaturesNode, 'output_prefix');
-
-  const featureSelectionColumnsParameter = getParameterIf(isFeatureSelectionNode, 'columns');
-  const featureSelectionAutoDetectParameter = getParameterIf(isFeatureSelectionNode, 'auto_detect');
-  const featureSelectionTargetColumnParameter = getParameterIf(isFeatureSelectionNode, 'target_column');
-  const featureSelectionMethodParameter = getParameterIf(isFeatureSelectionNode, 'method');
-  const featureSelectionScoreFuncParameter = getParameterIf(isFeatureSelectionNode, 'score_func');
-  const featureSelectionProblemTypeParameter = getParameterIf(isFeatureSelectionNode, 'problem_type');
-  const featureSelectionKParameter = getParameterIf(isFeatureSelectionNode, 'k');
-  const featureSelectionPercentileParameter = getParameterIf(isFeatureSelectionNode, 'percentile');
-  const featureSelectionAlphaParameter = getParameterIf(isFeatureSelectionNode, 'alpha');
-  const featureSelectionThresholdParameter = getParameterIf(isFeatureSelectionNode, 'threshold');
-  const featureSelectionModeParameter = getParameterIf(isFeatureSelectionNode, 'mode');
-  const featureSelectionEstimatorParameter = getParameterIf(isFeatureSelectionNode, 'estimator');
-  const featureSelectionStepParameter = getParameterIf(isFeatureSelectionNode, 'step');
-  const featureSelectionMinFeaturesParameter = getParameterIf(isFeatureSelectionNode, 'min_features');
-  const featureSelectionMaxFeaturesParameter = getParameterIf(isFeatureSelectionNode, 'max_features');
-  const featureSelectionDropUnselectedParameter = getParameterIf(
-    isFeatureSelectionNode,
-    'drop_unselected'
-  );
-
-  const featureMathErrorHandlingParameter = getParameterIf(isFeatureMathNode, 'error_handling');
-  const featureMathAllowOverwriteParameter = getParameterIf(isFeatureMathNode, 'allow_overwrite');
-  const featureMathDefaultTimezoneParameter = getParameterIf(isFeatureMathNode, 'default_timezone');
-  const featureMathEpsilonParameter = getParameterIf(isFeatureMathNode, 'epsilon');
-  const resamplingMethodParameter = getParameterIf(isClassResamplingNode, 'method');
-  const resamplingTargetColumnParameter = getParameterIf(isClassResamplingNode, 'target_column');
-  const resamplingSamplingStrategyParameter = getParameterIf(
-    isClassResamplingNode,
-    'sampling_strategy'
-  );
-  const resamplingRandomStateParameter = getParameterIf(isClassResamplingNode, 'random_state');
-  const resamplingKNeighborsParameter = getParameterIf(isClassOversamplingNode, 'k_neighbors');
-  const resamplingReplacementParameter = getParameterIf(isClassUndersamplingNode, 'replacement');
-  const featureTargetSplitTargetColumnParameter = getParameterIf(
-    isFeatureTargetSplitNode,
-    'target_column'
-  );
-  const hasTrainOrTuningNode = isTrainModelDraftNode || isHyperparameterTuningNode;
-  const trainModelTargetColumnParameter = getParameterIf(hasTrainOrTuningNode, 'target_column');
-  const trainModelProblemTypeParameter = getParameterIf(hasTrainOrTuningNode, 'problem_type');
-  const trainModelModelTypeParameter = getParameterIf(hasTrainOrTuningNode, 'model_type');
-  const trainModelHyperparametersParameter = getParameterIf(
-    isTrainModelDraftNode,
-    'hyperparameters'
-  );
-  const hyperparameterTuningSearchStrategyParameter = getParameterIf(
-    isHyperparameterTuningNode,
-    'search_strategy'
-  );
-  const hyperparameterTuningSearchIterationsParameter = getParameterIf(
-    isHyperparameterTuningNode,
-    'search_iterations'
-  );
-  const hyperparameterTuningSearchRandomStateParameter = getParameterIf(
-    isHyperparameterTuningNode,
-    'search_random_state'
-  );
-  const hyperparameterTuningScoringMetricParameter = getParameterIf(
-    isHyperparameterTuningNode,
-    'scoring_metric'
-  );
-  const trainModelCvEnabledParameter = getParameterIf(hasTrainOrTuningNode, 'cv_enabled');
-  const trainModelCvStrategyParameter = getParameterIf(hasTrainOrTuningNode, 'cv_strategy');
-  const trainModelCvFoldsParameter = getParameterIf(hasTrainOrTuningNode, 'cv_folds');
-  const trainModelCvShuffleParameter = getParameterIf(hasTrainOrTuningNode, 'cv_shuffle');
-  const trainModelCvRandomStateParameter = getParameterIf(hasTrainOrTuningNode, 'cv_random_state');
-  const trainModelCvRefitStrategyParameter = getParameterIf(
-    isTrainModelDraftNode,
-    'cv_refit_strategy'
-  );
-
-  const targetEncodingColumnsParameter = isTargetEncodingNode ? getParameter('columns') : null;
-  const targetEncodingTargetColumnParameter = isTargetEncodingNode ? getParameter('target_column') : null;
-  const targetEncodingAutoDetectParameter = isTargetEncodingNode ? getParameter('auto_detect') : null;
-  const targetEncodingMaxCategoriesParameter = isTargetEncodingNode ? getParameter('max_categories') : null;
-  const targetEncodingOutputSuffixParameter = isTargetEncodingNode ? getParameter('output_suffix') : null;
-  const targetEncodingDropOriginalParameter = isTargetEncodingNode ? getParameter('drop_original') : null;
-  const targetEncodingSmoothingParameter = isTargetEncodingNode ? getParameter('smoothing') : null;
-  const targetEncodingEncodeMissingParameter = isTargetEncodingNode ? getParameter('encode_missing') : null;
-  const targetEncodingHandleUnknownParameter = isTargetEncodingNode ? getParameter('handle_unknown') : null;
-
-  const ordinalEncodingColumnsParameter = isOrdinalEncodingNode ? getParameter('columns') : null;
-  const ordinalEncodingAutoDetectParameter = isOrdinalEncodingNode ? getParameter('auto_detect') : null;
-  const ordinalEncodingMaxCategoriesParameter = isOrdinalEncodingNode ? getParameter('max_categories') : null;
-  const ordinalEncodingOutputSuffixParameter = isOrdinalEncodingNode ? getParameter('output_suffix') : null;
-  const ordinalEncodingDropOriginalParameter = isOrdinalEncodingNode ? getParameter('drop_original') : null;
-  const ordinalEncodingEncodeMissingParameter = isOrdinalEncodingNode ? getParameter('encode_missing') : null;
-  const ordinalEncodingHandleUnknownParameter = isOrdinalEncodingNode ? getParameter('handle_unknown') : null;
-  const ordinalEncodingUnknownValueParameter = isOrdinalEncodingNode ? getParameter('unknown_value') : null;
-
-  const dummyEncodingColumnsParameter = isDummyEncodingNode ? getParameter('columns') : null;
-  const dummyEncodingAutoDetectParameter = isDummyEncodingNode ? getParameter('auto_detect') : null;
-  const dummyEncodingMaxCategoriesParameter = isDummyEncodingNode ? getParameter('max_categories') : null;
-  const dummyEncodingDropFirstParameter = isDummyEncodingNode ? getParameter('drop_first') : null;
-  const dummyEncodingIncludeMissingParameter = isDummyEncodingNode ? getParameter('include_missing') : null;
-  const dummyEncodingDropOriginalParameter = isDummyEncodingNode ? getParameter('drop_original') : null;
-  const dummyEncodingPrefixSeparatorParameter = isDummyEncodingNode ? getParameter('prefix_separator') : null;
-
-  const oneHotEncodingColumnsParameter = isOneHotEncodingNode ? getParameter('columns') : null;
-  const oneHotEncodingAutoDetectParameter = isOneHotEncodingNode ? getParameter('auto_detect') : null;
-  const oneHotEncodingMaxCategoriesParameter = isOneHotEncodingNode ? getParameter('max_categories') : null;
-  const oneHotEncodingDropFirstParameter = isOneHotEncodingNode ? getParameter('drop_first') : null;
-  const oneHotEncodingIncludeMissingParameter = isOneHotEncodingNode ? getParameter('include_missing') : null;
-  const oneHotEncodingDropOriginalParameter = isOneHotEncodingNode ? getParameter('drop_original') : null;
-  const oneHotEncodingPrefixSeparatorParameter = isOneHotEncodingNode ? getParameter('prefix_separator') : null;
-
-  const missingIndicatorColumnsParameter = getParameterIf(isMissingIndicatorNode, 'columns');
-  const missingIndicatorSuffixParameter = getParameterIf(isMissingIndicatorNode, 'flag_suffix');
-  const scalingDefaultMethodParameter = getParameterIf(isScalingNode, 'default_method');
-  const scalingAutoDetectParameter = getParameterIf(isScalingNode, 'auto_detect');
-
-  // requiresColumnCatalog & dropColumnParameter provided by useNodeParameters
-
-  const dropRowsAnyParameter = getParameterIf(isDropMissingRowsNode, 'drop_if_any_missing');
+  const {
+    binningColumnsParameter,
+    scalingColumnsParameter,
+    removeDuplicatesColumnsParameter,
+    removeDuplicatesKeepParameter,
+    replaceAliasesCustomPairsParameter,
+    trimWhitespaceColumnsParameter,
+    trimWhitespaceModeParameter,
+    removeSpecialColumnsParameter,
+    removeSpecialModeParameter,
+    removeSpecialReplacementParameter,
+    replaceInvalidColumnsParameter,
+    replaceInvalidModeParameter,
+    replaceInvalidMinValueParameter,
+    replaceInvalidMaxValueParameter,
+    regexCleanupColumnsParameter,
+    regexCleanupModeParameter,
+    regexCleanupPatternParameter,
+    regexCleanupReplacementParameter,
+    normalizeCaseColumnsParameter,
+    normalizeCaseModeParameter,
+    labelEncodingColumnsParameter,
+    labelEncodingAutoDetectParameter,
+    labelEncodingMaxUniqueParameter,
+    labelEncodingOutputSuffixParameter,
+    labelEncodingDropOriginalParameter,
+    labelEncodingMissingStrategyParameter,
+    labelEncodingMissingCodeParameter,
+    hashEncodingColumnsParameter,
+    hashEncodingAutoDetectParameter,
+    hashEncodingMaxCategoriesParameter,
+    hashEncodingBucketsParameter,
+    hashEncodingOutputSuffixParameter,
+    hashEncodingDropOriginalParameter,
+    hashEncodingEncodeMissingParameter,
+    polynomialColumnsParameter,
+    polynomialAutoDetectParameter,
+    polynomialDegreeParameter,
+    polynomialIncludeBiasParameter,
+    polynomialInteractionOnlyParameter,
+    polynomialIncludeInputFeaturesParameter,
+    polynomialOutputPrefixParameter,
+    featureSelectionColumnsParameter,
+    featureSelectionAutoDetectParameter,
+    featureSelectionTargetColumnParameter,
+    featureSelectionMethodParameter,
+    featureSelectionScoreFuncParameter,
+    featureSelectionProblemTypeParameter,
+    featureSelectionKParameter,
+    featureSelectionPercentileParameter,
+    featureSelectionAlphaParameter,
+    featureSelectionThresholdParameter,
+    featureSelectionModeParameter,
+    featureSelectionEstimatorParameter,
+    featureSelectionStepParameter,
+    featureSelectionMinFeaturesParameter,
+    featureSelectionMaxFeaturesParameter,
+    featureSelectionDropUnselectedParameter,
+    featureMathErrorHandlingParameter,
+    featureMathAllowOverwriteParameter,
+    featureMathDefaultTimezoneParameter,
+    featureMathEpsilonParameter,
+    resamplingMethodParameter,
+    resamplingTargetColumnParameter,
+    resamplingSamplingStrategyParameter,
+    resamplingRandomStateParameter,
+    resamplingKNeighborsParameter,
+    resamplingReplacementParameter,
+    featureTargetSplitTargetColumnParameter,
+    trainModelTargetColumnParameter,
+    trainModelProblemTypeParameter,
+    trainModelModelTypeParameter,
+    trainModelHyperparametersParameter,
+    hyperparameterTuningSearchStrategyParameter,
+    hyperparameterTuningSearchIterationsParameter,
+    hyperparameterTuningSearchRandomStateParameter,
+    hyperparameterTuningScoringMetricParameter,
+    trainModelCvEnabledParameter,
+    trainModelCvStrategyParameter,
+    trainModelCvFoldsParameter,
+    trainModelCvShuffleParameter,
+    trainModelCvRandomStateParameter,
+    trainModelCvRefitStrategyParameter,
+    targetEncodingColumnsParameter,
+    targetEncodingTargetColumnParameter,
+    targetEncodingAutoDetectParameter,
+    targetEncodingMaxCategoriesParameter,
+    targetEncodingOutputSuffixParameter,
+    targetEncodingDropOriginalParameter,
+    targetEncodingSmoothingParameter,
+    targetEncodingEncodeMissingParameter,
+    targetEncodingHandleUnknownParameter,
+    ordinalEncodingColumnsParameter,
+    ordinalEncodingAutoDetectParameter,
+    ordinalEncodingMaxCategoriesParameter,
+    ordinalEncodingOutputSuffixParameter,
+    ordinalEncodingDropOriginalParameter,
+    ordinalEncodingEncodeMissingParameter,
+    ordinalEncodingHandleUnknownParameter,
+    ordinalEncodingUnknownValueParameter,
+    dummyEncodingColumnsParameter,
+    dummyEncodingAutoDetectParameter,
+    dummyEncodingMaxCategoriesParameter,
+    dummyEncodingDropFirstParameter,
+    dummyEncodingIncludeMissingParameter,
+    dummyEncodingDropOriginalParameter,
+    dummyEncodingPrefixSeparatorParameter,
+    oneHotEncodingColumnsParameter,
+    oneHotEncodingAutoDetectParameter,
+    oneHotEncodingMaxCategoriesParameter,
+    oneHotEncodingDropFirstParameter,
+    oneHotEncodingIncludeMissingParameter,
+    oneHotEncodingDropOriginalParameter,
+    oneHotEncodingPrefixSeparatorParameter,
+    missingIndicatorColumnsParameter,
+    missingIndicatorSuffixParameter,
+    scalingDefaultMethodParameter,
+    scalingAutoDetectParameter,
+    dropRowsAnyParameter,
+  } = useNodeSpecificParameters(getParameter, catalogFlags);
   const filteredParameters = useFilteredParameters(parameters, {
     isBinningNode,
     isCastNode,
@@ -1414,127 +1374,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     refreshBinnedDistribution();
   }, [refreshBinnedDistribution, sourceId]);
 
-  const binnedDistributionCards = useMemo<BinnedDistributionCard[]>(() => {
-    if (!isBinnedDistributionNode) {
-      return [];
-    }
-
-    const rawColumns = Array.isArray(binnedDistributionData?.columns) ? binnedDistributionData?.columns : [];
-
-    const cards = rawColumns
-      .map((entry) => {
-        if (!entry || !entry.column) {
-          return null;
-        }
-
-        const totalRowsNumeric = Number(entry.total_rows);
-        const totalRows = Number.isFinite(totalRowsNumeric) ? Math.max(0, Math.round(totalRowsNumeric)) : 0;
-        if (totalRows <= 0) {
-          return null;
-        }
-
-        const rawBins = Array.isArray(entry.bins) ? entry.bins : [];
-        const sanitizedBins = rawBins
-          .map((bin): BinnedDistributionBin | null => {
-            if (!bin) {
-              return null;
-            }
-
-            const labelRaw = typeof bin.label === 'string' ? bin.label.trim() : String(bin.label ?? '');
-            const label = labelRaw || (bin.is_missing ? 'Missing' : 'Unlabeled bin');
-
-            const numericCount = Number(bin.count);
-            if (!Number.isFinite(numericCount)) {
-              return null;
-            }
-
-            const safeCount = Math.max(0, Math.round(numericCount));
-
-            const numericPercentage = Number(bin.percentage);
-            const clampedPercentage = Number.isFinite(numericPercentage)
-              ? Math.min(100, Math.max(0, numericPercentage))
-              : 0;
-            const roundedPercentage = Number(clampedPercentage.toFixed(2));
-
-            return {
-              label,
-              count: safeCount,
-              percentage: roundedPercentage,
-              isMissing: Boolean(bin.is_missing),
-            };
-          })
-          .filter((bin): bin is BinnedDistributionBin => Boolean(bin));
-
-        if (!sanitizedBins.length) {
-          return null;
-        }
-
-        sanitizedBins.sort((a, b) => {
-          if (a.isMissing !== b.isMissing) {
-            return a.isMissing ? 1 : -1;
-          }
-          if (a.count !== b.count) {
-            return b.count - a.count;
-          }
-          return a.label.localeCompare(b.label);
-        });
-
-        const totalBinCount = sanitizedBins.length;
-        const MAX_BINS = 12;
-        const hasMoreBins = totalBinCount > MAX_BINS;
-        const bins = hasMoreBins ? sanitizedBins.slice(0, MAX_BINS) : sanitizedBins;
-
-        const missingRowsNumeric = Number(entry.missing_rows);
-        const missingRows = Number.isFinite(missingRowsNumeric) ? Math.max(0, Math.round(missingRowsNumeric)) : 0;
-
-        const distinctBinsNumeric = Number(entry.distinct_bins);
-        const distinctBins = Number.isFinite(distinctBinsNumeric)
-          ? Math.max(0, Math.round(distinctBinsNumeric))
-          : sanitizedBins.length;
-
-        const rawTopLabel = entry.top_label;
-        let topLabel = typeof rawTopLabel === 'string' ? rawTopLabel.trim() || null : rawTopLabel ?? null;
-        const topCountNumeric = Number(entry.top_count);
-        let topCount = Number.isFinite(topCountNumeric) ? Math.max(0, Math.round(topCountNumeric)) : null;
-        const topPercentageNumeric = Number(entry.top_percentage);
-        let topPercentage = Number.isFinite(topPercentageNumeric)
-          ? Number(Math.min(100, Math.max(0, topPercentageNumeric)).toFixed(2))
-          : null;
-
-        if ((topLabel === null || topCount === null || topPercentage === null) && bins.length) {
-          topLabel = bins[0].label;
-          topCount = bins[0].count;
-          topPercentage = bins[0].percentage;
-        }
-
-        const sourceColumn = typeof entry.source_column === 'string' ? entry.source_column.trim() || null : entry.source_column ?? null;
-
-        return {
-          column: entry.column,
-          sourceColumn,
-          totalRows,
-          missingRows,
-          distinctBins,
-          topLabel,
-          topCount,
-          topPercentage,
-          bins,
-          hasMoreBins,
-          totalBinCount,
-        } as BinnedDistributionCard;
-      })
-      .filter((card): card is BinnedDistributionCard => Boolean(card));
-
-    cards.sort((a, b) => {
-      const diff = (b.topCount ?? 0) - (a.topCount ?? 0);
-      if (diff !== 0) {
-        return diff;
-      }
-      return a.column.localeCompare(b.column);
-    });
-
-    return cards;
-  }, [binnedDistributionData, isBinnedDistributionNode]);
+  const binnedDistributionCards = useBinnedDistributionCards(
+    isBinnedDistributionNode,
+    binnedDistributionData
+  );
 
 
 
