@@ -43,26 +43,12 @@ import {
 import { BinNumericColumnsSection } from './node-settings/nodes/binning/BinNumericColumnsSection';
 import { BinningInsightsSection } from './node-settings/nodes/binning/BinningInsightsSection';
 import { BinnedDistributionSection } from './node-settings/nodes/binning/BinnedDistributionSection';
-import {
-  IMPUTATION_METHOD_OPTIONS,
-  buildDefaultOptionsForMethod,
-  normalizeImputationStrategies,
-  sanitizeOptionsForMethod,
-  serializeImputationStrategies,
-  type ImputationMethodOption,
-  type ImputationStrategyConfig,
-  type ImputationStrategyMethod,
-  type ImputationStrategyOptions,
-} from './node-settings/nodes/imputation/imputationSettings';
+
 import { ImputationStrategiesSection } from './node-settings/nodes/imputation/ImputationStrategiesSection';
 import { SCALING_METHOD_ORDER } from './node-settings/nodes/scaling/scalingSettings';
 import { ScalingInsightsSection } from './node-settings/nodes/scaling/ScalingInsightsSection';
 import { SkewnessInsightsSection } from './node-settings/nodes/skewness/SkewnessInsightsSection';
-import {
-  dedupeSkewnessTransformations,
-  normalizeSkewnessTransformations,
-  type SkewnessTransformationConfig,
-} from './node-settings/nodes/skewness/skewnessSettings';
+
 import { SkewnessDistributionSection } from './node-settings/nodes/skewness/SkewnessDistributionSection';
 import {
   resolveMissingIndicatorSuffix,
@@ -130,7 +116,6 @@ import {
   arraysAreEqual,
   normalizeConfigBoolean,
   pickAutoDetectValue,
-  stableStringify,
 } from './node-settings/utils/configParsers';
 import { formatCellValue, formatColumnType, formatRelativeTime } from './node-settings/utils/formatters';
 import { DATA_CONSISTENCY_GUIDANCE } from './node-settings/utils/guidance';
@@ -172,6 +157,9 @@ import { useImputationStrategyHandlers } from './node-settings/hooks/useImputati
 import { useAliasStrategyHandlers } from './node-settings/hooks/useAliasStrategyHandlers';
 import { useDateStrategyHandlers } from './node-settings/hooks/useDateStrategyHandlers';
 import { useFeatureMathHandlers } from './node-settings/hooks/useFeatureMathHandlers';
+import { usePreviewSignature } from './node-settings/hooks/usePreviewSignature';
+import { useImputationStrategies } from './node-settings/hooks/useImputationStrategies';
+import { useSkewnessState } from './node-settings/hooks/useSkewnessState';
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -261,12 +249,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   const datasetBadge = isDataset;
   const isClassResamplingNode = isClassUndersamplingNode || isClassOversamplingNode;
 
-  const imputationMethodOptions = useMemo<ImputationMethodOption[]>(() => IMPUTATION_METHOD_OPTIONS, []);
 
-  const imputationMethodValues = useMemo(
-    () => imputationMethodOptions.map((option) => option.value),
-    [imputationMethodOptions]
-  );
 
   const {
     parameters,
@@ -321,16 +304,14 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     return configState ? { ...configState } : {};
   }, [configState, isModelRegistryNode]);
 
-  const imputerStrategies = useMemo(
-    () => normalizeImputationStrategies(configState?.strategies, imputationMethodValues),
-    [configState?.strategies, imputationMethodValues]
-  );
-  const imputerStrategyCount = imputerStrategies.length;
+  const {
+    imputationMethodOptions,
+    imputationMethodValues,
+    imputerStrategies,
+    imputerStrategyCount,
+  } = useImputationStrategies(configState);
 
-  const skewnessTransformations = useMemo(
-    () => dedupeSkewnessTransformations(normalizeSkewnessTransformations(configState?.transformations)),
-    [configState?.transformations],
-  );
+  const { skewnessTransformations, updateSkewnessTransformations } = useSkewnessState(configState, setConfigState);
 
   const {
     graphContext,
@@ -360,31 +341,13 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     upstreamTargetColumn,
     nodeId,
     modelTypeOptions: nodeParams.trainModel.modelType?.options ?? null,
-  });  const upstreamConfigFingerprints = useMemo(() => {
-    if (!upstreamNodeIds.length) {
-      return {} as Record<string, any>;
-    }
-    const map: Record<string, any> = {};
-    upstreamNodeIds.forEach((identifier) => {
-      const match = graphNodes.find((entry: any) => entry && typeof entry.id === 'string' && entry.id === identifier);
-      if (!match) {
-        return;
-      }
-      const configPayload = match?.data?.config ?? null;
-      map[identifier] = configPayload;
-    });
-    return map;
-  }, [graphNodes, upstreamNodeIds]);
-
-  const previewSignature = useMemo(() => {
-    return stableStringify({
-      sourceId: sourceId ?? null,
-      nodeId: nodeId || null,
-      config: configState,
-      upstreamIds: upstreamNodeIds,
-      upstreamConfig: upstreamConfigFingerprints,
-    });
-  }, [configState, nodeId, sourceId, upstreamConfigFingerprints, upstreamNodeIds]);
+  });  const { upstreamConfigFingerprints, previewSignature } = usePreviewSignature({
+    nodeId,
+    sourceId,
+    configState,
+    upstreamNodeIds,
+    graphNodes,
+  });
 
   const [cachedPreviewSchema, setCachedPreviewSchema] = useState<PipelinePreviewSchema | null>(null);
 
@@ -730,21 +693,7 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     return availableColumns.filter((column) => column.toLowerCase().includes(normalizedColumnSearch));
   }, [availableColumns, normalizedColumnSearch]);
 
-  const updateSkewnessTransformations = useCallback(
-    (updater: (current: SkewnessTransformationConfig[]) => SkewnessTransformationConfig[]) => {
-      setConfigState((previous) => {
-        const currentTransformations = dedupeSkewnessTransformations(
-          normalizeSkewnessTransformations(previous?.transformations),
-        );
-        const nextTransformations = dedupeSkewnessTransformations(updater(currentTransformations));
-        return {
-          ...previous,
-          transformations: nextTransformations.map((entry) => ({ ...entry })),
-        };
-      });
-    },
-    []
-  );
+
 
   const skewness = useSkewnessConfiguration({
     catalogFlags,

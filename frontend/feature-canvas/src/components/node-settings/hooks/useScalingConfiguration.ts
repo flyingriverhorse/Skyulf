@@ -17,9 +17,10 @@ import {
   type ScalingMethodOption,
   type ScalingRecommendationRow,
 } from '../nodes/scaling/scalingSettings';
+import type { CatalogFlagMap } from './useCatalogFlags';
 
 export type UseScalingConfigurationArgs = {
-  isScalingNode: boolean;
+  catalogFlags: CatalogFlagMap;
   configState: Record<string, any>;
   numericExcludedColumns: Set<string>;
   scalingData: ScalingRecommendationsResponse | null;
@@ -43,11 +44,12 @@ export type UseScalingConfigurationResult = {
 };
 
 export const useScalingConfiguration = ({
-  isScalingNode,
+  catalogFlags,
   configState,
   numericExcludedColumns,
   scalingData,
 }: UseScalingConfigurationArgs): UseScalingConfigurationResult => {
+  const { isScalingNode } = catalogFlags;
   const scalingConfig = useMemo<NormalizedScalingConfig>(
     () => {
       return normalizeScalingConfigValue(configState);

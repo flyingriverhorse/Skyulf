@@ -70,7 +70,7 @@ export const useNumericAnalysisState = ({
     scalingStatusMessage,
     scalingOverrideExampleSummary,
   } = useScalingConfiguration({
-    isScalingNode,
+    catalogFlags,
     configState,
     numericExcludedColumns,
     scalingData,
@@ -94,7 +94,7 @@ export const useNumericAnalysisState = ({
     outlierStatusMessage,
     outlierOverrideExampleSummary,
   } = useOutlierConfiguration({
-    isOutlierNode,
+    catalogFlags,
     configState,
     numericExcludedColumns,
     outlierData,
@@ -282,7 +282,7 @@ export const useNumericAnalysisState = ({
     manualBoundColumns,
     manualRangeFallbackMap,
   } = useNumericRangeSummaries({
-    isBinningNode,
+    catalogFlags,
     numericExcludedColumns,
     selectedColumns,
     previewSampleRows,
@@ -304,9 +304,7 @@ export const useNumericAnalysisState = ({
   }, [binningData?.excluded_columns]);
 
   usePruneColumnSelections({
-    isScalingNode,
-    isBinningNode,
-    isOutlierNode,
+    catalogFlags,
     scalingExcludedColumns,
     binningExcludedColumns,
     outlierExcludedColumns,
