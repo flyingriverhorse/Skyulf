@@ -1,17 +1,17 @@
-import { useDropMissingColumns } from './useDropMissingColumns';
-import { useDropColumnRecommendations } from './useDropColumnRecommendations';
-import { useEncodingRecommendationsState } from './useEncodingRecommendationsState';
-import { useOutlierRecommendations } from './useOutlierRecommendations';
-import { useScalingInsights } from './useScalingInsights';
-import { useBinningInsights } from './useBinningInsights';
-import { useBinnedDistribution } from './useBinnedDistribution';
-import { useSkewnessInsights } from './useSkewnessInsights';
-import { useMissingIndicatorState } from './useMissingIndicatorState';
-import { useDataCleaningState } from './useDataCleaningState';
-import { useNumericColumnAnalysis } from './useNumericColumnAnalysis';
-import { useNumericAnalysisState } from './useNumericAnalysisState';
-import { useRemoveDuplicatesState } from './useRemoveDuplicatesState';
-import type { CatalogFlagMap } from './useCatalogFlags';
+import { useDropMissingColumns } from './imputation/useDropMissingColumns';
+import { useDropColumnRecommendations } from './imputation/useDropColumnRecommendations';
+import { useEncodingRecommendationsState } from './encoding/useEncodingRecommendationsState';
+import { useOutlierRecommendations } from './outlier/useOutlierRecommendations';
+import { useScalingInsights } from './scaling/useScalingInsights';
+import { useBinningInsights } from './binning/useBinningInsights';
+import { useBinnedDistribution } from './binning/useBinnedDistribution';
+import { useSkewnessInsights } from './skewness/useSkewnessInsights';
+import { useMissingIndicatorState } from './imputation/useMissingIndicatorState';
+import { useDataCleaningState } from './cleaning/useDataCleaningState';
+import { useNumericColumnAnalysis } from './analysis/useNumericColumnAnalysis';
+import { useNumericAnalysisState } from './analysis/useNumericAnalysisState';
+import { useRemoveDuplicatesState } from './cleaning/useRemoveDuplicatesState';
+import type { CatalogFlagMap } from './core/useCatalogFlags';
 
 type UseNodeSettingsInsightsArgs = {
   catalogFlags: CatalogFlagMap;

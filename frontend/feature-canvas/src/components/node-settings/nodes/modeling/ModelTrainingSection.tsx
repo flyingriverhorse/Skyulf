@@ -25,7 +25,7 @@ import {
 } from '../../../../api';
 import { formatRelativeTime } from '../../utils/formatters';
 import type { TrainModelDraftConfig } from './TrainModelDraftSection';
-import type { TrainModelCVConfig } from '../../hooks/useModelingConfiguration';
+import type { TrainModelCVConfig } from '../../hooks';
 import { BestHyperparamsModal, type HyperparamPreset } from './BestHyperparamsModal';
 import { useScalingWarning, detectScalingConvergenceFromJob, hasScalingConvergenceMessage } from './useScalingWarning';
 

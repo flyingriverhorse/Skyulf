@@ -1,17 +1,17 @@
 import { useMemo } from 'react';
 import type { Node } from 'react-flow-renderer';
-import { useNodeMetadata } from './useNodeMetadata';
-import { useConnectionReadiness } from './useConnectionReadiness';
-import { useCatalogFlags } from './useCatalogFlags';
-import { useNodeParameters } from './useNodeParameters';
-import { useResetPermissions } from './useResetPermissions';
-import { useNodeConfigState } from './useNodeConfigState';
-import { useParameterHandlers } from './useParameterHandlers';
-import { useNodeSpecificParameters } from './useNodeSpecificParameters';
-import { useFilteredParameters } from './useFilteredParameters';
-import { useImputationStrategies } from './useImputationStrategies';
-import { useSkewnessState } from './useSkewnessState';
-import { useNodeCatalog } from './useNodeCatalog';
+import { useNodeMetadata } from './core/useNodeMetadata';
+import { useConnectionReadiness } from './core/useConnectionReadiness';
+import { useCatalogFlags } from './core/useCatalogFlags';
+import { useNodeParameters } from './core/useNodeParameters';
+import { useResetPermissions } from './core/useResetPermissions';
+import { useNodeConfigState } from './core/useNodeConfigState';
+import { useParameterHandlers } from './core/useParameterHandlers';
+import { useNodeSpecificParameters } from './core/useNodeSpecificParameters';
+import { useFilteredParameters } from './core/useFilteredParameters';
+import { useImputationStrategies } from './imputation/useImputationStrategies';
+import { useSkewnessState } from './skewness/useSkewnessState';
+import { useNodeCatalog } from './core/useNodeCatalog';
 import { DATA_CONSISTENCY_GUIDANCE } from '../utils/guidance';
 
 type UseNodeSettingsStateArgs = {

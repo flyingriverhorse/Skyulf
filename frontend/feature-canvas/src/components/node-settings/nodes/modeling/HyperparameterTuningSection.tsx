@@ -21,7 +21,7 @@ import {
 import { formatRelativeTime } from '../../utils/formatters';
 import { stableStringify } from '../../utils/configParsers';
 import type { TrainModelDraftConfig } from './TrainModelDraftSection';
-import type { TrainModelCVConfig } from '../../hooks/useModelingConfiguration';
+import type { TrainModelCVConfig } from '../../hooks';
 import { useScalingWarning, detectScalingConvergenceFromJob, hasScalingConvergenceMessage } from './useScalingWarning';
 
 const STATUS_LABEL: Record<string, string> = {

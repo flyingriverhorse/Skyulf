@@ -1,6 +1,6 @@
-import { useInsightSummaries } from './useInsightSummaries';
-import { useAsyncBusyLabel } from './useAsyncBusyLabel';
-import type { CatalogFlagMap } from './useCatalogFlags';
+import { useInsightSummaries } from './core/useInsightSummaries';
+import { useAsyncBusyLabel } from './core/useAsyncBusyLabel';
+import type { CatalogFlagMap } from './core/useCatalogFlags';
 
 type UseNodeSettingsSummariesArgs = {
   recommendationsGeneratedAt: any;

@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { NodeSettingsMultiSelectField } from '../fields/NodeSettingsMultiSelectField';
 import { NodeSettingsParameterField } from '../fields/NodeSettingsParameterField';
 import type { FeatureNodeParameter } from '../../../api';
-import type { CatalogFlagMap } from './useCatalogFlags';
+import type { CatalogFlagMap } from './core/useCatalogFlags';
 
 type UseNodeSettingsRenderersArgs = {
   nodeId: string;

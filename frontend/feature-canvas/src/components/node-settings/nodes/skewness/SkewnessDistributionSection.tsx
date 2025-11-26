@@ -2,7 +2,7 @@ import React from 'react';
 import { HistogramSparkline } from '../../utils/HistogramSparkline';
 import { formatMetricValue, formatNumericStat } from '../../formatting';
 import type { SkewnessColumnDistribution } from '../../../../api';
-import type { SkewnessDistributionCard, SkewnessDistributionView } from '../../hooks/useSkewnessConfiguration';
+import type { SkewnessDistributionCard, SkewnessDistributionView } from '../../hooks';
 
 type SkewnessDistributionSectionProps = {
   skewnessThreshold: number | null;

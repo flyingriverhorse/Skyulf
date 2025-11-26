@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import type { PipelinePreviewSchema } from '../../../api';
-import { useGraphTopology } from './useGraphTopology';
-import { useModelingConfiguration } from './useModelingConfiguration';
-import { usePreviewSignature } from './usePreviewSignature';
-import { useSchemaDiagnostics } from './useSchemaDiagnostics';
-import { useColumnCatalogState } from './useColumnCatalogState';
-import type { CatalogFlagMap } from './useCatalogFlags';
+import { useGraphTopology } from './core/useGraphTopology';
+import { useModelingConfiguration } from './modeling/useModelingConfiguration';
+import { usePreviewSignature } from './preview/usePreviewSignature';
+import { useSchemaDiagnostics } from './preview/useSchemaDiagnostics';
+import { useColumnCatalogState } from './core/useColumnCatalogState';
+import type { CatalogFlagMap } from './core/useCatalogFlags';
 
 type UseNodeSettingsDataArgs = {
   graphSnapshot: { nodes: any[]; edges: any[] } | null;

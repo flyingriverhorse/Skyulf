@@ -1,10 +1,10 @@
-import { useNodePreview } from './useNodePreview';
-import { usePreviewSignals } from './usePreviewSignals';
-import { useFeatureSelectionAutoConfig } from './useFeatureSelectionAutoConfig';
-import { useFeatureMathState } from './useFeatureMathState';
-import { usePreviewData } from './usePreviewData';
+import { useNodePreview } from './preview/useNodePreview';
+import { usePreviewSignals } from './preview/usePreviewSignals';
+import { useFeatureSelectionAutoConfig } from './feature_selection/useFeatureSelectionAutoConfig';
+import { useFeatureMathState } from './feature_math/useFeatureMathState';
+import { usePreviewData } from './preview/usePreviewData';
 import type { PipelinePreviewSchema } from '../../../api';
-import type { CatalogFlagMap } from './useCatalogFlags';
+import type { CatalogFlagMap } from './core/useCatalogFlags';
 
 type UseNodeSettingsPreviewArgs = {
   graphSnapshot: { nodes: any[]; edges: any[] } | null;

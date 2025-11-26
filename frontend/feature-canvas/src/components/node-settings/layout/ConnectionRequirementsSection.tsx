@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ConnectionInfoSnapshot } from '../hooks/useConnectionReadiness';
+import type { ConnectionInfoSnapshot } from '../hooks';
 
 type ConnectionRequirementsSectionProps = {
   connectionInfo: ConnectionInfoSnapshot;
