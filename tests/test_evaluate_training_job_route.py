@@ -39,6 +39,9 @@ class StubTrainingJob:
 
 
 class FakeSession:
+    def add(self, _obj: Any) -> None:
+        pass
+
     async def commit(self) -> None:  # pragma: no cover - trivial
         pass
 
@@ -96,10 +99,10 @@ async def test_evaluate_training_job_route(monkeypatch, fastapi_app, tmp_path):
         return (
             features,
             target,
-            None,
-            None,
-            None,
-            None,
+            features,
+            target,
+            features,
+            target,
             ["feature"],
             {"dtype": "categorical", "categories": [0, 1]},
         )
@@ -126,12 +129,14 @@ async def test_evaluate_training_job_route(monkeypatch, fastapi_app, tmp_path):
             notes=["evaluated"],
         )
 
-    monkeypatch.setattr(fe_routes, "fetch_training_job", fake_fetch_training_job)
-    monkeypatch.setattr(fe_routes, "_resolve_training_inputs", fake_resolve_training_inputs)
-    monkeypatch.setattr(fe_routes, "_prepare_training_data", fake_prepare_training_data)
-    monkeypatch.setattr(fe_routes.joblib, "load", fake_joblib_load)
+    from core.feature_engineering.api import training as training_api
+
+    monkeypatch.setattr(training_api, "fetch_training_job", fake_fetch_training_job)
+    monkeypatch.setattr(training_api, "_resolve_training_inputs", fake_resolve_training_inputs)
+    monkeypatch.setattr(training_api, "_prepare_training_data", fake_prepare_training_data)
+    monkeypatch.setattr(training_api.joblib, "load", fake_joblib_load)
     monkeypatch.setattr(
-        fe_routes,
+        training_api,
         "build_classification_split_report",
         fake_build_classification_split_report,
     )

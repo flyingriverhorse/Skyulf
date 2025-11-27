@@ -85,6 +85,8 @@ async def test_enqueue_training_job_creates_jobs_and_dispatches(monkeypatch, fas
     created_jobs: List[StubTrainingJob] = []
     dispatch_calls: List[str] = []
 
+    from core.feature_engineering.api import training as training_api
+
     async def fake_create_training_job_record(session, payload, *, user_id, model_type_override):
         assert payload.model_types == [model_type_override]
         job = StubTrainingJob(
@@ -104,8 +106,8 @@ async def test_enqueue_training_job_creates_jobs_and_dispatches(monkeypatch, fas
     def fake_dispatch_training_job(job_id: str) -> None:
         dispatch_calls.append(job_id)
 
-    monkeypatch.setattr(fe_routes, "create_training_job_record", fake_create_training_job_record)
-    monkeypatch.setattr(fe_routes, "dispatch_training_job", fake_dispatch_training_job)
+    monkeypatch.setattr(training_api, "create_training_job_record", fake_create_training_job_record)
+    monkeypatch.setattr(training_api, "dispatch_training_job", fake_dispatch_training_job)
 
     request_payload = _build_training_request(model_types=["random_forest", "lightgbm"])
 
@@ -127,6 +129,8 @@ async def test_enqueue_training_job_creates_jobs_and_dispatches(monkeypatch, fas
 async def test_enqueue_training_job_skips_dispatch_when_disabled(monkeypatch, fastapi_app):
     app = fastapi_app
 
+    from core.feature_engineering.api import training as training_api
+
     async def fake_create_training_job_record(session, payload, *, user_id, model_type_override):
         return StubTrainingJob(
             id="job-only",
@@ -143,8 +147,8 @@ async def test_enqueue_training_job_skips_dispatch_when_disabled(monkeypatch, fa
     def fake_dispatch_training_job(job_id: str) -> None:
         dispatch_calls.append(job_id)
 
-    monkeypatch.setattr(fe_routes, "create_training_job_record", fake_create_training_job_record)
-    monkeypatch.setattr(fe_routes, "dispatch_training_job", fake_dispatch_training_job)
+    monkeypatch.setattr(training_api, "create_training_job_record", fake_create_training_job_record)
+    monkeypatch.setattr(training_api, "dispatch_training_job", fake_dispatch_training_job)
 
     request_payload = _build_training_request(run_training=False)
 
@@ -162,6 +166,8 @@ async def test_enqueue_training_job_skips_dispatch_when_disabled(monkeypatch, fa
 @pytest.mark.asyncio
 async def test_enqueue_training_job_updates_status_on_dispatch_failure(monkeypatch, fastapi_app):
     app = fastapi_app
+
+    from core.feature_engineering.api import training as training_api
 
     job = StubTrainingJob(
         id="job-dispatch",
@@ -198,9 +204,9 @@ async def test_enqueue_training_job_updates_status_on_dispatch_failure(monkeypat
         })
         return target_job
 
-    monkeypatch.setattr(fe_routes, "create_training_job_record", fake_create_training_job_record)
-    monkeypatch.setattr(fe_routes, "dispatch_training_job", fake_dispatch_training_job)
-    monkeypatch.setattr(fe_routes, "update_job_status", fake_update_job_status)
+    monkeypatch.setattr(training_api, "create_training_job_record", fake_create_training_job_record)
+    monkeypatch.setattr(training_api, "dispatch_training_job", fake_dispatch_training_job)
+    monkeypatch.setattr(training_api, "update_job_status", fake_update_job_status)
 
     request_payload = _build_training_request()
 

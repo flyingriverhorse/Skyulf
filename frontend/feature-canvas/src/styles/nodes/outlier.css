@@ -15,7 +15,7 @@
 
 .canvas-outlier__method-note {
   font-size: 0.82rem;
-  color: rgba(148, 163, 184, 0.82);
+  color: rgba(203, 213, 225, 0.82);
 }
 
 .canvas-outlier__method-grid {
@@ -51,7 +51,7 @@
 .canvas-outlier__method-summary {
   margin: 0;
   font-size: 0.75rem;
-  color: rgba(148, 163, 184, 0.8);
+  color: rgba(203, 213, 225, 0.8);
   line-height: 1.35;
 }
 

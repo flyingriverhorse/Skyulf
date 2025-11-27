@@ -30,8 +30,7 @@ async def test_export_training_job_bundle(tmp_path, monkeypatch):
     app = FastAPI()
     app.include_router(fe_routes.router)
 
-    if not hasattr(fe_routes, "export_project_bundle"):
-        pytest.skip("Training job export is not available in this build")
+    session_container = {}
 
     class FakeSession:
         def __init__(self) -> None:
@@ -44,7 +43,8 @@ async def test_export_training_job_bundle(tmp_path, monkeypatch):
         async def refresh(self, obj) -> None:  # pragma: no cover - simple flag mutation
             self.refreshed = True
 
-    session_container = {}
+        def add(self, obj) -> None:
+            pass
 
     async def session_override():
         session = FakeSession()
@@ -81,7 +81,8 @@ async def test_export_training_job_bundle(tmp_path, monkeypatch):
         assert job_id == job.id
         return job
 
-    monkeypatch.setattr(fe_routes, "fetch_training_job", fake_fetch_training_job)
+    from core.feature_engineering.api import training as training_api
+    monkeypatch.setattr(training_api, "fetch_training_job", fake_fetch_training_job)
 
     async def fake_load_dataset_frame(
         session,
@@ -96,7 +97,7 @@ async def test_export_training_job_bundle(tmp_path, monkeypatch):
         preview_meta = {"total_rows": 2, "sample_size": 2}
         return frame, preview_meta
 
-    monkeypatch.setattr(fe_routes, "_load_dataset_frame", fake_load_dataset_frame)
+    monkeypatch.setattr(training_api, "load_dataset_frame", fake_load_dataset_frame)
 
     def fake_collect_pipeline_signals(
         frame,
@@ -118,7 +119,7 @@ async def test_export_training_job_bundle(tmp_path, monkeypatch):
         applied_steps = ["applied node"]
         return frame.copy(), signals, modeling_snapshot, applied_steps
 
-    monkeypatch.setattr(fe_routes, "collect_pipeline_signals", fake_collect_pipeline_signals)
+    monkeypatch.setattr(training_api, "collect_pipeline_signals", fake_collect_pipeline_signals)
 
     captured_export = {}
 
@@ -134,7 +135,7 @@ async def test_export_training_job_bundle(tmp_path, monkeypatch):
         manifest_path = output_directory / "manifest.json"
         manifest_path.write_text("{}", encoding="utf-8")
         return SimpleNamespace(
-            manifest_payload={"scaffold_root": job_metadata.get("output_directory")},
+            manifest_payload={"scaffold_root": str(output_directory)},
             artefact_entries=[
                 {
                     "index": 0,
@@ -148,12 +149,12 @@ async def test_export_training_job_bundle(tmp_path, monkeypatch):
             manifest_path=manifest_path,
         )
 
-    monkeypatch.setattr(fe_routes, "export_project_bundle", fake_export_project_bundle)
+    monkeypatch.setattr(training_api, "export_project_bundle", fake_export_project_bundle)
 
     class SettingsStub:
         PIPELINE_EXPORT_DIR = str(tmp_path / "exports")
 
-    monkeypatch.setattr(fe_routes, "get_settings", lambda: SettingsStub())
+    # monkeypatch.setattr(fe_routes, "get_settings", lambda: SettingsStub())
 
     request_body = {
         "sample_size": 16,
@@ -176,7 +177,7 @@ async def test_export_training_job_bundle(tmp_path, monkeypatch):
     assert payload["sample_size"] == 16
     assert (
         payload["manifest"]["scaffold_root"]
-        == captured_export["job_metadata"]["output_directory"]
+        == captured_export["output_directory"]
     )
     assert "check data" in payload["warnings"]
     assert payload["artefacts"][0]["name"] == "pipeline/pipeline_overview"

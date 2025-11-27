@@ -131,7 +131,7 @@ class FeatureEngineeringEDAService:
             "sample_size": int(frame.shape[0]),
             "total_rows": preview.total_rows,
             "estimated_total_rows": preview.total_rows,
-            "dtypes": {column: str(dtype) for column, dtype in frame.dtypes.items()},
+            "dtypes": {column: self._normalize_dtype(dtype) for column, dtype in frame.dtypes.items()},
             "mode": sampling_mode,
         }
 
@@ -289,7 +289,7 @@ class FeatureEngineeringEDAService:
         if source is None and normalized.isdigit():
             try:
                 source = await self.data_service.get_data_source(int(normalized))
-            except Exception:  # pragma: no cover - defensive fallback
+            except Exception:  # pragma: no cover - defensive
                 source = None
 
         if source is not None:
@@ -654,6 +654,10 @@ class FeatureEngineeringEDAService:
         return effective_offset, effective_limit, adjustments, is_large
 
     def _build_quality_report(self, frame: pd.DataFrame) -> Dict[str, Any]:
+        # Handle named index (e.g. "Id") so it appears in the report
+        if frame.index.name:
+            frame = frame.reset_index(drop=False)
+
         raw_details: List[Optional[Dict[str, Any]]] = [
             self._build_column_detail(frame, column) for column in frame.columns
         ]
@@ -712,7 +716,8 @@ class FeatureEngineeringEDAService:
         unique_non_missing = int(series.nunique(dropna=True)) if non_null_count else 0
         unique_pct = float((unique_non_missing / non_null_count) * 100.0) if non_null_count else 0.0
 
-        dtype_label = str(series.dtype)
+        dtype_label = self._normalize_dtype(series.dtype)
+
         text_category, avg_text_len = self._infer_text_metadata(series)
 
         detail = {
@@ -729,6 +734,22 @@ class FeatureEngineeringEDAService:
             "avg_text_length": avg_text_len,
         }
         return detail
+
+    def _normalize_dtype(self, dtype: Any) -> str:
+        dtype_label = str(dtype).lower()
+        if "int" in dtype_label:
+            return "Int64"
+        if "float" in dtype_label:
+            return "float64"
+        if "bool" in dtype_label:
+            return "boolean"
+        if "datetime" in dtype_label:
+            return "datetime64[ns]"
+        if "object" in dtype_label or "string" in dtype_label:
+            return "string"
+        if "category" in dtype_label:
+            return "category"
+        return str(dtype)
 
     def _infer_text_metadata(self, series: pd.Series) -> Tuple[Optional[str], Optional[float]]:
         is_text_like = (

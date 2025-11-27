@@ -15,6 +15,9 @@ from core.feature_engineering.modeling.hyperparameter_tuning.registry import (
 from core.utils.datetime import utcnow
 
 
+FullExecutionJobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
+
+
 class DropColumnCandidate(BaseModel):
     """Column candidate recommended for removal."""
 

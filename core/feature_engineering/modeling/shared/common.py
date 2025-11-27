@@ -305,18 +305,23 @@ def _prepare_training_data(
 async def _resolve_training_inputs(session, job) -> Tuple[pd.DataFrame, Dict[str, Any], Dict[str, Any], List[str]]:
     """Load dataset and apply pipeline transformations up to the training node."""
 
-    from core.feature_engineering import routes as fe_routes  # Lazy import to avoid circular deps
+    from core.feature_engineering.execution.graph import (
+        sanitize_graph_nodes,
+        sanitize_graph_edges,
+        ensure_dataset_node,
+        execution_order,
+    )
 
     graph_payload = job.graph or {}
     graph_nodes = graph_payload.get("nodes") or []
     graph_edges = graph_payload.get("edges") or []
 
-    node_map_raw = fe_routes._sanitize_graph_nodes(graph_nodes)
-    edges = fe_routes._sanitize_graph_edges(graph_edges)
-    node_map = cast(Dict[str, Dict[str, Any]], fe_routes._ensure_dataset_node(node_map_raw))
+    node_map_raw = sanitize_graph_nodes(graph_nodes)
+    edges = sanitize_graph_edges(graph_edges)
+    node_map = cast(Dict[str, Dict[str, Any]], ensure_dataset_node(node_map_raw))
 
-    execution_order = fe_routes._execution_order(node_map, edges, job.node_id)
-    if not execution_order:
+    exec_order = execution_order(node_map, edges, job.node_id)
+    if not exec_order:
         raise ValueError("Unable to resolve pipeline execution order for training node")
 
     upstream_order = execution_order[:-1] if execution_order[-1] == job.node_id else execution_order

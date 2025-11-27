@@ -130,12 +130,26 @@
   border-bottom: 1px solid rgba(71, 85, 105, 0.35);
 }
 
+.canvas-cast__table td {
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.canvas-modal__checkbox-label {
+  color: rgba(226, 232, 240, 0.9);
+}
+
 .canvas-cast__table th {
   font-size: 0.82rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.82);
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.canvas-cast__chip--muted {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.15);
+  color: rgba(203, 213, 225, 0.85);
 }
 
 .canvas-cast__table tbody tr:last-child td {
@@ -174,5 +188,5 @@
   flex-wrap: wrap;
   gap: 0.35rem;
   font-size: 0.75rem;
-  color: rgba(148, 163, 184, 0.75);
+  color: rgba(203, 213, 225, 0.85);
 }

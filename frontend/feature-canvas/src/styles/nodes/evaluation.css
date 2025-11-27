@@ -212,7 +212,7 @@
   padding: 0.35rem 0.9rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: rgba(148, 163, 184, 0.85);
+  color: rgba(203, 213, 225, 0.85);
   background: transparent;
   cursor: pointer;
   transition: color 0.2s ease, background 0.2s ease;
@@ -245,7 +245,7 @@
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(148, 163, 184, 0.7);
+  color: rgba(203, 213, 225, 0.7);
 }
 
 .evaluation-summary__value {
@@ -264,7 +264,7 @@
   border-radius: 1rem;
   padding: 1rem 1.25rem;
   background: rgba(15, 23, 42, 0.6);
-  color: rgba(148, 163, 184, 0.75);
+  color: rgba(203, 213, 225, 0.75);
   font-size: 0.9rem;
 }
 
@@ -293,7 +293,7 @@
 
 .evaluation-split__rows {
   font-size: 0.85rem;
-  color: rgba(148, 163, 184, 0.76);
+  color: rgba(203, 213, 225, 0.76);
 }
 
 .evaluation-split__content {

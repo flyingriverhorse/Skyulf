@@ -52,6 +52,7 @@ export const useNodePreview = ({
     isTrainTestSplitNode,
     isOutlierNode,
     isTransformerAuditNode,
+    isCastNode,
   } = catalogFlags;
 
   const shouldFetchPreview = useMemo(() => {
@@ -109,7 +110,7 @@ export const useNodePreview = ({
     targetNodeId: node?.id ?? null,
     previewSignature,
     skipPreview,
-    requestPreviewRows: isPreviewNode,
+    requestPreviewRows: isPreviewNode || isCastNode,
     includeSignals: shouldIncludeSignals,
   });
 

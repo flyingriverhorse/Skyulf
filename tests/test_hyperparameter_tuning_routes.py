@@ -90,14 +90,15 @@ async def test_enqueue_tuning_jobs_dispatches(monkeypatch, fastapi_app):
     created_jobs: List[StubTuningJob] = []
     dispatch_calls: List[str] = []
 
-    async def fake_create_job(session, payload, *, user_id, model_type_override):
+    async def fake_create_job(session, payload, *, user_id=None, model_type_override=None):
+        effective_model_type = model_type_override or payload.model_types[0]
         job = StubTuningJob(
-            id=f"tuning-{model_type_override}",
+            id=f"tuning-{effective_model_type}",
             dataset_source_id=payload.dataset_source_id,
             pipeline_id=payload.pipeline_id,
             node_id=payload.node_id,
             run_number=len(created_jobs) + 1,
-            model_type=model_type_override,
+            model_type=effective_model_type,
             search_strategy=payload.search_strategy,
             search_space=payload.search_space,
             n_iterations=payload.n_iterations,
@@ -109,8 +110,9 @@ async def test_enqueue_tuning_jobs_dispatches(monkeypatch, fastapi_app):
     def fake_dispatch(job_id: str) -> None:
         dispatch_calls.append(job_id)
 
-    monkeypatch.setattr(fe_routes, "create_hyperparameter_tuning_job_record", fake_create_job)
-    monkeypatch.setattr(fe_routes, "dispatch_hyperparameter_tuning_job", fake_dispatch)
+    from core.feature_engineering.api import tuning as tuning_api
+    monkeypatch.setattr(tuning_api, "create_tuning_job", fake_create_job)
+    monkeypatch.setattr(tuning_api, "dispatch_hyperparameter_tuning_job", fake_dispatch)
 
     request_payload = _build_tuning_request(model_types=["random_forest", "lightgbm"])
 
@@ -128,14 +130,14 @@ async def test_enqueue_tuning_jobs_dispatches(monkeypatch, fastapi_app):
 
 @pytest.mark.asyncio
 async def test_enqueue_tuning_jobs_skips_dispatch_when_disabled(monkeypatch, fastapi_app):
-    async def fake_create_job(session, payload, *, user_id, model_type_override):
+    async def fake_create_job(session, payload, *, user_id=None, model_type_override=None):
         return StubTuningJob(
             id="tuning-only",
             dataset_source_id=payload.dataset_source_id,
             pipeline_id=payload.pipeline_id,
             node_id=payload.node_id,
             run_number=1,
-            model_type=model_type_override,
+            model_type=model_type_override or payload.model_types[0],
             search_strategy=payload.search_strategy,
         )
 
@@ -144,8 +146,9 @@ async def test_enqueue_tuning_jobs_skips_dispatch_when_disabled(monkeypatch, fas
     def fake_dispatch(job_id: str) -> None:
         dispatch_calls.append(job_id)
 
-    monkeypatch.setattr(fe_routes, "create_hyperparameter_tuning_job_record", fake_create_job)
-    monkeypatch.setattr(fe_routes, "dispatch_hyperparameter_tuning_job", fake_dispatch)
+    from core.feature_engineering.api import tuning as tuning_api
+    monkeypatch.setattr(tuning_api, "create_tuning_job", fake_create_job)
+    monkeypatch.setattr(tuning_api, "dispatch_hyperparameter_tuning_job", fake_dispatch)
 
     request_payload = _build_tuning_request(run_tuning=False)
 
@@ -171,7 +174,7 @@ async def test_enqueue_tuning_jobs_handles_dispatch_failure(monkeypatch, fastapi
         search_strategy="grid",
     )
 
-    async def fake_create_job(session, payload, *, user_id, model_type_override):
+    async def fake_create_job(session, payload, *, user_id=None, model_type_override=None):
         return job
 
     def fake_dispatch(job_id: str) -> None:
@@ -196,9 +199,10 @@ async def test_enqueue_tuning_jobs_handles_dispatch_failure(monkeypatch, fastapi
         })
         return target_job
 
-    monkeypatch.setattr(fe_routes, "create_hyperparameter_tuning_job_record", fake_create_job)
-    monkeypatch.setattr(fe_routes, "dispatch_hyperparameter_tuning_job", fake_dispatch)
-    monkeypatch.setattr(fe_routes, "update_tuning_job_status", fake_update)
+    from core.feature_engineering.api import tuning as tuning_api
+    monkeypatch.setattr(tuning_api, "create_tuning_job", fake_create_job)
+    monkeypatch.setattr(tuning_api, "dispatch_hyperparameter_tuning_job", fake_dispatch)
+    monkeypatch.setattr(tuning_api, "update_tuning_job_status", fake_update)
 
     request_payload = _build_tuning_request()
 
