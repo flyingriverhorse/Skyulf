@@ -25,3 +25,11 @@
   font-size: 0.875rem;
   color: rgba(255, 255, 255, 0.9);
 }
+
+.node-settings__loading {
+  font-size: 0.9rem;
+  color: rgba(226, 232, 240, 0.9);
+  font-style: italic;
+  padding: 1rem;
+  text-align: center;
+}
