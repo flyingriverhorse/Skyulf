@@ -37,7 +37,7 @@ Since I am building this solo, I am prioritizing **stability and user experience
 
 #### UI/UX Consistency & Architecture
 *   **Extract Core Library (`skyulf-core`):** Separate the pure ML logic (transformers, pipeline utils) from the web application. This allows deployed models to run with a lightweight `pip install skyulf-core` instead of the full platform.
-*   **Full React Migration:** Gradually replace all Jinja2 server-rendered pages with a single React SPA. Keep FastAPI focused on clean JSON APIs.
+*   **Hybrid Architecture Strategy:** Solidify the "Island Architecture" approach. Use **React + Vite** exclusively for the high-interactivity Feature Canvas, while leveraging **Jinja2 + HTMX** for the Dashboard, Admin, and Auth pages to ensure fast load times and simplified maintenance.
 *   Unify layout, typography, and theming between the Canvas and the rest of the app.
 *   Make node interactions feel "buttery" (dragging, zooming, connecting edges).
 
