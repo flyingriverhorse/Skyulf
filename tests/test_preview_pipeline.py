@@ -59,7 +59,10 @@ async def test_preview_pipeline_full_dataset_signal(monkeypatch):
         meta = {"total_rows": 2, "sample_size": 0}
         return frame, meta
 
-    monkeypatch.setattr(fe_routes, "_load_dataset_frame", fake_load_dataset_frame)
+    import core.feature_engineering.execution.preview as preview_module
+    from core.feature_engineering.api import pipeline as pipeline_api
+
+    monkeypatch.setattr(preview_module, "load_dataset_frame", fake_load_dataset_frame)
 
     def fake_run_pipeline_execution(
         frame,
@@ -80,7 +83,7 @@ async def test_preview_pipeline_full_dataset_signal(monkeypatch):
         )
         return frame.copy(), ["Applied node-1"], signals, readiness
 
-    monkeypatch.setattr(fe_routes, "_run_pipeline_execution", fake_run_pipeline_execution)
+    monkeypatch.setattr(pipeline_api, "run_pipeline_execution", fake_run_pipeline_execution)
 
     captured_snapshot = {}
 
@@ -125,7 +128,7 @@ async def test_preview_pipeline_full_dataset_signal(monkeypatch):
             signals=signals,
         )
 
-    monkeypatch.setattr(fe_routes, "build_data_snapshot_response", fake_build_data_snapshot_response)
+    monkeypatch.setattr(pipeline_api, "build_data_snapshot_response", fake_build_data_snapshot_response)
 
     request_body = {
         "dataset_source_id": "dataset-123",

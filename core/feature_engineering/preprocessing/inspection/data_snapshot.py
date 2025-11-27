@@ -45,6 +45,8 @@ def _infer_logical_family(series: pd.Series) -> PipelineLogicalFamily:
         return "datetime"
     if pd.api.types.is_string_dtype(series):
         return "string"
+    if pd.api.types.is_object_dtype(series):
+        return "string"
     return "unknown"
 
 
@@ -73,6 +75,24 @@ def _normalize_snapshot_value(value: Any) -> Any:
         return None
 
 
+def _normalize_pandas_dtype(dtype_str: str) -> str:
+    """Normalize pandas dtype string to match frontend expectations."""
+    dtype_lower = dtype_str.lower()
+    if "int" in dtype_lower:
+        return "Int64"
+    if "float" in dtype_lower:
+        return "float64"
+    if "bool" in dtype_lower:
+        return "boolean"
+    if "datetime" in dtype_lower:
+        return "datetime64[ns]"
+    if "object" in dtype_lower or "string" in dtype_lower:
+        return "string"
+    if "category" in dtype_lower:
+        return "category"
+    return dtype_str
+
+
 def build_data_snapshot_response(
     frame: pd.DataFrame,
     *,
@@ -87,7 +107,12 @@ def build_data_snapshot_response(
     include_signals: bool = True,
 ) -> PipelinePreviewResponse:
     """Construct the pipeline preview response for a data snapshot."""
-    preview_frame = frame.reset_index(drop=True)
+    # Preserve index if it has a name (e.g. "Id") to ensure it appears in columns
+    if frame.index.name is not None:
+        preview_frame = frame.reset_index(drop=False)
+    else:
+        preview_frame = frame.reset_index(drop=True)
+
     preview_row_count = int(preview_frame.shape[0])
     column_count = int(preview_frame.shape[1])
 
@@ -95,7 +120,7 @@ def build_data_snapshot_response(
     if column_count:
         for column_name in preview_frame.columns:
             series = preview_frame[column_name]
-            pandas_dtype = str(series.dtype)
+            pandas_dtype = _normalize_pandas_dtype(str(series.dtype))
             logical_family = _infer_logical_family(series)
 
             schema_columns.append(
@@ -207,6 +232,40 @@ def build_data_snapshot_response(
     row_missing_stats: List[PipelinePreviewRowMissingStat] = []
 
     column_stats: List[PipelinePreviewColumnStat] = []
+    for column_name in preview_frame.columns:
+        series = preview_frame[column_name]
+        dtype_str = _normalize_pandas_dtype(str(series.dtype))
+
+        missing_count = int(series.isna().sum())
+        missing_percentage = float(round((missing_count / preview_row_count) * 100.0, 2)) if preview_row_count else 0.0
+        distinct_count = int(series.nunique(dropna=True)) if preview_row_count else 0
+
+        mean_val = None
+        median_val = None
+        if pd.api.types.is_numeric_dtype(series) and not pd.api.types.is_bool_dtype(series):
+            numeric_series = pd.to_numeric(series, errors="coerce").dropna()
+            if not numeric_series.empty:
+                mean_val = float(numeric_series.mean())
+                median_val = float(numeric_series.median())
+
+        mode_val = None
+        if not series.empty:
+            modes = series.mode().dropna()
+            if not modes.empty:
+                mode_val = _normalize_snapshot_value(modes.iloc[0])
+
+        column_stats.append(
+            PipelinePreviewColumnStat(
+                name=str(column_name),
+                dtype=dtype_str,
+                missing_count=missing_count,
+                missing_percentage=missing_percentage,
+                distinct_count=distinct_count,
+                mean=mean_val,
+                median=median_val,
+                mode=mode_val,
+            )
+        )
 
     sample_limit = min(preview_row_count, 1000)  # Sample size for recommendations
     sample_preview_rows = preview_frame.head(sample_limit).to_dict("records") if sample_limit else []

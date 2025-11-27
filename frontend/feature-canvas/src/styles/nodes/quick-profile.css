@@ -56,7 +56,7 @@
   font-size: 0.78rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.78);
+  color: rgba(203, 213, 225, 0.85);
   margin-bottom: 0.15rem;
 }
 
@@ -79,7 +79,7 @@
   font-size: 0.85rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.85);
+  color: rgba(203, 213, 225, 0.85);
 }
 
 .canvas-quick-profile__numeric-grid {

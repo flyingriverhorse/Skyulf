@@ -125,7 +125,7 @@
   justify-self: end;
   font-size: 0.75rem;
   font-weight: 600;
-  color: rgba(148, 163, 184, 0.72);
+  color: rgba(203, 213, 225, 0.72);
 }
 
 .model-registry__table-wrapper {
@@ -186,7 +186,7 @@
 
 .model-registry__status--neutral {
   background: rgba(148, 163, 184, 0.15);
-  color: rgba(148, 163, 184, 0.82);
+  color: rgba(203, 213, 225, 0.82);
 }
 
 .model-registry__metric {

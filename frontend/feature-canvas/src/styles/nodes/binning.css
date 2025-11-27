@@ -33,7 +33,7 @@
 .canvas-binning__subtitle {
   margin: 0.35rem 0 0;
   font-size: 0.85rem;
-  color: rgba(148, 163, 184, 0.85);
+  color: rgba(203, 213, 225, 0.85);
 }
 
 .canvas-binning__summary {
@@ -59,7 +59,7 @@
 
 .canvas-binning__summary-meta {
   font-size: 0.8rem;
-  color: rgba(148, 163, 184, 0.78);
+  color: rgba(203, 213, 225, 0.78);
 }
 
 .canvas-binning__meta {

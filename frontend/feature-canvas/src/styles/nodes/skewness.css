@@ -110,7 +110,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.82);
+  color: rgba(226, 232, 240, 0.9);
 }
 
 .canvas-skewness__table tbody tr:last-child td {
@@ -134,7 +134,7 @@
 
 .canvas-skewness__column-summary {
   font-size: 0.8rem;
-  color: rgba(203, 213, 225, 0.75);
+  color: rgba(226, 232, 240, 0.85);
   line-height: 1.4;
 }
 
@@ -171,6 +171,6 @@
 }
 
 .canvas-skewness__muted {
-  color: rgba(148, 163, 184, 0.72);
+  color: rgba(203, 213, 225, 0.8);
   font-size: 0.86rem;
 }

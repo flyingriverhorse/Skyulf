@@ -26,13 +26,35 @@ def _determine_semantic_type(series: pd.Series) -> str:
     if pd_types.is_numeric_dtype(dtype):
         return "numeric"
     if pd_types.is_string_dtype(dtype):
-        return "text"
+        return "string"
+    if pd_types.is_object_dtype(dtype):
+        return "string"
     return str(dtype)
+
+
+def _normalize_dtype(dtype: Any) -> str:
+    """Normalize pandas dtype to frontend-friendly string."""
+    s = str(dtype)
+    if "int" in s.lower():
+        return "Int64"
+    if "float" in s.lower():
+        return "float64"
+    if "bool" in s.lower():
+        return "boolean"
+    if "datetime" in s.lower():
+        return "datetime64[ns]"
+    if "category" in s.lower():
+        return "category"
+    return "string"
 
 
 def build_quick_profile_payload(frame: pd.DataFrame) -> Dict[str, Any]:
     """Compute a lightweight dataset profile summarizing core statistics."""
     working_frame = frame.copy()
+
+    # Handle named index (e.g. "Id") so it appears in the profile
+    if working_frame.index.name:
+        working_frame = working_frame.reset_index(drop=False)
 
     row_count = int(working_frame.shape[0])
     column_count = int(working_frame.shape[1])
@@ -57,7 +79,7 @@ def build_quick_profile_payload(frame: pd.DataFrame) -> Dict[str, Any]:
 
     for column_name in working_frame.columns:
         series = working_frame[column_name]
-        dtype_repr = str(series.dtype)
+        dtype_repr = _normalize_dtype(series.dtype)
         semantic_type = _determine_semantic_type(series)
 
         missing_count = int(series.isna().sum()) if row_count else 0
