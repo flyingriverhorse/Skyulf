@@ -123,7 +123,7 @@ const AnimatedEdge: React.FC<EdgeProps> = ({
   const { sourceX: sx, sourceY: sy, targetX: tx, targetY: ty } = coordinates;
   const { path: edgePath, labelX, labelY } = edgeParams;
   
-  const removeButtonSize = 32;
+  const removeButtonSize = 40; // Increased from 32
   const foreignObjectX = labelX - removeButtonSize / 2;
   const foreignObjectY = labelY - removeButtonSize / 2;
   const edgeClassName = `animated-edge${isHovered ? ' animated-edge--hovered' : ''}`;
@@ -164,7 +164,7 @@ const AnimatedEdge: React.FC<EdgeProps> = ({
         d={edgePath} 
         fill="none" 
         stroke="transparent"
-        strokeWidth={20}
+        strokeWidth={40} // Increased from 20
         style={{ cursor: 'pointer' }}
         className="animated-edge__interaction" 
       />

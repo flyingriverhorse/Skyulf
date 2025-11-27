@@ -120,8 +120,8 @@ export const TrainTestSplitSection: React.FC<TrainTestSplitSectionProps> = ({
   const targetColumnParam = parameters.find(p => p.name === 'target_column');
 
   return (
-    <div className="node-settings__section">
-      <div className="node-settings__section-header">
+    <div className="canvas-modal__section">
+      <div className="canvas-modal__section-header">
         <h3>Train/Test Split Configuration</h3>
       </div>
 

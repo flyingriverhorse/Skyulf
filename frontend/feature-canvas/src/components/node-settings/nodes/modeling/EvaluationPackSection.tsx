@@ -727,8 +727,8 @@ const EvaluationPackSection: React.FC<EvaluationPackSectionProps> = ({
 	}, [comparisonDisabledReason]);
 
 	return (
-		<div className="node-settings__section node-settings__evaluation">
-			<div className="node-settings__section-header">
+		<div className="canvas-modal__section node-settings__evaluation">
+			<div className="canvas-modal__section-header">
 				<h3>Model Evaluation</h3>
 				<div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
 					{lastRunRelative && <span className="evaluation-status">Last ran {lastRunRelative}</span>}

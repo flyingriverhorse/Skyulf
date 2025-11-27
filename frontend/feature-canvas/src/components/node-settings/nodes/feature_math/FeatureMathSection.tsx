@@ -608,16 +608,6 @@ export const FeatureMathSection: React.FC<FeatureMathSectionProps> = ({
       <div className="canvas-modal__section-header">
         <h3>Feature math operations</h3>
         <div className="canvas-modal__section-actions">
-          <select
-            value={pendingType}
-            onChange={(event) => setPendingType(event.target.value as FeatureMathOperationType)}
-          >
-            {FEATURE_MATH_TYPE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
           <button type="button" className="btn btn-outline-secondary" onClick={handleAddOperation}>
             Add operation
           </button>
