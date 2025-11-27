@@ -1,0 +1,53 @@
+.canvas-modal__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.canvas-modal__footer-status {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 1.25rem;
+  color: rgba(203, 213, 225, 0.85);
+  font-size: 0.92rem;
+  flex: 1 1 180px;
+}
+
+.canvas-modal__footer-spinner {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  border: 2px solid rgba(148, 163, 184, 0.42);
+  border-top-color: rgba(94, 234, 212, 0.9);
+  animation: canvas-modal-spin 0.75s linear infinite;
+}
+
+.canvas-modal__footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+@keyframes canvas-modal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.canvas-modal__reset {
+  padding: 0.45rem 1.1rem;
+  font-size: 0.9rem;
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(148, 163, 184, 0.45);
+}
+
+.canvas-modal__reset:hover {
+  box-shadow: 0 12px 28px rgba(56, 189, 248, 0.22);
+  border-color: rgba(94, 234, 212, 0.45);
+}

@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { EdgeProps, useReactFlow } from 'react-flow-renderer';
+import { EdgeProps, useReactFlow, Position } from 'react-flow-renderer';
+import { getSmartEdge } from '@tisoap/react-flow-smart-edge';
 
 const isFiniteNumber = (value: number) => Number.isFinite(value);
 
@@ -37,10 +38,12 @@ const AnimatedEdge: React.FC<EdgeProps> = ({
   sourceY,
   targetX,
   targetY,
+  sourcePosition = Position.Bottom,
+  targetPosition = Position.Top,
   markerEnd,
   style,
 }) => {
-  const { setEdges } = useReactFlow();
+  const { setEdges, getNodes } = useReactFlow();
   const [isHovered, setIsHovered] = useState(false);
 
   const handleMouseEnter = useCallback(() => {
@@ -65,27 +68,64 @@ const AnimatedEdge: React.FC<EdgeProps> = ({
     };
   }, [sourceX, sourceY, targetX, targetY, id]);
 
-  const edgePath = useMemo(() => {
+  const edgeParams = useMemo(() => {
     if (!coordinates) {
       return null;
     }
 
-    const { sourceX: sx, sourceY: sy, targetX: tx, targetY: ty } = coordinates;
-    return buildSmoothPath(sx, sy, tx, ty);
-  }, [coordinates]);
+    const { sourceX, sourceY, targetX, targetY } = coordinates;
+    
+    // 1. Try Smart Edge (Obstacle Avoidance)
+    try {
+      // Ensure nodes have dimensions so they are treated as obstacles
+      const nodes = getNodes().map(n => ({ 
+        ...n, 
+        width: n.width && n.width > 0 ? n.width : 320, 
+        height: n.height && n.height > 0 ? n.height : 170 
+      }));
+
+      const smartResult = getSmartEdge({
+        sourcePosition,
+        targetPosition,
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+        nodes,
+        options: {
+          nodePadding: 40, // Increased padding for better separation
+          gridRatio: 10,
+        },
+      });
+
+      if (smartResult && 'svgPathString' in smartResult) {
+        const { svgPathString, edgeCenterX, edgeCenterY } = smartResult;
+        return { path: svgPathString, labelX: edgeCenterX, labelY: edgeCenterY };
+      }
+    } catch (e) {
+      // Ignore smart edge errors and fall back
+    }
+
+    // 2. Fallback to Original Smooth Path
+    const path = buildSmoothPath(sourceX, sourceY, targetX, targetY);
+    const labelX = (sourceX + targetX) / 2;
+    const labelY = (sourceY + targetY) / 2;
+    
+    return { path, labelX, labelY };
+  }, [coordinates, sourcePosition, targetPosition, getNodes]);
 
   const gradientId = useMemo(() => `animated-edge-gradient-${id}`, [id]);
 
-  if (!coordinates || !edgePath) {
+  if (!coordinates || !edgeParams) {
     return null;
   }
 
   const { sourceX: sx, sourceY: sy, targetX: tx, targetY: ty } = coordinates;
-  const midpointX = (sx + tx) / 2;
-  const midpointY = (sy + ty) / 2;
+  const { path: edgePath, labelX, labelY } = edgeParams;
+  
   const removeButtonSize = 32;
-  const foreignObjectX = midpointX - removeButtonSize / 2;
-  const foreignObjectY = midpointY - removeButtonSize / 2;
+  const foreignObjectX = labelX - removeButtonSize / 2;
+  const foreignObjectY = labelY - removeButtonSize / 2;
   const edgeClassName = `animated-edge${isHovered ? ' animated-edge--hovered' : ''}`;
   const removeButtonClassName = `canvas-edge-remove${isHovered ? ' canvas-edge-remove--visible' : ''}`;
 

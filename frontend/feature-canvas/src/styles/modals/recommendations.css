@@ -1,0 +1,42 @@
+.canvas-modal__recommendation-name {
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.canvas-modal__recommendation-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: rgba(203, 213, 225, 0.9);
+}
+
+.canvas-modal__recommendation-reason {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.canvas-modal__priority-badge {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.canvas-modal__priority-badge--critical {
+  background: rgba(248, 113, 113, 0.18);
+  color: rgba(248, 113, 113, 0.95);
+}
+
+.canvas-modal__priority-badge--high {
+  background: rgba(251, 146, 60, 0.18);
+  color: rgba(251, 146, 60, 0.95);
+}
+
+.canvas-modal__priority-badge--medium {
+  background: rgba(59, 130, 246, 0.18);
+  color: rgba(129, 140, 248, 0.95);
+}
