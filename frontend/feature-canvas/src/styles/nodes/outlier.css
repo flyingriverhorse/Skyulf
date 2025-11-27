@@ -1,0 +1,104 @@
+.canvas-outlier__bar {
+  margin-top: 0.35rem;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.25);
+  overflow: hidden;
+}
+
+.canvas-outlier__bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0.85), rgba(239, 68, 68, 0.95));
+  border-radius: inherit;
+}
+
+.canvas-outlier__method-note {
+  font-size: 0.82rem;
+  color: rgba(148, 163, 184, 0.82);
+}
+
+.canvas-outlier__method-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.canvas-outlier__method-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(71, 85, 105, 0.45);
+  background: rgba(12, 20, 34, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.4);
+}
+
+.canvas-outlier__method-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.canvas-outlier__method-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #f8fafc;
+  letter-spacing: 0.01em;
+}
+
+.canvas-outlier__method-summary {
+  margin: 0;
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.8);
+  line-height: 1.35;
+}
+
+.canvas-outlier__parameter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.canvas-outlier__method-parameter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  color: rgba(203, 213, 225, 0.84);
+}
+
+.canvas-outlier__parameter-label {
+  font-weight: 500;
+}
+
+.canvas-outlier__method-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.canvas-outlier__method-input-field {
+  width: 72px;
+  padding: 0.35rem 0.55rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(71, 85, 105, 0.5);
+  background: rgba(11, 16, 28, 0.92);
+  color: #e2e8f0;
+  font-size: 0.82rem;
+  text-align: right;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.canvas-outlier__method-input-field:focus {
+  outline: none;
+  border-color: rgba(94, 234, 212, 0.5);
+  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.2);
+}
+
+.canvas-outlier__parameter-suffix {
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.78);
+}
