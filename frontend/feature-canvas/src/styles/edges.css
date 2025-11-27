@@ -56,13 +56,13 @@
 }
 
 .canvas-edge-remove__button {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
   border: 1px solid rgba(71, 85, 105, 0.65);
   background: rgba(15, 23, 42, 0.92);
   color: rgba(226, 232, 240, 0.9);
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
   display: flex;
   align-items: center;
