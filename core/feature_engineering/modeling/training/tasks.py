@@ -38,7 +38,7 @@ from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.preprocessing import label_binarize
 
 from config import get_settings
-from core.database.engine import create_tables, init_db
+from core.database.engine import create_tables, init_db, sync_session_factory
 from core.database.models import get_database_session
 from core.feature_engineering.schemas import TrainingJobStatus
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
@@ -50,7 +50,7 @@ from core.feature_engineering.modeling.shared import (
 )
 
 from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
-from .jobs import get_training_job, update_job_status
+from .jobs import get_training_job, update_job_status, update_job_progress_sync
 from .registry import get_model_spec
 
 _imblearn_metrics = None
@@ -686,6 +686,7 @@ def _run_cross_validation(
     X_train: pd.DataFrame,
     y_train: pd.Series,
     cv_config: CrossValidationConfig,
+    progress_callback: Optional[Callable[[int, str], None]] = None,
 ) -> Optional[Dict[str, Any]]:
     if not cv_config.enabled:
         return None
@@ -717,6 +718,12 @@ def _run_cross_validation(
 
     try:
         for fold_index, (train_idx, val_idx) in enumerate(splitter.split(X_train, y_array), start=1):
+            if progress_callback:
+                progress_callback(
+                    int((fold_index - 1) / cv_config.folds * 100),
+                    f"Training fold {fold_index}/{cv_config.folds}"
+                )
+
             if val_idx.size == 0:
                 continue
 
@@ -951,6 +958,16 @@ def _classification_metrics(model, X: np.ndarray, y: np.ndarray) -> Dict[str, fl
         "recall_weighted": float(recall_score(y, predictions, average="weighted", zero_division=0)),
         "f1_weighted": float(f1_score(y, predictions, average="weighted", zero_division=0)),
     }
+
+    # Add unweighted metrics for binary classification
+    try:
+        unique_classes = np.unique(y)
+        if len(unique_classes) == 2:
+            metrics["precision"] = float(precision_score(y, predictions, average="binary", zero_division=0))
+            metrics["recall"] = float(recall_score(y, predictions, average="binary", zero_division=0))
+            metrics["f1"] = float(f1_score(y, predictions, average="binary", zero_division=0))
+    except Exception:
+        pass
 
     if geometric_mean_score is not None:
         try:
@@ -1254,6 +1271,7 @@ def _train_and_save_model(
     version: int,
     cv_config: CrossValidationConfig,
     upstream_node_order: Optional[List[str]] = None,
+    progress_callback: Optional[Callable[[int, str], None]] = None,
 ) -> Tuple[str, Dict[str, Any], str, List[str]]:
     """Fit model synchronously, persist artifacts/metrics, and collect warnings."""
 
@@ -1266,7 +1284,9 @@ def _train_and_save_model(
         params = _merge_model_params(spec.default_params, hyperparameters)
         params = _normalize_model_params(spec, params)
 
-        cv_summary = _run_cross_validation(spec, params, resolved_problem_type, X_train, y_train, cv_config)
+        cv_summary = _run_cross_validation(
+            spec, params, resolved_problem_type, X_train, y_train, cv_config, progress_callback
+        )
 
         fit_features, fit_target, used_validation = _prepare_refit_dataset(
             X_train,
@@ -1276,9 +1296,15 @@ def _train_and_save_model(
             cv_config,
         )
 
+        if progress_callback:
+            progress_callback(90, "Training final model")
+
         final_model = spec.factory(**params)
         fit_target_array = _prepare_target_array(fit_target, resolved_problem_type)
         final_model.fit(fit_features, fit_target_array)
+
+        if progress_callback:
+            progress_callback(95, "Calculating metrics")
 
         metrics = _initialize_metrics(
             feature_columns,
@@ -1521,6 +1547,7 @@ async def _run_training_workflow(job_id: str) -> None:
                 version=version_value,
                 cv_config=cv_config,
                 upstream_node_order=upstream_order,
+                progress_callback=lambda p, s: update_job_progress_sync(job_id_value, p, s),
             )
 
             metrics["problem_type"] = resolved_problem_type
@@ -1571,7 +1598,9 @@ async def _run_training_workflow(job_id: str) -> None:
 @celery_app.task(name="core.feature_engineering.modeling.training.train_model")
 def train_model(job_id: str) -> None:
     """Celery entrypoint for training jobs."""
-
+    # Ensure DB is initialized in this worker process
+    # This is critical for sync_session_factory to be populated
+    asyncio.run(init_db())
     asyncio.run(_run_training_workflow(job_id))
 
 

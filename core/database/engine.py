@@ -89,9 +89,10 @@ async def init_db() -> None:
     )
 
     # Setup sync database for compatibility (convert async URL to sync)
-    sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite:///")
-    if sync_url.startswith("postgresql+asyncpg://"):
-        sync_url = sync_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+    if settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
+        sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
+    else:
+        sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
 
     sync_engine = create_engine(sync_url, echo=settings.DB_ECHO)
     sync_session_factory = sessionmaker(bind=sync_engine)

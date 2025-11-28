@@ -28,6 +28,16 @@ import type { TrainModelDraftConfig } from './TrainModelDraftSection';
 import type { TrainModelCVConfig } from '../../hooks';
 import { BestHyperparamsModal, type HyperparamPreset } from './BestHyperparamsModal';
 import { useScalingWarning, detectScalingConvergenceFromJob, hasScalingConvergenceMessage } from './useScalingWarning';
+import { TrainingJobHistory } from './TrainingJobHistory';
+import { HyperparameterControls } from './HyperparameterControls';
+import {
+	filterHyperparametersByFields,
+	valuesEqual,
+	sanitizeHyperparametersForPayload,
+	cloneJson,
+	pickPrimaryMetric,
+	formatMetricValue,
+} from './modelingUtils';
 
 export type TrainModelRuntimeConfig = {
 	modelType: string | null;
@@ -54,212 +64,6 @@ type ModelTrainingSectionProps = {
 	cvRandomStateParameter: FeatureNodeParameter | null;
 	cvRefitStrategyParameter: FeatureNodeParameter | null;
 	onSaveDraftConfig?: (options?: { closeModal?: boolean }) => void | Promise<void>;
-};
-
-type PrimaryMetric = {
-	label: string;
-	value: number;
-};
-
-const STATUS_LABEL: Record<string, string> = {
-	queued: 'Queued',
-	running: 'Running',
-	succeeded: 'Succeeded',
-	failed: 'Failed',
-	cancelled: 'Cancelled',
-};
-
-const METRIC_PREFERENCE = {
-	classification: ['accuracy', 'f1_weighted', 'roc_auc', 'precision_weighted', 'recall_weighted'],
-	regression: ['rmse', 'mae', 'r2'],
-	fallback: ['rmse', 'mae', 'r2', 'accuracy', 'f1_weighted', 'roc_auc'],
-};
-
-const filterHyperparametersByFields = (
-	values: Record<string, any> | null | undefined,
-	fieldNames: Set<string>
-): Record<string, any> => {
-	if (!values) {
-		return {};
-	}
-	const filtered: Record<string, any> = {};
-	Object.entries(values).forEach(([key, value]) => {
-		if (fieldNames.has(key)) {
-			filtered[key] = value;
-		}
-	});
-	return filtered;
-};
-
-const valuesEqual = (first: any, second: any): boolean => {
-	if (first === second) {
-		return true;
-	}
-	if (typeof first === 'number' && typeof second === 'number' && Number.isNaN(first) && Number.isNaN(second)) {
-		return true;
-	}
-	if (Array.isArray(first) && Array.isArray(second)) {
-		if (first.length !== second.length) {
-			return false;
-		}
-		return first.every((item, index) => valuesEqual(item, second[index]));
-	}
-	if (first && second && typeof first === 'object' && typeof second === 'object') {
-		try {
-			return JSON.stringify(first) === JSON.stringify(second);
-		} catch (error) {
-			return false;
-		}
-	}
-	return false;
-};
-
-const sanitizeHyperparametersForPayload = (
-	values: Record<string, any> | null | undefined,
-	fieldNames: Set<string>,
-	fieldMap?: Record<string, ModelHyperparameterField>
-): Record<string, any> => {
-	if (!values) {
-		return {};
-	}
-	const sanitized: Record<string, any> = {};
-	Object.entries(values).forEach(([key, rawValue]) => {
-		if (!fieldNames.has(key)) {
-			return;
-		}
-		if (rawValue === '' || rawValue === null || rawValue === undefined) {
-			return;
-		}
-		const field = fieldMap?.[key];
-		let value = rawValue;
-		if (field) {
-			if (typeof value === 'string') {
-				const trimmedValue = value.trim();
-				if (!trimmedValue) {
-					return;
-				}
-				if (field.type === 'select') {
-					value = trimmedValue;
-				}
-			}
-
-			if (field.name === 'multi_class' && typeof value === 'string') {
-				const normalizedMulti = value.trim().toLowerCase();
-				if (normalizedMulti === 'auto') {
-					return;
-				}
-				if (normalizedMulti === 'ovr' || normalizedMulti === 'multinomial') {
-					value = normalizedMulti;
-				}
-			}
-
-			if (field.default !== undefined) {
-				if (typeof field.default === 'string' && typeof value === 'string') {
-					const defaultTrimmed = field.default.trim();
-					const valueTrimmed = value.trim();
-					if (defaultTrimmed === valueTrimmed) {
-						return;
-					}
-				} else if (valuesEqual(field.default, value)) {
-					return;
-				}
-			}
-		}
-
-		sanitized[key] = value;
-	});
-	return sanitized;
-};
-
-const isRecord = (value: unknown): value is Record<string, any> => {
-	return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-};
-
-const cloneJson = <T,>(value: T): T => {
-	try {
-		return JSON.parse(JSON.stringify(value));
-	} catch (error) {
-		return value;
-	}
-};
-
-const resolveMetricPreference = (metrics: Record<string, any> | null | undefined): string[] => {
-	if (!metrics) {
-		return METRIC_PREFERENCE.fallback;
-	}
-	const modelType = String(metrics.model_type ?? metrics.modelType ?? '').toLowerCase();
-	if (modelType.includes('regressor')) {
-		return METRIC_PREFERENCE.regression;
-	}
-	if (modelType.includes('classifier') || modelType.includes('classification')) {
-		return METRIC_PREFERENCE.classification;
-	}
-	const hinted = String(metrics.problem_type ?? metrics.problemType ?? '').toLowerCase();
-	if (hinted === 'regression') {
-		return METRIC_PREFERENCE.regression;
-	}
-	if (hinted === 'classification') {
-		return METRIC_PREFERENCE.classification;
-	}
-	return METRIC_PREFERENCE.fallback;
-};
-
-const pickPrimaryMetric = (metrics: Record<string, any> | null | undefined): PrimaryMetric | null => {
-	if (!metrics) {
-		return null;
-	}
-
-	const metricBuckets: Array<{ dataset: Record<string, any>; labelPrefix: string }> = [];
-	const cvMean = metrics?.cross_validation?.metrics?.mean;
-	if (isRecord(cvMean) && metrics?.cross_validation?.status === 'completed') {
-		metricBuckets.push({ dataset: cvMean, labelPrefix: 'CV mean ' });
-	}
-
-	const candidateBuckets = [metrics.test, metrics.validation, metrics.train];
-	for (const bucket of candidateBuckets) {
-		if (isRecord(bucket)) {
-			metricBuckets.push({ dataset: bucket, labelPrefix: '' });
-		}
-	}
-
-	const orderedKeys = resolveMetricPreference(metrics);
-
-	for (const bucket of metricBuckets) {
-		for (const key of orderedKeys) {
-			const value = bucket.dataset[key];
-			if (typeof value === 'number' && Number.isFinite(value)) {
-				const label = bucket.labelPrefix ? `${bucket.labelPrefix}${key}` : key;
-				return { label, value };
-			}
-		}
-	}
-
-	for (const bucket of metricBuckets) {
-		for (const [key, value] of Object.entries(bucket.dataset)) {
-			if (typeof value === 'number' && Number.isFinite(value)) {
-				const label = bucket.labelPrefix ? `${bucket.labelPrefix}${key}` : key;
-				return { label, value };
-			}
-		}
-	}
-
-	return null;
-};
-
-const formatMetricValue = (value: number): string => {
-	if (!Number.isFinite(value)) {
-		return '';
-	}
-	if (Math.abs(value) >= 1000) {
-		return value.toFixed(0);
-	}
-	if (Math.abs(value) >= 100) {
-		return value.toFixed(1);
-	}
-	if (Math.abs(value) >= 10) {
-		return value.toFixed(2);
-	}
-	return value.toFixed(3);
 };
 
 export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
@@ -1083,7 +887,7 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 							onChange={(e) => handleHyperparamChange(field.name, e.target.value)}
 						>
 							{field.options?.map((opt) => (
-								<option key={opt.value} value={opt.value}>
+								<option key={String(opt.value)} value={String(opt.value)}>
 									{opt.label}
 								</option>
 							))}
@@ -1209,84 +1013,17 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 		}
 	}, [shouldFetchJobs, trainingJobsQuery]);
 
-		const renderJobSummary = (job: TrainingJobSummary) => {
-			const metric = pickPrimaryMetric(job.metrics ?? null);
-			const updatedLabel = job.updated_at ? formatRelativeTime(job.updated_at) : null;
-			const fallbackUpdated = job.updated_at || job.created_at;
-			const timestampLabel = fallbackUpdated
-				? updatedLabel ?? new Date(fallbackUpdated).toLocaleString()
-				: null;
-			const statusLabel = STATUS_LABEL[job.status] ?? job.status;
-			const jobProblemType = (
-				job.problem_type || job.metadata?.resolved_problem_type || job.metadata?.problem_type || ''
-			).toString();
-			const cvMetadata = (job.metadata?.cross_validation ?? null) as Record<string, any> | null;
-			const cvMetrics = (job.metrics?.cross_validation ?? null) as Record<string, any> | null;
-			const jobError = typeof job.error_message === 'string' ? job.error_message.trim() : '';
-
-			const detailParts: string[] = [];
-			detailParts.push(`Model ${job.model_type}`);
-			if (jobProblemType) {
-				detailParts.push(jobProblemType.charAt(0).toUpperCase() + jobProblemType.slice(1));
-			}
-			if (cvMetadata?.enabled) {
-				const strategyKey = String(cvMetadata.strategy ?? 'auto');
-				const strategyLabel =
-					strategyKey === 'stratified_kfold'
-						? 'Stratified KFold'
-						: strategyKey === 'kfold'
-						? 'KFold'
-						: 'Auto CV';
-				const foldLabel = typeof cvMetadata.folds === 'number' ? `${cvMetadata.folds} folds` : 'CV enabled';
-				detailParts.push(`${strategyLabel} (${foldLabel})`);
-				if (cvMetrics?.status === 'skipped') {
-					const reason = String(cvMetrics?.reason ?? 'unknown reason').replace(/_/g, ' ');
-					detailParts.push(`CV skipped (${reason})`);
-				}
-			} else if (cvMetrics?.status === 'skipped') {
-				const reason = String(cvMetrics?.reason ?? 'unknown reason').replace(/_/g, ' ');
-				detailParts.push(`CV skipped (${reason})`);
-			}
-			if (metric) {
-				detailParts.push(`${metric.label}: ${formatMetricValue(metric.value)}`);
-			}
-			if (job.status === 'failed' && jobError) {
-				const normalizedError = jobError.replace(/\s+/g, ' ');
-				detailParts.push(`Error: ${normalizedError}`);
-			}
-			if (timestampLabel) {
-				detailParts.push(`Updated ${timestampLabel}`);
-			}
-
-			return (
-				<li key={job.id}>
-					<strong>v{job.version}</strong> — {statusLabel}
-					{detailParts.length > 0 ? ` • ${detailParts.join(' • ')}` : ''}
-				</li>
-			);
-		};
-
 	return (
-		<section className="canvas-modal__section">
-			<div className="canvas-modal__section-header">
-				<h3>Background training jobs</h3>
-				<div className="canvas-modal__section-actions">
-					<button
-						type="button"
-						className="btn btn-outline-secondary"
-						onClick={handleRefreshJobs}
-						disabled={!shouldFetchJobs || isJobsLoading}
-					>
-						{isJobsLoading ? 'Refreshing…' : 'Refresh jobs'}
-					</button>
+		<>
+			<section className="canvas-modal__section">
+				<div className="canvas-modal__section-header">
+					<h3>Model Training</h3>
 				</div>
-			</div>
-			<p className="canvas-modal__note">
-				Enqueue a background training job for this node. Jobs run via Celery, versioned per pipeline, and
-				report metrics when finished.
-			</p>
+				<p className="canvas-modal__note">
+					Configure and launch training jobs.
+				</p>
 
-			{pipelineId && (
+				{pipelineId && (
 				<p className="canvas-modal__note canvas-modal__note--muted">
 					Pipeline ID: <code>{pipelineId}</code>
 				</p>
@@ -1357,195 +1094,30 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 					</>
 				)}
 				
-				{/* Hyperparameter configuration mode toggle */}
-				{modelType && hyperparamFields.length > 0 && (
-					<div className="canvas-modal__parameter" style={{ gridColumn: '1 / -1' }}>
-						<div
-							style={{
-								display: 'flex',
-								flexWrap: 'wrap',
-								alignItems: 'flex-start',
-								justifyContent: 'space-between',
-								gap: '1rem',
-								marginBottom: '0.75rem',
-								padding: '0.75rem 1rem',
-								background: 'rgba(15, 23, 42, 0.35)',
-								borderRadius: '6px',
-								border: '1px solid rgba(148, 163, 184, 0.25)'
-							}}
-						>
-							<div style={{ flex: '1 1 260px' }}>
-								<strong style={{ fontSize: '0.95rem', color: '#e2e8f0' }}>Model Configuration</strong>
-								<p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: 'rgba(148, 163, 184, 0.85)' }}>
-									{showAdvanced
-										? 'Fine-tune hyperparameters or use defaults for quick training'
-										: 'Using default hyperparameters — toggle Advanced to customize'}
-								</p>
-								{(primaryPreset || latestTuningJob) && (
-									<p style={{ margin: '0.5rem 0 0 0', fontSize: '0.8rem', color: 'rgba(148, 163, 184, 0.8)' }}>
-										{primaryPreset ? (
-											<>
-												✓ Tuned parameters available for <strong>{primaryPreset.modelType}</strong>
-												{primaryPreset.runNumber ? ` (run ${primaryPreset.runNumber})` : ''}
-												{primaryPresetRelative ? ` • ${primaryPresetRelative}` : ''}
-												{primaryPreset.targetColumn ? ` • Target: ${primaryPreset.targetColumn}` : ''}
-												{primaryPresetScoreLabel ? ` • ${primaryPresetScoreLabel}` : ''}
-											</>
-										) : (
-											<>
-												Latest tuning run {latestTuningRunNumber || 'N/A'}
-												{latestTuningRelative ? ` • ${latestTuningRelative}` : ''}
-												{latestTuningJob?.model_type && latestTuningJob.model_type !== modelType
-													? ` targeted ${latestTuningJob.model_type}.`
-													: ' did not produce reusable parameters for this configuration yet.'}
-											</>
-										)}
-									</p>
-								)}
-								{applyStatus && (
-									<p style={{ margin: '0.5rem 0 0 0', fontSize: '0.8rem', color: applyStatusColor }}>
-										{applyStatus.message}
-									</p>
-								)}
-							</div>
-							<div
-								style={{
-									display: 'flex',
-									flexWrap: 'wrap',
-									gap: '0.5rem',
-									alignItems: 'center',
-									justifyContent: 'flex-end'
-								}}
-							>
-								<button
-									type="button"
-									onClick={handleApplyBestParams}
-									disabled={applyButtonDisabled}
-									style={{
-										padding: '0.5rem 1rem',
-										fontSize: '0.875rem',
-										fontWeight: 500,
-										color: applyButtonDisabled ? 'rgba(148, 163, 184, 0.55)' : '#0c4a6e',
-										background: applyButtonDisabled ? 'rgba(15, 23, 42, 0.35)' : 'rgba(191, 219, 254, 0.9)',
-										border: applyButtonDisabled ? '1px solid rgba(148, 163, 184, 0.35)' : '1px solid rgba(147, 197, 253, 0.9)',
-										borderRadius: '4px',
-										cursor: applyButtonDisabled ? 'not-allowed' : 'pointer',
-										transition: 'all 0.2s ease',
-										minWidth: '130px',
-										boxShadow: applyButtonDisabled ? 'none' : '0 3px 10px rgba(14, 116, 144, 0.25)'
-									}}
-								>
-									Apply tuned params
-								</button>
-								<button
-									type="button"
-									onClick={() => setPresetModalOpen(true)}
-									disabled={browsePresetsDisabled}
-									style={{
-										padding: '0.5rem 1rem',
-										fontSize: '0.875rem',
-										fontWeight: 500,
-										color: browsePresetsDisabled ? 'rgba(148, 163, 184, 0.55)' : 'rgba(168, 85, 247, 0.95)',
-										background: browsePresetsDisabled ? 'rgba(15, 23, 42, 0.35)' : 'rgba(76, 29, 149, 0.18)',
-										border: browsePresetsDisabled ? '1px solid rgba(148, 163, 184, 0.35)' : '1px solid rgba(168, 85, 247, 0.45)',
-										borderRadius: '4px',
-										cursor: browsePresetsDisabled ? 'not-allowed' : 'pointer',
-										transition: 'all 0.2s ease',
-										minWidth: '150px'
-									}}
-								>
-									Browse tuned params
-								</button>
-								<button
-									type="button"
-									onClick={handleToggleAdvanced}
-									style={{
-										padding: '0.5rem 1rem',
-										fontSize: '0.875rem',
-										fontWeight: '500',
-										color: showAdvanced ? '#fff' : 'rgba(148, 163, 184, 0.85)',
-										background: showAdvanced ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(15, 23, 42, 0.6)',
-										border: showAdvanced ? 'none' : '1px solid rgba(148, 163, 184, 0.45)',
-										borderRadius: '4px',
-										cursor: 'pointer',
-										transition: 'all 0.2s ease',
-										minWidth: '100px',
-										boxShadow: showAdvanced ? '0 4px 12px rgba(118, 75, 162, 0.25)' : 'none'
-									}}
-									onMouseEnter={(e) => {
-										if (showAdvanced) {
-											e.currentTarget.style.boxShadow = '0 6px 16px rgba(118, 75, 162, 0.35)';
-										} else {
-											e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.65)';
-											e.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)';
-										}
-									}}
-									onMouseLeave={(e) => {
-										if (showAdvanced) {
-											e.currentTarget.style.boxShadow = '0 4px 12px rgba(118, 75, 162, 0.25)';
-										} else {
-											e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.45)';
-											e.currentTarget.style.background = 'rgba(15, 23, 42, 0.6)';
-										}
-									}}
-								>
-									{showAdvanced ? '✓ Advanced' : 'Default'}
-								</button>
-							</div>
-						</div>
-					</div>
-				)}
-				
-				{/* Render dynamic hyperparameter fields */}
-				{modelType && hyperparamQuery.isLoading && (
-					<p className="canvas-modal__note canvas-modal__note--muted">Loading hyperparameters…</p>
-				)}
-				{modelType && hyperparamQuery.error && (
-					<p className="canvas-modal__note canvas-modal__note--error">
-						Failed to load hyperparameters: {hyperparamQuery.error.message}
-					</p>
-				)}
-				{modelType && showAdvanced && hyperparamFields.length > 0 && (
-					<div style={{ 
-						gridColumn: '1 / -1',
-						padding: '1.25rem',
-						background: 'rgba(15, 23, 42, 0.25)',
-						border: '1px solid rgba(148, 163, 184, 0.2)',
-						borderRadius: '6px',
-						marginTop: '0.5rem'
-					}}>
-						<div style={{ 
-							marginBottom: '1rem',
-							paddingBottom: '0.75rem',
-							borderBottom: '2px solid rgba(102, 126, 234, 0.3)'
-						}}>
-							<h4 style={{ 
-								margin: '0 0 0.5rem 0', 
-								fontSize: '1rem',
-								fontWeight: '600',
-								color: '#e2e8f0'
-							}}>
-								Advanced Hyperparameters
-							</h4>
-							<p style={{ 
-								margin: '0', 
-								fontSize: '0.875rem', 
-								color: 'rgba(148, 163, 184, 0.85)',
-								lineHeight: '1.5'
-							}}>
-								Configure {modelType.replace(/_/g, ' ')} hyperparameters. Leave empty to use recommended defaults.
-							</p>
-						</div>
-						<div style={{ 
-							display: 'grid',
-							gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-							gap: '1rem'
-						}}>
-							{hyperparamFields.map(renderHyperparamField)}
-						</div>
-					</div>
-				)}
-				{!modelType && hyperparametersParameter && renderParameterField(hyperparametersParameter)}
+				<HyperparameterControls
+					modelType={modelType}
+					showAdvanced={showAdvanced}
+					hyperparamFields={hyperparamFields}
+					hyperparamValues={hyperparamValues}
+					onHyperparamChange={handleHyperparamChange}
+					onToggleAdvanced={handleToggleAdvanced}
+					isLoading={hyperparamQuery.isLoading}
+					error={hyperparamQuery.error}
+					primaryPreset={primaryPreset}
+					latestTuningJob={latestTuningJob}
+					applyStatus={applyStatus}
+					onApplyBestParams={handleApplyBestParams}
+					onBrowsePresets={() => setPresetModalOpen(true)}
+					applyButtonDisabled={applyButtonDisabled}
+					browsePresetsDisabled={browsePresetsDisabled}
+					latestTuningRunNumber={latestTuningRunNumber}
+					latestTuningRelative={latestTuningRelative}
+					primaryPresetRelative={primaryPresetRelative}
+					primaryPresetScoreLabel={primaryPresetScoreLabel}
+					applyStatusColor={applyStatusColor}
+					renderParameterField={renderParameterField}
+					hyperparametersParameter={hyperparametersParameter}
+				/>
 			</div>
 
 			{cvEnabled && (
@@ -1616,30 +1188,32 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 				</button>
 			</div>
 
-					{isJobsLoading && <p className="canvas-modal__note canvas-modal__note--muted">Loading recent jobs…</p>}
-					{hiddenJobCount > 0 && (
-						<p className="canvas-modal__note canvas-modal__note--muted">
-							{hiddenJobCount === 1
-								? '1 training job uses a different problem type. Switch the problem type to view it.'
-								: `${hiddenJobCount} training jobs use a different problem type. Switch the problem type to view them.`}
-						</p>
-					)}
-					{!isJobsLoading && filteredJobs.length === 0 && (
-						<p className="canvas-modal__note canvas-modal__note--muted">No training jobs found for this node.</p>
-					)}
-					{filteredJobs.length > 0 && <ul className="canvas-modal__note-list">{filteredJobs.map(renderJobSummary)}</ul>}
+			<BestHyperparamsModal
+				presets={hyperparamPresets}
+				isOpen={isPresetModalOpen}
+				onClose={() => setPresetModalOpen(false)}
+				onApply={(preset) => {
+					applyPreset(preset);
+					setPresetModalOpen(false);
+				}}
+				activePresetId={lastAppliedPresetId}
+				fieldMetadata={hyperparamFieldMap}
+			/>
+		</section>
 
-						<BestHyperparamsModal
-							presets={hyperparamPresets}
-							isOpen={isPresetModalOpen}
-							onClose={() => setPresetModalOpen(false)}
-							onApply={(preset) => {
-								applyPreset(preset);
-								setPresetModalOpen(false);
-							}}
-							activePresetId={lastAppliedPresetId}
-							fieldMetadata={hyperparamFieldMap}
-						/>
-			</section>
+		<TrainingJobHistory
+			jobs={filteredJobs}
+			isLoading={isJobsLoading}
+			hiddenJobCount={hiddenJobCount}
+			onRefresh={handleRefreshJobs}
+			pipelineId={pipelineId}
+			createJobError={createJobError instanceof Error ? createJobError : null}
+			jobsError={jobsError}
+			tuningJobsError={tuningJobsError}
+			lastCreatedJob={lastCreatedJob}
+			lastCreatedJobCount={lastCreatedJobCount}
+			isTuningJobsLoading={isTuningJobsLoading}
+		/>
+		</>
 	);
 };

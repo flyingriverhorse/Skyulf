@@ -86,6 +86,7 @@ def _build_searcher(
         "n_jobs": 1,
         "return_train_score": True,
         "refit": True,
+        "verbose": 2,  # Enable verbose output for progress tracking
     }
 
     if search_config.strategy == "grid":
@@ -123,6 +124,7 @@ def _build_searcher(
             "refit": True,
             "return_train_score": True,
             "n_jobs": 1,
+            "verbose": 2,  # Enable verbose output for Optuna
         }
         if search_config.random_state is not None:
             optuna_kwargs["random_state"] = search_config.random_state

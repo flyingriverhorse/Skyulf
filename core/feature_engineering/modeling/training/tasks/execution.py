@@ -68,6 +68,7 @@ def _run_cross_validation(
     X_train: pd.DataFrame,
     y_train: pd.Series,
     cv_config: CrossValidationConfig,
+    progress_callback: Optional[Callable[[int, str], None]] = None,
 ) -> Optional[Dict[str, Any]]:
     if not cv_config.enabled:
         return None
@@ -95,6 +96,10 @@ def _run_cross_validation(
     fold_entries: List[Dict[str, Any]] = []
     try:
         for fold_index, (train_idx, val_idx) in enumerate(splitter.split(X_train, y_array), start=1):
+            if progress_callback:
+                pct = int(((fold_index - 1) / cv_config.folds) * 100)
+                progress_callback(pct, f"Fold {fold_index}/{cv_config.folds}")
+
             if val_idx.size == 0:
                 continue
 
@@ -227,6 +232,7 @@ def _train_and_save_model(
     version: int,
     cv_config: CrossValidationConfig,
     upstream_node_order: Optional[List[str]] = None,
+    progress_callback: Optional[Callable[[int, str], None]] = None,
 ) -> Tuple[str, Dict[str, Any], str, List[str]]:
     """Fit model synchronously, persist artifacts/metrics, and collect warnings."""
 
@@ -239,7 +245,18 @@ def _train_and_save_model(
         params = _merge_model_params(spec.default_params, hyperparameters)
         params = _normalize_model_params(spec, params)
 
-        cv_summary = _run_cross_validation(spec, params, resolved_problem_type, X_train, y_train, cv_config)
+        if progress_callback:
+            progress_callback(0, "Starting training...")
+
+        cv_summary = _run_cross_validation(
+            spec, 
+            params, 
+            resolved_problem_type, 
+            X_train, 
+            y_train, 
+            cv_config,
+            progress_callback=progress_callback
+        )
 
         fit_features, fit_target, used_validation = _prepare_refit_dataset(
             X_train,
@@ -249,9 +266,15 @@ def _train_and_save_model(
             cv_config,
         )
 
+        if progress_callback:
+            progress_callback(90, "Training final model")
+
         final_model = spec.factory(**params)
         fit_target_array = _prepare_target_array(fit_target, resolved_problem_type)
         final_model.fit(fit_features, fit_target_array)
+
+        if progress_callback:
+            progress_callback(100, "Training completed")
 
         metrics = _initialize_metrics(
             feature_columns,

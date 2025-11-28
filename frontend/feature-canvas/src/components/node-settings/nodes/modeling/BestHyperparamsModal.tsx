@@ -109,7 +109,7 @@ export const BestHyperparamsModal: React.FC<BestHyperparamsModalProps> = ({
       typeof logisticSolverRaw === 'string' ? logisticSolverRaw.trim().toLowerCase() : null;
     const scalingNotice =
       logisticSolver && (logisticSolver === 'sag' || logisticSolver === 'saga')
-        ? 'SAG and SAGA solvers expect standardized features. Scale inputs before training to improve convergence and avoid repeated warnings.'
+        ? 'SAG/SAGA solvers require scaled features for stability.'
         : null;
 
     const paramEntries = selectedPreset
@@ -338,7 +338,10 @@ export const BestHyperparamsModal: React.FC<BestHyperparamsModalProps> = ({
                     <p className="best-param-modal__note">{selectedPreset.description}</p>
                   )}
                   {scalingNotice && (
-                    <div className="best-param-modal__notice best-param-modal__notice--warning">
+                    <div
+                      className="best-param-modal__notice best-param-modal__notice--warning"
+                      style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', margin: '0.5rem 0' }}
+                    >
                       <strong>Tip:</strong> {scalingNotice}
                     </div>
                   )}

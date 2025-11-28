@@ -985,6 +985,8 @@ export type TrainingJobSummary = {
   problem_type?: string | null;
   metrics?: Record<string, any> | null;
   error_message?: string | null;
+  progress?: number | null;
+  current_step?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -1131,6 +1133,8 @@ export type HyperparameterTuningJobSummary = {
   best_params?: Record<string, any> | null;
   best_score?: number | null;
   error_message?: string | null;
+  progress?: number | null;
+  current_step?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -1233,8 +1237,25 @@ export type ModelHyperparametersResponse = {
 };
 
 export type BestHyperparametersResponse = {
+  available: boolean;
   model_type: string;
-  best_params: Record<string, any>;
+  message?: string;
+  job_id?: string;
+  pipeline_id?: string | null;
+  node_id?: string | null;
+  run_number?: number;
+  best_params?: Record<string, any>;
   best_score?: number | null;
-  metadata?: Record<string, any> | null;
+  scoring?: string;
+  finished_at?: string | null;
+  search_strategy?: string;
+  n_iterations?: number;
+};
+
+export type FetchTrainingJobsOptions = {
+  datasetSourceId?: string;
+  pipelineId?: string;
+  nodeId?: string;
+  limit?: number;
+  offset?: number;
 };

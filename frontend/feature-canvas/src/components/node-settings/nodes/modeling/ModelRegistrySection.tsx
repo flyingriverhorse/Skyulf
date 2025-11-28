@@ -70,13 +70,16 @@ const METRIC_PREFERENCE = {
 		'pr_auc',
 		'pr_auc_weighted',
 		'g_score',
+		'f1',
+		'precision',
+		'recall',
 	],
-	regression: ['rmse', 'mae', 'r2', 'mape'],
-	fallback: ['rmse', 'mae', 'r2', 'accuracy', 'f1_weighted', 'roc_auc'],
+	regression: ['rmse', 'mae', 'r2', 'mape', 'mse'],
+	fallback: ['rmse', 'mae', 'r2', 'accuracy', 'f1_weighted', 'roc_auc', 'f1', 'precision', 'recall'],
 };
 
-const CLASSIFICATION_METRICS = ['accuracy', 'f1_weighted', 'precision_weighted', 'recall_weighted', 'roc_auc', 'roc_auc_weighted'];
-const REGRESSION_METRICS = ['rmse', 'mae', 'r2', 'mape'];
+const CLASSIFICATION_METRICS = ['accuracy', 'f1_weighted', 'precision_weighted', 'recall_weighted', 'roc_auc', 'roc_auc_weighted', 'f1', 'precision', 'recall'];
+const REGRESSION_METRICS = ['rmse', 'mae', 'r2', 'mape', 'mse'];
 
 const LOWER_IS_BETTER = new Set(['rmse', 'mae', 'mape', 'mse']);
 
@@ -754,21 +757,22 @@ const ModelRegistrySection: React.FC<ModelRegistrySectionProps> = ({
 			)}
 
 			{hasJobs && (
-				<div className="model-registry__table-wrapper">
-					<table className="model-registry__table">
+				<div className="model-registry__table-wrapper" style={{ overflowX: 'auto' }}>
+					<table className="model-registry__table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
 						<thead>
 							<tr>
-								<th scope="col">Version</th>
-								<th scope="col">Status</th>
-								<th scope="col">Model</th>
-								<th scope="col">Primary metric</th>
+								<th scope="col" style={{ padding: '0.75rem', textAlign: 'left', color: '#e2e8f0', fontWeight: 600 }}>Version</th>
+								<th scope="col" style={{ padding: '0.75rem', textAlign: 'left', color: '#e2e8f0', fontWeight: 600 }}>Status</th>
+								<th scope="col" style={{ padding: '0.75rem', textAlign: 'left', color: '#e2e8f0', fontWeight: 600 }}>Model</th>
+								<th scope="col" style={{ padding: '0.75rem', textAlign: 'left', color: '#e2e8f0', fontWeight: 600 }}>Target</th>
+								<th scope="col" style={{ padding: '0.75rem', textAlign: 'right', color: '#e2e8f0', fontWeight: 600 }}>Primary metric</th>
 								{metricColumns.map((metric) => (
-									<th key={metric} scope="col">
+									<th key={metric} scope="col" style={{ padding: '0.75rem', textAlign: 'right', color: '#e2e8f0', fontWeight: 600 }}>
 										{metric.replace(/_/g, ' ')}
 									</th>
 								))}
-								<th scope="col">Evaluated</th>
-								<th scope="col">Updated</th>
+								<th scope="col" style={{ padding: '0.75rem', textAlign: 'left', color: '#e2e8f0', fontWeight: 600 }}>Evaluated</th>
+								<th scope="col" style={{ padding: '0.75rem', textAlign: 'right', color: '#e2e8f0', fontWeight: 600 }}>Updated</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -778,36 +782,62 @@ const ModelRegistrySection: React.FC<ModelRegistrySectionProps> = ({
 								const bucketLabel = metricBucket.label ?? '—';
 								const updatedAt = job.updated_at ?? job.created_at ?? null;
 								return (
-													<tr key={job.id}>
-										<td>v{job.version}</td>
-										<td>
-											<span className={`model-registry__status model-registry__status--${STATUS_TONE[job.status]}`}>
+													<tr key={job.id} style={{ borderTop: '1px solid rgba(148, 163, 184, 0.1)' }}>
+										<td style={{ padding: '0.75rem', color: 'rgba(148, 163, 184, 0.8)' }}>v{job.version}</td>
+										<td style={{ padding: '0.75rem' }}>
+											<span
+												style={{
+													display: 'inline-block',
+													padding: '0.15rem 0.5rem',
+													borderRadius: '4px',
+													fontSize: '0.75rem',
+													fontWeight: 500,
+													background:
+														job.status === 'succeeded'
+															? 'rgba(34, 197, 94, 0.15)'
+															: job.status === 'failed'
+															? 'rgba(239, 68, 68, 0.15)'
+															: 'rgba(59, 130, 246, 0.15)',
+													color:
+														job.status === 'succeeded'
+															? '#4ade80'
+															: job.status === 'failed'
+															? '#f87171'
+															: '#60a5fa',
+												}}
+											>
 												{STATUS_LABEL[job.status]}
 											</span>
 										</td>
-										<td>{entry.modelLabel}</td>
-										<td>
+										<td style={{ padding: '0.75rem', fontWeight: 500, color: '#e2e8f0' }}>{entry.modelLabel}</td>
+										<td style={{ padding: '0.75rem', color: 'rgba(148, 163, 184, 0.8)' }}>{job.metadata?.target_column || '—'}</td>
+										<td style={{ padding: '0.75rem', textAlign: 'right' }}>
 											{primaryMetric ? (
 												<span className="model-registry__metric">
-													<span className="model-registry__metric-label">{primaryMetric.label}</span>
-													<span className="model-registry__metric-value">{formatMetricValue(primaryMetric.value)}</span>
+													<span className="model-registry__metric-label" style={{ marginRight: '0.5rem', color: 'rgba(148, 163, 184, 0.6)', fontSize: '0.75rem' }}>{primaryMetric.label}</span>
+													<span className="model-registry__metric-value" style={{ fontFamily: 'monospace', color: '#e2e8f0', fontWeight: 600 }}>{formatMetricValue(primaryMetric.value)}</span>
 												</span>
 											) : (
-												'—'
+												<span style={{ color: 'rgba(148, 163, 184, 0.3)' }}>—</span>
 											)}
 										</td>
 															{metricColumns.map((metricKey) => {
 											const metricValue = bucketValues[metricKey];
+											const hasVal = typeof metricValue === 'number' && Number.isFinite(metricValue);
 											return (
-																	<td key={`${job.id}-${metricKey}`}>
-													{typeof metricValue === 'number' && Number.isFinite(metricValue)
-														? formatMetricValue(metricValue)
-														: '—'}
+																	<td key={`${job.id}-${metricKey}`} style={{ padding: '0.75rem', textAlign: 'right' }}>
+													{hasVal ? (
+														<span style={{ fontFamily: 'monospace', color: '#e2e8f0' }}>
+															{formatMetricValue(metricValue)}
+														</span>
+													) : (
+														<span style={{ color: 'rgba(148, 163, 184, 0.3)' }}>—</span>
+													)}
 												</td>
 											);
 										})}
-										<td>{bucketLabel}</td>
-										<td>{updatedAt ? formatRelativeTime(updatedAt) ?? updatedAt : '—'}</td>
+										<td style={{ padding: '0.75rem', color: 'rgba(148, 163, 184, 0.8)' }}>{bucketLabel}</td>
+										<td style={{ padding: '0.75rem', textAlign: 'right', color: 'rgba(148, 163, 184, 0.8)' }}>{updatedAt ? formatRelativeTime(updatedAt) ?? updatedAt : '—'}</td>
 									</tr>
 								);
 							})}

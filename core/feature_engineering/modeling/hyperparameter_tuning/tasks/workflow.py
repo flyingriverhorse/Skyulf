@@ -25,7 +25,7 @@ from ...shared import (
     _serialize_value,
     celery_app,
 )
-from ..jobs import get_tuning_job, update_tuning_job_status
+from ..jobs import get_tuning_job, update_tuning_job_status, update_tuning_job_progress_sync
 from .data_bundle import TrainingDataBundle, _build_training_data_bundle
 from .execution import _execute_search
 from .searchers import _build_searcher, _prepare_search_parameters
@@ -118,6 +118,7 @@ async def _run_hyperparameter_tuning_workflow(job_id: str) -> None:
                 target_column,
                 search_config,
                 cv_config,
+                progress_callback=lambda p, s: update_tuning_job_progress_sync(job.id, p, s),
             )
 
             artifact_uri = _persist_best_estimator(job, search_result.best_estimator)
@@ -179,7 +180,9 @@ def _infer_target_class_count(training_data: TrainingDataBundle) -> int | None:
 @celery_app.task(name="core.feature_engineering.modeling.hyperparameter_tuning.run")
 def run_hyperparameter_tuning(job_id: str) -> None:
     """Celery entrypoint for hyperparameter tuning jobs."""
-
+    # Ensure DB is initialized in this worker process
+    from core.database.engine import init_db
+    asyncio.run(init_db())
     asyncio.run(_run_hyperparameter_tuning_workflow(job_id))
 
 

@@ -23,6 +23,9 @@ from sklearn.model_selection import KFold, StratifiedKFold
 from config import get_settings
 from core.database.engine import create_tables, init_db
 from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN
+from core.feature_engineering.full_capture import FullDatasetCaptureService
+from core.feature_engineering.execution.graph import resolve_catalog_type
+from core.feature_engineering.split_handler import remove_split_column
 
 logger = logging.getLogger(__name__)
 
@@ -324,24 +327,44 @@ async def _resolve_training_inputs(session, job) -> Tuple[pd.DataFrame, Dict[str
     if not exec_order:
         raise ValueError("Unable to resolve pipeline execution order for training node")
 
-    upstream_order = execution_order[:-1] if execution_order[-1] == job.node_id else execution_order
+    upstream_order = exec_order[:-1] if exec_order[-1] == job.node_id else exec_order
 
-    dataset_frame, dataset_meta = await fe_routes._load_dataset_frame(
-        session,
-        job.dataset_source_id,
-        sample_size=0,
-        execution_mode="full",
-    )
+    # Load dataset directly using FullDatasetCaptureService
+    capture_service = FullDatasetCaptureService(session)
+    dataset_frame, metadata = await capture_service.capture(job.dataset_source_id)
+    dataset_meta = {
+        "total_rows": metadata.get("total_rows") or dataset_frame.shape[0],
+        "columns": metadata.get("columns") or dataset_frame.columns.tolist(),
+        "dtypes": metadata.get("dtypes") or {},
+    }
 
     if upstream_order:
-        dataset_frame, _, _, _ = fe_routes._run_pipeline_execution(
-            dataset_frame,
-            upstream_order,
-            node_map,
-            pipeline_id=job.pipeline_id,
-            collect_signals=False,
-            preserve_split_column=True,
+        # Import execution engine helpers locally to avoid circular imports
+        from core.feature_engineering.execution.engine import (
+            invoke_node_transform,
+            should_skip_preprocessing_node,
+            apply_train_test_split_with_filter,
         )
+
+        # Apply pipeline transformations manually to preserve split column
+        for node_id in upstream_order:
+            node = node_map.get(node_id)
+            if not node:
+                continue
+
+            catalog_type = resolve_catalog_type(node)
+            
+            if should_skip_preprocessing_node(node, catalog_type, set()):
+                continue
+
+            # Special handling for train/test split filtering
+            if catalog_type == "train_test_split":
+                dataset_frame = apply_train_test_split_with_filter(
+                    dataset_frame, node, job.node_id, edges, node_map
+                )
+                continue
+
+            dataset_frame, _ = invoke_node_transform(catalog_type, dataset_frame, node, job.pipeline_id)
 
     try:
         resolved_config = (node_map.get(job.node_id, {}).get("data") or {}).get("config") or {}

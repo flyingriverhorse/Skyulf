@@ -8,6 +8,7 @@ from typing import Any, Iterable, List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import core.database.engine as db_engine
 from core.database.models import HyperparameterTuningJob
 from core.feature_engineering.schemas import HyperparameterTuningJobStatus
 from core.utils.datetime import utcnow
@@ -19,6 +20,30 @@ def _set_job_attribute(job: HyperparameterTuningJob, attr: str, value: Any) -> N
     """Assign a value to a SQLAlchemy model attribute without mypy issues."""
 
     setattr(job, attr, value)
+
+
+def update_tuning_job_progress_sync(job_id: str, progress: int, current_step: Optional[str] = None) -> None:
+    """Synchronously update job progress (for use in blocking tasks)."""
+    if not db_engine.sync_session_factory:
+        import sys
+        sys.stderr.write(f"⚠️ update_tuning_job_progress_sync: sync_session_factory is None for job {job_id}\n")
+        return
+
+    try:
+        with db_engine.sync_session_factory() as session:
+            job = session.query(HyperparameterTuningJob).filter(HyperparameterTuningJob.id == job_id).first()
+            if job:
+                job.progress = progress
+                if current_step:
+                    job.current_step = current_step
+                session.commit()
+            else:
+                import sys
+                sys.stderr.write(f"⚠️ update_tuning_job_progress_sync: Job {job_id} not found\n")
+    except Exception as e:
+        import sys
+        sys.stderr.write(f"❌ update_tuning_job_progress_sync error: {e}\n")
+        pass
 
 
 async def update_tuning_job_status(
