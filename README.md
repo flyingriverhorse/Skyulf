@@ -67,7 +67,7 @@ docker compose up --pull=always --build
 
 We have a clear vision to turn Skyulf into a complete **App Hub** for AI.
 
-*   **Phase 1: Polish & Stability** (Current Focus) - Full React migration, type safety, and documentation.
+*   **Phase 1: Polish & Stability** (Current Focus) - Hybrid Architecturing, type safety, and documentation.
 *   **Phase 2: Deepening Data Science** - Advanced EDA, Ethics/Fairness checks, Synthetic Data, and Public Data Hubs.
 *   **Phase 3: The "App Hub" Vision** - Plugin system, GenAI/LLM Builders, and Deployment.
 *   **Phase 4: Expansion** - Real-time collaboration, Edge/IoT export, and Audio support.
