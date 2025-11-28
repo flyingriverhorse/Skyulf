@@ -1662,7 +1662,7 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
           >
             <option value="">Use default</option>
             {(field.options ?? []).map((option) => (
-              <option key={option.value} value={option.value}>
+              <option key={String(option.value)} value={String(option.value)}>
                 {option.label}
               </option>
             ))}
@@ -2571,10 +2571,45 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
       detailParts.push(`Updated ${timestampLabel}`);
     }
 
+    const isRunning = job.status === 'running' || job.status === 'queued';
+    const progress = job.progress ?? 0;
+    const currentStep = job.current_step;
+
     return (
-      <li key={job.id}>
-        <strong>Run {job.run_number}</strong> — {statusLabel}
-        {detailParts.length ? ` • ${detailParts.join(' • ')}` : ''}
+      <li key={job.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>
+            <strong>Run {job.run_number}</strong> — {statusLabel}
+          </span>
+          {isRunning && (
+            <span style={{ fontSize: '0.85em', color: '#666' }}>
+              {progress}% {currentStep ? `— ${currentStep}` : ''}
+            </span>
+          )}
+        </div>
+        {isRunning && (
+          <div
+            style={{
+              width: '100%',
+              height: '4px',
+              backgroundColor: '#eee',
+              borderRadius: '2px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${progress}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%)',
+                transition: 'width 0.3s ease',
+              }}
+            />
+          </div>
+        )}
+        <div style={{ fontSize: '0.9em', color: '#666' }}>
+          {detailParts.length ? detailParts.join(' • ') : ''}
+        </div>
       </li>
     );
   };

@@ -18,7 +18,7 @@ from ...shared import (
     _prepare_training_data,
     _resolve_training_inputs,
 )
-from ..jobs import get_training_job, update_job_status
+from ..jobs import get_training_job, update_job_status, update_job_progress_sync
 from .execution import _train_and_save_model
 
 logger = logging.getLogger(__name__)
@@ -105,6 +105,7 @@ async def _run_training_workflow(job_id: str) -> None:
                 version=version_value,
                 cv_config=cv_config,
                 upstream_node_order=upstream_order,
+                progress_callback=lambda p, s: update_job_progress_sync(job.id, p, s),
             )
 
             metrics["problem_type"] = resolved_problem_type

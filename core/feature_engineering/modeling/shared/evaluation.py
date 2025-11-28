@@ -43,6 +43,16 @@ def _classification_metrics(model, X: np.ndarray, y: np.ndarray) -> Dict[str, fl
         "f1_weighted": float(f1_score(y, predictions, average="weighted", zero_division=0)),
     }
 
+    # Add unweighted metrics for binary classification
+    try:
+        unique_classes = np.unique(y)
+        if len(unique_classes) == 2:
+            metrics["precision"] = float(precision_score(y, predictions, average="binary", zero_division=0))
+            metrics["recall"] = float(recall_score(y, predictions, average="binary", zero_division=0))
+            metrics["f1"] = float(f1_score(y, predictions, average="binary", zero_division=0))
+    except Exception:
+        pass
+
     if geometric_mean_score is not None:
         try:
             metrics["g_score"] = float(geometric_mean_score(y, predictions, average="weighted"))

@@ -1749,6 +1749,8 @@ class TrainingJobResponse(BaseModel):
     metrics: Optional[Dict[str, Any]] = None
     artifact_uri: Optional[str] = None
     error_message: Optional[str] = None
+    progress: Optional[int] = 0
+    current_step: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
@@ -1784,6 +1786,8 @@ class TrainingJobSummary(BaseModel):
     )
     metrics: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
+    progress: Optional[int] = 0
+    current_step: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -1929,6 +1933,8 @@ class HyperparameterTuningJobResponse(BaseModel):
     best_score: Optional[float] = None
     artifact_uri: Optional[str] = None
     error_message: Optional[str] = None
+    progress: Optional[int] = 0
+    current_step: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
@@ -1973,6 +1979,8 @@ class HyperparameterTuningJobSummary(BaseModel):
     best_params: Optional[Dict[str, Any]] = None
     best_score: Optional[float] = None
     error_message: Optional[str] = None
+    progress: Optional[int] = 0
+    current_step: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

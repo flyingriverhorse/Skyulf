@@ -109,6 +109,12 @@ def _create_optuna_searcher(
             seed=search_config.random_state if search_config.random_state is not None else None
         )
         sampler_added = True
+    
+    # Ensure verbose is set if passed in kwargs (it should be from searchers.py)
+    # Optuna uses 'verbosity' in study, but OptunaSearchCV might use 'verbose'
+    if "verbose" in kwargs:
+        # OptunaSearchCV uses 'verbose' to control optuna logging
+        pass
 
     try:
         return search_cls(**kwargs)

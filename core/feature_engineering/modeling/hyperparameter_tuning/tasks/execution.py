@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import sys
+import logging
 import warnings
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 import pandas as pd
 
@@ -18,6 +20,128 @@ from ...shared import (
     _summarize_results,
 )
 from .data_bundle import TrainingDataBundle
+
+
+class StreamCapture:
+    def __init__(self, original, line_callback: Callable[[str], None]):
+        self.original = original
+        self.line_callback = line_callback
+        self.buffer = ""
+
+    def write(self, text: str) -> None:
+        if self.original:
+            self.original.write(text)
+        self.buffer += text
+        while "\n" in self.buffer:
+            line, self.buffer = self.buffer.split("\n", 1)
+            self.line_callback(line)
+
+    def flush(self) -> None:
+        if self.original:
+            self.original.flush()
+
+    def __getattr__(self, name):
+        return getattr(self.original, name)
+
+
+class StdoutProgressCapture(logging.Handler):
+    def __init__(self, callback: Callable[[int, str], None]):
+        logging.Handler.__init__(self)
+        self.callback = callback
+        self.total_fits = 0
+        self.current_fit = 0
+        self.original_stdout = sys.stdout
+        self.original_stderr = sys.stderr
+        self.stdout_capture: Optional[StreamCapture] = None
+        self.stderr_capture: Optional[StreamCapture] = None
+        self._processed_lines = set()
+
+    def __enter__(self):
+        self.stdout_capture = StreamCapture(self.original_stdout, self._parse_line)
+        self.stderr_capture = StreamCapture(self.original_stderr, self._parse_line)
+        sys.stdout = self.stdout_capture
+        sys.stderr = self.stderr_capture
+        
+        # Attach to root logger to capture everything
+        root_logger = logging.getLogger()
+        root_logger.addHandler(self)
+        
+        # Explicitly attach to optuna logger to ensure capture
+        optuna_logger = logging.getLogger("optuna")
+        optuna_logger.addHandler(self)
+        # Ensure optuna propagates if it wasn't already
+        optuna_logger.propagate = True
+        
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout = self.original_stdout
+        sys.stderr = self.original_stderr
+        logging.getLogger().removeHandler(self)
+        logging.getLogger("optuna").removeHandler(self)
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            self._parse_line(msg)
+        except Exception:
+            self.handleError(record)
+
+    def _parse_line(self, line: str) -> None:
+        line = line.strip()
+        if not line:
+            return
+
+        # Deduplication logic:
+        # Optuna uses logging, so messages might arrive via 'emit' AND 'write' (if propagated to stdout).
+        # We must deduplicate Optuna lines to avoid double-counting.
+        # Sklearn uses direct stdout/stderr writes, so it only arrives via 'write'.
+        # Sklearn lines (like "[CV] END...") can be identical across folds, so we MUST NOT deduplicate them.
+        
+        is_optuna = "Trial" in line and ("finished with value" in line or "pruned" in line)
+        
+        if is_optuna:
+            line_hash = hash(line)
+            if line_hash in self._processed_lines:
+                return
+            self._processed_lines.add(line_hash)
+
+        # Sklearn verbose=2 format:
+        # "Fitting 5 folds for each of 10 candidates, totalling 50 fits"
+        if "totalling" in line and "fits" in line:
+            try:
+                parts = line.split("totalling")
+                self.total_fits = int(parts[1].strip().split()[0])
+                # Reset current fit count when a new search starts (e.g. Halving search iterations)
+                self.current_fit = 0
+            except Exception:
+                pass
+        
+        # "[CV] END ...; score=... total time=..." or "[CV 1/5] END ..."
+        if "[CV" in line and "END" in line:
+            self.current_fit += 1
+            if self.total_fits > 0:
+                pct = int((self.current_fit / self.total_fits) * 100)
+                # Cap at 99 until done
+                pct = min(pct, 99)
+                self.callback(pct, f"Fit {self.current_fit}/{self.total_fits}")
+        
+        # Optuna format: "Trial 0 finished with value: ..."
+        # Also handle "Trial 0 pruned."
+        if is_optuna:
+            # We don't know total trials easily from stdout, but we can increment
+            self.current_fit += 1
+            # Heuristic: if we don't know total, just show count
+            if self.total_fits > 0:
+                 pct = int((self.current_fit / self.total_fits) * 100)
+                 pct = min(pct, 99)
+                 self.callback(pct, f"Trial {self.current_fit}/{self.total_fits}")
+            else:
+                 # If we missed the total count, just show trial number
+                 self.callback(0, f"Trial {self.current_fit}")
+
+    def set_total_trials(self, n_trials: int):
+        self.total_fits = n_trials
 
 
 @dataclass(frozen=True)
@@ -37,11 +161,37 @@ def _execute_search(
     target_column: str,
     search_config: SearchConfiguration,
     cv_config: CrossValidationConfig,
+    progress_callback: Optional[Callable[[int, str], None]] = None,
 ) -> SearchExecutionResult:
+    # Force Optuna verbosity to INFO so that StdoutProgressCapture can catch the logs
+    if search_config.strategy == "optuna":
+        try:
+            import optuna
+            optuna.logging.set_verbosity(optuna.logging.INFO)
+        except ImportError:
+            pass
+
     with warnings.catch_warnings(record=True) as caught_warnings:
         warnings.simplefilter("always")
         warnings.simplefilter("always", ConvergenceWarning)
-        searcher.fit(training_data.X_train, training_data.y_train)
+        
+        if progress_callback:
+            capture = StdoutProgressCapture(progress_callback)
+            # Try to set total trials if available in searcher
+            if hasattr(searcher, "n_trials"):
+                capture.set_total_trials(searcher.n_trials)
+            elif hasattr(searcher, "n_iter"):
+                # For RandomizedSearchCV
+                capture.set_total_trials(searcher.n_iter * cv_config.folds)
+            elif hasattr(searcher, "param_grid"):
+                 # For GridSearchCV
+                 # This is harder to calculate without iterating, but sklearn prints it.
+                 pass
+
+            with capture:
+                searcher.fit(training_data.X_train, training_data.y_train)
+        else:
+            searcher.fit(training_data.X_train, training_data.y_train)
 
     warning_messages = _extract_warning_messages(caught_warnings)
     summary = _summarize_results(searcher.cv_results_)
