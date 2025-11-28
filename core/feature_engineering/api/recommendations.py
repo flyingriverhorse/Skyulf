@@ -13,7 +13,7 @@ from core.feature_engineering.execution.recommendations import (
     DropColumnRecommendationBuilder,
 )
 from core.feature_engineering.execution.engine import apply_recommendation_graph
-from core.feature_engineering.execution.graph import extract_graph_payload, normalize_target_node
+from core.feature_engineering.execution.graph import extract_graph_payload, normalize_target_node, resolve_catalog_type
 
 from core.feature_engineering.schemas import (
     BinnedDistributionResponse,
@@ -76,6 +76,21 @@ class SkewnessRecommendationRequest(RecommendationRequest):
     transformations: Optional[str] = None
 
 
+def _get_target_column_from_graph(graph: Optional[Dict[str, Any]]) -> Optional[str]:
+    if not graph:
+        return None
+    
+    node_map, _ = extract_graph_payload(graph)
+    
+    for node in node_map.values():
+        if resolve_catalog_type(node) == "feature_target_split":
+            config = node.get("data", {}).get("config", {})
+            target = config.get("target_column") or config.get("target")
+            if target and isinstance(target, str):
+                return target
+    return None
+
+
 @router.post("/drop-columns", response_model=DropColumnRecommendations)
 async def recommend_drop_columns(
     request: RecommendationRequest = Body(...),
@@ -135,6 +150,13 @@ async def recommend_drop_columns(
     # 4. Generate payload and filter by currently available columns
     candidates = builder.build_candidate_payload()
     allowed_columns = set(frame.columns)
+
+    # Filter out target column if configured
+    target_column = _get_target_column_from_graph(request.graph)
+    if target_column:
+        if target_column in allowed_columns:
+            allowed_columns.remove(target_column)
+        candidates = [c for c in candidates if c.column != target_column]
     
     # Filter candidates to only include columns that exist in the current frame
     filtered_candidates = builder.filter_candidates(candidates, allowed_columns)
@@ -188,6 +210,16 @@ async def recommend_label_encoding(
 
     suggestions = build_label_encoding_suggestions(frame, column_metadata)
     
+    # Handle target column specifically
+    target_column = _get_target_column_from_graph(request.graph)
+    if target_column:
+        for suggestion in suggestions:
+            if suggestion.column == target_column:
+                suggestion.status = "recommended"
+                suggestion.selectable = True
+                suggestion.reason = "Target Column detected. You MUST select 'Replace Original' to use the encoded values for training."
+                suggestion.score = 1.0  # Boost score to ensure visibility
+
     # Calculate summary stats
     total_text_columns = len(suggestions)
     recommended_count = sum(1 for item in suggestions if item.status == "recommended" and item.selectable)
@@ -235,6 +267,11 @@ async def recommend_one_hot_encoding(
     )
 
     suggestions = build_one_hot_encoding_suggestions(frame, column_metadata)
+
+    # Filter out target column if configured
+    target_column = _get_target_column_from_graph(request.graph)
+    if target_column:
+        suggestions = [s for s in suggestions if s.column != target_column]
 
     total_text_columns = len(suggestions)
     recommended_count = sum(1 for item in suggestions if item.status == "recommended" and item.selectable)
@@ -288,6 +325,11 @@ async def recommend_outlier_detection(
     
     columns = _build_outlier_recommendations(frame)
 
+    # Filter out target column if configured
+    target_column = _get_target_column_from_graph(request.graph)
+    if target_column:
+        columns = [col for col in columns if col != target_column]
+
     return OutlierRecommendationsResponse(
         dataset_source_id=request.dataset_source_id,
         sample_size=request.sample_size,
@@ -315,6 +357,11 @@ async def recommend_scaling(
     )
 
     recommendations = _build_scaling_recommendations(frame)
+
+    # Filter out target column if configured
+    target_column = _get_target_column_from_graph(request.graph)
+    if target_column:
+        recommendations = [rec for rec in recommendations if rec.column != target_column]
 
     return ScalingRecommendationsResponse(
         dataset_source_id=request.dataset_source_id,
@@ -350,6 +397,11 @@ async def recommend_skewness_transform(
     # passing empty dict for now.
     recommendations = _build_skewness_recommendations(frame, selected_methods, {})
 
+    # Filter out target column if configured
+    target_column = _get_target_column_from_graph(request.graph)
+    if target_column:
+        recommendations = [rec for rec in recommendations if rec.column != target_column]
+
     return SkewnessRecommendationsResponse(
         dataset_source_id=request.dataset_source_id,
         sample_size=request.sample_size,
@@ -377,6 +429,12 @@ async def recommend_binning(
     )
 
     recommendations, excluded = _build_binning_recommendations(frame)
+
+    # Filter out target column if configured
+    target_column = _get_target_column_from_graph(request.graph)
+    if target_column:
+        recommendations = [rec for rec in recommendations if rec.column != target_column]
+        excluded = [ex for ex in excluded if ex.column != target_column]
 
     return BinningRecommendationsResponse(
         dataset_source_id=request.dataset_source_id,
@@ -412,6 +470,11 @@ async def recommend_ordinal_encoding(
     )
 
     suggestions = build_ordinal_encoding_suggestions(frame, column_metadata)
+
+    # Filter out target column if configured
+    target_column = _get_target_column_from_graph(request.graph)
+    if target_column:
+        suggestions = [s for s in suggestions if s.column != target_column]
 
     total_text_columns = len(suggestions)
     recommended_count = sum(1 for item in suggestions if item.status == "recommended" and item.selectable)
@@ -460,6 +523,11 @@ async def recommend_hash_encoding(
     )
 
     suggestions = build_hash_encoding_suggestions(frame, column_metadata)
+
+    # Filter out target column if configured
+    target_column = _get_target_column_from_graph(request.graph)
+    if target_column:
+        suggestions = [s for s in suggestions if s.column != target_column]
 
     total_text_columns = len(suggestions)
     recommended_count = sum(1 for item in suggestions if item.status == "recommended" and item.selectable)
@@ -511,6 +579,11 @@ async def recommend_target_encoding(
 
     suggestions = build_target_encoding_suggestions(frame, column_metadata)
 
+    # Filter out target column if configured
+    target_column = _get_target_column_from_graph(request.graph)
+    if target_column:
+        suggestions = [s for s in suggestions if s.column != target_column]
+
     total_text_columns = len(suggestions)
     recommended_count = sum(1 for item in suggestions if item.status == "recommended" and item.selectable)
     high_cardinality_columns = [
@@ -560,6 +633,11 @@ async def recommend_dummy_encoding(
     )
 
     suggestions = build_dummy_encoding_suggestions(frame, column_metadata)
+
+    # Filter out target column if configured
+    target_column = _get_target_column_from_graph(request.graph)
+    if target_column:
+        suggestions = [s for s in suggestions if s.column != target_column]
 
     total_text_columns = len(suggestions)
     recommended_count = sum(1 for item in suggestions if item.status == "recommended" and item.selectable)
