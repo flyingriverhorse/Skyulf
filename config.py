@@ -178,8 +178,8 @@ class Settings(BaseSettings):
     API_CONTACT_EMAIL: str | None = None
     API_CONTACT_URL: str | None = None
     API_TOS_URL: str | None = None
-    API_LICENSE_NAME: str | None = "Proprietary"
-    API_LICENSE_URL: str | None = None
+    API_LICENSE_NAME: str | None = "Apache 2.0"
+    API_LICENSE_URL: str | None = "https://www.apache.org/licenses/LICENSE-2.0.html"
     API_LOGO_URL: str | None = None
 
     # Session configuration

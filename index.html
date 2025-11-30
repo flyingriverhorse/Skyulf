@@ -989,7 +989,8 @@
                         </div>
                     </div>
                     <ul class="space-y-3 text-gray-300">
-                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Full React Migration:</strong> Moving to a unified Single Page Application for a buttery-smooth experience.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Extract Core Library (skyulf-core):</strong> Separate the pure ML logic (transformers, pipeline utils) from the web application.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Hybrid Architecture Strategy:</strong> Solidify the "Island Architecture" approach.</span></li>
                         <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Robustness:</strong> Enhanced type checking, test coverage, and error handling.</span></li>
                         <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Documentation:</strong> The "Skyulf Book" and interactive project templates.</span></li>
                     </ul>
@@ -1309,12 +1310,7 @@
                             </p>
                         </div>
                     </div> 
-                                who value data sovereignty and open-source principles.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
+                </div> 
                 <!-- FAQ Item 8 -->
                 <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
                     <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
@@ -1326,7 +1322,7 @@
                     <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
                         <div class="px-6 pb-5 pt-0">
                             <p class="text-gray-300">
-                                Yes. Skyulf is 100% open source under the Apache-2.0 license. Free to use, modify, embed, and deploy—no copyleft clauses, no hidden costs, no premium tiers. 
+                                Yes. Skyulf is open source with a split license model: <strong>Apache 2.0</strong> for the backend (permissive) and <strong>GNU AGPLv3</strong> for the frontend (copyleft). This ensures the core remains easy to integrate, while UI improvements are shared back to the community.
                                 If you find it useful, consider <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">starring the repo</a> 
                                 or contributing back to the project.
                             </p>
@@ -1345,7 +1341,7 @@
                     <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
                         <div class="px-6 pb-5 pt-0">
                             <p class="text-gray-300">
-                                Apache-2.0 already covers commercial and closed-source use. If you need SLAs, indemnification, or a partnership agreement, check 
+                                For the backend (Apache 2.0), commercial use is free. For the frontend (AGPLv3), if you build a proprietary SaaS that modifies the UI, you may need a commercial license exception. For SLAs, indemnification, or partnerships, check 
                                 <a href="https://github.com/flyingriverhorse/skyulf/blob/master/COMMERCIAL-LICENSE.md" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">COMMERCIAL-LICENSE.md</a>. 
                                 Open a “Commercial Partnership Request” discussion or contact us via the README links to start the conversation.
                             </p>
