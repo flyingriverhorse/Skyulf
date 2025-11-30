@@ -67,7 +67,7 @@ docker compose up --pull=always --build
 
 We have a clear vision to turn Skyulf into a complete **App Hub** for AI.
 
-*   **Phase 1: Polish & Stability** (Current Focus) - Full React migration, type safety, and documentation.
+*   **Phase 1: Polish & Stability** (Current Focus) - Hybrid Architecturing, type safety, and documentation.
 *   **Phase 2: Deepening Data Science** - Advanced EDA, Ethics/Fairness checks, Synthetic Data, and Public Data Hubs.
 *   **Phase 3: The "App Hub" Vision** - Plugin system, GenAI/LLM Builders, and Deployment.
 *   **Phase 4: Expansion** - Real-time collaboration, Edge/IoT export, and Audio support.
@@ -96,8 +96,14 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and w
 
 ## License
 
-Open Source: Apache-2.0. See `LICENSE` for full terms.
-Commercial: No separate commercial license is required. If you need SLAs, indemnification, or custom terms, see `COMMERCIAL-LICENSE.md` for partnership/support options.
+Skyulf uses a split licensing model to balance open standards with sustainable development:
+
+*   **Backend & Core:** [Apache 2.0](LICENSE) (Permissive) - Ideal for integration and enterprise use.
+*   **Frontend (Feature Canvas):** [GNU AGPLv3](frontend/feature-canvas/LICENSE) (Copyleft) - Ensures UI improvements are shared back to the community.
+
+**Commercial Use:**
+No separate commercial license is required for internal use or building proprietary plugins on the backend.
+However, if you are building a proprietary SaaS that modifies the frontend and cannot comply with AGPLv3, please see [`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md) for partnership options.
 
 ---
 
