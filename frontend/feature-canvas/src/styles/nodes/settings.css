@@ -33,3 +33,55 @@
   padding: 1rem;
   text-align: center;
 }
+
+/* Advanced Settings Toggle */
+.canvas-modal__advanced-toggle {
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid rgba(71, 85, 105, 0.4);
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.canvas-modal__advanced-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  transition: background 0.2s ease, color 0.2s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.canvas-modal__advanced-button:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #f8fafc;
+}
+
+.canvas-modal__advanced-button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  transition: transform 0.2s ease;
+  opacity: 0.9;
+  color: #818cf8;
+}
+
+.canvas-modal__advanced-button:hover svg {
+  opacity: 1;
+}
+
+.canvas-modal__advanced-description {
+  display: block;
+  margin: 0;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  padding: 0 1rem 0.75rem 2.6rem;
+  line-height: 1.5;
+}

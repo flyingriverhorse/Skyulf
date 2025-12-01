@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FormField, TextInput, NumberInput, SelectInput, CheckboxInput } from '../../ui/FormFields';
+import { AdvancedSettingsToggle } from '../../layout/AdvancedSettingsToggle';
 import {
   BINNING_LABEL_FORMAT_OPTIONS,
   BINNING_MISSING_OPTIONS,
@@ -49,99 +50,112 @@ export const BinNumericColumnsSection: React.FC<BinNumericColumnsSectionProps> =
   onMissingStrategyChange,
   onMissingLabelChange,
 }) => {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   return (
     <section className="canvas-modal__section">
-      <div className="canvas-modal__subsection">
-        <h4>Global output & labeling</h4>
-        <p className="canvas-modal__note">
-          Applies to every selected column unless custom bins or labels override the defaults.
-        </p>
-        <div className="canvas-modal__parameter-grid">
-          <FormField label="Output suffix" htmlFor={fieldIds.suffix}>
-            <TextInput
-              id={fieldIds.suffix}
-              value={config.outputSuffix}
-              onChange={(event) => onSuffixChange(event.target.value)}
-              placeholder="e.g. _binned"
-            />
-          </FormField>
+      <AdvancedSettingsToggle
+        isOpen={showAdvanced}
+        onToggle={() => setShowAdvanced(!showAdvanced)}
+        label="Advanced binning settings"
+        description="Configure output formatting, precision, and missing value handling"
+      />
 
-          <FormField
-            label="Label format"
-            htmlFor={fieldIds.labelFormat}
-            description="Controls how new bin values are named when custom labels aren’t provided."
-          >
-            <SelectInput
-              id={fieldIds.labelFormat}
-              value={config.labelFormat}
-              onChange={(event) => onLabelFormatChange((event.target.value as BinningLabelFormat) ?? 'range')}
-              options={BINNING_LABEL_FORMAT_OPTIONS}
-            />
-          </FormField>
+      {showAdvanced && (
+        <div style={{ marginTop: '1rem' }}>
+          <div className="canvas-modal__subsection">
+            <h4>Global output & labeling</h4>
+            <p className="canvas-modal__note">
+              Applies to every selected column unless custom bins or labels override the defaults.
+            </p>
+            <div className="canvas-modal__parameter-grid">
+              <FormField label="Output suffix" htmlFor={fieldIds.suffix}>
+                <TextInput
+                  id={fieldIds.suffix}
+                  value={config.outputSuffix}
+                  onChange={(event) => onSuffixChange(event.target.value)}
+                  placeholder="e.g. _binned"
+                />
+              </FormField>
 
-          <FormField
-            label="Decimal precision"
-            htmlFor={fieldIds.precision}
-            description="Sets rounding precision for interval labels."
-          >
-            <NumberInput
-              id={fieldIds.precision}
-              min={0}
-              max={8}
-              step={1}
-              value={config.precision}
-              onChange={(event) => onIntegerChange('precision', event.target.value, 0, 8)}
-            />
-          </FormField>
-        </div>
-        <div className="canvas-modal__parameter-grid">
-          <CheckboxInput
-            id={fieldIds.includeLowest}
-            label="Include the minimum value in the first bin"
-            checked={config.includeLowest}
-            onChange={(event) => onBooleanToggle('include_lowest', event.target.checked)}
-          />
-          <CheckboxInput
-            id={fieldIds.dropOriginal}
-            label="Remove source columns after binning"
-            checked={config.dropOriginal}
-            onChange={(event) => onBooleanToggle('drop_original', event.target.checked)}
-          />
-        </div>
-      </div>
-      <div className="canvas-modal__subsection">
-        <h4>Missing values</h4>
-        <div className="canvas-skewness__segmented" role="radiogroup" aria-label="Missing value handling">
-          {BINNING_MISSING_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className="canvas-skewness__segmented-button"
-              data-active={config.missingStrategy === option.value}
-              onClick={() => onMissingStrategyChange(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        {config.missingStrategy === 'label' && (
-          <div className="canvas-modal__parameter-field">
-            <label htmlFor={fieldIds.missingLabel} className="canvas-modal__parameter-label">
-              Missing label
-            </label>
-            <div className="canvas-modal__parameter-control">
-              <input
-                id={fieldIds.missingLabel}
-                type="text"
-                className="canvas-modal__input"
-                value={config.missingLabel}
-                onChange={(event) => onMissingLabelChange(event.target.value)}
-                placeholder="e.g. Missing"
+              <FormField
+                label="Label format"
+                htmlFor={fieldIds.labelFormat}
+                description="Controls how new bin values are named when custom labels aren’t provided."
+              >
+                <SelectInput
+                  id={fieldIds.labelFormat}
+                  value={config.labelFormat}
+                  onChange={(event) => onLabelFormatChange((event.target.value as BinningLabelFormat) ?? 'range')}
+                  options={BINNING_LABEL_FORMAT_OPTIONS}
+                />
+              </FormField>
+
+              <FormField
+                label="Decimal precision"
+                htmlFor={fieldIds.precision}
+                description="Sets rounding precision for interval labels."
+              >
+                <NumberInput
+                  id={fieldIds.precision}
+                  min={0}
+                  max={8}
+                  step={1}
+                  value={config.precision}
+                  onChange={(event) => onIntegerChange('precision', event.target.value, 0, 8)}
+                />
+              </FormField>
+            </div>
+            <div className="canvas-modal__parameter-grid">
+              <CheckboxInput
+                id={fieldIds.includeLowest}
+                label="Include the minimum value in the first bin"
+                checked={config.includeLowest}
+                onChange={(event) => onBooleanToggle('include_lowest', event.target.checked)}
+              />
+              <CheckboxInput
+                id={fieldIds.dropOriginal}
+                label="Remove source columns after binning"
+                checked={config.dropOriginal}
+                onChange={(event) => onBooleanToggle('drop_original', event.target.checked)}
               />
             </div>
           </div>
-        )}
-      </div>
+          <div className="canvas-modal__subsection">
+            <h4>Missing values</h4>
+            <div className="canvas-skewness__segmented" role="radiogroup" aria-label="Missing value handling">
+              {BINNING_MISSING_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="canvas-skewness__segmented-button"
+                  data-active={config.missingStrategy === option.value}
+                  onClick={() => onMissingStrategyChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            {config.missingStrategy === 'label' && (
+              <div className="canvas-modal__parameter-field">
+                <label htmlFor={fieldIds.missingLabel} className="canvas-modal__parameter-label">
+                  Missing label
+                </label>
+                <div className="canvas-modal__parameter-control">
+                  <input
+                    id={fieldIds.missingLabel}
+                    type="text"
+                    className="canvas-modal__input"
+                    value={config.missingLabel}
+                    onChange={(event) => onMissingLabelChange(event.target.value)}
+                    placeholder="e.g. Missing"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 };

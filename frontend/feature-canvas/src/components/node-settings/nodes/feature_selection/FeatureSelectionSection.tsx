@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { FeatureNodeParameter, FeatureSelectionNodeSignal } from '../../../../api';
+import { AdvancedSettingsToggle } from '../../layout/AdvancedSettingsToggle';
 
 type FeatureSelectionSectionProps = {
   columnsParameter: FeatureNodeParameter | null;
@@ -83,6 +84,8 @@ export const FeatureSelectionSection: React.FC<FeatureSelectionSectionProps> = (
   renderParameterField,
   signal,
 }) => {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   const primaryParameters = useMemo(() => {
     return [
       columnsParameter,
@@ -214,9 +217,19 @@ export const FeatureSelectionSection: React.FC<FeatureSelectionSectionProps> = (
         </div>
       )}
       {tuningParameters.length > 0 && (
-        <div className="canvas-modal__parameter-grid" style={{ marginTop: '1rem' }}>
-          {tuningParameters.map((parameter) => renderParameterField(parameter))}
-        </div>
+        <>
+          <AdvancedSettingsToggle
+            isOpen={showAdvanced}
+            onToggle={() => setShowAdvanced(!showAdvanced)}
+            label="Advanced tuning"
+            description="Configure thresholds, percentiles, and estimator settings"
+          />
+          {showAdvanced && (
+            <div className="canvas-modal__parameter-grid" style={{ marginTop: '1rem' }}>
+              {tuningParameters.map((parameter) => renderParameterField(parameter))}
+            </div>
+          )}
+        </>
       )}
       <p className="canvas-modal__note canvas-modal__note--muted">
         {dropUnselected

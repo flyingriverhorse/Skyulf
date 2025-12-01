@@ -18,8 +18,8 @@ export const HistogramSparkline: React.FC<HistogramSparklineProps> = ({ counts, 
   const binWidth = 100 / counts.length;
 
   return (
-    <div className={wrapperClass} role="img" aria-label="Histogram sparkline">
-      <svg viewBox="0 0 100 60">
+    <div className={wrapperClass} role="img" aria-label="Histogram sparkline" style={{ width: '100%', height: '100%', display: 'flex' }}>
+      <svg viewBox="0 0 100 60" style={{ width: '100%', height: '100%', overflow: 'visible' }} preserveAspectRatio="none">
         <line x1="0" y1="58" x2="100" y2="58" stroke="rgba(148, 163, 184, 0.35)" strokeWidth="0.75" />
         {counts.map((count, index) => {
           const height = (count / safeMax) * 52;
