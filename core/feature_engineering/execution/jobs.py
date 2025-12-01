@@ -195,7 +195,14 @@ class FullExecutionJobStore:
                 result_data = task_result.result
                 if isinstance(result_data, dict):
                     job.signal = FullExecutionSignal(**result_data)
-                    job.status = "succeeded"
+                    if job.signal.job_status:
+                        job.status = job.signal.job_status
+                    elif job.signal.status == "failed":
+                        job.status = "failed"
+                    elif job.signal.status == "skipped":
+                        job.status = "cancelled"
+                    else:
+                        job.status = "succeeded"
             elif task_result.state == "FAILURE":
                 job.status = "failed"
                 job.signal = FullExecutionSignal(

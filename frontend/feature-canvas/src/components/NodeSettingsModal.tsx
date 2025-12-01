@@ -838,6 +838,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               formatMissingPercentage={formatMissingPercentage}
               formatNumericStat={formatNumericStat}
               formatModeStat={formatModeStat}
+              nodeId={node?.id}
+              onUpdateNodeData={onUpdateNodeData}
             />
           )}
           <DatasetProfileSection

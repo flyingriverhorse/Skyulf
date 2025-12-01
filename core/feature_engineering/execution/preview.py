@@ -9,7 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import core.database.engine as db_engine
 from core.feature_engineering.execution.data import coerce_int, load_dataset_frame
-from core.feature_engineering.execution.engine import run_pipeline_execution
+from core.feature_engineering.execution.engine import (
+    apply_pending_configuration_signal,
+    run_pipeline_execution,
+)
 from core.feature_engineering.execution.graph import (
     DATASET_NODE_ID,
     execution_order,
@@ -159,6 +162,7 @@ def build_full_preview_signal(
         dataset_source_id=dataset_source_id,
         last_updated=utcnow(),
     )
+    signal = apply_pending_configuration_signal(signal, applied_steps=applied_steps)
     return signal, total_rows_actual
 
 

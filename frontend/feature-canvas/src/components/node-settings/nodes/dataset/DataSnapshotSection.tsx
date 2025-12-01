@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
   fetchPipelinePreviewRows,
@@ -76,6 +76,8 @@ type FullExecutionSummary = {
   isActive: boolean;
 };
 
+type BackgroundExecutionStatus = 'idle' | 'loading' | 'success' | 'error';
+
 const FULL_EXECUTION_STATUS_LABELS: Record<string, string> = {
   succeeded: 'Completed',
   deferred: 'Deferred',
@@ -90,6 +92,8 @@ const FULL_EXECUTION_WARNING_MESSAGES: Record<string, string> = {
   dataset_too_large: 'Full dataset run is executing in the background for large datasets.',
   memory_error: 'Full dataset execution failed because the server ran out of memory.',
   background_failure: 'Background job ended unexpectedly. Check server logs for details.',
+  pending_configuration:
+    'Some nodes still need configuration. Open each highlighted node and save its settings before retrying the full dataset run.',
 };
 
 const FULL_EXECUTION_JOB_STATUS_LABELS: Record<string, string> = {
@@ -258,6 +262,30 @@ const resolveFullExecutionSummary = (
     stepLabel,
     isActive: jobStatus === 'queued' || jobStatus === 'running',
   };
+};
+
+const deriveBackgroundExecutionStatus = (
+  signal: FullExecutionSignal | null | undefined,
+): BackgroundExecutionStatus => {
+  if (!signal) {
+    return 'idle';
+  }
+
+  const statusToken = (signal.job_status ?? signal.status ?? '').toLowerCase();
+  if (!statusToken) {
+    return 'idle';
+  }
+
+  if (statusToken === 'succeeded') {
+    return 'success';
+  }
+  if (statusToken === 'failed' || statusToken === 'skipped' || statusToken === 'cancelled') {
+    return 'error';
+  }
+  if (statusToken === 'running' || statusToken === 'queued' || statusToken === 'deferred') {
+    return 'loading';
+  }
+  return 'idle';
 };
 
 const createInitialRowWindowState = (): RowWindowState => ({
@@ -484,6 +512,8 @@ type DataSnapshotSectionProps = {
   formatMissingPercentage: (value?: number | null) => string;
   formatNumericStat: (value?: number | null) => string;
   formatModeStat: (value?: string | number | null) => string;
+  nodeId?: string | null;
+  onUpdateNodeData?: (nodeId: string, dataUpdates: Record<string, any>) => void;
 };
 
 export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
@@ -496,10 +526,31 @@ export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
   formatMissingPercentage,
   formatNumericStat,
   formatModeStat,
+  nodeId,
+  onUpdateNodeData,
 }) => {
   const [rowWindow, setRowWindow] = useState<RowWindowState>(() => createInitialRowWindowState());
   const [fullExecutionSummary, setFullExecutionSummary] = useState<FullExecutionSummary | null>(null);
   const [expandedContext, setExpandedContext] = useState<boolean>(false);
+  const backgroundStatusRef = useRef<BackgroundExecutionStatus>('idle');
+
+  const notifyBackgroundStatus = useCallback(
+    (signal: FullExecutionSignal | null | undefined) => {
+      if (!nodeId || !onUpdateNodeData) {
+        backgroundStatusRef.current = deriveBackgroundExecutionStatus(signal);
+        return;
+      }
+
+      const nextStatus = deriveBackgroundExecutionStatus(signal);
+      if (nextStatus === backgroundStatusRef.current) {
+        return;
+      }
+
+      backgroundStatusRef.current = nextStatus;
+      onUpdateNodeData(nodeId, { backgroundExecutionStatus: nextStatus });
+    },
+    [nodeId, onUpdateNodeData]
+  );
 
   const isRefreshing = previewState.status === 'loading';
   const isButtonDisabled = isRefreshing || !canTriggerPreview;
@@ -551,6 +602,7 @@ export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
         return createInitialRowWindowState();
       });
       setFullExecutionSummary(null);
+      notifyBackgroundStatus(null);
       return;
     }
 
@@ -559,6 +611,7 @@ export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
       formatMetricValue,
     );
     setFullExecutionSummary(summary);
+    notifyBackgroundStatus(previewState.data.signals?.full_execution);
 
     setRowWindow({
       status: 'ready',
@@ -571,7 +624,7 @@ export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
       largeDataset: false,
       error: null,
     });
-  }, [baseColumns, basePreviewRows, baseRowCount, baseHasMore, formatMetricValue, metrics?.total_rows, previewState.data, previewState.status]);
+  }, [baseColumns, basePreviewRows, baseRowCount, baseHasMore, formatMetricValue, metrics?.total_rows, notifyBackgroundStatus, previewState.data, previewState.status]);
 
   // Poll for background job status updates
   useEffect(() => {
@@ -594,6 +647,7 @@ export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
         .then((updatedSignal) => {
           const updatedSummary = resolveFullExecutionSummary(updatedSignal, formatMetricValue);
           setFullExecutionSummary(updatedSummary);
+          notifyBackgroundStatus(updatedSignal);
           
           // Update the preview state with the new signal
           if (previewState.data) {
@@ -614,7 +668,7 @@ export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
     }, pollInterval);
 
     return () => clearTimeout(timer);
-  }, [fullExecutionSummary, datasetSourceId, formatMetricValue, previewState.data]);
+  }, [fullExecutionSummary, datasetSourceId, formatMetricValue, notifyBackgroundStatus, previewState.data]);
 
   const visibleColumns = rowWindow.columns.length > 0 ? rowWindow.columns : baseColumns;
   const visibleRows = rowWindow.rows.length > 0 ? rowWindow.rows : basePreviewRows;
