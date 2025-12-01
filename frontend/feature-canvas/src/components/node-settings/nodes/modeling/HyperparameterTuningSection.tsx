@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   FeatureGraph,
@@ -14,6 +15,7 @@ import type {
 import {
   createHyperparameterTuningJob,
   fetchHyperparameterTuningJobs,
+  cancelHyperparameterTuningJob,
   fetchModelHyperparameters,
   generatePipelineId,
   type FetchHyperparameterTuningJobsOptions,
@@ -811,6 +813,24 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
   onSaveDraftConfig,
 }) => {
   const queryClient = useQueryClient();
+
+  const cancelMutation = useMutation({
+    mutationFn: cancelHyperparameterTuningJob,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hyperparameter-tuning-jobs'] });
+    },
+    onError: (error) => {
+      console.error('Failed to cancel job:', error);
+      alert(error instanceof Error ? error.message : 'Failed to cancel job');
+    },
+  });
+
+  const handleCancel = (jobId: string) => {
+    if (confirm('Are you sure you want to cancel this tuning job?')) {
+      cancelMutation.mutate(jobId);
+    }
+  };
+
   const [pipelineId, setPipelineId] = useState<string | null>(null);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [lastCreatedJob, setLastCreatedJob] = useState<HyperparameterTuningJobResponse | null>(null);
@@ -2578,9 +2598,34 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
     return (
       <li key={job.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>
-            <strong>Run {job.run_number}</strong> — {statusLabel}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span>
+              <strong>Run {job.run_number}</strong> — {statusLabel}
+            </span>
+            {isRunning && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCancel(job.id);
+                }}
+                disabled={cancelMutation.isPending}
+                title="Cancel this job (may not be immediate on Windows)"
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  color: '#b91c1c',
+                  background: '#fee2e2',
+                  border: '1px solid #fca5a5',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
           {isRunning && (
             <span style={{ fontSize: '0.85em', color: '#666' }}>
               {progress}% {currentStep ? `— ${currentStep}` : ''}
@@ -2655,11 +2700,17 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
             borderLeft: '3px solid rgba(251, 146, 60, 0.8)',
             padding: '0.75rem 1rem',
             margin: '0.75rem 0',
+            display: 'flex',
+            alignItems: 'start',
+            gap: '0.5rem'
           }}
         >
-          <strong>⚠️ Unsaved Configuration Changes</strong>
-          <br />
-          Enqueuing a tuning job saves the current configuration so results align with this pipeline snapshot.
+          <AlertTriangle size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+          <span>
+            <strong>Unsaved Configuration Changes</strong>
+            <br />
+            Enqueuing a tuning job saves the current configuration so results align with this pipeline snapshot.
+          </span>
         </p>
       )}
 
@@ -3027,9 +3078,12 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
               gap: '0.75rem',
             }}
           >
-            <div>
-              <strong>⚠️ {scalingWarning.headline}</strong>
-              <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem' }}>{scalingWarning.summary}</p>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'start' }}>
+              <AlertTriangle size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+              <div>
+                <strong>{scalingWarning.headline}</strong>
+                <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem' }}>{scalingWarning.summary}</p>
+              </div>
             </div>
             <button
               type="button"

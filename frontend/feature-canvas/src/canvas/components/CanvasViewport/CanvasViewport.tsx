@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React from 'react';
+import { RotateCcw, Plus } from 'lucide-react';
 import type { MutableRefObject } from 'react';
 import ReactFlow, {
   Background,
@@ -90,8 +91,9 @@ import ConnectionLine from '../../../components/edges/ConnectionLine';
        className="canvas-fab canvas-fab--reset"
        onClick={handleResetAllNodes}
        aria-label="Reset preprocessing nodes"
+       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
      >
-       ↺
+       <RotateCcw size={20} />
      </button>
  
      <button
@@ -99,8 +101,9 @@ import ConnectionLine from '../../../components/edges/ConnectionLine';
        className="canvas-fab"
        onClick={openCatalog}
        aria-label="Open node catalog"
+       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
      >
-       +
+       <Plus size={24} />
      </button>
    </div>
  );

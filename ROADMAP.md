@@ -56,6 +56,11 @@ Since I am building this solo, I am prioritizing **stability and user experience
 ### Phase 2: Deepening Data Science (Mid-Term)
 *Goal: Help users trust their models and understand their data.*
 
+#### Core Engine Optimization
+*   **"Rust Core" Execution Engine:** Move the pipeline orchestration loop from Python to Rust to eliminate overhead and enable parallel branch execution.
+*   **High-Performance Ingestion:** Replace Pandas with **Polars** and Rust CSV parsers for parallel, chunked reading of large datasets.
+*   **Hot Path Optimization:** Rewrite CPU-intensive row-level operations (Hashing, Regex cleaning) in Rust using **PyO3** for 50x-100x speedups.
+
 #### Advanced EDA & Validation
 *   **Data Quality (Great Expectations):** Integrate **Great Expectations** to automatically validate data (e.g., "Age must be > 0") and generate beautiful quality reports.
 *   **Ethics & Fairness:** Detect bias in datasets (e.g., "Is this model unfair to a specific demographic?") and calculate fairness metrics.
@@ -97,14 +102,18 @@ Since I am building this solo, I am prioritizing **stability and user experience
 *   **GPU Acceleration:** Optional support for CUDA-enabled training for Deep Learning nodes.
 *   Optimize caches and intermediate storage so even bigger datasets stay responsive.
 
-#### Deployment & Export (Early Access)
-*   **Export Standalone API (ZIP):** Generate a lightweight, self-contained ZIP file containing the trained model, preprocessing pipeline, and a ready-to-run FastAPI/Flask app. Users can unzip and run `python main.py` to serve their model anywhere.
-*   **Notebook Export:** "Export to Jupyter Notebook" button that generates a clean, runnable notebook with all your pipeline steps, so you can tweak the code manually.
-
 ---
 
 ### Phase 3: The "App Hub" Vision (Long-Term)
 *Goal: Turn Skyulf into a hub where people build, share, and deploy ML systems.*
+
+#### Production Serving & Real-time - High-Performance Architecture (Rust Integration): Scale to massive datasets and production-grade latency.
+*   **Rust Model Serving:** Build a low-latency inference API using **Axum** and **ONNX Runtime** to serve models with <10ms latency.
+*   **Real-time Sidecar:** Implement a lightweight Rust sidecar service to handle thousands of concurrent WebSocket connections for live progress updates.
+
+#### Deployment & Export (Early Access)
+*   **Export Standalone API (ZIP):** Generate a lightweight, self-contained ZIP file containing the trained model, preprocessing pipeline, and a ready-to-run FastAPI/Flask app. Users can unzip and run `python main.py` to serve their model anywhere.
+*   **Notebook Export:** "Export to Jupyter Notebook" button that generates a clean, runnable notebook with all your pipeline steps, so you can tweak the code manually
 
 #### Plugin System
 *   Let users drop their own node definitions (Python + JSON spec) into a folder and see them in the Canvas.

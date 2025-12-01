@@ -29,6 +29,7 @@ from core.feature_engineering.modeling.training.tasks import (
     _prepare_training_data,
     _resolve_training_inputs,
     dispatch_training_job,
+    cancel_training_task,
 )
 from core.feature_engineering.modeling.training.evaluation import (
     build_classification_split_report,
@@ -45,6 +46,7 @@ from core.feature_engineering.schemas import (
     TrainingJobSummary,
 )
 from core.utils.datetime import utcnow
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +105,39 @@ async def enqueue_training_job(
 
     job_payloads = [TrainingJobResponse.model_validate(job, from_attributes=True) for job in created_jobs]
     return TrainingJobBatchResponse(jobs=job_payloads)
+
+
+@router.post("/training-jobs/{job_id}/cancel", status_code=status.HTTP_202_ACCEPTED)
+async def cancel_training_job(
+    job_id: str,
+    session: AsyncSession = Depends(get_async_session),
+) -> Dict[str, str]:
+    """
+    Cancel a running training job.
+    
+    If JOB_CANCELLATION_ENABLED is False (e.g. on Windows), this returns a 501 Not Implemented
+    unless forced via query param (not implemented here for safety).
+    """
+    if not get_settings().JOB_CANCELLATION_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Cancellation is disabled on Windows/Solo pool. Set JOB_CANCELLATION_ENABLED=True in config to force it.",
+        )
+
+    job = await fetch_training_job(session, job_id)
+    if not job:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    if job.status not in [TrainingJobStatus.QUEUED, TrainingJobStatus.RUNNING]:
+        return {"message": f"Job is already {job.status}, no cancellation needed."}
+
+    # Mark as cancelled in DB immediately so UI updates
+    await update_job_status(session, job, status=TrainingJobStatus.CANCELLED)
+    
+    # Send revocation signal to Celery
+    cancel_training_task(job_id)
+
+    return {"message": "Cancellation signal sent"}
 
 
 @router.get(

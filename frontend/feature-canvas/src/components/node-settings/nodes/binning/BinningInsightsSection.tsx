@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Trash2 } from 'lucide-react';
 import type {
   BinningColumnRecommendation,
   BinningExcludedColumn,
@@ -256,7 +257,9 @@ export const BinningInsightsSection: React.FC<BinningInsightsSectionProps> = ({
             className="btn btn-outline-secondary"
             onClick={onClearOverrides}
             disabled={!binningOverrideCount}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
+            <Trash2 size={14} />
             Clear
           </button>
           {onApplyStrategies && (

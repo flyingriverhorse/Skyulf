@@ -4,7 +4,9 @@ import logging
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import pandas as pd
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.feature_engineering.execution.data import load_dataset_frame
 from core.feature_engineering.execution.graph import (
     DATASET_NODE_ID,
     determine_node_split_type,
@@ -21,6 +23,7 @@ from core.feature_engineering.execution.registry import (
 )
 from core.feature_engineering.preprocessing.split import SPLIT_TYPE_COLUMN, apply_train_test_split
 from core.feature_engineering.schemas import (
+    FullExecutionSignal,
     PipelinePreviewSignals,
     TrainModelDraftReadinessSnapshot,
 )
@@ -348,5 +351,52 @@ def collect_pipeline_signals(
         existing_signals=existing_signals,
         preserve_split_column=preserve_split_column,
     )
+
+
+async def run_full_dataset_execution(
+    *,
+    session: AsyncSession,
+    dataset_source_id: str,
+    execution_order: List[str],
+    node_map: Dict[str, Dict[str, Any]],
+    pipeline_id: str,
+    applied_steps: List[str],
+    preview_total_rows: int,
+) -> Tuple[FullExecutionSignal, int]:
+    
+    # Load full dataset
+    frame, meta = await load_dataset_frame(
+        session,
+        dataset_source_id,
+        sample_size=0,
+        execution_mode="full",
+    )
+    
+    if frame.empty:
+        raise ValueError(f"Could not load full dataset for {dataset_source_id}")
+        
+    total_rows = len(frame)
+    
+    # Run pipeline
+    transformed_frame, steps, signals, _ = run_pipeline_execution(
+        frame,
+        execution_order,
+        node_map,
+        pipeline_id=pipeline_id,
+        collect_signals=True,
+    )
+    
+    # Build signal
+    signal = FullExecutionSignal(
+        status="succeeded",
+        job_id=pipeline_id,
+        reason="Full execution completed",
+        total_rows=total_rows,
+        processed_rows=len(transformed_frame),
+        applied_steps=steps,
+        dataset_source_id=dataset_source_id,
+    )
+    
+    return signal, len(transformed_frame)
 
     return frame_result, signals, modeling_metadata

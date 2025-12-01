@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useCallback, useMemo } from 'react';
 import { Handle, NodeProps, Position } from 'react-flow-renderer';
+import { AlertTriangle, Check, AlertCircle, X, Loader2 } from 'lucide-react';
 import type { FeatureNodeData } from '../../types/nodes';
 import {
   NODE_HANDLE_CONFIG,
@@ -225,45 +226,39 @@ const FeatureCanvasNode: React.FC<NodeProps<FeatureNodeData>> = ({ id, data, sel
                 background: 'rgba(251, 191, 36, 0.2)',
                 color: 'rgb(245, 158, 11)',
                 border: '1px solid rgba(245, 158, 11, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
             >
-              ⚠
+              <AlertTriangle size={12} />
             </span>
           )}
           {backgroundStatus === 'loading' && (
             <span
               className="feature-node__status-indicator feature-node__status-indicator--loading"
               title="Loading full dataset in background..."
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              <svg className="feature-node__spinner" viewBox="0 0 24 24">
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  fill="none"
-                  strokeDasharray="60"
-                  strokeDashoffset="30"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <Loader2 size={12} className="feature-node__spinner" />
             </span>
           )}
           {backgroundStatus === 'success' && (
             <span
               className="feature-node__status-indicator feature-node__status-indicator--success"
               title="Full dataset ready"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              ✓
+              <Check size={12} />
             </span>
           )}
           {backgroundStatus === 'error' && (
             <span
               className="feature-node__status-indicator feature-node__status-indicator--error"
               title="Background execution failed"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              !
+              <AlertCircle size={12} />
             </span>
           )}
           {isRemovable && (
@@ -272,8 +267,9 @@ const FeatureCanvasNode: React.FC<NodeProps<FeatureNodeData>> = ({ id, data, sel
               type="button"
               onClick={handleRemove}
               title="Remove node"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              ×
+              <X size={12} />
             </button>
           )}
         </div>

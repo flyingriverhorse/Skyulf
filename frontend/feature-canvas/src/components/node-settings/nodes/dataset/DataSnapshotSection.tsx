@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
   fetchPipelinePreviewRows,
   type PipelinePreviewResponse,
@@ -813,8 +814,10 @@ export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
                 className="canvas-preview__full-execution-toggle"
                 onClick={() => setExpandedContext(!expandedContext)}
                 aria-expanded={expandedContext}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
               >
-                {expandedContext ? '▼' : '▶'} {expandedContext ? 'Hide' : 'Show'} job details
+                {expandedContext ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                {expandedContext ? 'Hide' : 'Show'} job details
               </button>
               {expandedContext && (
                 <dl className="canvas-preview__full-execution-meta">

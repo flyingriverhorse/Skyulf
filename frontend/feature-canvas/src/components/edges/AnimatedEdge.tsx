@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { EdgeProps, useReactFlow, Position } from 'react-flow-renderer';
+import { X } from 'lucide-react';
 import { getSmartEdge } from '@tisoap/react-flow-smart-edge';
 
 const isFiniteNumber = (value: number) => Number.isFinite(value);
@@ -241,8 +242,9 @@ const AnimatedEdge: React.FC<EdgeProps> = ({
               setEdges((edges) => edges.filter((edge) => edge.id !== id));
             }}
             aria-label="Remove connection"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            ×
+            <X size={12} />
           </button>
         </div>
       </foreignObject>

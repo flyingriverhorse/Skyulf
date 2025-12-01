@@ -189,11 +189,21 @@ def run_hyperparameter_tuning(job_id: str) -> None:
 def dispatch_hyperparameter_tuning_job(job_id: str) -> None:
     """Queue a hyperparameter tuning job via Celery."""
 
-    run_hyperparameter_tuning.delay(job_id)
+    run_hyperparameter_tuning.apply_async(args=[job_id], task_id=job_id)
+
+
+def cancel_tuning_task(job_id: str) -> None:
+    """
+    Send a revocation signal to the Celery worker for this job.
+    
+    Uses terminate=True to force kill the worker process if it's blocking.
+    """
+    celery_app.control.revoke(job_id, terminate=True)
 
 
 __all__ = [
     "_run_hyperparameter_tuning_workflow",
     "run_hyperparameter_tuning",
     "dispatch_hyperparameter_tuning_job",
+    "cancel_tuning_task",
 ]

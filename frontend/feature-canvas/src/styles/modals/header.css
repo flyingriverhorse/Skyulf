@@ -20,10 +20,12 @@
   border-radius: 14px;
   background: rgba(59, 130, 246, 0.22);
   font-size: 1.6rem;
+  color: #93c5fd;
 }
 
 .canvas-modal__title-glyph--dataset {
   background: rgba(56, 189, 248, 0.28);
+  color: #7dd3fc;
 }
 
 .canvas-modal__title {

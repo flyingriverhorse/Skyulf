@@ -28,6 +28,7 @@ def setup_universal_logging(
     rotation_interval: int = 1,
     max_bytes: int = 50 * 1024 * 1024,
     backup_count: int = 10,
+    console_log_level: str = "WARNING",
 ) -> None:
     """
     Universal logging setup for FastAPI applications.
@@ -36,6 +37,7 @@ def setup_universal_logging(
     Args:
         log_file: Path to log file (creates directory if needed)
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        console_log_level: Logging level for console output
     """
     # Create log directory with better error handling
     log_dir = os.path.dirname(log_file)
@@ -86,7 +88,7 @@ def setup_universal_logging(
     # Console handler with cleaner output for development
     console_handler = logging.StreamHandler()
     console_handler.setLevel(
-        logging.WARNING
+        getattr(logging, console_log_level.upper(), logging.WARNING)
     )  # Only show warnings and errors in console
     console_formatter = logging.Formatter("%(levelname)s: %(message)s")
     console_handler.setFormatter(console_formatter)
@@ -192,6 +194,11 @@ class Settings(BaseSettings):
     # Global setting: if True, ALL pages require authentication by default
     # Individual pages can be marked as public in PUBLIC_PAGES list
     REQUIRE_LOGIN_BY_DEFAULT: bool = True
+
+    # === JOB EXECUTION ===
+    # Controls whether job cancellation is enabled in the UI/API.
+    # Defaults to False on Windows (nt) due to Celery 'solo' pool limitations, True otherwise.
+    JOB_CANCELLATION_ENABLED: bool = os.name != 'nt'
 
     # Pages that are accessible without authentication (when REQUIRE_LOGIN_BY_DEFAULT=True)
     # or pages that require authentication (when REQUIRE_LOGIN_BY_DEFAULT=False)

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { TrainingJobResponse, TrainingJobSummary } from '../../../../api';
+import { cancelTrainingJob } from '../../../../api';
 import { formatRelativeTime } from '../../utils/formatters';
 import { STATUS_LABEL, pickPrimaryMetric, formatMetricValue } from './modelingUtils';
 import { ModelComparisonTable } from './ModelComparisonTable';
@@ -32,6 +34,24 @@ export const TrainingJobHistory: React.FC<TrainingJobHistoryProps> = ({
 	isTuningJobsLoading,
 }) => {
 	const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
+	const queryClient = useQueryClient();
+
+	const cancelMutation = useMutation({
+		mutationFn: cancelTrainingJob,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['training-jobs'] });
+		},
+		onError: (error) => {
+			console.error('Failed to cancel job:', error);
+			alert(error instanceof Error ? error.message : 'Failed to cancel job');
+		},
+	});
+
+	const handleCancel = (jobId: string) => {
+		if (confirm('Are you sure you want to cancel this training job?')) {
+			cancelMutation.mutate(jobId);
+		}
+	};
 
 	const renderJobSummary = (job: TrainingJobSummary) => {
 		const metric = pickPrimaryMetric(job.metrics ?? null);
@@ -89,9 +109,34 @@ export const TrainingJobHistory: React.FC<TrainingJobHistoryProps> = ({
 		return (
 			<li key={job.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
 				<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-					<span>
-						<strong>v{job.version}</strong> — {statusLabel}
-					</span>
+					<div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+						<span>
+							<strong>v{job.version}</strong> — {statusLabel}
+						</span>
+						{isRunning && (
+							<button
+								type="button"
+								onClick={(e) => {
+									e.stopPropagation();
+									handleCancel(job.id);
+								}}
+								disabled={cancelMutation.isPending}
+								title="Cancel this job (may not be immediate on Windows)"
+								style={{
+									padding: '2px 8px',
+									fontSize: '0.75rem',
+									fontWeight: 500,
+									color: '#b91c1c',
+									background: '#fee2e2',
+									border: '1px solid #fca5a5',
+									borderRadius: '4px',
+									cursor: 'pointer',
+								}}
+							>
+								Cancel
+							</button>
+						)}
+					</div>
 					{isRunning && (
 						<span style={{ fontSize: '0.85em', color: '#666' }}>
 							{progress}% {currentStep ? `— ${currentStep}` : ''}

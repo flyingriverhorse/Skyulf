@@ -1,4 +1,5 @@
 import React from 'react';
+import { RotateCcw, Save } from 'lucide-react';
 
 type NodeSettingsFooterProps = {
   onClose: () => void;
@@ -44,12 +45,21 @@ export const NodeSettingsFooter: React.FC<NodeSettingsFooterProps> = ({
           type="button"
           className="btn btn-outline-secondary canvas-modal__reset"
           onClick={onResetNode}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
         >
+          <RotateCcw size={16} />
           Reset node
         </button>
       )}
       {showSaveButton && (
-        <button type="button" className="btn btn-primary" onClick={onSave} disabled={!canSave}>
+        <button 
+          type="button" 
+          className="btn btn-primary" 
+          onClick={onSave} 
+          disabled={!canSave}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+        >
+          <Save size={16} />
           Save changes
         </button>
       )}

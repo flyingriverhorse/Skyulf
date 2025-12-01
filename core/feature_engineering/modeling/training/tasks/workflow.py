@@ -163,11 +163,21 @@ def train_model(job_id: str) -> None:
 def dispatch_training_job(job_id: str) -> None:
     """Queue a Celery task for the given job identifier."""
 
-    train_model.delay(job_id)
+    train_model.apply_async(args=[job_id], task_id=job_id)
+
+
+def cancel_training_task(job_id: str) -> None:
+    """
+    Send a revocation signal to the Celery worker for this job.
+    
+    Uses terminate=True to force kill the worker process if it's blocking.
+    """
+    celery_app.control.revoke(job_id, terminate=True)
 
 
 __all__ = [
     "_run_training_workflow",
     "train_model",
     "dispatch_training_job",
+    "cancel_training_task",
 ]

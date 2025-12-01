@@ -1,11 +1,13 @@
+Version 0.0.6 updates
+
 # Phase 1: Stability & UX Improvements
 
 This document tracks the progress of stability and user experience improvements for the Model Training module.
 
 ## 1. Stability & Reliability
 
-- [ ] **Graceful Cancellation**
-    - Add "Cancel" button in UI for running jobs.
+- [x] **Cancellation of train and tune jobs**
+    - Add "Cancel" button in UI for running jobs both in Model Training and Hyperparameter Tuning sections.(Not tested on Windows/Solo pool due to Celery limitations and linux as well due to windows environment).
     - Update Celery task to check for revocation signals between folds/steps.
 - [ ] **"Pre-flight" Validation**
     - Implement synchronous checks before async task submission (Target existence, NaN checks, Dataset size vs CV folds).
@@ -14,6 +16,10 @@ This document tracks the progress of stability and user experience improvements 
     - Frontend: Add "View Logs/Error" modal for detailed stack traces.
 - [x] **Routes.py**
     - Routes.py modularization and cleanup for better maintainability. Separated under Execution and api folders.
+- [x] **Background Execution Architecture**
+    - Refactored "Full Execution" (Preview Reset) to run asynchronously via Celery.
+    - Eliminated main-thread blocking during heavy data loading.
+    - Fixed Celery worker database initialization (`init_db`) for standalone process stability.
 - [x] **Recommendations**
     - Recommendations no longer suggest incompatible transformations for the target column based on its role (feature vs. target) and data type. Only Label encoding will suggest for the target column encoding.
 
@@ -37,6 +43,7 @@ This document tracks the progress of stability and user experience improvements 
     - Unified styling with Model Comparison Table (status badges, monospace fonts, spacing).
     - Added "Target" column.
     - Improved readability with better table layout and horizontal scrolling.
+    - Using now lucide-react icons for better visual consistency.
 - [x] **Real-time Progress Tracking**
     - Backend: Update job status with `progress` (0-100) and `current_step`.
     - Frontend: Display progress bar instead of static "Running" badge.

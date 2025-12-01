@@ -8,6 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { X } from 'lucide-react';
 import {
   Node,
   ReactFlowInstance,
@@ -321,8 +322,9 @@ const CanvasShell = forwardRef<CanvasShellHandle, CanvasShellProps>(
                 className="canvas-drawer__close"
                 onClick={closeCatalog}
                 aria-label="Close catalog"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                ×
+                <X size={20} />
               </button>
             </div>
             <div className="canvas-drawer__body">{sidebarContent}</div>
