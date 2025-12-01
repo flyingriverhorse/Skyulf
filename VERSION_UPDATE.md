@@ -20,6 +20,11 @@ This document tracks the progress of stability and user experience improvements 
     - Refactored "Full Execution" (Preview Reset) to run asynchronously via Celery.
     - Eliminated main-thread blocking during heavy data loading.
     - Fixed Celery worker database initialization (`init_db`) for standalone process stability.
+- [x] **Full Execution Diagnostics**
+    - Backend now flags specific nodes that remain in "pending configuration" so Celery responses no longer report success when nodes were skipped.
+    - Dataset modal shows a clear warning plus the node names that must be configured before rerunning.
+    - Frontend Save & Run flow patches the graph snapshot with the latest config, so Celery executes exactly what the user just saved.
+    - Feature-canvas badges stay in sync with Celery by polling job status even after the settings modal closes, switching from loading to success/error automatically.
 - [x] **Recommendations**
     - Recommendations no longer suggest incompatible transformations for the target column based on its role (feature vs. target) and data type. Only Label encoding will suggest for the target column encoding.
 

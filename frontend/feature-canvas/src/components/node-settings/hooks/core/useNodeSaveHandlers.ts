@@ -1,9 +1,12 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import { triggerFullDatasetExecution } from '../../../../api';
+import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
+import { fetchFullExecutionStatus, triggerFullDatasetExecution, type FullExecutionSignal } from '../../../../api';
 import { normalizeBinningConfigValue } from '../../nodes/binning/binningSettings';
 import { normalizeScalingConfigValue } from '../../nodes/scaling/scalingSettings';
 import { cloneConfig } from '../../utils/configParsers';
+import { PENDING_CONFIRMATION_FLAG } from '../../../../canvas/services/configSanitizer';
 import type { CatalogFlagMap } from './useCatalogFlags';
+
+type BackgroundExecutionStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export type UseNodeSaveHandlersArgs = {
   configState: Record<string, any>;
@@ -35,6 +38,119 @@ export const useNodeSaveHandlers = ({
   onResetConfig,
 }: UseNodeSaveHandlersArgs) => {
   const { isBinningNode, isScalingNode, isInspectionNode } = catalogFlags;
+  const activePollCancelRef = useRef<(() => void) | null>(null);
+
+  const mapSignalToBackgroundStatus = useCallback((signal?: FullExecutionSignal | null): BackgroundExecutionStatus => {
+    if (!signal) {
+      return 'idle';
+    }
+    const token = (signal.job_status ?? signal.status ?? '').toLowerCase();
+    if (!token) {
+      return 'idle';
+    }
+    if (token === 'succeeded') {
+      return 'success';
+    }
+    if (token === 'failed' || token === 'skipped' || token === 'cancelled') {
+      return 'error';
+    }
+    if (token === 'running' || token === 'queued' || token === 'deferred') {
+      return 'loading';
+    }
+    return 'idle';
+  }, []);
+
+  const startBackgroundStatusPolling = useCallback(
+    (signal?: FullExecutionSignal | null) => {
+      activePollCancelRef.current?.();
+
+      if (!signal) {
+        return;
+      }
+      const datasetSource = sourceId;
+      if (!datasetSource || !nodeId) {
+        return;
+      }
+      const datasetSourceId = datasetSource as string;
+      const initialStatus = mapSignalToBackgroundStatus(signal);
+      if (initialStatus !== 'loading') {
+        return;
+      }
+      const jobId = signal.job_id;
+      if (!jobId) {
+        return;
+      }
+
+      let cancelled = false;
+      const poll = async (pollAfterSeconds?: number | null) => {
+        const delayMs = typeof pollAfterSeconds === 'number' && pollAfterSeconds > 0 ? pollAfterSeconds * 1000 : 5000;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        if (cancelled) {
+          return;
+        }
+        try {
+          const updatedSignal = await fetchFullExecutionStatus(datasetSourceId, jobId);
+          const nextStatus = mapSignalToBackgroundStatus(updatedSignal);
+          onUpdateNodeData?.(nodeId, { backgroundExecutionStatus: nextStatus });
+          if (nextStatus === 'loading') {
+            poll(updatedSignal?.poll_after_seconds ?? null);
+          }
+        } catch (error) {
+          console.warn('Failed to poll full dataset execution status:', error);
+          onUpdateNodeData?.(nodeId, { backgroundExecutionStatus: 'error' });
+        }
+      };
+
+      poll(signal.poll_after_seconds ?? null);
+
+      activePollCancelRef.current = () => {
+        cancelled = true;
+      };
+    },
+    [mapSignalToBackgroundStatus, nodeId, onUpdateNodeData, sourceId]
+  );
+
+  const mergeGraphSnapshotWithConfig = useCallback(
+    (
+      snapshot: { nodes: any[]; edges: any[] } | null | undefined,
+      targetNodeId: string,
+      nextConfig: Record<string, any>
+    ) => {
+      if (!snapshot) {
+        return null;
+      }
+
+      const sanitizedConfig = cloneConfig(nextConfig);
+      if (sanitizedConfig && typeof sanitizedConfig === 'object') {
+        delete (sanitizedConfig as Record<string, any>)[PENDING_CONFIRMATION_FLAG];
+      }
+
+      const patchedNodes = Array.isArray(snapshot.nodes)
+        ? snapshot.nodes.map((node) => {
+            if (!node || node.id !== targetNodeId) {
+              return node;
+            }
+
+            const nextData = {
+              ...(node.data ?? {}),
+              config: sanitizedConfig,
+              isConfigured: true,
+            };
+
+            return {
+              ...node,
+              data: nextData,
+            };
+          })
+        : snapshot.nodes;
+
+      return {
+        nodes: patchedNodes,
+        edges: Array.isArray(snapshot.edges) ? [...snapshot.edges] : snapshot.edges,
+      };
+    },
+    []
+  );
 
   const handleSave = useCallback(
     (options?: { closeModal?: boolean }) => {
@@ -102,18 +218,23 @@ export const useNodeSaveHandlers = ({
         onClose();
       }
 
-      if (sourceId && graphSnapshot && !isInspectionNode) {
+      const updatedGraphSnapshot = mergeGraphSnapshotWithConfig(graphSnapshot, nodeId, payload);
+
+      if (sourceId && updatedGraphSnapshot && !isInspectionNode) {
         onUpdateNodeData?.(nodeId, { backgroundExecutionStatus: 'loading' });
         triggerFullDatasetExecution({
           dataset_source_id: sourceId,
           graph: {
-            nodes: graphSnapshot.nodes || [],
-            edges: graphSnapshot.edges || [],
+            nodes: updatedGraphSnapshot.nodes || [],
+            edges: updatedGraphSnapshot.edges || [],
           },
           target_node_id: nodeId,
         })
-          .then(() => {
-            onUpdateNodeData?.(nodeId, { backgroundExecutionStatus: 'success' });
+          .then((response) => {
+            const fullExecutionSignal = response?.signals?.full_execution;
+            const nextStatus = mapSignalToBackgroundStatus(fullExecutionSignal);
+            onUpdateNodeData?.(nodeId, { backgroundExecutionStatus: nextStatus });
+            startBackgroundStatusPolling(fullExecutionSignal);
           })
           .catch((error: unknown) => {
             onUpdateNodeData?.(nodeId, { backgroundExecutionStatus: 'error' });
@@ -132,6 +253,7 @@ export const useNodeSaveHandlers = ({
       onUpdateConfig,
       onUpdateNodeData,
       sourceId,
+      mergeGraphSnapshotWithConfig,
     ]
   );
 

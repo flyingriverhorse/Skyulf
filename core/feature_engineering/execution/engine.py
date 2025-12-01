@@ -32,6 +32,65 @@ from core.feature_engineering.split_handler import detect_splits, log_split_proc
 
 logger = logging.getLogger(__name__)
 
+PENDING_CONFIGURATION_TOKEN = "pending configuration"
+
+
+def summarize_pending_configuration(applied_steps: List[str]) -> List[str]:
+    pending_nodes: List[str] = []
+    for step in applied_steps or []:
+        normalized = (step or "").strip()
+        if not normalized:
+            continue
+        if PENDING_CONFIGURATION_TOKEN not in normalized.lower():
+            continue
+        label = normalized.split(":", 1)[0].strip()
+        if label and label not in pending_nodes:
+            pending_nodes.append(label)
+    return pending_nodes
+
+
+def apply_pending_configuration_signal(
+    signal: FullExecutionSignal,
+    *,
+    applied_steps: List[str],
+) -> FullExecutionSignal:
+    pending_nodes = summarize_pending_configuration(applied_steps)
+    if not pending_nodes:
+        return signal
+
+    if len(pending_nodes) == 1:
+        pending_summary = pending_nodes[0]
+    elif len(pending_nodes) == 2:
+        pending_summary = f"{pending_nodes[0]} and {pending_nodes[1]}"
+    else:
+        remaining = len(pending_nodes) - 2
+        plural = "node" if remaining == 1 else "nodes"
+        pending_summary = f"{pending_nodes[0]}, {pending_nodes[1]} and {remaining} other {plural}"
+
+    reason = (
+        f"Pending configuration detected for {pending_summary}. "
+        "Save each node's settings before running the full dataset."
+    )
+
+    warnings = list(signal.warnings or [])
+    if "pending_configuration" not in warnings:
+        warnings.append("pending_configuration")
+
+    status = "failed" if signal.status == "succeeded" else signal.status
+    job_status = signal.job_status
+    if job_status:
+        job_status = "failed"
+
+    return signal.model_copy(
+        update={
+            "status": status,
+            "reason": reason,
+            "warnings": warnings,
+            "job_status": job_status,
+            "applied_steps": applied_steps,
+        }
+    )
+
 
 def invoke_node_transform(
     catalog_type: str,
@@ -389,6 +448,7 @@ async def run_full_dataset_execution(
     # Build signal
     signal = FullExecutionSignal(
         status="succeeded",
+        job_status="succeeded",
         job_id=pipeline_id,
         reason="Full execution completed",
         total_rows=total_rows,
@@ -396,7 +456,9 @@ async def run_full_dataset_execution(
         applied_steps=steps,
         dataset_source_id=dataset_source_id,
     )
-    
+
+    signal = apply_pending_configuration_signal(signal, applied_steps=steps)
+
     return signal, len(transformed_frame)
 
     return frame_result, signals, modeling_metadata
