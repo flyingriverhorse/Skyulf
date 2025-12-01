@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Search, X, ChevronDown, ChevronRight, SlidersHorizontal, Layers } from 'lucide-react';
 import type { FeatureNodeCatalogEntry } from '../api';
 
 interface FeatureCanvasSidebarProps {
@@ -97,8 +98,12 @@ export const FeatureCanvasSidebar: React.FC<FeatureCanvasSidebarProps> = ({ node
   return (
     <div className="feature-canvas-sidebar" role="presentation">
       <header className="feature-canvas-sidebar__header">
-  <h3>Available steps</h3>
-        <div className="feature-canvas-sidebar__search">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+          <Layers size={20} className="text-muted" />
+          <h3 style={{ margin: 0 }}>Available steps</h3>
+        </div>
+        <div className="feature-canvas-sidebar__search" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <Search size={16} style={{ position: 'absolute', left: '12px', color: '#9ca3af', pointerEvents: 'none' }} />
           <input
             type="search"
             value={query}
@@ -106,6 +111,7 @@ export const FeatureCanvasSidebar: React.FC<FeatureCanvasSidebarProps> = ({ node
             placeholder="Search by name, tag, or output"
             className="feature-canvas-sidebar__search-input"
             aria-label="Search available steps"
+            style={{ paddingLeft: '36px' }}
           />
           {query && (
             <button
@@ -113,8 +119,9 @@ export const FeatureCanvasSidebar: React.FC<FeatureCanvasSidebarProps> = ({ node
               className="feature-canvas-sidebar__search-clear"
               onClick={() => setQuery('')}
               aria-label="Clear search"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', right: '8px' }}
             >
-              ×
+              <X size={14} />
             </button>
           )}
         </div>
@@ -140,8 +147,8 @@ export const FeatureCanvasSidebar: React.FC<FeatureCanvasSidebarProps> = ({ node
                   </span>
                   <span className="feature-canvas-sidebar__section-meta">
                     {entries.length}
-                    <span className="feature-canvas-sidebar__section-arrow" data-expanded={isExpanded}>
-                      ▾
+                    <span className="feature-canvas-sidebar__section-arrow" data-expanded={isExpanded} style={{ display: 'flex', alignItems: 'center' }}>
+                      {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </span>
                   </span>
                 </button>
@@ -171,7 +178,8 @@ export const FeatureCanvasSidebar: React.FC<FeatureCanvasSidebarProps> = ({ node
                               </span>
                             ) : null}
                             {node.parameters && node.parameters.length > 0 ? (
-                              <span className="feature-canvas-sidebar__chip">
+                              <span className="feature-canvas-sidebar__chip" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <SlidersHorizontal size={12} />
                                 {node.parameters.length} param{node.parameters.length > 1 ? 's' : ''}
                               </span>
                             ) : null}

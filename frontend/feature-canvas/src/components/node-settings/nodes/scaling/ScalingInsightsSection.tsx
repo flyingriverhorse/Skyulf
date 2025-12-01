@@ -1,4 +1,5 @@
 import React from 'react';
+import { Trash2 } from 'lucide-react';
 import { CheckboxInput } from '../../ui/FormFields';
 import type { ScalingMethodDetail, ScalingMethodName } from '../../../../api';
 import type {
@@ -84,7 +85,9 @@ export const ScalingInsightsSection: React.FC<ScalingInsightsSectionProps> = ({
             className="btn btn-outline-secondary"
             onClick={onClearOverrides}
             disabled={!scalingOverrideCount}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
+            <Trash2 size={14} />
             Clear overrides
           </button>
         </div>

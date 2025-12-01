@@ -19,7 +19,9 @@ from core.feature_engineering.modeling.hyperparameter_tuning.jobs.status import 
 )
 from core.feature_engineering.modeling.hyperparameter_tuning.tasks import (
     dispatch_hyperparameter_tuning_job,
+    cancel_tuning_task,
 )
+from config import get_settings
 from core.feature_engineering.schemas import (
     HyperparameterTuningJobBatchResponse,
     HyperparameterTuningJobCreate,
@@ -76,6 +78,37 @@ async def enqueue_tuning_job(
         for job in created_jobs
     ]
     return HyperparameterTuningJobBatchResponse(jobs=response_jobs, total=len(response_jobs))
+
+@router.post("/hyperparameter-tuning-jobs/{job_id}/cancel", status_code=status.HTTP_202_ACCEPTED)
+async def cancel_tuning_job(
+    job_id: str,
+    session: AsyncSession = Depends(get_async_session),
+) -> Dict[str, str]:
+    """
+    Cancel a running tuning job.
+    
+    If JOB_CANCELLATION_ENABLED is False (e.g. on Windows), this returns a 501 Not Implemented.
+    """
+    if not get_settings().JOB_CANCELLATION_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Cancellation is disabled on Windows/Solo pool. Set JOB_CANCELLATION_ENABLED=True in config to force it.",
+        )
+
+    job = await get_tuning_job(session, job_id)
+    if not job:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tuning job not found")
+
+    if job.status not in [HyperparameterTuningJobStatus.QUEUED, HyperparameterTuningJobStatus.RUNNING]:
+        return {"message": f"Job is already {job.status}, no cancellation needed."}
+
+    # Mark as cancelled in DB immediately
+    await update_tuning_job_status(session, job, status=HyperparameterTuningJobStatus.CANCELLED)
+    
+    # Send revocation signal
+    cancel_tuning_task(job_id)
+
+    return {"message": "Cancellation signal sent"}
 
 @router.get(
     "/hyperparameter-tuning-jobs/{job_id}",

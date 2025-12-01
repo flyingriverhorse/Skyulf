@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import type { FeatureNodeParameter } from '../../../../api';
 import type { PreviewState } from '../dataset/DataSnapshotSection';
 
@@ -209,8 +210,10 @@ export const TrainTestSplitSection: React.FC<TrainTestSplitSectionProps> = ({
 
       {/* Connection status */}
       {!hasReachableSource && (
-        <div className="node-settings__warning">
-          <span className="node-settings__warning-icon">⚠</span>
+        <div className="node-settings__warning" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span className="node-settings__warning-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <AlertTriangle size={16} />
+          </span>
           Connect this node to a data source to configure the split.
         </div>
       )}

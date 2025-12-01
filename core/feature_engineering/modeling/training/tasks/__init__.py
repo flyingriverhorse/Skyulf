@@ -16,7 +16,12 @@ from sklearn.metrics import (
 from ...shared import _prepare_training_data, _resolve_training_inputs
 from ...shared import evaluation as _shared_evaluation
 from .execution import _train_and_save_model
-from .workflow import _run_training_workflow, dispatch_training_job, train_model
+from .workflow import (
+    _run_training_workflow,
+    dispatch_training_job,
+    train_model,
+    cancel_training_task,
+)
 
 def _classification_metrics(model, X, y):
     """Proxy to shared implementation for backward compatibility."""
@@ -48,6 +53,7 @@ __all__ = [
     "accuracy_score",
     "average_precision_score",
     "dispatch_training_job",
+    "cancel_training_task",
     "f1_score",
     "mean_absolute_error",
     "mean_absolute_percentage_error",

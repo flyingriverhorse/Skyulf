@@ -1,4 +1,5 @@
 import React from 'react';
+import { Trash2 } from 'lucide-react';
 import { CheckboxInput, NumberInput } from '../../ui/FormFields';
 import type {
   OutlierMethodDetail,
@@ -167,7 +168,9 @@ export const OutlierInsightsSection: React.FC<OutlierInsightsSectionProps> = ({
             className="btn btn-outline-secondary"
             onClick={onClearOverrides}
             disabled={!outlierHasOverrides}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
+            <Trash2 size={14} />
             Clear overrides
           </button>
         </div>

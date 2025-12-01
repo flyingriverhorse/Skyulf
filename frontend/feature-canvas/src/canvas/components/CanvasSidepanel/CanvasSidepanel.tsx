@@ -1,4 +1,5 @@
 import React from 'react';
+import { Save, Trash2, RotateCw } from 'lucide-react';
 import type { DatasetSourceSummary, FeaturePipelineResponse } from '../../../api';
 import type { SaveFeedback } from '../../types/feedback';
 import { formatRelativeTime, formatTimestamp } from '../../utils/time';
@@ -130,8 +131,9 @@ export const CanvasSidepanel: React.FC<CanvasSidepanelProps> = ({
               disabled={!canClearCanvas}
               aria-label="Clean all nodes"
               title={canClearCanvas ? 'Remove all nodes and edges from the canvas' : 'Nothing to clean yet'}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
-              <span aria-hidden="true">🧹</span>
+              <Trash2 size={16} />
               <span>Clean all nodes</span>
             </button>
           </div>
@@ -145,8 +147,9 @@ export const CanvasSidepanel: React.FC<CanvasSidepanelProps> = ({
                 disabled={isHistoryLoading || !activeSourceId}
                 aria-label="Refresh history"
                 title="Refresh history"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                ⟳
+                <RotateCw size={16} />
               </button>
               <button
                 type="button"
@@ -155,8 +158,9 @@ export const CanvasSidepanel: React.FC<CanvasSidepanelProps> = ({
                 disabled={isSaveDisabled}
                 aria-label={saveButtonLabel}
                 title={saveButtonLabel}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                💾
+                <Save size={16} />
               </button>
             </div>
           </div>

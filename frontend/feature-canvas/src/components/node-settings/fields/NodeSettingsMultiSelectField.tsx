@@ -1,4 +1,5 @@
 import React from 'react';
+import { X } from 'lucide-react';
 import { FeatureNodeParameter } from '../../../api';
 import { DropMissingColumnsSection } from '../nodes/drop_col_rows/DropMissingColumnsSection';
 import {
@@ -257,8 +258,9 @@ export const NodeSettingsMultiSelectField: React.FC<NodeSettingsMultiSelectField
                   type="button"
                   onClick={() => handleRemoveColumn(column)}
                   aria-label={`Remove ${column}`}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  ×
+                  <X size={12} />
                 </button>
               </span>
             ))}

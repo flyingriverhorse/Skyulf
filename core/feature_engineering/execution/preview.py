@@ -91,6 +91,12 @@ def resolve_preview_sampling(
     if requested_sample_size < 0:
         requested_sample_size = 0
 
+    # If this is a full execution request (sample_size=0), we must NOT load the full dataset
+    # in the main thread. Instead, we load a small sample for the immediate response,
+    # and let maybe_collect_full_execution dispatch the background job.
+    if requested_sample_size == 0 and include_preview_rows:
+        requested_sample_size = DEFAULT_SAMPLE_CAP
+
     effective_sample_size = requested_sample_size if include_preview_rows else 0
     if include_preview_rows and target_catalog_type == "data_preview" and effective_sample_size <= 0:
         effective_sample_size = DEFAULT_SAMPLE_CAP
@@ -156,101 +162,9 @@ def build_full_preview_signal(
     return signal, total_rows_actual
 
 
-def should_defer_full_execution(total_rows_estimate: Optional[int]) -> bool:
-    return bool(total_rows_estimate and total_rows_estimate > FULL_DATASET_EXECUTION_ROW_LIMIT)
 
 
-def _log_background_exception(task: asyncio.Task) -> None:  # pragma: no cover - background logging
-    try:
-        task.result()
-    except Exception:
-        logger.exception("Full dataset background execution task failed")
-
-
-async def _run_full_execution_job(job: FullExecutionJob) -> None:
-    await full_execution_job_store.mark_running(
-        job.id,
-        reason="Full dataset execution running in background.",
-        poll_after_seconds=4,
-    )
-    try:
-        session_factory = db_engine.async_session_factory
-        if session_factory is None:
-            raise RuntimeError("Async session factory is not initialized")
-
-        async with session_factory() as job_session:
-            full_frame, full_meta = await load_dataset_frame(
-                job_session,
-                job.dataset_source_id,
-                sample_size=0,
-                execution_mode="full",
-            )
-
-        # Generate pipeline ID for transformer storage
-        pipeline_id = generate_pipeline_id(job.dataset_source_id, job.graph_nodes, job.graph_edges)
-
-        _, applied_steps, _, _ = run_pipeline_execution(
-            full_frame,
-            job.execution_order,
-            job.node_map,
-            pipeline_id=pipeline_id,
-            collect_signals=False,
-        )
-
-        processed_rows = int(full_frame.shape[0])
-        total_rows_full = coerce_int(full_meta.get("total_rows"), processed_rows)
-
-        await full_execution_job_store.mark_completed(
-            job.id,
-            status="succeeded",
-            signal_updates={
-                "status": "succeeded",
-                "reason": "Full dataset execution completed in background.",
-                "processed_rows": processed_rows,
-                "total_rows": total_rows_full,
-                "applied_steps": applied_steps,
-                "warnings": [],
-                "poll_after_seconds": None,
-            },
-        )
-    except MemoryError:
-        await full_execution_job_store.mark_completed(
-            job.id,
-            status="failed",
-            signal_updates={
-                "status": "failed",
-                "reason": "Full dataset execution failed due to insufficient memory.",
-                "warnings": ["memory_error"],
-                "poll_after_seconds": None,
-            },
-        )
-    except Exception as exc:
-        logger.exception(
-            "Full dataset background execution failed for dataset %s (job %s)",
-            job.dataset_source_id,
-            job.id,
-        )
-        await full_execution_job_store.mark_completed(
-            job.id,
-            status="failed",
-            signal_updates={
-                "status": "failed",
-                "reason": f"Full dataset execution failed: {exc}",
-                "warnings": ["background_failure"],
-                "poll_after_seconds": None,
-            },
-        )
-
-
-def schedule_full_execution_job(job: FullExecutionJob) -> None:
-    if job.task and not job.task.done():
-        return
-    task = asyncio.create_task(_run_full_execution_job(job))
-    job.task = task
-    task.add_done_callback(_log_background_exception)
-
-
-async def defer_full_execution_for_limit(
+async def submit_full_execution_job(
     *,
     applied_steps: List[str],
     dataset_source_id: str,
@@ -262,10 +176,7 @@ async def defer_full_execution_for_limit(
     total_rows_estimate: int,
     preview_total_rows: int,
 ) -> Tuple[FullExecutionSignal, int]:
-    defer_reason = (
-        f"Full dataset execution deferred – {total_rows_estimate:,} rows exceeds limit "
-        f"{FULL_DATASET_EXECUTION_ROW_LIMIT:,}."
-    )
+    defer_reason = "Full dataset execution running in background."
     append_unique_step(applied_steps, defer_reason)
 
     job, job_signal, _ = await full_execution_job_store.ensure_job(
@@ -277,56 +188,17 @@ async def defer_full_execution_for_limit(
         graph_nodes=graph_nodes,
         graph_edges=graph_edges,
         defer_reason=defer_reason,
+        applied_steps=applied_steps,
+        preview_total_rows=preview_total_rows,
     )
 
     if job_signal.reason and job_signal.reason.strip() != defer_reason.strip():
         append_unique_step(applied_steps, job_signal.reason)
 
-    schedule_full_execution_job(job)
     return job_signal, preview_total_rows
 
 
-async def run_full_dataset_execution(
-    *,
-    session: AsyncSession,
-    dataset_source_id: str,
-    execution_order: List[str],
-    node_map: Dict[str, Dict[str, Any]],
-    pipeline_id: str,
-    applied_steps: List[str],
-    preview_total_rows: int,
-) -> Tuple[FullExecutionSignal, int]:
-    full_frame, full_meta = await load_dataset_frame(
-        session,
-        dataset_source_id,
-        sample_size=0,
-        execution_mode="full",
-    )
 
-    _, full_applied_steps, _, _ = run_pipeline_execution(
-        full_frame,
-        execution_order,
-        node_map,
-        pipeline_id=pipeline_id,
-        collect_signals=False,
-    )
-
-    processed_rows = int(full_frame.shape[0])
-    total_rows_full = coerce_int(full_meta.get("total_rows"), processed_rows)
-    signal = FullExecutionSignal(
-        status="succeeded",
-        total_rows=total_rows_full,
-        processed_rows=processed_rows,
-        applied_steps=full_applied_steps,
-        dataset_source_id=dataset_source_id,
-        last_updated=utcnow(),
-    )
-
-    if total_rows_full:
-        preview_total_rows = total_rows_full
-
-    append_unique_step(applied_steps, f"Full dataset run processed {processed_rows:,} row(s).")
-    return signal, preview_total_rows
 
 
 def build_failed_full_execution_signal(
@@ -385,49 +257,17 @@ async def maybe_collect_full_execution(
         return signal, updated_total_rows
 
     total_rows_estimate = preview_total_rows if preview_total_rows > 0 else None
-    if should_defer_full_execution(total_rows_estimate):
-        signal, updated_total_rows = await defer_full_execution_for_limit(
-            applied_steps=applied_steps,
-            dataset_source_id=dataset_source_id,
-            execution_order=execution_order,
-            node_map=node_map,
-            payload=payload,
-            graph_nodes=graph_nodes,
-            graph_edges=graph_edges,
-            total_rows_estimate=total_rows_estimate or 0,
-            preview_total_rows=preview_total_rows,
-        )
-        return signal, updated_total_rows
-
-    try:
-        signal, updated_total_rows = await run_full_dataset_execution(
-            session=session,
-            dataset_source_id=dataset_source_id,
-            execution_order=execution_order,
-            node_map=node_map,
-            pipeline_id=pipeline_id,
-            applied_steps=applied_steps,
-            preview_total_rows=preview_total_rows,
-        )
-        return signal, updated_total_rows
-    except MemoryError:
-        reason = "Full dataset execution failed due to insufficient memory."
-        signal = build_failed_full_execution_signal(
-            status="failed",
-            reason=reason,
-            dataset_source_id=dataset_source_id,
-            total_rows_estimate=total_rows_estimate,
-            warnings=["memory_error"],
-        )
-        append_unique_step(applied_steps, reason)
-        return signal, preview_total_rows
-    except Exception as exc:
-        message = f"Full dataset execution failed: {exc}"
-        signal = build_failed_full_execution_signal(
-            status="failed",
-            reason=str(exc),
-            dataset_source_id=dataset_source_id,
-            total_rows_estimate=total_rows_estimate,
-        )
-        append_unique_step(applied_steps, message)
-        return signal, preview_total_rows
+    
+    # Always submit to background job for full execution requests
+    signal, updated_total_rows = await submit_full_execution_job(
+        applied_steps=applied_steps,
+        dataset_source_id=dataset_source_id,
+        execution_order=execution_order,
+        node_map=node_map,
+        payload=payload,
+        graph_nodes=graph_nodes,
+        graph_edges=graph_edges,
+        total_rows_estimate=total_rows_estimate or 0,
+        preview_total_rows=preview_total_rows,
+    )
+    return signal, updated_total_rows

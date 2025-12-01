@@ -43,6 +43,7 @@ from core.database.models import get_database_session
 from core.feature_engineering.schemas import TrainingJobStatus
 from core.feature_engineering.pipeline_store_singleton import get_pipeline_store
 from core.feature_engineering.modeling.shared import (
+    celery_app,
     _build_metadata_update,
     _persist_training_artifact,
     _resolve_problem_type_hint,
@@ -1362,6 +1363,8 @@ async def _resolve_training_inputs(session, job) -> Tuple[pd.DataFrame, Dict[str
     """Load dataset and apply pipeline transformations up to the training node."""
 
     from core.feature_engineering import routes as fe_routes  # Lazy import to avoid circular deps
+    from core.feature_engineering.execution.data import load_dataset_frame
+    from core.feature_engineering.execution.engine import run_pipeline_execution
 
     graph_payload = job.graph or {}
     graph_nodes = graph_payload.get("nodes") or []
@@ -1377,7 +1380,7 @@ async def _resolve_training_inputs(session, job) -> Tuple[pd.DataFrame, Dict[str
 
     upstream_order = execution_order[:-1] if execution_order[-1] == job.node_id else execution_order
 
-    dataset_frame, dataset_meta = await fe_routes._load_dataset_frame(
+    dataset_frame, dataset_meta = await load_dataset_frame(
         session,
         job.dataset_source_id,
         sample_size=0,
@@ -1385,7 +1388,7 @@ async def _resolve_training_inputs(session, job) -> Tuple[pd.DataFrame, Dict[str
     )
 
     if upstream_order:
-        dataset_frame, _, _, _ = fe_routes._run_pipeline_execution(
+        dataset_frame, _, _, _ = run_pipeline_execution(
             dataset_frame,
             upstream_order,
             node_map,
@@ -1607,5 +1610,18 @@ def train_model(job_id: str) -> None:
 def dispatch_training_job(job_id: str) -> None:
     """Queue a Celery task for the given job identifier."""
 
-    train_model.delay(job_id)
+    # Force task_id to match job_id for easier revocation
+    train_model.apply_async(args=[job_id], task_id=job_id)
+
+
+def cancel_training_task(job_id: str) -> None:
+    """
+    Send a revocation signal to the Celery worker for this job.
+    
+    Uses terminate=True to force kill the worker process if it's blocking.
+    This is required for 'solo' pools or blocking sklearn calls, though
+    it may have side effects (worker restart).
+    """
+    celery_app.control.revoke(job_id, terminate=True)
+
 

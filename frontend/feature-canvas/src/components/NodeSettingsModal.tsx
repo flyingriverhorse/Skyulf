@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Info } from 'lucide-react';
 import type { Node } from 'react-flow-renderer';
 import { DropMissingSettingsSection } from './node-settings/nodes/drop_col_rows/DropMissingSettingsSection';
 
@@ -10,7 +11,6 @@ import { DataSnapshotSection } from './node-settings/nodes/dataset/DataSnapshotS
 import { DatasetProfileSection } from './node-settings/nodes/dataset/datasetProfile';
 import { NodeSettingsHeader } from './node-settings/layout/NodeSettingsHeader';
 import { NodeSettingsFooter } from './node-settings/layout/NodeSettingsFooter';
-import { NodeDetailsSection } from './node-settings/layout/NodeDetailsSection';
 import { ensureArrayOfString } from './node-settings/sharedUtils';
 import {
   formatMetricValue,
@@ -849,8 +849,11 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
           />
           {dataConsistencyHint && (
             <section className="canvas-modal__section">
-              <p className="canvas-modal__note">
-                <strong>{dataConsistencyHint.title}.</strong> {dataConsistencyHint.body}
+              <p className="canvas-modal__note" style={{ display: 'flex', alignItems: 'start', gap: '0.5rem' }}>
+                <Info size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+                <span>
+                  <strong>{dataConsistencyHint.title}.</strong> {dataConsistencyHint.body}
+                </span>
               </p>
             </section>
           )}
@@ -1521,7 +1524,6 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               onRefreshPreview={handleRefreshPreview}
             />
           )}
-          <NodeDetailsSection metadata={metadata} />
 
         </div>
 

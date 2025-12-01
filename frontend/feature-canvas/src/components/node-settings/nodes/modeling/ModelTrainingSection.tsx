@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
 	FeatureGraph,
@@ -1034,12 +1035,18 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 					background: 'rgba(251, 146, 60, 0.1)', 
 					borderLeft: '3px solid rgba(251, 146, 60, 0.8)',
 					padding: '0.75rem 1rem',
-					margin: '0.75rem 0'
+					margin: '0.75rem 0',
+                    display: 'flex',
+                    alignItems: 'start',
+                    gap: '0.5rem'
 				}}>
-					<strong>⚠️ Unsaved Configuration Changes</strong>
-					<br />
-					Your changes will create a new training pipeline. Previous jobs remain under the old configuration.
-					Jobs will auto-save when you launch training.
+                    <AlertTriangle size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+                    <span>
+                        <strong>Unsaved Configuration Changes</strong>
+                        <br />
+                        Your changes will create a new training pipeline. Previous jobs remain under the old configuration.
+                        Jobs will auto-save when you launch training.
+                    </span>
 				</p>
 			)}
 
@@ -1145,9 +1152,12 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 							gap: '0.75rem',
 						}}
 					>
-						<div>
-							<strong>⚠️ {scalingWarning.headline}</strong>
-							<p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem' }}>{scalingWarning.summary}</p>
+						<div style={{ display: 'flex', gap: '0.5rem', alignItems: 'start' }}>
+                            <AlertTriangle size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+                            <div>
+                                <strong>{scalingWarning.headline}</strong>
+                                <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem' }}>{scalingWarning.summary}</p>
+                            </div>
 						</div>
 						<button
 							type="button"

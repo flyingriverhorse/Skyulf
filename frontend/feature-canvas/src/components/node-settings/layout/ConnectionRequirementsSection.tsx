@@ -1,4 +1,5 @@
 import React from 'react';
+import { Check, AlertTriangle, Circle } from 'lucide-react';
 import type { ConnectionInfoSnapshot } from '../hooks';
 
 type ConnectionRequirementsSectionProps = {
@@ -27,11 +28,17 @@ export const ConnectionRequirementsSection: React.FC<ConnectionRequirementsSecti
         className={
           connectionReady ? 'canvas-modal__note' : 'canvas-modal__note canvas-modal__note--warning'
         }
+        style={{ display: 'flex', alignItems: 'start', gap: '0.5rem' }}
       >
-        <strong>{connectionReady ? 'Ready to execute.' : 'Missing required connections.'}</strong>{' '}
-        {connectionReady
-          ? 'All required inputs are connected; you can continue configuring this node.'
-          : 'Connect the required inputs listed below before running training or evaluation workflows.'}
+        <span style={{ marginTop: '2px' }}>
+          {connectionReady ? <Check size={16} /> : <AlertTriangle size={16} />}
+        </span>
+        <span>
+          <strong>{connectionReady ? 'Ready to execute.' : 'Missing required connections.'}</strong>{' '}
+          {connectionReady
+            ? 'All required inputs are connected; you can continue configuring this node.'
+            : 'Connect the required inputs listed below before running training or evaluation workflows.'}
+        </span>
       </p>
       {connectionInfo.inputs && connectionInfo.inputs.length > 0 && (
         <div className="canvas-modal__note">
@@ -41,7 +48,8 @@ export const ConnectionRequirementsSection: React.FC<ConnectionRequirementsSecti
               const isConnected = connectedInputHandles.has(handle.key);
               const isRequired = handle.required !== false;
               return (
-                <li key={`inputs-${handle.key}`}>
+                <li key={`inputs-${handle.key}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {isConnected ? <Check size={14} /> : isRequired ? <AlertTriangle size={14} /> : <Circle size={14} />}
                   <span>{handle.label}</span>
                   <span>{' - '}</span>
                   <span>{isConnected ? 'Connected' : isRequired ? 'Missing' : 'Optional'}</span>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Trash2 } from 'lucide-react';
 import type { SkewnessMethodStatus } from '../../../../api';
 import {
   SKEWNESS_METHOD_ORDER,
@@ -283,7 +284,13 @@ export const SkewnessInsightsSection: React.FC<SkewnessInsightsSectionProps> = (
                 : 'No transformations configured yet.'}
             </span>
             {skewnessTransformationsCount > 0 && (
-              <button type="button" className="btn btn-outline-secondary" onClick={onClearSelections}>
+              <button 
+                type="button" 
+                className="btn btn-outline-secondary" 
+                onClick={onClearSelections}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Trash2 size={14} />
                 Clear selections
               </button>
             )}

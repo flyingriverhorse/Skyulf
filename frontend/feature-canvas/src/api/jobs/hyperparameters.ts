@@ -45,6 +45,37 @@ export async function createHyperparameterTuningJob(
   return { jobs: [], total: 0 };
 }
 
+export async function cancelHyperparameterTuningJob(jobId: string): Promise<void> {
+  if (!jobId) {
+    throw new Error('jobId is required');
+  }
+
+  const response = await fetch(
+    `/ml-workflow/api/hyperparameter-tuning-jobs/${encodeURIComponent(jobId)}/cancel`,
+    {
+      method: 'POST',
+      credentials: 'include',
+    }
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    // Try to parse JSON error detail if possible
+    let errorMessage = detail;
+    try {
+      const json = JSON.parse(detail);
+      if (json.detail) errorMessage = json.detail;
+    } catch (e) {
+      // ignore
+    }
+
+    if (response.status === 501) {
+      throw new Error(errorMessage || 'Cancellation is not supported in this environment.');
+    }
+    throw new Error(errorMessage || 'Failed to cancel tuning job');
+  }
+}
+
 export async function fetchHyperparameterTuningJob(
   jobId: string
 ): Promise<HyperparameterTuningJobResponse> {

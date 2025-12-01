@@ -4,6 +4,7 @@ from .workflow import (
     dispatch_hyperparameter_tuning_job,
     run_hyperparameter_tuning,
     _run_hyperparameter_tuning_workflow,
+    cancel_tuning_task,
 )
 from .optuna_support import (
     OptunaSearchCV,
