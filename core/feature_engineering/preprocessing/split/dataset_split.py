@@ -62,14 +62,23 @@ def apply_train_test_split(
     stratify_col = None
     if stratify_enabled and target_column and target_column in frame.columns:
         stratify_col = frame[target_column]
-        unique_values = stratify_col.nunique()
-        if unique_values < 2:
+        
+        # Check for missing values in target which breaks stratification
+        if stratify_col.isnull().any():
             logger.warning(
-                "Cannot stratify with target column '%s': only %s unique values",
+                "Cannot stratify with target column '%s': contains missing values",
                 target_column,
-                unique_values,
             )
             stratify_col = None
+        else:
+            unique_values = stratify_col.nunique()
+            if unique_values < 2:
+                logger.warning(
+                    "Cannot stratify with target column '%s': only %s unique values",
+                    target_column,
+                    unique_values,
+                )
+                stratify_col = None
 
     working_frame = frame.copy()
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { RotateCcw, Save } from 'lucide-react';
+import { RotateCcw, Save, Loader2 } from 'lucide-react';
 
 type NodeSettingsFooterProps = {
   onClose: () => void;
@@ -7,9 +7,10 @@ type NodeSettingsFooterProps = {
   onResetNode: () => void;
   showSaveButton: boolean;
   canSave: boolean;
-  onSave: () => void;
+  onSave: (options?: { closeModal?: boolean }) => void;
   isBusy: boolean;
   busyLabel?: string | null;
+  isSaving?: boolean;
 };
 
 export const NodeSettingsFooter: React.FC<NodeSettingsFooterProps> = ({
@@ -21,6 +22,7 @@ export const NodeSettingsFooter: React.FC<NodeSettingsFooterProps> = ({
   onSave,
   isBusy,
   busyLabel,
+  isSaving = false,
 }) => (
   <div className="canvas-modal__footer">
     <div
@@ -55,12 +57,21 @@ export const NodeSettingsFooter: React.FC<NodeSettingsFooterProps> = ({
         <button 
           type="button" 
           className="btn btn-primary" 
-          onClick={onSave} 
-          disabled={!canSave}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          onClick={() => onSave({ closeModal: false })} 
+          disabled={!canSave || isSaving}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: '180px', justifyContent: 'center' }}
         >
-          <Save size={16} />
-          Save changes
+          {isSaving ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save size={16} />
+              Save and run changes
+            </>
+          )}
         </button>
       )}
     </div>

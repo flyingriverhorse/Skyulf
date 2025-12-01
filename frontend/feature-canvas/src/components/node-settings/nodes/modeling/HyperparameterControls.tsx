@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ModelHyperparameterField, HyperparameterTuningJobSummary } from '../../../../api';
 import type { HyperparamPreset } from './BestHyperparamsModal';
+import { AdvancedSettingsToggle } from '../../layout/AdvancedSettingsToggle';
 
 type HyperparameterControlsProps = {
 	modelType: string | null;
@@ -230,41 +231,6 @@ export const HyperparameterControls: React.FC<HyperparameterControlsProps> = ({
 						>
 							Browse tuned params
 						</button>
-						<button
-							type="button"
-							onClick={onToggleAdvanced}
-							style={{
-								padding: '0.5rem 1rem',
-								fontSize: '0.875rem',
-								fontWeight: '500',
-								color: showAdvanced ? '#fff' : 'rgba(148, 163, 184, 0.85)',
-								background: showAdvanced ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(15, 23, 42, 0.6)',
-								border: showAdvanced ? 'none' : '1px solid rgba(148, 163, 184, 0.45)',
-								borderRadius: '4px',
-								cursor: 'pointer',
-								transition: 'all 0.2s ease',
-								minWidth: '100px',
-								boxShadow: showAdvanced ? '0 4px 12px rgba(118, 75, 162, 0.25)' : 'none'
-							}}
-							onMouseEnter={(e) => {
-								if (showAdvanced) {
-									e.currentTarget.style.boxShadow = '0 6px 16px rgba(118, 75, 162, 0.35)';
-								} else {
-									e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.65)';
-									e.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)';
-								}
-							}}
-							onMouseLeave={(e) => {
-								if (showAdvanced) {
-									e.currentTarget.style.boxShadow = '0 4px 12px rgba(118, 75, 162, 0.25)';
-								} else {
-									e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.45)';
-									e.currentTarget.style.background = 'rgba(15, 23, 42, 0.6)';
-								}
-							}}
-						>
-							{showAdvanced ? '✓ Advanced' : 'Default'}
-						</button>
 					</div>
 				</div>
 			</div>
@@ -277,45 +243,21 @@ export const HyperparameterControls: React.FC<HyperparameterControlsProps> = ({
 					Failed to load hyperparameters: {error.message}
 				</p>
 			)}
-			{showAdvanced && hyperparamFields.length > 0 && (
-				<div style={{ 
-					gridColumn: '1 / -1',
-					padding: '1.25rem',
-					background: 'rgba(15, 23, 42, 0.25)',
-					border: '1px solid rgba(148, 163, 184, 0.2)',
-					borderRadius: '6px',
-					marginTop: '0.5rem'
-				}}>
-					<div style={{ 
-						marginBottom: '1rem',
-						paddingBottom: '0.75rem',
-						borderBottom: '2px solid rgba(102, 126, 234, 0.3)'
-					}}>
-						<h4 style={{ 
-							margin: '0 0 0.5rem 0', 
-							fontSize: '1rem',
-							fontWeight: '600',
-							color: '#e2e8f0'
-						}}>
-							Advanced Hyperparameters
-						</h4>
-						<p style={{ 
-							margin: '0', 
-							fontSize: '0.875rem', 
-							color: 'rgba(148, 163, 184, 0.85)',
-							lineHeight: '1.5'
-						}}>
-							Configure {modelType.replace(/_/g, ' ')} hyperparameters. Leave empty to use recommended defaults.
-						</p>
-					</div>
-					<div style={{ 
-						display: 'grid',
-						gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-						gap: '1rem'
-					}}>
-						{hyperparamFields.map(renderHyperparamField)}
-					</div>
-				</div>
+			
+			{hyperparamFields.length > 0 && (
+				<>
+					<AdvancedSettingsToggle
+						isOpen={showAdvanced}
+						onToggle={onToggleAdvanced}
+						label="Advanced Hyperparameters"
+						description={modelType ? `Configure ${modelType.replace(/_/g, ' ')} hyperparameters. Leave empty to use recommended defaults.` : 'Configure model hyperparameters.'}
+					/>
+					{showAdvanced && (
+						<div className="canvas-modal__parameter-grid" style={{ marginTop: '0.5rem' }}>
+							{hyperparamFields.map(renderHyperparamField)}
+						</div>
+					)}
+				</>
 			)}
 		</>
 	);

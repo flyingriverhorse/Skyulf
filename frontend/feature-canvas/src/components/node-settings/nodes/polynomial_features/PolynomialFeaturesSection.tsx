@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { FeatureNodeParameter, PolynomialFeaturesNodeSignal } from '../../../../api';
+import { AdvancedSettingsToggle } from '../../layout/AdvancedSettingsToggle';
 
 type PolynomialFeaturesSectionProps = {
   columnsParameter: FeatureNodeParameter | null;
@@ -24,20 +25,24 @@ export const PolynomialFeaturesSection: React.FC<PolynomialFeaturesSectionProps>
   renderParameterField,
   signal,
 }) => {
-  const parameterList = useMemo(() => {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const primaryParameters = useMemo(() => {
     return [
       columnsParameter,
       autoDetectParameter,
       degreeParameter,
+    ].filter((parameter): parameter is FeatureNodeParameter => Boolean(parameter));
+  }, [columnsParameter, autoDetectParameter, degreeParameter]);
+
+  const advancedParameters = useMemo(() => {
+    return [
       includeBiasParameter,
       interactionOnlyParameter,
       includeInputFeaturesParameter,
       outputPrefixParameter,
     ].filter((parameter): parameter is FeatureNodeParameter => Boolean(parameter));
   }, [
-    columnsParameter,
-    autoDetectParameter,
-    degreeParameter,
     includeBiasParameter,
     interactionOnlyParameter,
     includeInputFeaturesParameter,
@@ -69,10 +74,25 @@ export const PolynomialFeaturesSection: React.FC<PolynomialFeaturesSectionProps>
         Expand numeric features with polynomial powers and interaction terms to capture non-linear relations. Preview the
         node to inspect generated columns and adjust degree or interaction options as needed.
       </p>
-      {parameterList.length > 0 && (
+      {primaryParameters.length > 0 && (
         <div className="canvas-modal__parameter-grid">
-          {parameterList.map((parameter) => renderParameterField(parameter))}
+          {primaryParameters.map((parameter) => renderParameterField(parameter))}
         </div>
+      )}
+      {advancedParameters.length > 0 && (
+        <>
+          <AdvancedSettingsToggle
+            isOpen={showAdvanced}
+            onToggle={() => setShowAdvanced(!showAdvanced)}
+            label="Advanced polynomial settings"
+            description="Configure bias, interactions, and output naming"
+          />
+          {showAdvanced && (
+            <div className="canvas-modal__parameter-grid" style={{ marginTop: '1rem' }}>
+              {advancedParameters.map((parameter) => renderParameterField(parameter))}
+            </div>
+          )}
+        </>
       )}
       {skippedColumns.length > 0 && (
         <p className="canvas-modal__note canvas-modal__note--warning">
