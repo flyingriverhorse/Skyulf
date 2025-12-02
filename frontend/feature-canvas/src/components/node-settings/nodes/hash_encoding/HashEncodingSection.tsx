@@ -28,6 +28,7 @@ type HashEncodingSectionProps = {
   };
   columnsParameter: FeatureNodeParameter | null;
   autoDetectParameter: FeatureNodeParameter | null;
+  autoDetectValue?: boolean;
   maxCategoriesParameter: FeatureNodeParameter | null;
   bucketsParameter: FeatureNodeParameter | null;
   outputSuffixParameter: FeatureNodeParameter | null;
@@ -79,6 +80,7 @@ export const HashEncodingSection: React.FC<HashEncodingSectionProps> = ({
   metadata,
   columnsParameter,
   autoDetectParameter,
+  autoDetectValue,
   maxCategoriesParameter,
   bucketsParameter,
   outputSuffixParameter,
@@ -103,8 +105,20 @@ export const HashEncodingSection: React.FC<HashEncodingSectionProps> = ({
       previewState.data.signals.full_execution,
     );
 
-    if (details.length > 0) {
-      onPendingConfigurationWarning?.(details);
+    let relevantDetails = details;
+
+    // If auto-detect is enabled, suppress "columns not configured" warnings
+    if (autoDetectValue) {
+      relevantDetails = relevantDetails.filter((d) => !d.label.toLowerCase().includes('columns'));
+    }
+
+    // If columns are manually selected, suppress "columns not configured" warnings
+    if (selectedColumns && selectedColumns.length > 0) {
+      relevantDetails = relevantDetails.filter((d) => !d.label.toLowerCase().includes('columns'));
+    }
+
+    if (relevantDetails.length > 0) {
+      onPendingConfigurationWarning?.(relevantDetails);
     } else {
       onPendingConfigurationCleared?.();
     }
@@ -112,6 +126,8 @@ export const HashEncodingSection: React.FC<HashEncodingSectionProps> = ({
     previewState?.data?.signals?.full_execution,
     onPendingConfigurationWarning,
     onPendingConfigurationCleared,
+    autoDetectValue,
+    selectedColumns,
   ]);
 
   const recommendedColumns = useMemo(() => {

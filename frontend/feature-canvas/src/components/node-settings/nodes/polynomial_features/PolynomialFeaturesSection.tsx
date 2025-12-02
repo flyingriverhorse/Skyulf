@@ -10,6 +10,7 @@ import { AdvancedSettingsToggle } from '../../layout/AdvancedSettingsToggle';
 type PolynomialFeaturesSectionProps = {
   columnsParameter: FeatureNodeParameter | null;
   autoDetectParameter: FeatureNodeParameter | null;
+  autoDetectValue?: boolean;
   degreeParameter: FeatureNodeParameter | null;
   includeBiasParameter: FeatureNodeParameter | null;
   interactionOnlyParameter: FeatureNodeParameter | null;
@@ -27,6 +28,7 @@ type PolynomialFeaturesSectionProps = {
 export const PolynomialFeaturesSection: React.FC<PolynomialFeaturesSectionProps> = ({
   columnsParameter,
   autoDetectParameter,
+  autoDetectValue,
   degreeParameter,
   includeBiasParameter,
   interactionOnlyParameter,
@@ -48,8 +50,15 @@ export const PolynomialFeaturesSection: React.FC<PolynomialFeaturesSectionProps>
       previewState.data.signals.full_execution,
     );
 
-    if (details.length > 0) {
-      onPendingConfigurationWarning?.(details);
+    let relevantDetails = details;
+
+    // If auto-detect is enabled, suppress "columns not configured" warnings
+    if (autoDetectValue) {
+      relevantDetails = relevantDetails.filter((d) => !d.label.toLowerCase().includes('columns'));
+    }
+
+    if (relevantDetails.length > 0) {
+      onPendingConfigurationWarning?.(relevantDetails);
     } else {
       onPendingConfigurationCleared?.();
     }
@@ -57,6 +66,7 @@ export const PolynomialFeaturesSection: React.FC<PolynomialFeaturesSectionProps>
     previewState?.data?.signals?.full_execution,
     onPendingConfigurationWarning,
     onPendingConfigurationCleared,
+    autoDetectValue,
   ]);
 
   const [showAdvanced, setShowAdvanced] = useState(false);

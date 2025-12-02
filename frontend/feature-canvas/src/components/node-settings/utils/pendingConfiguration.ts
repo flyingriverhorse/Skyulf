@@ -3,6 +3,8 @@ import type { FullExecutionSignal } from '../../../api';
 const PENDING_CONFIGURATION_TOKEN = 'pending configuration';
 const NOT_CONFIGURED_TOKEN = 'not configured';
 const PENDING_REASON_TOKEN = 'pending configuration detected for ';
+const NO_COLUMNS_SELECTED_TOKEN = 'no categorical columns selected';
+const NO_COLUMNS_REASON_TOKEN = 'no columns selected for ';
 
 export type PendingConfigurationDetail = {
   label: string;
@@ -39,8 +41,12 @@ const parseStepReason = (step: string): string | null => {
   if (dashIndex >= 0) {
     return sanitizeLabel(trimmed.slice(dashIndex + 1));
   }
-  if (trimmed.toLowerCase().startsWith(PENDING_CONFIGURATION_TOKEN)) {
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith(PENDING_CONFIGURATION_TOKEN)) {
     return sanitizeLabel(trimmed.slice(PENDING_CONFIGURATION_TOKEN.length));
+  }
+  if (lower.startsWith(NO_COLUMNS_SELECTED_TOKEN)) {
+    return sanitizeLabel(trimmed.slice(NO_COLUMNS_SELECTED_TOKEN.length));
   }
   return sanitizeLabel(trimmed);
 };
@@ -55,10 +61,12 @@ const extractFromAppliedSteps = (steps: unknown): PendingConfigurationDetail[] =
       continue;
     }
     const normalized = step.trim();
+    const lower = normalized.toLowerCase();
     if (
       !normalized ||
-      (!normalized.toLowerCase().includes(PENDING_CONFIGURATION_TOKEN) &&
-        !normalized.toLowerCase().includes(NOT_CONFIGURED_TOKEN))
+      (!lower.includes(PENDING_CONFIGURATION_TOKEN) &&
+        !lower.includes(NOT_CONFIGURED_TOKEN) &&
+        !lower.includes(NO_COLUMNS_SELECTED_TOKEN))
     ) {
       continue;
     }
@@ -76,11 +84,19 @@ const extractFromReason = (reason?: string | null): PendingConfigurationDetail[]
     return [];
   }
   const normalizedReason = reason.toLowerCase();
-  const markerIndex = normalizedReason.indexOf(PENDING_REASON_TOKEN);
+  
+  let markerIndex = normalizedReason.indexOf(PENDING_REASON_TOKEN);
+  let tokenLength = PENDING_REASON_TOKEN.length;
+
+  if (markerIndex === -1) {
+    markerIndex = normalizedReason.indexOf(NO_COLUMNS_REASON_TOKEN);
+    tokenLength = NO_COLUMNS_REASON_TOKEN.length;
+  }
+
   if (markerIndex === -1) {
     return [];
   }
-  const sliceStart = markerIndex + PENDING_REASON_TOKEN.length;
+  const sliceStart = markerIndex + tokenLength;
   const terminalIndex = reason.indexOf('.', sliceStart);
   const summary = reason.substring(sliceStart, terminalIndex === -1 ? reason.length : terminalIndex).trim();
   if (!summary) {

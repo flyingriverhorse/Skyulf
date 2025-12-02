@@ -10,6 +10,7 @@ import { AdvancedSettingsToggle } from '../../layout/AdvancedSettingsToggle';
 type FeatureSelectionSectionProps = {
   columnsParameter: FeatureNodeParameter | null;
   autoDetectParameter: FeatureNodeParameter | null;
+  autoDetectValue?: boolean;
   targetColumnParameter: FeatureNodeParameter | null;
   methodParameter: FeatureNodeParameter | null;
   scoreFuncParameter: FeatureNodeParameter | null;
@@ -77,6 +78,7 @@ const formatColumnPreview = (columns: string[], limit = 8): string => {
 export const FeatureSelectionSection: React.FC<FeatureSelectionSectionProps> = ({
   columnsParameter,
   autoDetectParameter,
+  autoDetectValue,
   targetColumnParameter,
   methodParameter,
   scoreFuncParameter,
@@ -107,8 +109,15 @@ export const FeatureSelectionSection: React.FC<FeatureSelectionSectionProps> = (
       previewState.data.signals.full_execution,
     );
 
-    if (details.length > 0) {
-      onPendingConfigurationWarning?.(details);
+    let relevantDetails = details;
+
+    // If auto-detect is enabled, suppress "columns not configured" warnings
+    if (autoDetectValue) {
+      relevantDetails = relevantDetails.filter((d) => !d.label.toLowerCase().includes('columns'));
+    }
+
+    if (relevantDetails.length > 0) {
+      onPendingConfigurationWarning?.(relevantDetails);
     } else {
       onPendingConfigurationCleared?.();
     }
@@ -116,6 +125,7 @@ export const FeatureSelectionSection: React.FC<FeatureSelectionSectionProps> = (
     previewState?.data?.signals?.full_execution,
     onPendingConfigurationWarning,
     onPendingConfigurationCleared,
+    autoDetectValue,
   ]);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
