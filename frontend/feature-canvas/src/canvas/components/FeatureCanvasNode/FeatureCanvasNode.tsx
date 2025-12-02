@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useCallback, useMemo } from 'react';
 import { Handle, NodeProps, Position } from 'react-flow-renderer';
-import { AlertTriangle, Check, AlertCircle, X, Loader2 } from 'lucide-react';
+import { AlertTriangle, Check, AlertCircle, X, Loader2, Cpu } from 'lucide-react';
 import type { FeatureNodeData } from '../../types/nodes';
 import {
   NODE_HANDLE_CONFIG,
@@ -43,6 +43,7 @@ const FeatureCanvasNode: React.FC<NodeProps<FeatureNodeData>> = ({ id, data, sel
   const isModelingNode = ['hyperparameter_tuning', 'train_model_draft', 'model_evaluation', 'model_registry_overview'].includes(
     catalogType
   );
+  const isTrainingNode = ['hyperparameter_tuning', 'train_model_draft'].includes(catalogType);
   const pendingWarningReason = data?.pendingWarningReason ?? null;
   const hasPendingWarning = Boolean(data?.pendingWarningActive);
   const isPendingHighlight = Boolean(data?.pendingHighlight);
@@ -260,10 +261,20 @@ const FeatureCanvasNode: React.FC<NodeProps<FeatureNodeData>> = ({ id, data, sel
           {backgroundStatus === 'loading' && (
             <span
               className="feature-node__status-indicator feature-node__status-indicator--loading"
-              title="Loading full dataset in background..."
+              title={isTrainingNode ? 'Training in progress...' : 'Loading full dataset in background...'}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              <Loader2 size={12} className="feature-node__spinner" />
+              {isTrainingNode ? (
+                typeof data?.progress === 'number' ? (
+                  <span style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#3b82f6' }}>
+                    {Math.round(data.progress)}%
+                  </span>
+                ) : (
+                  <Cpu size={12} />
+                )
+              ) : (
+                <Loader2 size={12} className="feature-node__spinner" />
+              )}
             </span>
           )}
           {backgroundStatus === 'success' && (
@@ -298,6 +309,22 @@ const FeatureCanvasNode: React.FC<NodeProps<FeatureNodeData>> = ({ id, data, sel
         </div>
       </div>
       {description && <p className="feature-node__description">{description}</p>}
+      {isTrainingNode && backgroundStatus === 'loading' && (
+        <p
+          className="feature-node__description"
+          style={{
+            color: '#3b82f6',
+            fontWeight: 500,
+            marginTop: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          <Loader2 size={10} className="feature-node__spinner" />
+          Training...
+        </p>
+      )}
       {hasPendingWarning && <p className="feature-node__pending-hint">{pendingWarningMessage}</p>}
       {sourceHandles.map((handle) => renderHandle(handle, 'source'))}
     </div>

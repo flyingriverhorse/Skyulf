@@ -87,6 +87,9 @@ type HyperparameterTuningSectionProps = {
   scoringMetricParameter: FeatureNodeParameter | null;
   setDraftConfigState: React.Dispatch<React.SetStateAction<Record<string, any>>>;
   onSaveDraftConfig?: (options?: { closeModal?: boolean }) => void | Promise<void>;
+  onUpdateNodeData?: (nodeId: string, dataUpdates: Record<string, any>) => void;
+  currentStatus?: string;
+  currentProgress?: number;
 };
 
 type ParsedJsonResult<T> = {
@@ -811,6 +814,9 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
   scoringMetricParameter,
   setDraftConfigState,
   onSaveDraftConfig,
+  onUpdateNodeData,
+  currentStatus,
+  currentProgress,
 }) => {
   const queryClient = useQueryClient();
 
@@ -2073,7 +2079,7 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
       const currentData = query.state.data as HyperparameterTuningJobListResponse | undefined;
       const jobList = currentData?.jobs ?? [];
       const hasActiveJob = jobList.some((job: HyperparameterTuningJobSummary) => job.status === 'queued' || job.status === 'running');
-      return hasActiveJob ? 5000 : false;
+      return hasActiveJob ? 1000 : false;
     },
   });
 
@@ -2089,8 +2095,39 @@ export const HyperparameterTuningSection: React.FC<HyperparameterTuningSectionPr
       setLastCreatedJob(firstJob);
       setLastCreatedJobCount(jobCount);
       queryClient.invalidateQueries({ queryKey: tuningJobsQueryKey });
+      if (firstJob && onUpdateNodeData) {
+        onUpdateNodeData(nodeId, { backgroundExecutionStatus: 'loading' });
+      }
     },
   });
+
+  useEffect(() => {
+    if (!tuningJobsQuery.data || !onUpdateNodeData) {
+      return;
+    }
+    const jobs = tuningJobsQuery.data.jobs ?? [];
+    if (jobs.length === 0) {
+      return;
+    }
+    // The API returns jobs sorted by created_at desc, so the first one is the latest.
+    const latestJob = jobs[0];
+    const status = latestJob.status?.toLowerCase();
+    let nodeStatus = 'idle';
+
+    if (status === 'running' || status === 'queued') {
+      nodeStatus = 'loading';
+    } else if (status === 'succeeded') {
+      nodeStatus = 'success';
+    } else if (status === 'failed' || status === 'cancelled') {
+      nodeStatus = 'error';
+    }
+
+    const progress = typeof latestJob.progress === 'number' ? latestJob.progress : undefined;
+
+    if (nodeStatus !== currentStatus || (progress !== undefined && progress !== currentProgress)) {
+      onUpdateNodeData(nodeId, { backgroundExecutionStatus: nodeStatus, progress });
+    }
+  }, [tuningJobsQuery.data, onUpdateNodeData, nodeId, currentStatus, currentProgress]);
 
   const prerequisites = useMemo(() => {
     const notes: string[] = [];

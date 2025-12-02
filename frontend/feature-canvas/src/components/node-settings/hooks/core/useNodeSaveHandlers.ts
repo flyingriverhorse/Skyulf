@@ -45,7 +45,13 @@ export const useNodeSaveHandlers = ({
   onPendingConfigurationWarning,
   onPendingConfigurationCleared,
 }: UseNodeSaveHandlersArgs) => {
-  const { isBinningNode, isScalingNode, isInspectionNode } = catalogFlags;
+  const {
+    isBinningNode,
+    isScalingNode,
+    isInspectionNode,
+    isTrainModelDraftNode,
+    isHyperparameterTuningNode,
+  } = catalogFlags;
   const activePollCancelRef = useRef<(() => void) | null>(null);
 
   const mapSignalToBackgroundStatus = useCallback((signal?: FullExecutionSignal | null): BackgroundExecutionStatus => {
@@ -57,6 +63,10 @@ export const useNodeSaveHandlers = ({
       return 'idle';
     }
     if (token === 'succeeded') {
+      const pending = extractPendingConfigurationDetails(signal);
+      if (pending.length > 0) {
+        return 'error';
+      }
       return 'success';
     }
     if (token === 'failed' || token === 'skipped' || token === 'cancelled') {
@@ -248,7 +258,13 @@ export const useNodeSaveHandlers = ({
 
       const updatedGraphSnapshot = mergeGraphSnapshotWithConfig(graphSnapshot, nodeId, payload);
 
-      if (sourceId && updatedGraphSnapshot && !isInspectionNode) {
+      if (
+        sourceId &&
+        updatedGraphSnapshot &&
+        !isInspectionNode &&
+        !isTrainModelDraftNode &&
+        !isHyperparameterTuningNode
+      ) {
         onUpdateNodeData?.(nodeId, { backgroundExecutionStatus: 'loading' });
         triggerFullDatasetExecution({
           dataset_source_id: sourceId,

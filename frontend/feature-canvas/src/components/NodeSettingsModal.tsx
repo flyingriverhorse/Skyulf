@@ -395,6 +395,12 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     setCollapsedStrategies(new Set());
   }, [stableInitialConfig]);
 
+  useEffect(() => {
+    if (sourceId) {
+      onPendingConfigurationCleared?.();
+    }
+  }, [sourceId, onPendingConfigurationCleared]);
+
   const {
     datasetProfileController,
     profileState,
@@ -1274,6 +1280,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                 cvRandomStateParameter={nodeParams.trainModel.cvRandomState}
                 cvRefitStrategyParameter={nodeParams.trainModel.cvRefitStrategy}
                 onSaveDraftConfig={handleSave}
+                onUpdateNodeData={onUpdateNodeData}
+                currentStatus={node?.data?.backgroundExecutionStatus}
+                currentProgress={node?.data?.progress}
               />
             </div>
           )}
@@ -1322,6 +1331,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                 scoringMetricParameter={nodeParams.hyperparameterTuning.scoringMetric}
                 setDraftConfigState={setConfigState}
                 onSaveDraftConfig={handleSave}
+                onUpdateNodeData={onUpdateNodeData}
+                currentStatus={node?.data?.backgroundExecutionStatus}
+                currentProgress={node?.data?.progress}
               />
             </div>
           )}
