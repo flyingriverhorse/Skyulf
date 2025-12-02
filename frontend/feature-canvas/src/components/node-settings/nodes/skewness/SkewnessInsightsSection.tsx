@@ -88,7 +88,7 @@ export const SkewnessInsightsSection: React.FC<SkewnessInsightsSectionProps> = (
             type="button"
             className="btn btn-primary"
             onClick={onApplyRecommendations}
-            disabled={isFetchingRecommendations || !hasSkewnessAutoRecommendations}
+            disabled={isFetchingSkewness || !hasSkewnessAutoRecommendations}
           >
             Apply recommendations
           </button>
@@ -255,7 +255,7 @@ export const SkewnessInsightsSection: React.FC<SkewnessInsightsSectionProps> = (
                                   <SelectInput
                                     value={currentValue}
                                     onChange={(event) => onOverrideChange(row.column, event.target.value)}
-                                    disabled={isFetchingRecommendations || !hasReachableSource}
+                                    disabled={isFetchingSkewness || !hasReachableSource}
                                     options={[]}
                                   >
                                     {optionEntries.map((option) => {

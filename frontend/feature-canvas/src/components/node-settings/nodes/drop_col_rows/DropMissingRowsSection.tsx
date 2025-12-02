@@ -6,6 +6,8 @@ import { extractPendingConfigurationDetails, type PendingConfigurationDetail } f
 export type DropMissingRowsSectionProps = {
   thresholdParameter: FeatureNodeParameter | null;
   dropIfAnyParameter: FeatureNodeParameter | null;
+  dropIfAnyValue?: boolean;
+  suppressWarnings?: boolean;
   renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
   previewState?: PreviewState;
   onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
@@ -15,21 +17,34 @@ export type DropMissingRowsSectionProps = {
 export const DropMissingRowsSection: React.FC<DropMissingRowsSectionProps> = ({
   thresholdParameter,
   dropIfAnyParameter,
+  dropIfAnyValue,
+  suppressWarnings,
   renderParameterField,
   previewState,
   onPendingConfigurationWarning,
   onPendingConfigurationCleared,
 }) => {
   useEffect(() => {
+    if (suppressWarnings) {
+      return;
+    }
+
+    if (dropIfAnyValue) {
+      onPendingConfigurationCleared?.();
+      return;
+    }
+
     if (previewState?.data?.signals?.full_execution) {
       const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
-      if (details.length > 0) {
-        onPendingConfigurationWarning?.(details);
+      const relevantDetails = details.filter((d) => d.label.toLowerCase().includes('rows'));
+
+      if (relevantDetails.length > 0) {
+        onPendingConfigurationWarning?.(relevantDetails);
       } else {
         onPendingConfigurationCleared?.();
       }
     }
-  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared, dropIfAnyValue, suppressWarnings]);
 
   if (!thresholdParameter && !dropIfAnyParameter) {
     return null;

@@ -156,7 +156,11 @@ async def recommend_drop_columns(
     if target_column:
         if target_column in allowed_columns:
             allowed_columns.remove(target_column)
-        candidates = [c for c in candidates if c.column != target_column]
+        # Handle both object and dict access for candidates
+        candidates = [
+            c for c in candidates 
+            if (c.get('column') if isinstance(c, dict) else c.column) != target_column
+        ]
     
     # Filter candidates to only include columns that exist in the current frame
     filtered_candidates = builder.filter_candidates(candidates, allowed_columns)
