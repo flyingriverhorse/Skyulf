@@ -159,13 +159,21 @@ export const OutlierInsightsSection: React.FC<OutlierInsightsSectionProps> = ({
   useEffect(() => {
     if (previewState?.data?.signals?.full_execution) {
       const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
-      if (details.length > 0) {
-        onPendingConfigurationWarning?.(details);
+      
+      let relevantDetails = details;
+
+      // If auto-detect is enabled, suppress "columns not configured" warnings
+      if (outlierAutoDetectEnabled) {
+        relevantDetails = relevantDetails.filter((d) => !d.label.toLowerCase().includes('columns'));
+      }
+
+      if (relevantDetails.length > 0) {
+        onPendingConfigurationWarning?.(relevantDetails);
       } else {
         onPendingConfigurationCleared?.();
       }
     }
-  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared, outlierAutoDetectEnabled]);
 
   const previewSummary = resolvePreviewSummary(outlierPreviewSignal);
 

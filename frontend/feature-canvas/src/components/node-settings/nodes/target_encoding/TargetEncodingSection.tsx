@@ -29,6 +29,7 @@ type TargetEncodingSectionProps = {
   columnsParameter: FeatureNodeParameter | null;
   targetColumnParameter: FeatureNodeParameter | null;
   autoDetectParameter: FeatureNodeParameter | null;
+  autoDetectValue?: boolean;
   maxCategoriesParameter: FeatureNodeParameter | null;
   outputSuffixParameter: FeatureNodeParameter | null;
   dropOriginalParameter: FeatureNodeParameter | null;
@@ -82,6 +83,7 @@ export const TargetEncodingSection: React.FC<TargetEncodingSectionProps> = ({
   columnsParameter,
   targetColumnParameter,
   autoDetectParameter,
+  autoDetectValue,
   maxCategoriesParameter,
   outputSuffixParameter,
   dropOriginalParameter,
@@ -107,8 +109,20 @@ export const TargetEncodingSection: React.FC<TargetEncodingSectionProps> = ({
       previewState.data.signals.full_execution,
     );
 
-    if (details.length > 0) {
-      onPendingConfigurationWarning?.(details);
+    let relevantDetails = details;
+
+    // If auto-detect is enabled, suppress "columns not configured" warnings
+    if (autoDetectValue) {
+      relevantDetails = relevantDetails.filter((d) => !d.label.toLowerCase().includes('columns'));
+    }
+
+    // If columns are manually selected, suppress "columns not configured" warnings
+    if (selectedColumns && selectedColumns.length > 0) {
+      relevantDetails = relevantDetails.filter((d) => !d.label.toLowerCase().includes('columns'));
+    }
+
+    if (relevantDetails.length > 0) {
+      onPendingConfigurationWarning?.(relevantDetails);
     } else {
       onPendingConfigurationCleared?.();
     }
@@ -116,6 +130,8 @@ export const TargetEncodingSection: React.FC<TargetEncodingSectionProps> = ({
     previewState?.data?.signals?.full_execution,
     onPendingConfigurationWarning,
     onPendingConfigurationCleared,
+    autoDetectValue,
+    selectedColumns,
   ]);
 
   const recommendedColumns = useMemo(() => {
