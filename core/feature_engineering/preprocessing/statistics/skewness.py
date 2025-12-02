@@ -40,8 +40,8 @@ SKEWNESS_METHODS: Dict[str, Dict[str, Any]] = {
         "label": "Logarithmic",
         "description": "Applies natural log (log1p) to compress long right tails.",
         "direction_bias": "right",
-        "requires_positive": True,
-        "supports_zero": False,
+        "requires_positive": False,
+        "supports_zero": True,
         "supports_negative": False,
     },
     "square_root": {
@@ -327,8 +327,15 @@ def _build_single_skewness_recommendation(
     column_key = str(column_name)
     selected_method = selected_methods.get(column_key)
     applied_method = applied_methods.get(column_key)
-    transform_method = selected_method or applied_method
-    distribution_after = _compute_distribution_after(series, transform_method, missing_count)
+    
+    # If a method is already applied (from graph history), the series is already transformed.
+    # We should not apply it again for the "After" distribution.
+    if applied_method:
+        transform_method = None
+        distribution_after = distribution_before
+    else:
+        transform_method = selected_method
+        distribution_after = _compute_distribution_after(series, transform_method, missing_count)
 
     return SkewnessColumnRecommendation(
         column=column_key,
@@ -405,8 +412,8 @@ def _perform_skewness_transform(series: pd.Series, method: str) -> Tuple[Optiona
         return None, "No numeric data"
 
     if method == "log":
-        if (values <= 0).any():
-            return None, "Requires positive values"
+        if (values < 0).any():
+            return None, "Requires non-negative values"
         return pd.Series(np.log1p(values), index=values.index), None
 
     if method == "square_root":

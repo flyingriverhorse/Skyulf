@@ -33,7 +33,11 @@ from core.feature_engineering.split_handler import detect_splits, log_split_proc
 logger = logging.getLogger(__name__)
 
 PENDING_CONFIGURATION_TOKEN = "pending configuration"
-NO_COLUMNS_SELECTED_TOKEN = "no categorical columns selected"
+NO_COLUMNS_SELECTED_TOKENS = [
+    "no columns selected",
+    "no transformations configured",
+    "no strategies configured",
+]
 
 
 def summarize_pending_configuration(applied_steps: List[str]) -> List[str]:
@@ -56,8 +60,17 @@ def summarize_no_columns_selected(applied_steps: List[str]) -> List[str]:
         normalized = (step or "").strip()
         if not normalized:
             continue
-        if NO_COLUMNS_SELECTED_TOKEN not in normalized.lower():
+        
+        lower_step = normalized.lower()
+        found = False
+        for token in NO_COLUMNS_SELECTED_TOKENS:
+            if token in lower_step:
+                found = True
+                break
+        
+        if not found:
             continue
+
         label = normalized.split(":", 1)[0].strip()
         if label and label not in nodes:
             nodes.append(label)
