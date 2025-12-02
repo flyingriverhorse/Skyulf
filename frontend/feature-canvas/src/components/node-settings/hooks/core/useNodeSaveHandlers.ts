@@ -3,6 +3,10 @@ import { fetchFullExecutionStatus, triggerFullDatasetExecution, type FullExecuti
 import { normalizeBinningConfigValue } from '../../nodes/binning/binningSettings';
 import { normalizeScalingConfigValue } from '../../nodes/scaling/scalingSettings';
 import { cloneConfig } from '../../utils/configParsers';
+import {
+  extractPendingConfigurationDetails,
+  type PendingConfigurationDetail,
+} from '../../utils/pendingConfiguration';
 import { PENDING_CONFIRMATION_FLAG } from '../../../../canvas/services/configSanitizer';
 import type { CatalogFlagMap } from './useCatalogFlags';
 
@@ -21,6 +25,8 @@ export type UseNodeSaveHandlersArgs = {
   canResetNode: boolean;
   defaultConfigTemplate?: Record<string, any> | null;
   onResetConfig?: (nodeId: string, config?: Record<string, any> | null) => void;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const useNodeSaveHandlers = ({
@@ -36,6 +42,8 @@ export const useNodeSaveHandlers = ({
   canResetNode,
   defaultConfigTemplate,
   onResetConfig,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }: UseNodeSaveHandlersArgs) => {
   const { isBinningNode, isScalingNode, isInspectionNode } = catalogFlags;
   const activePollCancelRef = useRef<(() => void) | null>(null);
@@ -65,11 +73,18 @@ export const useNodeSaveHandlers = ({
       activePollCancelRef.current?.();
 
       if (!signal) {
+        onPendingConfigurationCleared?.();
         return;
       }
       const datasetSource = sourceId;
       if (!datasetSource || !nodeId) {
         return;
+      }
+      const pendingDetails = extractPendingConfigurationDetails(signal);
+      if (pendingDetails.length) {
+        onPendingConfigurationWarning?.(pendingDetails);
+      } else {
+        onPendingConfigurationCleared?.();
       }
       const datasetSourceId = datasetSource as string;
       const initialStatus = mapSignalToBackgroundStatus(signal);
@@ -92,6 +107,12 @@ export const useNodeSaveHandlers = ({
           const updatedSignal = await fetchFullExecutionStatus(datasetSourceId, jobId);
           const nextStatus = mapSignalToBackgroundStatus(updatedSignal);
           onUpdateNodeData?.(nodeId, { backgroundExecutionStatus: nextStatus });
+          const pendingFromPoll = extractPendingConfigurationDetails(updatedSignal);
+          if (pendingFromPoll.length) {
+            onPendingConfigurationWarning?.(pendingFromPoll);
+          } else {
+            onPendingConfigurationCleared?.();
+          }
           if (nextStatus === 'loading') {
             poll(updatedSignal?.poll_after_seconds ?? null);
           }
@@ -107,7 +128,14 @@ export const useNodeSaveHandlers = ({
         cancelled = true;
       };
     },
-    [mapSignalToBackgroundStatus, nodeId, onUpdateNodeData, sourceId]
+    [
+      mapSignalToBackgroundStatus,
+      nodeId,
+      onPendingConfigurationCleared,
+      onPendingConfigurationWarning,
+      onUpdateNodeData,
+      sourceId,
+    ]
   );
 
   const mergeGraphSnapshotWithConfig = useCallback(
@@ -234,6 +262,12 @@ export const useNodeSaveHandlers = ({
             const fullExecutionSignal = response?.signals?.full_execution;
             const nextStatus = mapSignalToBackgroundStatus(fullExecutionSignal);
             onUpdateNodeData?.(nodeId, { backgroundExecutionStatus: nextStatus });
+            const pendingDetails = extractPendingConfigurationDetails(fullExecutionSignal);
+            if (pendingDetails.length) {
+              onPendingConfigurationWarning?.(pendingDetails);
+            } else {
+              onPendingConfigurationCleared?.();
+            }
             startBackgroundStatusPolling(fullExecutionSignal);
           })
           .catch((error: unknown) => {

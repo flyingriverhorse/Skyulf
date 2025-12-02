@@ -1309,10 +1309,10 @@ def _apply_binning_discretization(
     signal = _build_binning_signal_from_config(config, node_identifier)
 
     if frame.empty:
-        return frame, "Binning: no rows available", signal
+        return frame, "Binning / Discretization: no rows available", signal
 
     if not config.columns:
-        return frame, "Binning: no columns selected", signal
+        return frame, "Binning / Discretization: no columns selected", signal
 
     split_info = _resolve_split_info(frame)
     working_frame = frame.copy()
@@ -1339,12 +1339,12 @@ def _apply_binning_discretization(
     _finalize_signal_lists(signal)
 
     if not transformed_details:
-        summary = "Binning: no columns transformed"
+        summary = "Binning / Discretization: no columns transformed"
         if skipped_columns:
             summary = f"{summary}; skipped {', '.join(skipped_columns)}"
         return working_frame, summary, signal
 
-    summary = f"Binning: {', '.join(transformed_details)}"
+    summary = f"Binning / Discretization: {', '.join(transformed_details)}"
     if skipped_columns:
         summary = f"{summary}; skipped {', '.join(skipped_columns)}"
     return working_frame, summary, signal

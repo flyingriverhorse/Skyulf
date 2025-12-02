@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { FeatureNodeParameter } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 import {
   type CaseColumnSummary,
   type CaseModeDetails,
@@ -21,6 +23,9 @@ export type NormalizeTextCaseSectionProps = {
   modeDetails: CaseModeDetails;
   sampleMap: CaseSampleMap;
   selectedMode: CaseMode;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const NormalizeTextCaseSection: React.FC<NormalizeTextCaseSectionProps> = ({
@@ -34,7 +39,21 @@ export const NormalizeTextCaseSection: React.FC<NormalizeTextCaseSectionProps> =
   modeDetails,
   sampleMap,
   selectedMode,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+
   if (!columnsParameter && !modeParameter) {
     return null;
   }

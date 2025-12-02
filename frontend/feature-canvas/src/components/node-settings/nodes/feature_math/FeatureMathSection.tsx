@@ -4,6 +4,11 @@ import type {
   FeatureMathOperationStatus,
   FeatureNodeParameter,
 } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import {
+  extractPendingConfigurationDetails,
+  type PendingConfigurationDetail,
+} from '../../utils/pendingConfiguration';
 import {
   DATETIME_FEATURE_OPTIONS,
   FEATURE_MATH_TYPE_OPTIONS,
@@ -552,11 +557,16 @@ type FeatureMathSectionProps = {
   availableColumns: string[];
   signals: FeatureMathNodeSignal[];
   previewStatus: string;
+  previewState?: PreviewState;
   errorHandlingParameter: FeatureNodeParameter | null;
   allowOverwriteParameter: FeatureNodeParameter | null;
   defaultTimezoneParameter: FeatureNodeParameter | null;
   epsilonParameter: FeatureNodeParameter | null;
   renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
+  onPendingConfigurationWarning?: (
+    details: PendingConfigurationDetail[]
+  ) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const FeatureMathSection: React.FC<FeatureMathSectionProps> = ({
@@ -572,12 +582,36 @@ export const FeatureMathSection: React.FC<FeatureMathSectionProps> = ({
   availableColumns,
   signals,
   previewStatus,
+  previewState,
   errorHandlingParameter,
   allowOverwriteParameter,
   defaultTimezoneParameter,
   epsilonParameter,
   renderParameterField,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (!previewState?.data?.signals?.full_execution) {
+      onPendingConfigurationCleared?.();
+      return;
+    }
+
+    const details = extractPendingConfigurationDetails(
+      previewState.data.signals.full_execution,
+    );
+
+    if (details.length > 0) {
+      onPendingConfigurationWarning?.(details);
+    } else {
+      onPendingConfigurationCleared?.();
+    }
+  }, [
+    previewState?.data?.signals?.full_execution,
+    onPendingConfigurationWarning,
+    onPendingConfigurationCleared,
+  ]);
+
   const [pendingType, setPendingType] = useState<FeatureMathOperationType>('arithmetic');
   const summaryMap = useMemo(() => {
     const map = new Map<string, FeatureMathOperationSummary>();

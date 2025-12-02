@@ -52,12 +52,12 @@ def apply_drop_missing_columns(
             total_columns_after=total_columns_before,
             threshold=threshold_value,
         )
-        return frame, "Drop columns: no columns met the criteria", signal
+        return frame, "Drop high-missing columns: no columns met the criteria", signal
 
     removable_columns = [col for col in drop_candidates if col in frame.columns]
     remaining_frame = frame.drop(columns=removable_columns, errors="ignore")
     total_columns_after = int(remaining_frame.shape[1])
-    summary_parts = [f"Drop columns: removed {len(removable_columns)} column(s)"]
+    summary_parts = [f"Drop high-missing columns: removed {len(removable_columns)} column(s)"]
     if auto_dropped:
         summary_parts.append(f"threshold auto-drop ({len(auto_dropped)})")
 
@@ -88,7 +88,7 @@ def apply_drop_missing_rows(
             drop_if_any_missing=False,
             threshold=None,
         )
-        return frame, "Drop rows: no rows available", signal
+        return frame, "Drop high-missing rows: no rows available", signal
 
     data = node.get("data") or {}
     config = data.get("config") or {}
@@ -107,9 +107,9 @@ def apply_drop_missing_rows(
         filtered_frame = frame.dropna(axis=0, how="any")
         dropped_count = int(frame.shape[0] - filtered_frame.shape[0])
         summary = (
-            f"Drop rows: removed {dropped_count} row(s) with any missing values"
+            f"Drop high-missing rows: removed {dropped_count} row(s) with any missing values"
             if dropped_count
-            else "Drop rows: no rows contained missing values"
+            else "Drop high-missing rows: no rows contained missing values"
         )
         signal = DropMissingRowsNodeSignal(
             removed_rows=dropped_count,
@@ -130,16 +130,16 @@ def apply_drop_missing_rows(
             drop_if_any_missing=False,
             threshold=None,
         )
-        return frame, "Drop rows: threshold not configured", signal
+        return frame, "Drop high-missing rows: threshold not configured", signal
 
     missing_pct = frame.isna().mean(axis=1).mul(100)
     mask = missing_pct >= threshold_value
     filtered_frame = frame.loc[~mask].copy()
     dropped_count = int(mask.sum())
     summary = (
-        f"Drop rows: removed {dropped_count} row(s) at ≥{threshold_value:.0f}% missing"
+        f"Drop high-missing rows: removed {dropped_count} row(s) at ≥{threshold_value:.0f}% missing"
         if dropped_count
-        else "Drop rows: no rows met the threshold"
+        else "Drop high-missing rows: no rows met the threshold"
     )
     signal = DropMissingRowsNodeSignal(
         removed_rows=dropped_count,

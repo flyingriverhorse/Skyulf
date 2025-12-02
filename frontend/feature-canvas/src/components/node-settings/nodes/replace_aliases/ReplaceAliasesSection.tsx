@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FeatureNodeParameter } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 import {
   ALIAS_MODE_OPTIONS,
   type AliasColumnOption,
@@ -192,6 +194,9 @@ export type ReplaceAliasesSectionProps = {
   onColumnToggle: (index: number, column: string) => void;
   onColumnsChange: (index: number, value: string) => void;
   renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 const formatSamplePreview = (samples: string[]): string | null => {
@@ -222,7 +227,21 @@ export const ReplaceAliasesSection: React.FC<ReplaceAliasesSectionProps> = ({
   onColumnToggle,
   onColumnsChange,
   renderParameterField,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+
   const hasStrategies = strategies.length > 0;
   const selectedCount = columnSummary.selectedColumns.length;
   const recommendedSummary = useMemo(

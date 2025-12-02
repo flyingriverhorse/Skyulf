@@ -705,13 +705,13 @@ def apply_label_encoding(
     _initialize_signal_from_config(signal, config)
 
     if frame.empty:
-        return frame, "Label encoding: no data available", signal
+        return frame, "Label encode categories: no data available", signal
 
     candidate_columns, skipped_notes = _collect_candidate_columns(frame, config)
 
     if not candidate_columns:
         signal.evaluated_columns = []
-        return frame, "Label encoding: no categorical columns selected", signal
+        return frame, "Label encode categories: no categorical columns selected", signal
 
     signal.evaluated_columns = list(candidate_columns)
 

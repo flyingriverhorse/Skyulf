@@ -731,7 +731,7 @@ def _apply_scale_numeric_features(
     signal = ScalingNodeSignal(node_id=node_id_str)
 
     if frame.empty:
-        return frame, "Scaling: no data available", signal
+        return frame, "Scale numeric features: no data available", signal
 
     data = node.get("data") or {}
     config_payload = data.get("config") or {}

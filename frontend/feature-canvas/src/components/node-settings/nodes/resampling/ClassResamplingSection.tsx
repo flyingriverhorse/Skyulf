@@ -1,6 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import type { FeatureNodeParameter, FeatureNodeParameterOption } from '../../../../api';
 import type { PreviewState } from '../dataset/DataSnapshotSection';
+import {
+  extractPendingConfigurationDetails,
+  type PendingConfigurationDetail,
+} from '../../utils/pendingConfiguration';
 
 type ResamplingMode = 'undersampling' | 'oversampling';
 
@@ -42,6 +46,10 @@ type ClassResamplingSectionProps = {
   formatMetricValue: (value?: number | null, precision?: number) => string;
   formatMissingPercentage: (value?: number | null) => string;
   schemaGuard?: ResamplingSchemaGuard | null;
+  onPendingConfigurationWarning?: (
+    details: PendingConfigurationDetail[]
+  ) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 type ClassCountRow = {
@@ -135,7 +143,29 @@ export const ClassResamplingSection: React.FC<ClassResamplingSectionProps> = ({
   formatMetricValue,
   formatMissingPercentage,
   schemaGuard,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (!previewState.data?.signals?.full_execution) {
+      onPendingConfigurationCleared?.();
+      return;
+    }
+
+    const details = extractPendingConfigurationDetails(
+      previewState.data.signals.full_execution,
+    );
+
+    if (details.length > 0) {
+      onPendingConfigurationWarning?.(details);
+    } else {
+      onPendingConfigurationCleared?.();
+    }
+  }, [
+    previewState.data?.signals?.full_execution,
+    onPendingConfigurationWarning,
+    onPendingConfigurationCleared,
+  ]);
   const preview = previewState.data;
   const previewStatus = previewState.status;
   const appliedSteps = Array.isArray(preview?.applied_steps) ? preview?.applied_steps : [];

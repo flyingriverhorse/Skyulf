@@ -73,12 +73,20 @@ import { useNodeSettingsHandlers } from './node-settings/hooks';
 import { useNodeSettingsSummaries } from './node-settings/hooks';
 import { useNodeSettingsData } from './node-settings/hooks';
 import { useNodeSettingsState } from './node-settings/hooks';
+import type { PendingConfigurationDetail } from './node-settings/utils/pendingConfiguration';
 import {
   type BinnedSamplePresetValue,
 } from './node-settings/nodes/binning/binningSettings';
 import {
   DATE_MODE_OPTIONS,
 } from './node-settings/nodes/standardize_date/standardizeDateSettings';
+
+const normalizeLabel = (value?: string | null): string => {
+  if (!value || typeof value !== 'string') {
+    return '';
+  }
+  return value.replace(/\s+/g, ' ').trim().toLowerCase();
+};
 
 type NodeSettingsModalProps = {
   node: Node;
@@ -93,6 +101,10 @@ type NodeSettingsModalProps = {
   onResetConfig?: (nodeId: string, config?: Record<string, any> | null) => void;
   defaultConfigTemplate?: Record<string, any> | null;
   isResetAvailable?: boolean;
+  onPendingConfigurationUpdate?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
+  onHighlightPendingNodes?: (labels: string[]) => void;
+  pendingConfigurationDetails?: PendingConfigurationDetail[] | null;
 };
 
 export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
@@ -105,6 +117,10 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   onResetConfig,
   defaultConfigTemplate,
   isResetAvailable = false,
+  onPendingConfigurationUpdate,
+  onPendingConfigurationCleared,
+  onHighlightPendingNodes,
+  pendingConfigurationDetails,
 }) => {
   const {
     metadata,
@@ -292,6 +308,83 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
   } = columnCatalogState;
 
   const hasDropColumnParameter = Boolean(dropColumnParameter);
+
+  const nodeLabelSet = useMemo(() => {
+    const data = node?.data ?? {};
+    const candidates: string[] = [];
+    const pushCandidate = (value: unknown) => {
+      if (typeof value === 'string' && value.trim()) {
+        candidates.push(value);
+      }
+    };
+
+    pushCandidate(title);
+    pushCandidate(data?.label);
+    pushCandidate(data?.title);
+    pushCandidate(data?.name);
+    pushCandidate(data?.displayName);
+    pushCandidate(data?.display_label);
+    metadata?.forEach((entry) => {
+      pushCandidate(entry?.value);
+    });
+    pushCandidate(data?.catalogType);
+    pushCandidate(data?.type);
+    if (typeof node?.id === 'string') {
+      pushCandidate(node.id);
+    }
+
+    return new Set(candidates.map((label) => normalizeLabel(label)).filter(Boolean));
+  }, [metadata, node, title]);
+
+  const pendingDetailsForNode = useMemo(() => {
+    if (!pendingConfigurationDetails?.length || !nodeLabelSet.size) {
+      return [];
+    }
+    return pendingConfigurationDetails.filter((detail) => nodeLabelSet.has(normalizeLabel(detail.label)));
+  }, [pendingConfigurationDetails, nodeLabelSet]);
+
+  const formatPendingDetail = useCallback((detail: PendingConfigurationDetail) => {
+    const label = detail?.label?.trim() ?? '';
+    const reason = detail?.reason?.trim() ?? '';
+    if (label && reason) {
+      return `${label}: ${reason}`;
+    }
+    if (label) {
+      return `${label} still needs configuration.`;
+    }
+    if (reason) {
+      return reason;
+    }
+    return 'Additional configuration required.';
+  }, []);
+
+  const pendingSummaryLabel = useMemo(() => {
+    if (isPreviewNode || !pendingDetailsForNode.length) {
+      return null;
+    }
+    const [firstDetail, ...others] = pendingDetailsForNode;
+    const firstSummary = formatPendingDetail(firstDetail);
+    if (!others.length) {
+      return firstSummary;
+    }
+    const remainingCount = others.length;
+    const plural = remainingCount === 1 ? 'node' : 'nodes';
+    return `${firstSummary} (+${remainingCount} more ${plural}).`;
+  }, [formatPendingDetail, isPreviewNode, pendingDetailsForNode]);
+
+  const handlePendingWarning = useCallback(
+    (details: PendingConfigurationDetail[]) => {
+      if (!details?.length) {
+        return;
+      }
+      onPendingConfigurationUpdate?.(details);
+    },
+    [onPendingConfigurationUpdate]
+  );
+
+  const handlePendingCleared = useCallback(() => {
+    onPendingConfigurationCleared?.();
+  }, [onPendingConfigurationCleared]);
 
 
   const [binnedSamplePreset, setBinnedSamplePreset] = useState<BinnedSamplePresetValue>('500');
@@ -606,6 +699,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     standardizeDatesMode: standardizeDates.mode,
     setCollapsedFeatureMath,
     configState,
+    onPendingConfigurationWarning: handlePendingWarning,
+    onPendingConfigurationCleared: handlePendingCleared,
   });
 
   const {
@@ -803,6 +898,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               thresholdParameter={nodeParams.dropMissing.threshold ?? null}
               dropIfAnyParameter={nodeParams.dropRows.any}
               renderParameterField={renderParameterField}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {dropColumnParameter && (
@@ -811,6 +909,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               dropColumnParameter={dropColumnParameter}
               renderParameterField={renderParameterField}
               renderMultiSelectField={renderMultiSelectField}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isMissingIndicatorNode && (
@@ -824,6 +925,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                 columnsParameter={nodeParams.missingIndicator.columns}
                 suffixParameter={nodeParams.missingIndicator.suffix}
                 renderParameterField={renderParameterField}
+                previewState={previewState}
+                onPendingConfigurationWarning={handlePendingWarning}
+                onPendingConfigurationCleared={handlePendingCleared}
               />
             </>
           )}
@@ -840,6 +944,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               formatModeStat={formatModeStat}
               nodeId={node?.id}
               onUpdateNodeData={onUpdateNodeData}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           <DatasetProfileSection
@@ -848,6 +954,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             formatCellValue={formatCellValue}
             formatNumericStat={formatNumericStat}
             formatMissingPercentage={formatMissingPercentage}
+            previewState={previewState}
+            onPendingConfigurationWarning={handlePendingWarning}
           />
           {dataConsistencyHint && (
             <section className="canvas-modal__section">
@@ -870,6 +978,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               columnSummary={trimWhitespace.columnSummary}
               modeDetails={trimWhitespace.modeDetails}
               sampleMap={trimWhitespace.sampleMap}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isRemoveSpecialCharsNode && (
@@ -884,6 +995,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               columnSummary={removeSpecial.columnSummary}
               modeDetails={removeSpecial.modeDetails}
               sampleMap={removeSpecial.sampleMap}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isReplaceInvalidValuesNode && (
@@ -902,6 +1016,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               selectedMode={replaceInvalid.mode}
               minValue={replaceInvalid.minValue}
               maxValue={replaceInvalid.maxValue}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isRegexCleanupNode && (
@@ -919,6 +1036,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               sampleMap={regexCleanup.sampleMap}
               selectedMode={regexCleanup.selectedMode}
               replacementValue={regexCleanup.replacementValue}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isNormalizeTextCaseNode && (
@@ -933,6 +1053,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               modeDetails={normalizeCase.modeDetails}
               sampleMap={normalizeCase.sampleMap}
               selectedMode={normalizeCase.selectedMode}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isFeatureMathNode && (
@@ -954,6 +1077,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               defaultTimezoneParameter={nodeParams.featureMath.defaultTimezone}
               epsilonParameter={nodeParams.featureMath.epsilon}
               renderParameterField={renderParameterField}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isOrdinalEncodingNode && (
@@ -977,6 +1103,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               onToggleColumn={handleToggleColumn}
               onApplyRecommended={ordinalEncoding.handleApplyRecommended}
               formatMissingPercentage={formatMissingPercentage}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isTargetEncodingNode && (
@@ -1001,6 +1130,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               onToggleColumn={handleToggleColumn}
               onApplyRecommended={targetEncoding.handleApplyRecommended}
               formatMissingPercentage={formatMissingPercentage}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isDummyEncodingNode && (
@@ -1023,6 +1155,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               onToggleColumn={handleToggleColumn}
               onApplyRecommended={dummyEncoding.handleApplyRecommended}
               formatMissingPercentage={formatMissingPercentage}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isOneHotEncodingNode && (
@@ -1045,6 +1180,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               onToggleColumn={handleToggleColumn}
               onApplyRecommended={oneHotEncoding.handleApplyRecommended}
               formatMissingPercentage={formatMissingPercentage}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isFeatureTargetSplitNode && (
@@ -1059,6 +1197,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               renderParameterField={renderParameterField}
               formatMetricValue={formatMetricValue}
               formatMissingPercentage={formatMissingPercentage}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isTrainTestSplitNode && (
@@ -1072,6 +1212,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               parameters={parameters}
               renderParameterField={renderParameterField}
               formatMetricValue={formatMetricValue}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isClassResamplingNode && (
@@ -1092,6 +1234,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               formatMetricValue={formatMetricValue}
               formatMissingPercentage={formatMissingPercentage}
               schemaGuard={oversamplingSchemaGuard}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {(isTrainModelDraftNode || isHyperparameterTuningNode) && (
@@ -1201,6 +1345,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               onToggleColumn={handleToggleColumn}
               onApplyRecommended={labelEncoding.handleApplyRecommended}
               formatMissingPercentage={formatMissingPercentage}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isHashEncodingNode && (
@@ -1223,6 +1370,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               onToggleColumn={handleToggleColumn}
               onApplyRecommended={hashEncoding.handleApplyRecommended}
               formatMissingPercentage={formatMissingPercentage}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isPolynomialFeaturesNode && (
@@ -1236,6 +1386,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               outputPrefixParameter={nodeParams.polynomial.outputPrefix}
               renderParameterField={renderParameterField}
               signal={polynomialSignal}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isFeatureSelectionNode && (
@@ -1258,6 +1411,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               dropUnselectedParameter={nodeParams.featureSelection.dropUnselected}
               renderParameterField={renderParameterField}
               signal={featureSelectionSignal}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isStandardizeDatesNode && (
@@ -1277,6 +1433,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               onColumnsChange={handleDateStrategyColumnsChange}
               onAutoDetectToggle={handleDateStrategyAutoDetectToggle}
               modeOptions={DATE_MODE_OPTIONS}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isReplaceAliasesNode && (
@@ -1298,6 +1457,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               onColumnToggle={handleAliasColumnToggle}
               onColumnsChange={handleAliasColumnsChange}
               renderParameterField={renderParameterField}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isImputerNode && (
@@ -1324,6 +1486,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               formatNumericStat={formatNumericStat}
               formatModeStat={formatModeStat}
               schemaDiagnostics={imputationSchemaDiagnostics}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isCastNode && (
@@ -1336,8 +1501,11 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               selectedColumns={selectedColumns}
               previewColumns={previewColumns}
               previewStatus={previewState.status}
+              previewState={previewState}
               sourceId={sourceId}
               hasReachableSource={hasReachableSource}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isOutlierNode && (
@@ -1372,6 +1540,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               onOverrideSelect={outlier.handlers.handleOverrideSelect}
               onMethodParameterChange={outlier.handlers.handleMethodParameterChange}
               onColumnParameterChange={outlier.handlers.handleColumnParameterChange}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isScalingNode && (
@@ -1402,6 +1573,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               onDefaultMethodChange={scaling.handlers.handleDefaultMethodChange}
               onAutoDetectToggle={scaling.handlers.handleAutoDetectToggle}
               onOverrideSelect={scaling.handlers.handleOverrideSelect}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isBinningNode && (
@@ -1436,6 +1610,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                 onClearCustomColumn={binning.handlers.handleClearCustomColumn}
                 formatMetricValue={formatMetricValue}
                 formatNumericStat={formatNumericStat}
+                previewState={previewState}
+                onPendingConfigurationWarning={handlePendingWarning}
+                onPendingConfigurationCleared={handlePendingCleared}
               />
               <BinNumericColumnsSection
                 config={binning.config}
@@ -1446,6 +1623,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                 onLabelFormatChange={binning.handlers.handleLabelFormatChange}
                 onMissingStrategyChange={binning.handlers.handleMissingStrategyChange}
                 onMissingLabelChange={binning.handlers.handleMissingLabelChange}
+                previewState={previewState}
+                onPendingConfigurationWarning={handlePendingWarning}
               />
             </>
           )}
@@ -1472,6 +1651,9 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               onGroupByToggle={skewness.handlers.setGroupByMethod}
               onOverrideChange={skewness.handlers.handleOverrideChange}
               onClearSelections={skewness.handlers.clearTransformations}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isSkewnessDistributionNode && (
@@ -1497,6 +1679,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               error={binnedDistributionError}
               onRefresh={handleRefreshBinnedDistribution}
               canRefresh={Boolean(sourceId)}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
             />
           )}
           {isRemoveDuplicatesNode && (
@@ -1509,21 +1693,30 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
               removeDuplicatesKeepSelectId={removeDuplicatesState.removeDuplicatesKeepSelectId}
               removeDuplicatesKeep={removeDuplicatesState.removeDuplicatesKeep}
               onKeepChange={removeDuplicatesState.handleRemoveDuplicatesKeepChange}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isDataConsistencyNode && (
             <DataConsistencySettingsSection
               parameters={dataConsistencyParameters}
               renderParameterField={renderParameterField}
+              previewState={previewState}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
           {isTransformerAuditNode && (
             <TransformerAuditSection
               signal={transformerAuditSignal}
               previewStatus={previewState.status}
+              previewState={previewState}
               hasSource={Boolean(sourceId)}
               hasReachableSource={hasReachableSource}
               onRefreshPreview={handleRefreshPreview}
+              onPendingConfigurationWarning={handlePendingWarning}
+              onPendingConfigurationCleared={handlePendingCleared}
             />
           )}
 
@@ -1538,6 +1731,13 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
           onSave={handleSave}
           isBusy={hasActiveAsyncWork}
           busyLabel={footerBusyLabel}
+          statusMessage={
+            pendingSummaryLabel ? (
+              <span className="canvas-modal__footer-hint">
+                <strong>Pending:</strong> {pendingSummaryLabel}
+              </span>
+            ) : null
+          }
         />
       </div>
     </div>

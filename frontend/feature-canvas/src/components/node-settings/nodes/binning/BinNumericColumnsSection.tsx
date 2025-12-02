@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FormField, TextInput, NumberInput, SelectInput, CheckboxInput } from '../../ui/FormFields';
 import { AdvancedSettingsToggle } from '../../layout/AdvancedSettingsToggle';
 import {
@@ -8,6 +8,8 @@ import {
   type BinningMissingStrategy,
   type NormalizedBinningConfig,
 } from './binningSettings';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 
 type BinningFieldIds = {
   equalWidth: string;
@@ -38,6 +40,8 @@ type BinNumericColumnsSectionProps = {
   onLabelFormatChange: (value: BinningLabelFormat) => void;
   onMissingStrategyChange: (value: BinningMissingStrategy) => void;
   onMissingLabelChange: (value: string) => void;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
 };
 
 export const BinNumericColumnsSection: React.FC<BinNumericColumnsSectionProps> = ({
@@ -49,7 +53,17 @@ export const BinNumericColumnsSection: React.FC<BinNumericColumnsSectionProps> =
   onLabelFormatChange,
   onMissingStrategyChange,
   onMissingLabelChange,
+  previewState,
+  onPendingConfigurationWarning,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution && onPendingConfigurationWarning) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning(details);
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning]);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   return (

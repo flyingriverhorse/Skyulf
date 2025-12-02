@@ -1,12 +1,22 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import type { TransformerAuditNodeSignal, TransformerAuditEntrySignal, TransformerSplitActivitySignal } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import {
+  extractPendingConfigurationDetails,
+  type PendingConfigurationDetail,
+} from '../../utils/pendingConfiguration';
 
 type TransformerAuditSectionProps = {
   signal: TransformerAuditNodeSignal | null;
   previewStatus: 'idle' | 'loading' | 'success' | 'error';
+  previewState?: PreviewState;
   hasSource: boolean;
   hasReachableSource: boolean;
   onRefreshPreview: () => void;
+  onPendingConfigurationWarning?: (
+    details: PendingConfigurationDetail[]
+  ) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 const ACTION_LABELS: Record<TransformerSplitActivitySignal['action'], string> = {
@@ -103,9 +113,12 @@ const getMethodLabel = (entry: TransformerAuditEntrySignal): string | null => {
 export const TransformerAuditSection: React.FC<TransformerAuditSectionProps> = ({
   signal,
   previewStatus,
+  previewState,
   hasSource,
   hasReachableSource,
   onRefreshPreview,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
   const entries = useMemo<TransformerAuditEntrySignal[]>(() => signal?.transformers ?? [], [signal?.transformers]);
   const totalTransformers = signal?.total_transformers ?? entries.length;

@@ -629,13 +629,13 @@ def _prepare_dummy_encoding(
 ) -> Tuple[Optional[_DummyEncodingPreparation], Optional[str]]:
     if frame.empty:
         signal.evaluated_columns = []
-        return None, "Dummy encoding: no data available"
+        return None, "Dummy encode categories: no data available"
 
     candidate_columns, skipped_details = _collect_dummy_candidate_columns(frame, config, signal)
 
     if not candidate_columns:
         signal.evaluated_columns = []
-        return None, "Dummy encoding: no categorical columns selected"
+        return None, "Dummy encode categories: no categorical columns selected"
 
     working_frame = frame.copy()
     existing_columns = set(working_frame.columns)
@@ -719,7 +719,7 @@ def apply_dummy_encoding(
 
     preparation, early_summary = _prepare_dummy_encoding(frame, config, signal, pipeline_id, node_id)
     if early_summary is not None or preparation is None:
-        return frame, early_summary or "Dummy encoding: no columns encoded", signal
+        return frame, early_summary or "Dummy encode categories: no columns encoded", signal
 
     execution_result = _execute_dummy_encoding(preparation, config, signal)
     summary = _summarize_dummy_encoding(execution_result)

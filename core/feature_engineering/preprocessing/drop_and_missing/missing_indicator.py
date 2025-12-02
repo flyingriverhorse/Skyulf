@@ -42,7 +42,7 @@ def apply_missing_value_flags(
     )
 
     if frame.empty:
-        return frame, "Missing flags: no data available", signal
+        return frame, "Missing value indicator: no data available", signal
 
     target_columns = [column for column in configured_columns if column in frame.columns]
     missing_columns = [column for column in configured_columns if column not in frame.columns]
@@ -57,7 +57,7 @@ def apply_missing_value_flags(
     signal.missing_columns = list(missing_columns)
 
     if not target_columns:
-        return frame, "Missing flags: no eligible columns", signal
+        return frame, "Missing value indicator: no eligible columns", signal
 
     working_frame = frame.copy()
     created_columns: List[str] = []
@@ -101,7 +101,7 @@ def apply_missing_value_flags(
     signal.total_flagged_rows = total_flagged
     signal.skipped_columns = sorted(set(skipped_columns))
 
-    summary_parts = [f"Missing flags: processed {len(target_columns)} column(s)"]
+    summary_parts = [f"Missing value indicator: processed {len(target_columns)} column(s)"]
     if created_columns:
         summary_parts.append(f"added {len(created_columns)} indicator column(s)")
     if total_flagged:

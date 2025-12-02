@@ -1,9 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import type {
   FeatureNodeParameter,
   OneHotEncodingColumnSuggestion,
   OneHotEncodingSuggestionStatus,
 } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import {
+  extractPendingConfigurationDetails,
+  type PendingConfigurationDetail,
+} from '../../utils/pendingConfiguration';
 
 type OneHotEncodingSectionProps = {
   sourceId?: string | null;
@@ -32,6 +37,11 @@ type OneHotEncodingSectionProps = {
   onToggleColumn: (column: string) => void;
   onApplyRecommended: (columns: string[]) => void;
   formatMissingPercentage: (value?: number | null) => string;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (
+    details: PendingConfigurationDetail[]
+  ) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 const STATUS_LABELS: Record<OneHotEncodingSuggestionStatus, string> = {
@@ -78,7 +88,31 @@ export const OneHotEncodingSection: React.FC<OneHotEncodingSectionProps> = ({
   onToggleColumn,
   onApplyRecommended,
   formatMissingPercentage,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (!previewState?.data?.signals?.full_execution) {
+      onPendingConfigurationCleared?.();
+      return;
+    }
+
+    const details = extractPendingConfigurationDetails(
+      previewState.data.signals.full_execution,
+    );
+
+    if (details.length > 0) {
+      onPendingConfigurationWarning?.(details);
+    } else {
+      onPendingConfigurationCleared?.();
+    }
+  }, [
+    previewState?.data?.signals?.full_execution,
+    onPendingConfigurationWarning,
+    onPendingConfigurationCleared,
+  ]);
+
   const recommendedColumns = useMemo(() => {
     if (!suggestions.length) {
       return [] as string[];

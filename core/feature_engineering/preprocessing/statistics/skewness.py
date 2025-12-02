@@ -885,14 +885,14 @@ def _apply_skewness_transformations(
     signal = SkewnessNodeSignal(node_id=node_id_str)
 
     if frame.empty:
-        return frame, "Skewness transforms: no data available", signal
+        return frame, "Fix skewed columns: no data available", signal
 
     data = node.get("data") or {}
     config = data.get("config") or {}
     transformations = _normalize_skewness_transformations(config.get("transformations"))
 
     if not transformations:
-        return frame, "Skewness transforms: no transformations configured", signal
+        return frame, "Fix skewed columns: no transformations configured", signal
 
     working_frame = frame.copy()
     applied: List[str] = []

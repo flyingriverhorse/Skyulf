@@ -55,7 +55,7 @@ def apply_train_model_draft(
     if frame.empty:
         metadata.blockers.append("No data available in preview sample")
         metadata.ready_for_training = False
-        return frame, "Train model draft: no data available", metadata
+        return frame, "Train model: no data available", metadata
 
     data = node.get("data") or {}
     config = data.get("config") or {}
@@ -72,12 +72,12 @@ def apply_train_model_draft(
     if not target_column:
         metadata.blockers.append("Target column not configured")
         metadata.ready_for_training = False
-        return frame, "Train model draft: target column not configured", metadata
+        return frame, "Train model: target column not configured", metadata
 
     if target_column not in frame.columns:
         metadata.blockers.append(f"Target column '{target_column}' not found in preview data")
         metadata.ready_for_training = False
-        return frame, f"Train model draft: target column '{target_column}' not found", metadata
+        return frame, f"Train model: target column '{target_column}' not found", metadata
 
     target_series = frame[target_column]
     target_summary.pandas_dtype = str(target_series.dtype)
@@ -94,7 +94,7 @@ def apply_train_model_draft(
     if not feature_columns:
         metadata.blockers.append("Requires at least one feature column besides the target")
         metadata.ready_for_training = False
-        return frame, "Train model draft: requires at least one feature column besides the target", metadata
+        return frame, "Train model: requires at least one feature column besides the target", metadata
 
     numeric_features = [column for column in feature_columns if pd.api.types.is_numeric_dtype(frame[column])]
     non_numeric_features = [column for column in feature_columns if not pd.api.types.is_numeric_dtype(frame[column])]

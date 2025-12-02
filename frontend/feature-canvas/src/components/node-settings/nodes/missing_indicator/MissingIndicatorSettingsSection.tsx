@@ -1,16 +1,35 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 
 type MissingIndicatorSettingsSectionProps = {
   columnsParameter: any;
   suffixParameter: any;
   renderParameterField: (param: any) => React.ReactNode;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const MissingIndicatorSettingsSection: React.FC<MissingIndicatorSettingsSectionProps> = ({
   columnsParameter,
   suffixParameter,
   renderParameterField,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+
   if (!columnsParameter && !suffixParameter) {
     return null;
   }

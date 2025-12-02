@@ -1,7 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { FeatureNodeParameter } from '../../../../api';
 import type { PreviewState } from '../dataset/DataSnapshotSection';
+import {
+  extractPendingConfigurationDetails,
+  type PendingConfigurationDetail,
+} from '../../utils/pendingConfiguration';
 
 export type TrainTestSplitConfig = {
   test_size: number;
@@ -37,6 +41,10 @@ type TrainTestSplitSectionProps = {
   parameters: FeatureNodeParameter[];
   renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
   formatMetricValue: (value?: number | null, precision?: number) => string;
+  onPendingConfigurationWarning?: (
+    details: PendingConfigurationDetail[]
+  ) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 const resolveSignal = (
@@ -67,7 +75,29 @@ export const TrainTestSplitSection: React.FC<TrainTestSplitSectionProps> = ({
   parameters,
   renderParameterField,
   formatMetricValue,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (!previewState.data?.signals?.full_execution) {
+      onPendingConfigurationCleared?.();
+      return;
+    }
+
+    const details = extractPendingConfigurationDetails(
+      previewState.data.signals.full_execution,
+    );
+
+    if (details.length > 0) {
+      onPendingConfigurationWarning?.(details);
+    } else {
+      onPendingConfigurationCleared?.();
+    }
+  }, [
+    previewState.data?.signals?.full_execution,
+    onPendingConfigurationWarning,
+    onPendingConfigurationCleared,
+  ]);
   const preview = previewState.data;
   const previewStatus = previewState.status;
 

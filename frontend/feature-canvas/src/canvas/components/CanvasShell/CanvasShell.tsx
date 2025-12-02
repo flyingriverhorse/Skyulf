@@ -19,6 +19,9 @@ import {
 import AnimatedEdge from '../../../components/edges/AnimatedEdge';
 import { NodeSettingsModal } from '../../../components/NodeSettingsModal';
 import FeatureCanvasNode from '../FeatureCanvasNode/FeatureCanvasNode';
+import type { PendingConfigurationDetail } from '../../../components/node-settings/utils/pendingConfiguration';
+import { usePendingConfigurationToast } from '../../../components/node-settings/hooks';
+import PendingConfigurationDock from '../../../components/PendingConfigurationToast/PendingConfigurationDock';
 import {
   sanitizeDefaultConfigForNode,
   PENDING_CONFIRMATION_FLAG,
@@ -36,6 +39,13 @@ import { useSplitPropagation } from '../../hooks';
 import { useConnectionHandlers } from '../../hooks';
 import { CanvasViewport } from '../CanvasViewport/CanvasViewport';
 
+const normalizeLabel = (value?: string | null): string => {
+  if (!value || typeof value !== 'string') {
+    return '';
+  }
+  return value.replace(/\s+/g, ' ').trim().toLowerCase();
+};
+
 const CanvasShell = forwardRef<CanvasShellHandle, CanvasShellProps>(
     ({ sourceId, datasetName, onGraphChange, onPipelineHydrated, onPipelineError }, ref) => {
       const nodeTypes = useMemo(() => ({ featureNode: FeatureCanvasNode }), []);
@@ -49,6 +59,15 @@ const CanvasShell = forwardRef<CanvasShellHandle, CanvasShellProps>(
       const [edges, setEdges, onEdgesChange] = useEdgesState(getDefaultEdges());
       const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
       const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+      const [pendingConfigurationDetails, setPendingConfigurationDetails] = useState<PendingConfigurationDetail[]>([]);
+      const [pendingHighlightLabels, setPendingHighlightLabels] = useState<string[]>([]);
+      const {
+        pendingToastDetails,
+        isPendingToastVisible,
+        showPendingToast,
+        dismissPendingToast,
+        clearPendingToast,
+      } = usePendingConfigurationToast();
       const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
       const canvasViewportRef = useRef<HTMLDivElement | null>(null);
       const shouldFitViewRef = useRef(false);
@@ -102,6 +121,58 @@ const CanvasShell = forwardRef<CanvasShellHandle, CanvasShellProps>(
         setSelectedNodeId(null);
       }, []);
 
+      const handlePendingConfigurationUpdate = useCallback((details: PendingConfigurationDetail[]) => {
+        setPendingConfigurationDetails(details);
+      }, []);
+
+      const handlePendingConfigurationCleared = useCallback(() => {
+        setPendingConfigurationDetails([]);
+        setPendingHighlightLabels([]);
+      }, []);
+
+      const handleHighlightPendingNodes = useCallback(
+        (labels: string[]) => {
+          const normalized = Array.from(
+            new Set(
+              labels
+                .map((label) => normalizeLabel(label))
+                .filter((label): label is string => Boolean(label))
+            )
+          );
+          if (!normalized.length) {
+            return;
+          }
+          setIsSettingsModalOpen(false);
+          setSelectedNodeId(null);
+          setPendingHighlightLabels(normalized);
+          requestAnimationFrame(() => {
+            const targetNodes = nodes.filter((node) => {
+              const data = node.data ?? {};
+              const candidateLabels = [
+                typeof data.label === 'string' ? data.label : null,
+                typeof data.title === 'string' ? data.title : null,
+                typeof data.name === 'string' ? data.name : null,
+                typeof data.displayName === 'string' ? data.displayName : null,
+                typeof data.display_label === 'string' ? data.display_label : null,
+                typeof data.catalogType === 'string' ? data.catalogType : null,
+                typeof data.type === 'string' ? data.type : null,
+                node.id,
+              ];
+              return candidateLabels.some((value) => {
+                const normalizedLabel = normalizeLabel(value);
+                return normalizedLabel && normalized.includes(normalizedLabel);
+              });
+            });
+            if (targetNodes.length) {
+              reactFlowInstanceRef.current?.fitView({ nodes: targetNodes, padding: 0.35, duration: 400 });
+            } else {
+              reactFlowInstanceRef.current?.fitView({ padding: 0.3, duration: 350 });
+            }
+          });
+        },
+        [nodes, reactFlowInstanceRef]
+      );
+
       const scheduleFitView = useCallback(() => {
         shouldFitViewRef.current = true;
       }, []);
@@ -115,6 +186,43 @@ const CanvasShell = forwardRef<CanvasShellHandle, CanvasShellProps>(
           reactFlowInstanceRef.current?.fitView({ padding: 0.25, duration: 350 });
         });
       }, [edges, nodes]);
+
+      useEffect(() => {
+        if (!pendingHighlightLabels.length) {
+          return;
+        }
+        const timer = setTimeout(() => {
+          setPendingHighlightLabels([]);
+        }, 4000);
+        return () => clearTimeout(timer);
+      }, [pendingHighlightLabels]);
+
+      useEffect(() => {
+        if (!pendingConfigurationDetails.length) {
+          clearPendingToast();
+          return;
+        }
+        showPendingToast(pendingConfigurationDetails);
+      }, [pendingConfigurationDetails, showPendingToast, clearPendingToast]);
+
+      useEffect(() => {
+        if (!pendingConfigurationDetails.length) {
+          setPendingHighlightLabels((current) => (current.length ? [] : current));
+          return;
+        }
+        const pendingLabelSet = new Set(
+          pendingConfigurationDetails
+            .map((detail) => normalizeLabel(detail.label))
+            .filter((label): label is string => Boolean(label))
+        );
+        setPendingHighlightLabels((current) => {
+          if (!current.length) {
+            return current;
+          }
+          const filtered = current.filter((label) => pendingLabelSet.has(label));
+          return filtered.length === current.length ? current : filtered;
+        });
+      }, [pendingConfigurationDetails]);
 
       const {
         registerNode,
@@ -292,6 +400,83 @@ const CanvasShell = forwardRef<CanvasShellHandle, CanvasShellProps>(
         [handleOpenSettings]
       );
 
+      const pendingWarningMap = useMemo(() => {
+        const map = new Map<string, string | null>();
+        pendingConfigurationDetails.forEach(({ label, reason }) => {
+          const normalized = normalizeLabel(label);
+          if (!normalized) {
+            return;
+          }
+          map.set(normalized, reason ?? null);
+        });
+        return map;
+      }, [pendingConfigurationDetails]);
+
+      const pendingHighlightSet = useMemo(() => new Set(pendingHighlightLabels), [pendingHighlightLabels]);
+
+      useEffect(() => {
+        if (!pendingWarningMap.size && !pendingHighlightSet.size) {
+          setNodes((current) => {
+            let changed = false;
+            const next = current.map((node) => {
+              const hasWarning = Boolean(node.data?.pendingWarningActive);
+              const hasHighlight = Boolean(node.data?.pendingHighlight);
+              if (!hasWarning && !hasHighlight) {
+                return node;
+              }
+              changed = true;
+              return {
+                ...node,
+                data: {
+                  ...(node.data ?? {}),
+                  pendingWarningActive: false,
+                  pendingWarningReason: null,
+                  pendingHighlight: false,
+                },
+              };
+            });
+            return changed ? next : current;
+          });
+          return;
+        }
+
+        setNodes((current) => {
+          let changed = false;
+          const next = current.map((node) => {
+            const candidateLabels = [
+              typeof node.data?.label === 'string' ? node.data?.label : null,
+              typeof node.data?.title === 'string' ? node.data?.title : null,
+              node.id,
+            ];
+            const normalizedLabel = candidateLabels.map((value) => normalizeLabel(value)).find(Boolean) ?? '';
+            const hasPendingWarning = normalizedLabel ? pendingWarningMap.has(normalizedLabel) : false;
+            const warningReason = hasPendingWarning && normalizedLabel ? pendingWarningMap.get(normalizedLabel) ?? null : null;
+            const highlight = normalizedLabel ? pendingHighlightSet.has(normalizedLabel) : false;
+            const existingReason = node.data?.pendingWarningReason ?? null;
+            const existingHighlight = Boolean(node.data?.pendingHighlight);
+            const existingWarningFlag = Boolean(node.data?.pendingWarningActive);
+            if (
+              existingReason === warningReason &&
+              existingHighlight === highlight &&
+              existingWarningFlag === hasPendingWarning
+            ) {
+              return node;
+            }
+            changed = true;
+            return {
+              ...node,
+              data: {
+                ...(node.data ?? {}),
+                pendingWarningActive: hasPendingWarning,
+                pendingWarningReason: warningReason,
+                pendingHighlight: highlight,
+              },
+            };
+          });
+          return changed ? next : current;
+        });
+      }, [pendingHighlightSet, pendingWarningMap, setNodes]);
+
       return (
         <div
           className="canvas-stage"
@@ -343,6 +528,18 @@ const CanvasShell = forwardRef<CanvasShellHandle, CanvasShellProps>(
               onResetConfig={handleResetNodeConfig}
               defaultConfigTemplate={selectedNodeDefaultConfig}
               isResetAvailable={canResetSelectedNode}
+              onPendingConfigurationUpdate={handlePendingConfigurationUpdate}
+              onPendingConfigurationCleared={handlePendingConfigurationCleared}
+              onHighlightPendingNodes={handleHighlightPendingNodes}
+              pendingConfigurationDetails={pendingConfigurationDetails}
+            />
+          )}
+
+          {isPendingToastVisible && pendingToastDetails.length > 0 && (
+            <PendingConfigurationDock
+              details={pendingToastDetails}
+              onDismiss={dismissPendingToast}
+              onHighlight={handleHighlightPendingNodes}
             />
           )}
         </div>

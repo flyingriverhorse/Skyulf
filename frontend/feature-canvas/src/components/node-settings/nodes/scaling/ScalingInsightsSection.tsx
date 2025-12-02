@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import { CheckboxInput } from '../../ui/FormFields';
 import type { ScalingMethodDetail, ScalingMethodName } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 import type {
   NormalizedScalingConfig,
   ScalingMethodOption,
@@ -35,6 +37,9 @@ type ScalingInsightsSectionProps = {
   onDefaultMethodChange: (method: ScalingMethodName) => void;
   onAutoDetectToggle: (checked: boolean) => void;
   onOverrideSelect: (column: string, value: string) => void;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const ScalingInsightsSection: React.FC<ScalingInsightsSectionProps> = ({
@@ -64,7 +69,21 @@ export const ScalingInsightsSection: React.FC<ScalingInsightsSectionProps> = ({
   onDefaultMethodChange,
   onAutoDetectToggle,
   onOverrideSelect,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+
   const defaultDetail = scalingDefaultDetail ?? scalingMethodDetailMap.get(scalingConfig.defaultMethod) ?? null;
 
   return (

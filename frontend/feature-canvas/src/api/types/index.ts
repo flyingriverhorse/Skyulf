@@ -892,6 +892,7 @@ export type FullExecutionSignal = {
   processed_rows?: number | null;
   applied_steps?: string[];
   warnings?: string[];
+  pending_nodes?: string[] | null;
   dataset_source_id?: string | null;
   job_id?: string | null;
   job_status?: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | null;

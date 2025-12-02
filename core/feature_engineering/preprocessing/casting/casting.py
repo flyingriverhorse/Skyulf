@@ -297,13 +297,13 @@ def _summarize_cast_results(
     unique_targets = sorted({instruction.resolved_dtype for instruction in instructions})
 
     if len(unique_targets) == 1:
-        summary_parts = [f"Cast columns: attempted {attempted} column(s) to {unique_targets[0]}"]
+        summary_parts = [f"Cast column types: attempted {attempted} column(s) to {unique_targets[0]}"]
     else:
         targets_preview = ", ".join(unique_targets[:3])
         if len(unique_targets) > 3:
             targets_preview = f"{targets_preview}, ..."
         summary_parts = [
-            f"Cast columns: attempted {attempted} column(s) across {len(unique_targets)} dtype(s): {targets_preview}"
+            f"Cast column types: attempted {attempted} column(s) across {len(unique_targets)} dtype(s): {targets_preview}"
         ]
 
     if result.changed_columns:
@@ -342,19 +342,19 @@ def _prepare_cast_execution(
     config: CastConfiguration,
 ) -> _CastPreparationOutcome:
     if frame.empty:
-        return _CastPreparationOutcome(frame, [], [], [], "Cast columns: no data available")
+        return _CastPreparationOutcome(frame, [], [], [], "Cast column types: no data available")
 
     if not config.candidate_columns:
-        return _CastPreparationOutcome(frame, [], [], [], "Cast columns: no matching columns")
+        return _CastPreparationOutcome(frame, [], [], [], "Cast column types: no matching columns")
 
     instructions, missing_columns, skipped_missing_dtype = _collect_cast_instructions(frame, config)
 
     if instructions:
         return _CastPreparationOutcome(frame, instructions, missing_columns, skipped_missing_dtype, None)
 
-    summary = "Cast columns: target dtype not configured"
+    summary = "Cast column types: target dtype not configured"
     if missing_columns and not config.configured_columns:
-        summary = "Cast columns: no matching columns"
+        summary = "Cast column types: no matching columns"
     return _CastPreparationOutcome(frame, [], missing_columns, skipped_missing_dtype, summary)
 
 

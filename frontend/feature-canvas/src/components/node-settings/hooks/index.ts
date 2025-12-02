@@ -36,6 +36,7 @@ export * from './core/useNodeMetadata';
 export * from './core/useNodeParameters';
 export * from './core/useNodeSaveHandlers';
 export * from './core/useNodeSpecificParameters';
+export * from './core/usePendingConfigurationToast';
 export * from './core/useParameterCatalog';
 export * from './core/useParameterHandlers';
 export * from './core/usePruneColumnSelections';

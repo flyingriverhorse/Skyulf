@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import type {
   BinningColumnRecommendation,
   BinningExcludedColumn,
 } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 import {
   BINNING_STRATEGY_LABELS,
   BINNING_STRATEGY_OPTIONS,
@@ -96,6 +98,9 @@ type BinningInsightsSectionProps = {
   onClearCustomColumn: (column: string) => void;
   formatMetricValue: (value: number) => string;
   formatNumericStat: (value: number) => string;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const BinningInsightsSection: React.FC<BinningInsightsSectionProps> = ({
@@ -128,7 +133,21 @@ export const BinningInsightsSection: React.FC<BinningInsightsSectionProps> = ({
   onClearCustomColumn,
   formatMetricValue,
   formatNumericStat,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+
   const summaryLabel = useMemo(() => {
     if (!hasSource) {
       return 'Select a dataset to surface diagnostics.';
