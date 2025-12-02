@@ -38,6 +38,7 @@ import { usePipelineLoader } from '../../hooks';
 import { useSplitPropagation } from '../../hooks';
 import { useConnectionHandlers } from '../../hooks';
 import { CanvasViewport } from '../CanvasViewport/CanvasViewport';
+import { fetchTrainingJobs, fetchHyperparameterTuningJobs } from '../../../api';
 
 const normalizeLabel = (value?: string | null): string => {
   if (!value || typeof value !== 'string') {
@@ -247,6 +248,88 @@ const CanvasShell = forwardRef<CanvasShellHandle, CanvasShellProps>(
       useEffect(() => {
         updateNodeCounter(nodes);
       }, [nodes, updateNodeCounter]);
+
+      // Poll for active training/tuning jobs to update progress even when modal is closed
+      useEffect(() => {
+        const activeNodes = nodes.filter((node) => {
+          const status = node.data?.backgroundExecutionStatus;
+          const type = node.data?.catalogType;
+          return (
+            status === 'loading' &&
+            (type === 'train_model_draft' || type === 'hyperparameter_tuning')
+          );
+        });
+
+        if (activeNodes.length === 0) {
+          return;
+        }
+
+        const timer = setTimeout(async () => {
+          const updates = new Map<string, { backgroundExecutionStatus: string; progress?: number }>();
+
+          await Promise.all(
+            activeNodes.map(async (node) => {
+              try {
+                const catalogType = node.data?.catalogType;
+                let latestJob = null;
+
+                if (catalogType === 'train_model_draft') {
+                  const res = await fetchTrainingJobs({
+                    datasetSourceId: sourceId || undefined,
+                    nodeId: node.id,
+                    limit: 1,
+                  });
+                  latestJob = res.jobs?.[0];
+                } else if (catalogType === 'hyperparameter_tuning') {
+                  const res = await fetchHyperparameterTuningJobs({
+                    datasetSourceId: sourceId || undefined,
+                    nodeId: node.id,
+                    limit: 1,
+                  });
+                  latestJob = res.jobs?.[0];
+                }
+
+                if (latestJob) {
+                  const status = latestJob.status?.toLowerCase();
+                  let nodeStatus = 'idle';
+                  if (status === 'running' || status === 'queued') {
+                    nodeStatus = 'loading';
+                  } else if (status === 'succeeded') {
+                    nodeStatus = 'success';
+                  } else if (status === 'failed' || status === 'cancelled') {
+                    nodeStatus = 'error';
+                  }
+
+                  const progress = typeof latestJob.progress === 'number' ? latestJob.progress : undefined;
+                  updates.set(node.id, { backgroundExecutionStatus: nodeStatus, progress });
+                }
+              } catch (error) {
+                // Ignore polling errors
+              }
+            })
+          );
+
+          if (updates.size > 0) {
+            setNodes((currentNodes) =>
+              currentNodes.map((node) => {
+                if (updates.has(node.id)) {
+                  const update = updates.get(node.id)!;
+                  const currentData = node.data || {};
+                  if (
+                    currentData.backgroundExecutionStatus !== update.backgroundExecutionStatus ||
+                    currentData.progress !== update.progress
+                  ) {
+                    return { ...node, data: { ...currentData, ...update } };
+                  }
+                }
+                return node;
+              })
+            );
+          }
+        }, 1000);
+
+        return () => clearTimeout(timer);
+      }, [nodes, sourceId, setNodes]);
 
       const prepareNodes = useCallback(
         (rawNodes: Node[]) =>

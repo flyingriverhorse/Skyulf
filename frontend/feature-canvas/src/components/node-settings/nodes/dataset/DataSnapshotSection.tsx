@@ -281,6 +281,10 @@ const deriveBackgroundExecutionStatus = (
   }
 
   if (statusToken === 'succeeded') {
+    const pending = extractPendingConfigurationDetails(signal);
+    if (pending.length > 0) {
+      return 'error';
+    }
     return 'success';
   }
   if (statusToken === 'failed' || statusToken === 'skipped' || statusToken === 'cancelled') {

@@ -65,6 +65,9 @@ type ModelTrainingSectionProps = {
 	cvRandomStateParameter: FeatureNodeParameter | null;
 	cvRefitStrategyParameter: FeatureNodeParameter | null;
 	onSaveDraftConfig?: (options?: { closeModal?: boolean }) => void | Promise<void>;
+	onUpdateNodeData?: (nodeId: string, dataUpdates: Record<string, any>) => void;
+	currentStatus?: string;
+	currentProgress?: number;
 };
 
 export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
@@ -86,6 +89,9 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 	cvRandomStateParameter,
 	cvRefitStrategyParameter,
 	onSaveDraftConfig,
+	onUpdateNodeData,
+	currentStatus,
+	currentProgress,
 }) => {
 	const queryClient = useQueryClient();
 	const [pipelineId, setPipelineId] = useState<string | null>(null);
@@ -435,7 +441,7 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 			const hasActiveJob = jobList.some(
 				(job: TrainingJobSummary) => job.status === 'queued' || job.status === 'running'
 			);
-			return hasActiveJob ? 5000 : false;
+			return hasActiveJob ? 1000 : false;
 		},
 	});
 
@@ -451,8 +457,39 @@ export const ModelTrainingSection: React.FC<ModelTrainingSectionProps> = ({
 			setLastCreatedJob(firstJob);
 			setLastCreatedJobCount(jobCount);
 			queryClient.invalidateQueries({ queryKey: trainingJobsQueryKey });
+			if (firstJob && onUpdateNodeData) {
+				onUpdateNodeData(nodeId, { backgroundExecutionStatus: 'loading' });
+			}
 		},
 	});
+
+	useEffect(() => {
+		if (!trainingJobsQuery.data || !onUpdateNodeData) {
+			return;
+		}
+		const jobs = trainingJobsQuery.data.jobs ?? [];
+		if (jobs.length === 0) {
+			return;
+		}
+		// The API returns jobs sorted by created_at desc, so the first one is the latest.
+		const latestJob = jobs[0];
+		const status = latestJob.status?.toLowerCase();
+		let nodeStatus = 'idle';
+
+		if (status === 'running' || status === 'queued') {
+			nodeStatus = 'loading';
+		} else if (status === 'succeeded') {
+			nodeStatus = 'success';
+		} else if (status === 'failed' || status === 'cancelled') {
+			nodeStatus = 'error';
+		}
+
+		const progress = typeof latestJob.progress === 'number' ? latestJob.progress : undefined;
+
+		if (nodeStatus !== currentStatus || (progress !== undefined && progress !== currentProgress)) {
+			onUpdateNodeData(nodeId, { backgroundExecutionStatus: nodeStatus, progress });
+		}
+	}, [trainingJobsQuery.data, onUpdateNodeData, nodeId, currentStatus, currentProgress]);
 
 	const tuningJobsError = tuningJobsQuery.error as Error | null;
 	const isTuningJobsLoading = tuningJobsQuery.isLoading || tuningJobsQuery.isFetching;
