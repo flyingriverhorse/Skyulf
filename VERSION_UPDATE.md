@@ -52,6 +52,8 @@ This document tracks the progress of stability and user experience improvements 
 - [x] **Real-time Progress Tracking**
     - Backend: Update job status with `progress` (0-100) and `current_step`.
     - Frontend: Display progress bar instead of static "Running" badge.
+    - **Canvas Integration:** Replaced generic loading spinner on Training/Tuning nodes with real-time numeric progress percentage.
+    - **Persistence:** Implemented global polling and state restoration so progress updates continue when modals are closed or when switching datasets.
     - Fixed Optuna log capturing by forcing INFO verbosity.
     - Updated API schemas (`HyperparameterTuningJobSummary`, `TrainingJobSummary`) to expose progress fields.
 - [x] **Pending Configuration Guidance**

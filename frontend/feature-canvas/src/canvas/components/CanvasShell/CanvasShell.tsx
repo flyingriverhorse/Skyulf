@@ -377,6 +377,101 @@ const CanvasShell = forwardRef<CanvasShellHandle, CanvasShellProps>(
         onPipelineError,
       });
 
+      // Rehydration check: When pipeline finishes loading, check for active jobs that might have been saved as 'idle'
+      const [hasCheckedInitialJobs, setHasCheckedInitialJobs] = useState(false);
+
+      useEffect(() => {
+        setHasCheckedInitialJobs(false);
+      }, [sourceId]);
+
+      useEffect(() => {
+        if (isPipelineLoading || hasCheckedInitialJobs || !sourceId || nodes.length === 0) {
+          return;
+        }
+
+        // Ensure we have at least one node other than dataset-source to consider it loaded
+        const hasContent = nodes.some((n) => n.id !== 'dataset-source');
+        if (!hasContent && nodes.length > 1) {
+           // If we have nodes but they are all dataset-source (unlikely), skip
+           return;
+        }
+
+        const trainingNodes = nodes.filter((node) => {
+          const type = node.data?.catalogType;
+          return type === 'train_model_draft' || type === 'hyperparameter_tuning';
+        });
+
+        if (trainingNodes.length === 0) {
+          setHasCheckedInitialJobs(true);
+          return;
+        }
+
+        const checkJobs = async () => {
+          const updates = new Map<string, { backgroundExecutionStatus: string; progress?: number }>();
+
+          await Promise.all(
+            trainingNodes.map(async (node) => {
+              try {
+                const catalogType = node.data?.catalogType;
+                let latestJob = null;
+
+                if (catalogType === 'train_model_draft') {
+                  const res = await fetchTrainingJobs({
+                    datasetSourceId: sourceId || undefined,
+                    nodeId: node.id,
+                    limit: 1,
+                  });
+                  latestJob = res.jobs?.[0];
+                } else if (catalogType === 'hyperparameter_tuning') {
+                  const res = await fetchHyperparameterTuningJobs({
+                    datasetSourceId: sourceId || undefined,
+                    nodeId: node.id,
+                    limit: 1,
+                  });
+                  latestJob = res.jobs?.[0];
+                }
+
+                if (latestJob) {
+                  const status = latestJob.status?.toLowerCase();
+                  let nodeStatus = 'idle';
+                  if (status === 'running' || status === 'queued') {
+                    nodeStatus = 'loading';
+                  } else if (status === 'succeeded') {
+                    nodeStatus = 'success';
+                  } else if (status === 'failed' || status === 'cancelled') {
+                    nodeStatus = 'error';
+                  }
+
+                  const progress = typeof latestJob.progress === 'number' ? latestJob.progress : undefined;
+                  
+                  // Only update if status is active or different from current
+                  if (nodeStatus === 'loading' || nodeStatus !== node.data?.backgroundExecutionStatus) {
+                     updates.set(node.id, { backgroundExecutionStatus: nodeStatus, progress });
+                  }
+                }
+              } catch (error) {
+                // Ignore errors
+              }
+            })
+          );
+
+          if (updates.size > 0) {
+            setNodes((currentNodes) =>
+              currentNodes.map((node) => {
+                if (updates.has(node.id)) {
+                  const update = updates.get(node.id)!;
+                  return { ...node, data: { ...(node.data || {}), ...update } };
+                }
+                return node;
+              })
+            );
+          }
+          setHasCheckedInitialJobs(true);
+        };
+
+        checkJobs();
+      }, [isPipelineLoading, hasCheckedInitialJobs, sourceId, nodes, setNodes]);
+
       const clearGraph = useCallback(() => {
         setNodes((current) => {
           const existingDataset = current.find((node) => node.id === 'dataset-source');
