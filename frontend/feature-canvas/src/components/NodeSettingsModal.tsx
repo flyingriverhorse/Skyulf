@@ -903,6 +903,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <DropMissingRowsSection
               thresholdParameter={nodeParams.dropMissing.threshold ?? null}
               dropIfAnyParameter={nodeParams.dropRows.any}
+              dropIfAnyValue={configState?.['drop_if_any_missing']}
+              suppressWarnings={!!dropColumnParameter}
               renderParameterField={renderParameterField}
               previewState={previewState}
               onPendingConfigurationWarning={handlePendingWarning}
@@ -913,6 +915,8 @@ export const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <DropMissingSettingsSection
               thresholdParameter={nodeParams.dropMissing.threshold ?? null}
               dropColumnParameter={dropColumnParameter}
+              dropIfAnyValue={configState?.['drop_if_any_missing']}
+              selectedColumns={selectedColumns}
               renderParameterField={renderParameterField}
               renderMultiSelectField={renderMultiSelectField}
               previewState={previewState}
