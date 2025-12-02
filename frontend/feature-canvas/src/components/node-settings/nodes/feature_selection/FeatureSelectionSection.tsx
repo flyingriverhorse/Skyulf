@@ -1,5 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { FeatureNodeParameter, FeatureSelectionNodeSignal } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import {
+  extractPendingConfigurationDetails,
+  type PendingConfigurationDetail,
+} from '../../utils/pendingConfiguration';
 import { AdvancedSettingsToggle } from '../../layout/AdvancedSettingsToggle';
 
 type FeatureSelectionSectionProps = {
@@ -21,6 +26,11 @@ type FeatureSelectionSectionProps = {
   dropUnselectedParameter: FeatureNodeParameter | null;
   renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
   signal: FeatureSelectionNodeSignal | null;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (
+    details: PendingConfigurationDetail[]
+  ) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 const isDefinedParameter = (
@@ -83,7 +93,31 @@ export const FeatureSelectionSection: React.FC<FeatureSelectionSectionProps> = (
   dropUnselectedParameter,
   renderParameterField,
   signal,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (!previewState?.data?.signals?.full_execution) {
+      onPendingConfigurationCleared?.();
+      return;
+    }
+
+    const details = extractPendingConfigurationDetails(
+      previewState.data.signals.full_execution,
+    );
+
+    if (details.length > 0) {
+      onPendingConfigurationWarning?.(details);
+    } else {
+      onPendingConfigurationCleared?.();
+    }
+  }, [
+    previewState?.data?.signals?.full_execution,
+    onPendingConfigurationWarning,
+    onPendingConfigurationCleared,
+  ]);
+
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const primaryParameters = useMemo(() => {

@@ -1,6 +1,11 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { ensureArrayOfString } from '../../sharedUtils';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import {
+  extractPendingConfigurationDetails,
+  type PendingConfigurationDetail,
+} from '../../utils/pendingConfiguration';
 
 const COMMON_DTYPE_OPTIONS = ['float64', 'Int64', 'boolean', 'string', 'category', 'datetime64[ns]', 'object'];
 
@@ -13,8 +18,13 @@ export type CastColumnTypesSectionProps = {
   selectedColumns: string[];
   previewColumns: string[];
   previewStatus: 'idle' | 'loading' | 'success' | 'error';
+  previewState?: PreviewState;
   sourceId?: string | null;
   hasReachableSource: boolean;
+  onPendingConfigurationWarning?: (
+    details: PendingConfigurationDetail[]
+  ) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 type CastTableRow = {
@@ -40,9 +50,33 @@ export const CastColumnTypesSection: React.FC<CastColumnTypesSectionProps> = ({
   selectedColumns,
   previewColumns,
   previewStatus,
+  previewState,
   sourceId,
   hasReachableSource,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (!previewState?.data?.signals?.full_execution) {
+      onPendingConfigurationCleared?.();
+      return;
+    }
+
+    const details = extractPendingConfigurationDetails(
+      previewState.data.signals.full_execution,
+    );
+
+    if (details.length > 0) {
+      onPendingConfigurationWarning?.(details);
+    } else {
+      onPendingConfigurationCleared?.();
+    }
+  }, [
+    previewState?.data?.signals?.full_execution,
+    onPendingConfigurationWarning,
+    onPendingConfigurationCleared,
+  ]);
+
   const columnOverrides = useMemo(() => {
     const raw = configState?.column_overrides;
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {

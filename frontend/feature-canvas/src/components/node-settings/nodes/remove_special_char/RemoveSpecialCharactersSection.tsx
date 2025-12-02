@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { FeatureNodeParameter } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 import {
   type SpecialColumnSummary,
   type SpecialSampleMap,
@@ -20,6 +22,9 @@ export type RemoveSpecialCharactersSectionProps = {
   columnSummary: SpecialColumnSummary;
   modeDetails: RemoveSpecialModeDetails;
   sampleMap: SpecialSampleMap;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const RemoveSpecialCharactersSection: React.FC<RemoveSpecialCharactersSectionProps> = ({
@@ -33,7 +38,21 @@ export const RemoveSpecialCharactersSection: React.FC<RemoveSpecialCharactersSec
   columnSummary,
   modeDetails,
   sampleMap,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+
   if (!columnsParameter && !modeParameter && !replacementParameter) {
     return null;
   }

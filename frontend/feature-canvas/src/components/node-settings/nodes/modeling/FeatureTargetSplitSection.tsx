@@ -1,10 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import type {
   FeatureNodeParameter,
   FeatureTargetSplitNodeSignal,
   PipelinePreviewColumnStat,
 } from '../../../../api';
 import type { PreviewState } from '../dataset/DataSnapshotSection';
+import {
+  extractPendingConfigurationDetails,
+  type PendingConfigurationDetail,
+} from '../../utils/pendingConfiguration';
 
 export type FeatureTargetSplitConfig = {
   targetColumn: string;
@@ -22,6 +26,10 @@ type FeatureTargetSplitSectionProps = {
   renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
   formatMetricValue: (value?: number | null, precision?: number) => string;
   formatMissingPercentage: (value?: number | null) => string;
+  onPendingConfigurationWarning?: (
+    details: PendingConfigurationDetail[]
+  ) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 const summarizeList = (values: string[], limit = 5): string => {
@@ -74,7 +82,29 @@ export const FeatureTargetSplitSection: React.FC<FeatureTargetSplitSectionProps>
   renderParameterField,
   formatMetricValue,
   formatMissingPercentage,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (!previewState.data?.signals?.full_execution) {
+      onPendingConfigurationCleared?.();
+      return;
+    }
+
+    const details = extractPendingConfigurationDetails(
+      previewState.data.signals.full_execution,
+    );
+
+    if (details.length > 0) {
+      onPendingConfigurationWarning?.(details);
+    } else {
+      onPendingConfigurationCleared?.();
+    }
+  }, [
+    previewState.data?.signals?.full_execution,
+    onPendingConfigurationWarning,
+    onPendingConfigurationCleared,
+  ]);
   const preview = previewState.data;
   const previewStatus = previewState.status;
   const appliedSteps = Array.isArray(preview?.applied_steps) ? preview.applied_steps : [];

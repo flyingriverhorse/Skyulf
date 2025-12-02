@@ -43,6 +43,20 @@ const FeatureCanvasNode: React.FC<NodeProps<FeatureNodeData>> = ({ id, data, sel
   const isModelingNode = ['hyperparameter_tuning', 'train_model_draft', 'model_evaluation', 'model_registry_overview'].includes(
     catalogType
   );
+  const pendingWarningReason = data?.pendingWarningReason ?? null;
+  const hasPendingWarning = Boolean(data?.pendingWarningActive);
+  const isPendingHighlight = Boolean(data?.pendingHighlight);
+  const pendingWarningMessage = pendingWarningReason ?? 'This node still needs configuration.';
+
+  const nodeClassName = [
+    'feature-node',
+    selected ? 'feature-node--selected' : '',
+    isDataset ? 'feature-node--dataset' : '',
+    hasPendingWarning ? 'feature-node--pending-warning' : '',
+    isPendingHighlight ? 'feature-node--pending-highlight' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const handleRemove = useCallback(
     (event: React.MouseEvent) => {
@@ -208,7 +222,7 @@ const FeatureCanvasNode: React.FC<NodeProps<FeatureNodeData>> = ({ id, data, sel
   }, []);
 
   return (
-    <div className={`feature-node${selected ? ' feature-node--selected' : ''}${isDataset ? ' feature-node--dataset' : ''}`}>
+    <div className={nodeClassName}>
       {targetHandles.map((handle) => renderHandle(handle, 'target'))}
       <div className="feature-node__header">
         <div className="feature-node__title-group">
@@ -218,6 +232,15 @@ const FeatureCanvasNode: React.FC<NodeProps<FeatureNodeData>> = ({ id, data, sel
           <span className="feature-node__title">{label}</span>
         </div>
         <div className="feature-node__controls">
+          {hasPendingWarning && (
+            <span
+              className="feature-node__status-indicator feature-node__status-indicator--pending"
+              title={pendingWarningMessage}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              !
+            </span>
+          )}
           {needsConnection && isModelingNode && (
             <span
               className="feature-node__status-indicator feature-node__status-indicator--warning"
@@ -275,6 +298,7 @@ const FeatureCanvasNode: React.FC<NodeProps<FeatureNodeData>> = ({ id, data, sel
         </div>
       </div>
       {description && <p className="feature-node__description">{description}</p>}
+      {hasPendingWarning && <p className="feature-node__pending-hint">{pendingWarningMessage}</p>}
       {sourceHandles.map((handle) => renderHandle(handle, 'source'))}
     </div>
   );

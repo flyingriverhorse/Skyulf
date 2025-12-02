@@ -803,7 +803,7 @@ def apply_target_encoding(
         return frame, env_error, signal
 
     if environment is None:
-        fallback_message = "Target encoding: environment unavailable"
+        fallback_message = "Target encode categories: environment unavailable"
         signal.skipped_columns.append("environment unavailable")
         return frame, fallback_message, signal
 
@@ -815,7 +815,7 @@ def apply_target_encoding(
 
     if not candidate_columns:
         signal.evaluated_columns = []
-        return frame, "Target encoding: no categorical columns selected", signal
+        return frame, "Target encode categories: no categorical columns selected", signal
 
     signal.evaluated_columns = list(candidate_columns)
 

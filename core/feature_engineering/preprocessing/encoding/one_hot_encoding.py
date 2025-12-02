@@ -839,7 +839,7 @@ def apply_one_hot_encoding(
 
     if frame.empty:
         signal.evaluated_columns = []
-        return frame, "One-hot encoding: no data available", signal
+        return frame, "One-hot encode categories: no data available", signal
 
     candidate_columns, skipped_notes = _collect_candidate_columns(frame, config)
 
@@ -849,7 +849,7 @@ def apply_one_hot_encoding(
 
     if not candidate_columns:
         signal.evaluated_columns = []
-        return frame, "One-hot encoding: no categorical columns selected", signal
+        return frame, "One-hot encode categories: no categorical columns selected", signal
 
     working_frame = frame.copy()
     existing_columns = set(working_frame.columns)

@@ -23,6 +23,7 @@
 @import './styles/modals/header.css';
 @import './styles/modals/forms.css';
 @import './styles/modals/footer.css';
+@import './styles/modals/toast.css';
 @import './styles/modals/recommendations.css';
 @import './styles/modals/best-params.css';
 @import './styles/modals/columns.css';

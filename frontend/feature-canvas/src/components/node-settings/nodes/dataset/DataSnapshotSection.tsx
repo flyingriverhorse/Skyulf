@@ -8,6 +8,10 @@ import {
   type PipelinePreviewRowStat,
   type FullExecutionSignal,
 } from '../../../../api';
+import {
+  extractPendingConfigurationDetails,
+  type PendingConfigurationDetail,
+} from '../../utils/pendingConfiguration';
 
 export type PreviewState = {
   status: 'idle' | 'loading' | 'success' | 'error';
@@ -514,6 +518,8 @@ type DataSnapshotSectionProps = {
   formatModeStat: (value?: string | number | null) => string;
   nodeId?: string | null;
   onUpdateNodeData?: (nodeId: string, dataUpdates: Record<string, any>) => void;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
@@ -528,6 +534,8 @@ export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
   formatModeStat,
   nodeId,
   onUpdateNodeData,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
   const [rowWindow, setRowWindow] = useState<RowWindowState>(() => createInitialRowWindowState());
   const [fullExecutionSummary, setFullExecutionSummary] = useState<FullExecutionSummary | null>(null);
@@ -550,6 +558,21 @@ export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
       onUpdateNodeData(nodeId, { backgroundExecutionStatus: nextStatus });
     },
     [nodeId, onUpdateNodeData]
+  );
+
+  const handlePendingConfigurationSignal = useCallback(
+    (signal: FullExecutionSignal | null | undefined) => {
+      if (!onPendingConfigurationWarning && !onPendingConfigurationCleared) {
+        return;
+      }
+      const details = extractPendingConfigurationDetails(signal);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    },
+    [onPendingConfigurationCleared, onPendingConfigurationWarning]
   );
 
   const isRefreshing = previewState.status === 'loading';
@@ -624,7 +647,17 @@ export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
       largeDataset: false,
       error: null,
     });
-  }, [baseColumns, basePreviewRows, baseRowCount, baseHasMore, formatMetricValue, metrics?.total_rows, notifyBackgroundStatus, previewState.data, previewState.status]);
+  }, [
+    baseColumns,
+    basePreviewRows,
+    baseRowCount,
+    baseHasMore,
+    formatMetricValue,
+    metrics?.total_rows,
+    notifyBackgroundStatus,
+    previewState.data,
+    previewState.status,
+  ]);
 
   // Poll for background job status updates
   useEffect(() => {
@@ -648,6 +681,7 @@ export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
           const updatedSummary = resolveFullExecutionSummary(updatedSignal, formatMetricValue);
           setFullExecutionSummary(updatedSummary);
           notifyBackgroundStatus(updatedSignal);
+          handlePendingConfigurationSignal(updatedSignal);
           
           // Update the preview state with the new signal
           if (previewState.data) {
@@ -668,7 +702,14 @@ export const DataSnapshotSection: React.FC<DataSnapshotSectionProps> = ({
     }, pollInterval);
 
     return () => clearTimeout(timer);
-  }, [fullExecutionSummary, datasetSourceId, formatMetricValue, notifyBackgroundStatus, previewState.data]);
+  }, [
+    fullExecutionSummary,
+    datasetSourceId,
+    formatMetricValue,
+    handlePendingConfigurationSignal,
+    notifyBackgroundStatus,
+    previewState.data,
+  ]);
 
   const visibleColumns = rowWindow.columns.length > 0 ? rowWindow.columns : baseColumns;
   const visibleRows = rowWindow.rows.length > 0 ? rowWindow.rows : basePreviewRows;

@@ -4675,6 +4675,18 @@ body {
   flex: 1 1 180px;
 }
 
+.canvas-modal__footer-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: rgba(251, 191, 36, 0.92);
+  font-size: 0.9rem;
+}
+
+.canvas-modal__footer-hint strong {
+  font-size: 0.9rem;
+}
+
 .canvas-modal__footer-spinner {
   width: 1rem;
   height: 1rem;

@@ -1,4 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 import type {
   DateColumnOption,
   DateColumnSummary,
@@ -25,6 +27,9 @@ export type StandardizeDatesSectionProps = {
   onColumnsChange: (index: number, value: string) => void;
   onAutoDetectToggle: (index: number, enabled: boolean) => void;
   modeOptions?: DateModeOption[];
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 const formatSamplePreview = (samples: string[]): string | null => {
@@ -52,7 +57,21 @@ export const StandardizeDatesSection: React.FC<StandardizeDatesSectionProps> = (
   onColumnsChange,
   onAutoDetectToggle,
   modeOptions = DATE_MODE_OPTIONS,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+
   const hasStrategies = strategies.length > 0;
   const autoDetectActive = useMemo(
     () => strategies.some((strategy) => strategy.autoDetect),

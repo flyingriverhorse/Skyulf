@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { SkewnessMethodStatus } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 import {
   SKEWNESS_METHOD_ORDER,
   type SkewnessTableGroup,
@@ -35,6 +37,9 @@ type SkewnessInsightsSectionProps = {
   onGroupByToggle: (checked: boolean) => void;
   onOverrideChange: (column: string, value: string) => void;
   onClearSelections: () => void;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const SkewnessInsightsSection: React.FC<SkewnessInsightsSectionProps> = ({
@@ -59,7 +64,21 @@ export const SkewnessInsightsSection: React.FC<SkewnessInsightsSectionProps> = (
   onGroupByToggle,
   onOverrideChange,
   onClearSelections,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+
   return (
     <section className="canvas-modal__section">
       <div className="canvas-modal__section-header">

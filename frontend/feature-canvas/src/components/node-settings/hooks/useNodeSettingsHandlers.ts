@@ -5,6 +5,7 @@ import { useAliasStrategyHandlers } from './cleaning/useAliasStrategyHandlers';
 import { useDateStrategyHandlers } from './cleaning/useDateStrategyHandlers';
 import { useFeatureMathHandlers } from './feature_math/useFeatureMathHandlers';
 import type { CatalogFlagMap } from './core/useCatalogFlags';
+import type { PendingConfigurationDetail } from '../utils/pendingConfiguration';
 
 type UseNodeSettingsHandlersArgs = {
   catalogFlags: CatalogFlagMap;
@@ -35,6 +36,8 @@ type UseNodeSettingsHandlersArgs = {
   standardizeDatesMode: any;
   setCollapsedFeatureMath: any;
   configState: any;
+  onPendingConfigurationWarning?: (pendingNodes: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const useNodeSettingsHandlers = ({
@@ -66,6 +69,8 @@ export const useNodeSettingsHandlers = ({
   standardizeDatesMode,
   setCollapsedFeatureMath,
   configState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }: UseNodeSettingsHandlersArgs) => {
   const columnSelectionHandlers = useColumnSelectionHandlers({
     catalogFlags,
@@ -89,6 +94,8 @@ export const useNodeSettingsHandlers = ({
     canResetNode,
     defaultConfigTemplate,
     onResetConfig,
+    onPendingConfigurationWarning,
+    onPendingConfigurationCleared,
   });
 
   const imputationStrategyHandlers = useImputationStrategyHandlers({

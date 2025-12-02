@@ -1,5 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { FeatureNodeParameter, PolynomialFeaturesNodeSignal } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import {
+  extractPendingConfigurationDetails,
+  type PendingConfigurationDetail,
+} from '../../utils/pendingConfiguration';
 import { AdvancedSettingsToggle } from '../../layout/AdvancedSettingsToggle';
 
 type PolynomialFeaturesSectionProps = {
@@ -12,6 +17,11 @@ type PolynomialFeaturesSectionProps = {
   outputPrefixParameter: FeatureNodeParameter | null;
   renderParameterField: (parameter: FeatureNodeParameter) => React.ReactNode;
   signal: PolynomialFeaturesNodeSignal | null;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (
+    details: PendingConfigurationDetail[]
+  ) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const PolynomialFeaturesSection: React.FC<PolynomialFeaturesSectionProps> = ({
@@ -24,7 +34,31 @@ export const PolynomialFeaturesSection: React.FC<PolynomialFeaturesSectionProps>
   outputPrefixParameter,
   renderParameterField,
   signal,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (!previewState?.data?.signals?.full_execution) {
+      onPendingConfigurationCleared?.();
+      return;
+    }
+
+    const details = extractPendingConfigurationDetails(
+      previewState.data.signals.full_execution,
+    );
+
+    if (details.length > 0) {
+      onPendingConfigurationWarning?.(details);
+    } else {
+      onPendingConfigurationCleared?.();
+    }
+  }, [
+    previewState?.data?.signals?.full_execution,
+    onPendingConfigurationWarning,
+    onPendingConfigurationCleared,
+  ]);
+
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const primaryParameters = useMemo(() => {

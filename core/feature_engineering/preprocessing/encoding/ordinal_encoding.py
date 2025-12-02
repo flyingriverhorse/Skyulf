@@ -851,7 +851,7 @@ def apply_ordinal_encoding(
     )
 
     if frame.empty:
-        return frame, "Ordinal encoding: no data available", signal
+        return frame, "Ordinal encode categories: no data available", signal
 
     data = node.get("data") or {}
     config_payload = data.get("config") or {}
@@ -867,7 +867,7 @@ def apply_ordinal_encoding(
 
     if not candidate_columns:
         signal.evaluated_columns = []
-        return frame, "Ordinal encoding: no categorical columns selected", signal
+        return frame, "Ordinal encode categories: no categorical columns selected", signal
 
     working_frame = frame.copy()
     existing_columns = set(working_frame.columns)

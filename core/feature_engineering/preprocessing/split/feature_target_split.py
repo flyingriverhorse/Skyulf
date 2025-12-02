@@ -225,7 +225,7 @@ def apply_feature_target_split(
     signal.preview_row_count = total_rows
 
     if frame.empty:
-        summary = "Feature/target split: no data available"
+        summary = "Separate features & target: no data available"
         return frame.copy(), summary, signal
 
     target_present, available_columns = _update_target_metadata(

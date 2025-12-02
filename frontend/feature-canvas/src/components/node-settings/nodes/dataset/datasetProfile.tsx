@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Node } from 'react-flow-renderer';
 import { fetchQuickProfile, type QuickProfileResponse } from '../../../../api';
+import { PendingConfigurationDetail } from '../../../types';
+import { extractPendingConfigurationDetails } from '../../../utils/extractPendingConfigurationDetails';
 
 export type ProfilingSamplePresetValue = '200' | '500' | '1000' | 'all';
 
@@ -270,6 +272,8 @@ export type DatasetProfileSectionProps = {
   formatCellValue: (value: any) => string;
   formatNumericStat: (value?: number | null) => string;
   formatMissingPercentage: (value: number) => string;
+  previewState?: any;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
 };
 
 export const DatasetProfileSection: React.FC<DatasetProfileSectionProps> = ({
@@ -278,6 +282,8 @@ export const DatasetProfileSection: React.FC<DatasetProfileSectionProps> = ({
   formatCellValue,
   formatNumericStat,
   formatMissingPercentage,
+  previewState,
+  onPendingConfigurationWarning,
 }) => {
   if (!isDatasetProfileNode) {
     return null;

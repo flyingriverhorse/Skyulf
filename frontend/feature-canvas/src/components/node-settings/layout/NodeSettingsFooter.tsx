@@ -11,6 +11,7 @@ type NodeSettingsFooterProps = {
   isBusy: boolean;
   busyLabel?: string | null;
   isSaving?: boolean;
+  statusMessage?: React.ReactNode;
 };
 
 export const NodeSettingsFooter: React.FC<NodeSettingsFooterProps> = ({
@@ -23,6 +24,7 @@ export const NodeSettingsFooter: React.FC<NodeSettingsFooterProps> = ({
   isBusy,
   busyLabel,
   isSaving = false,
+  statusMessage,
 }) => (
   <div className="canvas-modal__footer">
     <div
@@ -37,6 +39,7 @@ export const NodeSettingsFooter: React.FC<NodeSettingsFooterProps> = ({
           <span>{busyLabel ?? 'Processing…'}</span>
         </>
       )}
+      {!isBusy && statusMessage}
     </div>
     <div className="canvas-modal__footer-actions">
       <button type="button" className="btn btn-outline-secondary" onClick={onClose}>

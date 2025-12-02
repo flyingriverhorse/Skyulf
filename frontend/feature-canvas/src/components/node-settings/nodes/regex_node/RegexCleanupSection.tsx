@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { FeatureNodeParameter } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 import {
   type RegexColumnSummary,
   type RegexModeDetails,
@@ -24,6 +26,9 @@ export type RegexCleanupSectionProps = {
   sampleMap: RegexSampleMap;
   selectedMode: RegexMode;
   replacementValue: string | null;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 const describeReplacementValue = (value: string | null): string | null => {
@@ -54,7 +59,21 @@ export const RegexCleanupSection: React.FC<RegexCleanupSectionProps> = ({
   sampleMap,
   selectedMode,
   replacementValue,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+
   if (!columnsParameter && !modeParameter && !patternParameter && !replacementParameter) {
     return null;
   }

@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { FeatureNodeParameter } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 import { DEDUP_KEEP_OPTIONS, type KeepStrategy } from './removeDuplicatesSettings';
 
 export type RemoveDuplicatesSectionProps = {
@@ -11,6 +13,9 @@ export type RemoveDuplicatesSectionProps = {
   removeDuplicatesKeepSelectId: string;
   removeDuplicatesKeep: KeepStrategy;
   onKeepChange: (value: KeepStrategy) => void;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const RemoveDuplicatesSection: React.FC<RemoveDuplicatesSectionProps> = ({
@@ -22,7 +27,21 @@ export const RemoveDuplicatesSection: React.FC<RemoveDuplicatesSectionProps> = (
   removeDuplicatesKeepSelectId,
   removeDuplicatesKeep,
   onKeepChange,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+
   if (!removeDuplicatesColumnsParameter && !removeDuplicatesKeepParameter) {
     return null;
   }

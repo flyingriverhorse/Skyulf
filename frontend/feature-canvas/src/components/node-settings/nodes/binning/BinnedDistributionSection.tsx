@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import {
   BINNED_SAMPLE_PRESETS,
   type BinnedDistributionCard,
   type BinnedSamplePresetValue,
 } from './binningSettings';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 
 type BinnedDistributionSectionProps = {
   cards: BinnedDistributionCard[];
@@ -15,6 +17,8 @@ type BinnedDistributionSectionProps = {
   error: string | null;
   onRefresh: () => void;
   canRefresh: boolean;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
 };
 
 export const BinnedDistributionSection: React.FC<BinnedDistributionSectionProps> = ({
@@ -27,7 +31,18 @@ export const BinnedDistributionSection: React.FC<BinnedDistributionSectionProps>
   error,
   onRefresh,
   canRefresh,
+  previewState,
+  onPendingConfigurationWarning,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution && onPendingConfigurationWarning) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning(details);
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning]);
+
   const activePreset = useMemo(() => {
     return BINNED_SAMPLE_PRESETS.find((preset) => preset.value === selectedPreset) ?? BINNED_SAMPLE_PRESETS[0];
   }, [selectedPreset]);

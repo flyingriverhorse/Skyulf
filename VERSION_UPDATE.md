@@ -54,3 +54,7 @@ This document tracks the progress of stability and user experience improvements 
     - Frontend: Display progress bar instead of static "Running" badge.
     - Fixed Optuna log capturing by forcing INFO verbosity.
     - Updated API schemas (`HyperparameterTuningJobSummary`, `TrainingJobSummary`) to expose progress fields.
+- [x] **Pending Configuration Guidance**
+    - Added a canvas-wide pending notification dock that stays centered at the bottom of the Feature Canvas and can collapse into a chip; it lists every node still blocked and provides a single "Highlight" CTA that pans/zooms directly to those nodes.
+    - Each node settings modal now surfaces pending warnings in the footer (except preview-only nodes) using the exact backend reason text (e.g., "Drop rows: threshold not configured"), so users know what must be fixed before saving.
+    - Pending indicators stay in sync regardless of where the warning originated: Data Snapshot sections, save handlers, and background polling all feed a shared store that drives the dock, footer copy, and node highlight state.

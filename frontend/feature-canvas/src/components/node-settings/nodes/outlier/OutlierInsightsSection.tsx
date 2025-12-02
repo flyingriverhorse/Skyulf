@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import { CheckboxInput, NumberInput } from '../../ui/FormFields';
 import type {
@@ -6,6 +6,8 @@ import type {
   OutlierMethodName,
   OutlierNodeSignal,
 } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 import {
   OUTLIER_METHOD_FALLBACK_LABELS,
   OUTLIER_METHOD_ORDER,
@@ -114,6 +116,9 @@ type OutlierInsightsSectionProps = {
   onOverrideSelect: (column: string, value: string) => void;
   onMethodParameterChange: (method: OutlierMethodName, parameter: string, value: number | null) => void;
   onColumnParameterChange: (column: string, parameter: string, value: number | null) => void;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const OutlierInsightsSection: React.FC<OutlierInsightsSectionProps> = ({
@@ -147,7 +152,21 @@ export const OutlierInsightsSection: React.FC<OutlierInsightsSectionProps> = ({
   onOverrideSelect,
   onMethodParameterChange,
   onColumnParameterChange,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+
   const previewSummary = resolvePreviewSummary(outlierPreviewSignal);
 
   return (

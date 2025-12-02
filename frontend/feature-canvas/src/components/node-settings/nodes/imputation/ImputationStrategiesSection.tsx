@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 import { FormField, SelectInput, NumberInput, TextInput, RangeInput } from '../../ui/FormFields';
 import {
   IMPUTER_MISSING_FILTER_PRESETS,
@@ -48,6 +50,9 @@ type ImputationStrategiesSectionProps = {
   formatNumericStat: (value: number | null | undefined) => string;
   formatModeStat: (value: string | number | null | undefined) => string;
   schemaDiagnostics?: ImputationSchemaDiagnostics | null;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 export const ImputationStrategiesSection: React.FC<ImputationStrategiesSectionProps> = ({
@@ -73,7 +78,21 @@ export const ImputationStrategiesSection: React.FC<ImputationStrategiesSectionPr
   formatNumericStat,
   formatModeStat,
   schemaDiagnostics,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+
   const schemaDiagnosticsMap = React.useMemo(() => {
     if (!schemaDiagnostics?.entries?.length) {
       return new Map<number, ImputationSchemaDiagnostics['entries'][number]>();

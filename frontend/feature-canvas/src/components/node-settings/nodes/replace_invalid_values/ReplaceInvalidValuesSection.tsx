@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { FeatureNodeParameter } from '../../../../api';
+import type { PreviewState } from '../dataset/DataSnapshotSection';
+import { extractPendingConfigurationDetails, type PendingConfigurationDetail } from '../../utils/pendingConfiguration';
 import {
   type InvalidValueColumnSummary,
   type InvalidValueMode,
@@ -25,6 +27,9 @@ export type ReplaceInvalidValuesSectionProps = {
   selectedMode: InvalidValueMode;
   minValue: number | null;
   maxValue: number | null;
+  previewState?: PreviewState;
+  onPendingConfigurationWarning?: (details: PendingConfigurationDetail[]) => void;
+  onPendingConfigurationCleared?: () => void;
 };
 
 const formatBoundsDescription = (mode: InvalidValueMode, minValue: number | null, maxValue: number | null): string | null => {
@@ -70,7 +75,21 @@ export const ReplaceInvalidValuesSection: React.FC<ReplaceInvalidValuesSectionPr
   selectedMode,
   minValue,
   maxValue,
+  previewState,
+  onPendingConfigurationWarning,
+  onPendingConfigurationCleared,
 }) => {
+  useEffect(() => {
+    if (previewState?.data?.signals?.full_execution) {
+      const details = extractPendingConfigurationDetails(previewState.data.signals.full_execution);
+      if (details.length > 0) {
+        onPendingConfigurationWarning?.(details);
+      } else {
+        onPendingConfigurationCleared?.();
+      }
+    }
+  }, [previewState, onPendingConfigurationWarning, onPendingConfigurationCleared]);
+
   if (!columnsParameter && !modeParameter && !minValueParameter && !maxValueParameter) {
     return null;
   }

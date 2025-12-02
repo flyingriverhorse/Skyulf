@@ -2,6 +2,7 @@ import type { SplitTypeKey } from '../constants/splits';
 
 export type FeatureNodeData = {
   label?: string;
+  title?: string;
   description?: string;
   isDataset?: boolean;
   isRemovable?: boolean;
@@ -18,6 +19,9 @@ export type FeatureNodeData = {
   connectedSplits?: SplitTypeKey[];
   hasRequiredConnections?: boolean;
   connectionInfo?: NodeConnectionInfo;
+  pendingWarningActive?: boolean;
+  pendingWarningReason?: string | null;
+  pendingHighlight?: boolean;
 };
 
 export type FeatureNodeParameter = {
