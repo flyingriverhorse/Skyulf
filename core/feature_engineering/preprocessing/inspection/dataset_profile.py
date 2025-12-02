@@ -48,7 +48,7 @@ def _normalize_dtype(dtype: Any) -> str:
     return "string"
 
 
-def build_quick_profile_payload(frame: pd.DataFrame) -> Dict[str, Any]:
+def build_quick_profile_payload(frame: pd.DataFrame, dataset_source_id: str) -> Dict[str, Any]:
     """Compute a lightweight dataset profile summarizing core statistics."""
     working_frame = frame.copy()
 
@@ -183,6 +183,10 @@ def build_quick_profile_payload(frame: pd.DataFrame) -> Dict[str, Any]:
                 )
 
     return {
+        "dataset_source_id": dataset_source_id,
+        "sample_size": row_count,
+        "rows_analyzed": row_count,
+        "columns_analyzed": column_count,
         "metrics": metrics,
         "columns": column_summaries,
         "correlations": correlations,

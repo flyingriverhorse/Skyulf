@@ -5540,7 +5540,7 @@ async def get_quick_profile(
     if frame.empty:
         raise HTTPException(status_code=400, detail="No data available to profile. Ensure upstream steps produce rows.")
 
-    payload = build_quick_profile_payload(frame)
+    payload = build_quick_profile_payload(frame, normalized_id)
 
     effective_sample_size = _coerce_int(preview_meta.get("sample_size"), frame.shape[0])
 
