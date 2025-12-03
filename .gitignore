@@ -88,7 +88,6 @@ exports/
 logs/
 temp/
 uploads/
-data/
 data_science_examples/
 app_data/
 backups/

@@ -2945,6 +2945,32 @@ wheels = [
 ]
 
 [[package]]
+name = "networkx"
+version = "3.4.2"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.11'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fd/1d/06475e1cd5264c0b870ea2cc6fdb3e37177c1e565c43f56ff17a10e3937f/networkx-3.4.2.tar.gz", hash = "sha256:307c3669428c5362aab27c8a1260aa8f47c4e91d3891f48be0141738d8d053e1", size = 2151368, upload-time = "2024-10-21T12:39:38.695Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b9/54/dd730b32ea14ea797530a4479b2ed46a6fb250f682a9cfb997e968bf0261/networkx-3.4.2-py3-none-any.whl", hash = "sha256:df5d4365b724cf81b8c6a7312509d0c22386097011ad1abe274afd5e9d3bbc5f", size = 1723263, upload-time = "2024-10-21T12:39:36.247Z" },
+]
+
+[[package]]
+name = "networkx"
+version = "3.6"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e8/fc/7b6fd4d22c8c4dc5704430140d8b3f520531d4fe7328b8f8d03f5a7950e8/networkx-3.6.tar.gz", hash = "sha256:285276002ad1f7f7da0f7b42f004bcba70d381e936559166363707fdad3d72ad", size = 2511464, upload-time = "2025-11-24T03:03:47.158Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/c7/d64168da60332c17d24c0d2f08bdf3987e8d1ae9d84b5bbd0eec2eb26a55/networkx-3.6-py3-none-any.whl", hash = "sha256:cdb395b105806062473d3be36458d8f1459a4e4b98e236a66c3a48996e07684f", size = 2063713, upload-time = "2025-11-24T03:03:45.21Z" },
+]
+
+[[package]]
 name = "nodeenv"
 version = "1.9.1"
 source = { registry = "https://pypi.org/simple" }
@@ -4669,6 +4695,8 @@ dependencies = [
     { name = "langid" },
     { name = "libpysal" },
     { name = "matplotlib" },
+    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "networkx", version = "3.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "numba" },
     { name = "numpy" },
     { name = "openml" },
@@ -4734,7 +4762,7 @@ requires-dist = [
     { name = "esda", specifier = ">=2.5.0,<3.0.0" },
     { name = "fastapi", specifier = ">=0.104.0,<1.0.0" },
     { name = "flower", specifier = ">=2.0.0,<3.0.0" },
-    { name = "geopandas", specifier = ">=0.14.0,<0.15.0" },
+    { name = "geopandas", specifier = ">=0.14.0,<1.2.0" },
     { name = "httpx", specifier = ">=0.25.0,<1.0.0" },
     { name = "imbalanced-learn", specifier = ">=0.12.0" },
     { name = "jinja2", specifier = ">=3.1.0,<4.0.0" },
@@ -4742,6 +4770,7 @@ requires-dist = [
     { name = "langid", specifier = ">=1.1.6" },
     { name = "libpysal", specifier = ">=4.10.0,<5.0.0" },
     { name = "matplotlib", specifier = ">=3.9.4" },
+    { name = "networkx", specifier = ">=3.4.2" },
     { name = "numba", specifier = ">=0.60.0" },
     { name = "numpy", specifier = ">=1.24.0,<2.0.0" },
     { name = "openml", specifier = ">=0.15.1" },
@@ -4754,9 +4783,9 @@ requires-dist = [
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "pydantic", specifier = ">=2.4.0,<3.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0,<3.0.0" },
-    { name = "pyproj", specifier = ">=3.6.0,<3.7.0" },
-    { name = "pytest", specifier = ">=7.4.4" },
-    { name = "pytest-asyncio", specifier = ">=0.23.8" },
+    { name = "pyproj", specifier = ">=3.6.0,<3.8.0" },
+    { name = "pytest", specifier = ">=7.4.4,<10.0.0" },
+    { name = "pytest-asyncio", specifier = ">=0.23.8,<2.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3.0,<4.0.0" },
     { name = "python-multipart", specifier = ">=0.0.6,<1.0.0" },
@@ -4766,7 +4795,7 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.4.0" },
     { name = "scipy", specifier = ">=1.13.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "shapely", specifier = ">=2.0.2,<2.1.0" },
+    { name = "shapely", specifier = ">=2.0.2,<2.2.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0,<3.0.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.24.0,<1.0.0" },
@@ -4785,8 +4814,8 @@ dev = [
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "mypy", specifier = ">=1.6.0,<2.0.0" },
     { name = "pre-commit", specifier = ">=3.4.0" },
-    { name = "pytest", specifier = ">=7.4.0,<8.0.0" },
-    { name = "pytest-asyncio", specifier = ">=0.21.0,<1.0.0" },
+    { name = "pytest", specifier = ">=7.4.0,<10.0.0" },
+    { name = "pytest-asyncio", specifier = ">=0.21.0,<2.0.0" },
     { name = "pytest-cov", specifier = ">=4.1.0,<5.0.0" },
 ]
 
