@@ -37,16 +37,13 @@ scikit-learn>=1.4.0,<2.0.0 # Model selection utilities
 optuna>=3.6.0,<4.5.0       # Bayesian/early-stopping hyperparameter search
 imbalanced-learn>=0.12.0,<1.0.0  # Sampling strategies for imbalanced datasets
 rapidfuzz>=3.6.1,<4.0.0   # Efficient string similarity metrics for feature math
-<<<<<<< HEAD
 geopandas>=0.14.0,<1.2.0 # Geospatial dataframe operations
-=======
-geopandas>=0.14.0,<0.15.0 # Geospatial dataframe operations
->>>>>>> 2e7e1151a68cb7198e22022191c98a0975bc4458
 shapely>=2.0.2,<2.2.0     # Geometry operations
 pyproj>=3.6.0,<3.8.0      # Coordinate reference transforms
 rtree>=1.3.0,<2.0.0       # Spatial indexes for faster spatial joins
 libpysal>=4.10.0,<5.0.0   # Spatial weights
 esda>=2.5.0,<3.0.0        # Spatial autocorrelation statistics
+networkx>=3.0.0,<4.0.0    # Graph algorithms for pipeline execution
 # Optional performance dependencies for pandas
 # Numba enables faster compute paths in pandas (used when compute.use_numba=True)
 numba>=0.62.0,<1.0.0
@@ -82,11 +79,7 @@ vaderSentiment>=3.3.2,<4.0.0 # Sentiment scoring utilities
 # === DEVELOPMENT DEPENDENCIES ===
 # Only install these in development environment
 pytest>=7.4.0,<10.0.0
-<<<<<<< HEAD
 pytest-asyncio>=0.21.0,<2.0.0
-=======
-pytest-asyncio>=0.21.0,<1.0.0
->>>>>>> 2e7e1151a68cb7198e22022191c98a0975bc4458
 pytest-cov>=4.1.0,<5.0.0
 httpx>=0.25.0,<1.0.0  # For testing async endpoints
 black>=23.0.0,<24.0.0
