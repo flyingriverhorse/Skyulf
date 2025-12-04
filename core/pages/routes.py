@@ -72,10 +72,12 @@ def add_page_routes(app: FastAPI) -> None:
         """ML workflow canvas shell page."""
         from core.auth.page_security import create_page_response
 
+        # Check if we should serve the new V2 canvas
+        # For now, we'll default to V2, but we could use a feature flag
         return create_page_response(
             request=request,
-            template_name="feature_canvas.html",
+            template_name="ml_canvas.html",
             extra_context={
-                "page_title": "ML Workflow Canvas"
+                "page_title": "ML Workflow Canvas V2"
             }
         )

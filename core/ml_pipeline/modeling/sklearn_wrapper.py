@@ -13,7 +13,7 @@ class SklearnCalculator(BaseModelCalculator):
     def problem_type(self) -> str:
         return self._problem_type
 
-    def fit(self, X: pd.DataFrame, y: pd.Series, config: Dict[str, Any]) -> Any:
+    def fit(self, X: pd.DataFrame, y: pd.Series, config: Dict[str, Any], progress_callback=None, validation_data=None) -> Any:
         # 1. Merge Config with Defaults
         params = self.default_params.copy()
         if config:

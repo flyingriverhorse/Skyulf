@@ -26,6 +26,7 @@ from core.health.routes import router as health_router
 from core.data_ingestion.routers.data_routes import data_router
 from core.user_management.routes import user_router, current_user_router, public_user_router
 from core.feature_engineering.routes import router as feature_engineering_router
+from core.ml_pipeline.api import router as ml_pipeline_v2_router
 from core.templates import setup_templates
 from core.pages import add_page_routes
 from middleware.error_handler import ErrorHandlerMiddleware
@@ -302,6 +303,9 @@ def _include_routers(app: FastAPI) -> None:
         app.include_router(feature_engineering_router)
     except Exception:
         logger.debug("feature_engineering_router not available to include")
+
+    # ML Pipeline
+    app.include_router(ml_pipeline_v2_router, prefix="/api/pipeline", tags=["ML Pipeline"])
 
 
 def _add_exception_handlers(app: FastAPI) -> None:
