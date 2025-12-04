@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from typing import Dict, Any, List, Optional, Union
 from pydantic import BaseModel
 import tempfile
@@ -6,6 +6,11 @@ import shutil
 import os
 import json
 import pandas as pd
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.database.engine import get_async_session
+from core.data_ingestion.service import DataIngestionService
+from core.utils.file_utils import extract_file_path_from_source
 
 from .execution.engine import PipelineEngine
 from .execution.schemas import PipelineConfig, NodeConfig, PipelineExecutionResult
@@ -44,13 +49,40 @@ class PreviewResponse(BaseModel):
 # --- Endpoints ---
 
 @router.post("/preview", response_model=PreviewResponse)
-def preview_pipeline(config: PipelineConfigModel):
+async def preview_pipeline(
+    config: PipelineConfigModel,
+    session: AsyncSession = Depends(get_async_session)
+):
     """
     Runs the pipeline in Preview Mode:
     - Uses a temporary artifact store (cleaned up after request).
-    - Forces 'sample=True' on Data Loader nodes.
-    - Returns execution results + data preview of the final node.
+    - Resolves dataset paths from IDs.
     """
+    
+    # Resolve dataset paths
+    ingestion_service = DataIngestionService(session)
+    for node in config.nodes:
+        if node.step_type == "data_loader" and "dataset_id" in node.params:
+            try:
+                ds_id = int(node.params["dataset_id"])
+                ds = await ingestion_service.get_data_source_by_id(ds_id)
+                if ds:
+                    # Convert SQLAlchemy model to dict for utility
+                    # Note: DataSource model stores connection info in 'config' column
+                    ds_dict = {
+                        "connection_info": ds.config,
+                        "file_path": ds.config.get("file_path") if ds.config else None
+                    }
+                    path = extract_file_path_from_source(ds_dict)
+                    if path:
+                        node.params["path"] = str(path)
+                    else:
+                        raise HTTPException(status_code=400, detail=f"Could not resolve path for dataset {ds_id}")
+                else:
+                    raise HTTPException(status_code=404, detail=f"Dataset {ds_id} not found")
+            except ValueError:
+                 raise HTTPException(status_code=400, detail=f"Invalid dataset ID: {node.params['dataset_id']}")
+
     # 1. Create Temporary Artifact Store
     temp_dir = tempfile.mkdtemp(prefix="skyulf_preview_")
     artifact_store = LocalArtifactStore(temp_dir)

@@ -81,3 +81,16 @@ def add_page_routes(app: FastAPI) -> None:
                 "page_title": "ML Workflow Canvas V2"
             }
         )
+
+    @app.get("/ml-workflow-v1", response_class=HTMLResponse)
+    async def ml_workflow_v1_page(request: Request):
+        """Legacy ML workflow canvas page."""
+        from core.auth.page_security import create_page_response
+
+        return create_page_response(
+            request=request,
+            template_name="feature_canvas.html",
+            extra_context={
+                "page_title": "ML Workflow Canvas (Legacy)"
+            }
+        )
