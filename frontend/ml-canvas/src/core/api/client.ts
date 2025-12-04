@@ -77,3 +77,23 @@ export const savePipeline = async (datasetSourceId: string, payload: FeaturePipe
   const response = await apiClient.post<FeaturePipelineResponse>(`/pipelines/${encodeURIComponent(datasetSourceId)}`, payload);
   return response.data;
 };
+
+export interface TrainingJobCreate {
+  dataset_source_id: string;
+  pipeline_id: string;
+  node_id: string;
+  model_types: string[];
+  hyperparameters?: any;
+  metadata?: any;
+  run_training?: boolean;
+  graph: {
+    nodes: any[];
+    edges: any[];
+  };
+  target_node_id?: string;
+}
+
+export const submitTrainingJob = async (payload: TrainingJobCreate) => {
+  const response = await apiClient.post('/training-jobs', payload);
+  return response.data;
+};

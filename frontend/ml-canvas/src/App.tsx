@@ -8,6 +8,7 @@ import { ScalingNode } from './modules/nodes/processing/ScalingNode'
 import { OneHotEncodingNode } from './modules/nodes/processing/OneHotEncodingNode'
 import { LabelEncodingNode } from './modules/nodes/processing/LabelEncodingNode'
 import { ModelTrainingNode } from './modules/nodes/modeling/ModelTrainingNode'
+import { EvaluationNode } from './modules/nodes/modeling/EvaluationNode'
 import { MainLayout } from './components/layout/MainLayout'
 import { useGraphStore } from './core/store/useGraphStore'
 
@@ -20,6 +21,7 @@ registry.register(ScalingNode);
 registry.register(OneHotEncodingNode);
 registry.register(LabelEncodingNode);
 registry.register(ModelTrainingNode);
+registry.register(EvaluationNode);
 
 function App() {
   const addNode = useGraphStore((state) => state.addNode);

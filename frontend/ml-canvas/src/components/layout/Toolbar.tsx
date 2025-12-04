@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Play, Save, Loader2, FolderOpen } from 'lucide-react';
+import { Play, Save, Loader2, FolderOpen, BrainCircuit } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
-import { runPipelinePreview, savePipeline, fetchPipeline } from '../../core/api/client';
+import { runPipelinePreview, savePipeline, fetchPipeline, submitTrainingJob } from '../../core/api/client';
 
 export const Toolbar: React.FC = () => {
   const nodes = useGraphStore((state) => state.nodes);
@@ -12,6 +12,7 @@ export const Toolbar: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isTraining, setIsTraining] = useState(false);
 
   const getPipelinePayload = () => ({
     nodes: nodes.map(n => ({
@@ -117,11 +118,55 @@ export const Toolbar: React.FC = () => {
     }
   };
 
+  const handleTrain = async () => {
+    const datasetNode = nodes.find(n => n.data.definitionType === 'dataset_node');
+    const datasetId = datasetNode?.data.datasetId as string;
+    const trainingNode = nodes.find(n => n.data.definitionType === 'train_model_draft');
+
+    if (!datasetId) {
+      alert('No dataset node found!');
+      return;
+    }
+
+    if (!trainingNode) {
+      alert('No training node found! Add a "Model Training" node to train a model.');
+      return;
+    }
+
+    setIsTraining(true);
+    try {
+      // 1. Save the pipeline first (required for training job)
+      const savedPipeline = await savePipeline(datasetId, {
+        name: 'Training Pipeline',
+        description: 'Auto-saved before training',
+        graph: getPipelinePayload()
+      });
+
+      // 2. Submit training job
+      await submitTrainingJob({
+        dataset_source_id: datasetId,
+        pipeline_id: savedPipeline.id.toString(),
+        node_id: trainingNode.id,
+        model_types: [trainingNode.data.modelType as string],
+        hyperparameters: trainingNode.data.hyperparameters,
+        graph: getPipelinePayload(),
+        run_training: true
+      });
+
+      alert('Training job submitted successfully! Check the jobs dashboard.');
+    } catch (error) {
+      console.error('Training failed:', error);
+      alert('Failed to submit training job.');
+    } finally {
+      setIsTraining(false);
+    }
+  };
+
   return (
     <div className="absolute top-4 right-4 z-10 flex gap-2">
       <button 
         onClick={handleLoad}
-        disabled={isLoading || isRunning}
+        disabled={isLoading || isRunning || isTraining}
         className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
       >
         {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />}
@@ -129,7 +174,7 @@ export const Toolbar: React.FC = () => {
       </button>
       <button 
         onClick={handleSave}
-        disabled={isSaving || isRunning}
+        disabled={isSaving || isRunning || isTraining}
         className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
       >
         {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -137,11 +182,19 @@ export const Toolbar: React.FC = () => {
       </button>
       <button 
         onClick={handleRun}
-        disabled={isRunning}
+        disabled={isRunning || isTraining}
         className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
       >
         {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-        <span className="text-sm font-medium">{isRunning ? 'Running...' : 'Run Pipeline'}</span>
+        <span className="text-sm font-medium">{isRunning ? 'Running...' : 'Run Preview'}</span>
+      </button>
+      <button 
+        onClick={handleTrain}
+        disabled={isRunning || isTraining}
+        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 transition-colors disabled:opacity-50"
+      >
+        {isTraining ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
+        <span className="text-sm font-medium">{isTraining ? 'Submitting...' : 'Train Model'}</span>
       </button>
     </div>
   );
