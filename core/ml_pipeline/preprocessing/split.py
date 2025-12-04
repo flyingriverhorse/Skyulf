@@ -1,8 +1,25 @@
-from typing import Optional, List, Tuple, Union
+from typing import Optional, List, Tuple, Union, Dict, Any
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from core.ml_pipeline.data.container import SplitDataset
+from .base import BaseCalculator, BaseApplier
+
+class TrainTestSplitterCalculator(BaseCalculator):
+    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+        # No learning from data, just pass through config
+        return config
+
+class TrainTestSplitterApplier(BaseApplier):
+    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> SplitDataset:
+        splitter = DataSplitter(
+            test_size=params.get("test_size", 0.2),
+            validation_size=params.get("validation_size", 0.0),
+            random_state=params.get("random_state", 42),
+            shuffle=params.get("shuffle", True),
+            stratify_col=params.get("target_column") if params.get("stratify", False) else None
+        )
+        return splitter.split(df)
 
 class DataSplitter:
     """

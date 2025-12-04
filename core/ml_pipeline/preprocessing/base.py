@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 import pandas as pd
 from ..data.container import SplitDataset
 from ..artifacts.store import ArtifactStore
@@ -30,7 +30,13 @@ class StatefulTransformer:
         self.apply_on_test = apply_on_test
         self.apply_on_validation = apply_on_validation
 
-    def fit_transform(self, dataset: SplitDataset, config: Dict[str, Any]) -> SplitDataset:
+    def fit_transform(self, dataset: Union[SplitDataset, pd.DataFrame], config: Dict[str, Any]) -> Union[SplitDataset, pd.DataFrame]:
+        if isinstance(dataset, pd.DataFrame):
+            # Fit on the whole dataframe (be careful about leakage!)
+            params = self.calculator.fit(dataset, config)
+            self.artifact_store.save(self.node_id, params)
+            return self.applier.apply(dataset, params)
+        
         # 1. Calculate on Train
         params = self.calculator.fit(dataset.train, config)
         
@@ -50,9 +56,12 @@ class StatefulTransformer:
         
         return SplitDataset(train=new_train, test=new_test, validation=new_val)
 
-    def transform(self, dataset: SplitDataset) -> SplitDataset:
+    def transform(self, dataset: Union[SplitDataset, pd.DataFrame]) -> Union[SplitDataset, pd.DataFrame]:
         # 1. Load Artifact
         params = self.artifact_store.load(self.node_id)
+        
+        if isinstance(dataset, pd.DataFrame):
+            return self.applier.apply(dataset, params)
         
         # 2. Apply
         new_train = self.applier.apply(dataset.train, params)

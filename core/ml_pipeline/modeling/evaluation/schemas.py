@@ -82,4 +82,5 @@ class ModelEvaluationReport(BaseModel):
     generated_at: datetime
     problem_type: Literal["classification", "regression"]
     target_column: Optional[str] = None
+    feature_columns: List[str] = Field(default_factory=list)
     splits: Dict[str, ModelEvaluationSplitPayload] = Field(default_factory=dict)

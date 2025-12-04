@@ -1,7 +1,7 @@
 """Cross-validation logic for V2 modeling."""
 
 from __future__ import annotations
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Callable
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold, StratifiedKFold
@@ -43,7 +43,8 @@ def perform_cross_validation(
     config: Dict[str, Any],
     n_folds: int = 5,
     stratified: bool = False,
-    random_state: int = 42
+    random_state: int = 42,
+    progress_callback: Optional[Callable[[int, int], None]] = None
 ) -> Dict[str, Any]:
     """
     Performs K-Fold cross-validation.
@@ -57,6 +58,7 @@ def perform_cross_validation(
         n_folds: Number of folds.
         stratified: Whether to use StratifiedKFold (classification only).
         random_state: Random seed.
+        progress_callback: Optional callback(current_fold, total_folds).
         
     Returns:
         Dict containing aggregated metrics and per-fold details.
@@ -78,6 +80,9 @@ def perform_cross_validation(
     
     # 2. Iterate Folds
     for fold_idx, (train_idx, val_idx) in enumerate(splitter.split(X_arr, y_arr)):
+        if progress_callback:
+            progress_callback(fold_idx + 1, n_folds)
+
         # Split Data
         X_train_fold = X.iloc[train_idx] if hasattr(X, "iloc") else X[train_idx]
         y_train_fold = y.iloc[train_idx] if hasattr(y, "iloc") else y[train_idx]

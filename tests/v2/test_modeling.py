@@ -253,3 +253,41 @@ def test_halving_strategies(classification_data, artifact_store):
         elif "n_splits" not in str(e) and "n_samples" not in str(e):
             raise e
 
+def test_advanced_features(classification_data, artifact_store):
+    from core.ml_pipeline.modeling.classification import LogisticRegressionCalculator, LogisticRegressionApplier
+    from core.ml_pipeline.modeling.base import StatefulEstimator
+    
+    calculator = LogisticRegressionCalculator()
+    applier = LogisticRegressionApplier()
+    estimator = StatefulEstimator(calculator, applier, artifact_store, "adv_node")
+    
+    # 1. Test Refit Strategy
+    # Should run without error and produce predictions
+    estimator.fit_predict(classification_data, "target", {})
+    estimator.refit(classification_data, "target", {})
+    
+    # Verify artifact exists (it should have been overwritten)
+    assert artifact_store.exists("adv_node")
+    
+    # 2. Test Progress Callback
+    progress_calls = []
+    def on_progress(current, total):
+        progress_calls.append((current, total))
+        
+    estimator.cross_validate(
+        classification_data, 
+        "target", 
+        {}, 
+        n_folds=2, 
+        progress_callback=on_progress
+    )
+    
+    assert len(progress_calls) == 2
+    assert progress_calls[0] == (1, 2)
+    assert progress_calls[1] == (2, 2)
+    
+    # 3. Test Feature Columns in Report
+    report = estimator.evaluate(classification_data, "target")
+    assert len(report.feature_columns) > 0
+    assert "f1" in report.feature_columns
+

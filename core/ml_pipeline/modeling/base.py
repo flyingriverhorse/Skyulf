@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Literal, Callable
 from datetime import datetime
 import pandas as pd
 from ..data.container import SplitDataset
@@ -17,7 +17,14 @@ class BaseModelCalculator(ABC):
         pass
 
     @abstractmethod
-    def fit(self, X: pd.DataFrame, y: pd.Series, config: Dict[str, Any]) -> Any:
+    def fit(
+        self, 
+        X: pd.DataFrame, 
+        y: pd.Series, 
+        config: Dict[str, Any], 
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+        validation_data: Optional[tuple[pd.DataFrame, pd.Series]] = None
+    ) -> Any:
         """
         Trains the model. Returns the model object (serializable).
         """
@@ -38,9 +45,16 @@ class StatefulEstimator:
         self.artifact_store = artifact_store
         self.node_id = node_id
 
-    def cross_validate(self, dataset: SplitDataset, target_column: str, config: Dict[str, Any], n_folds: int = 5) -> Dict[str, Any]:
+    def cross_validate(
+        self, 
+        dataset: SplitDataset, 
+        target_column: str, 
+        config: Dict[str, Any], 
+        n_folds: int = 5,
+        progress_callback: Optional[Callable[[int, int], None]] = None
+    ) -> Dict[str, Any]:
         """
-        Performs cross-validation on the training set.
+        Performs cross-validation on the training split.
         """
         X_train = dataset.train.drop(columns=[target_column])
         y_train = dataset.train[target_column]
@@ -51,10 +65,17 @@ class StatefulEstimator:
             X=X_train,
             y=y_train,
             config=config,
-            n_folds=n_folds
+            n_folds=n_folds,
+            progress_callback=progress_callback
         )
 
-    def fit_predict(self, dataset: SplitDataset, target_column: str, config: Dict[str, Any]) -> Dict[str, pd.Series]:
+    def fit_predict(
+        self, 
+        dataset: SplitDataset, 
+        target_column: str, 
+        config: Dict[str, Any],
+        progress_callback: Optional[Callable[[int, int], None]] = None
+    ) -> Dict[str, pd.Series]:
         """
         Fits the model on training data and returns predictions for all splits.
         """
@@ -62,8 +83,20 @@ class StatefulEstimator:
         X_train = dataset.train.drop(columns=[target_column])
         y_train = dataset.train[target_column]
         
+        validation_data = None
+        if dataset.validation is not None:
+            X_val = dataset.validation.drop(columns=[target_column])
+            y_val = dataset.validation[target_column]
+            validation_data = (X_val, y_val)
+
         # 2. Train Model
-        model_artifact = self.calculator.fit(X_train, y_train, config)
+        model_artifact = self.calculator.fit(
+            X_train, 
+            y_train, 
+            config, 
+            progress_callback=progress_callback,
+            validation_data=validation_data
+        )
         
         # 3. Save Artifact
         self.artifact_store.save(self.node_id, model_artifact)
@@ -90,6 +123,31 @@ class StatefulEstimator:
             predictions['validation'] = self.applier.predict(X_val, model_artifact)
             
         return predictions
+
+    def refit(self, dataset: SplitDataset, target_column: str, config: Dict[str, Any]) -> None:
+        """
+        Refits the model on Train + Validation data and updates the artifact.
+        """
+        if dataset.validation is None:
+            # Fallback to normal fit if no validation set
+            self.fit_predict(dataset, target_column, config)
+            return
+
+        # 1. Prepare Combined Data
+        X_train = dataset.train.drop(columns=[target_column])
+        y_train = dataset.train[target_column]
+        
+        X_val = dataset.validation.drop(columns=[target_column])
+        y_val = dataset.validation[target_column]
+        
+        X_combined = pd.concat([X_train, X_val], axis=0)
+        y_combined = pd.concat([y_train, y_val], axis=0)
+        
+        # 2. Train Model
+        model_artifact = self.calculator.fit(X_combined, y_combined, config)
+        
+        # 3. Save Artifact (Overwrites the previous one)
+        self.artifact_store.save(self.node_id, model_artifact)
 
     def evaluate(self, dataset: SplitDataset, target_column: str, job_id: str = "unknown") -> ModelEvaluationReport:
         """
@@ -136,12 +194,15 @@ class StatefulEstimator:
         if dataset.validation is not None:
             splits_payload['validation'] = evaluate_split('validation', dataset.validation)
             
+        feature_cols = [c for c in dataset.train.columns if c != target_column]
+
         return ModelEvaluationReport(
             job_id=job_id,
             node_id=self.node_id,
             generated_at=datetime.utcnow(),
             problem_type=problem_type, # type: ignore
             target_column=target_column,
+            feature_columns=feature_cols,
             splits=splits_payload
         )
 
