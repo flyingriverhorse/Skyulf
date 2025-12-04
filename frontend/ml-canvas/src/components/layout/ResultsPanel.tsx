@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useGraphStore } from '../../core/store/useGraphStore';
-import { ChevronUp, ChevronDown, Table, AlertCircle } from 'lucide-react';
+import { ChevronUp, ChevronDown, Table } from 'lucide-react';
 
 export const ResultsPanel: React.FC = () => {
   const executionResult = useGraphStore((state) => state.executionResult);
@@ -8,7 +8,13 @@ export const ResultsPanel: React.FC = () => {
 
   if (!executionResult) return null;
 
-  const { preview_data, preview_rows, preview_total_rows, signals } = executionResult;
+  // Map backend response to UI expectations
+  // Backend returns: { sample_rows: [], metrics: { preview_rows: 100, preview_total_rows: 1000 }, signals: ... }
+  const preview_data = executionResult.sample_rows || [];
+  const preview_rows = executionResult.metrics?.preview_rows || 0;
+  const preview_total_rows = executionResult.metrics?.preview_total_rows || 0;
+  // const signals = executionResult.signals ? [executionResult.signals] : []; // Signals might be an object, wrap in array if needed or iterate keys
+
   const columns = preview_data && preview_data.length > 0 ? Object.keys(preview_data[0]) : [];
 
   return (
@@ -38,15 +44,15 @@ export const ResultsPanel: React.FC = () => {
       {isExpanded && (
         <div className="flex-1 overflow-hidden flex flex-col">
           {/* Signals / Warnings */}
-          {signals && signals.length > 0 && (
-            <div className="p-2 bg-yellow-50 border-b flex gap-2 overflow-x-auto">
-              {signals.map((signal: any, idx: number) => (
-                <div key={idx} className="flex items-center gap-1 text-xs text-yellow-800 bg-yellow-100 px-2 py-1 rounded border border-yellow-200 whitespace-nowrap">
-                  <AlertCircle className="w-3 h-3" />
-                  {signal.message || JSON.stringify(signal)}
-                </div>
-              ))}
-            </div>
+          {/* TODO: Better signal visualization based on signal structure */}
+          {executionResult.applied_steps && executionResult.applied_steps.length > 0 && (
+             <div className="p-2 bg-blue-50 border-b flex gap-2 overflow-x-auto">
+                {executionResult.applied_steps.map((step: string, idx: number) => (
+                  <div key={idx} className="text-xs text-blue-800 bg-blue-100 px-2 py-1 rounded border border-blue-200 whitespace-nowrap">
+                    {step}
+                  </div>
+                ))}
+             </div>
           )}
 
           {/* Data Table */}

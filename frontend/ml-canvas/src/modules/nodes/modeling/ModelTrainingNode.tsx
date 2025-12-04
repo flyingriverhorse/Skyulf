@@ -88,7 +88,7 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
 };
 
 export const ModelTrainingNode: NodeDefinition<ModelTrainingConfig> = {
-  type: 'model_training',
+  type: 'train_model_draft',
   label: 'Model Training',
   category: 'Modeling',
   description: 'Train a machine learning model.',
