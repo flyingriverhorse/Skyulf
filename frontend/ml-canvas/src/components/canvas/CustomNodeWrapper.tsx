@@ -1,11 +1,17 @@
 import { memo } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
 import { registry } from '../../core/registry/NodeRegistry';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, X } from 'lucide-react';
 
-export const CustomNodeWrapper = memo(({ data, selected }: NodeProps) => {
+export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
   const definitionType = data.definitionType as string;
   const definition = registry.get(definitionType);
+  const { deleteElements } = useReactFlow();
+
+  const onDelete = (evt: React.MouseEvent) => {
+    evt.stopPropagation();
+    deleteElements({ nodes: [{ id }] });
+  };
 
   if (!definition) {
     return (
@@ -28,7 +34,7 @@ export const CustomNodeWrapper = memo(({ data, selected }: NodeProps) => {
       ${selected ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}
     `}>
       {/* Header */}
-      <div className="flex items-center p-3 border-b bg-muted/30 rounded-t-lg">
+      <div className="flex items-center p-3 border-b bg-muted/30 rounded-t-lg relative group">
         <div className="p-1.5 bg-primary/10 rounded mr-3">
           {definition.icon && <definition.icon className="w-4 h-4 text-primary" />}
         </div>
@@ -38,6 +44,15 @@ export const CustomNodeWrapper = memo(({ data, selected }: NodeProps) => {
             {definition.category}
           </div>
         </div>
+
+        {/* Delete Button */}
+        <button
+          onClick={onDelete}
+          className="absolute right-2 top-2 p-1 rounded-md hover:bg-destructive/10 hover:text-destructive text-muted-foreground/50 transition-all opacity-0 group-hover:opacity-100"
+          title="Remove Node"
+        >
+          <X size={14} />
+        </button>
       </div>
 
       {/* Body (Custom Component or Default) */}

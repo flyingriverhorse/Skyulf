@@ -1,19 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { registry } from '../../core/registry/NodeRegistry';
-import { X, Settings2 } from 'lucide-react';
+import { X, Settings2, Maximize2, Minimize2 } from 'lucide-react';
 
 export const PropertiesPanel: React.FC = () => {
   const nodes = useGraphStore((state) => state.nodes);
   const updateNodeData = useGraphStore((state) => state.updateNodeData);
   const onNodesChange = useGraphStore((state) => state.onNodesChange);
+  const [isExpanded, setIsExpanded] = useState(false);
   
   // Find the currently selected node
   const selectedNode = nodes.find((n) => n.selected);
 
   if (!selectedNode) {
     return (
-      <aside className="w-80 border-l bg-background p-8 flex flex-col items-center justify-center text-muted-foreground text-center">
+      <aside className="w-80 border-l bg-background p-8 flex flex-col items-center justify-center text-muted-foreground text-center shrink-0">
         <div className="p-4 bg-muted/50 rounded-full mb-4">
           <Settings2 className="w-8 h-8 opacity-50" />
         </div>
@@ -27,12 +28,16 @@ export const PropertiesPanel: React.FC = () => {
     onNodesChange([{ id: selectedNode.id, type: 'select', selected: false }]);
   };
 
+  const toggleExpand = () => {
+    setIsExpanded(!isExpanded);
+  };
+
   const definitionType = selectedNode.data.definitionType as string;
   const definition = registry.get(definitionType);
 
   if (!definition) {
     return (
-      <aside className="w-80 border-l bg-background p-4">
+      <aside className="w-80 border-l bg-background p-4 shrink-0">
         <div className="text-destructive flex items-center gap-2">
           <X className="w-4 h-4" />
           Error: Node definition '{definitionType}' not found.
@@ -44,7 +49,12 @@ export const PropertiesPanel: React.FC = () => {
   const SettingsComponent = definition.settings;
 
   return (
-    <aside className="w-80 border-l bg-background flex flex-col h-full shadow-xl z-20">
+    <aside 
+      className={`
+        border-l bg-background flex flex-col h-full shadow-xl z-20 transition-all duration-300 ease-in-out
+        ${isExpanded ? 'absolute right-0 top-0 bottom-0 w-[calc(100%-16rem)]' : 'w-80 shrink-0'}
+      `}
+    >
       <div className="p-4 border-b flex items-center justify-between bg-muted/10">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-primary/10 rounded-md">
@@ -55,12 +65,22 @@ export const PropertiesPanel: React.FC = () => {
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{definition.category}</p>
           </div>
         </div>
-        <button 
-          onClick={handleClose}
-          className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button 
+            onClick={toggleExpand}
+            className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
+            title={isExpanded ? "Collapse" : "Expand"}
+          >
+            {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+          <button 
+            onClick={handleClose}
+            className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
+            title="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">

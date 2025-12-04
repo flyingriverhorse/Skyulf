@@ -10,9 +10,9 @@ export const MainLayout: React.FC = () => {
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden flex-col">
       <Navbar />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         <Sidebar />
-        <main className="flex-1 h-full relative flex flex-col">
+        <main className="flex-1 h-full relative flex flex-col transition-all duration-300 ease-in-out">
           <Toolbar />
           <div className="flex-1 relative">
             <FlowCanvas />
