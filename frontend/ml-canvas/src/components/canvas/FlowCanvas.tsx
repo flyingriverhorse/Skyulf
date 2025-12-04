@@ -10,9 +10,14 @@ import '@xyflow/react/dist/style.css';
 
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { CustomNodeWrapper } from './CustomNodeWrapper';
+import { CustomEdge } from './CustomEdge';
 
 const nodeTypes = {
   custom: CustomNodeWrapper
+};
+
+const edgeTypes = {
+  custom: CustomEdge
 };
 
 const FlowCanvasContent: React.FC = () => {
@@ -72,10 +77,16 @@ const FlowCanvasContent: React.FC = () => {
         fitView
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{
-          type: 'smoothstep',
-          style: { stroke: 'url(#edge-gradient)', strokeWidth: 2 },
+          type: 'custom',
+          style: { 
+            stroke: 'url(#edge-gradient)', 
+            strokeWidth: 3,
+            strokeDasharray: '8 6',
+            filter: 'url(#glow)'
+          },
           animated: true,
         }}
+        edgeTypes={edgeTypes}
         deleteKeyCode={['Backspace', 'Delete']}
       >
         <svg style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0, pointerEvents: 'none' }}>
@@ -85,6 +96,13 @@ const FlowCanvasContent: React.FC = () => {
               <stop offset="50%" stopColor="#6366f1" />
               <stop offset="100%" stopColor="#a855f7" />
             </linearGradient>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
           </defs>
         </svg>
         <Background />

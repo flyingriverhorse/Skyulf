@@ -33,7 +33,9 @@ export const Navbar: React.FC = () => {
         <div className="p-1.5 bg-primary/10 rounded-md">
           <Layout className="w-5 h-5 text-primary" />
         </div>
-        <h1 className="font-bold text-lg tracking-tight">Skyulf ML Canvas</h1>
+        <h1 className="font-bold text-lg tracking-tight bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+          Skyulf ML Canvas
+        </h1>
       </div>
 
       <div className="flex items-center gap-2">

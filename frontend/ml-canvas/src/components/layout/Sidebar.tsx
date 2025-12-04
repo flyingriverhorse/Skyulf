@@ -21,7 +21,7 @@ export const Sidebar: React.FC = () => {
   const categories = ['Data Source', 'Preprocessing', 'Modeling', 'Evaluation', 'Utility'];
 
   return (
-    <aside className="w-64 border-r bg-background flex flex-col h-full shadow-sm z-10">
+    <aside className="w-64 shrink-0 border-r bg-background flex flex-col h-full shadow-sm z-10">
       <div className="p-4 border-b space-y-3">
         <div>
           <h2 className="font-semibold tracking-tight">Components</h2>

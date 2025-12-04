@@ -1,0 +1,42 @@
+.feature-canvas-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--light-bg-page-start), var(--light-bg-page-end));
+}
+
+.dark .feature-canvas-page {
+  background: linear-gradient(180deg, var(--dark-bg-page-start), var(--dark-bg-page-end));
+}
+
+.feature-canvas-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: .9rem clamp(1.2rem,4vw,2rem);
+  background: var(--light-navbar-bg);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(148,163,184,.22);
+  min-height: var(--feature-canvas-nav-height);
+  box-sizing: border-box;
+}
+
+.dark .feature-canvas-navbar {
+  background: linear-gradient(160deg, var(--dark-navbar-bg-start), var(--dark-navbar-bg-end));
+}
+
+.feature-canvas-navbar__brand--gradient {
+  display: inline-block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  color: #f8fafc;
+  background: var(--main-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

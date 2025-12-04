@@ -257,7 +257,8 @@ export const Toolbar: React.FC = () => {
       <button 
         onClick={handleRun}
         disabled={isRunning || isTraining}
-        className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
+        className="flex items-center gap-2 px-4 py-2 text-white rounded-md shadow-sm transition-all disabled:opacity-50"
+        style={{ background: 'var(--main-gradient)' }}
       >
         {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
         <span className="text-sm font-medium">{isRunning ? 'Running...' : 'Run Preview'}</span>
