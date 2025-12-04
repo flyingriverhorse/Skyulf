@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Play, Save, Loader2, FolderOpen, BrainCircuit } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
-import { runPipelinePreview, savePipeline, fetchPipeline, submitTrainingJob } from '../../core/api/client';
+import { savePipeline, fetchPipeline, submitTrainingJob, runPipelinePreviewV2, PipelineConfigModel, NodeConfigModel } from '../../core/api/client';
 
 export const Toolbar: React.FC = () => {
   const nodes = useGraphStore((state) => state.nodes);
@@ -34,6 +34,71 @@ export const Toolbar: React.FC = () => {
       data: e.data
     }))
   });
+
+  const convertGraphToPipelineConfig = (datasetId: string): PipelineConfigModel => {
+    const sortedNodes: NodeConfigModel[] = [];
+    const visited = new Set<string>();
+    const queue: string[] = [];
+
+    const startNode = nodes.find(n => n.data.definitionType === 'dataset_node');
+    if (startNode) {
+      queue.push(startNode.id);
+    }
+
+    while (queue.length > 0) {
+      const nodeId = queue.shift()!;
+      if (visited.has(nodeId)) continue;
+      visited.add(nodeId);
+
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node) continue;
+
+      let stepType = 'feature_engineering';
+      let params: any = {};
+      const incomingEdges = edges.filter(e => e.target === nodeId);
+      const inputs = incomingEdges.map(e => e.source);
+
+      if (node.data.definitionType === 'dataset_node') {
+        stepType = 'data_loader';
+        params = { 
+            dataset_id: node.data.datasetId,
+            path: "placeholder", 
+            sample: true 
+        };
+      } else {
+          let transformerType = 'SimpleTransformation';
+          if (node.data.definitionType === 'imputation_node') transformerType = 'SimpleImputer';
+          if (node.data.definitionType === 'drop_columns_node') transformerType = 'DropMissingColumns';
+          if (node.data.definitionType === 'scaling_node') transformerType = 'StandardScaler';
+          if (node.data.definitionType === 'one_hot_encoding_node') transformerType = 'OneHotEncoder';
+          if (node.data.definitionType === 'label_encoding_node') transformerType = 'LabelEncoder';
+          
+          params = {
+              steps: [{
+                  name: `${node.data.label || 'Step'}_${node.id}`,
+                  transformer: transformerType,
+                  params: node.data.config || {}
+              }]
+          };
+      }
+
+      sortedNodes.push({
+        node_id: node.id,
+        step_type: stepType,
+        params: params,
+        inputs: inputs
+      });
+
+      const outgoingEdges = edges.filter(e => e.source === nodeId);
+      outgoingEdges.forEach(e => queue.push(e.target));
+    }
+
+    return {
+      pipeline_id: `preview_${Date.now()}`,
+      nodes: sortedNodes,
+      metadata: { dataset_source_id: datasetId }
+    };
+  };
 
   const handleSave = async () => {
     const datasetNode = nodes.find(n => n.data.definitionType === 'dataset_node');
@@ -104,15 +169,24 @@ export const Toolbar: React.FC = () => {
     setExecutionResult(null); // Clear previous results
     
     try {
-      const result = await runPipelinePreview({
-        dataset_source_id: datasetId,
-        graph: getPipelinePayload()
-      });
+      // Use V2 API
+      const pipelineConfig = convertGraphToPipelineConfig(datasetId);
+      const result = await runPipelinePreviewV2(pipelineConfig);
       
-      setExecutionResult(result);
+      // Map V2 result to what ResultsPanel expects
+      const mappedResult = {
+          sample_rows: result.preview_data,
+          metrics: {
+              preview_rows: Array.isArray(result.preview_data) ? result.preview_data.length : 0,
+              preview_total_rows: 1000 // Sample size
+          },
+          applied_steps: Object.keys(result.node_results || {})
+      };
+
+      setExecutionResult(mappedResult);
     } catch (error) {
       console.error('Pipeline failed:', error);
-      alert('Pipeline execution failed.');
+      alert('Pipeline execution failed. Check console for details.');
     } finally {
       setIsRunning(false);
     }

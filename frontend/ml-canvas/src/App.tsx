@@ -40,6 +40,11 @@ function App() {
     }
   }, []);
 
+  // Simple dark mode toggle for testing (can be moved to a proper settings UI)
+  useEffect(() => {
+    // document.documentElement.classList.add('dark'); // Uncomment to force dark mode
+  }, []);
+
   return (
     <MainLayout />
   )

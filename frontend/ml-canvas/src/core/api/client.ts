@@ -97,3 +97,32 @@ export const submitTrainingJob = async (payload: TrainingJobCreate) => {
   const response = await apiClient.post('/training-jobs', payload);
   return response.data;
 };
+
+// --- V2 API Client & Types ---
+
+const API_V2_BASE = '/api';
+
+export const apiClientV2 = axios.create({
+  baseURL: API_V2_BASE,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+export interface NodeConfigModel {
+  node_id: string;
+  step_type: string;
+  params: Record<string, any>;
+  inputs: string[];
+}
+
+export interface PipelineConfigModel {
+  pipeline_id: string;
+  nodes: NodeConfigModel[];
+  metadata?: Record<string, any>;
+}
+
+export const runPipelinePreviewV2 = async (payload: PipelineConfigModel) => {
+  const response = await apiClientV2.post('/pipeline/preview', payload);
+  return response.data;
+};

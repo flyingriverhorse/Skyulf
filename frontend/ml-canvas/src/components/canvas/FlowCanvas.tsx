@@ -3,7 +3,6 @@ import {
   ReactFlow, 
   Background, 
   Controls, 
-  MiniMap,
   ReactFlowProvider,
   useReactFlow
 } from '@xyflow/react';
@@ -56,7 +55,11 @@ const FlowCanvasContent: React.FC = () => {
   );
 
   return (
-    <div className="w-full h-full" ref={reactFlowWrapper}>
+    <div 
+      className="w-full h-full outline-none" 
+      ref={reactFlowWrapper}
+      tabIndex={0} // Make the container focusable to capture key events
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -67,10 +70,25 @@ const FlowCanvasContent: React.FC = () => {
         onDragOver={onDragOver}
         onDrop={onDrop}
         fitView
+        proOptions={{ hideAttribution: true }}
+        defaultEdgeOptions={{
+          type: 'smoothstep',
+          style: { stroke: 'url(#edge-gradient)', strokeWidth: 2 },
+          animated: true,
+        }}
+        deleteKeyCode={['Backspace', 'Delete']}
       >
+        <svg style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0, pointerEvents: 'none' }}>
+          <defs>
+            <linearGradient id="edge-gradient">
+              <stop offset="0%" stopColor="#38bdf8" />
+              <stop offset="50%" stopColor="#6366f1" />
+              <stop offset="100%" stopColor="#a855f7" />
+            </linearGradient>
+          </defs>
+        </svg>
         <Background />
-        <Controls />
-        <MiniMap />
+        <Controls position="top-left" />
       </ReactFlow>
     </div>
   );
