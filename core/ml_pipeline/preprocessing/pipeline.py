@@ -90,8 +90,10 @@ class FeatureEngineer:
     def fit_transform(self, data: Union[pd.DataFrame, Any], artifact_store=None, node_id_prefix="") -> Any:
         """
         Runs the pipeline on data.
+        Returns: (transformed_data, metrics_dict)
         """
         current_data = data
+        metrics = {}
         
         for i, step in enumerate(self.steps_config):
             name = step["name"]
@@ -99,6 +101,13 @@ class FeatureEngineer:
             params = step.get("params", {})
             
             logger.info(f"Running step {i}: {name} ({transformer_type})")
+            
+            # Capture metrics before
+            rows_before = 0
+            cols_before = set()
+            if isinstance(current_data, pd.DataFrame):
+                rows_before = len(current_data)
+                cols_before = set(current_data.columns)
             
             calculator, applier = self._get_transformer_components(transformer_type)
             
@@ -146,8 +155,34 @@ class FeatureEngineer:
 
             else:
                 current_data = transformer.fit_transform(current_data, params)
+            
+            # Capture metrics after
+            if isinstance(current_data, pd.DataFrame):
+                rows_after = len(current_data)
+                cols_after = set(current_data.columns)
                 
-        return current_data
+                if transformer_type in ["DropMissingRows", "Deduplicate"]:
+                    dropped = rows_before - rows_after
+                    metrics[f"{transformer_type}_rows_removed"] = dropped
+                    metrics[f"{transformer_type}_rows_remaining"] = rows_after
+                    metrics[f"{transformer_type}_rows_total"] = rows_before
+                
+                if transformer_type == "MissingIndicator":
+                    new_cols = cols_after - cols_before
+                    metrics["missing_indicators_created"] = len(new_cols)
+                    metrics["missing_indicators_columns"] = list(new_cols)
+                    
+                if transformer_type == "DropMissingColumns":
+                    dropped_cols = cols_before - cols_after
+                    metrics["dropped_columns"] = list(dropped_cols)
+                    metrics["dropped_columns_count"] = len(dropped_cols)
+
+                if transformer_type == "feature_selection":
+                    dropped_cols = cols_before - cols_after
+                    metrics["dropped_columns"] = list(dropped_cols)
+                    metrics["dropped_columns_count"] = len(dropped_cols)
+
+        return current_data, metrics
 
     def _get_transformer_components(self, type_name: str):
         if type_name == "TrainTestSplitter":
