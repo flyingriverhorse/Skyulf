@@ -1,6 +1,6 @@
 import type { DatasetSourceSummary, FeaturePipelineResponse } from '../../../api';
 import type { SaveFeedback } from '../../types/feedback';
-import type { DatasetOption } from './useDatasetSelection';
+import type { DatasetOption } from './useDatasetSelectionHandler';
 
 type UseSidepanelViewModelOptions = {
   activePipelineUpdatedAt: string | null;

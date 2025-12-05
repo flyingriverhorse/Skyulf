@@ -21,7 +21,7 @@ const DataCleaningSettings: React.FC<{ config: DataCleaningConfig; onChange: (c:
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
-  const columns = schema?.columns.map(c => c.name) || [];
+  const columns = schema ? Object.values(schema.columns).map(c => c.name) : [];
 
   return (
     <div className="p-4 space-y-4">

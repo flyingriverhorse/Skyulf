@@ -39,6 +39,32 @@
   /* Shadows */
   --shadow-subtle: 0 10px 30px rgba(0,0,0,0.05);
   --shadow-strong: 0 24px 50px #0f172a73;
+
+  /* Recommendation Colors (Light Mode) */
+  --rec-bg-light: #eff6ff; /* blue-50 */
+  --rec-border-light: #dbeafe; /* blue-100 */
+  --rec-header-text-light: #1e40af; /* blue-800 */
+  --rec-card-bg-light: #ffffff; /* white */
+  --rec-card-border-light: #dbeafe; /* blue-100 */
+  --rec-card-text-light: #1f2937; /* gray-800 */
+  --rec-card-desc-light: #4b5563; /* gray-600 */
+  --rec-card-reason-light: #9ca3af; /* gray-400 */
+  --rec-btn-text-light: #2563eb; /* blue-600 */
+  --rec-btn-hover-bg-light: #eff6ff; /* blue-50 */
+  --rec-btn-hover-text-light: #1e40af; /* blue-800 */
+
+  /* Recommendation Colors (Dark Mode) */
+  --rec-bg-dark: #1e293b; /* slate-800 */
+  --rec-border-dark: #334155; /* slate-700 */
+  --rec-header-text-dark: #60a5fa; /* blue-400 */
+  --rec-card-bg-dark: #0f172a; /* slate-900 */
+  --rec-card-border-dark: #334155; /* slate-700 */
+  --rec-card-text-dark: #e2e8f0; /* slate-200 */
+  --rec-card-desc-dark: #94a3b8; /* slate-400 */
+  --rec-card-reason-dark: #64748b; /* slate-500 */
+  --rec-btn-text-dark: #60a5fa; /* blue-400 */
+  --rec-btn-hover-bg-dark: #1e293b; /* slate-800 */
+  --rec-btn-hover-text-dark: #93c5fd; /* blue-300 */
 }
 
 @keyframes dashdraw {

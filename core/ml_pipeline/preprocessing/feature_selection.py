@@ -280,3 +280,45 @@ class ModelBasedSelectionApplier(BaseApplier):
         
         return df.drop(columns=cols_to_drop)
 
+
+# --- Unified Feature Selection (Facade) ---
+class FeatureSelectionCalculator(BaseCalculator):
+    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+        method = config.get("method", "select_k_best")
+        
+        calculator = None
+        if method == "variance_threshold":
+            calculator = VarianceThresholdCalculator()
+        elif method in ["select_k_best", "select_percentile", "generic_univariate_select", "select_fpr", "select_fdr", "select_fwe"]:
+            calculator = UnivariateSelectionCalculator()
+        elif method in ["select_from_model", "rfe"]:
+            calculator = ModelBasedSelectionCalculator()
+        
+        if calculator:
+            return calculator.fit(df, config)
+            
+        logger.warning(f"Unknown feature selection method: {method}")
+        return {}
+
+class FeatureSelectionApplier(BaseApplier):
+    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+        # The params returned by the specific calculator will have a "type" field
+        # corresponding to the specific calculator's return value.
+        type_name = params.get("type")
+        
+        applier = None
+        if type_name == "variance_threshold":
+            applier = VarianceThresholdApplier()
+        elif type_name == "correlation_threshold":
+            applier = CorrelationThresholdApplier()
+        elif type_name == "univariate_selection":
+            applier = UnivariateSelectionApplier()
+        elif type_name == "model_based_selection":
+            applier = ModelBasedSelectionApplier()
+            
+        if applier:
+            return applier.apply(df, params)
+            
+        return df
+
+

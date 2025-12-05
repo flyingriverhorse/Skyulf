@@ -18,7 +18,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
-  const availableColumns = schema?.columns.map(c => c.name) || [];
+  const availableColumns = schema ? Object.values(schema.columns).map(c => c.name) : [];
 
   return (
     <div className="p-4 space-y-4">

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Play, Save, Loader2, FolderOpen, BrainCircuit } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
-import { savePipeline, fetchPipeline, submitTrainingJob, runPipelinePreviewV2, PipelineConfigModel, NodeConfigModel } from '../../core/api/client';
+import { runPipelinePreviewV2, PipelineConfigModel, NodeConfigModel, savePipeline, fetchPipeline, submitTrainingJob } from '../../core/api/client';
 
 export const Toolbar: React.FC = () => {
   const nodes = useGraphStore((state) => state.nodes);
@@ -53,7 +53,7 @@ export const Toolbar: React.FC = () => {
       const node = nodes.find(n => n.id === nodeId);
       if (!node) continue;
 
-      let stepType = 'feature_engineering';
+      let stepType = 'unknown';
       let params: any = {};
       const incomingEdges = edges.filter(e => e.target === nodeId);
       const inputs = incomingEdges.map(e => e.source);
@@ -62,24 +62,51 @@ export const Toolbar: React.FC = () => {
         stepType = 'data_loader';
         params = { 
             dataset_id: node.data.datasetId,
-            path: "placeholder", 
-            sample: true 
         };
-      } else {
-          let transformerType = 'SimpleTransformation';
-          if (node.data.definitionType === 'imputation_node') transformerType = 'SimpleImputer';
-          if (node.data.definitionType === 'drop_columns_node') transformerType = 'DropMissingColumns';
-          if (node.data.definitionType === 'scaling_node') transformerType = 'StandardScaler';
-          if (node.data.definitionType === 'one_hot_encoding_node') transformerType = 'OneHotEncoder';
-          if (node.data.definitionType === 'label_encoding_node') transformerType = 'LabelEncoder';
+      } else if (node.data.definitionType === 'simple_imputer') {
+          stepType = 'SimpleImputer';
+          params = node.data || {};
+      } else if (node.data.definitionType === 'drop_missing_columns') {
+          stepType = 'DropMissingColumns';
+          // Ensure we pass the columns array correctly
+          params = {
+            columns: node.data.columns || [],
+            missing_threshold: node.data.missing_threshold
+          };
+      } else if (node.data.definitionType === 'scale_numeric_features') {
+          const config = node.data as any || {};
+          const method = config.method || 'standard';
+          if (method === 'minmax') stepType = 'MinMaxScaler';
+          else if (method === 'maxabs') stepType = 'MaxAbsScaler';
+          else if (method === 'robust') stepType = 'RobustScaler';
+          else stepType = 'StandardScaler';
+          params = config;
+      } else if (node.data.definitionType === 'one_hot_encoding') {
+          stepType = 'OneHotEncoder';
+          params = node.data || {};
+      } else if (node.data.definitionType === 'label_encoding') {
+          stepType = 'LabelEncoder';
+          params = node.data || {};
+      } else if (node.data.definitionType === 'TrainTestSplitter') {
+          stepType = 'TrainTestSplitter';
+          params = node.data || {};
+      } else if (node.data.definitionType === 'feature_target_split') {
+          stepType = 'feature_target_split';
+          params = node.data || {};
+      } else if (node.data.definitionType === 'train_model_draft') {
+          stepType = 'model_training';
+          let algo = node.data.modelType;
+          // Simple mapping for now
+          if (algo === 'random_forest') algo = 'random_forest_classifier';
           
           params = {
-              steps: [{
-                  name: `${node.data.label || 'Step'}_${node.id}`,
-                  transformer: transformerType,
-                  params: node.data.config || {}
-              }]
+              target_column: node.data.targetColumn,
+              algorithm: algo,
+              hyperparameters: node.data.hyperparameters
           };
+      } else {
+          console.error(`Unknown node type: ${node.data.definitionType}`);
+          throw new Error(`Unknown node type: ${node.data.definitionType}. Pipeline execution stopped.`);
       }
 
       sortedNodes.push({
@@ -173,17 +200,7 @@ export const Toolbar: React.FC = () => {
       const pipelineConfig = convertGraphToPipelineConfig(datasetId);
       const result = await runPipelinePreviewV2(pipelineConfig);
       
-      // Map V2 result to what ResultsPanel expects
-      const mappedResult = {
-          sample_rows: result.preview_data,
-          metrics: {
-              preview_rows: Array.isArray(result.preview_data) ? result.preview_data.length : 0,
-              preview_total_rows: 1000 // Sample size
-          },
-          applied_steps: Object.keys(result.node_results || {})
-      };
-
-      setExecutionResult(mappedResult);
+      setExecutionResult(result);
     } catch (error) {
       console.error('Pipeline failed:', error);
       alert('Pipeline execution failed. Check console for details.');
