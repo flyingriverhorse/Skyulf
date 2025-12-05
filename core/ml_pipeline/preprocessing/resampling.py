@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Tuple
 import logging
 import pandas as pd
 import numpy as np
@@ -7,12 +7,13 @@ from imblearn.combine import SMOTETomek
 from imblearn.under_sampling import RandomUnderSampler, NearMiss, TomekLinks, EditedNearestNeighbours
 
 from .base import BaseCalculator, BaseApplier
+from ..utils import unpack_pipeline_input, pack_pipeline_output
 
 logger = logging.getLogger(__name__)
 
 # --- Oversampling (SMOTE variants) ---
 class OversamplingCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         # Config: {'method': 'smote', 'target_column': 'target', 'sampling_strategy': 'auto', ...}
         return {
             'type': 'oversampling',
@@ -25,13 +26,18 @@ class OversamplingCalculator(BaseCalculator):
         }
 
 class OversamplingApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
         target_col = params.get('target_column')
-        if not target_col or target_col not in df.columns:
-            return df
-            
-        X = df.drop(columns=[target_col])
-        y = df[target_col]
+        
+        # Resampling requires y. If not provided in tuple, try to extract from dataframe using target_column
+        if y is None:
+            if target_col and target_col in X.columns:
+                y = X[target_col]
+                X = X.drop(columns=[target_col])
+            else:
+                # Cannot resample without target
+                return pack_pipeline_output(X, y, is_tuple)
         
         method = params.get('method', 'smote')
         strategy = params.get('sampling_strategy', 'auto')
@@ -41,7 +47,7 @@ class OversamplingApplier(BaseApplier):
         
         sampler = None
         if method == 'smote':
-            sampler = SMOTE(sampling_strategy=strategy, random_state=random_state, k_neighbors=k_neighbors, n_jobs=n_jobs)
+            sampler = SMOTE(sampling_strategy=strategy, random_state=random_state, k_neighbors=k_neighbors)
         elif method == 'adasyn':
             sampler = ADASYN(sampling_strategy=strategy, random_state=random_state, n_neighbors=k_neighbors, n_jobs=n_jobs)
         elif method == 'borderline_smote':
@@ -54,20 +60,26 @@ class OversamplingApplier(BaseApplier):
             sampler = SMOTETomek(sampling_strategy=strategy, random_state=random_state, n_jobs=n_jobs)
             
         if not sampler:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
         try:
             X_res, y_res = sampler.fit_resample(X, y)
-            df_res = pd.DataFrame(X_res, columns=X.columns)
-            df_res[target_col] = y_res
-            return df_res
+            
+            # Ensure we return DataFrame/Series with correct names/columns
+            if not isinstance(X_res, pd.DataFrame):
+                X_res = pd.DataFrame(X_res, columns=X.columns)
+            if not isinstance(y_res, pd.Series):
+                y_res = pd.Series(y_res, name=y.name if y is not None else target_col)
+                
+            return pack_pipeline_output(X_res, y_res, is_tuple)
+
         except Exception as e:
             logger.error(f"Oversampling failed: {e}")
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
 
 # --- Undersampling ---
 class UndersamplingCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         return {
             'type': 'undersampling',
             'method': config.get('method', 'random_under_sampling'),
@@ -82,13 +94,18 @@ class UndersamplingCalculator(BaseCalculator):
         }
 
 class UndersamplingApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
         target_col = params.get('target_column')
-        if not target_col or target_col not in df.columns:
-            return df
-            
-        X = df.drop(columns=[target_col])
-        y = df[target_col]
+        
+        # Resampling requires y. If not provided in tuple, try to extract from dataframe using target_column
+        if y is None:
+            if target_col and target_col in X.columns:
+                y = X[target_col]
+                X = X.drop(columns=[target_col])
+            else:
+                # Cannot resample without target
+                return pack_pipeline_output(X, y, is_tuple)
         
         method = params.get('method', 'random_under_sampling')
         strategy = params.get('sampling_strategy', 'auto')
@@ -110,13 +127,19 @@ class UndersamplingApplier(BaseApplier):
             sampler = EditedNearestNeighbours(sampling_strategy=strategy, n_neighbors=n_neighbors, kind_sel=kind_sel, n_jobs=n_jobs)
             
         if not sampler:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
         try:
             X_res, y_res = sampler.fit_resample(X, y)
-            df_res = pd.DataFrame(X_res, columns=X.columns)
-            df_res[target_col] = y_res
-            return df_res
+            
+            # Ensure we return DataFrame/Series with correct names/columns
+            if not isinstance(X_res, pd.DataFrame):
+                X_res = pd.DataFrame(X_res, columns=X.columns)
+            if not isinstance(y_res, pd.Series):
+                y_res = pd.Series(y_res, name=y.name if y is not None else target_col)
+                
+            return pack_pipeline_output(X_res, y_res, is_tuple)
+
         except Exception as e:
             logger.error(f"Undersampling failed: {e}")
-            return df
+            return pack_pipeline_output(X, y, is_tuple)

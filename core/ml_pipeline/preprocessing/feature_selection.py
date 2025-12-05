@@ -10,7 +10,7 @@ from sklearn.feature_selection import (
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from .base import BaseCalculator, BaseApplier
-from ..utils import detect_numeric_columns, resolve_columns
+from ..utils import detect_numeric_columns, resolve_columns, unpack_pipeline_input, pack_pipeline_output
 
 logger = logging.getLogger(__name__)
 
@@ -45,32 +45,35 @@ def _resolve_score_function(name: Optional[str], problem_type: str) -> Callable:
 def _resolve_estimator(key: Optional[str], problem_type: str) -> Any:
     key = (key or "auto").lower()
     if problem_type == "classification":
-        if key in {"auto", "logistic_regression"}:
+        if key in {"auto", "logistic_regression", "logisticregression"}:
             return LogisticRegression(max_iter=1000)
-        if key in {"random_forest"}:
+        if key in {"random_forest", "randomforest"}:
             return RandomForestClassifier(n_estimators=100, random_state=0, n_jobs=-1)
-        if key == "linear_regression":
+        if key in {"linear_regression", "linearregression"}:
             return LinearRegression() # Odd for classification but allowed in V1 logic
     else:
-        if key in {"auto", "linear_regression"}:
+        if key in {"auto", "linear_regression", "linearregression"}:
             return LinearRegression()
-        if key in {"random_forest"}:
+        if key in {"random_forest", "randomforest"}:
             return RandomForestRegressor(n_estimators=100, random_state=0, n_jobs=-1)
     return None
 
 # --- Variance Threshold ---
 class VarianceThresholdCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
         # Config: {"threshold": 0.0, "columns": [...]}
         threshold = config.get("threshold", 0.0)
+        drop_columns = config.get("drop_columns", True)
         
-        cols = resolve_columns(df, config, lambda d: d.select_dtypes(include=["number"]).columns.tolist())
+        cols = resolve_columns(X, config, lambda d: d.select_dtypes(include=["number"]).columns.tolist())
         
         if not cols:
             return {}
             
         selector = VarianceThreshold(threshold=threshold)
-        selector.fit(df[cols])
+        selector.fit(X[cols])
         
         support = selector.get_support()
         selected_cols = [c for c, s in zip(cols, support) if s]
@@ -79,35 +82,46 @@ class VarianceThresholdCalculator(BaseCalculator):
             "type": "variance_threshold",
             "selected_columns": selected_cols,
             "candidate_columns": cols,
-            "threshold": threshold
+            "threshold": threshold,
+            "drop_columns": drop_columns
         }
 
 class VarianceThresholdApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         selected_cols = params.get("selected_columns")
         candidate_columns = params.get("candidate_columns", [])
+        drop_columns = params.get("drop_columns", True)
         
         if selected_cols is None:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
         cols_to_drop = set(candidate_columns) - set(selected_cols)
-        cols_to_drop = [c for c in cols_to_drop if c in df.columns]
+        cols_to_drop = [c for c in cols_to_drop if c in X.columns]
         
-        return df.drop(columns=cols_to_drop)
+        if cols_to_drop and drop_columns:
+            X = X.drop(columns=cols_to_drop)
+        return pack_pipeline_output(X, y, is_tuple)
 
 # --- Correlation Threshold ---
 class CorrelationThresholdCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        # Config: {"threshold": 0.95, "method": "pearson"}
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
+        # Config: {"threshold": 0.95, "correlation_method": "pearson"}
         threshold = config.get("threshold", 0.95)
-        method = config.get("method", "pearson")
+        drop_columns = config.get("drop_columns", True)
+        # Prefer "correlation_method" to avoid conflict with facade's "method"
+        # FIX: Do NOT fallback to config.get("method") because it might be "correlation_threshold" (the facade method name)
+        method = config.get("correlation_method", "pearson")
         
-        cols = resolve_columns(df, config, detect_numeric_columns)
+        cols = resolve_columns(X, config, detect_numeric_columns)
         
         if len(cols) < 2:
             return {}
             
-        corr_matrix = df[cols].corr(method=method).abs()
+        corr_matrix = X[cols].corr(method=method).abs()
         upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
         to_drop = [column for column in upper.columns if any(upper[column] > threshold)]
         
@@ -115,26 +129,40 @@ class CorrelationThresholdCalculator(BaseCalculator):
             "type": "correlation_threshold",
             "columns_to_drop": to_drop,
             "threshold": threshold,
-            "method": method
+            "method": method,
+            "drop_columns": drop_columns
         }
 
 class CorrelationThresholdApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         cols_to_drop = params.get("columns_to_drop", [])
-        cols_to_drop = [c for c in cols_to_drop if c in df.columns]
-        if not cols_to_drop: return df
-        return df.drop(columns=cols_to_drop)
+        drop_columns = params.get("drop_columns", True)
+        
+        cols_to_drop = [c for c in cols_to_drop if c in X.columns]
+        if not cols_to_drop:
+            return pack_pipeline_output(X, y, is_tuple)
+        
+        if drop_columns:
+            X = X.drop(columns=cols_to_drop)
+        return pack_pipeline_output(X, y, is_tuple)
 
 # --- Univariate Selection ---
 class UnivariateSelectionCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         # Config: method, k, percentile, alpha, score_func, target_column
         target_col = config.get("target_column")
-        if not target_col or target_col not in df.columns:
-            logger.error(f"UnivariateSelection requires target column '{target_col}' to be present in training data.")
-            return {}
-            
-        cols = resolve_columns(df, config, detect_numeric_columns)
+        
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
+        if not is_tuple:
+            if not target_col or target_col not in X.columns:
+                logger.error(f"UnivariateSelection requires target column '{target_col}' to be present in training data.")
+                return {}
+            y = X[target_col]
+
+        cols = resolve_columns(X, config, detect_numeric_columns)
         
         # Ensure target is not in candidate columns
         if target_col in cols:
@@ -148,13 +176,14 @@ class UnivariateSelectionCalculator(BaseCalculator):
         problem_type = config.get("problem_type", "auto")
         
         if problem_type == "auto":
-            problem_type = _infer_problem_type(df[target_col])
+            problem_type = _infer_problem_type(y)
             
         score_func = _resolve_score_function(score_func_name, problem_type)
         
         selector = None
         if method == "select_k_best":
             k = config.get("k", 10)
+            # logger.info(f"SelectKBest k={k}")
             selector = SelectKBest(score_func=score_func, k=k)
         elif method == "select_percentile":
             p = config.get("percentile", 10)
@@ -170,24 +199,27 @@ class UnivariateSelectionCalculator(BaseCalculator):
             selector = SelectFwe(score_func=score_func, alpha=alpha)
         elif method == "generic_univariate_select":
             mode = config.get("mode", "k_best")
-            param = config.get("param", 1e-5) # V1 logic handles param mapping
-            # Map param based on mode if needed, but usually passed directly
-            if mode == "k_best": param = config.get("k", 10)
-            elif mode == "percentile": param = config.get("percentile", 10)
-            else: param = config.get("alpha", 0.05)
+            # Prioritize explicit 'param' from config (Frontend sends this)
+            if "param" in config:
+                param = config.get("param")
+            else:
+                # Fallback to mapping from specific keys (Legacy/Alternative)
+                if mode == "k_best": param = config.get("k", 10)
+                elif mode == "percentile": param = config.get("percentile", 10)
+                else: param = config.get("alpha", 0.05)
+            
             selector = GenericUnivariateSelect(score_func=score_func, mode=mode, param=param)
             
         if not selector:
             return {}
             
-        X = df[cols].fillna(0)
-        y = df[target_col]
+        X_fit = X[cols].fillna(0)
         
         # Handle classification target encoding if needed
         if problem_type == "classification" and not pd.api.types.is_numeric_dtype(y):
             y = pd.factorize(y)[0]
             
-        selector.fit(X, y)
+        selector.fit(X_fit, y)
         support = selector.get_support()
         selected_cols = [c for c, s in zip(cols, support) if s]
         
@@ -195,31 +227,42 @@ class UnivariateSelectionCalculator(BaseCalculator):
             "type": "univariate_selection",
             "selected_columns": selected_cols,
             "candidate_columns": cols,
-            "method": method
+            "method": method,
+            "drop_columns": config.get("drop_columns", True)
         }
 
 class UnivariateSelectionApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         selected_cols = params.get("selected_columns")
         candidate_columns = params.get("candidate_columns", [])
+        drop_columns = params.get("drop_columns", True)
         
-        if selected_cols is None: return df
+        if selected_cols is None:
+            return pack_pipeline_output(X, y, is_tuple)
         
         cols_to_drop = set(candidate_columns) - set(selected_cols)
-        cols_to_drop = [c for c in cols_to_drop if c in df.columns]
-        
-        return df.drop(columns=cols_to_drop)
+        cols_to_drop = [c for c in cols_to_drop if c in X.columns]
+        if cols_to_drop and drop_columns:
+            X = X.drop(columns=cols_to_drop)
+        return pack_pipeline_output(X, y, is_tuple)
 
 # --- Model Based Selection ---
 class ModelBasedSelectionCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         # Config: method (select_from_model, rfe), estimator, target_column
         target_col = config.get("target_column")
-        if not target_col or target_col not in df.columns:
-            logger.error(f"ModelBasedSelection requires target column '{target_col}' to be present in training data.")
-            return {}
-            
-        cols = resolve_columns(df, config, detect_numeric_columns)
+        
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
+        if not is_tuple:
+            if not target_col or target_col not in X.columns:
+                logger.error(f"ModelBasedSelection requires target column '{target_col}' to be present in training data.")
+                return {}
+            y = X[target_col]
+
+        cols = resolve_columns(X, config, detect_numeric_columns)
         
         # Ensure target is not in candidate columns
         if target_col in cols:
@@ -233,10 +276,10 @@ class ModelBasedSelectionCalculator(BaseCalculator):
         problem_type = config.get("problem_type", "auto")
         
         if problem_type == "auto":
-            problem_type = _infer_problem_type(df[target_col])
+            problem_type = _infer_problem_type(y)
             
         estimator = _resolve_estimator(estimator_name, problem_type)
-        if not estimator:
+        if estimator is None:
             return {}
             
         selector = None
@@ -251,13 +294,12 @@ class ModelBasedSelectionCalculator(BaseCalculator):
         if not selector:
             return {}
             
-        X = df[cols].fillna(0)
-        y = df[target_col]
+        X_fit = X[cols].fillna(0)
         
         if problem_type == "classification" and not pd.api.types.is_numeric_dtype(y):
             y = pd.factorize(y)[0]
             
-        selector.fit(X, y)
+        selector.fit(X_fit, y)
         support = selector.get_support()
         selected_cols = [c for c, s in zip(cols, support) if s]
         
@@ -265,30 +307,38 @@ class ModelBasedSelectionCalculator(BaseCalculator):
             "type": "model_based_selection",
             "selected_columns": selected_cols,
             "candidate_columns": cols,
-            "method": method
+            "method": method,
+            "drop_columns": config.get("drop_columns", True)
         }
 
 class ModelBasedSelectionApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         selected_cols = params.get("selected_columns")
         candidate_columns = params.get("candidate_columns", [])
+        drop_columns = params.get("drop_columns", True)
         
-        if selected_cols is None: return df
+        if selected_cols is None:
+            return pack_pipeline_output(X, y, is_tuple)
         
         cols_to_drop = set(candidate_columns) - set(selected_cols)
-        cols_to_drop = [c for c in cols_to_drop if c in df.columns]
-        
-        return df.drop(columns=cols_to_drop)
+        cols_to_drop = [c for c in cols_to_drop if c in X.columns]
+        if cols_to_drop and drop_columns:
+            X = X.drop(columns=cols_to_drop)
+        return pack_pipeline_output(X, y, is_tuple)
 
 
 # --- Unified Feature Selection (Facade) ---
 class FeatureSelectionCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         method = config.get("method", "select_k_best")
         
         calculator = None
         if method == "variance_threshold":
             calculator = VarianceThresholdCalculator()
+        elif method == "correlation_threshold":
+            calculator = CorrelationThresholdCalculator()
         elif method in ["select_k_best", "select_percentile", "generic_univariate_select", "select_fpr", "select_fdr", "select_fwe"]:
             calculator = UnivariateSelectionCalculator()
         elif method in ["select_from_model", "rfe"]:
@@ -301,7 +351,7 @@ class FeatureSelectionCalculator(BaseCalculator):
         return {}
 
 class FeatureSelectionApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         # The params returned by the specific calculator will have a "type" field
         # corresponding to the specific calculator's return value.
         type_name = params.get("type")

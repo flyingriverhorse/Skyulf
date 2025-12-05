@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union, Tuple
 import logging
 import pandas as pd
 import numpy as np
@@ -6,7 +6,7 @@ from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, TargetEncoder, 
 from sklearn.feature_extraction import FeatureHasher
 
 from .base import BaseCalculator, BaseApplier
-from ..utils import resolve_columns
+from ..utils import resolve_columns, unpack_pipeline_input, pack_pipeline_output
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +15,10 @@ def detect_categorical_columns(df: pd.DataFrame) -> List[str]:
 
 # --- OneHot Encoder ---
 class OneHotEncoderCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        cols = resolve_columns(df, config, detect_categorical_columns)
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
+        cols = resolve_columns(X, config, detect_categorical_columns)
         
         if not cols:
             return {}
@@ -30,7 +32,7 @@ class OneHotEncoderCalculator(BaseCalculator):
         include_missing = config.get('include_missing', False)
         
         # Handle missing values for fit if requested
-        df_fit = df[cols].copy()
+        df_fit = X[cols].copy()
         if include_missing:
             df_fit = df_fit.fillna('__mlops_missing__')
         
@@ -57,51 +59,46 @@ class OneHotEncoderCalculator(BaseCalculator):
         }
 
 class OneHotEncoderApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         if not params or not params.get('columns'):
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
         cols = params['columns']
         encoder = params.get('encoder_object')
         feature_names = params.get('feature_names')
         drop_original = params.get('drop_original', True)
         include_missing = params.get('include_missing', False)
-        # prefix_separator is used implicitly by sklearn's get_feature_names_out during fit
         
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or not encoder:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
-        
-        # Prepare data
-        X = df_out[valid_cols].copy()
+        X_out = X.copy()
+        X_sub = X_out[valid_cols].copy()
         if include_missing:
-            X = X.fillna('__mlops_missing__')
+            X_sub = X_sub.fillna('__mlops_missing__')
             
-        # Transform
-        # Sklearn handles unknown categories based on handle_unknown='ignore' (all zeros)
-        encoded_array = encoder.transform(X)
-        
-        # Create DataFrame from encoded array
+        encoded_array = encoder.transform(X_sub)
         encoded_df = pd.DataFrame(
             encoded_array, 
             columns=feature_names, 
-            index=df_out.index
+            index=X_out.index
         )
         
-        # Drop original columns and concat encoded ones
         if drop_original:
-            df_out = df_out.drop(columns=valid_cols)
+            X_out = X_out.drop(columns=valid_cols)
             
-        df_out = pd.concat([df_out, encoded_df], axis=1)
-        
-        return df_out
+        X_out = pd.concat([X_out, encoded_df], axis=1)
+        return pack_pipeline_output(X_out, y, is_tuple)
 
 # --- Ordinal Encoder ---
 class OrdinalEncoderCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        cols = resolve_columns(df, config, detect_categorical_columns)
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
+        cols = resolve_columns(X, config, detect_categorical_columns)
         
         if not cols:
             return {}
@@ -111,7 +108,7 @@ class OrdinalEncoderCalculator(BaseCalculator):
         unknown_value = config.get('unknown_value', -1)
         encode_missing = config.get('encode_missing', False)
         
-        df_fit = df[cols].copy()
+        df_fit = X[cols].copy()
         if encode_missing:
             df_fit = df_fit.fillna('__mlops_missing__')
         
@@ -133,9 +130,11 @@ class OrdinalEncoderCalculator(BaseCalculator):
         }
 
 class OrdinalEncoderApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         if not params or not params.get('columns'):
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
         cols = params['columns']
         encoder = params.get('encoder_object')
@@ -143,41 +142,43 @@ class OrdinalEncoderApplier(BaseApplier):
         drop_original = params.get('drop_original', True)
         encode_missing = params.get('encode_missing', False)
         
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or not encoder:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
-        
-        X = df_out[valid_cols].copy()
+        X_out = X.copy()
+        X_sub = X_out[valid_cols].copy()
         if encode_missing:
-            X = X.fillna('__mlops_missing__')
+            X_sub = X_sub.fillna('__mlops_missing__')
         
-        # Transform
-        transformed = encoder.transform(X)
+        transformed = encoder.transform(X_sub)
         
         if drop_original:
-            df_out[valid_cols] = transformed
+            X_out[valid_cols] = transformed
         else:
             for i, col in enumerate(valid_cols):
                 out_col = f"{col}{output_suffix}"
-                df_out[out_col] = transformed[:, i]
-        
-        return df_out
+                X_out[out_col] = transformed[:, i]
+        return pack_pipeline_output(X_out, y, is_tuple)
 
 # --- Target Encoder ---
 class TargetEncoderCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         # Requires target column in config or passed separately?
         # BaseCalculator.fit signature is (df, config). 
         # We assume 'df' contains the target, and config specifies which column is target.
         
         target_col = config.get('target_column')
-        if not target_col or target_col not in df.columns:
-            logger.error(f"TargetEncoder requires target column '{target_col}' to be present in training data.")
-            return {}
-            
-        cols = resolve_columns(df, config, detect_categorical_columns)
+        
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
+        if not is_tuple:
+            if not target_col or target_col not in X.columns:
+                logger.error(f"TargetEncoder requires target column '{target_col}' to be present in training data.")
+                return {}
+            y = X[target_col]
+
+        cols = resolve_columns(X, config, detect_categorical_columns)
         
         # Ensure target is NEVER in the columns to be encoded (leakage prevention)
         if target_col in cols:
@@ -189,16 +190,13 @@ class TargetEncoderCalculator(BaseCalculator):
         smooth = config.get('smooth', 20.0) # Smoothing parameter
         encode_missing = config.get('encode_missing', False)
         
-        df_fit = df[cols].copy()
+        df_fit = X[cols].copy()
         if encode_missing:
             df_fit = df_fit.fillna('__mlops_missing__')
         
         encoder = TargetEncoder(smooth=smooth, target_type='continuous') # Auto-detects type usually, but explicit is safer
         
-        X = df_fit
-        y = df[target_col]
-        
-        encoder.fit(X, y)
+        encoder.fit(df_fit, y)
         
         return {
             'type': 'target',
@@ -210,9 +208,11 @@ class TargetEncoderCalculator(BaseCalculator):
         }
 
 class TargetEncoderApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         if not params or not params.get('columns'):
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
         cols = params['columns']
         encoder = params.get('encoder_object')
@@ -220,32 +220,31 @@ class TargetEncoderApplier(BaseApplier):
         drop_original = params.get('drop_original', True)
         encode_missing = params.get('encode_missing', False)
         
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or not encoder:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
-        
-        X = df_out[valid_cols].copy()
+        X_out = X.copy()
+        X_sub = X_out[valid_cols].copy()
         if encode_missing:
-            X = X.fillna('__mlops_missing__')
+            X_sub = X_sub.fillna('__mlops_missing__')
         
-        # Transform
-        transformed = encoder.transform(X)
+        transformed = encoder.transform(X_sub)
         
         if drop_original:
-            df_out[valid_cols] = transformed
+            X_out[valid_cols] = transformed
         else:
             for i, col in enumerate(valid_cols):
                 out_col = f"{col}{output_suffix}"
-                df_out[out_col] = transformed[:, i]
-        
-        return df_out
+                X_out[out_col] = transformed[:, i]
+        return pack_pipeline_output(X_out, y, is_tuple)
 
 # --- Hash Encoder ---
 class HashEncoderCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        cols = resolve_columns(df, config, detect_categorical_columns)
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
+        cols = resolve_columns(X, config, detect_categorical_columns)
         
         if not cols:
             return {}
@@ -265,9 +264,11 @@ class HashEncoderCalculator(BaseCalculator):
         }
 
 class HashEncoderApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         if not params or not params.get('columns'):
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
         cols = params['columns']
         n_features = params.get('n_features', 64)
@@ -275,49 +276,43 @@ class HashEncoderApplier(BaseApplier):
         drop_original = params.get('drop_original', True)
         encode_missing = params.get('encode_missing', False)
         
-        valid_cols = [c for c in cols if c in df.columns]
-        if not valid_cols:
-            return df
-            
-        df_out = df.copy()
-        
-        # FeatureHasher expects an iterable of iterables (e.g. list of strings).
-        # We hash each column independently to generate n_features for that specific column.
-        # Each value is treated as a single string token.
-        
         hasher = FeatureHasher(n_features=n_features, input_type='string')
         
+        valid_cols = [c for c in cols if c in X.columns]
+        if not valid_cols:
+            return pack_pipeline_output(X, y, is_tuple)
+            
+        X_out = X.copy()
         for col in valid_cols:
-            col_series = df_out[col]
+            series = X_out[col].astype(str)
             if encode_missing:
-                col_series = col_series.fillna('__mlops_missing__')
-                
-            # Convert column to list of strings (iterable of iterables)
-            # FeatureHasher expects [ ['a'], ['b'], ... ]
-            # We handle NaNs by converting them to string representation
-            col_data = col_series.astype(str).map(lambda x: [x]).tolist()
+                series = series.fillna('__mlops_missing__')
             
-            hashed = hasher.transform(col_data)
+            # FeatureHasher expects iterable of iterables (like list of strings)
+            # But here we are hashing single column values.
+            # Usually FeatureHasher is used for list of tokens.
+            # For single column categorical, we treat value as a single token.
+            # We need to wrap each value in a list: [['cat'], ['dog'], ...]
+            hashed = hasher.transform([[x] for x in series])
+            hashed_array = hashed.toarray()
             
-            base_name = f"{col}{output_suffix}"
+            # Add hashed features
+            new_cols = [f"{col}{output_suffix}_{i}" for i in range(n_features)]
+            hashed_df = pd.DataFrame(hashed_array, columns=new_cols, index=X_out.index)
             
-            hashed_df = pd.DataFrame(
-                hashed.toarray(),
-                columns=[f"{base_name}_{i}" for i in range(n_features)],
-                index=df_out.index
-            )
-            
-            df_out = pd.concat([df_out, hashed_df], axis=1)
+            X_out = pd.concat([X_out, hashed_df], axis=1)
             
         if drop_original:
-            df_out = df_out.drop(columns=valid_cols)
-        return df_out
+            X_out = X_out.drop(columns=valid_cols)
+        return pack_pipeline_output(X_out, y, is_tuple)
 
 # --- Dummy Encoder (Pandas get_dummies wrapper) ---
 # Note: In V2, we prefer OneHotEncoder, but this is for V1 compatibility
 class DummyEncoderCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        cols = resolve_columns(df, config, detect_categorical_columns)
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+        
+        cols = resolve_columns(X, config, detect_categorical_columns)
         
         if not cols:
             return {}
@@ -329,7 +324,7 @@ class DummyEncoderCalculator(BaseCalculator):
         # We need to know the categories to ensure consistent columns during apply
         categories = {}
         for col in cols:
-            series = df[col]
+            series = X[col]
             if include_missing:
                 series = series.fillna('__mlops_missing__')
             else:
@@ -352,9 +347,11 @@ class DummyEncoderCalculator(BaseCalculator):
         }
 
 class DummyEncoderApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         if not params or not params.get('columns'):
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
         cols = params['columns']
         categories = params.get('categories', {})
@@ -362,34 +359,36 @@ class DummyEncoderApplier(BaseApplier):
         prefix_separator = params.get('prefix_separator', '_')
         drop_original = params.get('drop_original', True)
         
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
+        X_out = X.copy()
         
         for col in valid_cols:
             # We manually construct the dummy columns to ensure consistency with 'fit'
             # This is safer than pd.get_dummies which depends on the data present
             known_cats = categories.get(col, [])
             
-            col_data = df_out[col]
+            col_data = X_out[col]
             if include_missing:
                 col_data = col_data.fillna('__mlops_missing__')
             
             for cat in known_cats:
                 col_name = f"{col}{prefix_separator}{cat}"
                 # Create boolean column (0/1)
-                df_out[col_name] = (col_data == cat).astype(int)
+                X_out[col_name] = (col_data == cat).astype(int)
                 
         if drop_original:
-            df_out = df_out.drop(columns=valid_cols)
-        return df_out
+            X_out = X_out.drop(columns=valid_cols)
+        return pack_pipeline_output(X_out, y, is_tuple)
 
 # --- Label Encoder ---
 class LabelEncoderCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        cols = resolve_columns(df, config, detect_categorical_columns)
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+        
+        cols = resolve_columns(X, config, detect_categorical_columns)
         
         if not cols:
             return {}
@@ -400,7 +399,7 @@ class LabelEncoderCalculator(BaseCalculator):
         encoders = {}
         for col in cols:
             le = LabelEncoder()
-            series = df[col]
+            series = X[col]
             
             if missing_strategy == 'encode':
                 series = series.fillna('__mlops_missing__')
@@ -421,9 +420,11 @@ class LabelEncoderCalculator(BaseCalculator):
         }
 
 class LabelEncoderApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         if not params or not params.get('columns'):
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
         cols = params['columns']
         encoders = params.get('encoders', {})
@@ -432,16 +433,16 @@ class LabelEncoderApplier(BaseApplier):
         missing_strategy = params.get('missing_strategy', 'keep_na')
         missing_code = params.get('missing_code', -1)
         
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
+        X_out = X.copy()
         
         for col in valid_cols:
             le = encoders.get(col)
             if le:
-                series = df_out[col]
+                series = X_out[col]
                 if missing_strategy == 'encode':
                     series = series.fillna('__mlops_missing__')
                 
@@ -468,10 +469,10 @@ class LabelEncoderApplier(BaseApplier):
                     mapped = mapped.astype(int)
                 
                 if drop_original:
-                    df_out[col] = mapped
+                    X_out[col] = mapped
                 else:
                     out_col = f"{col}{output_suffix}"
-                    df_out[out_col] = mapped
+                    X_out[out_col] = mapped
                 
-        return df_out
+        return pack_pipeline_output(X_out, y, is_tuple)
 

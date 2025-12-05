@@ -1,12 +1,16 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
 import { registry } from '../../core/registry/NodeRegistry';
-import { AlertCircle, X } from 'lucide-react';
+import { AlertCircle, X, CheckCircle2, XCircle } from 'lucide-react';
+import { useGraphStore } from '../../core/store/useGraphStore';
 
 export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
   const definitionType = data.definitionType as string;
   const definition = registry.get(definitionType);
   const { deleteElements } = useReactFlow();
+  
+  const executionResult = useGraphStore((state) => state.executionResult);
+  const nodeResult = executionResult?.node_results[id];
 
   const onDelete = (evt: React.MouseEvent) => {
     evt.stopPropagation();
@@ -38,8 +42,19 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
         <div className="p-1.5 bg-primary/10 rounded mr-3">
           {definition.icon && <definition.icon className="w-4 h-4 text-primary" />}
         </div>
-        <div>
-          <div className="text-sm font-bold">{definition.label}</div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <div className="text-sm font-bold">{definition.label}</div>
+            {nodeResult && (
+              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border ${
+                nodeResult.status === 'success' 
+                  ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-900' 
+                  : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-900'
+              }`}>
+                {nodeResult.status === 'success' ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+              </div>
+            )}
+          </div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
             {definition.category}
           </div>
@@ -48,7 +63,7 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
         {/* Delete Button */}
         <button
           onClick={onDelete}
-          className="absolute right-2 top-2 p-1 rounded-md hover:bg-destructive/10 hover:text-destructive text-muted-foreground/50 transition-all opacity-0 group-hover:opacity-100"
+          className="p-1 rounded-md hover:bg-destructive/10 hover:text-destructive text-muted-foreground/50 transition-all opacity-0 group-hover:opacity-100 ml-2"
           title="Remove Node"
         >
           <X size={14} />

@@ -1,28 +1,30 @@
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Tuple
 import logging
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, MaxAbsScaler
 
 from .base import BaseCalculator, BaseApplier
-from ..utils import detect_numeric_columns, resolve_columns
+from ..utils import detect_numeric_columns, resolve_columns, unpack_pipeline_input, pack_pipeline_output
 
 logger = logging.getLogger(__name__)
 
 # --- Standard Scaler ---
 class StandardScalerCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
         # Config: {'with_mean': True, 'with_std': True, 'columns': [...]}
         with_mean = config.get('with_mean', True)
         with_std = config.get('with_std', True)
         
-        cols = resolve_columns(df, config, detect_numeric_columns)
+        cols = resolve_columns(X, config, detect_numeric_columns)
         
         if not cols:
             return {}
             
         scaler = StandardScaler(with_mean=with_mean, with_std=with_std)
-        scaler.fit(df[cols])
+        scaler.fit(X[cols])
         
         return {
             'type': 'standard_scaler',
@@ -35,59 +37,48 @@ class StandardScalerCalculator(BaseCalculator):
         }
 
 class StandardScalerApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         cols = params.get('columns', [])
         mean = params.get('mean')
         scale = params.get('scale')
         
-        valid_cols = [c for c in cols if c in df.columns]
-        if not valid_cols:
-            return df
+        valid_cols = [c for c in cols if c in X.columns]
+        if not valid_cols or mean is None or scale is None:
+            return pack_pipeline_output(X, y, is_tuple)
             
-        # Reconstruct scaler (lightweight) or apply manually
-        # Manual application is safer for portability
-        df_out = df.copy()
-        
-        if mean is None or scale is None:
-            return df
-            
+        X_out = X.copy()
         mean_arr = np.array(mean)
         scale_arr = np.array(scale)
-        
-        # Filter mean/scale to match valid_cols indices
-        # The params['columns'] order matches mean/scale order.
-        # We need to map them correctly.
-        
         col_indices = [cols.index(c) for c in valid_cols]
         
-        X = df_out[valid_cols].values
-        
+        vals = X_out[valid_cols].values
         if params.get('with_mean', True):
-            X = X - mean_arr[col_indices]
-            
+            vals = vals - mean_arr[col_indices]
         if params.get('with_std', True):
-            # Avoid division by zero if scale is 0 (constant feature)
-            # Sklearn handles this by setting scale to 1.0 for constant features usually
             safe_scale = scale_arr[col_indices]
             safe_scale[safe_scale == 0] = 1.0
-            X = X / safe_scale
-            
-        df_out[valid_cols] = X
-        return df_out
+            vals = vals / safe_scale
+        
+        X_out[valid_cols] = vals
+        return pack_pipeline_output(X_out, y, is_tuple)
 
 # --- MinMax Scaler ---
 class MinMaxScalerCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
         # Config: {'feature_range': (0, 1), 'columns': [...]}
         feature_range = config.get('feature_range', (0, 1))
         
-        cols = resolve_columns(df, config, detect_numeric_columns)
+        cols = resolve_columns(X, config, detect_numeric_columns)
         
         if not cols:
             return {}
             
         scaler = MinMaxScaler(feature_range=feature_range)
-        scaler.fit(df[cols])
+        scaler.fit(X[cols])
         
         return {
             'type': 'minmax_scaler',
@@ -100,42 +91,44 @@ class MinMaxScalerCalculator(BaseCalculator):
         }
 
 class MinMaxScalerApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         cols = params.get('columns', [])
         min_val = params.get('min')
         scale = params.get('scale')
         
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or min_val is None or scale is None:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
-        
+        X_out = X.copy()
         min_arr = np.array(min_val)
         scale_arr = np.array(scale)
         col_indices = [cols.index(c) for c in valid_cols]
         
-        X = df_out[valid_cols].values
-        X = X * scale_arr[col_indices] + min_arr[col_indices]
-        
-        df_out[valid_cols] = X
-        return df_out
+        vals = X_out[valid_cols].values
+        vals = vals * scale_arr[col_indices] + min_arr[col_indices]
+        X_out[valid_cols] = vals
+        return pack_pipeline_output(X_out, y, is_tuple)
 
 # --- Robust Scaler ---
 class RobustScalerCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
         # Config: {'quantile_range': (25.0, 75.0), 'with_centering': True, 'with_scaling': True, 'columns': [...]}
         quantile_range = config.get('quantile_range', (25.0, 75.0))
         with_centering = config.get('with_centering', True)
         with_scaling = config.get('with_scaling', True)
         
-        cols = resolve_columns(df, config, detect_numeric_columns)
+        cols = resolve_columns(X, config, detect_numeric_columns)
         
         if not cols:
             return {}
             
         scaler = RobustScaler(quantile_range=quantile_range, with_centering=with_centering, with_scaling=with_scaling)
-        scaler.fit(df[cols])
+        scaler.fit(X[cols])
         
         return {
             'type': 'robust_scaler',
@@ -148,42 +141,47 @@ class RobustScalerCalculator(BaseCalculator):
         }
 
 class RobustScalerApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         cols = params.get('columns', [])
         center = params.get('center')
         scale = params.get('scale')
         
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
+        X_out = X.copy()
         col_indices = [cols.index(c) for c in valid_cols]
-        X = df_out[valid_cols].values
+        vals = X_out[valid_cols].values
         
         if params.get('with_centering', True) and center is not None:
             center_arr = np.array(center)
-            X = X - center_arr[col_indices]
+            vals = vals - center_arr[col_indices]
             
         if params.get('with_scaling', True) and scale is not None:
             scale_arr = np.array(scale)
+            # Avoid division by zero
             safe_scale = scale_arr[col_indices]
             safe_scale[safe_scale == 0] = 1.0
-            X = X / safe_scale
+            vals = vals / safe_scale
             
-        df_out[valid_cols] = X
-        return df_out
+        X_out[valid_cols] = vals
+        return pack_pipeline_output(X_out, y, is_tuple)
 
 # --- MaxAbs Scaler ---
 class MaxAbsScalerCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        cols = resolve_columns(df, config, detect_numeric_columns)
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+        
+        cols = resolve_columns(X, config, detect_numeric_columns)
         
         if not cols:
             return {}
             
         scaler = MaxAbsScaler()
-        scaler.fit(df[cols])
+        scaler.fit(X[cols])
         
         return {
             'type': 'maxabs_scaler',
@@ -193,23 +191,25 @@ class MaxAbsScalerCalculator(BaseCalculator):
         }
 
 class MaxAbsScalerApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         cols = params.get('columns', [])
         scale = params.get('scale')
         
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or scale is None:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
+        X_out = X.copy()
         scale_arr = np.array(scale)
         col_indices = [cols.index(c) for c in valid_cols]
         
-        X = df_out[valid_cols].values
+        vals = X_out[valid_cols].values
         # MaxAbsScaler just divides by max_abs (which is stored in scale_)
         safe_scale = scale_arr[col_indices]
         safe_scale[safe_scale == 0] = 1.0
-        X = X / safe_scale
+        vals = vals / safe_scale
         
-        df_out[valid_cols] = X
-        return df_out
+        X_out[valid_cols] = vals
+        return pack_pipeline_output(X_out, y, is_tuple)

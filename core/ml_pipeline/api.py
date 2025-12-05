@@ -7,8 +7,11 @@ import os
 import json
 import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update
 
+from config import get_settings
 from core.database.engine import get_async_session
+from core.database.models import FeatureEngineeringPipeline
 from core.data_ingestion.service import DataIngestionService
 from core.utils.file_utils import extract_file_path_from_source
 
@@ -47,7 +50,103 @@ class PreviewResponse(BaseModel):
     preview_data: Optional[Union[List[Dict[str, Any]], Dict[str, Any]]] = None 
     recommendations: List[Recommendation] = []
 
+class SavedPipelineModel(BaseModel):
+    name: str
+    description: Optional[str] = None
+    graph: Dict[str, Any]
+
 # --- Endpoints ---
+
+@router.post("/save/{dataset_id}")
+async def save_pipeline(
+    dataset_id: str, 
+    payload: SavedPipelineModel,
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Saves the pipeline configuration (supports DB or JSON based on config)."""
+    settings = get_settings()
+
+    if settings.PIPELINE_STORAGE_TYPE == "json":
+        storage_dir = settings.PIPELINE_STORAGE_PATH
+        os.makedirs(storage_dir, exist_ok=True)
+        file_path = os.path.join(storage_dir, f"{dataset_id}.json")
+        try:
+            with open(file_path, "w") as f:
+                json.dump(payload.dict(), f, indent=2)
+            return {"status": "success", "id": dataset_id, "storage": "json"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to save pipeline to JSON: {str(e)}")
+
+    # Default: Database Storage
+    try:
+        # Check if pipeline exists for this dataset
+        stmt = select(FeatureEngineeringPipeline).where(
+            FeatureEngineeringPipeline.dataset_source_id == dataset_id,
+            FeatureEngineeringPipeline.is_active == True
+        )
+        result = await session.execute(stmt)
+        existing_pipeline = result.scalar_one_or_none()
+
+        if existing_pipeline:
+            # Update existing
+            existing_pipeline.graph = payload.graph
+            existing_pipeline.name = payload.name
+            if payload.description:
+                existing_pipeline.description = payload.description
+            # existing_pipeline.updated_at is handled by mixin
+        else:
+            # Create new
+            new_pipeline = FeatureEngineeringPipeline(
+                dataset_source_id=dataset_id,
+                name=payload.name,
+                description=payload.description,
+                graph=payload.graph,
+                is_active=True
+            )
+            session.add(new_pipeline)
+        
+        await session.commit()
+        return {"status": "success", "id": dataset_id, "storage": "database"}
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to save pipeline: {str(e)}")
+
+@router.get("/load/{dataset_id}")
+async def load_pipeline(
+    dataset_id: str,
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Loads the pipeline configuration (supports DB or JSON based on config)."""
+    settings = get_settings()
+
+    if settings.PIPELINE_STORAGE_TYPE == "json":
+        storage_dir = settings.PIPELINE_STORAGE_PATH
+        file_path = os.path.join(storage_dir, f"{dataset_id}.json")
+        if not os.path.exists(file_path):
+            return None
+        
+        try:
+            with open(file_path, "r") as f:
+                data = json.load(f)
+            return data
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to load pipeline from JSON: {str(e)}")
+
+    # Default: Database Storage
+    try:
+        stmt = select(FeatureEngineeringPipeline).where(
+            FeatureEngineeringPipeline.dataset_source_id == dataset_id,
+            FeatureEngineeringPipeline.is_active == True
+        )
+        result = await session.execute(stmt)
+        pipeline = result.scalar_one_or_none()
+        
+        if not pipeline:
+            return None
+            
+        return pipeline.to_dict()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load pipeline: {str(e)}")
 
 @router.post("/preview", response_model=PreviewResponse)
 async def preview_pipeline(
@@ -129,18 +228,44 @@ async def preview_pipeline(
                 
                 df_for_analysis = None
                 
+                # Helper to process (X, y) tuple
+                def process_xy(xy_tuple, prefix):
+                    X, y = xy_tuple
+                    if isinstance(X, pd.Series): X = X.to_frame()
+                    if isinstance(y, pd.Series): y = y.to_frame()
+                    return {
+                        f"{prefix}_X": json.loads(X.head(20).to_json(orient="records")),
+                        f"{prefix}_y": json.loads(y.head(20).to_json(orient="records"))
+                    }
+
                 # Handle different artifact types
                 if isinstance(artifact, pd.DataFrame):
                     preview_data = json.loads(artifact.head(20).to_json(orient="records"))
                     df_for_analysis = artifact
                 elif isinstance(artifact, SplitDataset):
-                    preview_data = {
-                        "train": json.loads(artifact.train.head(20).to_json(orient="records")),
-                        "test": json.loads(artifact.test.head(20).to_json(orient="records")),
-                    }
+                    preview_data = {}
+                    
+                    # Handle Train
+                    if isinstance(artifact.train, tuple):
+                        preview_data.update(process_xy(artifact.train, "train"))
+                        df_for_analysis = artifact.train[0]
+                    else:
+                        preview_data["train"] = json.loads(artifact.train.head(20).to_json(orient="records"))
+                        df_for_analysis = artifact.train
+
+                    # Handle Test
+                    if isinstance(artifact.test, tuple):
+                        preview_data.update(process_xy(artifact.test, "test"))
+                    else:
+                        preview_data["test"] = json.loads(artifact.test.head(20).to_json(orient="records"))
+
+                    # Handle Validation
                     if artifact.validation is not None:
-                        preview_data["validation"] = json.loads(artifact.validation.head(20).to_json(orient="records"))
-                    df_for_analysis = artifact.train
+                        if isinstance(artifact.validation, tuple):
+                            preview_data.update(process_xy(artifact.validation, "val"))
+                        else:
+                            preview_data["validation"] = json.loads(artifact.validation.head(20).to_json(orient="records"))
+
                 elif isinstance(artifact, tuple) and len(artifact) == 2:
                     # Assume (X, y) from FeatureTargetSplitter
                     X, y = artifact
@@ -160,16 +285,6 @@ async def preview_pipeline(
                     # Both result in {'train': (X, y), 'test': (X, y)}
                     preview_data = {}
                     
-                    # Helper to process (X, y) tuple
-                    def process_xy(xy_tuple, prefix):
-                        X, y = xy_tuple
-                        if isinstance(X, pd.Series): X = X.to_frame()
-                        if isinstance(y, pd.Series): y = y.to_frame()
-                        return {
-                            f"{prefix}_X": json.loads(X.head(20).to_json(orient="records")),
-                            f"{prefix}_y": json.loads(y.head(20).to_json(orient="records"))
-                        }
-
                     if "train" in artifact:
                         preview_data.update(process_xy(artifact["train"], "train"))
                         df_for_analysis = artifact["train"][0] # X_train
