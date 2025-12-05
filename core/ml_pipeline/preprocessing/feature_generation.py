@@ -5,6 +5,7 @@ import math
 from difflib import SequenceMatcher
 from sklearn.preprocessing import PolynomialFeatures
 from .base import BaseCalculator, BaseApplier
+from ..utils import unpack_pipeline_input, pack_pipeline_output
 
 # --- Optional Dependencies ---
 try:
@@ -68,7 +69,7 @@ def _compute_similarity_score(a: Any, b: Any, method: str) -> float:
 
 # --- Polynomial Features ---
 class PolynomialFeaturesCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         # Config: 
         # columns: List[str]
         # degree: int
@@ -78,13 +79,15 @@ class PolynomialFeaturesCalculator(BaseCalculator):
         # output_prefix: str
         # auto_detect: bool
         
+        X, _, _ = unpack_pipeline_input(df)
+
         cols = config.get("columns", [])
         auto_detect = config.get("auto_detect", False)
         
         if not cols and auto_detect:
-            cols = _auto_detect_numeric_columns(df)
+            cols = _auto_detect_numeric_columns(X)
             
-        cols = [c for c in cols if c in df.columns]
+        cols = [c for c in cols if c in X.columns]
         
         if not cols:
             return {}
@@ -95,7 +98,7 @@ class PolynomialFeaturesCalculator(BaseCalculator):
         
         # We use sklearn to get feature names
         poly = PolynomialFeatures(degree=degree, interaction_only=interaction_only, include_bias=include_bias)
-        poly.fit(df[cols])
+        poly.fit(X[cols])
         
         return {
             "type": "polynomial_features",
@@ -109,12 +112,14 @@ class PolynomialFeaturesCalculator(BaseCalculator):
         }
 
 class PolynomialFeaturesApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         cols = params.get("columns", [])
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         
         if not valid_cols:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
         degree = params.get("degree", 2)
         interaction_only = params.get("interaction_only", False)
@@ -123,9 +128,9 @@ class PolynomialFeaturesApplier(BaseApplier):
         output_prefix = params.get("output_prefix", "poly")
         
         poly = PolynomialFeatures(degree=degree, interaction_only=interaction_only, include_bias=include_bias)
-        poly.fit(df[valid_cols]) # Cheap fit
+        poly.fit(X[valid_cols]) # Cheap fit
         
-        transformed = poly.transform(df[valid_cols])
+        transformed = poly.transform(X[valid_cols])
         feature_names = poly.get_feature_names_out(valid_cols)
         
         # Rename features with prefix
@@ -139,9 +144,9 @@ class PolynomialFeaturesApplier(BaseApplier):
             clean_name = name.replace(" ", "_").replace("^", "_pow_")
             new_names.append(f"{output_prefix}_{clean_name}")
             
-        df_poly = pd.DataFrame(transformed, columns=new_names, index=df.index)
+        df_poly = pd.DataFrame(transformed, columns=new_names, index=X.index)
         
-        df_out = df.copy()
+        df_out = X.copy()
         if not include_input_features:
             # If we dont want input features, we might still want to keep them if they are not part of the poly expansion?
             # Usually "include_input_features" means "keep the original columns in the output".
@@ -154,11 +159,11 @@ class PolynomialFeaturesApplier(BaseApplier):
         # Concatenate
         df_out = pd.concat([df_out, df_poly], axis=1)
         
-        return df_out
+        return pack_pipeline_output(df_out, y, is_tuple)
 
 # --- Feature Math ---
 class FeatureMathCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         # Config:
         # operations: List[Dict]
         # epsilon: float
@@ -172,15 +177,17 @@ class FeatureMathCalculator(BaseCalculator):
         }
 
 class FeatureMathApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         operations = params.get("operations", [])
         epsilon = params.get("epsilon", DEFAULT_EPSILON)
         allow_overwrite = params.get("allow_overwrite", False)
         
         if not operations:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
+        df_out = X.copy()
         
         for i, op in enumerate(operations):
             op_type = op.get("operation_type", "arithmetic")
@@ -332,13 +339,15 @@ class FeatureMathApplier(BaseApplier):
             except Exception:
                 pass
                 
-        return df_out
+        return pack_pipeline_output(df_out, y, is_tuple)
 
 # --- Date Parts (Simple) ---
 class DatePartsCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
         cols = config.get("columns", [])
-        cols = [c for c in cols if c in df.columns]
+        cols = [c for c in cols if c in X.columns]
         return {
             "type": "date_parts",
             "columns": cols,
@@ -346,12 +355,16 @@ class DatePartsCalculator(BaseCalculator):
         }
 
 class DatePartsApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         cols = params.get("columns", [])
         parts = params.get("parts", ["year", "month", "day", "dayofweek"])
-        valid_cols = [c for c in cols if c in df.columns]
-        if not valid_cols: return df
-        df_out = df.copy()
+        
+        valid_cols = [c for c in cols if c in X.columns]
+        if not valid_cols: return pack_pipeline_output(X, y, is_tuple)
+        
+        df_out = X.copy()
         for col in valid_cols:
             try:
                 dt_series = pd.to_datetime(df_out[col], errors="coerce")
@@ -367,11 +380,12 @@ class DatePartsApplier(BaseApplier):
                     elif part == "quarter": df_out[new_col_name] = dt_series.dt.quarter
                     elif part == "is_weekend": df_out[new_col_name] = (dt_series.dt.dayofweek >= 5).astype(int)
             except Exception: continue
-        return df_out
+        
+        return pack_pipeline_output(df_out, y, is_tuple)
 
 # --- Math Expression ---
 class MathExpressionCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "type": "math_expression",
             "expression": config.get("expression"),
@@ -379,19 +393,23 @@ class MathExpressionCalculator(BaseCalculator):
         }
 
 class MathExpressionApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         expr = params.get("expression")
         new_col = params.get("new_column")
-        if not expr or not new_col: return df
-        df_out = df.copy()
+        if not expr or not new_col: return pack_pipeline_output(X, y, is_tuple)
+        
+        df_out = X.copy()
         try:
             df_out[new_col] = df_out.eval(expr)
         except Exception: pass
-        return df_out
+        
+        return pack_pipeline_output(df_out, y, is_tuple)
 
 # --- Row Statistics ---
 class RowStatisticsCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "type": "row_statistics",
             "columns": config.get("columns", []),
@@ -400,13 +418,17 @@ class RowStatisticsCalculator(BaseCalculator):
         }
 
 class RowStatisticsApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         cols = params.get("columns", [])
         ops = params.get("operations", ["mean"])
         prefix = params.get("new_column_prefix", "stats")
-        valid_cols = [c for c in cols if c in df.columns]
-        if not valid_cols: return df
-        df_out = df.copy()
+        
+        valid_cols = [c for c in cols if c in X.columns]
+        if not valid_cols: return pack_pipeline_output(X, y, is_tuple)
+        
+        df_out = X.copy()
         for op in ops:
             new_col = f"{prefix}_{op}"
             if op == "mean": df_out[new_col] = df_out[valid_cols].mean(axis=1)
@@ -414,4 +436,5 @@ class RowStatisticsApplier(BaseApplier):
             elif op == "min": df_out[new_col] = df_out[valid_cols].min(axis=1)
             elif op == "max": df_out[new_col] = df_out[valid_cols].max(axis=1)
             elif op == "std": df_out[new_col] = df_out[valid_cols].std(axis=1)
-        return df_out
+        
+        return pack_pipeline_output(df_out, y, is_tuple)

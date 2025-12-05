@@ -1,8 +1,9 @@
 import React from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Split } from 'lucide-react';
-import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useGraphStore } from '../../../core/store/useGraphStore';
+import { getIncomers } from '@xyflow/react';
 
 interface FeatureTargetSplitConfig {
   target_column: string;
@@ -14,8 +15,36 @@ const FeatureTargetSplitSettings: React.FC<{ config: FeatureTargetSplitConfig; o
   onChange,
   nodeId,
 }) => {
-  const upstreamData = useUpstreamData(nodeId || '');
-  const upstreamDatasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
+  // Recursive search for datasetId
+  const nodes = useGraphStore((state) => state.nodes);
+  const edges = useGraphStore((state) => state.edges);
+
+  const findUpstreamDatasetId = (currentNodeId: string): string | undefined => {
+    const visited = new Set<string>();
+    const queue = [currentNodeId];
+    
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      
+      const node = nodes.find(n => n.id === id);
+      if (!node) continue;
+      
+      // If this is NOT the current node, check if it has datasetId
+      if (id !== currentNodeId && node.data?.datasetId) {
+        return node.data.datasetId as string;
+      }
+      
+      const incomers = getIncomers(node, nodes, edges);
+      for (const incomer of incomers) {
+        queue.push(incomer.id);
+      }
+    }
+    return undefined;
+  };
+
+  const upstreamDatasetId = findUpstreamDatasetId(nodeId || '');
 
   React.useEffect(() => {
     if (upstreamDatasetId && config.datasetId !== upstreamDatasetId) {

@@ -11,7 +11,7 @@ class TrainTestSplitterCalculator(BaseCalculator):
         return config
 
 class TrainTestSplitterApplier(BaseApplier):
-    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[SplitDataset, Dict[str, Tuple[pd.DataFrame, pd.Series]]]:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> SplitDataset:
         stratify = params.get("stratify", False)
         target_col = params.get("target_column")
         
@@ -53,7 +53,7 @@ class DataSplitter:
         self.shuffle = shuffle
         self.stratify_col = stratify_col
 
-    def split_xy(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, Tuple[pd.DataFrame, pd.Series]]:
+    def split_xy(self, X: pd.DataFrame, y: pd.Series) -> SplitDataset:
         """
         Splits X and y arrays.
         """
@@ -68,7 +68,7 @@ class DataSplitter:
             stratify=stratify
         )
         
-        X_val, y_val = None, None
+        validation = None
         if self.validation_size > 0:
             relative_val_size = self.validation_size / (1 - self.test_size)
             stratify_val = y_train_val if self.stratify_col else None
@@ -80,17 +80,15 @@ class DataSplitter:
                 shuffle=self.shuffle,
                 stratify=stratify_val
             )
+            validation = (X_val, y_val)
         else:
             X_train, y_train = X_train_val, y_train_val
             
-        result = {
-            "train": (X_train, y_train),
-            "test": (X_test, y_test)
-        }
-        if X_val is not None:
-            result["validation"] = (X_val, y_val)
-            
-        return result
+        return SplitDataset(
+            train=(X_train, y_train),
+            test=(X_test, y_test),
+            validation=validation
+        )
 
     def split(self, df: pd.DataFrame) -> SplitDataset:
         """
@@ -102,7 +100,7 @@ class DataSplitter:
         stratify = None
         if self.stratify_col:
             if self.stratify_col == "__implicit_target__":
-                raise ValueError("Stratification requested but no target column specified. Please select a target column in the node settings.")
+                raise ValueError("Stratification requested but no target column specified. Please select a target column in the Train/Test Split node settings.")
             if self.stratify_col not in df.columns:
                 raise ValueError(f"Stratification column '{self.stratify_col}' not found in DataFrame")
             stratify = df[self.stratify_col]

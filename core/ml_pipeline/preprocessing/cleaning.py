@@ -1,10 +1,10 @@
-from typing import Dict, Any, List, Optional, Union, Set
+from typing import Dict, Any, List, Optional, Union, Set, Tuple
 import pandas as pd
 import numpy as np
 import re
 import string
 from .base import BaseCalculator, BaseApplier
-from ..utils import resolve_columns
+from ..utils import resolve_columns, unpack_pipeline_input, pack_pipeline_output
 
 # --- Constants ---
 ALIAS_PUNCTUATION_TABLE = str.maketrans("", "", string.punctuation)
@@ -33,7 +33,7 @@ def _auto_detect_datetime_columns(df: pd.DataFrame) -> List[str]:
 
 # --- Text Cleaning ---
 class TextCleaningCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         # Config: 
         # columns: List[str]
         # operations: List[Dict] 
@@ -42,7 +42,9 @@ class TextCleaningCalculator(BaseCalculator):
         #   {'op': 'remove_special', 'mode': 'keep_alphanumeric'|'keep_alphanumeric_space'|'letters_only'|'digits_only', 'replacement': ''}
         #   {'op': 'regex', 'mode': 'custom'|'collapse_whitespace'|'extract_digits'|'normalize_slash_dates', 'pattern': '...', 'repl': '...'}
         
-        cols = resolve_columns(df, config, _auto_detect_text_columns)
+        X, _, _ = unpack_pipeline_input(df)
+
+        cols = resolve_columns(X, config, _auto_detect_text_columns)
         
         if not cols:
             return {}
@@ -56,18 +58,20 @@ class TextCleaningCalculator(BaseCalculator):
         }
 
 class TextCleaningApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         if not params or not params.get('columns'):
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
         cols = params['columns']
         operations = params.get('operations', [])
         
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or not operations:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
+        df_out = X.copy()
         
         for col in valid_cols:
             # Ensure column is string type
@@ -154,13 +158,15 @@ class TextCleaningApplier(BaseApplier):
                     
             df_out[col] = series
             
-        return df_out
+        return pack_pipeline_output(df_out, y, is_tuple)
 
 # --- Value Replacement ---
 class ValueReplacementCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
         cols = config.get('columns', [])
-        cols = [c for c in cols if c in df.columns]
+        cols = [c for c in cols if c in X.columns]
         
         return {
             'type': 'value_replacement',
@@ -169,28 +175,32 @@ class ValueReplacementCalculator(BaseCalculator):
         }
 
 class ValueReplacementApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         cols = params.get('columns', [])
         mapping = params.get('mapping', {})
         
         if not mapping:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
+        df_out = X.copy()
         
         for col in valid_cols:
             df_out[col] = df_out[col].replace(mapping)
             
-        return df_out
+        return pack_pipeline_output(df_out, y, is_tuple)
 
 # --- Alias Replacement ---
 class AliasReplacementCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        cols = resolve_columns(df, config, _auto_detect_text_columns)
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
+        cols = resolve_columns(X, config, _auto_detect_text_columns)
         
         if not cols:
             return {}
@@ -203,16 +213,18 @@ class AliasReplacementCalculator(BaseCalculator):
         }
 
 class AliasReplacementApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         cols = params.get('columns', [])
         mode = params.get('mode', 'custom')
         custom_pairs = params.get('custom_pairs', {})
         
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
+        df_out = X.copy()
         
         # Prepare mapping based on mode
         mapping = {}
@@ -251,18 +263,20 @@ class AliasReplacementApplier(BaseApplier):
                     # Direct replacement
                     df_out[col] = df_out[col].replace(mapping)
                     
-        return df_out
+        return pack_pipeline_output(df_out, y, is_tuple)
 
 # --- Invalid Value Replacement ---
 class InvalidValueReplacementCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         # Config:
         # columns: List[str]
         # mode: 'negative_to_nan', 'zero_to_nan', 'percentage_bounds', 'age_bounds', 'custom_range'
         # min_value: float (for custom_range)
         # max_value: float (for custom_range)
         
-        cols = resolve_columns(df, config, _auto_detect_numeric_columns)
+        X, _, _ = unpack_pipeline_input(df)
+
+        cols = resolve_columns(X, config, _auto_detect_numeric_columns)
         
         return {
             'type': 'invalid_value_replacement',
@@ -273,17 +287,19 @@ class InvalidValueReplacementCalculator(BaseCalculator):
         }
 
 class InvalidValueReplacementApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         cols = params.get('columns', [])
         mode = params.get('mode', 'negative_to_nan')
         min_val = params.get('min_value')
         max_val = params.get('max_value')
         
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
+        df_out = X.copy()
         
         # Determine bounds based on mode
         lower = None
@@ -321,18 +337,20 @@ class InvalidValueReplacementApplier(BaseApplier):
                 
                 df_out.loc[mask, col] = np.nan
                 
-        return df_out
+        return pack_pipeline_output(df_out, y, is_tuple)
 
 # --- Date Standardizer ---
 class DateStandardizerCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         def _detect_date_or_text(d):
             c = _auto_detect_datetime_columns(d)
             if not c:
                 c = _auto_detect_text_columns(d)
             return c
             
-        cols = resolve_columns(df, config, _detect_date_or_text)
+        X, _, _ = unpack_pipeline_input(df)
+
+        cols = resolve_columns(X, config, _detect_date_or_text)
         
         target_format = config.get('target_format', '%Y-%m-%d')
         
@@ -355,17 +373,19 @@ class DateStandardizerCalculator(BaseCalculator):
         }
 
 class DateStandardizerApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         cols = params.get('columns', [])
         target_format = params.get('target_format', '%Y-%m-%d')
         dayfirst = params.get('dayfirst', False)
         yearfirst = params.get('yearfirst', False)
         
-        valid_cols = [c for c in cols if c in df.columns]
+        valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
-        df_out = df.copy()
+        df_out = X.copy()
         
         for col in valid_cols:
             try:
@@ -374,4 +394,4 @@ class DateStandardizerApplier(BaseApplier):
             except Exception:
                 pass
                 
-        return df_out
+        return pack_pipeline_output(df_out, y, is_tuple)

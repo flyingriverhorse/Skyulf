@@ -208,6 +208,13 @@ class NodeRegistry:
                 params={"estimator": "RandomForest"}
             ),
             RegistryItem(
+                id="feature_selection",
+                name="Feature Selection",
+                category="Preprocessing",
+                description="Select features using various methods (Variance, Correlation, Univariate, Model-based).",
+                params={"method": "select_k_best"}
+            ),
+            RegistryItem(
                 id="Casting",
                 name="Type Casting",
                 category="Preprocessing",

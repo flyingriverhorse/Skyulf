@@ -1,6 +1,23 @@
 import pandas as pd
 import numpy as np
-from typing import List, Set
+from typing import List, Set, Union, Tuple, Optional
+
+def unpack_pipeline_input(data: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]) -> Tuple[pd.DataFrame, Optional[pd.Series], bool]:
+    """
+    Unpacks input which might be a DataFrame or a (X, y) tuple.
+    Returns: (X, y, is_tuple)
+    """
+    if isinstance(data, tuple):
+        return data[0], data[1], True
+    return data, None, False
+
+def pack_pipeline_output(X: pd.DataFrame, y: Optional[pd.Series], was_tuple: bool) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    """
+    Packs output back into a tuple if the input was a tuple and y is present.
+    """
+    if was_tuple and y is not None:
+        return (X, y)
+    return X
 
 def _is_binary_numeric(series: pd.Series) -> bool:
     """Check if a numeric series contains only 0s and 1s (or close to them)."""

@@ -93,7 +93,7 @@ class PipelineEngine:
             else:
                 # Try to run as a single transformer step
                 try:
-                    output_artifact_id = self._run_transformer(node)
+                    output_artifact_id, metrics = self._run_transformer(node)
                 except Exception as e:
                      # If it fails or isn't a valid transformer, re-raise
                      if "Unknown transformer type" in str(e):
@@ -227,7 +227,7 @@ class PipelineEngine:
         
         return node.node_id, {"best_score": result.best_score, "best_params": result.best_params}
 
-    def _run_transformer(self, node: NodeConfig) -> str:
+    def _run_transformer(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
         """Runs a single transformer node as a 1-step feature engineering pipeline."""
         # Input: DataFrame or SplitDataset
         data = self._resolve_input(node)
@@ -246,7 +246,23 @@ class PipelineEngine:
         processed_data = engineer.fit_transform(data, self.artifact_store, node_id_prefix=f"exec_{node.node_id}")
         
         self.artifact_store.save(node.node_id, processed_data)
-        return node.node_id
+        
+        # Load fitted params to get metrics (e.g. dropped columns)
+        metrics = {}
+        try:
+            # FeatureEngineer saves params at {prefix}_{step_name}
+            params_id = f"exec_{node.node_id}_step"
+            fitted_params = self.artifact_store.load(params_id)
+            if isinstance(fitted_params, dict):
+                if "columns_to_drop" in fitted_params:
+                    metrics["dropped_columns"] = fitted_params["columns_to_drop"]
+                if "selected_columns" in fitted_params:
+                    metrics["selected_columns"] = fitted_params["selected_columns"]
+        except Exception:
+            # Artifact might not exist or be loadable, or store might not support load
+            pass
+            
+        return node.node_id, metrics
 
     def _get_model_components(self, algorithm: str):
         if algorithm == "logistic_regression":

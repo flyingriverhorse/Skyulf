@@ -72,7 +72,7 @@ export const fetchDatasetProfile = async (datasetId: string): Promise<AnalysisPr
 // --- Placeholder Functions (To be implemented in V2) ---
 
 export interface SavedPipeline {
-  id: string;
+  id?: string; // Optional because backend might not return it on load
   graph: {
     nodes: any[];
     edges: any[];
@@ -82,13 +82,15 @@ export interface SavedPipeline {
 }
 
 export const savePipeline = async (datasetId: string, payload: any): Promise<{ id: string }> => {
-  console.warn('savePipeline is not yet implemented in V2', datasetId, payload);
-  return { id: 'mock_id' };
+  const response = await apiClientV2.post<{ id: string }>(`/pipeline/save/${datasetId}`, payload);
+  return response.data;
 };
 
 export const fetchPipeline = async (datasetId: string): Promise<SavedPipeline | null> => {
-  console.warn('fetchPipeline is not yet implemented in V2', datasetId);
-  return null; 
+  const response = await apiClientV2.get<SavedPipeline | null>(`/pipeline/load/${datasetId}`);
+  // Handle 204 No Content or null response
+  if (!response.data) return null;
+  return response.data;
 };
 
 export const submitTrainingJob = async (payload: any): Promise<{ job_id: string }> => {

@@ -104,6 +104,9 @@ export const Toolbar: React.FC = () => {
               algorithm: algo,
               hyperparameters: node.data.hyperparameters
           };
+      } else if (node.data.definitionType === 'feature_selection') {
+          stepType = 'feature_selection';
+          params = node.data || {};
       } else {
           console.error(`Unknown node type: ${node.data.definitionType}`);
           throw new Error(`Unknown node type: ${node.data.definitionType}. Pipeline execution stopped.`);

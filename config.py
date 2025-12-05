@@ -228,6 +228,11 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
 
+    # === PIPELINE STORAGE ===
+    # Options: "database" (default) or "json"
+    PIPELINE_STORAGE_TYPE: str = "database"
+    PIPELINE_STORAGE_PATH: str = "exports/pipelines"
+
     # Database configuration options (migrated from Flask)
     DB_TYPE: str = "sqlite"  # sqlite or postgres
     DB_PRIMARY: str = "sqlite"  # primary database choice
