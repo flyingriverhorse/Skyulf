@@ -85,7 +85,12 @@ class PipelineEngine:
             if node.step_type == "data_loader":
                 output_artifact_id = self._run_data_loader(node)
             elif node.step_type == "feature_engineering":
-                output_artifact_id = self._run_feature_engineering(node)
+                # Check if it's actually a misconfigured data loader
+                if not node.inputs and "dataset_id" in node.params:
+                    logger.warning(f"Node {node.node_id} has step_type='feature_engineering' but looks like a data loader. Executing as data loader.")
+                    output_artifact_id = self._run_data_loader(node)
+                else:
+                    output_artifact_id, metrics = self._run_feature_engineering(node)
             elif node.step_type == "model_training":
                 output_artifact_id, metrics = self._run_model_training(node)
             elif node.step_type == "model_tuning":
@@ -151,17 +156,17 @@ class PipelineEngine:
         self.artifact_store.save(node.node_id, df)
         return node.node_id
 
-    def _run_feature_engineering(self, node: NodeConfig) -> str:
+    def _run_feature_engineering(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
         # Input: DataFrame
         df = self._resolve_input(node)
         
         # params: {"steps": [...]}
         engineer = FeatureEngineer(node.params.get("steps", []))
         # Pass artifact_store and node_id to allow internal steps to save state
-        processed_df = engineer.fit_transform(df, self.artifact_store, node.node_id)
+        processed_df, metrics = engineer.fit_transform(df, self.artifact_store, node.node_id)
         
         self.artifact_store.save(node.node_id, processed_df)
-        return node.node_id
+        return node.node_id, metrics
 
     def _run_model_training(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset (from Feature Engineering) or DataFrame
@@ -243,12 +248,12 @@ class PipelineEngine:
         
         # We use a prefix that includes the node_id to avoid collisions if FeatureEngineer saves internal state
         # But mostly we care about the final result which we save manually below.
-        processed_data = engineer.fit_transform(data, self.artifact_store, node_id_prefix=f"exec_{node.node_id}")
+        processed_data, run_metrics = engineer.fit_transform(data, self.artifact_store, node_id_prefix=f"exec_{node.node_id}")
         
         self.artifact_store.save(node.node_id, processed_data)
         
         # Load fitted params to get metrics (e.g. dropped columns)
-        metrics = {}
+        metrics = run_metrics.copy()
         try:
             # FeatureEngineer saves params at {prefix}_{step_name}
             params_id = f"exec_{node.node_id}_step"

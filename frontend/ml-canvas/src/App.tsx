@@ -1,35 +1,6 @@
 import { useEffect } from 'react'
-import { registry } from './core/registry/NodeRegistry'
-import { DebugNode } from './modules/nodes/base/DebugNode'
-import { DatasetNode } from './modules/nodes/data/DatasetNode'
-import { DropColumnsNode } from './modules/nodes/processing/DropColumnsNode'
-import { ImputationNode } from './modules/nodes/processing/ImputationNode'
-import { ScalingNode } from './modules/nodes/processing/ScalingNode'
-import { OneHotEncodingNode } from './modules/nodes/processing/OneHotEncodingNode'
-import { LabelEncodingNode } from './modules/nodes/processing/LabelEncodingNode'
-import { ModelTrainingNode } from './modules/nodes/modeling/ModelTrainingNode'
-import { EvaluationNode } from './modules/nodes/modeling/EvaluationNode'
-import { FeatureSelectionNode } from './modules/nodes/processing/FeatureSelectionNode'
-import { TrainTestSplitNode } from './modules/nodes/modeling/TrainTestSplitNode'
-import { FeatureTargetSplitNode } from './modules/nodes/modeling/FeatureTargetSplitNode'
 import { MainLayout } from './components/layout/MainLayout'
 import { useGraphStore } from './core/store/useGraphStore'
-
-// Register nodes (normally this would happen in a bootstrap file)
-registry.register(DebugNode);
-registry.register(DatasetNode);
-registry.register(DropColumnsNode);
-registry.register(ImputationNode);
-registry.register(ScalingNode);
-registry.register(OneHotEncodingNode);
-registry.register(LabelEncodingNode);
-registry.register(FeatureSelectionNode);
-registry.register(TrainTestSplitNode);
-registry.register(FeatureTargetSplitNode);
-registry.register(ModelTrainingNode);
-registry.register(EvaluationNode);
-
-
 
 function App() {
   const addNode = useGraphStore((state) => state.addNode);

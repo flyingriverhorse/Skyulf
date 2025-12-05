@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
-import { Database } from 'lucide-react';
+import { Database, TableProperties } from 'lucide-react';
 import { DatasetService } from '../../../core/api/datasets';
 import { Dataset } from '../../../core/types/api';
+import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 
 interface DatasetNodeConfig {
   datasetId: string;
@@ -15,6 +16,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
 }) => {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(false);
+  const { data: schema, isLoading: isSchemaLoading } = useDatasetSchema(config.datasetId);
 
   useEffect(() => {
     setLoading(true);
@@ -35,23 +37,69 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
   };
 
   return (
-    <div className="p-4 space-y-2">
-      <label className="block text-sm font-medium">Select Dataset</label>
-      {loading ? (
-        <div className="text-xs text-muted-foreground">Loading datasets...</div>
-      ) : (
-        <select
-          className="w-full p-2 border rounded bg-background"
-          value={config.datasetId || ''}
-          onChange={handleChange}
-        >
-          <option value="">-- Select --</option>
-          {datasets.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
+    <div className="p-4 space-y-4">
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">Select Dataset</label>
+        {loading ? (
+          <div className="text-xs text-muted-foreground">Loading datasets...</div>
+        ) : (
+          <select
+            className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
+            value={config.datasetId || ''}
+            onChange={handleChange}
+          >
+            <option value="">-- Select --</option>
+            {datasets.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Schema Preview */}
+      {config.datasetId && (
+        <div className="space-y-2 pt-2 border-t">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <TableProperties size={14} />
+            <span>Dataset Schema</span>
+          </div>
+          
+          {isSchemaLoading ? (
+            <div className="text-xs text-muted-foreground animate-pulse">Loading schema...</div>
+          ) : schema ? (
+            <>
+              <div className="border rounded-md bg-muted/10 max-h-60 overflow-y-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-muted/20 sticky top-0">
+                    <tr>
+                      <th className="p-2 font-medium border-b">Column</th>
+                      <th className="p-2 font-medium border-b">Type</th>
+                      <th className="p-2 font-medium border-b text-right">Missing</th>
+                      <th className="p-2 font-medium border-b text-right">Unique</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.values(schema.columns).map((col) => (
+                      <tr key={col.name} className="border-b last:border-0 hover:bg-muted/20">
+                        <td className="p-2 font-mono font-medium">{col.name}</td>
+                        <td className="p-2 text-muted-foreground">{col.dtype}</td>
+                        <td className="p-2 text-right text-muted-foreground">{col.missing_count}</td>
+                        <td className="p-2 text-right text-muted-foreground">{col.unique_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1 text-center italic">
+                Expand node to see full details
+              </p>
+            </>
+          ) : (
+            <div className="text-xs text-muted-foreground italic">No schema available.</div>
+          )}
+        </div>
       )}
     </div>
   );

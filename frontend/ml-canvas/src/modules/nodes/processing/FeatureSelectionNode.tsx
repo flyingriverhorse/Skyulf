@@ -3,9 +3,6 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { Filter } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
-import { useRecommendations } from '../../../core/hooks/useRecommendations';
-import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
-import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { getIncomers } from '@xyflow/react';
 
@@ -113,18 +110,6 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
     return () => observer.disconnect();
   }, []);
 
-  // Recommendations
-  const recommendations = useRecommendations(nodeId || '', {
-    types: ['feature_selection'],
-    scope: 'any'
-  });
-
-  const handleApplyRecommendation = (rec: Recommendation) => {
-    if (rec.suggested_params) {
-      onChange({ ...config, ...rec.suggested_params });
-    }
-  };
-
   // Helper to determine available score functions based on problem type
   const getScoreFunctions = () => {
     const type = config.problem_type || 'auto';
@@ -174,15 +159,6 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
         
         {/* Left Column: Method & Target */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
-          {recommendations.length > 0 && (
-            <div className="shrink-0">
-              <RecommendationsPanel 
-                recommendations={recommendations} 
-                onApply={handleApplyRecommendation}
-              />
-            </div>
-          )}
-
           <div className="space-y-2">
             <label className="text-sm font-medium">Selection Method</label>
             <select

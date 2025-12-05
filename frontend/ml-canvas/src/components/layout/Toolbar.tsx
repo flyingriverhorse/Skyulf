@@ -66,12 +66,34 @@ export const Toolbar: React.FC = () => {
       } else if (node.data.definitionType === 'simple_imputer') {
           stepType = 'SimpleImputer';
           params = node.data || {};
-      } else if (node.data.definitionType === 'drop_missing_columns') {
+      } else if (node.data.definitionType === 'drop_missing_columns' || node.data.definitionType === 'DropMissingColumns') {
           stepType = 'DropMissingColumns';
-          // Ensure we pass the columns array correctly
           params = {
             columns: node.data.columns || [],
             missing_threshold: node.data.missing_threshold
+          };
+      } else if (node.data.definitionType === 'drop_missing_rows' || node.data.definitionType === 'DropMissingRows') {
+          stepType = 'DropMissingRows';
+          params = {
+            missing_threshold: node.data.missing_threshold,
+            drop_if_any_missing: node.data.drop_if_any_missing
+          };
+      } else if (node.data.definitionType === 'deduplicate' || node.data.definitionType === 'Deduplicate') {
+          stepType = 'Deduplicate';
+          params = {
+            subset: node.data.subset,
+            keep: node.data.keep
+          };
+      } else if (node.data.definitionType === 'casting' || node.data.definitionType === 'Casting') {
+          stepType = 'Casting';
+          params = {
+            column_types: node.data.column_types
+          };
+      } else if (node.data.definitionType === 'MissingIndicator' || node.data.definitionType === 'missing_indicator') {
+          stepType = 'MissingIndicator';
+          params = {
+            columns: node.data.columns,
+            flag_suffix: node.data.flag_suffix
           };
       } else if (node.data.definitionType === 'scale_numeric_features') {
           const config = node.data as any || {};

@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Activity } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { Recommendation } from '../../../core/api/client';
+import { useGraphStore } from '../../../core/store/useGraphStore';
 
 interface DropColumnsConfig {
   columns: string[];
@@ -21,6 +22,10 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
   const availableColumns = schema ? Object.values(schema.columns).map(c => c.name) : [];
+  
+  const executionResult = useGraphStore((state) => state.executionResult);
+  const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
+  const metrics = nodeResult?.metrics;
   
   // Responsive Layout Logic
   const containerRef = useRef<HTMLDivElement>(null);
@@ -120,6 +125,34 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
               className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
             />
           </div>
+
+          {/* Feedback Section */}
+          {metrics && (metrics.dropped_columns_count !== undefined) && (
+            <div className="p-3 bg-muted/30 rounded-md border border-border">
+              <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
+                <Activity size={14} />
+                <span>Last Run Results</span>
+              </div>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Columns Dropped:</span>
+                  <span className="font-medium text-destructive">{metrics.dropped_columns_count}</span>
+                </div>
+                {metrics.dropped_columns && Array.isArray(metrics.dropped_columns) && metrics.dropped_columns.length > 0 && (
+                  <div className="pt-1 border-t mt-1">
+                    <span className="text-muted-foreground block mb-1">Dropped Names:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {metrics.dropped_columns.map((col: string) => (
+                        <span key={col} className="px-1.5 py-0.5 bg-background border rounded text-[10px] font-mono">
+                          {col}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Column (Column List) */}
