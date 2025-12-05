@@ -3,7 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { Trash2 } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
-import { useGraphStore } from '../../../core/store/useGraphStore';
+import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { Recommendation } from '../../../core/api/client';
 
@@ -22,8 +22,6 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
   const availableColumns = schema ? Object.values(schema.columns).map(c => c.name) : [];
   
-  const executionResult = useGraphStore(state => state.executionResult);
-  
   // Responsive Layout Logic
   const containerRef = useRef<HTMLDivElement>(null);
   const [isWide, setIsWide] = useState(false);
@@ -39,16 +37,11 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
     return () => observer.disconnect();
   }, []);
   
-  const recommendations = useMemo(() => {
-    // Only show recommendations if we have a connected dataset
-    if (!datasetId || !executionResult?.recommendations) return [];
-    
-    return executionResult.recommendations.filter(r => 
-      r.type === 'cleaning' || 
-      r.type === 'feature_selection' ||
-      r.suggested_node_type === 'DropMissingColumns'
-    );
-  }, [executionResult, datasetId]);
+  const recommendations = useRecommendations(nodeId || '', {
+    types: ['cleaning', 'feature_selection'],
+    suggestedNodeTypes: ['DropMissingColumns'],
+    scope: 'column'
+  });
 
   const handleApplyRecommendation = (rec: Recommendation) => {
     if (rec.target_columns && rec.target_columns.length > 0) {

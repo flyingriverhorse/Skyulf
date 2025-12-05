@@ -6,6 +6,7 @@ import { Dataset } from '../../../core/types/api';
 
 interface DatasetNodeConfig {
   datasetId: string;
+  datasetName?: string;
 }
 
 const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: DatasetNodeConfig) => void }> = ({
@@ -23,6 +24,16 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
       .finally(() => setLoading(false));
   }, []);
 
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedId = e.target.value;
+    const selectedDataset = datasets.find(d => String(d.id) === selectedId);
+    onChange({ 
+      ...config, 
+      datasetId: selectedId,
+      datasetName: selectedDataset?.name 
+    });
+  };
+
   return (
     <div className="p-4 space-y-2">
       <label className="block text-sm font-medium">Select Dataset</label>
@@ -32,7 +43,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
         <select
           className="w-full p-2 border rounded bg-background"
           value={config.datasetId || ''}
-          onChange={(e) => onChange({ ...config, datasetId: e.target.value })}
+          onChange={handleChange}
         >
           <option value="">-- Select --</option>
           {datasets.map((d) => (
@@ -47,24 +58,25 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
 };
 
 const DatasetNodeComponent: React.FC<{ data: DatasetNodeConfig }> = ({ data }) => {
-  const [datasetName, setDatasetName] = useState<string>('');
+  // Fallback state for backward compatibility with nodes that only have ID
+  const [fetchedName, setFetchedName] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    if (data.datasetId) {
-      // In a real app, we might cache this or store the name in the config as well
+    // Only fetch if we have an ID but no Name, and haven't fetched yet
+    if (data.datasetId && !data.datasetName && fetchedName === undefined) {
       DatasetService.getById(data.datasetId)
-        .then(d => setDatasetName(d.name))
-        .catch(() => setDatasetName(data.datasetId));
-    } else {
-      setDatasetName('');
+        .then(d => setFetchedName(d.name))
+        .catch(() => setFetchedName(data.datasetId)); // Fallback to ID on error
     }
-  }, [data.datasetId]);
+  }, [data.datasetId, data.datasetName, fetchedName]);
+
+  const displayName = data.datasetName || fetchedName || data.datasetId;
 
   return (
     <div className="text-xs">
       {data.datasetId ? (
-        <div className="font-medium truncate max-w-[150px]" title={datasetName}>
-          {datasetName || 'Loading...'}
+        <div className="font-medium truncate max-w-[150px]" title={displayName}>
+          {displayName || 'Loading...'}
         </div>
       ) : (
         <div className="text-muted-foreground italic">Select a dataset</div>

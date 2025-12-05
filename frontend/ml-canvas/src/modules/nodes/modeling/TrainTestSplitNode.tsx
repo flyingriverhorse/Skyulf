@@ -43,98 +43,138 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
     }
   }, [upstreamDatasetId, upstreamTargetColumn, config.datasetId, config.target_column, onChange]);
 
-  const { data: schema } = useDatasetSchema(upstreamDatasetId || config.datasetId);
+  const { data: schema, isLoading } = useDatasetSchema(upstreamDatasetId || config.datasetId);
   const columns = schema ? Object.values(schema.columns).map(c => c.name) : [];
 
   const valSize = config.validation_size || 0;
   const trainSize = 1 - config.test_size - valSize;
 
-  return (
-    <div className="p-4 space-y-4">
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Test Size (0.0 - 1.0)</label>
-        <input
-          type="number"
-          step="0.05"
-          min="0.05"
-          max="0.95"
-          className="w-full p-2 border rounded bg-background text-sm"
-          value={config.test_size}
-          onChange={(e) => onChange({ ...config, test_size: parseFloat(e.target.value) })}
-        />
-      </div>
+  // Responsive Layout Logic
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [isWide, setIsWide] = React.useState(false);
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Validation Size (0.0 - 1.0)</label>
-        <input
-          type="number"
-          step="0.05"
-          min="0.00"
-          max="0.95"
-          className="w-full p-2 border rounded bg-background text-sm"
-          value={valSize}
-          onChange={(e) => onChange({ ...config, validation_size: parseFloat(e.target.value) })}
-        />
-        <p className="text-xs text-muted-foreground">
-          {Math.round(trainSize * 100)}% Training, {Math.round(valSize * 100)}% Validation, {Math.round(config.test_size * 100)}% Testing
-        </p>
-        {trainSize <= 0 && (
-          <p className="text-xs text-red-500 font-medium">
-            Error: Total split size exceeds 100%
-          </p>
+  React.useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setIsWide(entry.contentRect.width > 450); // Switch to 2-column layout if wider than 450px
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`flex flex-col h-full w-full bg-background ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+      {/* Top Status Bar (Always Visible) */}
+      <div className="shrink-0 p-4 pb-0 space-y-2">
+        {!upstreamDatasetId && !config.datasetId && (
+          <div className="p-2 bg-yellow-50 text-yellow-800 text-xs rounded border border-yellow-200">
+            Connect a dataset node to see available columns.
+          </div>
+        )}
+        
+        {isLoading && (
+          <div className="text-xs text-muted-foreground animate-pulse">
+            Loading schema...
+          </div>
         )}
       </div>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Random State</label>
-        <input
-          type="number"
-          className="w-full p-2 border rounded bg-background text-sm"
-          value={config.random_state}
-          onChange={(e) => onChange({ ...config, random_state: parseInt(e.target.value) })}
-        />
-      </div>
+      {/* Main Content Area - Responsive Grid/Flex */}
+      <div className={`flex-1 min-h-0 p-4 gap-4 ${isWide ? 'grid grid-cols-2' : 'flex flex-col'}`}>
+        
+        {/* Left Column: Split Ratios & Random State */}
+        <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Test Size (0.0 - 1.0)</label>
+            <input
+              type="number"
+              step="0.05"
+              min="0.05"
+              max="0.95"
+              className="w-full p-2 border rounded bg-background text-sm"
+              value={config.test_size}
+              onChange={(e) => onChange({ ...config, test_size: parseFloat(e.target.value) })}
+            />
+          </div>
 
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          id="shuffle"
-          checked={config.shuffle}
-          onChange={(e) => onChange({ ...config, shuffle: e.target.checked })}
-        />
-        <label htmlFor="shuffle" className="text-sm font-medium">
-          Shuffle Data
-        </label>
-      </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Validation Size (0.0 - 1.0)</label>
+            <input
+              type="number"
+              step="0.05"
+              min="0.00"
+              max="0.95"
+              className="w-full p-2 border rounded bg-background text-sm"
+              value={valSize}
+              onChange={(e) => onChange({ ...config, validation_size: parseFloat(e.target.value) })}
+            />
+            <p className="text-xs text-muted-foreground">
+              {Math.round(trainSize * 100)}% Training, {Math.round(valSize * 100)}% Validation, {Math.round(config.test_size * 100)}% Testing
+            </p>
+            {trainSize <= 0 && (
+              <p className="text-xs text-red-500 font-medium">
+                Error: Total split size exceeds 100%
+              </p>
+            )}
+          </div>
 
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          id="stratify"
-          checked={config.stratify}
-          onChange={(e) => onChange({ ...config, stratify: e.target.checked })}
-        />
-        <label htmlFor="stratify" className="text-sm font-medium">
-          Stratify by Target
-        </label>
-      </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Random State</label>
+            <input
+              type="number"
+              className="w-full p-2 border rounded bg-background text-sm"
+              value={config.random_state}
+              onChange={(e) => onChange({ ...config, random_state: parseInt(e.target.value) })}
+            />
+          </div>
+        </div>
 
-      <div className="space-y-2 pl-6 border-l-2 border-muted">
-        <label className="text-sm font-medium">Target Column</label>
-        <select
-          className="w-full p-2 border rounded bg-background text-sm"
-          value={config.target_column ?? ''}
-          onChange={(e) => onChange({ ...config, target_column: e.target.value })}
-          disabled={!config.stratify}
-        >
-          <option value="">-- Select Target --</option>
-          {columns.map(col => (
-            <option key={col} value={col}>{col}</option>
-          ))}
-        </select>
-        <p className="text-xs text-muted-foreground">
-          Required for stratification. If input is already separated (X, y), this is ignored.
-        </p>
+        {/* Right Column: Options & Stratification */}
+        <div className={`space-y-4 ${isWide ? 'overflow-y-auto pl-2 border-l' : 'shrink-0 pt-4 border-t'}`}>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="shuffle"
+              checked={config.shuffle}
+              onChange={(e) => onChange({ ...config, shuffle: e.target.checked })}
+            />
+            <label htmlFor="shuffle" className="text-sm font-medium">
+              Shuffle Data
+            </label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="stratify"
+              checked={config.stratify}
+              onChange={(e) => onChange({ ...config, stratify: e.target.checked })}
+            />
+            <label htmlFor="stratify" className="text-sm font-medium">
+              Stratify by Target
+            </label>
+          </div>
+
+          <div className="space-y-2 pl-6 border-l-2 border-muted">
+            <label className="text-sm font-medium">Target Column</label>
+            <select
+              className="w-full p-2 border rounded bg-background text-sm"
+              value={config.target_column ?? ''}
+              onChange={(e) => onChange({ ...config, target_column: e.target.value })}
+              disabled={!config.stratify}
+            >
+              <option value="">-- Select Target --</option>
+              {columns.map(col => (
+                <option key={col} value={col}>{col}</option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Required for stratification. If input is already separated (X, y), this is ignored.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

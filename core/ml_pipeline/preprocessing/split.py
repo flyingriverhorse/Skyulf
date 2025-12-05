@@ -173,7 +173,7 @@ class FeatureTargetSplitCalculator(BaseCalculator):
         return config
 
 class FeatureTargetSplitApplier(BaseApplier):
-    def apply(self, df: Union[pd.DataFrame, SplitDataset], params: Dict[str, Any]) -> Union[Tuple[pd.DataFrame, pd.Series], Dict[str, Tuple[pd.DataFrame, pd.Series]]]:
+    def apply(self, df: Union[pd.DataFrame, SplitDataset], params: Dict[str, Any]) -> Union[Tuple[pd.DataFrame, pd.Series], SplitDataset]:
         target_col = params.get("target_column")
         if not target_col:
             raise ValueError("Target column must be specified for Feature-Target Split")
@@ -185,16 +185,16 @@ class FeatureTargetSplitApplier(BaseApplier):
             X_train, y_train = selector.select(df.train)
             X_test, y_test = selector.select(df.test)
             
-            result = {
-                "train": (X_train, y_train),
-                "test": (X_test, y_test)
-            }
-            
+            validation = None
             if df.validation is not None:
                 X_val, y_val = selector.select(df.validation)
-                result["validation"] = (X_val, y_val)
+                validation = (X_val, y_val)
                 
-            return result
+            return SplitDataset(
+                train=(X_train, y_train),
+                test=(X_test, y_test),
+                validation=validation
+            )
             
         return selector.select(df)
 
