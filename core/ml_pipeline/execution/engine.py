@@ -204,13 +204,19 @@ class PipelineEngine:
         
         # We need X_train, y_train
         # Assuming data is SplitDataset
-        X_train = data.train.drop(columns=[target_col])
-        y_train = data.train[target_col]
+        if isinstance(data.train, tuple):
+            X_train, y_train = data.train
+        else:
+            X_train = data.train.drop(columns=[target_col])
+            y_train = data.train[target_col]
         
         validation_data = None
         if data.validation is not None:
-            X_val = data.validation.drop(columns=[target_col])
-            y_val = data.validation[target_col]
+            if isinstance(data.validation, tuple):
+                X_val, y_val = data.validation
+            else:
+                X_val = data.validation.drop(columns=[target_col])
+                y_val = data.validation[target_col]
             validation_data = (X_val, y_val)
         
         result = tuner.tune(X_train, y_train, config, validation_data=validation_data)

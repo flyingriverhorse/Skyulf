@@ -108,9 +108,9 @@ export const ResultsPanel: React.FC = () => {
 
           {/* Signals / Warnings */}
           {applied_steps.length > 0 && executionResult.status !== 'failed' && (
-             <div className="p-2 bg-blue-50 border-b flex gap-2 overflow-x-auto">
+             <div className="p-2 bg-blue-50 dark:bg-blue-950/20 border-b dark:border-blue-900/30 flex gap-2 overflow-x-auto">
                 {applied_steps.map((step: string, idx: number) => (
-                  <div key={idx} className="text-xs text-blue-800 bg-blue-100 px-2 py-1 rounded border border-blue-200 whitespace-nowrap">
+                  <div key={idx} className="text-xs text-blue-800 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded border border-blue-200 dark:border-blue-800 whitespace-nowrap">
                     {step}
                   </div>
                 ))}
