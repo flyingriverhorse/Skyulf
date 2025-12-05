@@ -66,9 +66,20 @@ class DropMissingColumnsCalculator(BaseCalculator):
         if threshold is not None:
             try:
                 threshold_val = float(threshold)
-                missing_pct = df.isna().mean() * 100
-                auto_dropped = missing_pct[missing_pct >= threshold_val].index.tolist()
-                cols_to_drop.update(auto_dropped)
+                # If threshold is 0, it means "Drop if missing >= 0%".
+                # This drops ALL columns (since missing % is always >= 0).
+                # Usually, users mean "Drop if missing > 0%" (Strict) or "Disable" if 0.
+                # But V1 logic was >=.
+                # If the user sends 0, they likely mean "Don't use threshold" OR "Drop any missing".
+                # Let's assume if threshold is 0, we ignore it unless explicitly set to strict mode?
+                # No, let's just fix the logic:
+                # If threshold is 0, we should probably treat it as "Ignore" because the UI defaults to 0.
+                # If the user wants to drop columns with ANY missing values, they should set it to a small number like 0.01 or we need a separate flag.
+                # However, to fix the "0 rows" bug where everything is dropped because default is 0:
+                if threshold_val > 0:
+                    missing_pct = df.isna().mean() * 100
+                    auto_dropped = missing_pct[missing_pct >= threshold_val].index.tolist()
+                    cols_to_drop.update(auto_dropped)
             except (TypeError, ValueError):
                 pass
                 

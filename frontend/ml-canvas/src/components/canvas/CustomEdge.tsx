@@ -27,7 +27,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
     targetX,
     targetY,
     targetPosition,
-    borderRadius: 24, // Increased for smoother corners
+    borderRadius: 24,
   });
 
   const onEdgeClick = (evt: React.MouseEvent) => {
@@ -37,7 +37,18 @@ export const CustomEdge: React.FC<EdgeProps> = ({
 
   return (
     <>
-      <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />
+      {/* Invisible wider path for easier selection */}
+      <BaseEdge 
+        path={edgePath} 
+        style={{ strokeWidth: 20, stroke: 'transparent', cursor: 'pointer' }} 
+      />
+      {/* Visible path */}
+      <BaseEdge 
+        path={edgePath} 
+        markerEnd={markerEnd} 
+        style={{ ...style, strokeWidth: 2 }} 
+        className="react-flow__edge-path"
+      />
       <EdgeLabelRenderer>
         <div
           style={{

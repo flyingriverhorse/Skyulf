@@ -18,9 +18,11 @@ const OneHotEncodingSettings: React.FC<{ config: OneHotEncodingConfig; onChange:
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
   
   // Filter for categorical columns (object, string, category)
-  const categoricalColumns = schema?.columns
-    .filter(c => ['object', 'string', 'category', 'bool'].some(t => c.dtype?.toLowerCase().includes(t)))
-    .map(c => c.name) || [];
+  const categoricalColumns = schema 
+    ? Object.values(schema.columns)
+        .filter(c => ['object', 'string', 'category', 'bool'].some(t => c.dtype?.toLowerCase().includes(t)))
+        .map(c => c.name)
+    : [];
 
   return (
     <div className="p-4 space-y-4">

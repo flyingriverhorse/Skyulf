@@ -37,6 +37,12 @@ class StatefulTransformer:
             self.artifact_store.save(self.node_id, params)
             return self.applier.apply(dataset, params)
         
+        # If dataset is a tuple (e.g. from FeatureTargetSplitter), we can't fit on it like a SplitDataset
+        if isinstance(dataset, tuple):
+             # This case shouldn't happen for standard transformers, but if it does, we might need to handle it.
+             # For now, assume standard transformers don't run AFTER a FeatureTargetSplitter in this pipeline structure.
+             raise ValueError(f"Unexpected input type 'tuple' for node {self.node_id}. Did you place a transformer after a Feature-Target Split?")
+
         # 1. Calculate on Train
         params = self.calculator.fit(dataset.train, config)
         

@@ -91,7 +91,14 @@ class PipelineEngine:
             elif node.step_type == "model_tuning":
                 output_artifact_id, metrics = self._run_model_tuning(node)
             else:
-                raise ValueError(f"Unknown step type: {node.step_type}")
+                # Try to run as a single transformer step
+                try:
+                    output_artifact_id = self._run_transformer(node)
+                except Exception as e:
+                     # If it fails or isn't a valid transformer, re-raise
+                     if "Unknown transformer type" in str(e):
+                         raise ValueError(f"Unknown step type: {node.step_type}")
+                     raise e
 
             duration = time.time() - start_ts
             return NodeExecutionResult(
@@ -213,6 +220,27 @@ class PipelineEngine:
         estimator.fit_predict(data, target_col, result.best_params)
         
         return node.node_id, {"best_score": result.best_score, "best_params": result.best_params}
+
+    def _run_transformer(self, node: NodeConfig) -> str:
+        """Runs a single transformer node as a 1-step feature engineering pipeline."""
+        # Input: DataFrame or SplitDataset
+        data = self._resolve_input(node)
+        
+        # Wrap the single node as a 1-step feature engineering pipeline
+        step_config = {
+            "name": "step", # Generic name, the artifact will be saved by engine anyway
+            "transformer": node.step_type,
+            "params": node.params
+        }
+        
+        engineer = FeatureEngineer([step_config])
+        
+        # We use a prefix that includes the node_id to avoid collisions if FeatureEngineer saves internal state
+        # But mostly we care about the final result which we save manually below.
+        processed_data = engineer.fit_transform(data, self.artifact_store, node_id_prefix=f"exec_{node.node_id}")
+        
+        self.artifact_store.save(node.node_id, processed_data)
+        return node.node_id
 
     def _get_model_components(self, algorithm: str):
         if algorithm == "logistic_regression":

@@ -17,9 +17,11 @@ const LabelEncodingSettings: React.FC<{ config: LabelEncodingConfig; onChange: (
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
   
-  const categoricalColumns = schema?.columns
-    .filter(c => ['object', 'string', 'category', 'bool'].some(t => c.dtype?.toLowerCase().includes(t)))
-    .map(c => c.name) || [];
+  const categoricalColumns = schema 
+    ? Object.values(schema.columns)
+        .filter(c => ['object', 'string', 'category', 'bool'].some(t => c.dtype?.toLowerCase().includes(t)))
+        .map(c => c.name)
+    : [];
 
   return (
     <div className="p-4 space-y-4">

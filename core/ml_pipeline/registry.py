@@ -33,6 +33,13 @@ class NodeRegistry:
                 params={"test_size": 0.2, "random_state": 42, "stratify": None}
             ),
             RegistryItem(
+                id="feature_target_split",
+                name="Feature-Target Split",
+                category="Preprocessing",
+                description="Separate features (X) from target (y).",
+                params={"target_column": "string"}
+            ),
+            RegistryItem(
                 id="SimpleImputer",
                 name="Simple Imputer",
                 category="Preprocessing",

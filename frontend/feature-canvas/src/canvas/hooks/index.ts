@@ -12,3 +12,5 @@ export * from './ui/useNodeCatalogDrawer';
 export * from './ui/useSaveFeedbackState';
 export * from './ui/useSidepanelToggle';
 export * from './ui/useSidepanelViewModel';
+export * from './ui/useDatasetSelectionHandler';
+

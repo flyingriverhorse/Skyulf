@@ -1,21 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useGraphStore } from '../../core/store/useGraphStore';
-import { ChevronUp, ChevronDown, Table } from 'lucide-react';
+import { ChevronUp, ChevronDown, Table, Layers } from 'lucide-react';
 
 export const ResultsPanel: React.FC = () => {
   const executionResult = useGraphStore((state) => state.executionResult);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
+
+  // Determine available datasets (tabs)
+  const datasets = useMemo(() => {
+    if (!executionResult?.preview_data) return {};
+    
+    if (Array.isArray(executionResult.preview_data)) {
+      return { 'Result': executionResult.preview_data };
+    }
+    
+    if (typeof executionResult.preview_data === 'object') {
+      // It's a dictionary of datasets (e.g. { train: [...], test: [...] } or { X: [...], y: [...] })
+      return executionResult.preview_data;
+    }
+    
+    return {};
+  }, [executionResult]);
+
+  const tabNames = Object.keys(datasets);
+  
+  // Set default tab if none selected or current selection is invalid
+  React.useEffect(() => {
+    if (tabNames.length > 0 && (!activeTab || !tabNames.includes(activeTab))) {
+      // Prefer 'train' or 'X' if available, otherwise first one
+      if (tabNames.includes('train')) setActiveTab('train');
+      else if (tabNames.includes('X')) setActiveTab('X');
+      else setActiveTab(tabNames[0]);
+    }
+  }, [tabNames, activeTab]);
 
   if (!executionResult) return null;
 
-  // Map backend response to UI expectations
-  // Backend returns: { sample_rows: [], metrics: { preview_rows: 100, preview_total_rows: 1000 }, signals: ... }
-  const preview_data = executionResult.sample_rows || [];
-  const preview_rows = executionResult.metrics?.preview_rows || 0;
-  const preview_total_rows = executionResult.metrics?.preview_total_rows || 0;
-  // const signals = executionResult.signals ? [executionResult.signals] : []; // Signals might be an object, wrap in array if needed or iterate keys
+  const currentRows = activeTab && datasets[activeTab] ? datasets[activeTab] : [];
+  const columns = currentRows.length > 0 ? Object.keys(currentRows[0]) : [];
+  const applied_steps = executionResult.node_results ? Object.keys(executionResult.node_results) : [];
 
-  const columns = preview_data && preview_data.length > 0 ? Object.keys(preview_data[0]) : [];
+  // Check for errors
+  const errorNodeId = Object.keys(executionResult.node_results || {}).find(
+    nodeId => executionResult.node_results[nodeId].status === 'failed'
+  );
+  const error = errorNodeId ? executionResult.node_results[errorNodeId].error : null;
 
   return (
     <div 
@@ -32,8 +62,13 @@ export const ResultsPanel: React.FC = () => {
           <Table className="w-4 h-4 text-primary" />
           <span className="font-semibold text-sm">Preview Results</span>
           <span className="text-xs text-muted-foreground ml-2">
-            {preview_rows} rows shown (of {preview_total_rows})
+            {currentRows.length} rows shown
           </span>
+          {executionResult.status === 'failed' && (
+            <span className="text-xs text-red-600 font-bold ml-2">
+              (Failed)
+            </span>
+          )}
         </div>
         <button className="p-1 hover:bg-muted rounded">
           {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
@@ -43,11 +78,38 @@ export const ResultsPanel: React.FC = () => {
       {/* Content */}
       {isExpanded && (
         <div className="flex-1 overflow-hidden flex flex-col">
+          {/* Error Message */}
+          {executionResult.status === 'failed' && (
+             <div className="p-4 bg-red-50 border-b text-red-800 text-sm overflow-auto max-h-32">
+                <div className="font-bold mb-1">Pipeline Execution Failed</div>
+                <div className="font-mono text-xs whitespace-pre-wrap">{error || 'Unknown error occurred during execution.'}</div>
+             </div>
+          )}
+
+          {/* Tabs for Multiple Outputs */}
+          {tabNames.length > 1 && (
+            <div className="flex items-center gap-1 px-2 pt-2 border-b bg-muted/5">
+              <Layers className="w-3 h-3 text-muted-foreground mr-1" />
+              {tabNames.map(name => (
+                <button
+                  key={name}
+                  onClick={() => setActiveTab(name)}
+                  className={`px-3 py-1 text-xs font-medium rounded-t-md border-t border-l border-r transition-colors ${
+                    activeTab === name 
+                      ? 'bg-background text-primary border-b-background translate-y-[1px]' 
+                      : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border-transparent'
+                  }`}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Signals / Warnings */}
-          {/* TODO: Better signal visualization based on signal structure */}
-          {executionResult.applied_steps && executionResult.applied_steps.length > 0 && (
+          {applied_steps.length > 0 && executionResult.status !== 'failed' && (
              <div className="p-2 bg-blue-50 border-b flex gap-2 overflow-x-auto">
-                {executionResult.applied_steps.map((step: string, idx: number) => (
+                {applied_steps.map((step: string, idx: number) => (
                   <div key={idx} className="text-xs text-blue-800 bg-blue-100 px-2 py-1 rounded border border-blue-200 whitespace-nowrap">
                     {step}
                   </div>
@@ -58,20 +120,20 @@ export const ResultsPanel: React.FC = () => {
           {/* Data Table */}
           <div className="flex-1 overflow-auto">
             <table className="w-full text-sm text-left border-collapse">
-              <thead className="bg-muted/50 sticky top-0 z-10">
+              <thead className="text-xs text-muted-foreground uppercase bg-muted sticky top-0 z-10 shadow-sm">
                 <tr>
                   {columns.map((col) => (
-                    <th key={col} className="px-4 py-2 font-medium text-muted-foreground border-b border-r last:border-r-0 whitespace-nowrap">
+                    <th key={col} className="px-4 py-2 font-medium border-b whitespace-nowrap">
                       {col}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {preview_data.map((row: any, idx: number) => (
-                  <tr key={idx} className="hover:bg-muted/5 border-b last:border-b-0">
+                {currentRows.map((row: any, idx: number) => (
+                  <tr key={idx} className="border-b hover:bg-muted/10">
                     {columns.map((col) => (
-                      <td key={`${idx}-${col}`} className="px-4 py-2 border-r last:border-r-0 whitespace-nowrap font-mono text-xs">
+                      <td key={`${idx}-${col}`} className="px-4 py-2 whitespace-nowrap font-mono text-xs">
                         {row[col] !== null ? String(row[col]) : <span className="text-muted-foreground italic">null</span>}
                       </td>
                     ))}
@@ -79,6 +141,11 @@ export const ResultsPanel: React.FC = () => {
                 ))}
               </tbody>
             </table>
+            {currentRows.length === 0 && (
+              <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+                No preview data available {activeTab ? `for ${activeTab}` : ''}
+              </div>
+            )}
           </div>
         </div>
       )}

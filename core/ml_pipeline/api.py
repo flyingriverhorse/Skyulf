@@ -16,10 +16,11 @@ from .execution.engine import PipelineEngine
 from .execution.schemas import PipelineConfig, NodeConfig, PipelineExecutionResult
 from .artifacts.local import LocalArtifactStore
 from .data.container import SplitDataset
+from .data.loader import DataLoader
 from .registry import NodeRegistry, RegistryItem
 from .data.profiler import DataProfiler
 from .recommendations.engine import AdvisorEngine
-from .recommendations.schemas import Recommendation
+from .recommendations.schemas import Recommendation, AnalysisProfile
 from .execution.jobs import JobManager, JobStatus, JobInfo
 
 router = APIRouter()
@@ -140,6 +141,44 @@ async def preview_pipeline(
                     if artifact.validation is not None:
                         preview_data["validation"] = json.loads(artifact.validation.head(20).to_json(orient="records"))
                     df_for_analysis = artifact.train
+                elif isinstance(artifact, tuple) and len(artifact) == 2:
+                    # Assume (X, y) from FeatureTargetSplitter
+                    X, y = artifact
+                    preview_data = {}
+                    
+                    if isinstance(X, (pd.DataFrame, pd.Series)):
+                        if isinstance(X, pd.Series): X = X.to_frame()
+                        preview_data["X"] = json.loads(X.head(20).to_json(orient="records"))
+                        
+                    if isinstance(y, (pd.DataFrame, pd.Series)):
+                        if isinstance(y, pd.Series): y = y.to_frame()
+                        preview_data["y"] = json.loads(y.head(20).to_json(orient="records"))
+                        
+                    df_for_analysis = X if isinstance(X, pd.DataFrame) else None
+                elif isinstance(artifact, dict) and "train" in artifact and isinstance(artifact["train"], tuple):
+                    # Handle FeatureTargetSplitter result on SplitDataset OR TrainTestSplitter result on (X, y)
+                    # Both result in {'train': (X, y), 'test': (X, y)}
+                    preview_data = {}
+                    
+                    # Helper to process (X, y) tuple
+                    def process_xy(xy_tuple, prefix):
+                        X, y = xy_tuple
+                        if isinstance(X, pd.Series): X = X.to_frame()
+                        if isinstance(y, pd.Series): y = y.to_frame()
+                        return {
+                            f"{prefix}_X": json.loads(X.head(20).to_json(orient="records")),
+                            f"{prefix}_y": json.loads(y.head(20).to_json(orient="records"))
+                        }
+
+                    if "train" in artifact:
+                        preview_data.update(process_xy(artifact["train"], "train"))
+                        df_for_analysis = artifact["train"][0] # X_train
+                        
+                    if "test" in artifact:
+                        preview_data.update(process_xy(artifact["test"], "test"))
+                        
+                    if "validation" in artifact:
+                        preview_data.update(process_xy(artifact["validation"], "val"))
                 
                 # Generate Recommendations
                 if df_for_analysis is not None:
@@ -238,3 +277,40 @@ def get_node_registry():
     Returns the list of available pipeline nodes (transformers, models, etc.).
     """
     return NodeRegistry.get_all_nodes()
+
+@router.get("/datasets/{dataset_id}/schema", response_model=AnalysisProfile)
+async def get_dataset_schema(
+    dataset_id: int,
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Returns the schema (columns, types, stats) of a dataset.
+    Uses the V2 DataProfiler.
+    """
+    ingestion_service = DataIngestionService(session)
+    ds = await ingestion_service.get_data_source_by_id(dataset_id)
+    
+    if not ds:
+        raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found")
+        
+    try:
+        # Resolve path
+        ds_dict = {
+            "connection_info": ds.config,
+            "file_path": ds.config.get("file_path") if ds.config else None
+        }
+        path = extract_file_path_from_source(ds_dict)
+        
+        if not path:
+             raise HTTPException(status_code=400, detail=f"Could not resolve path for dataset {dataset_id}")
+             
+        # Load sample
+        loader = DataLoader()
+        df = loader.load_sample(str(path), n=1000)
+        
+        # Profile
+        profile = DataProfiler.generate_profile(df)
+        return profile
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to profile dataset: {str(e)}")

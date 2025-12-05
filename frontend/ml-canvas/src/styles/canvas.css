@@ -9,6 +9,42 @@
   background: radial-gradient(circle at top, var(--dark-bg-flow-start), var(--dark-bg-flow-end));
 }
 
+/* React Flow Controls - Dark Mode Support */
+.react-flow__controls {
+  box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.08);
+}
+
+.dark .react-flow__controls {
+  background-color: #1e293b; /* slate-800 */
+  border-color: #334155; /* slate-700 */
+  box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.4);
+}
+
+.react-flow__controls-button {
+  background-color: #ffffff;
+  border-bottom: 1px solid #eeeeee;
+  color: #555;
+}
+
+.dark .react-flow__controls-button {
+  background-color: #1e293b; /* slate-800 */
+  border-bottom: 1px solid #334155; /* slate-700 */
+  color: #94a3b8; /* slate-400 */
+}
+
+.react-flow__controls-button:hover {
+  background-color: #f4f4f4;
+}
+
+.dark .react-flow__controls-button:hover {
+  background-color: #334155; /* slate-700 */
+  color: #e2e8f0; /* slate-200 */
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+
 .react-flow__handle {
   width: 22px !important;
   height: 22px !important;

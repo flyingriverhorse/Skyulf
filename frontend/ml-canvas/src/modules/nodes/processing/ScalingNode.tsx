@@ -19,9 +19,11 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
   
   // Filter for numeric columns only, as scaling only applies to them
-  const numericColumns = schema?.columns
-    .filter(c => ['int', 'float', 'number'].some(t => c.dtype?.toLowerCase().includes(t)))
-    .map(c => c.name) || [];
+  const numericColumns = schema 
+    ? Object.values(schema.columns)
+        .filter(c => ['int', 'float', 'number'].some(t => c.dtype?.toLowerCase().includes(t)))
+        .map(c => c.name)
+    : [];
 
   return (
     <div className="p-4 space-y-4">

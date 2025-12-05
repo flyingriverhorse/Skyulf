@@ -5,7 +5,10 @@ import pandas as pd
 import logging
 
 # Import all transformers
-from .split import TrainTestSplitterCalculator, TrainTestSplitterApplier
+from .split import (
+    TrainTestSplitterCalculator, TrainTestSplitterApplier,
+    FeatureTargetSplitCalculator, FeatureTargetSplitApplier
+)
 from .cleaning import (
     TextCleaningCalculator, TextCleaningApplier,
     ValueReplacementCalculator, ValueReplacementApplier,
@@ -55,7 +58,8 @@ from .feature_selection import (
     VarianceThresholdCalculator, VarianceThresholdApplier,
     CorrelationThresholdCalculator, CorrelationThresholdApplier,
     UnivariateSelectionCalculator, UnivariateSelectionApplier,
-    ModelBasedSelectionCalculator, ModelBasedSelectionApplier
+    ModelBasedSelectionCalculator, ModelBasedSelectionApplier,
+    FeatureSelectionCalculator, FeatureSelectionApplier
 )
 from .casting import (
     CastingCalculator, CastingApplier
@@ -109,8 +113,37 @@ class FeatureEngineer:
             transformer = StatefulTransformer(calculator, applier, artifact_store, step_node_id)
             
             # Some transformers return a tuple (train, test) like Splitter
+            # Or (X, y) like FeatureTargetSplitter
+            # We need to handle these special cases or let StatefulTransformer handle them if possible.
+            # But StatefulTransformer expects SplitDataset or DataFrame.
+            
+            # If the transformer is a Splitter, it might return a SplitDataset directly from its apply method
+            # But StatefulTransformer wraps it.
+            
+            # Special handling for Splitters if they don't fit the standard "fit on train, apply on all" pattern
+            # Actually, TrainTestSplitter is a bit unique. It takes a DataFrame and returns a SplitDataset.
+            # It doesn't really "fit" anything.
+            
             if transformer_type == "TrainTestSplitter":
-                current_data = transformer.fit_transform(current_data, params)
+                # TrainTestSplitter changes DataFrame -> SplitDataset.
+                # We bypass StatefulTransformer to allow this structural change.
+                # It can also handle (X, y) tuple if FeatureTargetSplit was done first.
+                if isinstance(current_data, (pd.DataFrame, tuple)):
+                    params = calculator.fit(current_data, params)
+                    current_data = applier.apply(current_data, params)
+                    if artifact_store:
+                        artifact_store.save(step_node_id, params)
+                else:
+                    logger.warning("Attempting to split an already split dataset. Skipping TrainTestSplitter.")
+            
+            elif transformer_type == "feature_target_split":
+                 # FeatureTargetSplitter changes structure to (X, y) or Dict of (X, y).
+                 # We bypass StatefulTransformer to allow this structural change.
+                 params = calculator.fit(current_data, params)
+                 current_data = applier.apply(current_data, params)
+                 if artifact_store:
+                    artifact_store.save(step_node_id, params)
+
             else:
                 current_data = transformer.fit_transform(current_data, params)
                 
@@ -119,6 +152,8 @@ class FeatureEngineer:
     def _get_transformer_components(self, type_name: str):
         if type_name == "TrainTestSplitter":
             return TrainTestSplitterCalculator(), TrainTestSplitterApplier()
+        elif type_name == "feature_target_split":
+            return FeatureTargetSplitCalculator(), FeatureTargetSplitApplier()
         elif type_name == "TextCleaning":
             return TextCleaningCalculator(), TextCleaningApplier()
         elif type_name == "ValueReplacement":
@@ -185,6 +220,8 @@ class FeatureEngineer:
             return UnivariateSelectionCalculator(), UnivariateSelectionApplier()
         elif type_name == "ModelBasedSelection":
             return ModelBasedSelectionCalculator(), ModelBasedSelectionApplier()
+        elif type_name == "feature_selection":
+            return FeatureSelectionCalculator(), FeatureSelectionApplier()
         elif type_name == "Casting":
             return CastingCalculator(), CastingApplier()
         elif type_name == "PolynomialFeatures":

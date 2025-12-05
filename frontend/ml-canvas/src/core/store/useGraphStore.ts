@@ -13,6 +13,7 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react';
 import { registry } from '../registry/NodeRegistry';
+import { PreviewResponse } from '../api/client';
 
 interface GraphState {
   nodes: Node[];
@@ -30,8 +31,8 @@ interface GraphState {
   setGraph: (nodes: Node[], edges: Edge[]) => void;
 
   // Execution State
-  executionResult: any | null;
-  setExecutionResult: (result: any) => void;
+  executionResult: PreviewResponse | null;
+  setExecutionResult: (result: PreviewResponse | null) => void;
 }
 
 export const useGraphStore = create<GraphState>((set, get) => ({
@@ -98,9 +99,40 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
 
   validateGraph: async () => {
-    // TODO: Implement graph validation logic
-    // 1. Check if all required ports are connected
+    const { nodes, edges } = get();
+    
+    // 1. Check if graph is empty
+    if (nodes.length === 0) {
+      return false;
+    }
+
     // 2. Run individual node validation
+    for (const node of nodes) {
+      const definition = registry.get(node.data.definitionType as string);
+      if (definition) {
+        const validation = definition.validate(node.data);
+        if (!validation.isValid) {
+          // TODO: We could store this error in the node state to show a visual indicator
+          console.warn(`Node ${node.id} validation failed: ${validation.message}`);
+          return false;
+        }
+      }
+    }
+
+    // 3. Check connectivity (Basic check: All nodes except sources must have at least one input)
+    // This is a heuristic; some nodes might be optional or standalone, but in a pipeline, usually everything connects.
+    // We can refine this by checking definition.inputs.length > 0
+    for (const node of nodes) {
+      const definition = registry.get(node.data.definitionType as string);
+      if (definition && definition.inputs.length > 0) {
+        const hasInput = edges.some(e => e.target === node.id);
+        if (!hasInput) {
+          console.warn(`Node ${node.id} (${definition.label}) is disconnected.`);
+          return false;
+        }
+      }
+    }
+
     return true;
   },
 }));

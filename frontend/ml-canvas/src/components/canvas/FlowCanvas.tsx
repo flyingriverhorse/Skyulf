@@ -6,6 +6,7 @@ import {
   ReactFlowProvider,
   useReactFlow
 } from '@xyflow/react';
+import { useShallow } from 'zustand/react/shallow';
 import '@xyflow/react/dist/style.css';
 
 import { useGraphStore } from '../../core/store/useGraphStore';
@@ -31,7 +32,16 @@ const FlowCanvasContent: React.FC = () => {
     onEdgesChange, 
     onConnect,
     addNode 
-  } = useGraphStore();
+  } = useGraphStore(
+    useShallow((state) => ({
+      nodes: state.nodes,
+      edges: state.edges,
+      onNodesChange: state.onNodesChange,
+      onEdgesChange: state.onEdgesChange,
+      onConnect: state.onConnect,
+      addNode: state.addNode,
+    }))
+  );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
