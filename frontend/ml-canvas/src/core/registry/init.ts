@@ -15,6 +15,7 @@ import { CastTypeNode } from '../../modules/nodes/processing/CastTypeNode';
 import { MissingIndicatorNode } from '../../modules/nodes/processing/MissingIndicatorNode';
 import { EncodingNode } from '../../modules/nodes/processing/EncodingNode';
 import { OutlierNode } from '../../modules/nodes/processing/OutlierNode';
+import { TransformationNode } from '../../modules/nodes/processing/TransformationNode';
 
 export const initializeRegistry = () => {
   registry.register(DebugNode);
@@ -23,6 +24,7 @@ export const initializeRegistry = () => {
   registry.register(ImputationNode);
   registry.register(ScalingNode);
   registry.register(OutlierNode);
+  registry.register(TransformationNode);
   registry.register(EncodingNode);
   registry.register(FeatureSelectionNode);
   registry.register(TrainTestSplitNode);

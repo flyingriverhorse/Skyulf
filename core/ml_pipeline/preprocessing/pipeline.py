@@ -50,7 +50,8 @@ from .outliers import (
 )
 from .transformations import (
     PowerTransformerCalculator, PowerTransformerApplier,
-    SimpleTransformationCalculator, SimpleTransformationApplier
+    SimpleTransformationCalculator, SimpleTransformationApplier,
+    GeneralTransformationCalculator, GeneralTransformationApplier
 )
 from .bucketing import (
     GeneralBinningCalculator, BaseBinningApplier as GeneralBinningApplier,
@@ -361,6 +362,8 @@ class FeatureEngineer:
             return PowerTransformerCalculator(), PowerTransformerApplier()
         elif type_name == "SimpleTransformation":
             return SimpleTransformationCalculator(), SimpleTransformationApplier()
+        elif type_name == "GeneralTransformation":
+            return GeneralTransformationCalculator(), GeneralTransformationApplier()
         elif type_name == "GeneralBinning":
             return GeneralBinningCalculator(), GeneralBinningApplier()
         elif type_name == "CustomBinning":
