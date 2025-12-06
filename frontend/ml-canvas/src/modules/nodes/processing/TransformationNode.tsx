@@ -314,7 +314,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
         onApply={(rec) => {
           // Apply recommendation logic
           const r = rec as any;
-          const method = r.params?.method || 'log';
+          const method = r.suggested_params?.method || r.params?.method || 'log';
           const columns = r.target_columns || [];
           
           if (columns.length > 0) {
