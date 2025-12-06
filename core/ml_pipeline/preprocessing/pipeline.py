@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Union
 import pandas as pd
 import logging
 from ..data.container import SplitDataset
+from ..utils import get_data_stats
 
 # Import all transformers
 from .split import (
@@ -89,35 +90,6 @@ class FeatureEngineer:
     def __init__(self, steps_config: List[Dict[str, Any]]):
         self.steps_config = steps_config
 
-    def _get_data_stats(self, data):
-        rows = 0
-        cols = set()
-        
-        if isinstance(data, pd.DataFrame):
-            rows = len(data)
-            cols = set(data.columns)
-        elif isinstance(data, tuple) and len(data) == 2:
-            # Handle (X, y) tuple
-            rows = len(data[0])
-            cols = set(data[0].columns)
-        elif isinstance(data, SplitDataset):
-            # Sum rows from all splits
-            # Train
-            r, c = self._get_data_stats(data.train)
-            rows += r
-            cols = c # Assume columns are same
-            
-            # Test
-            r, _ = self._get_data_stats(data.test)
-            rows += r
-            
-            # Validation
-            if data.validation is not None:
-                r, _ = self._get_data_stats(data.validation)
-                rows += r
-                
-        return rows, cols
-
     def fit_transform(self, data: Union[pd.DataFrame, Any], artifact_store=None, node_id_prefix="") -> Any:
         """
         Runs the pipeline on data.
@@ -136,7 +108,7 @@ class FeatureEngineer:
             logger.debug(f"current_data type: {type(current_data)}")
             
             # Capture metrics before
-            rows_before, cols_before = self._get_data_stats(current_data)
+            rows_before, cols_before = get_data_stats(current_data)
             
             # Keep reference for comparison (for Winsorize metrics)
             data_before = current_data
@@ -253,7 +225,7 @@ class FeatureEngineer:
                 logger.warning(f"Failed to retrieve metrics for step {name}: {e}")
 
             # Capture metrics after
-            rows_after, cols_after = self._get_data_stats(current_data)
+            rows_after, cols_after = get_data_stats(current_data)
 
             if rows_after > 0 or cols_after:
                 if transformer_type in ["DropMissingRows", "Deduplicate", "IQR", "ZScore", "EllipticEnvelope", "Winsorize"]:
