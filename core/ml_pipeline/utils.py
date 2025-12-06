@@ -1,6 +1,43 @@
 import pandas as pd
 import numpy as np
 from typing import List, Set, Union, Tuple, Optional
+from .data.container import SplitDataset
+
+def get_data_stats(data: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series], SplitDataset]) -> Tuple[int, Set[str]]:
+    """
+    Calculates row count and column set for various data structures.
+    Supports DataFrame, (X, y) tuple, and SplitDataset.
+    """
+    rows = 0
+    cols = set()
+    
+    if isinstance(data, pd.DataFrame):
+        rows = len(data)
+        cols = set(data.columns)
+    elif isinstance(data, tuple) and len(data) == 2:
+        # Handle (X, y) tuple
+        # Check if first element is DataFrame/Series
+        if hasattr(data[0], 'shape'):
+             rows = len(data[0])
+             if hasattr(data[0], 'columns'):
+                 cols = set(data[0].columns)
+    elif isinstance(data, SplitDataset):
+        # Sum rows from all splits
+        # Train
+        r, c = get_data_stats(data.train)
+        rows += r
+        cols = c # Assume columns are same
+        
+        # Test
+        r, _ = get_data_stats(data.test)
+        rows += r
+        
+        # Validation
+        if data.validation is not None:
+            r, _ = get_data_stats(data.validation)
+            rows += r
+            
+    return rows, cols
 
 def unpack_pipeline_input(data: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]) -> Tuple[pd.DataFrame, Optional[pd.Series], bool]:
     """
