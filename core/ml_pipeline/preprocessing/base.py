@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, Tuple
 import pandas as pd
 from ..data.container import SplitDataset
 from ..artifacts.store import ArtifactStore
@@ -37,11 +37,12 @@ class StatefulTransformer:
             self.artifact_store.save(self.node_id, params)
             return self.applier.apply(dataset, params)
         
-        # If dataset is a tuple (e.g. from FeatureTargetSplitter), we can't fit on it like a SplitDataset
+        # If dataset is a tuple (e.g. from FeatureTargetSplitter), pass it through.
+        # This allows nodes like TrainTestSplitter to accept (X, y) tuples.
         if isinstance(dataset, tuple):
-             # This case shouldn't happen for standard transformers, but if it does, we might need to handle it.
-             # For now, assume standard transformers don't run AFTER a FeatureTargetSplitter in this pipeline structure.
-             raise ValueError(f"Unexpected input type 'tuple' for node {self.node_id}. Did you place a transformer after a Feature-Target Split?")
+            params = self.calculator.fit(dataset, config)
+            self.artifact_store.save(self.node_id, params)
+            return self.applier.apply(dataset, params)
 
         # 1. Calculate on Train
         params = self.calculator.fit(dataset.train, config)
@@ -67,6 +68,9 @@ class StatefulTransformer:
         params = self.artifact_store.load(self.node_id)
         
         if isinstance(dataset, pd.DataFrame):
+            return self.applier.apply(dataset, params)
+
+        if isinstance(dataset, tuple):
             return self.applier.apply(dataset, params)
         
         # 2. Apply

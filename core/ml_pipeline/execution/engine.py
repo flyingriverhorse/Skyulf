@@ -98,6 +98,7 @@ class PipelineEngine:
             else:
                 # Try to run as a single transformer step
                 try:
+                    logger.debug(f"Running as single transformer: {node.step_type}")
                     output_artifact_id, metrics = self._run_transformer(node)
                 except Exception as e:
                      # If it fails or isn't a valid transformer, re-raise

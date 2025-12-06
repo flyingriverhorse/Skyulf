@@ -25,6 +25,9 @@ from .data.profiler import DataProfiler
 from .recommendations.engine import AdvisorEngine
 from .recommendations.schemas import Recommendation, AnalysisProfile
 from .execution.jobs import JobManager, JobStatus, JobInfo
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -188,6 +191,10 @@ async def preview_pipeline(
     artifact_store = LocalArtifactStore(temp_dir)
     
     try:
+        logger.debug(f"Preview request received with {len(config.nodes)} nodes")
+        for n in config.nodes:
+            logger.debug(f"Node {n.node_id} - Type: {n.step_type}")
+
         # 2. Adapt Config for Preview
         # Convert Pydantic to Dataclass
         nodes = []
@@ -226,6 +233,11 @@ async def preview_pipeline(
             if artifact_store.exists(last_node_id):
                 artifact = artifact_store.load(last_node_id)
                 
+                # Debug logging
+                logger.debug(f"Loaded artifact for node {last_node_id}. Type: {type(artifact)}")
+                if isinstance(artifact, SplitDataset):
+                    logger.debug(f"SplitDataset Train Type: {type(artifact.train)}")
+                
                 df_for_analysis = None
                 
                 # Helper to process (X, y) tuple
@@ -234,50 +246,55 @@ async def preview_pipeline(
                     if isinstance(X, pd.Series): X = X.to_frame()
                     if isinstance(y, pd.Series): y = y.to_frame()
                     return {
-                        f"{prefix}_X": json.loads(X.head(20).to_json(orient="records")),
-                        f"{prefix}_y": json.loads(y.head(20).to_json(orient="records"))
+                        f"{prefix}_X": json.loads(X.head(50).to_json(orient="records")),
+                        f"{prefix}_y": json.loads(y.head(50).to_json(orient="records"))
                     }
 
                 # Handle different artifact types
                 if isinstance(artifact, pd.DataFrame):
-                    preview_data = json.loads(artifact.head(20).to_json(orient="records"))
+                    logger.debug("Handling DataFrame artifact")
+                    preview_data = json.loads(artifact.head(50).to_json(orient="records"))
                     df_for_analysis = artifact
                 elif isinstance(artifact, SplitDataset):
+                    logger.debug("Handling SplitDataset artifact")
                     preview_data = {}
                     
                     # Handle Train
                     if isinstance(artifact.train, tuple):
+                        logger.debug("Train is tuple")
                         preview_data.update(process_xy(artifact.train, "train"))
                         df_for_analysis = artifact.train[0]
                     else:
-                        preview_data["train"] = json.loads(artifact.train.head(20).to_json(orient="records"))
+                        logger.debug("Train is DataFrame")
+                        preview_data["train"] = json.loads(artifact.train.head(50).to_json(orient="records"))
                         df_for_analysis = artifact.train
 
                     # Handle Test
                     if isinstance(artifact.test, tuple):
                         preview_data.update(process_xy(artifact.test, "test"))
                     else:
-                        preview_data["test"] = json.loads(artifact.test.head(20).to_json(orient="records"))
+                        preview_data["test"] = json.loads(artifact.test.head(50).to_json(orient="records"))
 
                     # Handle Validation
                     if artifact.validation is not None:
                         if isinstance(artifact.validation, tuple):
-                            preview_data.update(process_xy(artifact.validation, "val"))
+                            preview_data.update(process_xy(artifact.validation, "validation"))
                         else:
-                            preview_data["validation"] = json.loads(artifact.validation.head(20).to_json(orient="records"))
+                            preview_data["validation"] = json.loads(artifact.validation.head(50).to_json(orient="records"))
 
                 elif isinstance(artifact, tuple) and len(artifact) == 2:
+                    logger.debug("Handling Tuple artifact")
                     # Assume (X, y) from FeatureTargetSplitter
                     X, y = artifact
                     preview_data = {}
                     
                     if isinstance(X, (pd.DataFrame, pd.Series)):
                         if isinstance(X, pd.Series): X = X.to_frame()
-                        preview_data["X"] = json.loads(X.head(20).to_json(orient="records"))
+                        preview_data["X"] = json.loads(X.head(50).to_json(orient="records"))
                         
                     if isinstance(y, (pd.DataFrame, pd.Series)):
                         if isinstance(y, pd.Series): y = y.to_frame()
-                        preview_data["y"] = json.loads(y.head(20).to_json(orient="records"))
+                        preview_data["y"] = json.loads(y.head(50).to_json(orient="records"))
                         
                     df_for_analysis = X if isinstance(X, pd.DataFrame) else None
                 elif isinstance(artifact, dict) and "train" in artifact and isinstance(artifact["train"], tuple):
@@ -293,7 +310,7 @@ async def preview_pipeline(
                         preview_data.update(process_xy(artifact["test"], "test"))
                         
                     if "validation" in artifact:
-                        preview_data.update(process_xy(artifact["validation"], "val"))
+                        preview_data.update(process_xy(artifact["validation"], "validation"))
                 
                 # Generate Recommendations
                 if df_for_analysis is not None:

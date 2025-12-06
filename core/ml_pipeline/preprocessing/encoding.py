@@ -386,17 +386,30 @@ class DummyEncoderApplier(BaseApplier):
 # --- Label Encoder ---
 class LabelEncoderCalculator(BaseCalculator):
     def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+        X, y, is_tuple = unpack_pipeline_input(df)
         
         cols = resolve_columns(X, config, detect_categorical_columns)
         
-        if not cols:
+        # Check if we need to encode the target variable (y)
+        encode_target = False
+        target_col_name = None
+        
+        if is_tuple and y is not None:
+            target_col_name = y.name
+            requested_cols = config.get('columns')
+            # If target is explicitly requested but not found in X (because it's in y)
+            if requested_cols and target_col_name in requested_cols and target_col_name not in cols:
+                encode_target = True
+
+        if not cols and not encode_target:
             return {}
             
         missing_strategy = config.get('missing_strategy', 'keep_na') # keep_na, encode
         
         # LabelEncoder is strictly 1D, so we need one per column
         encoders = {}
+        
+        # Fit columns in X
         for col in cols:
             le = LabelEncoder()
             series = X[col]
@@ -409,9 +422,21 @@ class LabelEncoderCalculator(BaseCalculator):
             le.fit(series.astype(str))
             encoders[col] = le
             
+        # Fit target column (y)
+        if encode_target and target_col_name:
+            le = LabelEncoder()
+            series = y
+            
+            if missing_strategy == 'encode':
+                series = series.fillna('__mlops_missing__')
+                
+            le.fit(series.astype(str))
+            encoders[target_col_name] = le
+            
         return {
             'type': 'label',
             'columns': cols,
+            'target_column': target_col_name if encode_target else None,
             'encoders': encoders,
             'output_suffix': config.get('output_suffix', ''),
             'drop_original': config.get('drop_original', True),
@@ -423,56 +448,70 @@ class LabelEncoderApplier(BaseApplier):
     def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         
-        if not params or not params.get('columns'):
+        if not params:
             return pack_pipeline_output(X, y, is_tuple)
             
-        cols = params['columns']
+        cols = params.get('columns', [])
+        target_col = params.get('target_column')
         encoders = params.get('encoders', {})
         output_suffix = params.get('output_suffix', '')
         drop_original = params.get('drop_original', True)
         missing_strategy = params.get('missing_strategy', 'keep_na')
         missing_code = params.get('missing_code', -1)
         
+        # 1. Apply to X columns
         valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols:
-            return pack_pipeline_output(X, y, is_tuple)
-            
         X_out = X.copy()
         
         for col in valid_cols:
             le = encoders.get(col)
             if le:
                 series = X_out[col]
-                if missing_strategy == 'encode':
-                    series = series.fillna('__mlops_missing__')
+                X_out = self._apply_encoding(X_out, col, series, le, missing_strategy, missing_code, drop_original, output_suffix)
+
+        # 2. Apply to y (Target)
+        y_out = y
+        if is_tuple and y is not None and target_col == y.name:
+            le = encoders.get(target_col)
+            if le:
+                # For y, we always "drop original" (replace) because y is a Series
+                # We can't really add a suffix to y in the same way as X columns without changing it to DataFrame
+                # So we just transform it.
+                y_out = self._transform_series(y, le, missing_strategy, missing_code)
                 
-                # Handle unseen labels safely by mapping them to -1.
-                # Standard LabelEncoder raises an error for unseen labels.
-                
-                # Create mapping from learned classes
-                le_classes = le.classes_.tolist()
-                le_map = {c: i for i, c in enumerate(le_classes)}
-                
-                # Apply map and fill unknowns with -1
-                mapped = series.astype(str).map(le_map)
-                
-                if missing_strategy == 'keep_na':
-                    # If we kept NaNs, they are now NaNs in mapped
-                    pass
-                else:
-                    mapped = mapped.fillna(missing_code)
-                
-                # Convert to numeric if possible
-                if mapped.isnull().any():
-                    mapped = mapped.astype(float)
-                else:
-                    mapped = mapped.astype(int)
-                
-                if drop_original:
-                    X_out[col] = mapped
-                else:
-                    out_col = f"{col}{output_suffix}"
-                    X_out[out_col] = mapped
-                
-        return pack_pipeline_output(X_out, y, is_tuple)
+        return pack_pipeline_output(X_out, y_out, is_tuple)
+
+    def _transform_series(self, series: pd.Series, le: LabelEncoder, missing_strategy: str, missing_code: Any) -> pd.Series:
+        if missing_strategy == 'encode':
+            series = series.fillna('__mlops_missing__')
+        
+        # Handle unseen labels safely by mapping them to -1.
+        le_classes = le.classes_.tolist()
+        le_map = {c: i for i, c in enumerate(le_classes)}
+        
+        # Apply map and fill unknowns with -1
+        mapped = series.astype(str).map(le_map)
+        
+        if missing_strategy == 'keep_na':
+            pass
+        else:
+            mapped = mapped.fillna(missing_code)
+        
+        # Convert to numeric if possible
+        if mapped.isnull().any():
+            mapped = mapped.astype(float)
+        else:
+            mapped = mapped.astype(int)
+            
+        return mapped
+
+    def _apply_encoding(self, df: pd.DataFrame, col: str, series: pd.Series, le: LabelEncoder, missing_strategy: str, missing_code: Any, drop_original: bool, output_suffix: str) -> pd.DataFrame:
+        mapped = self._transform_series(series, le, missing_strategy, missing_code)
+        
+        if drop_original:
+            df[col] = mapped
+        else:
+            out_col = f"{col}{output_suffix}"
+            df[out_col] = mapped
+        return df
 
