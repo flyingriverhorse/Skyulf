@@ -140,6 +140,102 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
 
   const isModelBased = ['select_from_model', 'rfe'].includes(config.method);
 
+  const FeedbackSection = () => {
+    const result = executionResult?.node_results[nodeId || ''];
+    if (!result) return null;
+    
+    const metrics = result.metrics || {};
+    const dropped = metrics.dropped_columns as string[] | undefined;
+    const scores = metrics.feature_scores as Record<string, number> | undefined;
+    const pvalues = metrics.p_values as Record<string, number> | undefined;
+    const importances = metrics.feature_importances as Record<string, number> | undefined;
+    const variances = metrics.variances as Record<string, number> | undefined;
+    const ranking = metrics.ranking as Record<string, number> | undefined;
+    
+    return (
+      <div className="mt-4 p-3 bg-muted/50 rounded border text-xs space-y-3">
+        <div className="font-medium text-muted-foreground">Execution Feedback</div>
+        
+        {result.error && (
+          <div className="p-2 bg-destructive/10 text-destructive rounded border border-destructive/20">
+            {result.error}
+          </div>
+        )}
+
+        {/* Dropped Columns Section */}
+        {dropped && dropped.length > 0 ? (
+          <div>
+            <div className="font-medium text-muted-foreground mb-1 flex justify-between items-center">
+               <span>Dropped Columns ({dropped.length})</span>
+            </div>
+            <div className="max-h-40 overflow-y-auto bg-background p-2 rounded border space-y-1">
+              {dropped.map(col => {
+                const score = scores?.[col];
+                const pval = pvalues?.[col];
+                const imp = importances?.[col];
+                const variance = variances?.[col];
+                const rank = ranking?.[col];
+                
+                return (
+                  <div key={col} className="flex justify-between items-center border-b border-border/50 last:border-0 pb-1 last:pb-0">
+                    <span className="truncate max-w-[120px] font-medium text-destructive" title={col}>{col}</span>
+                    <div className="flex flex-col items-end text-[10px] text-muted-foreground">
+                      {score !== undefined && <span>Score: {score.toFixed(4)}</span>}
+                      {pval !== undefined && <span>p-val: {pval.toExponential(2)}</span>}
+                      {imp !== undefined && <span>Imp: {imp.toFixed(4)}</span>}
+                      {variance !== undefined && <span>Var: {variance.toFixed(4)}</span>}
+                      {rank !== undefined && <span>Rank: {rank}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+           result.status === 'success' && (
+             <div className="text-green-600 text-[10px] space-y-1">
+               <div>No columns were dropped.</div>
+               {config.method === 'variance_threshold' && (
+                 <div className="text-muted-foreground italic">
+                   All features have variance &gt; {config.threshold ?? 0}. Try increasing the threshold.
+                 </div>
+               )}
+               {config.method === 'select_k_best' && (
+                 <div className="text-muted-foreground italic">
+                   K ({config.k ?? 10}) is likely larger than or equal to the number of features. Try reducing K.
+                 </div>
+               )}
+               {config.method === 'correlation_threshold' && (
+                 <div className="text-muted-foreground italic">
+                   No feature pairs found with correlation &gt; {config.threshold ?? 0.95}.
+                 </div>
+               )}
+             </div>
+           )
+        )}
+
+        {/* Top Features Section */}
+        {(scores || importances) && (
+           <div>
+             <div className="font-medium text-muted-foreground mb-1">Top 5 Features</div>
+             <div className="max-h-32 overflow-y-auto bg-background p-2 rounded border space-y-1">
+                {Object.entries(scores || importances || {})
+                   .sort(([, a], [, b]) => (b as number) - (a as number))
+                   .slice(0, 5)
+                   .map(([col, val]) => (
+                     <div key={col} className="flex justify-between items-center">
+                        <span className="truncate max-w-[120px]" title={col}>{col}</span>
+                        <span className="font-mono text-[10px]">{(val as number).toFixed(4)}</span>
+                     </div>
+                   ))
+                }
+             </div>
+           </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div ref={containerRef} className={`flex flex-col h-full w-full bg-background ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>
       {/* Top Status Bar */}
@@ -222,6 +318,9 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                </select>
              </div>
           )}
+          
+          {/* Feedback Section - Show here if wide (Left Column) */}
+          {isWide && <FeedbackSection />}
         </div>
 
         {/* Right Column: Parameters */}
@@ -425,42 +524,8 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
             If unchecked, columns will be identified but not removed from the dataset.
           </p>
 
-          {/* Feedback Section */}
-          {executionResult && executionResult.node_results[nodeId || ''] && (
-            <div className="mt-4 p-3 bg-muted/50 rounded border text-xs">
-              {(() => {
-                const result = executionResult.node_results[nodeId || ''];
-                const dropped = result.metrics?.dropped_columns as string[] | undefined;
-
-                return (
-                  <div className="space-y-2">
-                    {result.error && (
-                      <div className="p-2 bg-destructive/10 text-destructive rounded border border-destructive/20">
-                        {result.error}
-                      </div>
-                    )}
-
-                    {dropped && dropped.length > 0 && (
-                      <div>
-                        <div className="font-medium text-muted-foreground mb-1">Dropped Columns ({dropped.length}):</div>
-                        <div className="max-h-32 overflow-y-auto bg-background p-2 rounded border">
-                          <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                            {dropped.map(col => (
-                              <li key={col} className="truncate" title={col}>{col}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    )}
-
-                    {dropped && dropped.length === 0 && result.status === 'success' && (
-                      <div className="text-muted-foreground italic">No columns were dropped.</div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
+          {/* Feedback Section - Show here if NOT wide (Mobile/Narrow) */}
+          {!isWide && <FeedbackSection />}
         </div>
       </div>
     </div>

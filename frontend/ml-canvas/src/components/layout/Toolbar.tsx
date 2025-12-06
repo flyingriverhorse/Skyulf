@@ -63,6 +63,31 @@ export const Toolbar: React.FC = () => {
         params = { 
             dataset_id: node.data.datasetId,
         };
+      } else if (node.data.definitionType === 'imputation_node') {
+          const method = node.data.method || 'simple';
+          if (method === 'knn') {
+              stepType = 'KNNImputer';
+              params = {
+                  columns: node.data.columns,
+                  n_neighbors: node.data.n_neighbors,
+                  weights: node.data.weights
+              };
+          } else if (method === 'iterative') {
+              stepType = 'IterativeImputer';
+              params = {
+                  columns: node.data.columns,
+                  max_iter: node.data.max_iter,
+                  estimator: node.data.estimator,
+                  random_state: 0
+              };
+          } else {
+              stepType = 'SimpleImputer';
+              params = {
+                  columns: node.data.columns,
+                  strategy: node.data.strategy,
+                  fill_value: node.data.fill_value
+              };
+          }
       } else if (node.data.definitionType === 'simple_imputer') {
           stepType = 'SimpleImputer';
           params = node.data || {};
@@ -103,14 +128,27 @@ export const Toolbar: React.FC = () => {
           else if (method === 'robust') stepType = 'RobustScaler';
           else stepType = 'StandardScaler';
           params = config;
-      } else if (node.data.definitionType === 'one_hot_encoding') {
-          stepType = 'OneHotEncoder';
+      } else if (node.data.definitionType === 'encoding') {
+          const method = node.data.method;
+          if (method === 'onehot') stepType = 'OneHotEncoder';
+          else if (method === 'dummy') {
+              stepType = 'DummyEncoder';
+              params = { ...node.data, drop_first: true };
+          }
+          else if (method === 'label') stepType = 'LabelEncoder';
+          else if (method === 'ordinal') stepType = 'OrdinalEncoder';
+          else if (method === 'target') stepType = 'TargetEncoder';
+          else if (method === 'hash') stepType = 'HashEncoder';
+          else stepType = 'OneHotEncoder'; // Default
+          
+          if (stepType !== 'DummyEncoder') {
+              params = node.data;
+          }
+      } else if (node.data.definitionType === 'TrainTestSplitter') {
+          stepType = 'TrainTestSplitter';
           params = node.data || {};
       } else if (node.data.definitionType === 'label_encoding') {
           stepType = 'LabelEncoder';
-          params = node.data || {};
-      } else if (node.data.definitionType === 'TrainTestSplitter') {
-          stepType = 'TrainTestSplitter';
           params = node.data || {};
       } else if (node.data.definitionType === 'feature_target_split') {
           stepType = 'feature_target_split';
@@ -129,6 +167,14 @@ export const Toolbar: React.FC = () => {
       } else if (node.data.definitionType === 'feature_selection') {
           stepType = 'feature_selection';
           params = node.data || {};
+      } else if (node.data.definitionType === 'outlier') {
+          const method = node.data.method || 'iqr';
+          if (method === 'iqr') stepType = 'IQR';
+          else if (method === 'zscore') stepType = 'ZScore';
+          else if (method === 'winsorize') stepType = 'Winsorize';
+          else if (method === 'elliptic_envelope') stepType = 'EllipticEnvelope';
+          else stepType = 'IQR';
+          params = node.data;
       } else {
           console.error(`Unknown node type: ${node.data.definitionType}`);
           throw new Error(`Unknown node type: ${node.data.definitionType}. Pipeline execution stopped.`);

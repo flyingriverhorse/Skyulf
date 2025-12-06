@@ -57,11 +57,17 @@ class SimpleImputerCalculator(BaseCalculator):
         # Map columns to their fill values
         fill_values = dict(zip(cols, statistics))
         
+        # Calculate missing counts for feedback
+        missing_counts = X[cols].isnull().sum().to_dict()
+        total_missing = int(sum(missing_counts.values()))
+        
         return {
             'type': 'simple_imputer',
             'strategy': strategy,
             'fill_values': fill_values,
-            'columns': cols
+            'columns': cols,
+            'missing_counts': missing_counts,
+            'total_missing': total_missing
         }
 
 class SimpleImputerApplier(BaseApplier):
@@ -94,16 +100,25 @@ class KNNImputerCalculator(BaseCalculator):
         
         cols = resolve_columns(X, config, detect_numeric_columns)
         
+        # Enforce numeric columns only for KNN
+        numeric_cols = set(detect_numeric_columns(X))
+        cols = [c for c in cols if c in numeric_cols]
+
         if not cols:
             return {}
             
         imputer = KNNImputer(n_neighbors=n_neighbors, weights=weights)
         imputer.fit(X[cols])
         
+        missing_counts = X[cols].isnull().sum().to_dict()
+        total_missing = int(sum(missing_counts.values()))
+        
         return {
             'type': 'knn_imputer',
             'columns': cols,
-            'imputer_object': imputer 
+            'imputer_object': imputer,
+            'missing_counts': missing_counts,
+            'total_missing': total_missing
         }
 
 class KNNImputerApplier(BaseApplier):
@@ -152,6 +167,10 @@ class IterativeImputerCalculator(BaseCalculator):
             
         cols = resolve_columns(X, config, detect_numeric_columns)
         
+        # Enforce numeric columns only for Iterative
+        numeric_cols = set(detect_numeric_columns(X))
+        cols = [c for c in cols if c in numeric_cols]
+
         if not cols:
             return {}
             
@@ -162,10 +181,15 @@ class IterativeImputerCalculator(BaseCalculator):
         )
         imputer.fit(X[cols])
         
+        missing_counts = X[cols].isnull().sum().to_dict()
+        total_missing = int(sum(missing_counts.values()))
+        
         return {
             'type': 'iterative_imputer',
             'columns': cols,
-            'imputer_object': imputer
+            'imputer_object': imputer,
+            'missing_counts': missing_counts,
+            'total_missing': total_missing
         }
 
 class IterativeImputerApplier(BaseApplier):

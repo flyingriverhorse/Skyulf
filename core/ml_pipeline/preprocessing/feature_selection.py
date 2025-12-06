@@ -78,12 +78,17 @@ class VarianceThresholdCalculator(BaseCalculator):
         support = selector.get_support()
         selected_cols = [c for c, s in zip(cols, support) if s]
         
+        variances = {}
+        if hasattr(selector, 'variances_'):
+             variances = dict(zip(cols, selector.variances_.tolist()))
+
         return {
             "type": "variance_threshold",
             "selected_columns": selected_cols,
             "candidate_columns": cols,
             "threshold": threshold,
-            "drop_columns": drop_columns
+            "drop_columns": drop_columns,
+            "variances": variances
         }
 
 class VarianceThresholdApplier(BaseApplier):
@@ -215,6 +220,12 @@ class UnivariateSelectionCalculator(BaseCalculator):
             
         X_fit = X[cols].fillna(0)
         
+        # Handle Chi2 negative values
+        if score_func_name == "chi2" and (X_fit < 0).any().any():
+            logger.warning("Chi-squared statistic requires non-negative feature values. Applying MinMaxScaler to features for selection.")
+            from sklearn.preprocessing import MinMaxScaler
+            X_fit = pd.DataFrame(MinMaxScaler().fit_transform(X_fit), columns=X_fit.columns, index=X_fit.index)
+
         # Handle classification target encoding if needed
         if problem_type == "classification" and not pd.api.types.is_numeric_dtype(y):
             y = pd.factorize(y)[0]
@@ -223,12 +234,26 @@ class UnivariateSelectionCalculator(BaseCalculator):
         support = selector.get_support()
         selected_cols = [c for c, s in zip(cols, support) if s]
         
+        scores = {}
+        pvalues = {}
+        if hasattr(selector, 'scores_'):
+            # Handle potential NaN/Inf in scores
+            safe_scores = np.nan_to_num(selector.scores_, nan=0.0, posinf=0.0, neginf=0.0)
+            scores = dict(zip(cols, safe_scores.tolist()))
+            
+        if hasattr(selector, 'pvalues_'):
+            # Handle potential NaN in pvalues
+            safe_pvalues = np.nan_to_num(selector.pvalues_, nan=1.0)
+            pvalues = dict(zip(cols, safe_pvalues.tolist()))
+
         return {
             "type": "univariate_selection",
             "selected_columns": selected_cols,
             "candidate_columns": cols,
             "method": method,
-            "drop_columns": config.get("drop_columns", True)
+            "drop_columns": config.get("drop_columns", True),
+            "feature_scores": scores,
+            "p_values": pvalues
         }
 
 class UnivariateSelectionApplier(BaseApplier):
@@ -303,12 +328,30 @@ class ModelBasedSelectionCalculator(BaseCalculator):
         support = selector.get_support()
         selected_cols = [c for c, s in zip(cols, support) if s]
         
+        feature_importances = {}
+        ranking = {}
+        
+        # Extract importance from the underlying estimator
+        est = selector.estimator_
+        if hasattr(est, 'feature_importances_'):
+             feature_importances = dict(zip(cols, est.feature_importances_.tolist()))
+        elif hasattr(est, 'coef_'):
+             coefs = np.abs(est.coef_)
+             if coefs.ndim > 1:
+                 coefs = np.mean(coefs, axis=0)
+             feature_importances = dict(zip(cols, coefs.tolist()))
+             
+        if hasattr(selector, 'ranking_'):
+             ranking = dict(zip(cols, selector.ranking_.tolist()))
+
         return {
             "type": "model_based_selection",
             "selected_columns": selected_cols,
             "candidate_columns": cols,
             "method": method,
-            "drop_columns": config.get("drop_columns", True)
+            "drop_columns": config.get("drop_columns", True),
+            "feature_importances": feature_importances,
+            "ranking": ranking
         }
 
 class ModelBasedSelectionApplier(BaseApplier):

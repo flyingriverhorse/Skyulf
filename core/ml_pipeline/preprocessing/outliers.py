@@ -23,9 +23,11 @@ class IQRCalculator(BaseCalculator):
             return {}
             
         bounds = {}
+        warnings = []
         for col in cols:
             series = pd.to_numeric(X[col], errors='coerce').dropna()
             if series.empty:
+                warnings.append(f"Column '{col}': Empty or non-numeric")
                 continue
                 
             q1 = series.quantile(0.25)
@@ -40,7 +42,8 @@ class IQRCalculator(BaseCalculator):
         return {
             'type': 'iqr',
             'bounds': bounds,
-            'multiplier': multiplier
+            'multiplier': multiplier,
+            'warnings': warnings
         }
 
 class IQRApplier(BaseApplier):
@@ -90,15 +93,18 @@ class ZScoreCalculator(BaseCalculator):
             return {}
             
         stats = {}
+        warnings = []
         for col in cols:
             series = pd.to_numeric(X[col], errors='coerce').dropna()
             if series.empty:
+                warnings.append(f"Column '{col}': Empty or non-numeric")
                 continue
                 
             mean = series.mean()
             std = series.std(ddof=0)
             
             if std == 0:
+                warnings.append(f"Column '{col}': Zero variance (std=0)")
                 continue
                 
             stats[col] = {'mean': mean, 'std': std}
@@ -106,7 +112,8 @@ class ZScoreCalculator(BaseCalculator):
         return {
             'type': 'zscore',
             'stats': stats,
-            'threshold': threshold
+            'threshold': threshold,
+            'warnings': warnings
         }
 
 class ZScoreApplier(BaseApplier):
@@ -163,9 +170,11 @@ class WinsorizeCalculator(BaseCalculator):
             return {}
             
         bounds = {}
+        warnings = []
         for col in cols:
             series = pd.to_numeric(X[col], errors='coerce').dropna()
             if series.empty:
+                warnings.append(f"Column '{col}': Empty or non-numeric")
                 continue
                 
             lower_val = series.quantile(lower_p / 100.0)
@@ -177,7 +186,8 @@ class WinsorizeCalculator(BaseCalculator):
             'type': 'winsorize',
             'bounds': bounds,
             'lower_percentile': lower_p,
-            'upper_percentile': upper_p
+            'upper_percentile': upper_p,
+            'warnings': warnings
         }
 
 class WinsorizeApplier(BaseApplier):
@@ -264,9 +274,11 @@ class EllipticEnvelopeCalculator(BaseCalculator):
             return {}
             
         models = {}
+        warnings = []
         for col in cols:
             series = pd.to_numeric(X[col], errors='coerce').dropna()
             if series.shape[0] < 5:
+                warnings.append(f"Column '{col}': Too few samples ({series.shape[0]})")
                 continue
                 
             try:
@@ -275,12 +287,14 @@ class EllipticEnvelopeCalculator(BaseCalculator):
                 models[col] = model
             except Exception as e:
                 logger.warning(f"EllipticEnvelope fit failed for column {col}: {e}")
+                warnings.append(f"Column '{col}': {str(e)}")
                 pass
                 
         return {
             'type': 'elliptic_envelope',
             'models': models,
-            'contamination': contamination
+            'contamination': contamination,
+            'warnings': warnings
         }
 
 class EllipticEnvelopeApplier(BaseApplier):
