@@ -175,6 +175,26 @@ export const Toolbar: React.FC = () => {
           else if (method === 'elliptic_envelope') stepType = 'EllipticEnvelope';
           else stepType = 'IQR';
           params = node.data;
+      } else if (node.data.definitionType === 'TransformationNode') {
+          stepType = 'GeneralTransformation';
+          
+          // Flatten transformations: { columns: ['a', 'b'], method: 'log' } -> [{ column: 'a', method: 'log' }, { column: 'b', method: 'log' }]
+          const rawTransformations = (node.data.transformations || []) as any[];
+          const flattenedTransformations = [];
+          
+          for (const rule of rawTransformations) {
+              if (rule.columns && Array.isArray(rule.columns)) {
+                  for (const col of rule.columns) {
+                      flattenedTransformations.push({
+                          column: col,
+                          method: rule.method,
+                          ...rule.params
+                      });
+                  }
+              }
+          }
+          
+          params = { transformations: flattenedTransformations };
       } else {
           console.error(`Unknown node type: ${node.data.definitionType}`);
           throw new Error(`Unknown node type: ${node.data.definitionType}. Pipeline execution stopped.`);
