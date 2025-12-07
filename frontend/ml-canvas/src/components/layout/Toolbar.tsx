@@ -220,6 +220,18 @@ export const Toolbar: React.FC = () => {
           params = {
               operations: node.data.operations
           };
+      } else if (node.data.definitionType === 'TextCleaning') {
+          stepType = 'TextCleaning';
+          params = node.data;
+      } else if (node.data.definitionType === 'ValueReplacement') {
+          stepType = 'ValueReplacement';
+          params = node.data;
+      } else if (node.data.definitionType === 'AliasReplacement') {
+          stepType = 'AliasReplacement';
+          params = node.data;
+      } else if (node.data.definitionType === 'InvalidValueReplacement') {
+          stepType = 'InvalidValueReplacement';
+          params = node.data;
       } else {
           console.error(`Unknown node type: ${node.data.definitionType}`);
           throw new Error(`Unknown node type: ${node.data.definitionType}. Pipeline execution stopped.`);

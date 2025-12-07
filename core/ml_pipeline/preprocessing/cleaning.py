@@ -171,7 +171,8 @@ class ValueReplacementCalculator(BaseCalculator):
         return {
             'type': 'value_replacement',
             'columns': cols,
-            'mapping': config.get('mapping', {})
+            'mapping': config.get('mapping', {}),
+            'replacements': config.get('replacements', [])
         }
 
 class ValueReplacementApplier(BaseApplier):
@@ -180,18 +181,25 @@ class ValueReplacementApplier(BaseApplier):
         
         cols = params.get('columns', [])
         mapping = params.get('mapping', {})
+        replacements = params.get('replacements', [])
         
-        if not mapping:
+        if not mapping and not replacements:
             return pack_pipeline_output(X, y, is_tuple)
             
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
             return pack_pipeline_output(X, y, is_tuple)
             
+        # Merge replacements into mapping
+        final_mapping = mapping.copy()
+        for r in replacements:
+            if 'old' in r and 'new' in r:
+                final_mapping[r['old']] = r['new']
+        
         df_out = X.copy()
         
         for col in valid_cols:
-            df_out[col] = df_out[col].replace(mapping)
+            df_out[col] = df_out[col].replace(final_mapping)
             
         return pack_pipeline_output(df_out, y, is_tuple)
 
