@@ -22,6 +22,13 @@ class OversamplingCalculator(BaseCalculator):
             'sampling_strategy': config.get('sampling_strategy', 'auto'),
             'random_state': config.get('random_state', 42),
             'k_neighbors': config.get('k_neighbors', 5),
+            'm_neighbors': config.get('m_neighbors', 10),
+            'kind': config.get('kind', 'borderline-1'),
+            'svm_estimator': config.get('svm_estimator', None),
+            'out_step': config.get('out_step', 0.5),
+            'kmeans_estimator': config.get('kmeans_estimator', None),
+            'cluster_balance_threshold': config.get('cluster_balance_threshold', 0.1),
+            'density_exponent': config.get('density_exponent', 'auto'),
             'n_jobs': config.get('n_jobs', -1)
         }
 
@@ -39,43 +46,50 @@ class OversamplingApplier(BaseApplier):
                 # Cannot resample without target
                 return pack_pipeline_output(X, y, is_tuple)
         
+        # Check for non-numeric columns
+        non_numeric_cols = X.select_dtypes(exclude=[np.number]).columns
+        if len(non_numeric_cols) > 0:
+            raise ValueError(f"Resampling requires all features to be numeric. Found non-numeric columns: {list(non_numeric_cols)}. Please use an Encoder node (e.g., OneHotEncoder, OrdinalEncoder) before Resampling.")
+
         method = params.get('method', 'smote')
         strategy = params.get('sampling_strategy', 'auto')
         random_state = params.get('random_state', 42)
         k_neighbors = params.get('k_neighbors', 5)
         n_jobs = params.get('n_jobs', -1)
         
+        # Additional params
+        m_neighbors = params.get('m_neighbors', 10)
+        kind = params.get('kind', 'borderline-1')
+        out_step = params.get('out_step', 0.5)
+        cluster_balance_threshold = params.get('cluster_balance_threshold', 0.1)
+        density_exponent = params.get('density_exponent', 'auto')
+        
         sampler = None
         if method == 'smote':
             sampler = SMOTE(sampling_strategy=strategy, random_state=random_state, k_neighbors=k_neighbors)
         elif method == 'adasyn':
-            sampler = ADASYN(sampling_strategy=strategy, random_state=random_state, n_neighbors=k_neighbors, n_jobs=n_jobs)
+            sampler = ADASYN(sampling_strategy=strategy, random_state=random_state, n_neighbors=k_neighbors)
         elif method == 'borderline_smote':
-            sampler = BorderlineSMOTE(sampling_strategy=strategy, random_state=random_state, k_neighbors=k_neighbors, n_jobs=n_jobs)
+            sampler = BorderlineSMOTE(sampling_strategy=strategy, random_state=random_state, k_neighbors=k_neighbors, m_neighbors=m_neighbors, kind=kind)
         elif method == 'svm_smote':
-            sampler = SVMSMOTE(sampling_strategy=strategy, random_state=random_state, k_neighbors=k_neighbors, n_jobs=n_jobs)
+            sampler = SVMSMOTE(sampling_strategy=strategy, random_state=random_state, k_neighbors=k_neighbors, m_neighbors=m_neighbors, out_step=out_step)
         elif method == 'kmeans_smote':
-            sampler = KMeansSMOTE(sampling_strategy=strategy, random_state=random_state, k_neighbors=k_neighbors, n_jobs=n_jobs)
+            sampler = KMeansSMOTE(sampling_strategy=strategy, random_state=random_state, k_neighbors=k_neighbors, cluster_balance_threshold=cluster_balance_threshold, density_exponent=density_exponent)
         elif method == 'smote_tomek':
-            sampler = SMOTETomek(sampling_strategy=strategy, random_state=random_state, n_jobs=n_jobs)
+            sampler = SMOTETomek(sampling_strategy=strategy, random_state=random_state)
             
         if not sampler:
             return pack_pipeline_output(X, y, is_tuple)
             
-        try:
-            X_res, y_res = sampler.fit_resample(X, y)
+        X_res, y_res = sampler.fit_resample(X, y)
+        
+        # Ensure we return DataFrame/Series with correct names/columns
+        if not isinstance(X_res, pd.DataFrame):
+            X_res = pd.DataFrame(X_res, columns=X.columns)
+        if not isinstance(y_res, pd.Series):
+            y_res = pd.Series(y_res, name=y.name if y is not None else target_col)
             
-            # Ensure we return DataFrame/Series with correct names/columns
-            if not isinstance(X_res, pd.DataFrame):
-                X_res = pd.DataFrame(X_res, columns=X.columns)
-            if not isinstance(y_res, pd.Series):
-                y_res = pd.Series(y_res, name=y.name if y is not None else target_col)
-                
-            return pack_pipeline_output(X_res, y_res, is_tuple)
-
-        except Exception as e:
-            logger.error(f"Oversampling failed: {e}")
-            return pack_pipeline_output(X, y, is_tuple)
+        return pack_pipeline_output(X_res, y_res, is_tuple)
 
 # --- Undersampling ---
 class UndersamplingCalculator(BaseCalculator):
@@ -107,6 +121,11 @@ class UndersamplingApplier(BaseApplier):
                 # Cannot resample without target
                 return pack_pipeline_output(X, y, is_tuple)
         
+        # Check for non-numeric columns
+        non_numeric_cols = X.select_dtypes(exclude=[np.number]).columns
+        if len(non_numeric_cols) > 0:
+            raise ValueError(f"Resampling requires all features to be numeric. Found non-numeric columns: {list(non_numeric_cols)}. Please use an Encoder node (e.g., OneHotEncoder, OrdinalEncoder) before Resampling.")
+
         method = params.get('method', 'random_under_sampling')
         strategy = params.get('sampling_strategy', 'auto')
         random_state = params.get('random_state', 42)
@@ -118,28 +137,23 @@ class UndersamplingApplier(BaseApplier):
             sampler = RandomUnderSampler(sampling_strategy=strategy, random_state=random_state, replacement=replacement)
         elif method == 'nearmiss':
             version = params.get('version', 1)
-            sampler = NearMiss(sampling_strategy=strategy, version=version, n_jobs=n_jobs)
+            sampler = NearMiss(sampling_strategy=strategy, version=version)
         elif method == 'tomek_links':
-            sampler = TomekLinks(sampling_strategy=strategy, n_jobs=n_jobs)
+            sampler = TomekLinks(sampling_strategy=strategy)
         elif method == 'edited_nearest_neighbours':
             n_neighbors = params.get('n_neighbors', 3)
             kind_sel = params.get('kind_sel', 'all')
-            sampler = EditedNearestNeighbours(sampling_strategy=strategy, n_neighbors=n_neighbors, kind_sel=kind_sel, n_jobs=n_jobs)
+            sampler = EditedNearestNeighbours(sampling_strategy=strategy, n_neighbors=n_neighbors, kind_sel=kind_sel)
             
         if not sampler:
             return pack_pipeline_output(X, y, is_tuple)
             
-        try:
-            X_res, y_res = sampler.fit_resample(X, y)
+        X_res, y_res = sampler.fit_resample(X, y)
+        
+        # Ensure we return DataFrame/Series with correct names/columns
+        if not isinstance(X_res, pd.DataFrame):
+            X_res = pd.DataFrame(X_res, columns=X.columns)
+        if not isinstance(y_res, pd.Series):
+            y_res = pd.Series(y_res, name=y.name if y is not None else target_col)
             
-            # Ensure we return DataFrame/Series with correct names/columns
-            if not isinstance(X_res, pd.DataFrame):
-                X_res = pd.DataFrame(X_res, columns=X.columns)
-            if not isinstance(y_res, pd.Series):
-                y_res = pd.Series(y_res, name=y.name if y is not None else target_col)
-                
-            return pack_pipeline_output(X_res, y_res, is_tuple)
-
-        except Exception as e:
-            logger.error(f"Undersampling failed: {e}")
-            return pack_pipeline_output(X, y, is_tuple)
+        return pack_pipeline_output(X_res, y_res, is_tuple)

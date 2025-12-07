@@ -42,7 +42,9 @@ class RecommendationType(str, Enum):
     OUTLIER_REMOVAL = "outlier_removal"
     FEATURE_SELECTION = "feature_selection"
     TRANSFORMATION = "transformation"
+    FEATURE_GENERATION = "feature_generation"
     CLEANING = "cleaning"
+    RESAMPLING = "resampling"
 
 class Recommendation(BaseModel):
     rule_id: str

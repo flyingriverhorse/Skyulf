@@ -54,9 +54,7 @@ from .transformations import (
     GeneralTransformationCalculator, GeneralTransformationApplier
 )
 from .bucketing import (
-    GeneralBinningCalculator, BaseBinningApplier as GeneralBinningApplier,
-    CustomBinningCalculator, CustomBinningApplier,
-    KBinsDiscretizerCalculator, KBinsDiscretizerApplier
+    GeneralBinningCalculator, GeneralBinningApplier
 )
 from .feature_selection import (
     VarianceThresholdCalculator, VarianceThresholdApplier,
@@ -70,7 +68,7 @@ from .casting import (
 )
 from .feature_generation import (
     PolynomialFeaturesCalculator, PolynomialFeaturesApplier,
-    FeatureMathCalculator, FeatureMathApplier
+    FeatureGenerationCalculator, FeatureGenerationApplier
 )
 from .resampling import (
     OversamplingCalculator, OversamplingApplier,
@@ -222,11 +220,66 @@ class FeatureEngineer:
                         if transformer_type == "EllipticEnvelope":
                             if "contamination" in fitted_params: metrics["contamination"] = fitted_params["contamination"]
 
+                        # Bucketing Metrics
+                        if transformer_type in ["GeneralBinning", "EqualWidthBinning", "EqualFrequencyBinning", "CustomBinning", "KBinsDiscretizer"]:
+                            if "bin_edges" in fitted_params: metrics["bin_edges"] = fitted_params["bin_edges"]
+                            if "n_bins" in fitted_params: metrics["n_bins"] = fitted_params["n_bins"]
+
+                        # Feature Generation Metrics
+                        if transformer_type in ["FeatureMath", "FeatureGenerationNode"]:
+                            if "operations" in fitted_params: 
+                                metrics["operations_count"] = len(fitted_params["operations"])
+                                metrics["operations"] = fitted_params["operations"]
+                            # Calculate generated features by comparing columns
+                            if isinstance(data_before, pd.DataFrame) and isinstance(current_data, pd.DataFrame):
+                                new_cols = list(set(current_data.columns) - set(data_before.columns))
+                                metrics["generated_features"] = new_cols
+                            elif isinstance(data_before, SplitDataset) and isinstance(current_data, SplitDataset):
+                                # Check train set
+                                if isinstance(data_before.train, pd.DataFrame) and isinstance(current_data.train, pd.DataFrame):
+                                     new_cols = list(set(current_data.train.columns) - set(data_before.train.columns))
+                                     metrics["generated_features"] = new_cols
+                                elif isinstance(data_before.train, tuple) and isinstance(current_data.train, tuple):
+                                     # (X, y) tuple
+                                     X_before, _ = data_before.train
+                                     X_after, _ = current_data.train
+                                     if isinstance(X_before, pd.DataFrame) and isinstance(X_after, pd.DataFrame):
+                                         new_cols = list(set(X_after.columns) - set(X_before.columns))
+                                         metrics["generated_features"] = new_cols
+
             except Exception as e:
                 logger.warning(f"Failed to retrieve metrics for step {name}: {e}")
 
             # Capture metrics after
             rows_after, cols_after = get_data_stats(current_data)
+
+            # Resampling Metrics (Calculated from data)
+            if transformer_type in ["Oversampling", "Undersampling"]:
+                try:
+                    # Extract y to calculate class counts
+                    y_res = None
+                    if isinstance(current_data, SplitDataset):
+                        if isinstance(current_data.train, tuple):
+                            _, y_res = current_data.train
+                        elif isinstance(current_data.train, pd.DataFrame):
+                            # Try to find target column from params
+                            target_col = params.get("target_column")
+                            if target_col and target_col in current_data.train.columns:
+                                y_res = current_data.train[target_col]
+                    elif isinstance(current_data, tuple):
+                        _, y_res = current_data
+                    elif isinstance(current_data, pd.DataFrame):
+                        target_col = params.get("target_column")
+                        if target_col and target_col in current_data.columns:
+                            y_res = current_data[target_col]
+                    
+                    if y_res is not None:
+                        counts = y_res.value_counts().to_dict()
+                        # Convert keys to string to ensure JSON serializability
+                        metrics["class_counts"] = {str(k): int(v) for k, v in counts.items()}
+                        metrics["total_samples"] = int(len(y_res))
+                except Exception as e:
+                    logger.warning(f"Failed to calculate resampling metrics: {e}")
 
             if rows_after > 0 or cols_after:
                 if transformer_type in ["DropMissingRows", "Deduplicate", "IQR", "ZScore", "EllipticEnvelope", "Winsorize"]:
@@ -366,10 +419,6 @@ class FeatureEngineer:
             return GeneralTransformationCalculator(), GeneralTransformationApplier()
         elif type_name == "GeneralBinning":
             return GeneralBinningCalculator(), GeneralBinningApplier()
-        elif type_name == "CustomBinning":
-            return CustomBinningCalculator(), CustomBinningApplier()
-        elif type_name == "KBinsDiscretizer":
-            return KBinsDiscretizerCalculator(), KBinsDiscretizerApplier()
         elif type_name == "VarianceThreshold":
             return VarianceThresholdCalculator(), VarianceThresholdApplier()
         elif type_name == "CorrelationThreshold":
@@ -384,8 +433,8 @@ class FeatureEngineer:
             return CastingCalculator(), CastingApplier()
         elif type_name == "PolynomialFeatures":
             return PolynomialFeaturesCalculator(), PolynomialFeaturesApplier()
-        elif type_name == "FeatureMath":
-            return FeatureMathCalculator(), FeatureMathApplier()
+        elif type_name == "FeatureMath" or type_name == "FeatureGenerationNode":
+            return FeatureGenerationCalculator(), FeatureGenerationApplier()
         elif type_name == "Oversampling":
             return OversamplingCalculator(), OversamplingApplier()
         elif type_name == "Undersampling":

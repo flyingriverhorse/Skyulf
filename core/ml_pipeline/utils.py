@@ -51,9 +51,16 @@ def unpack_pipeline_input(data: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Serie
 def pack_pipeline_output(X: pd.DataFrame, y: Optional[pd.Series], was_tuple: bool) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
     """
     Packs output back into a tuple if the input was a tuple and y is present.
+    Otherwise, if y is present, concatenates it back to X.
     """
     if was_tuple and y is not None:
         return (X, y)
+    
+    if y is not None:
+        # Re-attach y to X
+        # Ensure indices align (they should if coming from same operation)
+        return pd.concat([X, y], axis=1)
+        
     return X
 
 def _is_binary_numeric(series: pd.Series) -> bool:

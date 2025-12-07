@@ -1,9 +1,9 @@
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Tuple
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import KBinsDiscretizer
 from .base import BaseCalculator, BaseApplier
-from ..utils import detect_numeric_columns, resolve_columns
+from ..utils import detect_numeric_columns, resolve_columns, unpack_pipeline_input, pack_pipeline_output
 
 # --- Base Binning Applier ---
 class BaseBinningApplier(BaseApplier):
@@ -11,10 +11,12 @@ class BaseBinningApplier(BaseApplier):
     Base class for applying binning transformations.
     Expects 'bin_edges' in params: Dict[str, List[float]] mapping column names to bin edges.
     """
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
         bin_edges_map = params.get('bin_edges', {})
         if not bin_edges_map:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
             
         output_suffix = params.get('output_suffix', '_binned')
         drop_original = params.get('drop_original', False)
@@ -25,7 +27,7 @@ class BaseBinningApplier(BaseApplier):
         precision = params.get('precision', 3)
         custom_labels_map = params.get('custom_labels', {})
         
-        df_out = df.copy()
+        df_out = X.copy()
         processed_cols = []
         
         for col, edges in bin_edges_map.items():
@@ -78,11 +80,17 @@ class BaseBinningApplier(BaseApplier):
                          # It's a categorical of intervals
                          def format_interval(iv):
                              if pd.isna(iv) or isinstance(iv, str): return iv
-                             return f"[{round(iv.left, precision)}, {round(iv.right, precision)}]" if include_lowest else f"({round(iv.left, precision)}, {round(iv.right, precision)}]"
+                             
+                             # Use the logical left edge if it's the first bin and include_lowest is True
+                             left_val = iv.left
+                             if include_lowest and len(sorted_edges) > 0 and left_val < sorted_edges[0]:
+                                 left_val = sorted_edges[0]
+                                 
+                             return f"[{round(left_val, precision)}, {round(iv.right, precision)}]" if include_lowest else f"({round(left_val, precision)}, {round(iv.right, precision)}]"
                          
                          # We need to map the categories themselves
                          new_categories = [format_interval(c) for c in binned_series.cat.categories]
-                         binned_series.cat.categories = new_categories
+                         binned_series = binned_series.cat.rename_categories(new_categories)
                          binned_series = binned_series.astype(str)
                      else:
                          binned_series = binned_series.astype(str)
@@ -101,25 +109,27 @@ class BaseBinningApplier(BaseApplier):
         if drop_original:
             df_out = df_out.drop(columns=processed_cols)
             
-        return df_out
+        return pack_pipeline_output(df_out, y, is_tuple)
 
-# --- General Binning Calculator (V1 Compatibility) ---
+# --- General Binning Calculator ---
 class GeneralBinningCalculator(BaseCalculator):
     """
-    Master calculator that handles mixed strategies and overrides (V1 parity).
+    Master calculator that handles mixed strategies and overrides.
     """
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        columns = resolve_columns(df, config, detect_numeric_columns)
+    def fit(self, df: Union[pd.DataFrame, tuple], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+        columns = resolve_columns(X, config, detect_numeric_columns)
         
         global_strategy = config.get('strategy', 'equal_width')
         column_strategies = config.get('column_strategies', {})
         
         # Global settings
-        n_bins_global = config.get('equal_width_bins', 5)
-        q_bins_global = config.get('equal_frequency_bins', 5)
-        duplicates_global = config.get('duplicates', 'raise')
+        default_n_bins = config.get('n_bins', 5)
+        n_bins_global = config.get('equal_width_bins', default_n_bins)
+        q_bins_global = config.get('equal_frequency_bins', default_n_bins)
+        duplicates_global = config.get('duplicates', 'drop')
         
-        valid_cols = [c for c in columns if c in df.columns]
+        valid_cols = [c for c in columns if c in X.columns]
         bin_edges_map = {}
         custom_labels_map = {}
         
@@ -129,7 +139,7 @@ class GeneralBinningCalculator(BaseCalculator):
             strategy = override.get('strategy', global_strategy)
             
             try:
-                series = df[col].dropna()
+                series = X[col].dropna()
                 if series.empty:
                     continue
                 
@@ -138,11 +148,23 @@ class GeneralBinningCalculator(BaseCalculator):
                 if strategy == 'equal_width':
                     n_bins = override.get('equal_width_bins', n_bins_global)
                     _, edges = pd.cut(series, bins=n_bins, retbins=True)
+                    # Clamp first edge to min if it was extended
+                    if len(edges) > 0 and edges[0] < series.min():
+                        edges[0] = series.min()
                     
                 elif strategy == 'equal_frequency':
                     n_bins = override.get('equal_frequency_bins', q_bins_global)
                     duplicates = override.get('duplicates', duplicates_global)
                     _, edges = pd.qcut(series, q=n_bins, retbins=True, duplicates=duplicates)
+                    # Clamp first edge to min if it was extended
+                    if len(edges) > 0 and edges[0] < series.min():
+                        edges[0] = series.min()
+
+                elif strategy == 'kmeans':
+                    n_bins = override.get('n_bins', default_n_bins)
+                    est = KBinsDiscretizer(n_bins=n_bins, strategy='kmeans', encode='ordinal')
+                    est.fit(series.values.reshape(-1, 1))
+                    edges = est.bin_edges_[0]
                     
                 elif strategy == 'custom':
                     # Check override first, then global custom_bins
@@ -161,7 +183,7 @@ class GeneralBinningCalculator(BaseCalculator):
                         custom_labels_map[col] = labels
                         
                 elif strategy == 'kbins':
-                    n_bins = override.get('kbins_n_bins', config.get('kbins_n_bins', 5))
+                    n_bins = override.get('kbins_n_bins', config.get('kbins_n_bins', default_n_bins))
                     k_strategy = override.get('kbins_strategy', config.get('kbins_strategy', 'quantile'))
                     
                     # Map strategy names
@@ -193,158 +215,4 @@ class GeneralBinningCalculator(BaseCalculator):
         }
 
 class GeneralBinningApplier(BaseBinningApplier):
-    pass
-
-# --- Equal Width Binning ---
-class EqualWidthBinningCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        cols = resolve_columns(df, config, detect_numeric_columns)
-        
-        n_bins = config.get('n_bins', 5)
-        
-        valid_cols = [c for c in cols if c in df.columns]
-        bin_edges_map = {}
-        
-        for col in valid_cols:
-            # Use pd.cut to find edges
-            try:
-                # dropna is important
-                series = df[col].dropna()
-                if series.empty:
-                    continue
-                _, edges = pd.cut(series, bins=n_bins, retbins=True)
-                bin_edges_map[col] = edges.tolist()
-            except Exception:
-                continue
-                
-        return {
-            'type': 'equal_width',
-            'bin_edges': bin_edges_map,
-            'output_suffix': config.get('output_suffix', '_binned'),
-            'drop_original': config.get('drop_original', False),
-            'label_format': config.get('label_format', 'ordinal'),
-            'missing_strategy': config.get('missing_strategy', 'keep'),
-            'missing_label': config.get('missing_label', 'Missing'),
-            'include_lowest': config.get('include_lowest', True),
-            'precision': config.get('precision', 3)
-        }
-
-class EqualWidthBinningApplier(BaseBinningApplier):
-    pass
-
-# --- Equal Frequency Binning ---
-class EqualFrequencyBinningCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        cols = resolve_columns(df, config, detect_numeric_columns)
-        
-        n_bins = config.get('n_bins', 5)
-        duplicates = config.get('duplicates', 'drop') # raise or drop
-        
-        valid_cols = [c for c in cols if c in df.columns]
-        bin_edges_map = {}
-        
-        for col in valid_cols:
-            try:
-                series = df[col].dropna()
-                if series.empty:
-                    continue
-                _, edges = pd.qcut(series, q=n_bins, retbins=True, duplicates=duplicates)
-                bin_edges_map[col] = edges.tolist()
-            except Exception:
-                continue
-                
-        return {
-            'type': 'equal_frequency',
-            'bin_edges': bin_edges_map,
-            'output_suffix': config.get('output_suffix', '_binned'),
-            'drop_original': config.get('drop_original', False),
-            'label_format': config.get('label_format', 'ordinal'),
-            'missing_strategy': config.get('missing_strategy', 'keep'),
-            'missing_label': config.get('missing_label', 'Missing'),
-            'include_lowest': config.get('include_lowest', True),
-            'precision': config.get('precision', 3)
-        }
-
-class EqualFrequencyBinningApplier(BaseBinningApplier):
-    pass
-
-# --- Custom Binning ---
-class CustomBinningCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        bins_map = config.get('bins', {})
-        labels_map = config.get('labels', {})
-        
-        valid_bins = {}
-        valid_labels = {}
-        
-        for col, edges in bins_map.items():
-            if col in df.columns:
-                valid_bins[col] = edges
-                if col in labels_map:
-                    valid_labels[col] = labels_map[col]
-                
-        return {
-            'type': 'custom_binning',
-            'bin_edges': valid_bins, # Standardize key to bin_edges
-            'custom_labels': valid_labels,
-            'output_suffix': config.get('output_suffix', '_binned'),
-            'drop_original': config.get('drop_original', False),
-            'label_format': config.get('label_format', 'ordinal'),
-            'missing_strategy': config.get('missing_strategy', 'keep'),
-            'missing_label': config.get('missing_label', 'Missing'),
-            'include_lowest': config.get('include_lowest', True),
-            'precision': config.get('precision', 3)
-        }
-
-class CustomBinningApplier(BaseBinningApplier):
-    pass
-
-# --- KBins Discretizer (Sklearn Wrapper) ---
-class KBinsDiscretizerCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        cols = resolve_columns(df, config, detect_numeric_columns)
-        
-        if not cols:
-            return {}
-            
-        n_bins = config.get('n_bins', 5)
-        strategy = config.get('strategy', 'quantile')
-        encode = config.get('encode', 'ordinal')
-        
-        # Map strategies if needed
-        sklearn_strategy = strategy
-        if strategy == 'equal_width':
-            sklearn_strategy = 'uniform'
-        elif strategy == 'equal_frequency':
-            sklearn_strategy = 'quantile'
-            
-        est = KBinsDiscretizer(n_bins=n_bins, strategy=sklearn_strategy, encode=encode, subsample=None)
-        
-        df_clean = df[cols].dropna()
-        if df_clean.empty:
-            return {}
-            
-        est.fit(df_clean)
-        
-        # Extract edges
-        bin_edges_map = {}
-        for i, col in enumerate(cols):
-            bin_edges_map[col] = est.bin_edges_[i].tolist()
-            
-        return {
-            'type': 'kbins',
-            'bin_edges': bin_edges_map,
-            'n_bins': n_bins,
-            'strategy': strategy,
-            'encode': encode,
-            'output_suffix': config.get('output_suffix', '_binned'),
-            'drop_original': config.get('drop_original', False),
-            'label_format': config.get('label_format', 'ordinal'),
-            'missing_strategy': config.get('missing_strategy', 'keep'),
-            'missing_label': config.get('missing_label', 'Missing'),
-            'include_lowest': config.get('include_lowest', True),
-            'precision': config.get('precision', 3)
-        }
-
-class KBinsDiscretizerApplier(BaseBinningApplier):
     pass

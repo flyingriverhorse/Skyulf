@@ -16,6 +16,9 @@ import { MissingIndicatorNode } from '../../modules/nodes/processing/MissingIndi
 import { EncodingNode } from '../../modules/nodes/processing/EncodingNode';
 import { OutlierNode } from '../../modules/nodes/processing/OutlierNode';
 import { TransformationNode } from '../../modules/nodes/processing/TransformationNode';
+import { BinningNode } from '../../modules/nodes/processing/BinningNode';
+import { ResamplingNode } from '../../modules/nodes/processing/ResamplingNode';
+import { FeatureGenerationNode } from '../../modules/nodes/processing/FeatureGenerationNode';
 
 export const initializeRegistry = () => {
   registry.register(DebugNode);
@@ -25,6 +28,9 @@ export const initializeRegistry = () => {
   registry.register(ScalingNode);
   registry.register(OutlierNode);
   registry.register(TransformationNode);
+  registry.register(BinningNode);
+  registry.register(ResamplingNode);
+  registry.register(FeatureGenerationNode);
   registry.register(EncodingNode);
   registry.register(FeatureSelectionNode);
   registry.register(TrainTestSplitNode);

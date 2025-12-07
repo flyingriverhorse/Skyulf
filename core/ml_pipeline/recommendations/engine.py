@@ -9,6 +9,9 @@ from .plugins.cleaning import CleaningAdvisor
 from .plugins.encoding import EncodingAdvisor
 from .plugins.outliers import OutlierAdvisor
 from .plugins.transformation import TransformationAdvisor
+from .plugins.resampling import ResamplingAdvisor
+from .plugins.feature_generation import FeatureGenerationAdvisor
+from .plugins.bucketing import BucketingAdvisor
 
 class AdvisorEngine:
     def __init__(self):
@@ -22,6 +25,9 @@ class AdvisorEngine:
         self.plugins.append(EncodingAdvisor())
         self.plugins.append(OutlierAdvisor())
         self.plugins.append(TransformationAdvisor())
+        self.plugins.append(ResamplingAdvisor())
+        self.plugins.append(FeatureGenerationAdvisor())
+        self.plugins.append(BucketingAdvisor())
 
     def register_plugin(self, plugin: BaseAdvisorPlugin):
         self.plugins.append(plugin)

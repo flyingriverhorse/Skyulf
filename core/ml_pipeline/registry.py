@@ -229,8 +229,8 @@ class NodeRegistry:
                 params={"degree": 2, "interaction_only": False}
             ),
             RegistryItem(
-                id="FeatureMath",
-                name="Feature Math",
+                id="FeatureGenerationNode",
+                name="Feature Generation",
                 category="Preprocessing",
                 description="Create new features using mathematical expressions.",
                 params={"expression": ""}

@@ -20,9 +20,10 @@ DEFAULT_EPSILON = 1e-9
 FEATURE_MATH_ALLOWED_TYPES = {
     "arithmetic",
     "ratio",
-    "stat",
     "similarity",
     "datetime_extract",
+    "group_agg",
+    "polynomial",
 }
 ALLOWED_DATETIME_FEATURES = {
     "year", "quarter", "month", "month_name", "week", "day", "day_name",
@@ -161,8 +162,8 @@ class PolynomialFeaturesApplier(BaseApplier):
         
         return pack_pipeline_output(df_out, y, is_tuple)
 
-# --- Feature Math ---
-class FeatureMathCalculator(BaseCalculator):
+# --- Feature Generation ---
+class FeatureGenerationCalculator(BaseCalculator):
     def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
         # Config:
         # operations: List[Dict]
@@ -170,13 +171,13 @@ class FeatureMathCalculator(BaseCalculator):
         # allow_overwrite: bool
         
         return {
-            "type": "feature_math",
+            "type": "feature_generation",
             "operations": config.get("operations", []),
             "epsilon": config.get("epsilon", DEFAULT_EPSILON),
             "allow_overwrite": config.get("allow_overwrite", False)
         }
 
-class FeatureMathApplier(BaseApplier):
+class FeatureGenerationApplier(BaseApplier):
     def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         
@@ -273,24 +274,6 @@ class FeatureMathApplier(BaseApplier):
                     
                     result = _safe_divide(num_sum, den_sum, epsilon)
                     
-                elif op_type == "stat":
-                    valid_inputs = [c for c in input_cols if c in df_out.columns]
-                    if not valid_inputs: continue
-                    
-                    # Row-wise stats
-                    data = df_out[valid_inputs].apply(pd.to_numeric, errors="coerce")
-                    if fillna is not None:
-                        data = data.fillna(fillna)
-                        
-                    if method == "sum": result = data.sum(axis=1)
-                    elif method == "mean": result = data.mean(axis=1)
-                    elif method == "min": result = data.min(axis=1)
-                    elif method == "max": result = data.max(axis=1)
-                    elif method == "std": result = data.std(axis=1)
-                    elif method == "median": result = data.median(axis=1)
-                    elif method == "count": result = data.count(axis=1)
-                    elif method == "range": result = data.max(axis=1) - data.min(axis=1)
-                    
                 elif op_type == "similarity":
                     # input_cols[0] vs secondary_cols[0] (or input_cols[1])
                     col_a = input_cols[0] if input_cols else None
@@ -327,6 +310,55 @@ class FeatureMathApplier(BaseApplier):
                     # datetime_extract usually generates multiple columns, so we might not set "result"
                     # unless we want to return one specific thing. V1 generates multiple.
                     continue 
+
+                elif op_type == "group_agg":
+                    # input_cols[0] = group_col
+                    # secondary_cols[0] = target_col
+                    # method = agg method
+                    group_col = input_cols[0] if input_cols else None
+                    target_col = secondary_cols[0] if secondary_cols else None
+                    
+                    if group_col and target_col and group_col in df_out.columns and target_col in df_out.columns:
+                        try:
+                            # Use transform to keep same shape
+                            if method == "mean": result = df_out.groupby(group_col)[target_col].transform("mean")
+                            elif method == "sum": result = df_out.groupby(group_col)[target_col].transform("sum")
+                            elif method == "count": result = df_out.groupby(group_col)[target_col].transform("count")
+                            elif method == "min": result = df_out.groupby(group_col)[target_col].transform("min")
+                            elif method == "max": result = df_out.groupby(group_col)[target_col].transform("max")
+                            elif method == "std": result = df_out.groupby(group_col)[target_col].transform("std")
+                            elif method == "median": result = df_out.groupby(group_col)[target_col].transform("median")
+                        except Exception: pass
+                    
+                elif op_type == "polynomial":
+                    valid_inputs = [c for c in input_cols if c in df_out.columns]
+                    if valid_inputs:
+                        degree = op.get("degree", 2)
+                        interaction_only = op.get("interaction_only", False)
+                        include_bias = op.get("include_bias", False)
+                        include_input_features = op.get("include_input_features", False)
+                        output_prefix = op.get("output_prefix", "poly")
+                        
+                        try:
+                            poly = PolynomialFeatures(degree=degree, interaction_only=interaction_only, include_bias=include_bias)
+                            X_poly = df_out[valid_inputs].fillna(0)
+                            transformed = poly.fit_transform(X_poly)
+                            feature_names = poly.get_feature_names_out(valid_inputs)
+                            
+                            # If output_col is provided, use it as prefix, otherwise use output_prefix
+                            prefix = output_col if output_col else output_prefix
+                            
+                            for name, values in zip(feature_names, transformed.T):
+                                # Check if this is an input feature (degree 1)
+                                is_input_feature = name in valid_inputs
+                                
+                                if is_input_feature and not include_input_features:
+                                    continue
+                                    
+                                clean_name = name.replace(" ", "_").replace("^", "_pow_")
+                                df_out[f"{prefix}_{clean_name}"] = values
+                        except Exception: pass
+                    continue
 
                 if result is not None:
                     if round_digits is not None:
