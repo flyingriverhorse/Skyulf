@@ -195,6 +195,31 @@ export const Toolbar: React.FC = () => {
           }
           
           params = { transformations: flattenedTransformations };
+      } else if (node.data.definitionType === 'BinningNode') {
+          stepType = 'GeneralBinning';
+          params = {
+              columns: node.data.columns,
+              strategy: node.data.strategy,
+              n_bins: node.data.n_bins,
+              label_format: node.data.label_format,
+              output_suffix: node.data.output_suffix,
+              drop_original: node.data.drop_original,
+              custom_bins: node.data.custom_bins, // For custom strategy
+              custom_labels: node.data.custom_labels // For custom strategy
+          };
+      } else if (node.data.definitionType === 'ResamplingNode') {
+          const type = node.data.type || 'oversampling';
+          if (type === 'oversampling') {
+              stepType = 'Oversampling';
+          } else {
+              stepType = 'Undersampling';
+          }
+          params = node.data;
+      } else if (node.data.definitionType === 'FeatureGenerationNode') {
+          stepType = 'FeatureMath';
+          params = {
+              operations: node.data.operations
+          };
       } else {
           console.error(`Unknown node type: ${node.data.definitionType}`);
           throw new Error(`Unknown node type: ${node.data.definitionType}. Pipeline execution stopped.`);
