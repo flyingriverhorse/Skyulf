@@ -184,7 +184,7 @@ class TunerCalculator:
             searcher = HalvingGridSearchCV(
                 estimator=base_estimator,
                 param_grid=config.search_space,
-                scoring=config.metric,
+                scoring=metric,
                 cv=cv,
                 n_jobs=-1,
                 random_state=config.random_state,
@@ -195,7 +195,7 @@ class TunerCalculator:
                 estimator=base_estimator,
                 param_distributions=config.search_space,
                 n_candidates=config.n_trials,  # Map n_trials to n_candidates
-                scoring=config.metric,
+                scoring=metric,
                 cv=cv,
                 n_jobs=-1,
                 random_state=config.random_state,
@@ -227,7 +227,7 @@ class TunerCalculator:
                 n_trials=config.n_trials,
                 timeout=config.timeout,
                 cv=cv,
-                scoring=config.metric,
+                scoring=metric,
                 n_jobs=-1,
                 random_state=config.random_state,
                 refit=False,

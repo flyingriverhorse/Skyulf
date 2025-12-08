@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
-import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal } from 'lucide-react';
-import { JobInfo } from '../../core/api/jobs';
+import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard } from 'lucide-react';
+import { JobInfo, jobsApi } from '../../core/api/jobs';
 
 export const JobsDrawer: React.FC = () => {
   const { 
@@ -108,7 +108,56 @@ export const JobsDrawer: React.FC = () => {
   );
 };
 
-const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () => void }> = ({ job, onBack, onClose }) => {
+const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () => void }> = ({ job: initialJob, onBack, onClose }) => {
+    const { cancelJob } = useJobStore();
+    const [job, setJob] = useState<JobInfo>(initialJob);
+    const [activeTab, setActiveTab] = useState<'overview' | 'logs'>('overview');
+    const [isCancelling, setIsCancelling] = useState(false);
+    const logsEndRef = useRef<HTMLDivElement>(null);
+
+    // Poll for updates if running
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        
+        const fetchDetails = async () => {
+            try {
+                const updatedJob = await jobsApi.getJob(initialJob.job_id);
+                setJob(updatedJob);
+            } catch (e) {
+                console.error("Failed to fetch job details", e);
+            }
+        };
+
+        fetchDetails(); // Initial fetch
+
+        if (job.status === 'running' || job.status === 'queued') {
+            interval = setInterval(fetchDetails, 2000);
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [initialJob.job_id, job.status]);
+
+    // Auto-scroll logs
+    useEffect(() => {
+        if (activeTab === 'logs' && logsEndRef.current) {
+            logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [job.logs, activeTab]);
+
+    const handleCancel = async () => {
+        if (!confirm('Are you sure you want to stop this job?')) return;
+        setIsCancelling(true);
+        try {
+            await cancelJob(job.job_id);
+        } catch (e) {
+            alert('Failed to cancel job');
+        } finally {
+            setIsCancelling(false);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
@@ -126,87 +175,143 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                         </h2>
                     </div>
                 </div>
-                <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
-                    <X className="w-4 h-4" />
+                <div className="flex items-center gap-2">
+                    {(job.status === 'running' || job.status === 'queued') && (
+                        <button 
+                            onClick={handleCancel}
+                            disabled={isCancelling}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded text-xs font-medium transition-colors border border-red-200 dark:border-red-800"
+                        >
+                            <Square className="w-3 h-3 fill-current" />
+                            {isCancelling ? 'Stopping...' : 'Stop Job'}
+                        </button>
+                    )}
+                    <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 dark:border-gray-700 px-4">
+                <button
+                    className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                    activeTab === 'overview' 
+                        ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                    }`}
+                    onClick={() => setActiveTab('overview')}
+                >
+                    <LayoutDashboard className="w-4 h-4" />
+                    Overview
+                </button>
+                <button
+                    className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                    activeTab === 'logs' 
+                        ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                    }`}
+                    onClick={() => setActiveTab('logs')}
+                >
+                    <FileText className="w-4 h-4" />
+                    Live Logs
+                    {job.status === 'running' && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />}
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {/* Status Section */}
-                <div className="grid grid-cols-3 gap-4">
-                    <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</div>
-                        <div className="font-medium capitalize flex items-center gap-2 text-gray-800 dark:text-gray-200">
-                            {job.status}
-                        </div>
-                    </div>
-                    <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Dataset</div>
-                        <div className="font-medium text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                            <Database className="w-3 h-3 text-gray-400" />
-                            {job.dataset_name || job.dataset_id || 'Unknown'}
-                        </div>
-                    </div>
-                    <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Duration</div>
-                        <div className="font-medium text-gray-800 dark:text-gray-200 font-mono">
-                            {job.start_time && job.end_time 
-                                ? `${Math.round((new Date(job.end_time).getTime() - new Date(job.start_time).getTime()) / 1000)}s` 
-                                : '-'}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Error Section */}
-                {job.error && (
-                    <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-lg">
-                        <h3 className="text-sm font-medium text-red-800 dark:text-red-300 mb-2 flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4" />
-                            Error Log
-                        </h3>
-                        <pre className="text-xs text-red-700 dark:text-red-400 whitespace-pre-wrap font-mono">
-                            {job.error}
-                        </pre>
-                    </div>
-                )}
-
-                {/* Results Section */}
-                {job.result && (
-                    <div className="space-y-4">
-                        <h3 className="text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                            <Terminal className="w-4 h-4" />
-                            Execution Results
-                        </h3>
-                        
-                        {job.job_type === 'training' && job.result.metrics && (
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                {Object.entries(job.result.metrics).map(([k, v]) => (
-                                    <div key={k} className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">{k.replace(/_/g, ' ')}</div>
-                                        <div className="font-mono font-medium text-blue-600 dark:text-blue-400">
-                                            {typeof v === 'number' ? v.toFixed(4) : String(v)}
-                                        </div>
-                                    </div>
-                                ))}
+            <div className="flex-1 overflow-y-auto p-6">
+                {activeTab === 'overview' ? (
+                    <div className="space-y-6">
+                        {/* Status Section */}
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</div>
+                                <div className="font-medium capitalize flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                                    {job.status}
+                                </div>
                             </div>
-                        )}
-
-                        {job.job_type === 'tuning' && job.result.best_params && (
-                            <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
-                                <div className="text-gray-500 mb-2"># Best Hyperparameters</div>
-                                <pre>{JSON.stringify(job.result.best_params, null, 2)}</pre>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Dataset</div>
+                                <div className="font-medium text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                    <Database className="w-3 h-3 text-gray-400" />
+                                    {job.dataset_name || job.dataset_id || 'Unknown'}
+                                </div>
                             </div>
-                        )}
-                        
-                        {/* Raw JSON Dump for debugging */}
-                        <div className="mt-4">
-                            <details className="text-xs text-gray-500 cursor-pointer">
-                                <summary className="hover:text-gray-700 dark:hover:text-gray-300">View Raw Output</summary>
-                                <pre className="mt-2 p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto">
-                                    {JSON.stringify(job.result, null, 2)}
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Duration</div>
+                                <div className="font-medium text-gray-800 dark:text-gray-200 font-mono">
+                                    {job.start_time && job.end_time 
+                                        ? `${Math.round((new Date(job.end_time).getTime() - new Date(job.start_time).getTime()) / 1000)}s` 
+                                        : '-'}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Error Section */}
+                        {job.error && (
+                            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-lg">
+                                <h3 className="text-sm font-medium text-red-800 dark:text-red-300 mb-2 flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4" />
+                                    Error Log
+                                </h3>
+                                <pre className="text-xs text-red-700 dark:text-red-400 whitespace-pre-wrap font-mono">
+                                    {job.error}
                                 </pre>
-                            </details>
-                        </div>
+                            </div>
+                        )}
+
+                        {/* Results Section */}
+                        {job.result && (
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                    <Terminal className="w-4 h-4" />
+                                    Execution Results
+                                </h3>
+                                
+                                {job.job_type === 'training' && job.result.metrics && (
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                        {Object.entries(job.result.metrics).map(([k, v]) => (
+                                            <div key={k} className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">{k.replace(/_/g, ' ')}</div>
+                                                <div className="font-mono font-medium text-blue-600 dark:text-blue-400">
+                                                    {typeof v === 'number' ? v.toFixed(4) : String(v)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {job.job_type === 'tuning' && job.result.best_params && (
+                                    <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
+                                        <div className="text-gray-500 mb-2"># Best Hyperparameters</div>
+                                        <pre>{JSON.stringify(job.result.best_params, null, 2)}</pre>
+                                    </div>
+                                )}
+                                
+                                {/* Raw JSON Dump for debugging */}
+                                <div className="mt-4">
+                                    <details className="text-xs text-gray-500 cursor-pointer">
+                                        <summary className="hover:text-gray-700 dark:hover:text-gray-300">View Raw Output</summary>
+                                        <pre className="mt-2 p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto">
+                                            {JSON.stringify(job.result, null, 2)}
+                                        </pre>
+                                    </details>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="bg-gray-900 rounded-lg p-4 min-h-[400px] font-mono text-xs text-gray-300 overflow-x-auto">
+                        {job.logs && job.logs.length > 0 ? (
+                            job.logs.map((log, i) => (
+                                <div key={i} className="mb-1 border-b border-gray-800 pb-1 last:border-0">
+                                    {log}
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-gray-500 italic">No logs available yet...</div>
+                        )}
+                        <div ref={logsEndRef} />
                     </div>
                 )}
             </div>

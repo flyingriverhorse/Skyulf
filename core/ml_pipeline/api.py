@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from typing import Dict, Any, List, Optional, Union
 from pydantic import BaseModel
+from datetime import datetime
 import tempfile
 import shutil
 import os
@@ -447,10 +448,17 @@ def _run_engine_task(store, config, job_id, target_node_id=None):
     db_gen = get_db()
     session = next(db_gen)
     
+    def log_callback(msg):
+        try:
+            ts_msg = f"[{datetime.now().strftime('%H:%M:%S')}] {msg}"
+            JobManager.update_status_sync(session, job_id, logs=[ts_msg])
+        except Exception as e:
+            logger.error(f"Failed to write log to DB: {e}")
+    
     try:
         JobManager.update_status_sync(session, job_id, JobStatus.RUNNING)
         
-        engine = PipelineEngine(store)
+        engine = PipelineEngine(store, log_callback=log_callback)
         result = engine.run(config)
         
         if result.status == "success":
@@ -502,6 +510,19 @@ async def get_job_status(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
+
+@router.post("/jobs/{job_id}/cancel")
+async def cancel_job(
+    job_id: str,
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Cancels a running or queued job.
+    """
+    success = await JobManager.cancel_job(session, job_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Job could not be cancelled (maybe it's already finished or doesn't exist)")
+    return {"message": "Job cancelled successfully"}
 
 @router.get("/jobs", response_model=List[JobInfo])
 async def list_jobs(

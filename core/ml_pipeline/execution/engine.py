@@ -33,15 +33,21 @@ class PipelineEngine:
     """
     Orchestrates the execution of ML pipelines.
     """
-    def __init__(self, artifact_store: ArtifactStore):
+    def __init__(self, artifact_store: ArtifactStore, log_callback=None):
         self.artifact_store = artifact_store
+        self.log_callback = log_callback
         self._results: Dict[str, NodeExecutionResult] = {}
+
+    def log(self, message: str):
+        logger.info(message)
+        if self.log_callback:
+            self.log_callback(message)
 
     def run(self, config: PipelineConfig) -> PipelineExecutionResult:
         """
         Executes the pipeline defined by the configuration.
         """
-        logger.info(f"Starting pipeline execution: {config.pipeline_id}")
+        self.log(f"Starting pipeline execution: {config.pipeline_id}")
         start_time = datetime.now()
         
         pipeline_result = PipelineExecutionResult(
@@ -75,7 +81,7 @@ class PipelineEngine:
 
     def _execute_node(self, node: NodeConfig) -> NodeExecutionResult:
         """Executes a single node based on its type."""
-        logger.info(f"Executing node: {node.node_id} ({node.step_type})")
+        self.log(f"Executing node: {node.node_id} ({node.step_type})")
         start_ts = time.time()
         
         try:
@@ -148,10 +154,10 @@ class PipelineEngine:
         
         if node.params.get("sample", False):
             limit = node.params.get("limit", 1000)
-            logger.info(f"Loading sample data from {path} (limit={limit})")
+            self.log(f"Loading sample data from {path} (limit={limit})")
             df = loader.load_sample(path, n=limit)
         else:
-            logger.info(f"Loading full data from {path}")
+            self.log(f"Loading full data from {path}")
             df = loader.load_full(path)
             
         self.artifact_store.save(node.node_id, df)
