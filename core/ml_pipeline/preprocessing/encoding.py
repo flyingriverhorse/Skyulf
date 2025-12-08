@@ -48,6 +48,24 @@ class OneHotEncoderCalculator(BaseCalculator):
         
         encoder.fit(df_fit)
         
+        # Check for columns that produced no features
+        if hasattr(encoder, 'categories_'):
+            for i, col in enumerate(cols):
+                n_cats = len(encoder.categories_[i])
+                # If drop='first' and n_cats == 1, we get 0 features (1-1=0)
+                # If n_cats == 0, we get 0 features
+                
+                # We can check the actual output feature names to be sure, but checking categories is a good proxy
+                # Actually, sklearn's get_feature_names_out handles the drop logic.
+                
+                # Let's check if this specific column generated any features in the output
+                # This is a bit tricky with the bulk encoder, but we can infer.
+                
+                if n_cats == 0:
+                     logger.warning(f"OneHotEncoder: Column '{col}' has 0 categories (empty or all missing). It will be dropped.")
+                elif drop == 'first' and n_cats == 1:
+                     logger.warning(f"OneHotEncoder: Column '{col}' has only 1 category ('{encoder.categories_[i][0]}') and 'Drop First' is enabled. This results in 0 encoded features. The column will be effectively dropped.")
+        
         return {
             'type': 'onehot',
             'columns': cols,

@@ -11,6 +11,7 @@ interface EncodingConfig {
   columns: string[];
   // OneHot/Dummy specific
   drop_first?: boolean;
+  drop_original?: boolean;
   handle_unknown?: 'error' | 'ignore';
   // Hash specific
   n_features?: number;
@@ -112,6 +113,21 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
             {config.method === 'target' && "Encodes categories based on target mean."}
             {config.method === 'hash' && "Maps categories to a fixed number of features."}
           </p>
+          
+          <div className="pt-2">
+            <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={config.drop_original !== false} // Default to true
+                  onChange={(e) => onChange({ ...config, drop_original: e.target.checked })}
+                  className="rounded border-gray-300"
+                />
+                Drop Original Column
+            </label>
+            <p className="text-[10px] text-muted-foreground ml-5">
+                If unchecked, keeps the original column alongside encoded features.
+            </p>
+          </div>
         </div>
 
         {/* Method Specific Settings */}

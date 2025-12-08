@@ -8,6 +8,9 @@ from .evaluation.schemas import ModelEvaluationReport, ModelEvaluationSplitPaylo
 from .evaluation.classification import build_classification_split_report
 from .evaluation.regression import build_regression_split_report
 from .cross_validation import perform_cross_validation
+import logging
+
+logger = logging.getLogger(__name__)
 
 class BaseModelCalculator(ABC):
     @property
@@ -37,6 +40,13 @@ class BaseModelApplier(ABC):
         Generates predictions.
         """
         pass
+
+    def predict_proba(self, df: pd.DataFrame, model_artifact: Any) -> Optional[pd.DataFrame]:
+        """
+        Generates prediction probabilities if supported.
+        Returns DataFrame where columns are classes.
+        """
+        return None
 
 class StatefulEstimator:
     def __init__(self, calculator: BaseModelCalculator, applier: BaseModelApplier, artifact_store: ArtifactStore, node_id: str):
@@ -184,6 +194,7 @@ class StatefulEstimator:
     def evaluate(self, dataset: SplitDataset, target_column: str, job_id: str = "unknown") -> ModelEvaluationReport:
         """
         Evaluates the model on all splits and returns a detailed report.
+        Also saves raw predictions (y_true, y_pred) as an artifact for visualization.
         """
         # 1. Load Artifact
         model_artifact = self.artifact_store.load(self.node_id)
@@ -191,17 +202,58 @@ class StatefulEstimator:
         
         splits_payload: Dict[str, ModelEvaluationSplitPayload] = {}
         
+        # Container for raw predictions to be saved as artifact
+        evaluation_data = {
+            "job_id": job_id,
+            "node_id": self.node_id,
+            "problem_type": problem_type,
+            "splits": {}
+        }
+        
         # Helper to evaluate a single split
         def evaluate_split(split_name: str, data: Any):
             if isinstance(data, tuple):
                 X, y = data
             elif isinstance(data, pd.DataFrame):
                 if target_column not in data.columns:
-                    return # Cannot evaluate without target
+                    return None # Cannot evaluate without target
                 X = data.drop(columns=[target_column])
                 y = data[target_column]
             else:
-                return 
+                return None
+
+            # Generate predictions for saving
+            # We need to predict here to save the raw values, even if build_*_report does it internally
+            # Optimization: build_*_report could accept y_pred, but for now we re-predict or rely on the report builder
+            # Actually, let's just let the report builder do the work, but we need the raw values for the artifact.
+            # So we will predict here.
+            y_pred = self.applier.predict(X, model_artifact)
+            
+            # Try to get probabilities for classification
+            y_proba = None
+            if problem_type == "classification":
+                y_proba_df = self.applier.predict_proba(X, model_artifact)
+                if y_proba_df is not None:
+                    # Convert to list of dicts or list of lists?
+                    # List of lists is more compact: [[p0, p1], [p0, p1]]
+                    # But we need to know class order. DataFrame columns has it.
+                    y_proba = {
+                        "classes": y_proba_df.columns.tolist(),
+                        "values": y_proba_df.values.tolist()
+                    }
+
+            # Save to evaluation_data
+            # We convert to list to ensure JSON serializability if needed later, 
+            # though joblib can handle numpy arrays. Lists are safer for generic consumption.
+            split_data = {
+                "y_true": y.tolist() if hasattr(y, "tolist") else list(y),
+                "y_pred": y_pred.tolist() if hasattr(y_pred, "tolist") else list(y_pred)
+            }
+            
+            if y_proba:
+                split_data["y_proba"] = y_proba
+                
+            evaluation_data["splits"][split_name] = split_data
 
             if problem_type == "classification":
                 return build_classification_split_report(
@@ -236,6 +288,12 @@ class StatefulEstimator:
         # 4. Evaluate Validation
         if dataset.validation is not None:
             splits_payload['validation'] = evaluate_split('validation', dataset.validation)
+            
+        # Save the raw evaluation data artifact
+        # Key format: {node_id}_evaluation_data
+        key = f"{self.node_id}_evaluation_data"
+        logger.info(f"Saving evaluation artifact to key: {key}")
+        self.artifact_store.save(key, evaluation_data)
             
         # Feature cols for report metadata
         if isinstance(dataset.train, tuple):

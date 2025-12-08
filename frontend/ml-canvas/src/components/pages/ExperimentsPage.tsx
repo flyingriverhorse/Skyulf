@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  ScatterChart, Scatter, LineChart, Line, ReferenceLine
 } from 'recharts';
-import { Filter, Rocket, ChevronDown, ChevronRight } from 'lucide-react';
+import { Filter, Rocket, ChevronDown, ChevronRight, Activity } from 'lucide-react';
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClientV2 } from '../../core/api/client';
 
@@ -26,12 +27,23 @@ export const ExperimentsPage: React.FC = () => {
   const [isParamsExpanded, setIsParamsExpanded] = useState(true);
 
   // View state
-  const [activeView, setActiveView] = useState<'charts' | 'table'>('charts');
+  const [activeView, setActiveView] = useState<'charts' | 'table' | 'evaluation'>('charts');
+  const [evaluationData, setEvaluationData] = useState<any>(null);
+  const [isEvalLoading, setIsEvalLoading] = useState(false);
+  const [evalError, setEvalError] = useState<string | null>(null);
+  const [evalJobId, setEvalJobId] = useState<string | null>(null);
+  const [selectedRocClass, setSelectedRocClass] = useState<string | null>(null);
 
   useEffect(() => {
     fetchJobs();
     fetchDatasets();
   }, [fetchJobs]);
+
+  useEffect(() => {
+    if (evaluationData?.splits?.train?.y_proba?.classes?.length > 0) {
+        setSelectedRocClass(evaluationData.splits.train.y_proba.classes[0]);
+    }
+  }, [evaluationData]);
 
   const fetchDatasets = async () => {
     try {
@@ -53,6 +65,92 @@ export const ExperimentsPage: React.FC = () => {
       console.error(err);
     }
   };
+
+  const fetchEvaluationData = async (jobId: string) => {
+      setIsEvalLoading(true);
+      setEvaluationData(null);
+      setEvalError(null);
+      setEvalJobId(jobId);
+      try {
+          const res = await apiClientV2.get(`/pipeline/jobs/${jobId}/evaluation`);
+          setEvaluationData(res.data);
+      } catch (err: any) {
+          console.error("Failed to fetch evaluation data", err);
+          setEvalError(err.response?.data?.detail || "Failed to fetch evaluation data");
+      } finally {
+          setIsEvalLoading(false);
+      }
+  };
+
+  const calculateConfusionMatrix = (y_true: any[], y_pred: any[]) => {
+      const classes = Array.from(new Set([...y_true, ...y_pred])).sort();
+      const matrix = classes.map(trueClass => {
+          return classes.map(predClass => {
+              return y_true.reduce((count, t, i) => {
+                  const p = y_pred[i];
+                  return (t === trueClass && p === predClass) ? count + 1 : count;
+              }, 0);
+          });
+      });
+      return { classes, matrix };
+  };
+
+  const calculateROC = (y_true: any[], y_proba: { classes: any[], values: number[][] }, targetClass: any) => {
+      if (!y_proba || !y_proba.values) return null;
+      
+      // Find index of target class
+      const classIndex = y_proba.classes.indexOf(targetClass);
+      if (classIndex === -1) return null;
+      
+      const scores = y_proba.values.map(v => v[classIndex]);
+      
+      const data = scores.map((score, i) => ({
+          score,
+          actual: y_true[i] === targetClass ? 1 : 0
+      }));
+      
+      // Sort by score descending
+      data.sort((a, b) => b.score - a.score);
+      
+      const rocPoints = [];
+      let tp = 0;
+      let fp = 0;
+      const totalPos = data.filter(d => d.actual === 1).length;
+      const totalNeg = data.length - totalPos;
+      
+      if (totalPos === 0 || totalNeg === 0) return null; // Cannot calculate ROC if only one class present in split
+
+      rocPoints.push({ fpr: 0, tpr: 0 });
+      
+      for (let i = 0; i < data.length; i++) {
+          if (data[i].actual === 1) tp++;
+          else fp++;
+          
+          rocPoints.push({
+              fpr: fp / totalNeg,
+              tpr: tp / totalPos
+          });
+      }
+      
+      return rocPoints;
+  };
+
+  // Effect to fetch evaluation data when view changes or selection changes
+  useEffect(() => {
+      if (activeView === 'evaluation') {
+          // If we have a specific eval job selected, use it
+          // Otherwise default to the first selected job
+          if (!evalJobId && selectedJobIds.length > 0) {
+              fetchEvaluationData(selectedJobIds[0]);
+          } else if (evalJobId && !selectedJobIds.includes(evalJobId) && selectedJobIds.length > 0) {
+              // If current eval job is deselected, switch to another
+              fetchEvaluationData(selectedJobIds[0]);
+          } else if (selectedJobIds.length === 0) {
+              setEvaluationData(null);
+              setEvalJobId(null);
+          }
+      }
+  }, [activeView, selectedJobIds, evalJobId]);
 
   const filteredJobs = jobs.filter(job => {
     const typeMatch = filterType === 'all' || job.job_type === filterType;
@@ -205,6 +303,11 @@ export const ExperimentsPage: React.FC = () => {
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                   {job.model_type} • {job.dataset_name || 'Unknown Dataset'}
+                  {job.job_type === 'tuning' && job.config?.tuning?.strategy && (
+                      <span className="ml-1 text-gray-400">
+                          ({job.config.tuning.strategy})
+                      </span>
+                  )}
                 </div>
                 <div className="flex justify-between items-center text-[10px] text-gray-400">
                   <span>{new Date(job.start_time || job.created_at).toLocaleString()}</span>
@@ -248,6 +351,16 @@ export const ExperimentsPage: React.FC = () => {
                       onClick={() => setActiveView('table')}
                   >
                       Detailed Metrics & Params
+                  </button>
+                  <button
+                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                          activeView === 'evaluation'
+                              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                              : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                      }`}
+                      onClick={() => setActiveView('evaluation')}
+                  >
+                      Model Evaluation
                   </button>
               </div>
 
@@ -417,6 +530,310 @@ export const ExperimentsPage: React.FC = () => {
                   </table>
                 </div>
               </div>
+              )}
+
+              {/* Evaluation View */}
+              {activeView === 'evaluation' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                    {/* Job Selector if multiple */}
+                    {selectedJobIds.length > 1 && (
+                        <div className="flex gap-2 overflow-x-auto pb-2">
+                            {selectedJobIds.map(id => (
+                                <button
+                                    key={id}
+                                    onClick={() => fetchEvaluationData(id)}
+                                    className={`px-3 py-1 text-xs font-mono rounded border ${
+                                        evalJobId === id 
+                                            ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300'
+                                            : 'bg-white border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400'
+                                    }`}
+                                >
+                                    {id.slice(0, 8)}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {isEvalLoading ? (
+                        <div className="h-64 flex items-center justify-center text-gray-400">
+                            <Activity className="w-6 h-6 animate-spin mr-2" />
+                            Loading evaluation data...
+                        </div>
+                    ) : evalError ? (
+                        <div className="h-64 flex flex-col items-center justify-center text-red-500 p-4 text-center">
+                            <p className="font-medium">Error loading evaluation data</p>
+                            <p className="text-sm mt-2 opacity-80">{evalError}</p>
+                        </div>
+                    ) : !evaluationData ? (
+                        <div className="h-64 flex items-center justify-center text-gray-400 italic text-center">
+                            <p>Select a completed job to view evaluation details.</p>
+                            <p className="text-xs mt-2 opacity-70">(Note: Only jobs run after this update have evaluation artifacts)</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {/* Controls for Evaluation View */}
+                            <div className="flex justify-between items-center bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                                <div className="flex gap-4 text-sm">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={showTrainMetrics} 
+                                            onChange={e => setShowTrainMetrics(e.target.checked)}
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-gray-700 dark:text-gray-300">Train</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={showTestMetrics} 
+                                            onChange={e => setShowTestMetrics(e.target.checked)}
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-gray-700 dark:text-gray-300">Test</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={showValMetrics} 
+                                            onChange={e => setShowValMetrics(e.target.checked)}
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-gray-700 dark:text-gray-300">Validation</span>
+                                    </label>
+                                </div>
+                                
+                                {evaluationData.problem_type === 'classification' && evaluationData.splits?.train?.y_proba && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-gray-500 dark:text-gray-400">Target Class (ROC):</span>
+                                        <select 
+                                            className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5"
+                                            value={selectedRocClass || ''}
+                                            onChange={(e) => setSelectedRocClass(e.target.value)}
+                                        >
+                                            {evaluationData.splits.train.y_proba.classes.map((c: any) => (
+                                                <option key={c} value={c}>{c}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex flex-col gap-6">
+                            {/* Render charts for each split */}
+                            {Object.entries(evaluationData.splits || {})
+                                .filter(([splitName]) => {
+                                    if (splitName === 'train' && !showTrainMetrics) return false;
+                                    if (splitName === 'test' && !showTestMetrics) return false;
+                                    if (splitName === 'validation' && !showValMetrics) return false;
+                                    return true;
+                                })
+                                .map(([splitName, splitData]: [string, any]) => {
+                                const data = splitData.y_true.map((y: any, i: number) => ({
+                                    x: y,
+                                    y: splitData.y_pred[i]
+                                }));
+                                
+                                return (
+                                    <div key={splitName} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4 capitalize">{splitName} Set</h4>
+                                        
+                                        {evaluationData.problem_type === 'regression' ? (
+                                            <div className="grid grid-cols-1 gap-8">
+                                                {/* Scatter Plot: Actual vs Predicted */}
+                                                <div className="h-[300px]">
+                                                    <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">Actual vs Predicted</h5>
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                                            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                                            <XAxis 
+                                                                type="number" 
+                                                                dataKey="x" 
+                                                                name="Actual" 
+                                                                unit="" 
+                                                                label={{ value: 'Actual Values', position: 'bottom', offset: 0, fontSize: 12 }} 
+                                                                tick={{ fontSize: 11 }}
+                                                            />
+                                                            <YAxis 
+                                                                type="number" 
+                                                                dataKey="y" 
+                                                                name="Predicted" 
+                                                                unit="" 
+                                                                label={{ value: 'Predicted Values', angle: -90, position: 'left', fontSize: 12 }} 
+                                                                tick={{ fontSize: 11 }}
+                                                            />
+                                                            <Tooltip 
+                                                                cursor={{ strokeDasharray: '3 3' }}
+                                                                content={({ active, payload }) => {
+                                                                    if (active && payload && payload.length) {
+                                                                        const data = payload[0].payload;
+                                                                        return (
+                                                                            <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 shadow-sm rounded text-xs">
+                                                                                <p className="font-medium">Actual: {data.x.toFixed(4)}</p>
+                                                                                <p className="font-medium">Predicted: {data.y.toFixed(4)}</p>
+                                                                                <p className="text-gray-500">Error: {(data.y - data.x).toFixed(4)}</p>
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                    return null;
+                                                                }}
+                                                            />
+                                                            {/* Reference Line for Perfect Prediction (y=x) */}
+                                                            <Line 
+                                                                dataKey="x" 
+                                                                stroke="#ccc" 
+                                                                strokeDasharray="3 3" 
+                                                                dot={false} 
+                                                                activeDot={false} 
+                                                                legendType="none"
+                                                                isAnimationActive={false}
+                                                            />
+                                                            <Scatter name="Predictions" data={data} fill="#8884d8" fillOpacity={0.6} />
+                                                        </ScatterChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+
+                                                {/* Residual Plot: Residuals vs Predicted */}
+                                                <div className="h-[300px]">
+                                                    <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">Residuals vs Predicted</h5>
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                                            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                                            <XAxis 
+                                                                type="number" 
+                                                                dataKey="y" 
+                                                                name="Predicted" 
+                                                                unit="" 
+                                                                label={{ value: 'Predicted Values', position: 'bottom', offset: 0, fontSize: 12 }} 
+                                                                tick={{ fontSize: 11 }}
+                                                            />
+                                                            <YAxis 
+                                                                type="number" 
+                                                                dataKey="residual" 
+                                                                name="Residual" 
+                                                                unit="" 
+                                                                label={{ value: 'Residuals (Actual - Predicted)', angle: -90, position: 'left', fontSize: 12 }} 
+                                                                tick={{ fontSize: 11 }}
+                                                            />
+                                                            <Tooltip 
+                                                                cursor={{ strokeDasharray: '3 3' }}
+                                                                content={({ active, payload }) => {
+                                                                    if (active && payload && payload.length) {
+                                                                        const data = payload[0].payload;
+                                                                        return (
+                                                                            <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 shadow-sm rounded text-xs">
+                                                                                <p className="font-medium">Predicted: {data.y.toFixed(4)}</p>
+                                                                                <p className="font-medium">Residual: {data.residual.toFixed(4)}</p>
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                    return null;
+                                                                }}
+                                                            />
+                                                            {/* Zero Line */}
+                                                            <ReferenceLine y={0} stroke="#ccc" strokeDasharray="3 3" />
+                                                            <Scatter 
+                                                                name="Residuals" 
+                                                                data={data.map((d: any) => ({ ...d, residual: d.x - d.y }))} 
+                                                                fill="#82ca9d" 
+                                                                fillOpacity={0.6} 
+                                                            />
+                                                        </ScatterChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                                {/* Confusion Matrix */}
+                                                <div className="h-[300px] flex flex-col items-center justify-center">
+                                                    {(() => {
+                                                        const { classes, matrix } = calculateConfusionMatrix(splitData.y_true, splitData.y_pred);
+                                                        return (
+                                                            <div className="flex flex-col items-center">
+                                                                <div className="flex">
+                                                                    <div className="w-8"></div> {/* Y-axis label spacer */}
+                                                                    <div className="flex ml-2"> {/* Added margin-left to align with matrix */}
+                                                                        {classes.map(c => (
+                                                                            <div key={c} className="w-16 text-center text-xs font-medium text-gray-500 dark:text-gray-400 pb-2">
+                                                                                Pred {c}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex">
+                                                                    <div className="flex flex-col justify-center mr-2">
+                                                                        {classes.map(c => (
+                                                                            <div key={c} className="h-16 flex items-center justify-end text-xs font-medium text-gray-500 dark:text-gray-400 pr-2">
+                                                                                True {c}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                    <div className="border border-gray-200 dark:border-gray-700">
+                                                                        {matrix.map((row, i) => (
+                                                                            <div key={i} className="flex">
+                                                                                {row.map((count, j) => {
+                                                                                    // Calculate intensity
+                                                                                    const max = Math.max(...matrix.flat());
+                                                                                    const intensity = max > 0 ? count / max : 0;
+                                                                                    return (
+                                                                                        <div 
+                                                                                            key={j} 
+                                                                                            className="w-16 h-16 flex items-center justify-center text-sm font-mono border border-gray-100 dark:border-gray-800"
+                                                                                            style={{
+                                                                                                backgroundColor: `rgba(59, 130, 246, ${intensity * 0.8 + 0.1})`, // Blue base
+                                                                                                color: intensity > 0.5 ? 'white' : 'inherit'
+                                                                                            }}
+                                                                                            title={`True: ${classes[i]}, Pred: ${classes[j]}, Count: ${count}`}
+                                                                                        >
+                                                                                            {count}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="mt-4 text-xs text-gray-400">
+                                                                    Confusion Matrix
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+
+                                                {/* ROC Curve (if available) */}
+                                                {splitData.y_proba && (
+                                                    <div className="h-[300px] w-full">
+                                                        <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">ROC Curve</h5>
+                                                        {(() => {
+                                                            const rocData = calculateROC(splitData.y_true, splitData.y_proba, selectedRocClass);
+                                                            if (!rocData) return <div className="text-center text-xs text-gray-400">ROC not available (multiclass or missing proba)</div>;
+                                                            
+                                                            return (
+                                                                <ResponsiveContainer width="100%" height="100%">
+                                                                    <LineChart data={rocData} margin={{ top: 5, right: 20, bottom: 20, left: 20 }}>
+                                                                        <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                                                                        <XAxis type="number" dataKey="fpr" domain={[0, 1]} label={{ value: 'False Positive Rate', position: 'bottom', offset: 0, fontSize: 12 }} />
+                                                                        <YAxis type="number" dataKey="tpr" domain={[0, 1]} label={{ value: 'True Positive Rate', angle: -90, position: 'left', fontSize: 12 }} />
+                                                                        <Tooltip />
+                                                                        <Line type="monotone" dataKey="tpr" stroke="#8884d8" dot={false} strokeWidth={2} />
+                                                                        {/* Diagonal reference line */}
+                                                                        <Line dataKey="fpr" stroke="#ccc" strokeDasharray="3 3" dot={false} />
+                                                                    </LineChart>
+                                                                </ResponsiveContainer>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        </div>
+                    )}
+                </div>
               )}
 
             </div>

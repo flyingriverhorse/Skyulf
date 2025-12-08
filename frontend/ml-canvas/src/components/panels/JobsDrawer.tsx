@@ -82,7 +82,7 @@ export const JobsDrawer: React.FC = () => {
                 {/* List Header */}
                 <div className="grid grid-cols-12 gap-4 px-6 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
                     <div className="col-span-2">Status</div>
-                    <div className="col-span-2">Dataset</div>
+                    <div className="col-span-2">Dataset / Model</div>
                     <div className="col-span-1">Job ID</div>
                     <div className="col-span-2">Started</div>
                     <div className="col-span-1">Duration</div>
@@ -367,10 +367,18 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
         </span>
       </div>
 
-      {/* Dataset */}
-      <div className="col-span-2 flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 truncate" title={job.dataset_id}>
-        <Database className="w-3 h-3" />
-        {job.dataset_name || job.dataset_id || '-'}
+      {/* Dataset & Model */}
+      <div className="col-span-2 flex flex-col justify-center text-xs text-gray-600 dark:text-gray-400 truncate">
+        <div className="flex items-center gap-1" title={job.dataset_name || job.dataset_id}>
+            <Database className="w-3 h-3" />
+            <span className="truncate">{job.dataset_name || job.dataset_id || '-'}</span>
+        </div>
+        <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500">
+            <span className="font-medium truncate">{job.model_type || 'Unknown Model'}</span>
+            {job.job_type === 'tuning' && job.config?.tuning?.strategy && (
+                <span className="text-gray-400 truncate">({job.config.tuning.strategy})</span>
+            )}
+        </div>
       </div>
 
       {/* Job ID */}
