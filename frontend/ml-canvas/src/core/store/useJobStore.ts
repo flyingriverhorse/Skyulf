@@ -10,6 +10,7 @@ interface JobState {
   // Actions
   fetchJobs: () => Promise<void>;
   submitJob: (payload: RunPipelineRequest) => Promise<string>;
+  cancelJob: (jobId: string) => Promise<void>;
   toggleDrawer: (isOpen?: boolean) => void;
   setTab: (tab: 'training' | 'tuning') => void;
   
@@ -51,6 +52,16 @@ export const useJobStore = create<JobState>((set, get) => {
         return response.job_id;
       } catch (error) {
         console.error('Failed to submit job:', error);
+        throw error;
+      }
+    },
+
+    cancelJob: async (jobId: string) => {
+      try {
+        await jobsApi.cancelJob(jobId);
+        await get().fetchJobs();
+      } catch (error) {
+        console.error('Failed to cancel job:', error);
         throw error;
       }
     },

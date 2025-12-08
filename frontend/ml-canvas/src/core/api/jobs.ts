@@ -1,6 +1,6 @@
 import { apiClientV2, PipelineConfigModel } from './client';
 
-export type JobStatus = 'queued' | 'running' | 'completed' | 'succeeded' | 'failed';
+export type JobStatus = 'queued' | 'running' | 'completed' | 'succeeded' | 'failed' | 'cancelled';
 
 export interface JobInfo {
   job_id: string;
@@ -14,6 +14,7 @@ export interface JobInfo {
   end_time: string | null;
   error: string | null;
   result: Record<string, any> | null;
+  logs?: string[];
 }
 
 export interface RunPipelineRequest extends PipelineConfigModel {
@@ -36,6 +37,10 @@ export const jobsApi = {
   getJob: async (jobId: string): Promise<JobInfo> => {
     const response = await apiClientV2.get<JobInfo>(`/pipeline/jobs/${jobId}`);
     return response.data;
+  },
+
+  cancelJob: async (jobId: string): Promise<void> => {
+    await apiClientV2.post(`/pipeline/jobs/${jobId}/cancel`);
   },
 
   listJobs: async (limit: number = 50): Promise<JobInfo[]> => {

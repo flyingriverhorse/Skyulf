@@ -19,6 +19,7 @@ class JobStatus(str, Enum):
     COMPLETED = "completed"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 class JobInfo(BaseModel):
     job_id: str
@@ -32,6 +33,7 @@ class JobInfo(BaseModel):
     end_time: Optional[datetime] = None
     error: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
+    logs: Optional[List[str]] = None
 
 class JobManager:
     
@@ -80,12 +82,35 @@ class JobManager:
         return job_id
 
     @staticmethod
+    async def cancel_job(session: AsyncSession, job_id: str) -> bool:
+        """Cancels a job if it is running or queued."""
+        # Try TrainingJob
+        stmt = select(TrainingJob).where(TrainingJob.id == job_id)
+        result = await session.execute(stmt)
+        job = result.scalar_one_or_none()
+        
+        if not job:
+            stmt = select(HyperparameterTuningJob).where(HyperparameterTuningJob.id == job_id)
+            result = await session.execute(stmt)
+            job = result.scalar_one_or_none()
+            
+        if job:
+            if job.status in [JobStatus.QUEUED.value, JobStatus.RUNNING.value]:
+                job.status = JobStatus.CANCELLED.value
+                job.error_message = "Job cancelled by user."
+                job.finished_at = datetime.now()
+                await session.commit()
+                return True
+        return False
+
+    @staticmethod
     def update_status_sync(
         session: Session, 
         job_id: str, 
-        status: JobStatus, 
+        status: Optional[JobStatus] = None, 
         error: Optional[str] = None, 
-        result: Optional[Dict[str, Any]] = None
+        result: Optional[Dict[str, Any]] = None,
+        logs: Optional[List[str]] = None
     ):
         """Updates job status (Sync - for Background Tasks)."""
         # Try finding in TrainingJob first
@@ -94,10 +119,17 @@ class JobManager:
             job = session.query(HyperparameterTuningJob).filter(HyperparameterTuningJob.id == job_id).first()
             
         if job:
-            job.status = status.value
+            if status:
+                job.status = status.value
             if error:
                 job.error_message = error
-                # Also update specific error fields if they exist
+            
+            if logs:
+                # Append logs if existing, or set new
+                current_logs = job.logs or []
+                job.logs = current_logs + logs
+                
+                # Update specific error fields if they exist
             
             if result:
                 # Map result fields to model columns
@@ -152,7 +184,8 @@ class JobManager:
                 start_time=job.started_at,
                 end_time=job.finished_at,
                 error=job.error_message,
-                result={"metrics": job.metrics} if job_type == "training" else {"best_params": job.best_params}
+                result={"metrics": job.metrics} if job_type == "training" else {"best_params": job.best_params},
+                logs=job.logs
             )
         return None
 
