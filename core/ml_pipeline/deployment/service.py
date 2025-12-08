@@ -7,7 +7,60 @@ import pandas as pd
 import logging
 import os
 
+from core.ml_pipeline.preprocessing.encoding import (
+    OneHotEncoderApplier, LabelEncoderApplier, OrdinalEncoderApplier, 
+    TargetEncoderApplier, HashEncoderApplier, DummyEncoderApplier
+)
+from core.ml_pipeline.preprocessing.scaling import (
+    StandardScalerApplier, MinMaxScalerApplier, RobustScalerApplier, MaxAbsScalerApplier
+)
+from core.ml_pipeline.preprocessing.imputation import (
+    SimpleImputerApplier, IterativeImputerApplier, KNNImputerApplier
+)
+from core.ml_pipeline.preprocessing.transformations import (
+    PowerTransformerApplier, SimpleTransformationApplier, GeneralTransformationApplier
+)
+from core.ml_pipeline.preprocessing.bucketing import GeneralBinningApplier
+from core.ml_pipeline.preprocessing.outliers import IQRApplier, ZScoreApplier
+from core.ml_pipeline.preprocessing.cleaning import TextCleaningApplier
+from core.ml_pipeline.preprocessing.feature_generation import PolynomialFeaturesApplier
+from core.ml_pipeline.preprocessing.feature_selection import VarianceThresholdApplier
+from core.ml_pipeline.preprocessing.casting import CastingApplier
+from core.ml_pipeline.preprocessing.drop_and_missing import (
+    DeduplicateApplier, DropMissingColumnsApplier, DropMissingRowsApplier, MissingIndicatorApplier
+)
+
 logger = logging.getLogger(__name__)
+
+APPLIER_MAP = {
+    "onehot": OneHotEncoderApplier,
+    "label": LabelEncoderApplier,
+    "ordinal": OrdinalEncoderApplier,
+    "target": TargetEncoderApplier,
+    "hash": HashEncoderApplier,
+    "dummy": DummyEncoderApplier,
+    "standard_scaler": StandardScalerApplier,
+    "minmax_scaler": MinMaxScalerApplier,
+    "robust_scaler": RobustScalerApplier,
+    "maxabs_scaler": MaxAbsScalerApplier,
+    "simple_imputer": SimpleImputerApplier,
+    "iterative_imputer": IterativeImputerApplier,
+    "knn_imputer": KNNImputerApplier,
+    "power_transformer": PowerTransformerApplier,
+    "simple_transformation": SimpleTransformationApplier,
+    "general_transformation": GeneralTransformationApplier,
+    "general_binning": GeneralBinningApplier,
+    "iqr": IQRApplier,
+    "zscore": ZScoreApplier,
+    "text_cleaning": TextCleaningApplier,
+    "polynomial_features": PolynomialFeaturesApplier,
+    "variance_threshold": VarianceThresholdApplier,
+    "casting": CastingApplier,
+    "deduplicate": DeduplicateApplier,
+    "drop_missing_columns": DropMissingColumnsApplier,
+    "drop_missing_rows": DropMissingRowsApplier,
+    "missing_indicator": MissingIndicatorApplier,
+}
 
 class DeploymentService:
     
@@ -119,8 +172,69 @@ class DeploymentService:
         df = pd.DataFrame(data)
         
         # 4. Predict
-        if hasattr(model, "predict"):
-            predictions = model.predict(df)
+        final_model = model
+        
+        # Check if artifact is a full pipeline (dict with transformers)
+        if isinstance(model, dict) and "model" in model:
+            final_model = model["model"]
+            transformers = model.get("transformers", [])
+            plan = model.get("transformer_plan", [])
+            
+            # Build lookup for transformer objects
+            # Key: (node_id, transformer_name, column_name)
+            t_objs = {}
+            for t in transformers:
+                # Handle None column_name by converting to 'None' string or keeping None
+                # The plan uses what was saved. _collect_transformers converts None to None.
+                # But let's be safe and match exactly what's in the dict.
+                t_node = t.get("node_id")
+                t_name = t.get("transformer_name")
+                t_col = t.get("column_name")
+                t_objs[(t_node, t_name, t_col)] = t.get("transformer")
+
+            # Apply transformations in order
+            for step in plan:
+                node_id = step.get("node_id")
+                for t_spec in step.get("transformers", []):
+                    t_name = t_spec.get("transformer_name")
+                    t_col = t_spec.get("column_name")
+                    metadata = t_spec.get("metadata") or {}
+                    
+                    # Get object
+                    obj = t_objs.get((node_id, t_name, t_col))
+                    
+                    t_type = metadata.get("type")
+                    ApplierCls = APPLIER_MAP.get(t_type)
+                    
+                    if ApplierCls:
+                        try:
+                            applier = ApplierCls()
+                            # Prepare params
+                            params = metadata.copy()
+                            # Inject object into common keys
+                            if obj is not None:
+                                params["encoder_object"] = obj
+                                params["scaler_object"] = obj
+                                params["imputer_object"] = obj
+                                params["transformer_object"] = obj
+                            
+                            # Apply
+                            res = applier.apply(df, params)
+                            
+                            # Unpack result
+                            if isinstance(res, tuple):
+                                df = res[0]
+                            else:
+                                df = res
+                        except Exception as e:
+                            logger.warning(f"Failed to apply transformer {t_type} for {t_col}: {e}")
+                            # Continue? Or fail? 
+                            # If we fail, the whole prediction fails. 
+                            # If we continue, the model might fail later due to missing columns.
+                            # Better to log and try to continue.
+
+        if hasattr(final_model, "predict"):
+            predictions = final_model.predict(df)
             if hasattr(predictions, "tolist"):
                 return predictions.tolist()
             return list(predictions)
