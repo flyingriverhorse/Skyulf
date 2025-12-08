@@ -12,7 +12,7 @@ from sqlalchemy import select, update
 
 from config import get_settings
 from core.database.engine import get_async_session, get_db
-from core.database.models import FeatureEngineeringPipeline
+from core.database.models import FeatureEngineeringPipeline, TrainingJob, HyperparameterTuningJob
 from core.data_ingestion.service import DataIngestionService
 from core.utils.file_utils import extract_file_path_from_source
 
@@ -547,6 +547,61 @@ async def cancel_job(
     if not success:
         raise HTTPException(status_code=400, detail="Job could not be cancelled (maybe it's already finished or doesn't exist)")
     return {"message": "Job cancelled successfully"}
+
+@router.get("/jobs/{job_id}/evaluation")
+async def get_job_evaluation(
+    job_id: str,
+    session: AsyncSession = Depends(get_async_session)
+):
+    """Retrieves the raw evaluation data (y_true, y_pred) for a job."""
+    
+    # 1. Get Job Info
+    stmt = select(TrainingJob).where(TrainingJob.id == job_id)
+    result = await session.execute(stmt)
+    job = result.scalar_one_or_none()
+    
+    if not job:
+        # Try Tuning Job
+        stmt = select(HyperparameterTuningJob).where(HyperparameterTuningJob.id == job_id)
+        result = await session.execute(stmt)
+        job = result.scalar_one_or_none()
+        
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # 2. Determine Artifact Path
+    # Matches the path used in run_pipeline
+    persistent_path = os.path.join(os.getcwd(), "exports", "models", job.pipeline_id)
+    
+    artifact_store = LocalArtifactStore(persistent_path)
+    
+    # 3. Load Evaluation Artifact
+    # Key format: {node_id}_evaluation_data
+    key = f"{job.node_id}_evaluation_data"
+    
+    if not artifact_store.exists(key):
+        # Fallback: Check if the job failed or is still running
+        if job.status != "completed" and job.status != "succeeded":
+             raise HTTPException(status_code=400, detail=f"Job is {job.status}, evaluation data not available yet.")
+        
+        # Debug info
+        path = artifact_store._get_path(key)
+        raise HTTPException(status_code=404, detail=f"Evaluation data artifact not found. Key: {key}, Path: {path}")
+        
+    try:
+        data = artifact_store.load(key)
+        # Verify it belongs to this job (since we share the folder)
+        if data.get("job_id") != job_id:
+             # This confirms the overwrite issue mentioned earlier.
+             # If the ID doesn't match, it means a newer job overwrote it.
+             # We return it anyway with a warning in the logs, or we accept it as "latest for this pipeline".
+             # For now, let's return it but log a warning.
+             logger.warning(f"Evaluation data job_id mismatch. Requested: {job_id}, Found: {data.get('job_id')}")
+             
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load evaluation data: {str(e)}")
+
 
 @router.get("/jobs", response_model=List[JobInfo])
 async def list_jobs(

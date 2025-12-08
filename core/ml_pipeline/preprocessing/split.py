@@ -1,9 +1,12 @@
 from typing import Optional, List, Tuple, Union, Dict, Any
+import logging
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from core.ml_pipeline.data.container import SplitDataset
 from .base import BaseCalculator, BaseApplier
+
+logger = logging.getLogger(__name__)
 
 class TrainTestSplitterCalculator(BaseCalculator):
     def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
@@ -59,6 +62,12 @@ class DataSplitter:
         """
         stratify = y if self.stratify_col else None # If stratify is requested, use y
         
+        if stratify is not None:
+            class_counts = y.value_counts()
+            if class_counts.min() < 2:
+                logger.warning(f"Stratified split requested but the least populated class has only {class_counts.min()} member(s). Stratification will be disabled.")
+                stratify = None
+
         # First split: Train+Val vs Test
         X_train_val, X_test, y_train_val, y_test = train_test_split(
             X, y,
@@ -73,6 +82,12 @@ class DataSplitter:
             relative_val_size = self.validation_size / (1 - self.test_size)
             stratify_val = y_train_val if self.stratify_col else None
             
+            if stratify_val is not None:
+                class_counts_val = y_train_val.value_counts()
+                if class_counts_val.min() < 2:
+                    logger.warning(f"Stratified validation split requested but the least populated class has only {class_counts_val.min()} member(s). Stratification will be disabled for validation split.")
+                    stratify_val = None
+
             X_train, X_val, y_train, y_val = train_test_split(
                 X_train_val, y_train_val,
                 test_size=relative_val_size,
@@ -106,6 +121,12 @@ class DataSplitter:
             stratify = df[self.stratify_col]
 
         # First split: Train+Val vs Test
+        if stratify is not None:
+            class_counts = stratify.value_counts()
+            if class_counts.min() < 2:
+                logger.warning(f"Stratified split requested but the least populated class has only {class_counts.min()} member(s). Stratification will be disabled.")
+                stratify = None
+
         train_val, test = train_test_split(
             df,
             test_size=self.test_size,
@@ -125,6 +146,11 @@ class DataSplitter:
             stratify_val = None
             if self.stratify_col:
                 stratify_val = train_val[self.stratify_col]
+                if stratify_val is not None:
+                    class_counts_val = stratify_val.value_counts()
+                    if class_counts_val.min() < 2:
+                        logger.warning(f"Stratified validation split requested but the least populated class has only {class_counts_val.min()} member(s). Stratification will be disabled for validation split.")
+                        stratify_val = None
 
             train, validation = train_test_split(
                 train_val,

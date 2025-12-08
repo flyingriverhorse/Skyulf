@@ -1,4 +1,4 @@
-from typing import Any, Dict, Type
+from typing import Any, Dict, Type, Optional
 import pandas as pd
 from sklearn.base import BaseEstimator
 from .base import BaseModelCalculator, BaseModelApplier
@@ -58,3 +58,15 @@ class SklearnApplier(BaseModelApplier):
     def predict(self, df: pd.DataFrame, model_artifact: Any) -> pd.Series:
         # model_artifact is the fitted sklearn estimator
         return pd.Series(model_artifact.predict(df), index=df.index)
+
+    def predict_proba(self, df: pd.DataFrame, model_artifact: Any) -> Optional[pd.DataFrame]:
+        if hasattr(model_artifact, "predict_proba"):
+            try:
+                probas = model_artifact.predict_proba(df)
+                # Handle binary vs multiclass
+                # If binary, classes_ usually has 2 entries.
+                classes = model_artifact.classes_
+                return pd.DataFrame(probas, columns=classes, index=df.index)
+            except Exception:
+                return None
+        return None

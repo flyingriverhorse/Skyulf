@@ -21,6 +21,7 @@ export interface JobInfo {
   hyperparameters?: Record<string, any>;
   created_at: string;
   metrics?: Record<string, number>;
+  config?: any;
 }
 
 export interface RunPipelineRequest extends PipelineConfigModel {

@@ -155,8 +155,25 @@ class TunerCalculator:
         # 3. Select Search Strategy
         searcher = None
         
-        # Handle multiclass metrics
+        # Handle multiclass metrics and map user-friendly names
         metric = config.metric
+        
+        # Map common user-friendly metrics to sklearn scoring strings
+        metric_map = {
+            "mse": "neg_mean_squared_error",
+            "mae": "neg_mean_absolute_error",
+            "rmse": "neg_root_mean_squared_error",
+            "r2": "r2",
+            "accuracy": "accuracy",
+            "f1": "f1",
+            "precision": "precision",
+            "recall": "recall",
+            "roc_auc": "roc_auc"
+        }
+        
+        if metric in metric_map:
+            metric = metric_map[metric]
+
         if self.model_calculator.problem_type == "classification":
             # Check if target is multiclass
             is_multiclass = False
@@ -166,10 +183,11 @@ class TunerCalculator:
                 is_multiclass = len(np.unique(y)) > 2
             
             # If multiclass and metric is binary-default, switch to weighted
+            # Note: We check against the mapped names now (e.g. "f1", "precision")
             if is_multiclass and metric in ["f1", "precision", "recall", "roc_auc"]:
                 metric = f"{metric}_weighted"
                 # roc_auc needs special handling (ovr/ovo) usually, but weighted often works for simple cases
-                if config.metric == "roc_auc":
+                if config.metric == "roc_auc": # Check original config metric name just in case
                     metric = "roc_auc_ovr_weighted"
 
         if config.strategy == "grid":
@@ -261,9 +279,23 @@ class TunerCalculator:
         X_arr = X_for_search.to_numpy() if hasattr(X_for_search, "to_numpy") else X_for_search
         y_arr = y_for_search.to_numpy() if hasattr(y_for_search, "to_numpy") else y_for_search
         
-        searcher.fit(X_arr, y_arr)
+        try:
+            searcher.fit(X_arr, y_arr)
+        except Exception as e:
+            logger.error(f"Hyperparameter tuning failed: {str(e)}")
+            error_msg = str(e)
+            if "No trials are completed yet" in error_msg:
+                 raise ValueError("Hyperparameter tuning failed: No trials completed successfully. This usually means the model failed to train with the provided hyperparameter combinations. Please check your search space and data.") from e
+            
+            if "n_samples" in error_msg and "resample" in error_msg and "Got 0" in error_msg:
+                raise ValueError("Hyperparameter tuning with Halving strategy failed because the dataset is too small for the configured halving parameters. Please try using 'Random Search' or 'Grid Search' instead, or increase your dataset size.") from e
+                
+            raise e
         
         # 5. Extract Results
+        if not hasattr(searcher, "best_params_"):
+             raise ValueError("Hyperparameter tuning failed to find any valid combination of parameters. All trials likely failed.")
+
         best_params = searcher.best_params_
         best_score = searcher.best_score_
         
