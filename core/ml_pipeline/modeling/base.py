@@ -100,7 +100,8 @@ class StatefulEstimator:
         dataset: Union[SplitDataset, pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], 
         target_column: str, 
         config: Dict[str, Any],
-        progress_callback: Optional[Callable[[int, int], None]] = None
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+        job_id: str = "unknown"
     ) -> Dict[str, pd.Series]:
         """
         Fits the model on training data and returns predictions for all splits.
@@ -130,6 +131,11 @@ class StatefulEstimator:
         
         # 3. Save Artifact
         self.artifact_store.save(self.node_id, model_artifact)
+        
+        if job_id and job_id != "unknown":
+             # Save with job_id to allow specific retrieval
+             logger.info(f"Saving model artifact to job key: {job_id}")
+             self.artifact_store.save(job_id, model_artifact)
         
         # 4. Predict on all splits
         predictions = {}
@@ -169,13 +175,13 @@ class StatefulEstimator:
             
         return predictions
 
-    def refit(self, dataset: SplitDataset, target_column: str, config: Dict[str, Any]) -> None:
+    def refit(self, dataset: SplitDataset, target_column: str, config: Dict[str, Any], job_id: str = "unknown") -> None:
         """
         Refits the model on Train + Validation data and updates the artifact.
         """
         if dataset.validation is None:
             # Fallback to normal fit if no validation set
-            self.fit_predict(dataset, target_column, config)
+            self.fit_predict(dataset, target_column, config, job_id=job_id)
             return
 
         # 1. Prepare Combined Data
@@ -190,6 +196,11 @@ class StatefulEstimator:
         
         # 3. Save Artifact (Overwrites the previous one)
         self.artifact_store.save(self.node_id, model_artifact)
+        
+        if job_id and job_id != "unknown":
+             # Save with job_id
+             logger.info(f"Saving refitted model artifact to job key: {job_id}")
+             self.artifact_store.save(job_id, model_artifact)
 
     def evaluate(self, dataset: SplitDataset, target_column: str, job_id: str = "unknown") -> ModelEvaluationReport:
         """
@@ -291,9 +302,15 @@ class StatefulEstimator:
             
         # Save the raw evaluation data artifact
         # Key format: {node_id}_evaluation_data
+        # We also save with job_id if available to avoid collisions or for easier lookup
         key = f"{self.node_id}_evaluation_data"
         logger.info(f"Saving evaluation artifact to key: {key}")
         self.artifact_store.save(key, evaluation_data)
+        
+        if job_id and job_id != "unknown":
+             job_key = f"{job_id}_evaluation_data"
+             logger.info(f"Saving evaluation artifact to job key: {job_key}")
+             self.artifact_store.save(job_key, evaluation_data)
             
         # Feature cols for report metadata
         if isinstance(dataset.train, tuple):

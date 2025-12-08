@@ -82,7 +82,9 @@ class PowerTransformerApplier(BaseApplier):
         # 2. Apply standardization using scaler_params
         
         X_vals = df_out[valid_cols].values
-        lambdas_arr = np.array(lambdas)
+        # Filter lambdas and scaler params to match valid_cols
+        col_indices = [cols.index(c) for c in valid_cols]
+        lambdas_arr = np.array(lambdas)[col_indices]
         
         # 1. Power Transform
         # We can use sklearn's internal functions or reimplement.
@@ -100,8 +102,17 @@ class PowerTransformerApplier(BaseApplier):
             if standardize:
                 from sklearn.preprocessing import StandardScaler
                 scaler = StandardScaler()
-                scaler.mean_ = np.array(scaler_params.get('mean'))
-                scaler.scale_ = np.array(scaler_params.get('scale'))
+                
+                mean = np.array(scaler_params.get('mean'))
+                scale = np.array(scaler_params.get('scale'))
+                
+                if len(mean) == len(cols):
+                     mean = mean[col_indices]
+                if len(scale) == len(cols):
+                     scale = scale[col_indices]
+                     
+                scaler.mean_ = mean
+                scaler.scale_ = scale
                 scaler.var_ = np.square(scaler.scale_) # Approximate if not stored
                 pt._scaler = scaler
                 

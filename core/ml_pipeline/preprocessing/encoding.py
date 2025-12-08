@@ -94,21 +94,62 @@ class OneHotEncoderApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
             
         X_out = X.copy()
-        X_sub = X_out[valid_cols].copy()
+        
+        # Ensure all expected columns are present for the encoder
+        # If some columns are missing in input, we fill them with NaN
+        # This allows encoder.transform to receive the correct number of features
+        missing_cols = set(cols) - set(X.columns)
+        if missing_cols:
+            for c in missing_cols:
+                X_out[c] = np.nan
+        
+        # Select columns in the order expected by the encoder
+        X_sub = X_out[cols].copy()
+        
         if include_missing:
             X_sub = X_sub.fillna('__mlops_missing__')
             
-        encoded_array = encoder.transform(X_sub)
-        encoded_df = pd.DataFrame(
-            encoded_array, 
-            columns=feature_names, 
-            index=X_out.index
-        )
+        # Handle NaNs in X_sub if not include_missing
+        # If handle_unknown='ignore', OneHotEncoder treats NaNs as unknown (all zeros)
+        # But we need to ensure they are not passed as float nan to string encoder if it expects strings
+        # Usually OneHotEncoder handles mixed types or casts to string.
+        # Let's cast to string to be safe if they were object columns
+        for col in X_sub.columns:
+            if X_sub[col].dtype == 'object':
+                X_sub[col] = X_sub[col].astype(str)
+                # "nan" string might be treated as a category if it was seen during fit.
+                # If it wasn't seen, it's unknown.
+                # If real NaN, astype(str) makes it "nan".
         
-        if drop_original:
-            X_out = X_out.drop(columns=valid_cols)
+        try:
+            encoded_array = encoder.transform(X_sub)
+            encoded_df = pd.DataFrame(
+                encoded_array, 
+                columns=feature_names, 
+                index=X_out.index
+            )
             
-        X_out = pd.concat([X_out, encoded_df], axis=1)
+            if drop_original:
+                # Only drop columns that were actually in the original X
+                cols_to_drop = [c for c in cols if c in X.columns]
+                X_out = X_out.drop(columns=cols_to_drop)
+                # Also drop the temporary missing columns we added? 
+                # No, X_out is a copy, and we added them to X_out.
+                # If we added them, we should drop them too if drop_original is True.
+                # Actually, if drop_original is True, we want to remove the raw columns.
+                # Since we added missing columns to X_out, we should remove them too.
+                cols_to_drop_all = cols
+                # But X_out might not have them if we didn't add them (if they were present).
+                # Safe way: drop existing cols from 'cols' list
+                existing_cols_to_drop = [c for c in cols if c in X_out.columns]
+                X_out = X_out.drop(columns=existing_cols_to_drop)
+                
+            X_out = pd.concat([X_out, encoded_df], axis=1)
+        except Exception as e:
+            logger.warning(f"OneHotEncoder application failed: {e}")
+            # If failed, we return original X (maybe with missing cols added? No, let's return X)
+            return pack_pipeline_output(X, y, is_tuple)
+
         return pack_pipeline_output(X_out, y, is_tuple)
 
 # --- Ordinal Encoder ---

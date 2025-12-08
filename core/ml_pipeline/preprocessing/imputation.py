@@ -77,16 +77,24 @@ class SimpleImputerApplier(BaseApplier):
         cols = params.get('columns', [])
         fill_values = params.get('fill_values', {})
         
-        valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols:
+        if not cols:
             return pack_pipeline_output(X, y, is_tuple)
             
         X_out = X.copy()
-        for col in valid_cols:
-            if col in fill_values:
-                val = fill_values[col]
-                if val is not None:
-                    X_out[col] = X_out[col].fillna(val)
+        
+        # Iterate over ALL expected columns, not just valid ones
+        for col in cols:
+            val = fill_values.get(col)
+            if val is None:
+                continue
+                
+            if col not in X_out.columns:
+                # Restore missing column with fill value
+                X_out[col] = val
+            else:
+                # Fill existing NaNs
+                X_out[col] = X_out[col].fillna(val)
+                
         return pack_pipeline_output(X_out, y, is_tuple)
 
 # --- KNN Imputer ---
@@ -131,15 +139,26 @@ class KNNImputerApplier(BaseApplier):
         if not imputer or not cols:
             return pack_pipeline_output(X, y, is_tuple)
             
-        valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols:
-            return pack_pipeline_output(X, y, is_tuple)
+        # Ensure all training columns are present, filling missing with NaN
+        X_working = X.copy()
+        missing_cols = [c for c in cols if c not in X_working.columns]
         
-        X_sub = X[valid_cols]
+        if missing_cols:
+            # Add missing columns as NaN
+            for c in missing_cols:
+                X_working[c] = np.nan
+        
         try:
+            # Select only the relevant columns in correct order for sklearn
+            X_sub = X_working[cols]
+            
             X_imputed = imputer.transform(X_sub)
-            X_out = X.copy()
-            X_out[valid_cols] = X_imputed
+            
+            # Update the dataframe with imputed values
+            # We use X_working as base to include restored columns
+            X_out = X_working.copy()
+            X_out[cols] = X_imputed
+            
             return pack_pipeline_output(X_out, y, is_tuple)
         except Exception as e:
             logger.error(f"KNN Imputation failed: {e}")
@@ -202,15 +221,25 @@ class IterativeImputerApplier(BaseApplier):
         if not imputer or not cols:
             return pack_pipeline_output(X, y, is_tuple)
             
-        valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols:
-            return pack_pipeline_output(X, y, is_tuple)
+        # Ensure all training columns are present, filling missing with NaN
+        X_working = X.copy()
+        missing_cols = [c for c in cols if c not in X_working.columns]
         
-        X_sub = X[valid_cols]
+        if missing_cols:
+            # Add missing columns as NaN
+            for c in missing_cols:
+                X_working[c] = np.nan
+        
         try:
+            # Select only the relevant columns in correct order for sklearn
+            X_sub = X_working[cols]
+            
             X_imputed = imputer.transform(X_sub)
-            X_out = X.copy()
-            X_out[valid_cols] = X_imputed
+            
+            # Update the dataframe with imputed values
+            X_out = X_working.copy()
+            X_out[cols] = X_imputed
+            
             return pack_pipeline_output(X_out, y, is_tuple)
         except Exception as e:
             logger.error(f"Iterative Imputation failed: {e}")

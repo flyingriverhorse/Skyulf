@@ -98,10 +98,11 @@ def calculate_classification_metrics(model: Any, X: pd.DataFrame, y: pd.Series) 
 def calculate_regression_metrics(model: Any, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
     """Compute regression metrics for predictions."""
     
-    X_arr = X.to_numpy() if hasattr(X, "to_numpy") else X
+    # Use DataFrame directly if possible to preserve feature names
+    predictions = model.predict(X)
+    
     y_arr = y.to_numpy() if hasattr(y, "to_numpy") else y
 
-    predictions = model.predict(X_arr)
     mse_value = mean_squared_error(y_arr, predictions)
     metrics: Dict[str, float] = {
         "mae": float(mean_absolute_error(y_arr, predictions)),

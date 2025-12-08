@@ -151,6 +151,8 @@ class JobManager:
                         job.best_params = result["best_params"]
                     if "best_score" in result:
                         job.best_score = result["best_score"]
+                    if "artifact_uri" in result:
+                        job.artifact_uri = result["artifact_uri"]
                     
                     # Save all metrics (including train/test/val scores) to the metrics column
                     # Filter out complex objects if necessary, but result usually contains simple types
