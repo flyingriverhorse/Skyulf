@@ -10,7 +10,7 @@ import uuid
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update
+from sqlalchemy import select, update, or_, cast, String
 from core.database.models import TrainingJob, HyperparameterTuningJob, DataSource
 
 class JobStatus(str, Enum):
@@ -34,6 +34,12 @@ class JobInfo(BaseModel):
     error: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
     logs: Optional[List[str]] = None
+    
+    # Extended fields for Experiments Page
+    model_type: Optional[str] = None
+    hyperparameters: Optional[Dict[str, Any]] = None
+    created_at: Optional[datetime] = None
+    metrics: Optional[Dict[str, Any]] = None
 
 class JobManager:
     
@@ -138,11 +144,20 @@ class JobManager:
                         job.metrics = result["metrics"]
                     if "artifact_uri" in result:
                         job.artifact_uri = result["artifact_uri"]
+                    if "hyperparameters" in result:
+                        job.hyperparameters = result["hyperparameters"]
                 elif isinstance(job, HyperparameterTuningJob):
                     if "best_params" in result:
                         job.best_params = result["best_params"]
                     if "best_score" in result:
                         job.best_score = result["best_score"]
+                    
+                    # Save all metrics (including train/test/val scores) to the metrics column
+                    # Filter out complex objects if necessary, but result usually contains simple types
+                    # We exclude best_params/best_score to avoid duplication if desired, 
+                    # but keeping them in metrics is also fine for consistency.
+                    # Let's save everything that looks like a metric.
+                    job.metrics = result
             
             if status in [JobStatus.COMPLETED, JobStatus.FAILED]:
                 job.finished_at = datetime.now()
@@ -173,6 +188,15 @@ class JobManager:
                 job_type = "tuning"
             
         if job:
+            # Extract hyperparameters from graph if possible, or metadata
+            hyperparameters = None
+            if job.graph and "nodes" in job.graph:
+                # Find the node that matches job.node_id
+                for node in job.graph["nodes"]:
+                    if node.get("id") == job.node_id:
+                        hyperparameters = node.get("data", {}).get("params", {})
+                        break
+            
             return JobInfo(
                 job_id=job.id,
                 pipeline_id=job.pipeline_id,
@@ -185,7 +209,11 @@ class JobManager:
                 end_time=job.finished_at,
                 error=job.error_message,
                 result={"metrics": job.metrics} if job_type == "training" else {"best_params": job.best_params},
-                logs=job.logs
+                logs=job.logs,
+                model_type=job.model_type,
+                hyperparameters=hyperparameters,
+                created_at=job.created_at,
+                metrics=job.metrics if job_type == "training" else ({"score": job.best_score} if job.best_score else None)
             )
         return None
 
@@ -196,7 +224,10 @@ class JobManager:
         # For now, let's fetch TrainingJobs
         result_train = await session.execute(
             select(TrainingJob, DataSource.name)
-            .outerjoin(DataSource, TrainingJob.dataset_source_id == DataSource.source_id)
+            .outerjoin(DataSource, or_(
+                TrainingJob.dataset_source_id == DataSource.source_id,
+                TrainingJob.dataset_source_id == cast(DataSource.id, String)
+            ))
             .order_by(TrainingJob.started_at.desc())
             .limit(limit)
         )
@@ -204,7 +235,10 @@ class JobManager:
         
         result_tune = await session.execute(
             select(HyperparameterTuningJob, DataSource.name)
-            .outerjoin(DataSource, HyperparameterTuningJob.dataset_source_id == DataSource.source_id)
+            .outerjoin(DataSource, or_(
+                HyperparameterTuningJob.dataset_source_id == DataSource.source_id,
+                HyperparameterTuningJob.dataset_source_id == cast(DataSource.id, String)
+            ))
             .order_by(HyperparameterTuningJob.started_at.desc())
             .limit(limit)
         )
@@ -212,6 +246,14 @@ class JobManager:
         
         combined = []
         for j, d_name in train_rows:
+            # Extract hyperparameters
+            hyperparameters = j.hyperparameters
+            if not hyperparameters and j.graph and "nodes" in j.graph:
+                for node in j.graph["nodes"]:
+                    if node.get("id") == j.node_id:
+                        hyperparameters = node.get("data", {}).get("params", {})
+                        break
+
             combined.append(JobInfo(
                 job_id=j.id,
                 pipeline_id=j.pipeline_id,
@@ -223,9 +265,24 @@ class JobManager:
                 start_time=j.started_at,
                 end_time=j.finished_at,
                 error=j.error_message,
-                result={"metrics": j.metrics}
+                result={"metrics": j.metrics},
+                model_type=j.model_type,
+                hyperparameters=hyperparameters,
+                created_at=j.created_at,
+                metrics=j.metrics
             ))
         for j, d_name in tune_rows:
+            # Extract hyperparameters (search space)
+            # For display in Experiments table, users prefer to see the BEST params found
+            # if the job is completed. Otherwise, show the search space.
+            if j.status == JobStatus.COMPLETED.value and j.best_params:
+                hyperparameters = j.best_params
+            else:
+                hyperparameters = j.search_space
+
+            # Use stored metrics if available, otherwise fallback to best_score
+            metrics = j.metrics if j.metrics else ({"score": j.best_score} if j.best_score else None)
+
             combined.append(JobInfo(
                 job_id=j.id,
                 pipeline_id=j.pipeline_id,
@@ -237,7 +294,11 @@ class JobManager:
                 start_time=j.started_at,
                 end_time=j.finished_at,
                 error=j.error_message,
-                result={"best_params": j.best_params}
+                result={"best_params": j.best_params, "metrics": metrics}, # Ensure metrics are in result too
+                model_type=j.model_type,
+                hyperparameters=hyperparameters,
+                created_at=j.created_at,
+                metrics=metrics
             ))
             
         # Sort by start time

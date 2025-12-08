@@ -59,23 +59,23 @@ export const JobsDrawer: React.FC = () => {
                 <div className="flex border-b border-gray-200 dark:border-gray-700">
                 <button
                     className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'training' 
-                        ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20' 
-                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                    }`}
-                    onClick={() => setTab('training')}
-                >
-                    Training Jobs
-                </button>
-                <button
-                    className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === 'tuning' 
                         ? 'border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-50/50 dark:bg-purple-900/20' 
                         : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                     }`}
                     onClick={() => setTab('tuning')}
                 >
-                    Tuning Jobs
+                    Model Optimization
+                </button>
+                <button
+                    className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'training' 
+                        ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20' 
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                    }`}
+                    onClick={() => setTab('training')}
+                >
+                    Standard Training
                 </button>
                 </div>
 
@@ -83,17 +83,18 @@ export const JobsDrawer: React.FC = () => {
                 <div className="grid grid-cols-12 gap-4 px-6 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
                     <div className="col-span-2">Status</div>
                     <div className="col-span-2">Dataset</div>
-                    <div className="col-span-2">Job ID</div>
+                    <div className="col-span-1">Job ID</div>
                     <div className="col-span-2">Started</div>
                     <div className="col-span-1">Duration</div>
-                    <div className="col-span-3">Result</div>
+                    <div className="col-span-2">Model Ready</div>
+                    <div className="col-span-2">Result</div>
                 </div>
 
                 {/* List */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50/30 dark:bg-gray-900/30">
                 {filteredJobs.length === 0 ? (
                     <div className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">
-                    No {activeTab} jobs found.
+                    No {activeTab === 'tuning' ? 'optimization' : 'training'} jobs found.
                     </div>
                 ) : (
                     filteredJobs.map(job => (
@@ -263,10 +264,17 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                         {/* Results Section */}
                         {job.result && (
                             <div className="space-y-4">
-                                <h3 className="text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                                    <Terminal className="w-4 h-4" />
-                                    Execution Results
-                                </h3>
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                        <Terminal className="w-4 h-4" />
+                                        Execution Results
+                                    </h3>
+                                    {job.status === 'completed' && (
+                                        <span className="text-xs px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full flex items-center gap-1 border border-green-200 dark:border-green-800 font-medium">
+                                            <CheckCircle className="w-3 h-3" /> Model Ready
+                                        </span>
+                                    )}
+                                </div>
                                 
                                 {job.job_type === 'training' && job.result.metrics && (
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -287,16 +295,6 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                         <pre>{JSON.stringify(job.result.best_params, null, 2)}</pre>
                                     </div>
                                 )}
-                                
-                                {/* Raw JSON Dump for debugging */}
-                                <div className="mt-4">
-                                    <details className="text-xs text-gray-500 cursor-pointer">
-                                        <summary className="hover:text-gray-700 dark:hover:text-gray-300">View Raw Output</summary>
-                                        <pre className="mt-2 p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto">
-                                            {JSON.stringify(job.result, null, 2)}
-                                        </pre>
-                                    </details>
-                                </div>
                             </div>
                         )}
                     </div>
@@ -376,7 +374,7 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
       </div>
 
       {/* Job ID */}
-      <div className="col-span-2 font-mono text-xs text-gray-500 dark:text-gray-400 truncate" title={job.job_id}>
+      <div className="col-span-1 font-mono text-xs text-gray-500 dark:text-gray-400 truncate" title={job.job_id}>
         {job.job_id.slice(0, 8)}
       </div>
 
@@ -390,17 +388,26 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
         {getDuration(job.start_time, job.end_time)}
       </div>
 
+      {/* Model Ready */}
+      <div className="col-span-2">
+        {job.status === 'completed' && (
+            <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full flex items-center gap-1 border border-green-200 dark:border-green-800 w-fit">
+                <CheckCircle className="w-3 h-3" /> Ready
+            </span>
+        )}
+      </div>
+
       {/* Result / Error */}
-      <div className="col-span-3">
+      <div className="col-span-2">
         {job.error ? (
             <span className="text-red-600 dark:text-red-400 text-xs truncate block" title={job.error}>
-                Error: {job.error}
+                Error
             </span>
         ) : job.status === 'completed' && job.result ? (
              job.job_type === 'training' && job.result.metrics ? (
-               <div className="flex flex-wrap gap-2">
-                 {Object.entries(job.result.metrics).slice(0, 2).map(([k, v]) => (
-                   <span key={k} className="text-[10px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+               <div className="flex flex-wrap gap-1">
+                 {Object.entries(job.result.metrics).slice(0, 1).map(([k, v]) => (
+                   <span key={k} className="text-[10px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 truncate max-w-full">
                      {k}: {Number(v).toFixed(3)}
                    </span>
                  ))}

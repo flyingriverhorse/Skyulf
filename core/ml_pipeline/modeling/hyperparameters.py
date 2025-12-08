@@ -39,7 +39,7 @@ LOGISTIC_REGRESSION_PARAMS = [
             {"label": "L1", "value": "l1"},
             {"label": "L2", "value": "l2"},
             {"label": "ElasticNet", "value": "elasticnet"},
-            {"label": "None", "value": "none"},
+            {"label": "None", "value": None},
         ],
         description="Norm used in the penalization."
     ),
@@ -206,7 +206,7 @@ DEFAULT_SEARCH_SPACES = {
     "logistic_regression": {
         "C": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
         "penalty": ["l1", "l2", "elasticnet"],
-        "solver": ["lbfgs", "liblinear", "saga", "newton-cg"],
+        "solver": ["saga"],
         "max_iter": [100, 200, 500, 1000],
         "l1_ratio": [0.1, 0.5, 0.7, 0.9] # Only used for elasticnet
     },

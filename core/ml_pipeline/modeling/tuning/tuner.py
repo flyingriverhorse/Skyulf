@@ -56,6 +56,21 @@ class TunerCalculator:
     def __init__(self, model_calculator: BaseModelCalculator):
         self.model_calculator = model_calculator
 
+    def _clean_search_space(self, search_space: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Recursively cleans the search space.
+        - Converts "none" string to None.
+        """
+        cleaned = {}
+        for k, v in search_space.items():
+            if isinstance(v, list):
+                cleaned[k] = [None if x == "none" else x for x in v]
+            elif isinstance(v, dict):
+                cleaned[k] = self._clean_search_space(v)
+            else:
+                cleaned[k] = None if v == "none" else v
+        return cleaned
+
     def fit(
         self, 
         X: pd.DataFrame, 
@@ -163,43 +178,47 @@ class TunerCalculator:
             # For now, we only support progress for Optuna or if we implement custom loop.
             searcher = GridSearchCV(
                 estimator=base_estimator,
-                param_grid=config.search_space,
+                param_grid=self._clean_search_space(config.search_space),
                 scoring=metric,
                 cv=cv,
                 n_jobs=-1,
-                refit=False # We just want best params
+                refit=False, # We just want best params
+                error_score=np.nan # Skip invalid combinations (e.g. solver/penalty mismatch)
             )
         elif config.strategy == "random":
             searcher = RandomizedSearchCV(
                 estimator=base_estimator,
-                param_distributions=config.search_space,
+                param_distributions=self._clean_search_space(config.search_space),
                 n_iter=config.n_trials,
                 scoring=metric,
                 cv=cv,
                 n_jobs=-1,
                 random_state=config.random_state,
-                refit=False
+                refit=False,
+                error_score=np.nan
             )
         elif config.strategy == "halving_grid":
             searcher = HalvingGridSearchCV(
                 estimator=base_estimator,
-                param_grid=config.search_space,
+                param_grid=self._clean_search_space(config.search_space),
                 scoring=metric,
                 cv=cv,
                 n_jobs=-1,
                 random_state=config.random_state,
-                refit=False
+                refit=False,
+                error_score=np.nan
             )
         elif config.strategy == "halving_random":
             searcher = HalvingRandomSearchCV(
                 estimator=base_estimator,
-                param_distributions=config.search_space,
+                param_distributions=self._clean_search_space(config.search_space),
                 n_candidates=config.n_trials,  # Map n_trials to n_candidates
                 scoring=metric,
                 cv=cv,
                 n_jobs=-1,
                 random_state=config.random_state,
-                refit=False
+                refit=False,
+                error_score=np.nan
             )
         elif config.strategy == "optuna":
             if not HAS_OPTUNA:

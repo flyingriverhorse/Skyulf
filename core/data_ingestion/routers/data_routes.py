@@ -271,6 +271,33 @@ async def get_data_source(
         )
 
 
+@data_router.get("/api/sources/{source_id}/sample")
+async def get_data_source_sample(
+    source_id: str,
+    limit: int = Query(5, ge=1, le=100),
+    current_user: User = Depends(require_data_access),
+    service: DataIngestionService = Depends(get_data_service)
+):
+    """Get a sample of data from the source."""
+    try:
+        data = await service.get_data_sample(source_id, limit)
+        return JSONResponse(content={
+            "success": True,
+            "data": data
+        })
+    except DataSourceNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Data source not found: {source_id}"
+        )
+    except Exception as e:
+        logger.error(f"Error getting data sample for {source_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get data sample: {str(e)}"
+        )
+
+
 @data_router.delete("/api/sources/{source_id}")
 async def delete_data_source(
     source_id: str,

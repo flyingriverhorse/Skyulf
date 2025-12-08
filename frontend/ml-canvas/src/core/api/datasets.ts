@@ -17,6 +17,16 @@ export const DatasetService = {
     if (!response.ok) {
       throw new Error('Failed to fetch dataset');
     }
-    return response.json();
+    const data = await response.json();
+    return data.source;
+  },
+
+  getSample: async (id: string, limit: number = 1): Promise<any[]> => {
+    const response = await fetch(`${API_BASE}/sources/${id}/sample?limit=${limit}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch dataset sample');
+    }
+    const data = await response.json();
+    return data.data;
   }
 };

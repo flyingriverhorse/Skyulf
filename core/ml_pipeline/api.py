@@ -371,11 +371,16 @@ async def run_pipeline(
 
     for node in config.nodes:
         if node.step_type == "data_loader" and "dataset_id" in node.params:
+            # Default to whatever is passed
             dataset_source_id = str(node.params["dataset_id"])
             try:
                 ds_id = int(node.params["dataset_id"])
                 ds = await ingestion_service.get_data_source_by_id(ds_id)
                 if ds:
+                    # Use the UUID source_id for consistency with the database join
+                    if ds.source_id:
+                        dataset_source_id = ds.source_id
+                    
                     ds_dict = {
                         "connection_info": ds.config,
                         "file_path": ds.config.get("file_path") if ds.config else None
@@ -388,7 +393,8 @@ async def run_pipeline(
                 else:
                     raise HTTPException(status_code=404, detail=f"Dataset {ds_id} not found")
             except ValueError:
-                 raise HTTPException(status_code=400, detail=f"Invalid dataset ID: {node.params['dataset_id']}")
+                 # If it's not an int, assume it's already a UUID or string ID
+                 pass
 
     # 2. Create Job (Async, Persistent)
     
@@ -471,6 +477,24 @@ def _run_engine_task(store, config, job_id, target_node_id=None):
                 # For training jobs, metrics contains accuracy, f1, etc.
                 if node_res.metrics:
                     job_result.update(node_res.metrics)
+                
+                # Add artifact_uri
+                job_result["artifact_uri"] = target_node_id # Using node_id as the URI key for LocalArtifactStore
+
+                # Extract hyperparameters from the config for the target node
+                # We need to find the node config in the pipeline config
+                target_node_config = next((n for n in config.nodes if n.node_id == target_node_id), None)
+                if target_node_config:
+                    # Check for hyperparameters in params
+                    # Logic should match engine._run_model_training extraction
+                    params = target_node_config.params
+                    hyperparameters = params.get("hyperparameters")
+                    
+                    # If not explicitly in "hyperparameters" key, maybe it's flat in params?
+                    # But engine._run_model_training looks for params.get("hyperparameters", {})
+                    # So we should stick to that.
+                    if hyperparameters:
+                        job_result["hyperparameters"] = hyperparameters
             
             JobManager.update_status_sync(
                 session, 
@@ -621,3 +645,15 @@ def get_model_default_search_space(model_type: str):
     Returns the default search space for a specific model type.
     """
     return get_default_search_space(model_type)
+
+@router.get("/datasets/list", response_model=List[Dict[str, Any]])
+async def list_datasets(
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Returns a simple list of available datasets for filtering.
+    """
+    from core.database.models import DataSource
+    stmt = select(DataSource.source_id, DataSource.name).where(DataSource.is_active == True)
+    result = await session.execute(stmt)
+    return [{"id": row.source_id, "name": row.name} for row in result.all()]

@@ -9,6 +9,7 @@ import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useElementSize } from '../../../core/hooks/useElementSize';
 import { useGraphStore } from '../../../core/store/useGraphStore';
+import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { getIncomers } from '@xyflow/react';
 
@@ -143,8 +144,8 @@ const BestParamsModal: React.FC<{
                     ) : jobs.length === 0 ? (
                         <div className="text-center py-12 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
                             <Database className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">No completed tuning jobs found.</p>
-                            <p className="text-xs opacity-70 mt-1">Run a tuning job to see results here.</p>
+                            <p className="text-sm">No completed optimization jobs found.</p>
+                            <p className="text-xs opacity-70 mt-1">Run an optimization job to see results here.</p>
                         </div>
                     ) : (
                         jobs.map(job => (
@@ -159,14 +160,19 @@ const BestParamsModal: React.FC<{
                                                 {job.end_time ? new Date(job.end_time).toLocaleString() : 'Unknown Date'}
                                             </span>
                                         </div>
-                                        {job.result?.best_score !== undefined && (
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs font-medium text-gray-500">Score:</span>
-                                                <span className="text-sm font-bold text-green-600 dark:text-green-400">
-                                                    {job.result.best_score.toFixed(4)}
-                                                </span>
-                                            </div>
-                                        )}
+                                        <div className="flex items-center gap-3 mt-1">
+                                            {job.result?.best_score !== undefined && (
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-xs font-medium text-gray-500">Score:</span>
+                                                    <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                                                        {job.result.best_score.toFixed(4)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full flex items-center gap-1">
+                                                <Check className="w-3 h-3" /> Model Ready
+                                            </span>
+                                        </div>
                                     </div>
                                     <button 
                                         onClick={() => {
@@ -189,12 +195,6 @@ const BestParamsModal: React.FC<{
                                         <Check className="w-3 h-3" />
                                         Apply
                                     </button>
-                                </div>
-                                
-                                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-2.5 border border-gray-100 dark:border-gray-800">
-                                    <code className="text-[10px] text-gray-600 dark:text-gray-300 font-mono break-all">
-                                        {JSON.stringify(job.result?.best_params || {}, null, 2)}
-                                    </code>
                                 </div>
                             </div>
                         ))
@@ -266,7 +266,9 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
   const [hyperparameters, setHyperparameters] = useState<HyperparameterDef[]>([]);
   const [showParamsModal, setShowParamsModal] = useState(false);
   const [isLoadingDefs, setIsLoadingDefs] = useState(false);
+  const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_model_training'));
   
+  const { toggleDrawer, setTab } = useJobStore();
   const upstreamData = useUpstreamData(nodeId || '');
   
   // Recursive search for datasetId
@@ -349,6 +351,8 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
             job_type: 'training'
         });
         alert("Training job submitted successfully!");
+        setTab('training');
+        toggleDrawer(true);
     } catch (error) {
         console.error("Failed to submit training job:", error);
         alert("Failed to submit training job. Check console for details.");
@@ -604,6 +608,21 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
 
   return (
     <div className="flex flex-col h-full" ref={containerRef}>
+      {showInfo && (
+        <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded text-xs text-blue-700 dark:text-blue-300 flex justify-between items-start gap-2">
+          <span>Train a model using fixed parameters or defaults.</span>
+          <button 
+            onClick={() => {
+                setShowInfo(false);
+                sessionStorage.setItem('hide_info_model_training', 'true');
+            }} 
+            className="text-blue-400 hover:text-blue-600 dark:hover:text-blue-200"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
       <BestParamsModal 
         isOpen={showParamsModal} 
         onClose={() => setShowParamsModal(false)} 
@@ -671,7 +690,7 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
           style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' }}
         >
           <Play className="w-4 h-4 fill-current" />
-          <span className="text-sm font-semibold">Train Model</span>
+          <span className="text-sm font-semibold">Start Training</span>
         </button>
       </div>
     </div>
@@ -680,9 +699,9 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
 
 export const ModelTrainingNode: NodeDefinition = {
   type: 'model_training',
-  label: 'Model Training',
+  label: 'Standard Training',
   category: 'Modeling',
-  description: 'Train a machine learning model.',
+  description: 'Train a model with fixed or default parameters.',
   icon: BrainCircuit,
   inputs: [{ id: 'in', label: 'Training Data', type: 'dataset' }],
   outputs: [{ id: 'model', label: 'Trained Model', type: 'model' }],

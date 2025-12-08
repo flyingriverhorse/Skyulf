@@ -1660,6 +1660,7 @@ class TrainingJobStatus(str, Enum):
     QUEUED = "queued"
     RUNNING = "running"
     SUCCEEDED = "succeeded"
+    COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
 
