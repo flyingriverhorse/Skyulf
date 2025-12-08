@@ -11,7 +11,11 @@ class TuningConfig:
     n_trials: int = 10
     timeout: Optional[int] = None # Seconds
     search_space: Dict[str, List[Any]] = field(default_factory=dict) # e.g. {"C": [0.1, 1.0, 10.0]}
+    cv_enabled: bool = True
     cv_folds: int = 5
+    cv_type: Literal["k_fold", "stratified_k_fold", "time_series_split", "shuffle_split"] = "k_fold"
+    cv_shuffle: bool = True
+    cv_random_state: int = 42
     random_state: int = 42
 
 @dataclass

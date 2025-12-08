@@ -12,7 +12,9 @@ from sklearn.model_selection import (
     HalvingGridSearchCV, 
     HalvingRandomSearchCV,
     KFold, 
-    StratifiedKFold
+    StratifiedKFold,
+    TimeSeriesSplit,
+    ShuffleSplit
 )
 
 from ..base import BaseModelCalculator, BaseModelApplier
@@ -122,14 +124,39 @@ class TunerCalculator:
             
             cv = PredefinedSplit(test_fold)
         else:
-            if self.model_calculator.problem_type == "classification":
+            if not config.cv_enabled:
+                # Single split validation (20% holdout)
+                cv = ShuffleSplit(n_splits=1, test_size=0.2, random_state=config.random_state)
+            elif config.cv_type == "time_series_split":
+                cv = TimeSeriesSplit(n_splits=config.cv_folds)
+            elif config.cv_type == "shuffle_split":
+                cv = ShuffleSplit(n_splits=config.cv_folds, test_size=0.2, random_state=config.random_state)
+            elif config.cv_type == "stratified_k_fold" and self.model_calculator.problem_type == "classification":
                 cv = StratifiedKFold(n_splits=config.cv_folds, shuffle=True, random_state=config.random_state)
             else:
+                # Default to KFold (also fallback for stratified if regression)
                 cv = KFold(n_splits=config.cv_folds, shuffle=True, random_state=config.random_state)
             
         # 3. Select Search Strategy
         searcher = None
         
+        # Handle multiclass metrics
+        metric = config.metric
+        if self.model_calculator.problem_type == "classification":
+            # Check if target is multiclass
+            is_multiclass = False
+            if isinstance(y, pd.Series):
+                is_multiclass = y.nunique() > 2
+            elif isinstance(y, np.ndarray):
+                is_multiclass = len(np.unique(y)) > 2
+            
+            # If multiclass and metric is binary-default, switch to weighted
+            if is_multiclass and metric in ["f1", "precision", "recall", "roc_auc"]:
+                metric = f"{metric}_weighted"
+                # roc_auc needs special handling (ovr/ovo) usually, but weighted often works for simple cases
+                if config.metric == "roc_auc":
+                    metric = "roc_auc_ovr_weighted"
+
         if config.strategy == "grid":
             # Note: GridSearchCV does not support granular progress callbacks easily.
             # We could wrap the CV iterator, but n_jobs=-1 makes it complex.
@@ -137,7 +164,7 @@ class TunerCalculator:
             searcher = GridSearchCV(
                 estimator=base_estimator,
                 param_grid=config.search_space,
-                scoring=config.metric,
+                scoring=metric,
                 cv=cv,
                 n_jobs=-1,
                 refit=False # We just want best params
@@ -147,7 +174,7 @@ class TunerCalculator:
                 estimator=base_estimator,
                 param_distributions=config.search_space,
                 n_iter=config.n_trials,
-                scoring=config.metric,
+                scoring=metric,
                 cv=cv,
                 n_jobs=-1,
                 random_state=config.random_state,

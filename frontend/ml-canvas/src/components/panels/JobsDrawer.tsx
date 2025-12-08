@@ -1,0 +1,314 @@
+import React, { useState } from 'react';
+import { useJobStore } from '../../core/store/useJobStore';
+import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal } from 'lucide-react';
+import { JobInfo } from '../../core/api/jobs';
+
+export const JobsDrawer: React.FC = () => {
+  const { 
+    isDrawerOpen, 
+    toggleDrawer, 
+    jobs, 
+    isLoading, 
+    activeTab, 
+    setTab,
+    fetchJobs 
+  } = useJobStore();
+
+  const [selectedJob, setSelectedJob] = useState<JobInfo | null>(null);
+
+  if (!isDrawerOpen) return null;
+
+  const filteredJobs = jobs.filter(job => job.job_type === activeTab);
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-center items-center">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={() => toggleDrawer(false)}
+      />
+      
+      {/* Modal Content */}
+      <div className="relative w-[900px] h-[85vh] bg-white dark:bg-gray-800 shadow-2xl rounded-lg flex flex-col border border-gray-200 dark:border-gray-700 overflow-hidden transition-all">
+        
+        {selectedJob ? (
+            <JobDetailsView job={selectedJob} onBack={() => setSelectedJob(null)} onClose={() => toggleDrawer(false)} />
+        ) : (
+            <>
+                {/* Header */}
+                <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+                <h2 className="font-semibold text-gray-800 dark:text-gray-100">Job History</h2>
+                <div className="flex items-center gap-2">
+                    <button 
+                    onClick={() => fetchJobs()}
+                    className={`p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 ${isLoading ? 'animate-spin' : ''}`}
+                    title="Refresh"
+                    >
+                    <RefreshCw className="w-4 h-4" />
+                    </button>
+                    <button 
+                    onClick={() => toggleDrawer(false)}
+                    className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
+                    >
+                    <X className="w-4 h-4" />
+                    </button>
+                </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex border-b border-gray-200 dark:border-gray-700">
+                <button
+                    className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'training' 
+                        ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20' 
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                    }`}
+                    onClick={() => setTab('training')}
+                >
+                    Training Jobs
+                </button>
+                <button
+                    className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'tuning' 
+                        ? 'border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-50/50 dark:bg-purple-900/20' 
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                    }`}
+                    onClick={() => setTab('tuning')}
+                >
+                    Tuning Jobs
+                </button>
+                </div>
+
+                {/* List Header */}
+                <div className="grid grid-cols-12 gap-4 px-6 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <div className="col-span-2">Status</div>
+                    <div className="col-span-2">Dataset</div>
+                    <div className="col-span-2">Job ID</div>
+                    <div className="col-span-2">Started</div>
+                    <div className="col-span-1">Duration</div>
+                    <div className="col-span-3">Result</div>
+                </div>
+
+                {/* List */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50/30 dark:bg-gray-900/30">
+                {filteredJobs.length === 0 ? (
+                    <div className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">
+                    No {activeTab} jobs found.
+                    </div>
+                ) : (
+                    filteredJobs.map(job => (
+                    <JobRow key={job.job_id} job={job} onClick={() => setSelectedJob(job)} />
+                    ))
+                )}
+                </div>
+            </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () => void }> = ({ job, onBack, onClose }) => {
+    return (
+        <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500">
+                        <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <div>
+                        <h2 className="font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                            Job Details
+                            <span className="text-xs font-normal text-gray-500 font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                                {job.job_id.slice(0, 8)}
+                            </span>
+                        </h2>
+                    </div>
+                </div>
+                <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
+                    <X className="w-4 h-4" />
+                </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Status Section */}
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</div>
+                        <div className="font-medium capitalize flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                            {job.status}
+                        </div>
+                    </div>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Dataset</div>
+                        <div className="font-medium text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <Database className="w-3 h-3 text-gray-400" />
+                            {job.dataset_name || job.dataset_id || 'Unknown'}
+                        </div>
+                    </div>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Duration</div>
+                        <div className="font-medium text-gray-800 dark:text-gray-200 font-mono">
+                            {job.start_time && job.end_time 
+                                ? `${Math.round((new Date(job.end_time).getTime() - new Date(job.start_time).getTime()) / 1000)}s` 
+                                : '-'}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Error Section */}
+                {job.error && (
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-lg">
+                        <h3 className="text-sm font-medium text-red-800 dark:text-red-300 mb-2 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" />
+                            Error Log
+                        </h3>
+                        <pre className="text-xs text-red-700 dark:text-red-400 whitespace-pre-wrap font-mono">
+                            {job.error}
+                        </pre>
+                    </div>
+                )}
+
+                {/* Results Section */}
+                {job.result && (
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <Terminal className="w-4 h-4" />
+                            Execution Results
+                        </h3>
+                        
+                        {job.job_type === 'training' && job.result.metrics && (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                {Object.entries(job.result.metrics).map(([k, v]) => (
+                                    <div key={k} className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">{k.replace(/_/g, ' ')}</div>
+                                        <div className="font-mono font-medium text-blue-600 dark:text-blue-400">
+                                            {typeof v === 'number' ? v.toFixed(4) : String(v)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {job.job_type === 'tuning' && job.result.best_params && (
+                            <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
+                                <div className="text-gray-500 mb-2"># Best Hyperparameters</div>
+                                <pre>{JSON.stringify(job.result.best_params, null, 2)}</pre>
+                            </div>
+                        )}
+                        
+                        {/* Raw JSON Dump for debugging */}
+                        <div className="mt-4">
+                            <details className="text-xs text-gray-500 cursor-pointer">
+                                <summary className="hover:text-gray-700 dark:hover:text-gray-300">View Raw Output</summary>
+                                <pre className="mt-2 p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto">
+                                    {JSON.stringify(job.result, null, 2)}
+                                </pre>
+                            </details>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick }) => {
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed': 
+      case 'succeeded':
+        return <CheckCircle className="w-4 h-4 text-green-500 dark:text-green-400" />;
+      case 'failed': return <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400" />;
+      case 'running': return <RefreshCw className="w-4 h-4 text-blue-500 dark:text-blue-400 animate-spin" />;
+      default: return <Clock className="w-4 h-4 text-gray-400 dark:text-gray-500" />;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50';
+      case 'failed': return 'bg-red-50/30 dark:bg-red-900/10 border-red-100 dark:border-red-900/30 hover:bg-red-50/50 dark:hover:bg-red-900/20';
+      case 'running': return 'bg-blue-50/30 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/30 hover:bg-blue-50/50 dark:hover:bg-blue-900/20';
+      default: return 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700';
+    }
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleString(undefined, {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  };
+
+  const getDuration = (start: string | null, end: string | null) => {
+      if (!start || !end) return '-';
+      const diff = new Date(end).getTime() - new Date(start).getTime();
+      const seconds = Math.floor(diff / 1000);
+      if (seconds < 60) return `${seconds}s`;
+      const minutes = Math.floor(seconds / 60);
+      return `${minutes}m ${seconds % 60}s`;
+  };
+
+  return (
+    <div 
+        onClick={onClick}
+        className={`grid grid-cols-12 gap-4 p-3 rounded-lg border text-sm items-center transition-colors cursor-pointer ${getStatusColor(job.status)}`}
+    >
+      {/* Status */}
+      <div className="col-span-2 flex items-center gap-2">
+        {getStatusIcon(job.status)}
+        <span className="font-medium text-gray-700 dark:text-gray-300 capitalize truncate">
+          {job.status}
+        </span>
+      </div>
+
+      {/* Dataset */}
+      <div className="col-span-2 flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 truncate" title={job.dataset_id}>
+        <Database className="w-3 h-3" />
+        {job.dataset_name || job.dataset_id || '-'}
+      </div>
+
+      {/* Job ID */}
+      <div className="col-span-2 font-mono text-xs text-gray-500 dark:text-gray-400 truncate" title={job.job_id}>
+        {job.job_id.slice(0, 8)}
+      </div>
+
+      {/* Started */}
+      <div className="col-span-2 text-gray-600 dark:text-gray-400 text-xs">
+        {formatDate(job.start_time)}
+      </div>
+
+      {/* Duration */}
+      <div className="col-span-1 text-gray-600 dark:text-gray-400 text-xs font-mono">
+        {getDuration(job.start_time, job.end_time)}
+      </div>
+
+      {/* Result / Error */}
+      <div className="col-span-3">
+        {job.error ? (
+            <span className="text-red-600 dark:text-red-400 text-xs truncate block" title={job.error}>
+                Error: {job.error}
+            </span>
+        ) : job.status === 'completed' && job.result ? (
+             job.job_type === 'training' && job.result.metrics ? (
+               <div className="flex flex-wrap gap-2">
+                 {Object.entries(job.result.metrics).slice(0, 2).map(([k, v]) => (
+                   <span key={k} className="text-[10px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                     {k}: {Number(v).toFixed(3)}
+                   </span>
+                 ))}
+               </div>
+             ) : job.job_type === 'tuning' && job.result.best_params ? (
+               <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate" title={JSON.stringify(job.result.best_params)}>
+                   Params found
+               </div>
+             ) : <span className="text-gray-400 text-xs">-</span>
+        ) : (
+            <span className="text-gray-400 text-xs">-</span>
+        )}
+      </div>
+    </div>
+  );
+};

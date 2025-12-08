@@ -176,13 +176,46 @@ class PipelineEngine:
         
         data = self._resolve_input(node)
         target_col = node.params["target_column"]
-        algorithm = node.params["algorithm"]
+        algorithm = node.params.get("algorithm") or node.params.get("model_type")
+        if not algorithm:
+             raise ValueError("Missing 'algorithm' or 'model_type' in node parameters")
         hyperparameters = node.params.get("hyperparameters", {})
         
         # Factory logic (simplified)
         calculator, applier = self._get_model_components(algorithm)
         
         estimator = StatefulEstimator(calculator, applier, self.artifact_store, node.node_id)
+        
+        # 1. Cross-Validation (Optional)
+        cv_metrics = {}
+        if node.params.get("cv_enabled", False):
+            # Handle DataFrame vs SplitDataset
+            cv_data = data
+            if isinstance(data, pd.DataFrame):
+                from ..data.container import SplitDataset
+                cv_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+            elif isinstance(data, tuple):
+                 from ..data.container import SplitDataset
+                 cv_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+
+            cv_results = estimator.cross_validate(
+                cv_data, 
+                target_col, 
+                hyperparameters,
+                n_folds=node.params.get("cv_folds", 5),
+                cv_type=node.params.get("cv_type", "k_fold"),
+                shuffle=node.params.get("cv_shuffle", True),
+                random_state=node.params.get("cv_random_state", 42)
+            )
+            
+            # Aggregate metrics for the return value
+            # cv_results structure: {"accuracy": {"mean": 0.9, "std": 0.01, ...}, ...}
+            for metric_name, stats in cv_results.items():
+                if isinstance(stats, dict) and "mean" in stats:
+                    cv_metrics[f"cv_{metric_name}_mean"] = stats["mean"]
+                    cv_metrics[f"cv_{metric_name}_std"] = stats["std"]
+
+        # 2. Train Final Model
         estimator.fit_predict(data, target_col, hyperparameters)
         
         # Optional: Evaluate immediately
@@ -193,13 +226,18 @@ class PipelineEngine:
             if "test" in report.splits:
                 metrics = report.splits["test"].metrics
         
+        # Merge CV metrics
+        metrics.update(cv_metrics)
+        
         return node.node_id, metrics
 
     def _run_model_tuning(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset
         data = self._resolve_input(node)
         target_col = node.params["target_column"]
-        algorithm = node.params["algorithm"]
+        algorithm = node.params.get("algorithm") or node.params.get("model_type")
+        if not algorithm:
+             raise ValueError("Missing 'algorithm' or 'model_type' in node parameters")
         tuning_params = node.params["tuning_config"] # Dict matching TuningConfig
         
         calculator, applier = self._get_model_components(algorithm)

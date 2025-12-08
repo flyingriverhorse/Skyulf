@@ -5,6 +5,7 @@ import { DropColumnsNode } from '../../modules/nodes/processing/DropColumnsNode'
 import { ImputationNode } from '../../modules/nodes/processing/ImputationNode';
 import { ScalingNode } from '../../modules/nodes/processing/ScalingNode';
 import { ModelTrainingNode } from '../../modules/nodes/modeling/ModelTrainingNode';
+import { HyperparameterTuningNode } from '../../modules/nodes/modeling/HyperparameterTuningNode';
 import { EvaluationNode } from '../../modules/nodes/modeling/EvaluationNode';
 import { FeatureSelectionNode } from '../../modules/nodes/processing/FeatureSelectionNode';
 import { TrainTestSplitNode } from '../../modules/nodes/modeling/TrainTestSplitNode';
@@ -48,6 +49,7 @@ export const initializeRegistry = () => {
   registry.register(CastTypeNode);
   registry.register(MissingIndicatorNode);
   registry.register(ModelTrainingNode);
+  registry.register(HyperparameterTuningNode);
   registry.register(EvaluationNode);
   
   console.log('[Registry] Initialization complete. Total nodes:', registry.getAll().length);

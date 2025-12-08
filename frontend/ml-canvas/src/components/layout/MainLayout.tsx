@@ -5,10 +5,12 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { Toolbar } from './Toolbar';
 import { ResultsPanel } from './ResultsPanel';
 import { Navbar } from './Navbar';
+import { JobsDrawer } from '../panels/JobsDrawer';
 
 export const MainLayout: React.FC = () => {
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden flex-col">
+      <JobsDrawer />
       <Navbar />
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar />
