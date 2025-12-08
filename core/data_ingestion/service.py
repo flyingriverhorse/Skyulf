@@ -9,7 +9,7 @@ import unicodedata
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple, Set, cast
+from typing import Dict, Any, List, Optional, Tuple, Set, cast, Union
 
 import aiofiles
 import pandas as pd
@@ -631,6 +631,29 @@ class DataIngestionService:
                 "sources_by_category": {},
                 "message": "Error calculating statistics. Please check the logs."
             }
+
+    async def get_data_sample(self, source_id: Union[int, str], limit: int = 5) -> List[Dict[str, Any]]:
+        """Get a sample of data from the source."""
+        # Resolve source_id to int if possible, or use string lookup
+        try:
+            source_id_int = int(source_id)
+            source = await self.get_data_source(source_id_int)
+        except (ValueError, DataSourceNotFoundError):
+            # Try string lookup if int lookup fails or if source_id is not an int
+            source = await self.get_data_source_by_source_id(str(source_id))
+            if not source:
+                raise DataSourceNotFoundError(str(source_id))
+
+        # Extract file path
+        source_dict = source.to_dict()
+        file_path = extract_file_path_from_source(source_dict)
+        
+        if not file_path or not file_path.exists():
+            raise DataProcessingError(f"File not found for source {source_id}")
+
+        # Load sample
+        data, _, _, _ = await self._load_file_data(str(file_path), limit, 0)
+        return data
 
     async def update_data_source(
         self,

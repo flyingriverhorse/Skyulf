@@ -15,6 +15,12 @@ export interface JobInfo {
   error: string | null;
   result: Record<string, any> | null;
   logs?: string[];
+  
+  // Extended fields
+  model_type?: string;
+  hyperparameters?: Record<string, any>;
+  created_at: string;
+  metrics?: Record<string, number>;
 }
 
 export interface RunPipelineRequest extends PipelineConfigModel {

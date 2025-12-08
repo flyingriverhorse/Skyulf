@@ -36,11 +36,14 @@ if _imblearn_metrics is not None:
 def calculate_classification_metrics(model: Any, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
     """Compute classification metrics for predictions."""
     
-    # Ensure inputs are numpy
-    X_arr = X.to_numpy() if hasattr(X, "to_numpy") else X
+    # Use DataFrame directly if possible to preserve feature names
+    # Only convert to numpy if model doesn't support pandas or if X is not pandas
+    
+    predictions = model.predict(X)
+    
+    # For metrics calculation, we might need numpy arrays for y
     y_arr = y.to_numpy() if hasattr(y, "to_numpy") else y
 
-    predictions = model.predict(X_arr)
     metrics: Dict[str, float] = {
         "accuracy": float(accuracy_score(y_arr, predictions)),
         "precision_weighted": float(precision_score(y_arr, predictions, average="weighted", zero_division=0)),
@@ -66,7 +69,7 @@ def calculate_classification_metrics(model: Any, X: pd.DataFrame, y: pd.Series) 
 
     try:
         if hasattr(model, "predict_proba"):
-            proba = model.predict_proba(X_arr)
+            proba = model.predict_proba(X)
             if proba.ndim == 2 and proba.shape[1] >= 2:
                 class_count = proba.shape[1]
                 try:

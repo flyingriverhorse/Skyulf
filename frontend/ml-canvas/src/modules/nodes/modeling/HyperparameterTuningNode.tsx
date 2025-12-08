@@ -3,13 +3,14 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { 
     Sliders, Play, Loader2, Database, Activity, 
     Settings2, BarChart3, X, RefreshCw, ChevronRight, ChevronDown,
-    HelpCircle, AlertCircle, AlertTriangle
+    HelpCircle, AlertCircle, AlertTriangle, Check
 } from 'lucide-react';
 import { jobsApi, JobInfo } from '../../../core/api/jobs';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useElementSize } from '../../../core/hooks/useElementSize';
 import { useGraphStore } from '../../../core/store/useGraphStore';
+import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { getIncomers } from '@xyflow/react';
 
@@ -269,8 +270,8 @@ const BestParamsModal: React.FC<{
                     ) : jobs.length === 0 ? (
                         <div className="text-center py-12 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
                             <Database className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">No completed tuning jobs found.</p>
-                            <p className="text-xs opacity-70 mt-1">Run a tuning job to see results here.</p>
+                            <p className="text-sm">No completed optimization jobs found.</p>
+                            <p className="text-xs opacity-70 mt-1">Run an optimization job to see results here.</p>
                         </div>
                     ) : (
                         jobs.map(job => (
@@ -285,21 +286,20 @@ const BestParamsModal: React.FC<{
                                                 {job.end_time ? new Date(job.end_time).toLocaleString() : 'Unknown Date'}
                                             </span>
                                         </div>
-                                        {job.result?.best_score !== undefined && (
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs font-medium text-gray-500">Score:</span>
-                                                <span className="text-sm font-bold text-green-600 dark:text-green-400">
-                                                    {job.result.best_score.toFixed(4)}
-                                                </span>
-                                            </div>
-                                        )}
+                                        <div className="flex items-center gap-3 mt-1">
+                                            {job.result?.best_score !== undefined && (
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-xs font-medium text-gray-500">Score:</span>
+                                                    <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                                                        {job.result.best_score.toFixed(4)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full flex items-center gap-1">
+                                                <Check className="w-3 h-3" /> Model Ready
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
-                                
-                                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-2.5 border border-gray-100 dark:border-gray-800">
-                                    <code className="text-[10px] text-gray-600 dark:text-gray-300 font-mono break-all">
-                                        {JSON.stringify(job.result?.best_params || {}, null, 2)}
-                                    </code>
                                 </div>
                             </div>
                         ))
@@ -322,11 +322,13 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
   const [showParamsModal, setShowParamsModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'config' | 'search_space'>('config');
   const [showCV, setShowCV] = useState(false);
+  const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_model_optimizer'));
   
   const [containerRef, { width }] = useElementSize();
   const isWide = width > 450;
 
   // --- Upstream Data Logic ---
+  const { toggleDrawer, setTab } = useJobStore();
   const upstreamData = useUpstreamData(nodeId || '');
   const nodes = useGraphStore((state) => state.nodes);
   const edges = useGraphStore((state) => state.edges);
@@ -424,6 +426,8 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
             job_type: 'tuning'
         });
         alert("Tuning job submitted successfully!");
+        setTab('tuning');
+        toggleDrawer(true);
     } catch (error) {
         console.error("Failed to submit tuning job:", error);
         alert("Failed to submit tuning job.");
@@ -660,6 +664,21 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
 
   return (
     <div className="flex flex-col h-full" ref={containerRef}>
+      {showInfo && (
+        <div className="mb-4 p-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded text-xs text-purple-700 dark:text-purple-300 flex justify-between items-start gap-2">
+          <span>Automatically explore configurations to find the best performing model.</span>
+          <button 
+            onClick={() => {
+                setShowInfo(false);
+                sessionStorage.setItem('hide_info_model_optimizer', 'true');
+            }} 
+            className="text-purple-400 hover:text-purple-600 dark:hover:text-purple-200"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
       {/* Mobile/Narrow Tabs */}
       {!isWide && (
         <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
@@ -708,7 +727,7 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
           style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' }}
         >
           <Play className="w-4 h-4 fill-current" />
-          <span className="text-sm font-semibold">Run Tuning Job</span>
+          <span className="text-sm font-semibold">Start Optimization</span>
         </button>
 
         <button 
@@ -731,9 +750,9 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
 
 export const HyperparameterTuningNode: NodeDefinition = {
   type: 'hyperparameter_tuning',
-  label: 'Hyperparameter Tuning',
+  label: 'Train Model and Optimize',
   category: 'Modeling',
-  description: 'Optimize model hyperparameters.',
+  description: 'Automatically optimize model performance.',
   icon: Sliders,
   inputs: [{ id: 'in', label: 'Training Data', type: 'dataset' }],
   outputs: [{ id: 'model', label: 'Best Model', type: 'model' }],

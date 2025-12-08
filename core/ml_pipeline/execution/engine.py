@@ -4,6 +4,8 @@ import logging
 import time
 from datetime import datetime
 from typing import Any, Dict, Optional
+import pandas as pd
+import numpy as np
 
 from ..artifacts.store import ArtifactStore
 from .schemas import PipelineConfig, PipelineExecutionResult, NodeExecutionResult, NodeConfig
@@ -181,6 +183,11 @@ class PipelineEngine:
         # Modeling expects SplitDataset usually.
         
         data = self._resolve_input(node)
+        
+        # Safety check: Ensure data is not a model artifact
+        if hasattr(data, "predict") or hasattr(data, "fit"):
+             raise ValueError(f"Node {node.node_id} received a Model object instead of a Dataset. Check your pipeline connections. Did you connect a Tuning/Training node output to a Training node input?")
+             
         target_col = node.params["target_column"]
         algorithm = node.params.get("algorithm") or node.params.get("model_type")
         if not algorithm:
@@ -228,9 +235,18 @@ class PipelineEngine:
         metrics = {}
         if node.params.get("evaluate", True):
             report = estimator.evaluate(data, target_col)
-            # Flatten metrics for summary
-            if "test" in report.splits:
-                metrics = report.splits["test"].metrics
+            # Flatten metrics for summary with prefixes
+            if "train" in report.splits and report.splits["train"]:
+                for k, v in report.splits["train"].metrics.items():
+                    metrics[f"train_{k}"] = v
+            
+            if "test" in report.splits and report.splits["test"]:
+                for k, v in report.splits["test"].metrics.items():
+                    metrics[f"test_{k}"] = v
+                    
+            if "validation" in report.splits and report.splits["validation"]:
+                for k, v in report.splits["validation"].metrics.items():
+                    metrics[f"val_{k}"] = v
         
         # Merge CV metrics
         metrics.update(cv_metrics)
@@ -275,7 +291,26 @@ class PipelineEngine:
         estimator = StatefulEstimator(calculator, applier, self.artifact_store, node.node_id)
         estimator.fit_predict(data, target_col, result.best_params)
         
-        return node.node_id, {"best_score": result.best_score, "best_params": result.best_params}
+        metrics = {"best_score": result.best_score, "best_params": result.best_params}
+        
+        # Evaluate the tuned model
+        try:
+            report = estimator.evaluate(data, target_col)
+            if "train" in report.splits and report.splits["train"]:
+                for k, v in report.splits["train"].metrics.items():
+                    metrics[f"train_{k}"] = v
+            
+            if "test" in report.splits and report.splits["test"]:
+                for k, v in report.splits["test"].metrics.items():
+                    metrics[f"test_{k}"] = v
+                    
+            if "validation" in report.splits and report.splits["validation"]:
+                for k, v in report.splits["validation"].metrics.items():
+                    metrics[f"val_{k}"] = v
+        except Exception as e:
+            logger.warning(f"Failed to evaluate tuned model: {e}")
+        
+        return node.node_id, metrics
 
     def _run_transformer(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
         """Runs a single transformer node as a 1-step feature engineering pipeline."""

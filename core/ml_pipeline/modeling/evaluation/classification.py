@@ -73,8 +73,11 @@ def _build_confusion_matrix_payload(
     y_pred: np.ndarray,
     label_names: Sequence[str],
 ) -> ModelEvaluationConfusionMatrix:
-    label_indices = np.arange(len(label_names))
-    counts = confusion_matrix(y_true, y_pred, labels=label_indices)
+    # Ensure inputs are strings to match label_names
+    y_true_str = y_true.astype(str)
+    y_pred_str = y_pred.astype(str)
+    
+    counts = confusion_matrix(y_true_str, y_pred_str, labels=label_names)
     totals = counts.sum(axis=1)
 
     with np.errstate(divide="ignore", invalid="ignore"):
