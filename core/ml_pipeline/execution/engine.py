@@ -45,11 +45,11 @@ class PipelineEngine:
         if self.log_callback:
             self.log_callback(message)
 
-    def run(self, config: PipelineConfig) -> PipelineExecutionResult:
+    def run(self, config: PipelineConfig, job_id: str = "unknown") -> PipelineExecutionResult:
         """
         Executes the pipeline defined by the configuration.
         """
-        self.log(f"Starting pipeline execution: {config.pipeline_id}")
+        self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
         start_time = datetime.now()
         
         pipeline_result = PipelineExecutionResult(
@@ -60,7 +60,7 @@ class PipelineEngine:
 
         for node in config.nodes:
             try:
-                node_result = self._execute_node(node)
+                node_result = self._execute_node(node, job_id=job_id)
                 pipeline_result.node_results[node.node_id] = node_result
                 
                 if node_result.status == "failed":
@@ -81,7 +81,7 @@ class PipelineEngine:
         pipeline_result.end_time = datetime.now()
         return pipeline_result
 
-    def _execute_node(self, node: NodeConfig) -> NodeExecutionResult:
+    def _execute_node(self, node: NodeConfig, job_id: str = "unknown") -> NodeExecutionResult:
         """Executes a single node based on its type."""
         self.log(f"Executing node: {node.node_id} ({node.step_type})")
         start_ts = time.time()
@@ -100,9 +100,9 @@ class PipelineEngine:
                 else:
                     output_artifact_id, metrics = self._run_feature_engineering(node)
             elif node.step_type == "model_training":
-                output_artifact_id, metrics = self._run_model_training(node)
+                output_artifact_id, metrics = self._run_model_training(node, job_id=job_id)
             elif node.step_type == "model_tuning":
-                output_artifact_id, metrics = self._run_model_tuning(node)
+                output_artifact_id, metrics = self._run_model_tuning(node, job_id=job_id)
             else:
                 # Try to run as a single transformer step
                 try:
@@ -177,7 +177,7 @@ class PipelineEngine:
         self.artifact_store.save(node.node_id, processed_df)
         return node.node_id, metrics
 
-    def _run_model_training(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
+    def _run_model_training(self, node: NodeConfig, job_id: str = "unknown") -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset (from Feature Engineering) or DataFrame
         # Wait, FeatureEngineer returns SplitDataset if split=True, or DataFrame if not.
         # Modeling expects SplitDataset usually.
@@ -229,12 +229,12 @@ class PipelineEngine:
                     cv_metrics[f"cv_{metric_name}_std"] = stats["std"]
 
         # 2. Train Final Model
-        estimator.fit_predict(data, target_col, hyperparameters)
+        estimator.fit_predict(data, target_col, hyperparameters, job_id=job_id)
         
         # Optional: Evaluate immediately
         metrics = {}
         if node.params.get("evaluate", True):
-            report = estimator.evaluate(data, target_col)
+            report = estimator.evaluate(data, target_col, job_id=job_id)
             # Flatten metrics for summary with prefixes
             if "train" in report.splits and report.splits["train"]:
                 for k, v in report.splits["train"].metrics.items():
@@ -253,7 +253,7 @@ class PipelineEngine:
         
         return node.node_id, metrics
 
-    def _run_model_tuning(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
+    def _run_model_tuning(self, node: NodeConfig, job_id: str = "unknown") -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset
         data = self._resolve_input(node)
         target_col = node.params["target_column"]
@@ -289,13 +289,13 @@ class PipelineEngine:
         
         # Train final model with best params
         estimator = StatefulEstimator(calculator, applier, self.artifact_store, node.node_id)
-        estimator.fit_predict(data, target_col, result.best_params)
+        estimator.fit_predict(data, target_col, result.best_params, job_id=job_id)
         
         metrics = {"best_score": result.best_score, "best_params": result.best_params}
         
         # Evaluate the tuned model
         try:
-            report = estimator.evaluate(data, target_col)
+            report = estimator.evaluate(data, target_col, job_id=job_id)
             if "train" in report.splits and report.splits["train"]:
                 for k, v in report.splits["train"].metrics.items():
                     metrics[f"train_{k}"] = v

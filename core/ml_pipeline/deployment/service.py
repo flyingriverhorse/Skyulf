@@ -6,6 +6,10 @@ from core.ml_pipeline.execution.jobs import JobManager
 import pandas as pd
 import logging
 import os
+import sklearn
+
+# Ensure sklearn outputs pandas DataFrames where possible to preserve feature names
+sklearn.set_config(transform_output="pandas")
 
 from core.ml_pipeline.preprocessing.encoding import (
     OneHotEncoderApplier, LabelEncoderApplier, OrdinalEncoderApplier, 
@@ -233,7 +237,37 @@ class DeploymentService:
                             # If we continue, the model might fail later due to missing columns.
                             # Better to log and try to continue.
 
+        # Ensure sklearn outputs pandas DataFrames if final_model is a Pipeline
+        if hasattr(final_model, "set_output"):
+            try:
+                final_model.set_output(transform="pandas")
+            except Exception:
+                pass
+
         if hasattr(final_model, "predict"):
+            # Log columns for debugging
+            if isinstance(df, pd.DataFrame):
+                logger.info(f"Predicting with columns: {df.columns.tolist()}")
+                # Check if model has feature names and if they match
+                if hasattr(final_model, "feature_names_in_"):
+                    model_cols = final_model.feature_names_in_.tolist()
+                    missing_in_df = set(model_cols) - set(df.columns)
+                    if missing_in_df:
+                        logger.warning(f"Missing columns in input DataFrame: {missing_in_df}")
+                        # Add missing columns as NaN?
+                        # If we add them, the model might handle them if it can handle NaNs (e.g. HistGradientBoosting)
+                        # But RandomForest usually can't.
+                        # However, if we don't add them, we get shape mismatch.
+                        # Let's try to add them as 0 or NaN?
+                        # Adding as 0 is safer for tree models if it's one-hot encoded features.
+                        for c in missing_in_df:
+                            df[c] = 0 # Assuming 0 is a safe default for missing features (e.g. one-hot)
+                            
+                    # Reorder columns to match model
+                    df = df[model_cols]
+            else:
+                logger.warning(f"Predicting with non-DataFrame input of type {type(df)}")
+
             predictions = final_model.predict(df)
             if hasattr(predictions, "tolist"):
                 return predictions.tolist()

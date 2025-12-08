@@ -465,7 +465,7 @@ def _run_engine_task(store, config, job_id, target_node_id=None):
         JobManager.update_status_sync(session, job_id, JobStatus.RUNNING)
         
         engine = PipelineEngine(store, log_callback=log_callback)
-        result = engine.run(config)
+        result = engine.run(config, job_id=job_id)
         
         if result.status == "success":
             # Extract results from target node if available
@@ -479,7 +479,8 @@ def _run_engine_task(store, config, job_id, target_node_id=None):
                     job_result.update(node_res.metrics)
                 
                 # Add artifact_uri
-                job_result["artifact_uri"] = target_node_id # Using node_id as the URI key for LocalArtifactStore
+                # We use the job_id as the artifact URI/Key to ensure we point to the specific run's model
+                job_result["artifact_uri"] = job_id 
 
                 # Extract hyperparameters from the config for the target node
                 # We need to find the node config in the pipeline config
