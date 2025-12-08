@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
 from config import get_settings
-from core.database.engine import get_async_session
+from core.database.engine import get_async_session, get_db
 from core.database.models import FeatureEngineeringPipeline
 from core.data_ingestion.service import DataIngestionService
 from core.utils.file_utils import extract_file_path_from_source
@@ -25,6 +25,7 @@ from .data.profiler import DataProfiler
 from .recommendations.engine import AdvisorEngine
 from .recommendations.schemas import Recommendation, AnalysisProfile
 from .execution.jobs import JobManager, JobStatus, JobInfo
+from .modeling.hyperparameters import get_hyperparameters, get_default_search_space
 import logging
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,8 @@ class PipelineConfigModel(BaseModel):
     pipeline_id: str
     nodes: List[NodeConfigModel]
     metadata: Dict[str, Any] = {}
+    target_node_id: Optional[str] = None
+    job_type: Optional[str] = "training" # "training" or "tuning"
 
 class PreviewResponse(BaseModel):
     pipeline_id: str
@@ -228,13 +231,23 @@ async def preview_pipeline(
         recommendations = []
         
         if result.status == "success" and config.nodes:
-            # Get the last node's output
-            last_node_id = config.nodes[-1].node_id
-            if artifact_store.exists(last_node_id):
-                artifact = artifact_store.load(last_node_id)
+            # Determine which node's output to preview
+            target_node = config.nodes[-1]
+            target_node_id = target_node.node_id
+            
+            # If the last node is a modeling node, we can't preview the model object as data.
+            # Instead, we preview the input data that went into the model.
+            if target_node.step_type in ["model_training", "model_tuning"]:
+                if target_node.inputs:
+                    # Use the input node's output
+                    target_node_id = target_node.inputs[0]
+                    logger.info(f"Last node is {target_node.step_type}, previewing input node {target_node_id} instead")
+
+            if artifact_store.exists(target_node_id):
+                artifact = artifact_store.load(target_node_id)
                 
                 # Debug logging
-                logger.debug(f"Loaded artifact for node {last_node_id}. Type: {type(artifact)}")
+                logger.debug(f"Loaded artifact for node {target_node_id}. Type: {type(artifact)}")
                 if isinstance(artifact, SplitDataset):
                     logger.debug(f"SplitDataset Train Type: {type(artifact.train)}")
                 
@@ -336,22 +349,78 @@ async def preview_pipeline(
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 @router.post("/run")
-def run_pipeline(config: PipelineConfigModel, background_tasks: BackgroundTasks):
+async def run_pipeline(
+    config: PipelineConfigModel, 
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_async_session)
+):
     """
     Runs the pipeline in Full Mode:
     - Uses the persistent artifact store.
     - Uses full dataset.
     - Runs asynchronously (simulated via BackgroundTasks for now).
     """
-    # 1. Create Job
-    job_id = JobManager.create_job(config.pipeline_id)
+    # 1. Determine Job Details
+    target_node = config.target_node_id or (config.nodes[-1].node_id if config.nodes else "unknown")
+    job_type = config.job_type or "training"
     
-    # 2. Setup Persistent Store
+    # Resolve dataset paths (Same logic as preview)
+    ingestion_service = DataIngestionService(session)
+    dataset_source_id = "unknown"
+
+    for node in config.nodes:
+        if node.step_type == "data_loader" and "dataset_id" in node.params:
+            dataset_source_id = str(node.params["dataset_id"])
+            try:
+                ds_id = int(node.params["dataset_id"])
+                ds = await ingestion_service.get_data_source_by_id(ds_id)
+                if ds:
+                    ds_dict = {
+                        "connection_info": ds.config,
+                        "file_path": ds.config.get("file_path") if ds.config else None
+                    }
+                    path = extract_file_path_from_source(ds_dict)
+                    if path:
+                        node.params["path"] = str(path)
+                    else:
+                        raise HTTPException(status_code=400, detail=f"Could not resolve path for dataset {ds_id}")
+                else:
+                    raise HTTPException(status_code=404, detail=f"Dataset {ds_id} not found")
+            except ValueError:
+                 raise HTTPException(status_code=400, detail=f"Invalid dataset ID: {node.params['dataset_id']}")
+
+    # 2. Create Job (Async, Persistent)
+    
+    # Extract model_type from target node if available
+    model_type = "unknown"
+    for node in config.nodes:
+        if node.node_id == target_node:
+            # Check params for model_type or algorithm
+            if "model_type" in node.params:
+                model_type = node.params["model_type"]
+            elif "algorithm" in node.params:
+                model_type = node.params["algorithm"]
+            # Also check config inside params if nested
+            elif "config" in node.params and "model_type" in node.params["config"]:
+                model_type = node.params["config"]["model_type"]
+            break
+
+    job_id = await JobManager.create_job(
+        session, 
+        config.pipeline_id, 
+        target_node, 
+        job_type,
+        dataset_id=dataset_source_id,
+        model_type=model_type,
+        graph=config.dict()
+    )
+    
+    # 3. Setup Persistent Store
     # In production, this path should come from env vars or config
     persistent_path = os.path.join(os.getcwd(), "exports", "models", config.pipeline_id)
     artifact_store = LocalArtifactStore(persistent_path)
     
-    # 3. Adapt Config
+    # 4. Adapt Config
     nodes = [
         NodeConfig(
             node_id=n.node_id,
@@ -367,20 +436,40 @@ def run_pipeline(config: PipelineConfigModel, background_tasks: BackgroundTasks)
         metadata=config.metadata
     )
     
-    # 4. Run in Background
-    background_tasks.add_task(_run_engine_task, artifact_store, pipeline_config, job_id)
+    # 5. Run in Background
+    background_tasks.add_task(_run_engine_task, artifact_store, pipeline_config, job_id, target_node)
     
     return {"message": "Pipeline execution started", "pipeline_id": config.pipeline_id, "job_id": job_id}
 
-def _run_engine_task(store, config, job_id):
+def _run_engine_task(store, config, job_id, target_node_id=None):
     """Helper to run engine in background."""
-    JobManager.update_status(job_id, JobStatus.RUNNING)
+    # Use a fresh sync session for the background task
+    db_gen = get_db()
+    session = next(db_gen)
+    
     try:
+        JobManager.update_status_sync(session, job_id, JobStatus.RUNNING)
+        
         engine = PipelineEngine(store)
         result = engine.run(config)
         
         if result.status == "success":
-            JobManager.update_status(job_id, JobStatus.COMPLETED, result={"pipeline_id": result.pipeline_id})
+            # Extract results from target node if available
+            job_result = {"pipeline_id": result.pipeline_id}
+            
+            if target_node_id and target_node_id in result.node_results:
+                node_res = result.node_results[target_node_id]
+                # For tuning jobs, metrics contains best_params and best_score
+                # For training jobs, metrics contains accuracy, f1, etc.
+                if node_res.metrics:
+                    job_result.update(node_res.metrics)
+            
+            JobManager.update_status_sync(
+                session, 
+                job_id, 
+                JobStatus.COMPLETED, 
+                result=job_result
+            )
         else:
             # Find the error
             error_msg = "Unknown error"
@@ -388,20 +477,71 @@ def _run_engine_task(store, config, job_id):
                 if node_res.status == "failed":
                     error_msg = f"Node {node_res.node_id} failed: {node_res.error}"
                     break
-            JobManager.update_status(job_id, JobStatus.FAILED, error=error_msg)
+            JobManager.update_status_sync(session, job_id, JobStatus.FAILED, error=error_msg)
             
     except Exception as e:
-        JobManager.update_status(job_id, JobStatus.FAILED, error=str(e))
+        JobManager.update_status_sync(session, job_id, JobStatus.FAILED, error=str(e))
+    finally:
+        # Close the session
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
+        except Exception:
+            pass
 
 @router.get("/jobs/{job_id}", response_model=JobInfo)
-def get_job_status(job_id: str):
+async def get_job_status(
+    job_id: str,
+    session: AsyncSession = Depends(get_async_session)
+):
     """
     Returns the status of a background job.
     """
-    job = JobManager.get_job(job_id)
+    job = await JobManager.get_job(session, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
+
+@router.get("/jobs", response_model=List[JobInfo])
+async def list_jobs(
+    limit: int = 50,
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Lists recent jobs.
+    """
+    return await JobManager.list_jobs(session, limit)
+
+@router.get("/jobs/tuning/latest/{node_id}", response_model=Optional[JobInfo])
+async def get_latest_tuning_job(
+    node_id: str,
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Retrieves the latest completed tuning job for a specific node.
+    """
+    return await JobManager.get_latest_tuning_job_for_node(session, node_id)
+
+@router.get("/jobs/tuning/best/{model_type}", response_model=Optional[JobInfo])
+async def get_best_tuning_job_model(
+    model_type: str,
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Retrieves the latest completed tuning job for a specific model type.
+    """
+    return await JobManager.get_best_tuning_job_for_model(session, model_type)
+
+@router.get("/jobs/tuning/history/{model_type}", response_model=List[JobInfo])
+async def get_tuning_jobs_history(
+    model_type: str,
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Retrieves a history of completed tuning jobs for a specific model type.
+    """
+    return await JobManager.get_tuning_jobs_for_model(session, model_type)
 
 @router.get("/registry", response_model=List[RegistryItem])
 def get_node_registry():
@@ -446,3 +586,17 @@ async def get_dataset_schema(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to profile dataset: {str(e)}")
+
+@router.get("/hyperparameters/{model_type}")
+def get_model_hyperparameters(model_type: str):
+    """
+    Returns the list of tunable hyperparameters for a specific model type.
+    """
+    return get_hyperparameters(model_type)
+
+@router.get("/hyperparameters/{model_type}/defaults")
+def get_model_default_search_space(model_type: str):
+    """
+    Returns the default search space for a specific model type.
+    """
+    return get_default_search_space(model_type)

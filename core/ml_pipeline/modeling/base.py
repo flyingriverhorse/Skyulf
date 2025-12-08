@@ -62,6 +62,9 @@ class StatefulEstimator:
         target_column: str, 
         config: Dict[str, Any], 
         n_folds: int = 5,
+        cv_type: str = "k_fold",
+        shuffle: bool = True,
+        random_state: int = 42,
         progress_callback: Optional[Callable[[int, int], None]] = None
     ) -> Dict[str, Any]:
         """
@@ -76,6 +79,9 @@ class StatefulEstimator:
             y=y_train,
             config=config,
             n_folds=n_folds,
+            cv_type=cv_type,
+            shuffle=shuffle,
+            random_state=random_state,
             progress_callback=progress_callback
         )
 
@@ -122,7 +128,15 @@ class StatefulEstimator:
         predictions['train'] = self.applier.predict(X_train, model_artifact)
         
         # Test Predictions
-        if not dataset.test.empty:
+        # Check if dataset.test is empty. 
+        # If it's a tuple, check if the first element (X) is empty.
+        is_test_empty = False
+        if isinstance(dataset.test, tuple):
+            is_test_empty = dataset.test[0].empty
+        else:
+            is_test_empty = dataset.test.empty
+
+        if not is_test_empty:
             if isinstance(dataset.test, tuple):
                 X_test, _ = dataset.test
             else:
@@ -210,7 +224,13 @@ class StatefulEstimator:
         splits_payload['train'] = evaluate_split('train', dataset.train)
         
         # 3. Evaluate Test
-        if not dataset.test.empty:
+        has_test = False
+        if isinstance(dataset.test, pd.DataFrame):
+            has_test = not dataset.test.empty
+        elif isinstance(dataset.test, tuple):
+            has_test = len(dataset.test) == 2 and len(dataset.test[0]) > 0
+            
+        if has_test:
             splits_payload['test'] = evaluate_split('test', dataset.test)
         
         # 4. Evaluate Validation

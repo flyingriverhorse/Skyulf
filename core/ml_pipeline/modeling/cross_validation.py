@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Callable
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.model_selection import KFold, StratifiedKFold, TimeSeriesSplit, ShuffleSplit
 
 if TYPE_CHECKING:
     from .base import BaseModelCalculator, BaseModelApplier
@@ -42,7 +42,8 @@ def perform_cross_validation(
     y: pd.Series,
     config: Dict[str, Any],
     n_folds: int = 5,
-    stratified: bool = False,
+    cv_type: str = "k_fold", # k_fold, stratified_k_fold, time_series_split, shuffle_split
+    shuffle: bool = True,
     random_state: int = 42,
     progress_callback: Optional[Callable[[int, int], None]] = None
 ) -> Dict[str, Any]:
@@ -56,8 +57,9 @@ def perform_cross_validation(
         y: Target.
         config: Model configuration.
         n_folds: Number of folds.
-        stratified: Whether to use StratifiedKFold (classification only).
-        random_state: Random seed.
+        cv_type: Type of CV.
+        shuffle: Whether to shuffle data before splitting (for KFold/Stratified).
+        random_state: Random seed for shuffling.
         progress_callback: Optional callback(current_fold, total_folds).
         
     Returns:
@@ -67,10 +69,15 @@ def perform_cross_validation(
     problem_type = calculator.problem_type
     
     # 1. Setup Splitter
-    if stratified and problem_type == "classification":
-        splitter = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+    if cv_type == "time_series_split":
+        splitter = TimeSeriesSplit(n_splits=n_folds)
+    elif cv_type == "shuffle_split":
+        splitter = ShuffleSplit(n_splits=n_folds, test_size=0.2, random_state=random_state)
+    elif cv_type == "stratified_k_fold" and problem_type == "classification":
+        splitter = StratifiedKFold(n_splits=n_folds, shuffle=shuffle, random_state=random_state if shuffle else None)
     else:
-        splitter = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+        # Default to KFold
+        splitter = KFold(n_splits=n_folds, shuffle=shuffle, random_state=random_state if shuffle else None)
         
     fold_results = []
     
