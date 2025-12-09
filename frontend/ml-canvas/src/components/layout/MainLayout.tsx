@@ -14,7 +14,7 @@ export const MainLayout: React.FC = () => {
   const { activeView } = useViewStore();
 
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden flex-col">
+    <div className="flex h-full w-full bg-background overflow-hidden flex-col">
       <JobsDrawer />
       <Navbar />
       

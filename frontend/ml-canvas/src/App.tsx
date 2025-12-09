@@ -1,32 +1,25 @@
-import { useEffect } from 'react'
-import { MainLayout } from './components/layout/MainLayout'
-import { useGraphStore } from './core/store/useGraphStore'
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Layout } from './components/Layout';
+import { Dashboard } from './pages/Dashboard';
+import { DataSources } from './pages/DataSources';
+import { CanvasPage } from './pages/CanvasPage';
 
 function App() {
-  const addNode = useGraphStore((state) => state.addNode);
-
-  useEffect(() => {
-    // Check for source_id in URL query params
-    const params = new URLSearchParams(window.location.search);
-    const sourceId = params.get('source_id');
-
-    if (sourceId) {
-      // Add a dataset node automatically
-      // We use a timeout to ensure the store is ready and to avoid strict mode double-mount issues
-      setTimeout(() => {
-        addNode('dataset_node', { x: 100, y: 100 }, { datasetId: sourceId });
-      }, 100);
-    }
-  }, []);
-
-  // Simple dark mode toggle for testing (can be moved to a proper settings UI)
-  useEffect(() => {
-    // document.documentElement.classList.add('dark'); // Uncomment to force dark mode
-  }, []);
-
   return (
-    <MainLayout />
-  )
+    <BrowserRouter>
+      <Routes>
+        {/* Main App Layout (with Sidebar) */}
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="data" element={<DataSources />} />
+          <Route path="deployments" element={<div className="p-8">Deployments (Coming Soon)</div>} />
+        </Route>
+
+        {/* Full Screen Canvas Layout (No Sidebar) */}
+        <Route path="/canvas" element={<CanvasPage />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;

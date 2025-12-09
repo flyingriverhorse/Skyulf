@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Moon, Sun, Layout, BarChart2, GitBranch, Rocket } from 'lucide-react';
+import { Moon, Sun, Layout, BarChart2, GitBranch, Rocket, ArrowLeft } from 'lucide-react';
 import { useViewStore } from '../../core/store/useViewStore';
+import { Link } from 'react-router-dom';
 
 export const Navbar: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -33,6 +34,9 @@ export const Navbar: React.FC = () => {
     <div className="h-14 border-b bg-card px-4 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-8">
         <div className="flex items-center gap-2">
+          <Link to="/" className="mr-2 p-2 hover:bg-accent rounded-md transition-colors text-muted-foreground hover:text-foreground" title="Back to Dashboard">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
           <div className="p-1.5 bg-primary/10 rounded-md">
             <Layout className="w-5 h-5 text-primary" />
           </div>

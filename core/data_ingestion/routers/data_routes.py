@@ -6,8 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Q
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from ...auth.dependencies import get_current_active_user
-from ..dependencies import get_data_service, require_data_access
+from ..dependencies import get_data_service
 from ..service import DataIngestionService
 from ..exceptions import DataIngestionException, DataSourceNotFoundError, FileUploadError
 from ...database.models import User
@@ -68,7 +67,6 @@ class BulkDeleteResponse(BaseModel):
 async def upload_file(
     file: UploadFile = File(...),
     custom_name: Optional[str] = Form(None),
-    current_user: User = Depends(require_data_access),
     service: DataIngestionService = Depends(get_data_service)
 ):
     """API endpoint for file upload (adapted from main.py).
@@ -79,7 +77,7 @@ async def upload_file(
     """
     try:
         # Handle the file upload through the service
-        upload_result = await service.handle_file_upload(file, current_user)
+        upload_result = await service.handle_file_upload(file, None)
 
         return UploadResponse(
             success=True,
@@ -111,7 +109,6 @@ async def upload_file(
 
 @data_router.get("/api/sources", response_model=DataSourceListResponse)
 async def list_data_sources(
-    current_user: User = Depends(require_data_access),
     service: DataIngestionService = Depends(get_data_service)
 ):
     """
@@ -121,7 +118,7 @@ async def list_data_sources(
     """
     try:
         # Use service method to get formatted data sources list
-        result = await service.get_formatted_data_sources_list(current_user)
+        result = await service.get_formatted_data_sources_list(None)
 
         return DataSourceListResponse(
             success=result["success"],
@@ -145,7 +142,6 @@ async def search_data_sources(
     source_type: Optional[str] = Query(None, description="Filter by source type"),
     limit: int = Query(50, ge=1, le=1000, description="Maximum results to return"),
     order: str = Query("created_desc", description="Order results by"),
-    current_user: User = Depends(require_data_access),
     service: DataIngestionService = Depends(get_data_service)
 ):
     """
@@ -154,7 +150,7 @@ async def search_data_sources(
     Supports filtering by category and source type with comprehensive response formatting.
     """
     try:
-        logger.info(f"Searching data sources for user {current_user.username}: query='{q}'")
+        logger.info(f"Searching data sources: query='{q}'")
 
         # Use the enhanced service method that handles all business logic
         result = await service.search_data_sources_with_formatting(
@@ -163,7 +159,7 @@ async def search_data_sources(
             source_type=source_type if source_type else None,
             limit=limit,
             order_by=order,
-            current_user=current_user,
+            current_user=None,
             include_user_scoping=True
         )
 
@@ -190,7 +186,6 @@ async def search_data_sources(
 @data_router.get("/api/sources/{source_id}")
 async def get_data_source(
     source_id: str,
-    current_user: User = Depends(require_data_access),
     service: DataIngestionService = Depends(get_data_service)
 ):
     """Get detailed information about a specific data source."""
@@ -221,7 +216,7 @@ async def get_data_source(
                                 "file_path": str(file_path),
                                 "created_at": file_path.stat().st_mtime and None or None,
                                 "metadata": {
-                                    "created_by": getattr(current_user, 'username', 'unknown'),
+                                    "created_by": "unknown",
                                     "file_type": file_path.suffix.upper().lstrip('.') or 'UNKNOWN',
                                     "upload_method": "web_interface",
                                     "connector_type": "file_upload"
@@ -234,13 +229,6 @@ async def get_data_source(
 
         # Fallback: lookup in the database via the service
         source = await service.get_data_source(source_id)
-
-        # Check permissions - users can only access their own sources unless admin
-        if not current_user.has_permission("admin") and source.created_by != current_user.username:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied to this data source"
-            )
 
         return JSONResponse(content={
             "success": True,
@@ -275,7 +263,6 @@ async def get_data_source(
 async def get_data_source_sample(
     source_id: str,
     limit: int = Query(5, ge=1, le=100),
-    current_user: User = Depends(require_data_access),
     service: DataIngestionService = Depends(get_data_service)
 ):
     """Get a sample of data from the source."""
@@ -301,7 +288,6 @@ async def get_data_source_sample(
 @data_router.delete("/api/sources/{source_id}")
 async def delete_data_source(
     source_id: str,
-    current_user: User = Depends(require_data_access),
     service: DataIngestionService = Depends(get_data_service)
 ):
     """Delete a data source.
@@ -339,38 +325,7 @@ async def delete_data_source(
 
         source_name = getattr(source, 'name', f"{source_id_int}")
 
-        # Permission check: only admins or the owner may delete
-        is_admin = current_user.has_permission("admin") if hasattr(current_user, 'has_permission') else False
-        try:
-            current_user_id = await service._get_user_id_from_username(getattr(current_user, 'username', '') or '')
-        except Exception:
-            current_user_id = None
-
-        owner_id = getattr(source, 'created_by', None)
-
-        if not (is_admin or (owner_id is not None and current_user_id is not None and owner_id == current_user_id)):
-            # Audit log denied attempt
-            try:
-                log_data_action(
-                    "DELETE_DATA_SOURCE",
-                    False,
-                    (
-                        f"Denied delete attempt for source '{source_name}' "
-                        f"(ID: {source_id_int}) by {getattr(current_user, 'username', 'unknown')}"
-                    ),
-                )
-            except Exception:
-                logger.warning("Failed to write audit log for denied delete attempt")
-
-            return JSONResponse(
-                status_code=status.HTTP_403_FORBIDDEN,
-                content={
-                    "success": False,
-                    "error": "Access denied to delete this data source",
-                    "message": "Only the resource owner or an admin may delete this data source."
-                }
-            )
-
+        # Permission check: Disabled for open mode
         # Perform deletion (this method returns bool)
         deletion_result = await service.delete_data_source_by_id(source_id_int)
 
@@ -382,7 +337,7 @@ async def delete_data_source(
                     True,
                     (
                         f"Deleted source '{source_name}' (ID: {source_id_int}) "
-                        f"by {getattr(current_user, 'username', 'unknown')}"
+                        f"by anonymous"
                     ),
                 )
             except Exception:
@@ -417,7 +372,6 @@ async def delete_data_source(
 @data_router.post("/api/sources/bulk-delete", response_model=BulkDeleteResponse)
 async def bulk_delete_data_sources(
     request: BulkDeleteRequest,
-    current_user: User = Depends(require_data_access),
     service: DataIngestionService = Depends(get_data_service)
 ):
     """
@@ -434,11 +388,10 @@ async def bulk_delete_data_sources(
             )
 
         logger.info(
-            "Bulk delete request by %s: %s sources",
-            current_user.username,
+            "Bulk delete request by anonymous: %s sources",
             len(source_ids),
         )
-        is_admin = current_user.has_permission("admin")
+        is_admin = True
 
         deleted_sources = []
         failed_deletions = []
@@ -455,12 +408,7 @@ async def bulk_delete_data_sources(
                 })
 
         # Prefer current_user.id if present to avoid extra lookups
-        try:
-            current_user_id = getattr(current_user, 'id', None) or await service._get_user_id_from_username(
-                getattr(current_user, 'username', '') or ''
-            )
-        except Exception:
-            current_user_id = None
+        current_user_id = None
 
         for source_id in source_ids_int:
             try:
@@ -572,7 +520,7 @@ async def get_health_status():
 # ======================== EXPORT API ========================
 
 @data_router.get("/api/export/formats")
-async def get_export_formats(current_user: User = Depends(get_current_active_user)):
+async def get_export_formats():
     """
     Get available export formats.
     This is a simple stub implementation.
@@ -632,8 +580,7 @@ async def get_export_formats(current_user: User = Depends(get_current_active_use
 # ======================== NOTIFICATIONS API ========================@data_router.get("/api/notifications")
 async def get_notifications(
     unread_only: bool = False,
-    mark_read: bool = False,
-    current_user: User = Depends(get_current_active_user)
+    mark_read: bool = False
 ):
     """
     Get notifications for the current user.
@@ -666,8 +613,7 @@ async def get_notifications(
 
 @data_router.post("/api/notifications/{notification_id}/read")
 async def mark_notification_read(
-    notification_id: str,
-    current_user: User = Depends(get_current_active_user)
+    notification_id: str
 ):
     """
     Mark a notification as read.

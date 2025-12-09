@@ -5,7 +5,7 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/static/ml_canvas/',
+  base: '/',
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -29,6 +29,10 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/ml-workflow': {
         target: 'http://localhost:8000',
         changeOrigin: true,
       }
