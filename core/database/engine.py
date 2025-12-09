@@ -20,10 +20,10 @@ from sqlalchemy.pool import StaticPool
 try:
     # Avoid mutating sys.path here which is
     # brittle and hides import problems.
-    from config import get_settings
+    from core.config import get_settings
 except ImportError as exc:
     raise ImportError(
-        "Could not import 'config'. Ensure you're running the project as a package (python -m <package>) "
+        "Could not import 'core.config'. Ensure you're running the project as a package (python -m <package>) "
         "or that the project root is on PYTHONPATH. Original error: "
         + str(exc)
     ) from exc

@@ -8,7 +8,7 @@ import logging
 from sqlalchemy import text as sa_text
 
 from ..adapter import async_session_or_connection
-from config import Settings
+from core.config import Settings
 
 logger = logging.getLogger(__name__)
 

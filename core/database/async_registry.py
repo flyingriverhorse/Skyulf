@@ -11,8 +11,11 @@ import os
 import aiosqlite
 from sqlalchemy import MetaData, Table, Column, String, Text
 
-from config import Settings
-from .engine import get_engine
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
+
+from core.config import Settings
+from .engine import get_async_session
 
 logger = logging.getLogger(__name__)
 

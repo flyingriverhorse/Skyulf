@@ -20,12 +20,19 @@ export const deploymentApi = {
     return response.data;
   },
 
-  getActiveDeployment: async (): Promise<DeploymentInfo> => {
-    const response = await apiClient.get<DeploymentInfo>('/deployment/active');
-    return response.data;
+  getActive: async (): Promise<DeploymentInfo | null> => {
+    try {
+      const response = await apiClient.get<DeploymentInfo>('/deployment/active');
+      return response.data;
+    } catch (error: any) {
+      if (error.response && error.response.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   },
 
-  deactivateDeployment: async (): Promise<void> => {
+  deactivate: async (): Promise<void> => {
     await apiClient.post('/deployment/deactivate');
   },
 

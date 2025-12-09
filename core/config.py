@@ -191,23 +191,6 @@ class Settings(BaseSettings):
     SESSION_COOKIE_SAMESITE: str = "Lax"
 
     # === PAGE-LEVEL SECURITY CONFIGURATION ===
-    # Global setting: if True, ALL pages require authentication by default
-    # Individual pages can be marked as public in PUBLIC_PAGES list
-    REQUIRE_LOGIN_BY_DEFAULT: bool = True
-
-    # === JOB EXECUTION ===
-    # Controls whether job cancellation is enabled in the UI/API.
-    # Defaults to False on Windows (nt) due to Celery 'solo' pool limitations, True otherwise.
-    JOB_CANCELLATION_ENABLED: bool = os.name != 'nt'
-
-    # Pages that are accessible without authentication (when REQUIRE_LOGIN_BY_DEFAULT=True)
-    # or pages that require authentication (when REQUIRE_LOGIN_BY_DEFAULT=False)
-    # Can be set as comma-separated string in environment variables
-    PUBLIC_PAGES: str = "/login,/"
-
-    # Pages that ALWAYS require admin privileges (overrides everything)
-    # Can be set as comma-separated string in environment variables
-
     # Redirect URL for unauthenticated users
     LOGIN_REDIRECT_URL: str = "/login"
 
@@ -217,9 +200,6 @@ class Settings(BaseSettings):
     # === USER REGISTRATION SETTINGS ===
     # Allow new user registration via the frontend
     ALLOW_USER_REGISTRATION: bool = True
-
-    # Require email verification for new registrations
-    REQUIRE_EMAIL_VERIFICATION: bool = False
 
     # === DATABASE CONFIGURATION ===
     DATABASE_URL: str = "sqlite+aiosqlite:///./mlops_database.db"
@@ -248,8 +228,8 @@ class Settings(BaseSettings):
     DB_EXTRA_PARAMS: Optional[str] = None  # e.g. application_name=mlops
 
     # === BACKGROUND TASKS / CELERY ===
-    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
-    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
+    CELERY_BROKER_URL: str = "redis://127.0.0.1:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://127.0.0.1:6379/0"
     CELERY_TASK_DEFAULT_QUEUE: str = "mlops-training"
 
     # Model training artifact storage
@@ -263,127 +243,10 @@ class Settings(BaseSettings):
         ".pkl", ".pickle", ".feather", ".h5", ".hdf5"
     ]
 
-    # === COMPREHENSIVE CLEANUP SYSTEM ===
-    # Global cleanup enablement
-    SYSTEM_CLEANUP_ENABLED: bool = True
-
-    # Log file cleanup
-    LOG_CLEANUP_ENABLED: bool = False
-    LOG_CLEANUP_MAX_FILES: int = 10
-    LOG_CLEANUP_MAX_AGE_DAYS: int = 30
-    LOG_FILES_PATTERN: str = "*.log*"
-
-    # Temporary files cleanup
-    TEMP_CLEANUP_ENABLED: bool = False
-    TEMP_CLEANUP_MAX_FILES: int = 5
-    TEMP_CLEANUP_MAX_AGE_DAYS: int = 1
-    TEMP_FILES_PATTERN: str = "*.*"
-
-    # Export files cleanup
-    EXPORT_CLEANUP_ENABLED: bool = False
-    EXPORT_CLEANUP_MAX_FILES: int = 20
-    EXPORT_CLEANUP_MAX_AGE_DAYS: int = 14
-    EXPORT_FILES_PATTERN: str = "*.*"
-
-    # Model cache cleanup
-    MODEL_CLEANUP_ENABLED: bool = False
-    MODEL_CLEANUP_MAX_FILES: int = 15
-    MODEL_CLEANUP_MAX_AGE_DAYS: int = 7
-    MODEL_FILES_PATTERN: str = "*.*"
-
-    # Upload folder comprehensive cleanup
-    UPLOAD_CLEANUP_ENABLED: bool = False
-    UPLOAD_CLEANUP_MAX_FILES: int = 20
-    UPLOAD_CLEANUP_MAX_AGE_DAYS: int = 7
-
-    # Cleanup scheduling
-    CLEANUP_ON_STARTUP: bool = False  # Run cleanup when application starts
-    CLEANUP_SCHEDULER_ENABLED: bool = False  # Enable automatic scheduled cleanup
-    CLEANUP_SCHEDULE_HOURS: int = 24  # How often to run cleanup (in hours)
-
-    # Data source deletion settings
-    DELETE_FILES_ON_SOURCE_REMOVAL: bool = True  # Delete physical files when data source is deleted
-    ALLOW_DIRECTORY_DELETION: bool = False  # Allow deletion of directories (extra safety measure)
-    FILES_ONLY_DELETION: bool = True  # Only delete files, never directories
-
-    # User limits
-    USER_MAX_DATA_SOURCES: int = 1
-
     # Data processing directories
     TEMP_DIR: str = "temp/processing"
     EXPORT_DIR: str = "exports/data"
     MODELS_DIR: str = "uploads/models"
-
-    # === PERFORMANCE SETTINGS ===
-    ENABLE_DATABASE: bool = True
-    DB_QUERY_TIMEOUT: int = 30  # Increased for complex ML queries
-    MAX_SEARCH_RESULTS: int = 10000  # Increased for ML datasets
-    SEARCH_TIMEOUT: int = 120  # Longer timeout for data processing
-
-    # Controls how the AutoSyncManager is run
-    SYNC_RUNNER_MODE: str = "disabled"  # 'disabled', 'inprocess', 'separate'
-
-    # === PANDAS AND DATA PROCESSING (Enhanced for ML) ===
-    PANDAS_OPTIONS: Dict[str, Any] = {
-        "display.max_columns": 50,
-        "display.max_rows": 100,
-        "display.precision": 3,
-        "mode.chained_assignment": "warn",
-        "compute.use_numba": True,
-    }
-
-    # Data processing settings
-    DATA_SAMPLE_SIZE: int = 10000  # Default sample size for previews
-    DATA_CHUNK_SIZE: int = 50000  # Process data in chunks for memory efficiency
-    DATA_LOADER_MAX_ROWS: int = 5000000  # Maximum rows to hold in memory
-
-    # === ML PLATFORM CONFIGURATION ===
-    # Used in training workflows for cache sizing (core/ml services)
-    ML_MODEL_CACHE_SIZE: int = 1000  # Number of models to keep in memory
-    # Used to guard long-running fits (core/ml services)
-    ML_MAX_TRAINING_TIME: int = 3600  # 1 hour max training time
-    # Used when splitting datasets in training utilities (core/ml services)
-    ML_DEFAULT_TEST_SIZE: float = 0.2  # 20% test split by default
-    # Used anywhere we seed random operations (core/ml services)
-    ML_RANDOM_STATE: int = 42  # Reproducible results
-
-    HYPERPARAMETER_TUNING_STRATEGIES: List[Dict[str, Any]] = [
-        {
-            "value": "random",
-            "label": "Random search",
-            "description": "Sample candidate hyperparameters uniformly at random.",
-            "impl": "random",
-            "aliases": ["random_search"],
-        },
-        {
-            "value": "grid",
-            "label": "Grid search",
-            "description": "Evaluate every combination in the search space.",
-            "impl": "grid",
-            "aliases": ["grid_search"],
-        },
-        {
-            "value": "halving",
-            "label": "Successive halving (grid)",
-            "description": "Successively allocate resources to the best grid candidates.",
-            "impl": "halving",
-            "aliases": ["successive_halving", "halving_grid"],
-        },
-        {
-            "value": "halving_random",
-            "label": "Successive halving (random)",
-            "description": "Random sampling with successive halving to prune weak candidates.",
-            "impl": "halving_random",
-            "aliases": ["successive_halving_random", "halving_search"],
-        },
-        {
-            "value": "optuna",
-            "label": "Optuna (TPE)",
-            "description": "Bayesian optimisation with pruning via Optuna.",
-            "impl": "optuna",
-            "aliases": ["bayesian", "optuna_tpe"],
-        },
-    ]
 
     # === SNOWFLAKE CONFIGURATION (Enhanced) ===
     SNOWFLAKE_CONNECTION_TYPE: str = "native"  # Modern native connection
@@ -396,42 +259,6 @@ class Settings(BaseSettings):
     SNOWFLAKE_SCHEMA: Optional[str] = None
     FEATURE_SNOWFLAKE: bool = False
 
-    # === LLM CONFIGURATION (Comprehensive) ===
-    # OpenAI Configuration
-    OPENAI_API_KEY: Optional[str] = None
-    OPENAI_ORG_ID: Optional[str] = None
-    OPENAI_DEFAULT_MODEL: str = "gpt-3.5-turbo"
-
-    # DeepSeek Configuration
-    DEEPSEEK_API_KEY: Optional[str] = None
-    DEEPSEEK_API_URL: str = "https://api.deepseek.com"
-    DEEPSEEK_DEFAULT_MODEL: str = "deepseek-chat"
-    DEEPSEEK_CODE_MODEL: str = "deepseek-coder"  # For code-specific tasks
-    DEEPSEEK_MATH_MODEL: str = "deepseek-math"   # For mathematical analysis
-    DEEPSEEK_TIMEOUT_SECONDS: int = 90
-    DEEPSEEK_MAX_RETRIES: int = 2
-    DEEPSEEK_RETRY_BACKOFF_SECONDS: float = 1.5
-
-    # Anthropic Claude Configuration
-    ANTHROPIC_API_KEY: Optional[str] = None
-    CLAUDE_DEFAULT_MODEL: str = "claude-3-haiku-20240307"
-
-    # Local LLM Configuration (Ollama, LM Studio, etc.)
-    LOCAL_LLM_URL: str = "http://localhost:11434"
-    LOCAL_LLM_MODEL: str = "llama2"
-    LOCAL_LLM_TYPE: str = "ollama"  # ollama, lmstudio, textgen
-
-    # Default LLM settings
-    DEFAULT_LLM_PROVIDER: str = "openai"
-    DEFAULT_LLM_MODEL: str = "gpt-3.5-turbo"
-    LLM_MAX_HISTORY_MESSAGES: int = 12
-    LLM_MAX_HISTORY_CHAR_LENGTH: int = 12000
-    LLM_SYSTEM_PROMPT_CHAR_LIMIT: int = 6000
-    LLM_USER_HISTORY_MESSAGES: int = 12
-    LLM_USER_HISTORY_CHAR_LENGTH: int = 12000
-    LLM_CELL_HISTORY_MESSAGES: int = 8
-    LLM_CELL_HISTORY_CHAR_LENGTH: int = 8000
-
     # === DATA INGESTION FEATURE TOGGLES ===
     ENABLE_LINEAGE: bool = True
     ENABLE_SCHEMA_DRIFT: bool = True
@@ -442,7 +269,7 @@ class Settings(BaseSettings):
     LOG_FILE: str = "logs/fastapi_app.log"
     LOG_FORMAT: str = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s [%(filename)s:%(lineno)d in %(funcName)s()]"
     LOG_MAX_SIZE: int = 50 * 1024 * 1024  # 50MB
-    LOG_BACKUP_COUNT: int = 10
+    LOG_BACKUP_COUNT: int = 5
     # Rotation strategy: 'size' (default) or 'time'
     LOG_ROTATION_TYPE: str = "size"
     # When using time-based rotation, this controls the 'when' argument
@@ -491,26 +318,6 @@ class Settings(BaseSettings):
     def parse_api_docs_servers(cls, v):
         if isinstance(v, str):
             return [item.strip() for item in v.split(",") if item.strip()]
-        return v
-
-    @field_validator("PUBLIC_PAGES", mode="before")
-    @classmethod
-    def parse_public_pages(cls, v):
-        """Parse PUBLIC_PAGES from environment variable string if needed."""
-        if isinstance(v, str) and v:
-            # Keep as string - we'll parse it in a property
-            return v.strip()
-        elif isinstance(v, list):
-            # Convert list back to comma-separated string for consistency
-            return ",".join(str(item).strip() for item in v if item)
-        return v or "/login,/health,/"
-
-
-    @field_validator("ML_DEFAULT_TEST_SIZE")
-    @classmethod
-    def validate_test_size(cls, v):
-        if not 0.0 < v < 1.0:
-            raise ValueError("ML_DEFAULT_TEST_SIZE must be between 0 and 1")
         return v
 
     @model_validator(mode="after")
@@ -597,14 +404,11 @@ class Settings(BaseSettings):
         try:
             import pandas as pd
 
-            # Apply all pandas options
-            for option, value in self.PANDAS_OPTIONS.items():
-                pd.set_option(option, value)
-
             # Enable copy-on-write mode for better memory efficiency (Pandas 2.x feature)
             pd.options.mode.copy_on_write = True
 
-            print("✓ Pandas configured with optimized settings for ML workflows")
+            # Avoid non-ASCII to prevent Windows console encoding issues
+            print("OK Pandas configured with optimized settings for ML workflows")
 
         except ImportError:
             print("WARNING: Pandas not available, skipping configuration")
@@ -702,13 +506,6 @@ class Settings(BaseSettings):
         """Return True if the given settings field was explicitly provided by the user."""
         return field_name in getattr(self, "model_fields_set", set())
 
-    @property
-    def public_pages_list(self) -> List[str]:
-        """Get PUBLIC_PAGES as a list of strings."""
-        if isinstance(self.PUBLIC_PAGES, str):
-            return [page.strip() for page in self.PUBLIC_PAGES.split(",") if page.strip()]
-        return []
-
 
 
 class DevelopmentSettings(Settings):
@@ -793,7 +590,7 @@ class TestingSettings(Settings):
     def init_test_features(self) -> None:
         """Initialize testing-specific features."""
         self.setup_logging()
-        print("🧪 Running in TESTING mode")
+        print("[TEST] Running in TESTING mode")
 
 
 @lru_cache()

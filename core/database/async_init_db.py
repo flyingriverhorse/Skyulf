@@ -18,7 +18,7 @@ errors when drivers or configuration are missing.
 import logging
 from typing import Optional
 
-from config import Settings
+from core.config import Settings
 from .async_registry import ensure_registry_tables
 
 logger = logging.getLogger(__name__)
@@ -85,46 +85,21 @@ async def _try_init_mongodb(settings: Settings):
     return False
 
 
-async def initialize(settings: Settings, preferred: Optional[str] = None) -> bool:
-    """Initialize the selected database backend asynchronously.
-
-    preferred: optional override ('postgres'|'mysql'|'mongodb'|'sqlite').
-    If not provided, uses settings.DB_TYPE. Returns True on success, False otherwise.
+async def initialize(settings: Optional[Settings] = None):
     """
-    db_type_value = preferred or getattr(settings, "DB_TYPE", "postgres")
-    db_type = db_type_value.lower() if isinstance(db_type_value, str) else "postgres"
-    logger.info("Async DB initializer selected type: %s", db_type)
+    Initialize the database backend based on configuration.
+    """
+    if settings is None:
+        from core.config import Settings
+        settings = Settings()
 
-    success = False
-
-    if db_type == "postgres":
-        success = await _try_init_postgres(settings)
-    elif db_type == "sqlite":
-        success = await _try_init_sqlite(settings)
-    elif db_type == "mysql":
-        success = await _try_init_mysql(settings)
-    elif db_type in ("mongodb", "mongo"):
-        success = await _try_init_mongodb(settings)
-    else:
-        logger.error("Unsupported database type: %s", db_type)
-        return False
-
-    # Ensure registry tables exist after successful initialization
-    if success:
-        try:
-            await ensure_registry_tables(settings)
-            logger.info("Registry tables ensured successfully")
-        except Exception as e:
-            logger.exception("Failed to ensure registry tables: %s", e)
-            # Don't fail the entire initialization for registry table issues
-
-    return success
+    db_type = settings.DB_TYPE.lower() if settings.DB_TYPE else "postgres"
 
 
 # For standalone testing
 async def main():
     """Standalone test function."""
-    from config import Settings
+    from core.config import Settings
 
     settings = Settings()
     success = await initialize(settings)

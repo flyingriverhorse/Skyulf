@@ -4,10 +4,10 @@ import aiofiles
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, Union
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from core.database.models import DataSource, User
 from core.data_ingestion.schemas.ingestion import DataSourceCreate, IngestionJobResponse
@@ -33,16 +33,28 @@ class DataIngestionService:
         result = await self.session.execute(query)
         return result.scalars().all()
 
-    async def get_source(self, source_id: int) -> Optional[DataSource]:
+    async def get_source(self, source_id: Union[int, str]) -> Optional[DataSource]:
         """
-        Get a data source by ID.
+        Get a data source by ID (PK) or source_id (UUID).
         """
-        result = await self.session.execute(
-            select(DataSource).where(DataSource.id == source_id)
-        )
+        stmt = select(DataSource)
+        
+        if isinstance(source_id, int):
+             stmt = stmt.where(DataSource.id == source_id)
+        elif isinstance(source_id, str):
+             if source_id.isdigit():
+                 stmt = stmt.where(DataSource.id == int(source_id))
+             else:
+                 stmt = stmt.where(DataSource.source_id == source_id)
+        
+        result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def delete_source(self, source_id: int) -> bool:
+    async def get_data_source_by_id(self, ds_id: int) -> Optional[DataSource]:
+        """Alias for get_source with int ID, for backward compatibility if needed."""
+        return await self.get_source(ds_id)
+
+    async def delete_source(self, source_id: Union[int, str]) -> bool:
         """
         Delete a data source and its associated file if applicable.
         """
@@ -66,7 +78,7 @@ class DataIngestionService:
         await self.session.commit()
         return True
 
-    async def get_sample(self, source_id: int, limit: int = 5) -> list[dict]:
+    async def get_sample(self, source_id: Union[int, str], limit: int = 5) -> list[dict]:
         """
         Get a sample of data from the source.
         """
@@ -76,7 +88,7 @@ class DataIngestionService:
         
         config = source.config or {}
         
-        if source.type == 'file':
+        if source.type == 'file' or source.type == 'csv' or source.type == 'txt':
             file_path = config.get('file_path')
             if not file_path:
                 raise HTTPException(status_code=400, detail="Missing file path")
@@ -98,11 +110,9 @@ class DataIngestionService:
                 return df.to_dicts()
             except Exception as e:
                 logger.error(f"Failed to get sample: {e}")
-                # Return empty list instead of crashing for UI resilience? 
-                # Or raise detailed error. Let's raise detailed error for now.
-                raise HTTPException(status_code=500, detail=f"Failed to get sample: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Failed to read data sample: {str(e)}")
         
-        # TODO: Implement other source types
+        # TODO: Handle other source types (SQL, etc.)
         return []
 
     async def handle_file_upload(self, file: UploadFile, user_id: int) -> IngestionJobResponse:

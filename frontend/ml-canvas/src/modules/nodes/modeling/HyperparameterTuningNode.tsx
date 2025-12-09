@@ -728,7 +728,7 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
           style={{ background: 'var(--main-gradient)' }}
         >
           <Play className="w-4 h-4 fill-current" />
-          <span className="text-sm font-semibold">Start Optimization</span>
+          <span className="text-sm font-semibold">Start Train-Optimization</span>
         </button>
 
         <button 

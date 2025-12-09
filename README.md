@@ -36,14 +36,10 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install --upgrade pip
 pip install -r requirements-fastapi.txt
-python -m uvicorn main:app --host 127.0.0.1 --port 8000
+python run_fastapi.py
 ```
 
-Optional: start the Celery worker (Redis required)
-
-```powershell
-.\.venv\Scripts\python.exe -m celery -A celery_worker.celery_app worker --pool=solo --loglevel=info --queues mlops-training
-```
+The `run_fastapi.py` script will automatically start the FastAPI server and the Celery worker (in development mode).
 
 ### With Docker Compose (Recommended)
 

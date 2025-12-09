@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 import aiosqlite
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
-from config import Settings
+from core.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class AsyncSQLiteConnectionManager:
             await self._setup_database_optimizations()
 
             self._initialized = True
-            logger.info(f"✓ Async SQLite manager initialized for {self.database_path}")
+            logger.info(f"[OK] Async SQLite manager initialized for {self.database_path}")
 
         except Exception as e:
             logger.error(f"Failed to initialize async SQLite manager: {e}")
@@ -71,7 +71,7 @@ class AsyncSQLiteConnectionManager:
 
                 await conn.commit()
 
-            logger.info("✓ Async SQLite WAL mode and optimizations enabled")
+            logger.info("[OK] Async SQLite WAL mode and optimizations enabled")
 
         except Exception as e:
             logger.error(f"Failed to setup SQLite optimizations: {e}")
@@ -148,7 +148,7 @@ class AsyncSQLiteConnectionManager:
 
     def _sync_close_all(self):
         """Synchronous close for atexit handler"""
-        logger.info("✓ Async SQLite manager cleanup registered")
+        logger.info("[OK] Async SQLite manager cleanup registered")
 
 
 class AsyncPostgreSQLConnectionManager:
@@ -196,7 +196,7 @@ class AsyncPostgreSQLConnectionManager:
                 await conn.execute("SELECT 1")
 
             self._initialized = True
-            logger.info(f"✓ Async PostgreSQL connection pool initialized with {self.pool_size} connections")
+            logger.info(f"[OK] Async PostgreSQL connection pool initialized with {self.pool_size} connections")
 
         except Exception as e:
             logger.error(f"Failed to initialize async PostgreSQL connection pool: {e}")
@@ -257,7 +257,7 @@ class AsyncPostgreSQLConnectionManager:
         """Close the async engine and all connections"""
         if self._engine:
             await self._engine.dispose()
-            logger.info("✓ Async PostgreSQL connection pool closed")
+            logger.info("[OK] Async PostgreSQL connection pool closed")
 
 
 class AsyncDatabaseManager:
@@ -294,7 +294,7 @@ class AsyncDatabaseManager:
                 await self.postgres_manager.initialize()
 
             self._initialized = True
-            logger.info("✓ Async database managers initialized successfully")
+            logger.info("[OK] Async database managers initialized successfully")
 
         except Exception as e:
             logger.error(f"Failed to initialize async database managers: {e}")
@@ -340,7 +340,7 @@ class AsyncDatabaseManager:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
-        logger.info("✓ All async database connections closed")
+        logger.info("[OK] All async database connections closed")
 
 
 # Global async database manager instance

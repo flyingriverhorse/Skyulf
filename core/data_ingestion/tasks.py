@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import json
 import asyncio
 
-from config import get_settings
+from core.config import get_settings
 from core.database.models import DataSource
 from core.data_ingestion.connectors.file import LocalFileConnector
 from core.data_ingestion.connectors.sql import DatabaseConnector
