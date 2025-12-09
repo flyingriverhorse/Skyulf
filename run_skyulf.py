@@ -9,9 +9,6 @@ It replaces the Flask run.py with modern async server capabilities.
 
 import logging
 import sys
-import subprocess
-import os
-import signal
 
 from core.config import get_settings, setup_universal_logging
 from core.main import app
@@ -30,40 +27,6 @@ def setup_logging():
         max_bytes=settings.LOG_MAX_SIZE,
         backup_count=settings.LOG_BACKUP_COUNT,
     )
-
-
-def start_celery_worker():
-    """Start the Celery worker in a separate process."""
-    if sys.platform == "win32":
-        pool_arg = "--pool=solo"
-    else:
-        pool_arg = "--pool=prefork"
-
-    cmd = [
-        sys.executable, "-m", "celery",
-        "-A", "celery_worker.celery_app",
-        "worker",
-        pool_arg,
-        "--loglevel=info",
-        "--queues", "mlops-training"
-    ]
-    
-    print(f"👷 Starting Celery worker: {' '.join(cmd)}")
-    return subprocess.Popen(cmd, cwd=os.getcwd())
-
-
-def check_redis_availability():
-    """Check if Redis is running and accessible."""
-    settings = get_settings()
-    try:
-        import redis
-        # Use a short timeout to avoid hanging
-        client = redis.from_url(settings.CELERY_BROKER_URL, socket_connect_timeout=1)
-        client.ping()
-        return True
-    except Exception:
-        return False
-
 
 
 def main():
@@ -87,38 +50,20 @@ def main():
         logger.error("❌ uvicorn not installed. Please run: pip install uvicorn[standard]")
         sys.exit(1)
 
-    celery_process = None
-
     # Development vs Production server configuration
     if settings.DEBUG:
-        # Start Celery worker in development mode if Redis is available
-        if check_redis_availability():
-            try:
-                celery_process = start_celery_worker()
-            except Exception as e:
-                logger.error(f"❌ Failed to start Celery worker: {e}")
-        else:
-            logger.warning("⚠️ Redis not found. Celery worker will NOT be started.")
-            logger.warning("   To enable background tasks, start Redis: docker-compose up -d redis")
-
         # Development server with auto-reload
         logger.info("🔧 Running in development mode with auto-reload")
-        try:
-            uvicorn.run(
-                "core.main:app",
-                host=settings.HOST,
-                port=settings.PORT,
-                reload=True,
-                reload_dirs=["."],
-                log_level="info",
-                access_log=True,
-                use_colors=True
-            )
-        finally:
-            if celery_process:
-                logger.info("🛑 Stopping Celery worker...")
-                celery_process.terminate()
-                celery_process.wait()
+        uvicorn.run(
+            "core.main:app",
+            host=settings.HOST,
+            port=settings.PORT,
+            reload=True,
+            reload_dirs=["."],
+            log_level="info",
+            access_log=True,
+            use_colors=True
+        )
     else:
         # Production server
         logger.info("🏭 Running in production mode")
