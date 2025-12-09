@@ -644,6 +644,34 @@ async def get_tuning_jobs_history(
     """
     return await JobManager.get_tuning_jobs_for_model(session, model_type)
 
+
+@router.get("/stats", response_model=Dict[str, int])
+async def get_system_stats(session: AsyncSession = Depends(get_async_session)):
+    """
+    Returns high-level system statistics for the dashboard.
+    """
+    from sqlalchemy import func, select
+    from core.database.models import TrainingJob, HyperparameterTuningJob, Deployment, DataSource
+
+    # Execute queries in parallel or sequence
+    # 1. Total Jobs (Training + Tuning)
+    training_count = await session.scalar(select(func.count(TrainingJob.id)))
+    tuning_count = await session.scalar(select(func.count(HyperparameterTuningJob.id)))
+    
+    # 2. Active Deployments
+    deployment_count = await session.scalar(select(func.count(Deployment.id)).where(Deployment.is_active == True))
+    
+    # 3. Data Sources
+    datasource_count = await session.scalar(select(func.count(DataSource.id)))
+
+    return {
+        "total_jobs": (training_count or 0) + (tuning_count or 0),
+        "active_deployments": deployment_count or 0,
+        "data_sources": datasource_count or 0,
+        "training_jobs": training_count or 0,
+        "tuning_jobs": tuning_count or 0
+    }
+
 @router.get("/registry", response_model=List[RegistryItem])
 def get_node_registry():
     """

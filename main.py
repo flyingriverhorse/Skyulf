@@ -20,22 +20,17 @@ from pathlib import Path
 
 # Use absolute imports to fix import issues
 from config import get_settings
-from core.auth import auth_router, auth_template_router
-from core.admin.routes import admin_router
+
 from core.health.routes import router as health_router
 from core.data_ingestion.routers.data_routes import data_router
-from core.user_management.routes import user_router, current_user_router, public_user_router
 from core.feature_engineering.routes import router as feature_engineering_router
 from core.ml_pipeline.api import router as ml_pipeline_v2_router
 from core.ml_pipeline.deployment.api import router as deployment_router
-from core.templates import setup_templates
-from core.pages import add_page_routes
 from middleware.error_handler import ErrorHandlerMiddleware
 from middleware.logging import LoggingMiddleware
 from core.database.engine import init_db, close_db, create_tables
 from core.exceptions.handlers import (
     not_found_exception_handler,
-    unauthorized_exception_handler,
     validation_exception_handler,
     method_not_allowed_exception_handler,
     generic_http_exception_handler
@@ -52,27 +47,13 @@ settings = get_settings()
 
 OPENAPI_DESCRIPTION = (
     f"{settings.APP_DESCRIPTION}\n\n"
-    "### Getting Started\n"
-    "1. Obtain API credentials from an administrator.\n"
-    "2. Exchange credentials for a JWT token at `/auth/token`.\n"
-    "3. Attach the token using the `Authorization: Bearer <token>` header on subsequent requests.\n\n"
     "### Highlights\n"
     "- **Data Management**: Upload datasets, explore sources, and clean ML assets.\n"
     "- **Feature Engineering**: Launch automated feature pipelines and inspect results.\n"
-    "- **Core Services**: Interact with authentication, user provisioning, and administration APIs.\n"
     "- **Monitoring**: Track system health via lightweight readiness and detailed diagnostics.\n"
 )
 
 OPENAPI_TAGS = [
-    {"name": "authentication", "description": "Issue and refresh JWT access tokens for the platform."},
-    {"name": "auth-pages", "description": "Server-rendered authentication views used by the web console."},
-    {"name": "admin", "description": "Administrative endpoints for managing users, jobs, and platform configuration."},
-    {"name": "User Management", "description": "Admin-facing user CRUD operations and directory insights."},
-    {"name": "Current User", "description": "Self-service profile and password operations for the authenticated user."},
-    {
-        "name": "Public User Operations",
-        "description": "Registration helper endpoints such as username and email availability checks."
-    },
     {"name": "Data Management", "description": "Dataset ingestion, lifecycle, and catalog management APIs."},
     {"name": "ml-workflow", "description": "Feature engineering and ML workflow orchestration endpoints."},
     {"name": "health", "description": "Health and readiness probes consumed by monitoring systems."},
@@ -157,13 +138,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await create_tables()
     logger.info("✅ Database tables created/verified")
 
-    # Run startup maintenance if enabled
-    try:
-        from core.utils.maintenance import run_startup_maintenance
-        await run_startup_maintenance()
-    except Exception as e:
-        logger.warning(f"⚠️ Startup maintenance failed: {e}")
-
     # Initialize other services here as needed
     # await init_cache()
     # await init_background_tasks()
@@ -238,17 +212,6 @@ def _setup_templates_and_static(app: FastAPI) -> None:
     except Exception as e:
         logger.error(f"❌ Failed to mount static files: {e}")
 
-    # Setup templates using the utility function
-    try:
-        templates = setup_templates(base_dir)
-
-        # Store templates in app state for use in routes
-        app.state.templates = templates
-        logger.info(f"✅ Templates initialized from: {base_dir / 'templates'}")
-    except Exception as e:
-        logger.error(f"❌ Failed to initialize templates: {e}")
-        raise
-
 
 def _add_middleware(app: FastAPI, settings) -> None:
     """Add middleware to the FastAPI application."""
@@ -280,24 +243,8 @@ def _include_routers(app: FastAPI) -> None:
     # are registered before the template-level routes which may define overlapping paths.
     app.include_router(data_router)
 
-    # Add template routes next
-    add_page_routes(app)
-
     # Health check (no prefix, available at /health)
     app.include_router(health_router, tags=["health"])
-
-    # === CORE DOMAIN ROUTERS (Business Logic Layer) ===
-    # Authentication routes (from core/auth)
-    app.include_router(auth_router, prefix="/api/auth")
-    app.include_router(auth_template_router)  # Template endpoints
-
-    # Admin routes (from core/admin) - admin_router already has /admin prefix
-    app.include_router(admin_router)
-
-    # User Management routes (from core/user_management)
-    app.include_router(user_router, prefix="/api")
-    app.include_router(current_user_router, prefix="/api")
-    app.include_router(public_user_router, prefix="/api")
 
     # Feature engineering routes (prototype API)
     try:
@@ -309,6 +256,13 @@ def _include_routers(app: FastAPI) -> None:
     app.include_router(ml_pipeline_v2_router, prefix="/api/pipeline", tags=["ML Pipeline"])
     app.include_router(deployment_router, prefix="/api", tags=["Deployment"])
 
+    # Root redirect
+    from fastapi.responses import RedirectResponse
+    @app.get("/", include_in_schema=False)
+    async def root():
+        return RedirectResponse(url="/docs")
+
+
 
 def _add_exception_handlers(app: FastAPI) -> None:
     """Add global exception handlers for both HTML and JSON responses."""
@@ -317,10 +271,6 @@ def _add_exception_handlers(app: FastAPI) -> None:
 
     # Handle 404 Not Found
     app.add_exception_handler(404, not_found_exception_handler)
-
-    # Handle 401 Unauthorized and 403 Forbidden
-    app.add_exception_handler(401, unauthorized_exception_handler)
-    app.add_exception_handler(403, unauthorized_exception_handler)
 
     # Handle 405 Method Not Allowed
     app.add_exception_handler(405, method_not_allowed_exception_handler)

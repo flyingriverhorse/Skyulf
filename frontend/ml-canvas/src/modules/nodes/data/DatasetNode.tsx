@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
-import { Database, TableProperties } from 'lucide-react';
+import { Database, TableProperties, Plus } from 'lucide-react';
 import { DatasetService } from '../../../core/api/datasets';
 import { Dataset } from '../../../core/types/api';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { FileUpload } from './FileUpload';
 
 interface DatasetNodeConfig {
   datasetId: string;
@@ -16,14 +17,19 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
 }) => {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
   const { data: schema, isLoading: isSchemaLoading } = useDatasetSchema(config.datasetId);
 
-  useEffect(() => {
+  const fetchDatasets = () => {
     setLoading(true);
     DatasetService.getAll()
       .then(setDatasets)
       .catch(console.error)
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchDatasets();
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -36,10 +42,34 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
     });
   };
 
+  const handleUploadComplete = (newId: string, newName: string) => {
+    setShowUpload(false);
+    fetchDatasets(); // Refresh list
+    onChange({
+      ...config,
+      datasetId: newId,
+      datasetName: newName
+    });
+  };
+
+  if (showUpload) {
+    return <FileUpload onUploadComplete={handleUploadComplete} onCancel={() => setShowUpload(false)} />;
+  }
+
   return (
     <div className="p-4 space-y-4">
       <div className="space-y-2">
-        <label className="block text-sm font-medium">Select Dataset</label>
+        <div className="flex justify-between items-center">
+          <label className="block text-sm font-medium">Select Dataset</label>
+          <button 
+            onClick={() => setShowUpload(true)}
+            className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium"
+          >
+            <Plus size={14} />
+            New Upload
+          </button>
+        </div>
+        
         {loading ? (
           <div className="text-xs text-muted-foreground">Loading datasets...</div>
         ) : (

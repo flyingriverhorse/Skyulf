@@ -28,5 +28,22 @@ export const DatasetService = {
     }
     const data = await response.json();
     return data.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    const response = await fetch(`${API_BASE}/sources/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete dataset');
+    }
+  },
+
+  getProfile: async (id: string): Promise<any> => {
+        const response = await fetch(`/ml-workflow/api/analytics/quick-profile?dataset_source_id=${id}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch dataset profile');
+    }
+    return await response.json();
   }
 };

@@ -207,7 +207,6 @@ class Settings(BaseSettings):
 
     # Pages that ALWAYS require admin privileges (overrides everything)
     # Can be set as comma-separated string in environment variables
-    ADMIN_REQUIRED_PAGES: str = "/admin,/admin/*,/admin/dashboard,/admin/users,/health"
 
     # Redirect URL for unauthenticated users
     LOGIN_REDIRECT_URL: str = "/login"
@@ -297,13 +296,6 @@ class Settings(BaseSettings):
     UPLOAD_CLEANUP_MAX_FILES: int = 20
     UPLOAD_CLEANUP_MAX_AGE_DAYS: int = 7
 
-    # Data folder cleanup (uploads/data and related data sources)
-    DATA_CLEANUP_ENABLED: bool = True
-    DATA_CLEANUP_MAX_FILES: int = 1
-    DATA_CLEANUP_MAX_AGE_DAYS: int = 0
-    DATA_CLEANUP_REMOVE_DATA_SOURCES: bool = True  # Remove related data sources from database
-    DATA_FILES_PATTERN: str = "*.*"
-
     # Cleanup scheduling
     CLEANUP_ON_STARTUP: bool = False  # Run cleanup when application starts
     CLEANUP_SCHEDULER_ENABLED: bool = False  # Enable automatic scheduled cleanup
@@ -321,11 +313,6 @@ class Settings(BaseSettings):
     TEMP_DIR: str = "temp/processing"
     EXPORT_DIR: str = "exports/data"
     MODELS_DIR: str = "uploads/models"
-    APP_DATA_DIR: str = "data"
-    APP_DATA_DIR_CACHE: str = "data/cache"
-    APP_DATA_DIR_EDA_CACHE: str = "data/eda_cache"
-    APP_DATA_DIR_EDA_SESSIONS: str = "data/eda_sessions"
-    APP_DATA_DIR_USER_EDA_HISTORY: str = "data/user_eda_history"
 
     # === PERFORMANCE SETTINGS ===
     ENABLE_DATABASE: bool = True
@@ -397,41 +384,6 @@ class Settings(BaseSettings):
             "aliases": ["bayesian", "optuna_tpe"],
         },
     ]
-
-    # === ADVANCED EDA / GRANULAR RUNTIME SETTINGS ===
-    # None indicates no imposed limit on row counts.
-    # Analysis runtime: max rows before sampling (granular runtime module)
-    GRANULAR_RUNTIME_MAX_ROWS: Optional[int] = None
-    # Analysis runtime: sampling strategy used in the advanced EDA UI
-    GRANULAR_RUNTIME_SAMPLING_STRATEGY: str = "random"
-    # Analysis runtime: seed for deterministic sampling
-    GRANULAR_RUNTIME_RANDOM_STATE: Optional[int] = 42
-    # Analysis runtime: toggle for cached results in the analysis UI
-    GRANULAR_RUNTIME_CACHE_ENABLED: bool = True
-    # Analysis runtime: cache TTL for result reuse
-    GRANULAR_RUNTIME_CACHE_TTL_SECONDS: int = 300
-    # Analysis runtime: max cached entries for repeat runs
-    GRANULAR_RUNTIME_CACHE_MAX_ITEMS: int = 128
-    # Column insights: cache size backing async EDA service
-    GRANULAR_CACHE_MAX_SIZE: int = 256
-    # Column insights UI: TTL for cached column insights payload
-    GRANULAR_COLUMN_INSIGHTS_CACHE_TTL: int = 300
-    # Multi-analysis/code generation: TTL for cached analysis bundles (core/eda/advanced_eda/services.py)
-    GRANULAR_ANALYSIS_CACHE_TTL: int = 180
-    # Text analysis tiles: max rows fed into NLP routines (core/eda/advanced_eda/granular_runtime/text.py)
-    GRANULAR_TEXT_NLP_SAMPLE_LIMIT: Optional[int] = None
-    # Text analysis tiles: cap on stats (core/eda/advanced_eda/granular_runtime/text.py)
-    GRANULAR_TEXT_FEATURE_SAMPLE_LIMIT: Optional[int] = None
-    # Domain detection & dataset preview: row cutoff before returning full data (core/eda/advanced_eda/data_manager.py)
-    EDA_PREVIEW_FULL_DATA_THRESHOLD: Optional[int] = None
-    # Unified sample limit for EDA workflows (applied when explicitly configured)
-    EDA_GLOBAL_SAMPLE_LIMIT: Optional[int] = None
-    # Column insights sampling cap (core/eda/advanced_eda/services.py)
-    EDA_COLUMN_INSIGHTS_SAMPLE_LIMIT: Optional[int] = 1000
-    # Custom code execution rate limiting (core/eda/security/rate_limiter.py)
-    EDA_CUSTOM_EXECUTIONS_PER_MINUTE: Optional[int] = 20
-    EDA_CUSTOM_MAX_CONCURRENT_EXECUTIONS: Optional[int] = 1
-    EDA_CUSTOM_RATE_CLEANUP_INTERVAL_SECONDS: Optional[int] = 300
 
     # === SNOWFLAKE CONFIGURATION (Enhanced) ===
     SNOWFLAKE_CONNECTION_TYPE: str = "native"  # Modern native connection
@@ -541,55 +493,6 @@ class Settings(BaseSettings):
             return [item.strip() for item in v.split(",") if item.strip()]
         return v
 
-    # Granular Runtime Configuration
-    # The validator now treats None and empty strings as "no limit" and
-    # also accepts string aliases such as "none" or "unlimited".
-    @field_validator("GRANULAR_RUNTIME_SAMPLING_STRATEGY")
-    @classmethod
-    def validate_granular_sampling_strategy(cls, v: str) -> str:
-        if not v:
-            return "random"
-        normalized = v.lower()
-        if normalized not in {"random", "head", "stratified"}:
-            raise ValueError("GRANULAR_RUNTIME_SAMPLING_STRATEGY must be one of: random, head, stratified")
-        return normalized
-
-    # Granular Runtime Configuration
-    @staticmethod
-    def _parse_optional_int(value: Any) -> Optional[int]:
-        if value is None:
-            return None
-        if isinstance(value, int):
-            return value
-        if isinstance(value, float) and value.is_integer():
-            return int(value)
-        if isinstance(value, str):
-            stripped = value.strip().lower()
-            if stripped in {"", "none", "null", "nan", "unlimited", "infinite", "inf"}:
-                return None
-            try:
-                return int(stripped)
-            except ValueError:
-                raise ValueError(f"Could not parse integer from value '{value}'")
-        return value
-
-    @field_validator(
-        "GRANULAR_RUNTIME_MAX_ROWS",
-        "GRANULAR_RUNTIME_RANDOM_STATE",
-        "GRANULAR_TEXT_NLP_SAMPLE_LIMIT",
-        "GRANULAR_TEXT_FEATURE_SAMPLE_LIMIT",
-        "EDA_PREVIEW_FULL_DATA_THRESHOLD",
-        "EDA_GLOBAL_SAMPLE_LIMIT",
-        "EDA_COLUMN_INSIGHTS_SAMPLE_LIMIT",
-        "EDA_CUSTOM_EXECUTIONS_PER_MINUTE",
-        "EDA_CUSTOM_MAX_CONCURRENT_EXECUTIONS",
-        "EDA_CUSTOM_RATE_CLEANUP_INTERVAL_SECONDS",
-        mode="before",
-    )
-    @classmethod
-    def parse_optional_granular_ints(cls, v):
-        return cls._parse_optional_int(v)
-
     @field_validator("PUBLIC_PAGES", mode="before")
     @classmethod
     def parse_public_pages(cls, v):
@@ -602,17 +505,6 @@ class Settings(BaseSettings):
             return ",".join(str(item).strip() for item in v if item)
         return v or "/login,/health,/"
 
-    @field_validator("ADMIN_REQUIRED_PAGES", mode="before")
-    @classmethod
-    def parse_admin_pages(cls, v):
-        """Parse ADMIN_REQUIRED_PAGES from environment variable string if needed."""
-        if isinstance(v, str) and v:
-            # Keep as string - we'll parse it in a property
-            return v.strip()
-        elif isinstance(v, list):
-            # Convert list back to comma-separated string for consistency
-            return ",".join(str(item).strip() for item in v if item)
-        return v or "/admin,/admin/*,/admin/dashboard,/admin/users"
 
     @field_validator("ML_DEFAULT_TEST_SIZE")
     @classmethod
@@ -657,11 +549,6 @@ class Settings(BaseSettings):
             self.TEMP_DIR,
             self.EXPORT_DIR,
             self.MODELS_DIR,
-            self.APP_DATA_DIR,
-            self.APP_DATA_DIR_CACHE,
-            self.APP_DATA_DIR_EDA_CACHE,
-            self.APP_DATA_DIR_EDA_SESSIONS,
-            self.APP_DATA_DIR_USER_EDA_HISTORY,
             Path(self.LOG_FILE).parent,
             "logs",
             "exports/models",
@@ -822,12 +709,6 @@ class Settings(BaseSettings):
             return [page.strip() for page in self.PUBLIC_PAGES.split(",") if page.strip()]
         return []
 
-    @property
-    def admin_required_pages_list(self) -> List[str]:
-        """Get ADMIN_REQUIRED_PAGES as a list of strings."""
-        if isinstance(self.ADMIN_REQUIRED_PAGES, str):
-            return [page.strip() for page in self.ADMIN_REQUIRED_PAGES.split(",") if page.strip()]
-        return []
 
 
 class DevelopmentSettings(Settings):
@@ -940,88 +821,6 @@ def get_settings() -> Settings:
     settings.create_directories()
 
     return settings
-
-
-# === ML PLATFORM UTILITIES (Migrated from Flask) ===
-
-def get_optimal_chunk_size(file_size_mb: float) -> int:
-    """
-    Calculate optimal chunk size for processing large datasets.
-    This helps with memory management in the ML pipeline.
-
-    Args:
-        file_size_mb: File size in megabytes
-
-    Returns:
-        Optimal chunk size for processing
-    """
-    if file_size_mb < 10:
-        return 10000  # Small files: process all at once
-    elif file_size_mb < 100:
-        return 50000  # Medium files: moderate chunks
-    elif file_size_mb < 1000:
-        return 100000  # Large files: bigger chunks
-    else:
-        return 250000  # Very large files: large chunks for efficiency
-
-
-def validate_ml_environment() -> Dict[str, Any]:
-    """
-    Validate that the ML environment is properly configured.
-    This helps with troubleshooting when users report issues.
-
-    Returns:
-        Dictionary with validation results
-    """
-    results: Dict[str, Any] = {
-        "pandas_version": None,
-        "numpy_version": None,
-        "sklearn_available": False,
-        "pandas_performance_features": False,
-        "memory_available_gb": None,
-        "disk_space_gb": None,
-        "fastapi_version": None,
-        "pydantic_version": None,
-    }
-
-    try:
-        import pandas as pd
-        results["pandas_version"] = pd.__version__
-        # Check if we have Pandas 2.x performance features
-        results["pandas_performance_features"] = hasattr(pd.options.mode, "copy_on_write")
-    except ImportError:
-        pass
-
-    try:
-        import numpy as np
-        results["numpy_version"] = np.__version__
-    except ImportError:
-        pass
-
-    try:
-        import fastapi
-        results["fastapi_version"] = fastapi.__version__
-    except ImportError:
-        pass
-
-    try:
-        import pydantic
-        results["pydantic_version"] = pydantic.VERSION
-    except ImportError:
-        pass
-
-    import importlib.util
-    results["sklearn_available"] = bool(importlib.util.find_spec("sklearn"))
-
-    # Check system resources
-    try:
-        import psutil
-        results["memory_available_gb"] = round(psutil.virtual_memory().total / (1024**3), 2)
-        results["disk_space_gb"] = round(psutil.disk_usage(".").free / (1024**3), 2)
-    except (ImportError, OSError):
-        pass
-
-    return results
 
 
 # Global settings instance accessor

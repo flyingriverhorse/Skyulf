@@ -1120,7 +1120,7 @@ class DataIngestionService:
 
         return None
 
-    async def handle_file_upload(self, file: UploadFile, current_user: User) -> Dict[str, Any]:
+    async def handle_file_upload(self, file: UploadFile, current_user: Optional[User] = None) -> Dict[str, Any]:
         """
         Handle complete file upload process including file saving and database record creation.
 
@@ -1128,7 +1128,7 @@ class DataIngestionService:
             Dict containing file_info, source_id, and other upload details
         """
         try:
-            uploader = getattr(current_user, 'username', 'anonymous')
+            uploader = current_user.username if current_user else 'anonymous'
             original_filename = file.filename or "upload"
             logger.info("File upload attempt by %s: %s", uploader, original_filename)
 
@@ -1227,7 +1227,7 @@ class DataIngestionService:
                 }
 
             upload_timestamp = self._utc_now_iso()
-            created_by_id = getattr(current_user, 'id', None)
+            created_by_id = current_user.id if current_user else None
 
             db_source = DataSource(
                 source_id=source_id,
@@ -1342,6 +1342,9 @@ class DataIngestionService:
         source_dict = source.to_dict() if hasattr(source, "to_dict") else {}
         source_type = source_dict.get("type", getattr(source, "type", "unknown"))
         display_type = type_display_map.get(source_type, source_type.upper())
+        
+        config = source_dict.get("config") or getattr(source, "config", {}) or {}
+        file_size_bytes = config.get("file_size_bytes", 0)
 
         return {
             "id": source_dict.get("id") or getattr(source, "id", None),
@@ -1357,6 +1360,13 @@ class DataIngestionService:
             "updated_at": source_dict.get("updated_at", getattr(source, "updated_at", None)),
             "last_tested": source_dict.get("last_tested", getattr(source, "last_tested", None)),
             "description": source_dict.get("description", getattr(source, "description", "")),
+            "row_count": config.get("estimated_rows", 0),
+            "rows": config.get("estimated_rows", 0),
+            "column_count": config.get("column_count", 0),
+            "columns": config.get("column_count", 0),
+            "file_size": self._format_file_size(file_size_bytes) if file_size_bytes else "Unknown",
+            "file_size_bytes": file_size_bytes,
+            "size_bytes": file_size_bytes,
             "metadata": {
                 "created_by": source_dict.get("created_by", getattr(source, "created_by", "Unknown")),
                 "connector_type": source_dict.get("type", source_type),
@@ -1375,7 +1385,7 @@ class DataIngestionService:
                         if k not in ["password", "secret", "key", "token"]
                     }
 
-    async def get_formatted_data_sources_list(self, current_user: User) -> Dict[str, Any]:
+    async def get_formatted_data_sources_list(self, current_user: Optional[User] = None) -> Dict[str, Any]:
         """
         Get formatted list of data sources for API response.
 
@@ -1383,10 +1393,14 @@ class DataIngestionService:
             Dict containing sources list, total count, and scope information
         """
         try:
-            logger.info(f"Getting formatted data sources list for user: {current_user.username}")
+            username = current_user.username if current_user else "anonymous"
+            logger.info(f"Getting formatted data sources list for user: {username}")
 
             # Determine scope based on user permissions
-            is_admin = current_user.has_permission("admin")
+            is_admin = True
+            if current_user:
+                is_admin = current_user.has_permission("admin")
+            
             scope = "admin_full" if is_admin else "user_scoped"
 
             # Use existing service method to get raw data sources
