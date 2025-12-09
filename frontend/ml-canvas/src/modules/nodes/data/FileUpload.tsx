@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Upload, FileSpreadsheet, AlertCircle, X } from 'lucide-react';
-import axios from 'axios';
+import { DatasetService } from '../../../core/api/datasets';
 
 interface FileUploadProps {
   onUploadComplete: (datasetId: string, datasetName: string) => void;
@@ -44,32 +44,16 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
     setError(null);
     setProgress(0);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      // Use direct axios call to match backend route structure /data/api/upload
-      const response = await axios.post('/data/api/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
-          setProgress(percentCompleted);
-        },
-      });
-
-      if (response.data && response.data.success) {
-        // Backend returns source_id
-        const datasetId = response.data.source_id;
-        const datasetName = response.data.file_info?.filename || file.name;
-        onUploadComplete(datasetId, datasetName);
-      } else {
-        throw new Error(response.data?.message || 'Upload failed');
-      }
+      // Use DatasetService.upload
+      const response = await DatasetService.upload(file);
+      
+      // Returns job_id (which is source_id) and status
+      onUploadComplete(response.job_id, file.name);
+      
     } catch (err: any) {
       console.error('Upload failed:', err);
-      setError(err.response?.data?.detail || err.message || 'Failed to upload file. Please try again.');
+      setError(err.message || 'Failed to upload file. Please try again.');
     } finally {
       setUploading(false);
     }

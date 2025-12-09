@@ -1,4 +1,4 @@
-import { apiClientV2, PipelineConfigModel } from './client';
+import { apiClient, PipelineConfigModel } from './client';
 
 export type JobStatus = 'queued' | 'running' | 'completed' | 'succeeded' | 'failed' | 'cancelled';
 
@@ -37,46 +37,46 @@ export interface RunPipelineResponse {
 
 export const jobsApi = {
   runPipeline: async (payload: RunPipelineRequest): Promise<RunPipelineResponse> => {
-    const response = await apiClientV2.post<RunPipelineResponse>('/pipeline/run', payload);
+    const response = await apiClient.post<RunPipelineResponse>('/pipeline/run', payload);
     return response.data;
   },
 
   getJob: async (jobId: string): Promise<JobInfo> => {
-    const response = await apiClientV2.get<JobInfo>(`/pipeline/jobs/${jobId}`);
+    const response = await apiClient.get<JobInfo>(`/pipeline/jobs/${jobId}`);
     return response.data;
   },
 
   cancelJob: async (jobId: string): Promise<void> => {
-    await apiClientV2.post(`/pipeline/jobs/${jobId}/cancel`);
+    await apiClient.post(`/pipeline/jobs/${jobId}/cancel`);
   },
 
-  listJobs: async (limit: number = 50): Promise<JobInfo[]> => {
-    const response = await apiClientV2.get<JobInfo[]>('/pipeline/jobs', { params: { limit } });
+  getJobs: async (limit: number = 10, skip: number = 0): Promise<JobInfo[]> => {
+    const response = await apiClient.get<JobInfo[]>('/pipeline/jobs', { params: { limit, skip } });
     return response.data;
   },
 
   getHyperparameters: async (modelType: string): Promise<any[]> => {
-    const response = await apiClientV2.get<any[]>(`/pipeline/hyperparameters/${modelType}`);
+    const response = await apiClient.get<any[]>(`/pipeline/hyperparameters/${modelType}`);
     return response.data;
   },
 
-  getDefaultSearchSpace: async (modelType: string): Promise<Record<string, any>> => {
-    const response = await apiClientV2.get<Record<string, any>>(`/pipeline/hyperparameters/${modelType}/defaults`);
+  getDefaultHyperparameters: async (modelType: string): Promise<Record<string, any>> => {
+    const response = await apiClient.get<Record<string, any>>(`/pipeline/hyperparameters/${modelType}/defaults`);
     return response.data;
   },
 
   getLatestTuningJob: async (nodeId: string): Promise<JobInfo | null> => {
-    const response = await apiClientV2.get<JobInfo | null>(`/pipeline/jobs/tuning/latest/${nodeId}`);
+    const response = await apiClient.get<JobInfo | null>(`/pipeline/jobs/tuning/latest/${nodeId}`);
     return response.data;
   },
 
-  getBestTuningJobForModel: async (modelType: string): Promise<JobInfo | null> => {
-    const response = await apiClientV2.get<JobInfo | null>(`/pipeline/jobs/tuning/best/${modelType}`);
+  getBestTuningJob: async (modelType: string): Promise<JobInfo | null> => {
+    const response = await apiClient.get<JobInfo | null>(`/pipeline/jobs/tuning/best/${modelType}`);
     return response.data;
   },
 
-  getTuningJobsForModel: async (modelType: string): Promise<JobInfo[]> => {
-    const response = await apiClientV2.get<JobInfo[]>(`/pipeline/jobs/tuning/history/${modelType}`);
+  getTuningHistory: async (modelType: string): Promise<JobInfo[]> => {
+    const response = await apiClient.get<JobInfo[]>(`/pipeline/jobs/tuning/history/${modelType}`);
     return response.data;
   }
 };

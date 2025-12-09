@@ -15,6 +15,7 @@ from core.database.engine import get_async_session, get_db
 from core.database.models import FeatureEngineeringPipeline, TrainingJob, HyperparameterTuningJob
 from core.data_ingestion.service import DataIngestionService
 from core.utils.file_utils import extract_file_path_from_source
+from core.ml_pipeline.tasks import run_pipeline_task
 
 from .execution.engine import PipelineEngine
 from .execution.schemas import PipelineConfig, NodeConfig, PipelineExecutionResult
@@ -31,7 +32,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/api/pipeline", tags=["ML Pipeline"])
 
 # --- Pydantic Models for API ---
 # We mirror the dataclasses but use Pydantic for validation
@@ -48,6 +49,93 @@ class PipelineConfigModel(BaseModel):
     metadata: Dict[str, Any] = {}
     target_node_id: Optional[str] = None
     job_type: Optional[str] = "training" # "training" or "tuning"
+
+class RunPipelineResponse(BaseModel):
+    message: str
+    pipeline_id: str
+    job_id: str
+
+@router.post("/run", response_model=RunPipelineResponse)
+async def run_pipeline(
+    config: PipelineConfigModel,
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Submit a pipeline for asynchronous execution via Celery.
+    """
+    # Extract details for Job creation
+    pipeline_id = config.pipeline_id
+    target_node_id = config.target_node_id
+    
+    # Find target node to get model type if possible
+    model_type = "unknown"
+    dataset_id = "unknown"
+    
+    # Simple heuristic: find the last node if target not specified
+    if not target_node_id and config.nodes:
+        target_node_id = config.nodes[-1].node_id
+        
+    # Try to find model type from target node params
+    for node in config.nodes:
+        if node.node_id == target_node_id:
+            if node.step_type == "trainer" or node.step_type == "model_training":
+                model_type = node.params.get("model_type", "unknown")
+            elif node.step_type == "model_tuning":
+                # For tuning nodes, model_type might be in params directly or inside tuning_config?
+                # Usually it's 'algorithm' or 'model_type' in params
+                model_type = node.params.get("algorithm") or node.params.get("model_type", "unknown")
+                
+        # Try to find dataset_id from data_loader node
+        if node.step_type == "data_loader":
+            dataset_id = node.params.get("dataset_id", "unknown")
+
+    # --- Path Resolution Logic ---
+    ingestion_service = DataIngestionService(db)
+    for node in config.nodes:
+        if node.step_type == "data_loader" and "dataset_id" in node.params:
+            try:
+                ds_id = int(node.params["dataset_id"])
+                ds = await ingestion_service.get_source(ds_id)
+                if ds:
+                    # Use the UUID source_id for consistency with the database join
+                    if ds.source_id:
+                        dataset_id = ds.source_id # Update dataset_id for job record
+                    
+                    ds_dict = {
+                        "connection_info": ds.config,
+                        "file_path": ds.config.get("file_path") if ds.config else None
+                    }
+                    path = extract_file_path_from_source(ds_dict)
+                    if path:
+                        node.params["path"] = str(path)
+                    else:
+                        raise HTTPException(status_code=400, detail=f"Could not resolve path for dataset {ds_id}")
+                else:
+                    raise HTTPException(status_code=404, detail=f"Dataset {ds_id} not found")
+            except ValueError:
+                 # If it's not an int, assume it's already a UUID or string ID
+                 pass
+    # -----------------------------
+
+    # Create Job in DB
+    job_id = await JobManager.create_job(
+        session=db,
+        pipeline_id=pipeline_id,
+        node_id=target_node_id or "unknown",
+        job_type=config.job_type,
+        dataset_id=dataset_id,
+        model_type=model_type,
+        graph=config.dict()
+    )
+    
+    # Trigger Celery Task
+    run_pipeline_task.delay(job_id, config.dict())
+    
+    return RunPipelineResponse(
+        message="Pipeline execution started",
+        pipeline_id=pipeline_id,
+        job_id=job_id
+    )
 
 class PreviewResponse(BaseModel):
     pipeline_id: str
@@ -349,180 +437,6 @@ async def preview_pipeline(
         # 5. Cleanup
         shutil.rmtree(temp_dir, ignore_errors=True)
 
-@router.post("/run")
-async def run_pipeline(
-    config: PipelineConfigModel, 
-    background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_async_session)
-):
-    """
-    Runs the pipeline in Full Mode:
-    - Uses the persistent artifact store.
-    - Uses full dataset.
-    - Runs asynchronously (simulated via BackgroundTasks for now).
-    """
-    # 1. Determine Job Details
-    target_node = config.target_node_id or (config.nodes[-1].node_id if config.nodes else "unknown")
-    job_type = config.job_type or "training"
-    
-    # Resolve dataset paths (Same logic as preview)
-    ingestion_service = DataIngestionService(session)
-    dataset_source_id = "unknown"
-
-    for node in config.nodes:
-        if node.step_type == "data_loader" and "dataset_id" in node.params:
-            # Default to whatever is passed
-            dataset_source_id = str(node.params["dataset_id"])
-            try:
-                ds_id = int(node.params["dataset_id"])
-                ds = await ingestion_service.get_data_source_by_id(ds_id)
-                if ds:
-                    # Use the UUID source_id for consistency with the database join
-                    if ds.source_id:
-                        dataset_source_id = ds.source_id
-                    
-                    ds_dict = {
-                        "connection_info": ds.config,
-                        "file_path": ds.config.get("file_path") if ds.config else None
-                    }
-                    path = extract_file_path_from_source(ds_dict)
-                    if path:
-                        node.params["path"] = str(path)
-                    else:
-                        raise HTTPException(status_code=400, detail=f"Could not resolve path for dataset {ds_id}")
-                else:
-                    raise HTTPException(status_code=404, detail=f"Dataset {ds_id} not found")
-            except ValueError:
-                 # If it's not an int, assume it's already a UUID or string ID
-                 pass
-
-    # 2. Create Job (Async, Persistent)
-    
-    # Extract model_type from target node if available
-    model_type = "unknown"
-    for node in config.nodes:
-        if node.node_id == target_node:
-            # Check params for model_type or algorithm
-            if "model_type" in node.params:
-                model_type = node.params["model_type"]
-            elif "algorithm" in node.params:
-                model_type = node.params["algorithm"]
-            # Also check config inside params if nested
-            elif "config" in node.params and "model_type" in node.params["config"]:
-                model_type = node.params["config"]["model_type"]
-            break
-
-    job_id = await JobManager.create_job(
-        session, 
-        config.pipeline_id, 
-        target_node, 
-        job_type,
-        dataset_id=dataset_source_id,
-        model_type=model_type,
-        graph=config.dict()
-    )
-    
-    # 3. Setup Persistent Store
-    # In production, this path should come from env vars or config
-    persistent_path = os.path.join(os.getcwd(), "exports", "models", config.pipeline_id)
-    artifact_store = LocalArtifactStore(persistent_path)
-    
-    # 4. Adapt Config
-    nodes = [
-        NodeConfig(
-            node_id=n.node_id,
-            step_type=n.step_type,
-            params=n.params, # No sampling injection
-            inputs=n.inputs
-        ) for n in config.nodes
-    ]
-    
-    pipeline_config = PipelineConfig(
-        pipeline_id=config.pipeline_id,
-        nodes=nodes,
-        metadata=config.metadata
-    )
-    
-    # 5. Run in Background
-    background_tasks.add_task(_run_engine_task, artifact_store, pipeline_config, job_id, target_node)
-    
-    return {"message": "Pipeline execution started", "pipeline_id": config.pipeline_id, "job_id": job_id}
-
-def _run_engine_task(store, config, job_id, target_node_id=None):
-    """Helper to run engine in background."""
-    # Use a fresh sync session for the background task
-    db_gen = get_db()
-    session = next(db_gen)
-    
-    def log_callback(msg):
-        try:
-            ts_msg = f"[{datetime.now().strftime('%H:%M:%S')}] {msg}"
-            JobManager.update_status_sync(session, job_id, logs=[ts_msg])
-        except Exception as e:
-            logger.error(f"Failed to write log to DB: {e}")
-    
-    try:
-        JobManager.update_status_sync(session, job_id, JobStatus.RUNNING)
-        
-        engine = PipelineEngine(store, log_callback=log_callback)
-        result = engine.run(config, job_id=job_id)
-        
-        if result.status == "success":
-            # Extract results from target node if available
-            job_result = {"pipeline_id": result.pipeline_id}
-            
-            if target_node_id and target_node_id in result.node_results:
-                node_res = result.node_results[target_node_id]
-                # For tuning jobs, metrics contains best_params and best_score
-                # For training jobs, metrics contains accuracy, f1, etc.
-                if node_res.metrics:
-                    job_result.update(node_res.metrics)
-                
-                # Add artifact_uri
-                # We use the job_id as the artifact URI/Key to ensure we point to the specific run's model
-                job_result["artifact_uri"] = job_id 
-
-                # Extract hyperparameters from the config for the target node
-                # We need to find the node config in the pipeline config
-                target_node_config = next((n for n in config.nodes if n.node_id == target_node_id), None)
-                if target_node_config:
-                    # Check for hyperparameters in params
-                    # Logic should match engine._run_model_training extraction
-                    params = target_node_config.params
-                    hyperparameters = params.get("hyperparameters")
-                    
-                    # If not explicitly in "hyperparameters" key, maybe it's flat in params?
-                    # But engine._run_model_training looks for params.get("hyperparameters", {})
-                    # So we should stick to that.
-                    if hyperparameters:
-                        job_result["hyperparameters"] = hyperparameters
-            
-            JobManager.update_status_sync(
-                session, 
-                job_id, 
-                JobStatus.COMPLETED, 
-                result=job_result
-            )
-        else:
-            # Find the error
-            error_msg = "Unknown error"
-            for node_res in result.node_results.values():
-                if node_res.status == "failed":
-                    error_msg = f"Node {node_res.node_id} failed: {node_res.error}"
-                    break
-            JobManager.update_status_sync(session, job_id, JobStatus.FAILED, error=error_msg)
-            
-    except Exception as e:
-        JobManager.update_status_sync(session, job_id, JobStatus.FAILED, error=str(e))
-    finally:
-        # Close the session
-        try:
-            next(db_gen)
-        except StopIteration:
-            pass
-        except Exception:
-            pass
-
 @router.get("/jobs/{job_id}", response_model=JobInfo)
 async def get_job_status(
     job_id: str,
@@ -571,14 +485,21 @@ async def get_job_evaluation(
         raise HTTPException(status_code=404, detail="Job not found")
 
     # 2. Determine Artifact Path
-    # Matches the path used in run_pipeline
-    persistent_path = os.path.join(os.getcwd(), "exports", "models", job.pipeline_id)
+    # Matches the path used in run_pipeline (tasks.py)
+    settings = get_settings()
+    persistent_path = os.path.join(settings.TRAINING_ARTIFACT_DIR, job_id)
     
     artifact_store = LocalArtifactStore(persistent_path)
     
     # 3. Load Evaluation Artifact
     # Key format: {node_id}_evaluation_data
-    key = f"{job.node_id}_evaluation_data"
+    # Or {job_id}_evaluation_data if saved with job_id (which we do now)
+    
+    # Try job_id key first (preferred)
+    key = f"{job_id}_evaluation_data"
+    if not artifact_store.exists(key):
+        # Fallback to node_id key
+        key = f"{job.node_id}_evaluation_data"
     
     if not artifact_store.exists(key):
         # Fallback: Check if the job failed or is still running
@@ -686,13 +607,55 @@ async def get_dataset_schema(
 ):
     """
     Returns the schema (columns, types, stats) of a dataset.
-    Uses the V2 DataProfiler.
+    Uses the DataProfiler.
     """
     ingestion_service = DataIngestionService(session)
-    ds = await ingestion_service.get_data_source_by_id(dataset_id)
+    ds = await ingestion_service.get_source(dataset_id)
     
     if not ds:
         raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found")
+
+    # Check if we have a cached profile in metadata
+    if ds.source_metadata and 'profile' in ds.source_metadata:
+        try:
+            cached_profile = ds.source_metadata['profile']
+            columns = {}
+            for col_name, stats in cached_profile.get('columns', {}).items():
+                # Map stats to ColumnProfile
+                dtype = str(stats.get('type', 'unknown'))
+                col_type = "unknown"
+                if any(x in dtype for x in ["Int", "Float", "Decimal"]):
+                    col_type = "numeric"
+                elif any(x in dtype for x in ["Utf8", "String", "Categorical", "Object"]):
+                    col_type = "categorical"
+                elif "Date" in dtype or "Time" in dtype:
+                    col_type = "datetime"
+                elif "Bool" in dtype:
+                    col_type = "boolean"
+                
+                columns[col_name] = {
+                    "name": col_name,
+                    "dtype": dtype,
+                    "column_type": col_type,
+                    "missing_count": stats.get('null_count', 0),
+                    "missing_ratio": stats.get('null_percentage', 0) / 100.0,
+                    "unique_count": stats.get('unique_count', 0),
+                    "min_value": stats.get('min'),
+                    "max_value": stats.get('max'),
+                    "mean_value": stats.get('mean'),
+                    "std_value": stats.get('std'),
+                }
+            
+            return {
+                "row_count": cached_profile.get('row_count', 0),
+                "column_count": cached_profile.get('column_count', 0),
+                "duplicate_row_count": cached_profile.get('duplicate_rows', 0),
+                "columns": columns
+            }
+        except Exception as e:
+            logger.warning(f"Failed to parse cached profile for {dataset_id}: {e}")
+            # Fallback to loading file
+            pass
         
     try:
         # Resolve path

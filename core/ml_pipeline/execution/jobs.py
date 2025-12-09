@@ -210,7 +210,7 @@ class JobManager:
                 start_time=job.started_at,
                 end_time=job.finished_at,
                 error=job.error_message,
-                result={"metrics": job.metrics} if job_type == "training" else {"best_params": job.best_params},
+                result={"metrics": job.metrics} if job_type == "training" else {"best_params": job.best_params, "best_score": job.best_score, "metrics": job.metrics, "results": job.results},
                 logs=job.logs,
                 model_type=job.model_type,
                 hyperparameters=hyperparameters,
@@ -220,7 +220,7 @@ class JobManager:
         return None
 
     @staticmethod
-    async def list_jobs(session: AsyncSession, limit: int = 50) -> List[JobInfo]:
+    async def list_jobs(session: AsyncSession, limit: int = 50, skip: int = 0) -> List[JobInfo]:
         """Lists recent jobs (Async)."""
         # Fetch both and merge? Or just return separate lists?
         # For now, let's fetch TrainingJobs
@@ -232,6 +232,7 @@ class JobManager:
             ))
             .order_by(TrainingJob.started_at.desc())
             .limit(limit)
+            .offset(skip)
         )
         train_rows = result_train.all()
         
@@ -243,6 +244,7 @@ class JobManager:
             ))
             .order_by(HyperparameterTuningJob.started_at.desc())
             .limit(limit)
+            .offset(skip)
         )
         tune_rows = result_tune.all()
         
@@ -296,7 +298,7 @@ class JobManager:
                 start_time=j.started_at,
                 end_time=j.finished_at,
                 error=j.error_message,
-                result={"best_params": j.best_params, "metrics": metrics}, # Ensure metrics are in result too
+                result={"best_params": j.best_params, "best_score": j.best_score, "metrics": metrics}, # Ensure metrics are in result too
                 model_type=j.model_type,
                 hyperparameters=hyperparameters,
                 created_at=j.created_at,

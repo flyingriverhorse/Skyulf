@@ -1,4 +1,4 @@
-import { apiClientV2 } from './client';
+import { apiClient } from './client';
 
 export interface DeploymentInfo {
   id: number;
@@ -15,22 +15,22 @@ export interface PredictionResponse {
 }
 
 export const deploymentApi = {
-  deploy: async (jobId: string): Promise<DeploymentInfo> => {
-    const response = await apiClientV2.post<DeploymentInfo>(`/deployment/deploy/${jobId}`);
+  deployModel: async (jobId: string): Promise<DeploymentInfo> => {
+    const response = await apiClient.post<DeploymentInfo>(`/deployment/deploy/${jobId}`);
     return response.data;
   },
 
-  getActive: async (): Promise<DeploymentInfo> => {
-    const response = await apiClientV2.get<DeploymentInfo>('/deployment/active');
+  getActiveDeployment: async (): Promise<DeploymentInfo> => {
+    const response = await apiClient.get<DeploymentInfo>('/deployment/active');
     return response.data;
   },
 
-  deactivate: async (): Promise<void> => {
-    await apiClientV2.post('/deployment/deactivate');
+  deactivateDeployment: async (): Promise<void> => {
+    await apiClient.post('/deployment/deactivate');
   },
 
   predict: async (data: any[]): Promise<PredictionResponse> => {
-    const response = await apiClientV2.post<PredictionResponse>('/deployment/predict', { data });
+    const response = await apiClient.post<PredictionResponse>('/deployment/predict', { data });
     return response.data;
   }
 };

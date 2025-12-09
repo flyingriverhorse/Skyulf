@@ -185,10 +185,11 @@ class PipelineEngine:
                 "job_id": job_id
             }
             
-            # Save back to the same key (overwriting the raw model)
-            self.artifact_store.save(model_artifact_key, full_artifact)
+            # Do NOT overwrite the raw model at model_artifact_key (node_id)
+            # because evaluate() expects the raw model object.
+            # self.artifact_store.save(model_artifact_key, full_artifact)
             
-            # Also save to job_id key if available
+            # Save to job_id key if available - this is the final artifact for the job
             if job_id and job_id != "unknown":
                 self.artifact_store.save(job_id, full_artifact)
                 
@@ -210,6 +211,7 @@ class PipelineEngine:
             self.log(f"Loading full data from {path}")
             df = loader.load_full(path)
             
+        self.log(f"Data loaded successfully. Shape: {df.shape} ({len(df)} rows, {len(df.columns)} columns)")
         self.artifact_store.save(node.node_id, df)
         return node.node_id
 
@@ -222,6 +224,11 @@ class PipelineEngine:
         # Pass artifact_store and node_id to allow internal steps to save state
         processed_df, metrics = engineer.fit_transform(df, self.artifact_store, node.node_id)
         
+        self.log(f"Feature engineering completed. Output shape: {processed_df.shape}")
+        if isinstance(processed_df, tuple):
+             # SplitDataset
+             self.log(f"Split details - Train: {processed_df[0].shape}, Test: {processed_df[1].shape if processed_df[1] is not None else 'None'}")
+
         self.artifact_store.save(node.node_id, processed_df)
         
         # Track executed transformers
@@ -288,7 +295,9 @@ class PipelineEngine:
                     cv_metrics[f"cv_{metric_name}_std"] = stats["std"]
 
         # 2. Train Final Model
+        self.log(f"Starting model training with algorithm: {algorithm}")
         estimator.fit_predict(data, target_col, hyperparameters, job_id=job_id)
+        self.log("Model training finished.")
         
         # Bundle transformers with the model for inference
         self._bundle_transformers_with_model(node.node_id, job_id=job_id)
@@ -330,6 +339,8 @@ class PipelineEngine:
         # Convert dict to TuningConfig object
         config = TuningConfig(**tuning_params)
         
+        self.log(f"Starting hyperparameter tuning (Strategy: {config.strategy}, Trials: {config.n_trials})")
+
         # We need X_train, y_train
         # Assuming data is SplitDataset
         if isinstance(data.train, tuple):
@@ -347,16 +358,31 @@ class PipelineEngine:
                 y_val = data.validation[target_col]
             validation_data = (X_val, y_val)
         
-        result = tuner.tune(X_train, y_train, config, validation_data=validation_data)
+        def progress_callback(current, total, score=None, params=None):
+            msg = f"Tuning progress: Trial {current}/{total}"
+            if score is not None:
+                msg += f" - Score: {score:.4f}"
+            self.log(msg)
+
+        result = tuner.tune(X_train, y_train, config, validation_data=validation_data, progress_callback=progress_callback)
         
+        self.log(f"Tuning completed. Best Score: {result.best_score:.4f}")
+        self.log(f"Best Params: {result.best_params}")
+
         # Train final model with best params
+        self.log("Retraining final model with best parameters...")
         estimator = StatefulEstimator(calculator, applier, self.artifact_store, node.node_id)
         estimator.fit_predict(data, target_col, result.best_params, job_id=job_id)
+        self.log("Final model retraining finished.")
         
         # Bundle transformers with the model for inference
         self._bundle_transformers_with_model(node.node_id, job_id=job_id)
         
-        metrics = {"best_score": result.best_score, "best_params": result.best_params}
+        metrics = {
+            "best_score": result.best_score, 
+            "best_params": result.best_params,
+            "trials": result.trials
+        }
         
         # Evaluate the tuned model
         try:

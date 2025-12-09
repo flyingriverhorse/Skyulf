@@ -3,20 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { DatasetService } from '../core/api/datasets';
 import { Dataset } from '../core/types/api';
 import { FileUpload } from '../modules/nodes/data/FileUpload';
-import { Trash2, Play, FileText, Calendar, Database, Plus, Eye } from 'lucide-react';
+import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2 } from 'lucide-react';
 import { formatBytes } from '../core/utils/format';
 import { DatasetPreviewModal } from '../components/data/DatasetPreviewModal';
+import { AddSourceModal } from '../components/data/AddSourceModal';
+import { IngestionJobsModal } from '../components/data/IngestionJobsModal';
 
 export const DataSources: React.FC = () => {
   const navigate = useNavigate();
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
+  const [showAddSource, setShowAddSource] = useState(false);
+  const [showIngestionJobs, setShowIngestionJobs] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [previewDataset, setPreviewDataset] = useState<Dataset | null>(null);
 
   const fetchDatasets = async () => {
-    setLoading(true);
+    // Don't set loading to true on subsequent polls to avoid flickering
+    if (datasets.length === 0) setLoading(true);
     try {
       const data = await DatasetService.getAll();
       setDatasets(data);
@@ -29,7 +34,18 @@ export const DataSources: React.FC = () => {
 
   useEffect(() => {
     fetchDatasets();
-  }, []);
+    // Poll every 5 seconds if there are pending jobs
+    const interval = setInterval(() => {
+      const hasPending = datasets.some(d => 
+        d.source_metadata?.ingestion_status?.status === 'pending' || 
+        d.source_metadata?.ingestion_status?.status === 'processing'
+      );
+      if (hasPending) {
+        fetchDatasets();
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [datasets]); // Re-run effect when datasets change to update "hasPending" check
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this dataset?')) return;
@@ -55,6 +71,31 @@ export const DataSources: React.FC = () => {
     fetchDatasets();
   };
 
+  const handleSourceCreated = () => {
+    setShowAddSource(false);
+    fetchDatasets();
+  };
+
+  const getStatusBadge = (dataset: Dataset) => {
+    const status = dataset.source_metadata?.ingestion_status?.status;
+    if (!status || status === 'completed') return null;
+
+    if (status === 'failed') {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400">
+          Failed
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
+        <Loader2 size={12} className="animate-spin" />
+        {status === 'processing' ? 'Processing...' : 'Pending...'}
+      </span>
+    );
+  };
+
   return (
     <div className="p-8 space-y-6 max-w-7xl mx-auto">
       <DatasetPreviewModal 
@@ -63,19 +104,47 @@ export const DataSources: React.FC = () => {
         onClose={() => setPreviewDataset(null)} 
       />
 
+      <AddSourceModal
+        isOpen={showAddSource}
+        onClose={() => setShowAddSource(false)}
+        onSuccess={handleSourceCreated}
+      />
+
+      <IngestionJobsModal
+        isOpen={showIngestionJobs}
+        onClose={() => setShowIngestionJobs(false)}
+        datasets={datasets}
+      />
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Data Sources</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">Manage your uploaded datasets and use them in experiments.</p>
         </div>
-        <button
-          onClick={() => setShowUpload(!showUpload)}
-          className="flex items-center gap-2 text-white px-4 py-2 rounded-md shadow-sm transition-all hover:opacity-90"
-          style={{ background: 'var(--main-gradient)' }}
-        >
-          <Plus size={18} />
-          {showUpload ? 'Cancel Upload' : 'Upload New Dataset'}
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowIngestionJobs(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-200"
+          >
+            <Calendar size={18} />
+            Ingestion Jobs
+          </button>
+          <button
+            onClick={() => setShowAddSource(true)}
+            className="flex items-center gap-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 px-4 py-2 rounded-md shadow-sm transition-all hover:bg-slate-50 dark:hover:bg-slate-700"
+          >
+            <Database size={18} />
+            Add Source
+          </button>
+          <button
+            onClick={() => setShowUpload(!showUpload)}
+            className="flex items-center gap-2 text-white px-4 py-2 rounded-md shadow-sm transition-all hover:opacity-90"
+            style={{ background: 'var(--main-gradient)' }}
+          >
+            <Plus size={18} />
+            {showUpload ? 'Cancel Upload' : 'Upload File'}
+          </button>
+        </div>
       </div>
 
       {showUpload && (
@@ -97,7 +166,7 @@ export const DataSources: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-900">
-              {loading ? (
+              {loading && datasets.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
                     <div className="flex items-center justify-center gap-2">
@@ -123,8 +192,13 @@ export const DataSources: React.FC = () => {
                           <FileText size={18} />
                         </div>
                         <div>
-                          <div className="font-medium text-slate-900 dark:text-slate-100">{d.name}</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">{d.id}</div>
+                          <div className="font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                            {d.name}
+                            {getStatusBadge(d)}
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5" title="Dataset ID">
+                            {d.source_id || d.id}
+                          </div>
                         </div>
                       </div>
                     </td>
