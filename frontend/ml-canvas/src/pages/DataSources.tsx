@@ -70,7 +70,8 @@ export const DataSources: React.FC = () => {
         </div>
         <button
           onClick={() => setShowUpload(!showUpload)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 text-white px-4 py-2 rounded-md shadow-sm transition-all hover:opacity-90"
+          style={{ background: 'var(--main-gradient)' }}
         >
           <Plus size={18} />
           {showUpload ? 'Cancel Upload' : 'Upload New Dataset'}
