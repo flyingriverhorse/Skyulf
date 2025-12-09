@@ -37,7 +37,8 @@ export const Dashboard: React.FC = () => {
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Dashboard</h1>
         <Link 
           to="/canvas" 
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+          className="text-white px-4 py-2 rounded-md shadow-sm transition-all hover:opacity-90"
+          style={{ background: 'var(--main-gradient)' }}
         >
           New Experiment
         </Link>

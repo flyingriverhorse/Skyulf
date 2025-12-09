@@ -686,8 +686,8 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
       <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
         <button
           onClick={handleTrain}
-          className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 text-white rounded-lg shadow-lg shadow-purple-500/20 transition-all hover:shadow-purple-500/30 hover:-translate-y-0.5 active:translate-y-0"
-          style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' }}
+          className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 text-white rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
+          style={{ background: 'var(--main-gradient)' }}
         >
           <Play className="w-4 h-4 fill-current" />
           <span className="text-sm font-semibold">Start Training</span>
