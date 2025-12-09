@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Play, Save, Loader2, FolderOpen, History } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
-import { runPipelinePreviewV2, savePipeline, fetchPipeline } from '../../core/api/client';
+import { runPipelinePreview, savePipeline, fetchPipeline } from '../../core/api/client';
 import { convertGraphToPipelineConfig } from '../../core/utils/pipelineConverter';
 
 export const Toolbar: React.FC = () => {
@@ -53,7 +53,7 @@ export const Toolbar: React.FC = () => {
     try {
       await savePipeline(datasetId, {
         name: 'My Pipeline', // TODO: Add UI for naming
-        description: 'Saved from V2 Canvas',
+        description: 'Saved from Canvas',
         graph: getPipelinePayload()
       });
       alert('Pipeline saved successfully!');
@@ -109,9 +109,9 @@ export const Toolbar: React.FC = () => {
     setExecutionResult(null); // Clear previous results
     
     try {
-      // Use V2 API
+      // Use API
       const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
-      const result = await runPipelinePreviewV2(pipelineConfig);
+      const result = await runPipelinePreview(pipelineConfig);
       
       setExecutionResult(result);
     } catch (error) {

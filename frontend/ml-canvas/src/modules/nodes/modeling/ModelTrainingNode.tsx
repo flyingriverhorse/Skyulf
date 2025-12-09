@@ -68,7 +68,8 @@ const BestParamsModal: React.FC<{
         if (!currentModelType) return;
         setIsLoading(true);
         setError(null);
-        jobsApi.getTuningJobsForModel(currentModelType)
+        // Use getTuningHistory instead of getTuningJobsForModel
+        jobsApi.getTuningHistory(currentModelType)
             .then(data => {
                 setJobs(data || []);
             })
@@ -161,7 +162,7 @@ const BestParamsModal: React.FC<{
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-3 mt-1">
-                                            {job.result?.best_score !== undefined && (
+                                            {typeof job.result?.best_score === 'number' && (
                                                 <div className="flex items-center gap-1">
                                                     <span className="text-xs font-medium text-gray-500">Score:</span>
                                                     <span className="text-sm font-bold text-green-600 dark:text-green-400">

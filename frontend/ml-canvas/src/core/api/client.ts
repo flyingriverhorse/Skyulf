@@ -1,16 +1,16 @@
 import axios from 'axios';
 
-// --- V2 API Client ---
-const API_V2_BASE = '/api';
+// --- API Client ---
+const API_BASE = '/api';
 
-export const apiClientV2 = axios.create({
-  baseURL: API_V2_BASE,
+export const apiClient = axios.create({
+  baseURL: API_BASE,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// --- V2 Interfaces ---
+// --- Interfaces ---
 export interface NodeConfigModel {
   node_id: string;
   step_type: string;
@@ -22,6 +22,8 @@ export interface PipelineConfigModel {
   pipeline_id: string;
   nodes: NodeConfigModel[];
   metadata?: Record<string, any>;
+  target_node_id?: string;
+  job_type?: string;
 }
 
 export interface ColumnProfile {
@@ -57,19 +59,19 @@ export interface PreviewResponse {
   recommendations: Recommendation[];
 }
 
-// --- V2 Functions ---
+// --- Functions ---
 
-export const runPipelinePreviewV2 = async (payload: PipelineConfigModel): Promise<PreviewResponse> => {
-  const response = await apiClientV2.post<PreviewResponse>('/pipeline/preview', payload);
+export const runPipelinePreview = async (payload: PipelineConfigModel): Promise<PreviewResponse> => {
+  const response = await apiClient.post<PreviewResponse>('/pipeline/preview', payload);
   return response.data;
 };
 
 export const fetchDatasetProfile = async (datasetId: string): Promise<AnalysisProfile> => {
-  const response = await apiClientV2.get<AnalysisProfile>(`/pipeline/datasets/${datasetId}/schema`);
+  const response = await apiClient.get<AnalysisProfile>(`/pipeline/datasets/${datasetId}/schema`);
   return response.data;
 };
 
-// --- Placeholder Functions (To be implemented in V2) ---
+// --- Placeholder Functions ---
 
 export interface SavedPipeline {
   id?: string; // Optional because backend might not return it on load
@@ -82,19 +84,19 @@ export interface SavedPipeline {
 }
 
 export const savePipeline = async (datasetId: string, payload: any): Promise<{ id: string }> => {
-  const response = await apiClientV2.post<{ id: string }>(`/pipeline/save/${datasetId}`, payload);
+  const response = await apiClient.post<{ id: string }>(`/pipeline/save/${datasetId}`, payload);
   return response.data;
 };
 
 export const fetchPipeline = async (datasetId: string): Promise<SavedPipeline | null> => {
-  const response = await apiClientV2.get<SavedPipeline | null>(`/pipeline/load/${datasetId}`);
+  const response = await apiClient.get<SavedPipeline | null>(`/pipeline/load/${datasetId}`);
   // Handle 204 No Content or null response
   if (!response.data) return null;
   return response.data;
 };
 
-export const submitTrainingJob = async (payload: any): Promise<{ job_id: string }> => {
-  console.warn('submitTrainingJob is not yet implemented in V2', payload);
-  return { job_id: 'mock_job_id' };
+export const submitTrainingJob = async (payload: PipelineConfigModel): Promise<{ job_id: string }> => {
+  const response = await apiClient.post<{ job_id: string }>('/pipeline/run', payload);
+  return response.data;
 };
 

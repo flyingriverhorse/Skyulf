@@ -31,6 +31,9 @@ httpx>=0.25.0,<1.0.0      # Async HTTP client (replacement for requests)
 psutil>=5.9.0,<6.0.0      # System and process utilities
 
 # === DATA PROCESSING ===
+polars>=0.20.0,<1.0.0     # Fast DataFrame library (V2 Ingestion)
+xlsx2csv>=0.8.0           # Excel to CSV converter for Polars
+openpyxl>=3.1.0           # Excel reading support
 pandas>=2.0.0,<3.0.0      # Data analysis and manipulation
 numpy>=1.24.0,<2.0.0      # Numerical computing
 scikit-learn>=1.4.0,<2.0.0 # Model selection utilities

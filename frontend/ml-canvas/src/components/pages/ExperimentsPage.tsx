@@ -4,12 +4,12 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ScatterChart, Scatter, LineChart, Line, ReferenceLine
 } from 'recharts';
-import { Filter, Rocket, ChevronDown, ChevronRight, Activity } from 'lucide-react';
+import { Filter, Rocket, ChevronDown, ChevronRight, Activity, RefreshCw } from 'lucide-react';
 import { deploymentApi } from '../../core/api/deployment';
-import { apiClientV2 } from '../../core/api/client';
+import { apiClient } from '../../core/api/client';
 
 export const ExperimentsPage: React.FC = () => {
-  const { jobs, fetchJobs } = useJobStore();
+  const { jobs, fetchJobs, hasMore, loadMoreJobs, isLoading } = useJobStore();
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
   const [filterType, setFilterType] = useState<'all' | 'training' | 'tuning'>('all');
   const [datasets, setDatasets] = useState<{id: string, name: string}[]>([]);
@@ -47,7 +47,7 @@ export const ExperimentsPage: React.FC = () => {
 
   const fetchDatasets = async () => {
     try {
-      const response = await apiClientV2.get('/pipeline/datasets/list');
+      const response = await apiClient.get('/pipeline/datasets/list');
       setDatasets(response.data);
     } catch (e) {
       console.error("Failed to fetch datasets", e);
@@ -58,7 +58,7 @@ export const ExperimentsPage: React.FC = () => {
     e.stopPropagation();
     if (!confirm('Are you sure you want to deploy this model to production?')) return;
     try {
-      await deploymentApi.deploy(jobId);
+      await deploymentApi.deployModel(jobId);
       alert('Model deployed successfully!');
     } catch (err) {
       alert('Failed to deploy model');
@@ -72,7 +72,7 @@ export const ExperimentsPage: React.FC = () => {
       setEvalError(null);
       setEvalJobId(jobId);
       try {
-          const res = await apiClientV2.get(`/pipeline/jobs/${jobId}/evaluation`);
+          const res = await apiClient.get(`/pipeline/jobs/${jobId}/evaluation`);
           setEvaluationData(res.data);
       } catch (err: any) {
           console.error("Failed to fetch evaluation data", err);
@@ -317,6 +317,19 @@ export const ExperimentsPage: React.FC = () => {
                 </div>
               </div>
             ))}
+            
+            {hasMore && (
+                <div className="p-2 flex justify-center border-t border-gray-100 dark:border-gray-700">
+                    <button 
+                        onClick={() => loadMoreJobs()}
+                        disabled={isLoading}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 flex items-center gap-1"
+                    >
+                        {isLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ChevronDown className="w-3 h-3" />}
+                        Load More
+                    </button>
+                </div>
+            )}
           </div>
         </div>
 

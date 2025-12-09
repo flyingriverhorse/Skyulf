@@ -22,10 +22,10 @@ from pathlib import Path
 from config import get_settings
 
 from core.health.routes import router as health_router
-from core.data_ingestion.routers.data_routes import data_router
-from core.feature_engineering.routes import router as feature_engineering_router
-from core.ml_pipeline.api import router as ml_pipeline_v2_router
+# from core.feature_engineering.routes import router as feature_engineering_router
+from core.ml_pipeline.api import router as ml_pipeline_router
 from core.ml_pipeline.deployment.api import router as deployment_router
+from core.data_ingestion.router import router as data_ingestion_router, sources_router as data_sources_router
 from middleware.error_handler import ErrorHandlerMiddleware
 from middleware.logging import LoggingMiddleware
 from core.database.engine import init_db, close_db, create_tables
@@ -241,7 +241,8 @@ def _include_routers(app: FastAPI) -> None:
     """Include all API routers."""
     # Include data ingestion router first so its API routes (e.g. /data/api/sources/search)
     # are registered before the template-level routes which may define overlapping paths.
-    app.include_router(data_router)
+    app.include_router(data_ingestion_router)
+    app.include_router(data_sources_router)
 
     # Health check (no prefix, available at /health)
     app.include_router(health_router, tags=["health"])
@@ -253,7 +254,10 @@ def _include_routers(app: FastAPI) -> None:
         logger.debug("feature_engineering_router not available to include")
 
     # ML Pipeline
-    app.include_router(ml_pipeline_v2_router, prefix="/api/pipeline", tags=["ML Pipeline"])
+    # Note: ml_pipeline_router already has prefix="/api/pipeline" defined in its file
+    # But we double check to avoid double prefixing if we change it later.
+    # For now, let's remove the prefix here since we added it to the router definition.
+    app.include_router(ml_pipeline_router)
     app.include_router(deployment_router, prefix="/api", tags=["Deployment"])
 
     # Root redirect

@@ -40,25 +40,27 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'sample' | 'stats'>('sample');
+  const [sampleSize, setSampleSize] = useState(100);
 
   useEffect(() => {
     if (isOpen && dataset) {
-      fetchData();
+      fetchData(100);
     } else {
       setSampleData([]);
       setProfile(null);
       setError(null);
       setActiveTab('sample');
+      setSampleSize(100);
     }
   }, [isOpen, dataset]);
 
-  const fetchData = async () => {
+  const fetchData = async (limit: number) => {
     if (!dataset) return;
     setLoading(true);
     setError(null);
     try {
       const [sample, profileData] = await Promise.all([
-        DatasetService.getSample(dataset.id, 10),
+        DatasetService.getSample(dataset.id, limit),
         DatasetService.getProfile(dataset.id)
       ]);
       setSampleData(sample);
@@ -69,6 +71,12 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLoadMore = () => {
+    const newSize = sampleSize + 500;
+    setSampleSize(newSize);
+    fetchData(newSize);
   };
 
   if (!isOpen || !dataset) return null;
@@ -150,7 +158,7 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
             <div className="flex flex-col items-center justify-center h-64 text-red-500 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-900/20">
               <p>{error}</p>
               <button 
-                onClick={fetchData}
+                onClick={() => fetchData(sampleSize)}
                 className="mt-4 px-4 py-2 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-800 rounded-md text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
               >
                 Retry
@@ -166,33 +174,43 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
                 Data loaded but no columns found.
               </div>
             ) : (
-              <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                      <tr>
-                        {columns.map((col) => (
-                          <th key={col} className="px-4 py-3 font-semibold whitespace-nowrap">
-                            {col}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-900">
-                      {sampleData.map((row, i) => (
-                        <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+              <div className="space-y-4">
+                <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto max-h-[60vh]">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
+                        <tr>
                           {columns.map((col) => (
-                            <td key={`${i}-${col}`} className="px-4 py-2 whitespace-nowrap text-slate-700 dark:text-slate-300">
-                              {String(row[col] ?? '')}
-                            </td>
+                            <th key={col} className="px-4 py-3 font-semibold whitespace-nowrap bg-slate-50 dark:bg-slate-800">
+                              {col}
+                            </th>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-900">
+                        {sampleData.map((row, i) => (
+                          <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            {columns.map((col) => (
+                              <td key={`${i}-${col}`} className="px-4 py-2 whitespace-nowrap text-slate-700 dark:text-slate-300">
+                                {String(row[col] ?? '')}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2 text-xs text-slate-500 border-t border-slate-200 dark:border-slate-700 text-center">
-                  Showing first {sampleData.length} rows
+                <div className="flex justify-center items-center gap-4">
+                  <button
+                    onClick={handleLoadMore}
+                    className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                  >
+                    Load More (+500 rows)
+                  </button>
+                  <span className="text-xs text-slate-500">
+                    Showing first {sampleData.length} rows
+                  </span>
                 </div>
               </div>
             )

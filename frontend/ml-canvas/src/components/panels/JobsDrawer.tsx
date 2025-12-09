@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
-import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard } from 'lucide-react';
+import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown } from 'lucide-react';
 import { JobInfo, jobsApi } from '../../core/api/jobs';
 
 export const JobsDrawer: React.FC = () => {
@@ -11,7 +11,9 @@ export const JobsDrawer: React.FC = () => {
     isLoading, 
     activeTab, 
     setTab,
-    fetchJobs 
+    fetchJobs,
+    hasMore,
+    loadMoreJobs
   } = useJobStore();
 
   const [selectedJob, setSelectedJob] = useState<JobInfo | null>(null);
@@ -97,9 +99,24 @@ export const JobsDrawer: React.FC = () => {
                     No {activeTab === 'tuning' ? 'optimization' : 'training'} jobs found.
                     </div>
                 ) : (
-                    filteredJobs.map(job => (
-                    <JobRow key={job.job_id} job={job} onClick={() => setSelectedJob(job)} />
-                    ))
+                    <>
+                        {filteredJobs.map(job => (
+                            <JobRow key={job.job_id} job={job} onClick={() => setSelectedJob(job)} />
+                        ))}
+                        
+                        {hasMore && (
+                            <div className="flex justify-center pt-2 pb-4">
+                                <button 
+                                    onClick={() => loadMoreJobs()}
+                                    disabled={isLoading}
+                                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 flex items-center gap-1"
+                                >
+                                    {isLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ChevronDown className="w-3 h-3" />}
+                                    Load More History
+                                </button>
+                            </div>
+                        )}
+                    </>
                 )}
                 </div>
             </>
@@ -289,10 +306,44 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                     </div>
                                 )}
 
-                                {job.job_type === 'tuning' && job.result.best_params && (
-                                    <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
-                                        <div className="text-gray-500 mb-2"># Best Hyperparameters</div>
-                                        <pre>{JSON.stringify(job.result.best_params, null, 2)}</pre>
+                                {job.job_type === 'tuning' && (
+                                    <div className="space-y-4">
+                                        {/* Best Score */}
+                                        {job.result.best_score !== undefined && (
+                                            <div className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg w-fit">
+                                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Optimization Score</div>
+                                                <div className="font-mono font-medium text-purple-600 dark:text-purple-400 text-lg">
+                                                    {Number(job.result.best_score).toFixed(5)}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Full Metrics (Train/Test/Val) */}
+                                        {job.result.metrics && (
+                                            <div className="space-y-2">
+                                                <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Evaluation Metrics</h4>
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                                    {Object.entries(job.result.metrics)
+                                                        .filter(([k]) => !['best_score', 'best_params', 'trials'].includes(k))
+                                                        .map(([k, v]) => (
+                                                        <div key={k} className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">{k.replace(/_/g, ' ')}</div>
+                                                            <div className="font-mono font-medium text-blue-600 dark:text-blue-400">
+                                                                {typeof v === 'number' ? v.toFixed(4) : String(v)}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Best Params */}
+                                        {job.result.best_params && (
+                                            <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
+                                                <div className="text-gray-500 mb-2"># Best Hyperparameters</div>
+                                                <pre>{JSON.stringify(job.result.best_params, null, 2)}</pre>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -420,9 +471,16 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
                    </span>
                  ))}
                </div>
-             ) : job.job_type === 'tuning' && job.result.best_params ? (
-               <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate" title={JSON.stringify(job.result.best_params)}>
-                   Params found
+             ) : job.job_type === 'tuning' ? (
+               <div className="flex flex-wrap gap-1">
+                   {job.result.best_score !== undefined && (
+                       <span className="text-[10px] bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 truncate">
+                           Score: {Number(job.result.best_score).toFixed(4)}
+                       </span>
+                   )}
+                   {!job.result.best_score && job.result.best_params && (
+                       <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate">Params found</span>
+                   )}
                </div>
              ) : <span className="text-gray-400 text-xs">-</span>
         ) : (

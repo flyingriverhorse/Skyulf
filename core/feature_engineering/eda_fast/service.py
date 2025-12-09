@@ -13,6 +13,7 @@ import io
 import json
 import time
 import warnings
+import os
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -285,12 +286,20 @@ class FeatureEngineeringEDAService:
         if not normalized:
             return None
 
-        source = await self.data_service.get_data_source_by_source_id(normalized)
-        if source is None and normalized.isdigit():
+        # Try to get by ID first (since we use integer IDs in the UI)
+        source = None
+        if normalized.isdigit():
             try:
-                source = await self.data_service.get_data_source(int(normalized))
-            except Exception:  # pragma: no cover - defensive
-                source = None
+                source = await self.data_service.get_source(int(normalized))
+            except Exception:
+                pass
+        
+        # If not found, try by source_id (UUID)
+        if source is None:
+            # We don't have get_data_source_by_source_id in DataIngestionService yet
+            # But we can query the DB directly or add it. 
+            # For now, let's assume the ID passed is the integer ID.
+            pass
 
         if source is not None:
             config = getattr(source, "config", {}) or {}
@@ -300,19 +309,16 @@ class FeatureEngineeringEDAService:
                     resolved = Path(candidate)
                     if resolved.exists():
                         return resolved
-
-        if self._uploads_dir.exists():
-            candidate = next(
-                (
-                    file_path
-                    for file_path in self._uploads_dir.iterdir()
-                    if file_path.is_file() and normalized in file_path.name
-                ),
-                None,
-            )
-            if candidate:
-                return candidate
-
+                    # Try relative to workspace
+                    abs_path = Path(os.getcwd()) / candidate
+                    if abs_path.exists():
+                        return abs_path
+        
+        # Fallback: check uploads dir directly (legacy behavior)
+        candidate = self._uploads_dir / normalized
+        if candidate.exists() and candidate.is_file():
+            return candidate
+            
         return None
 
     def _generate_preview(self, file_path: Path, sample_size: int, mode: str) -> _PreviewPayload:

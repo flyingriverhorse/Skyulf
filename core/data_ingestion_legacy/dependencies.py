@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database.engine import get_async_session
 from core.database.models import User
-from .service import DataIngestionService
+from .service import DataIngestionService, get_data_ingestion_service
 from .exceptions import DataIngestionException
 
 
@@ -14,7 +14,7 @@ async def get_data_service(
     session: Annotated[AsyncSession, Depends(get_async_session)]
 ) -> DataIngestionService:
     """Get data ingestion service dependency."""
-    return DataIngestionService(session)
+    return get_data_ingestion_service(session)
 
 
 async def require_data_access() -> None:

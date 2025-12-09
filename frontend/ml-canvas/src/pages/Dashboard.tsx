@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiClientV2 } from '../core/api/client';
+import axios from 'axios';
+import { apiClient } from '../core/api/client';
 
 interface SystemStats {
   total_jobs: number;
@@ -10,17 +11,28 @@ interface SystemStats {
   tuning_jobs: number;
 }
 
+interface TrainingJobSummary {
+  id: string;
+  status: string;
+  model_type: string;
+  created_at: string;
+  metrics?: Record<string, any>;
+}
+
 export const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<SystemStats | null>(null);
+  const [jobs, setJobs] = useState<TrainingJobSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes] = await Promise.all([
-          apiClientV2.get<SystemStats>('/pipeline/stats')
+        const [statsRes, jobsRes] = await Promise.all([
+          apiClient.get<SystemStats>('/pipeline/stats'),
+          axios.get('/ml-workflow/api/training-jobs?limit=5')
         ]);
         setStats(statsRes.data);
+        setJobs(jobsRes.data.jobs);
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       } finally {
@@ -65,12 +77,51 @@ export const Dashboard: React.FC = () => {
         />
       </div>
 
-      {/* Recent Activity Placeholder */}
+      {/* Recent Activity */}
       <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
         <h2 className="text-xl font-semibold mb-4 text-slate-900 dark:text-slate-100">Recent Activity</h2>
-        <div className="text-slate-500 dark:text-slate-400 text-sm">
-          Job history list will appear here...
-        </div>
+        {loading ? (
+           <div className="text-slate-500 dark:text-slate-400 text-sm">Loading...</div>
+        ) : jobs.length === 0 ? (
+          <div className="text-slate-500 dark:text-slate-400 text-sm">
+            No recent jobs found.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+              <thead>
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Job ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Model</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Created At</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
+                {jobs.map((job) => (
+                  <tr key={job.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100" title={job.id}>
+                      {job.id.substring(0, 8)}...
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">{job.model_type}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        job.status === 'succeeded' ? 'bg-green-100 text-green-800' : 
+                        job.status === 'failed' ? 'bg-red-100 text-red-800' : 
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {job.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                      {new Date(job.created_at).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

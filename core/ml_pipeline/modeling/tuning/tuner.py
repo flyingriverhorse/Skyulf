@@ -76,7 +76,7 @@ class TunerCalculator:
         X: pd.DataFrame, 
         y: pd.Series, 
         config: Dict[str, Any], 
-        progress_callback: Optional[Callable[[int, int], None]] = None,
+        progress_callback: Optional[Callable[[int, int, Optional[float], Optional[Dict]], None]] = None,
         validation_data: Optional[tuple[pd.DataFrame, pd.Series]] = None
     ) -> Any:
         """
@@ -99,7 +99,7 @@ class TunerCalculator:
         X: pd.DataFrame, 
         y: pd.Series, 
         config: TuningConfig,
-        progress_callback: Optional[Callable[[int, int], None]] = None,
+        progress_callback: Optional[Callable[[int, int, Optional[float], Optional[Dict]], None]] = None,
         validation_data: Optional[tuple[pd.DataFrame, pd.Series]] = None
     ) -> TuningResult:
         """
@@ -255,7 +255,9 @@ class TunerCalculator:
             if progress_callback:
                 def _optuna_callback(study, trial):
                     # Optuna doesn't know total trials upfront easily if not set, but we have config.n_trials
-                    progress_callback(trial.number + 1, config.n_trials)
+                    # trial.value is the score (or None if failed/pruned)
+                    score = trial.value if trial.value is not None else None
+                    progress_callback(trial.number + 1, config.n_trials, score, trial.params)
                 callbacks.append(_optuna_callback)
 
             searcher = OptunaSearchCV(
