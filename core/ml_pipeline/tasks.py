@@ -7,7 +7,7 @@ from datetime import datetime
 import json
 import os
 
-from config import get_settings
+from core.config import get_settings
 from core.database.models import TrainingJob, HyperparameterTuningJob, DataSource
 from core.ml_pipeline.execution.engine import PipelineEngine
 from core.ml_pipeline.execution.schemas import PipelineConfig, NodeConfig

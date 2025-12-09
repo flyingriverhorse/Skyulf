@@ -3,7 +3,7 @@ from pathlib import Path
 repo_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root))
 from fastapi.testclient import TestClient
-from main import app
+from core.main import app
 
 with TestClient(app) as client:
     res = client.get('/health')

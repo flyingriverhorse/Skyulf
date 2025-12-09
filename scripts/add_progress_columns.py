@@ -15,7 +15,7 @@ def add_columns():
     # Initialize DB first
     asyncio.run(setup())
     
-    from config import get_settings
+    from core.config import get_settings
     settings = get_settings()
     print(f"Original DATABASE_URL: {settings.DATABASE_URL}")
     

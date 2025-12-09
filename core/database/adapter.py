@@ -18,13 +18,13 @@ import logging
 
 # Import settings with fallback
 try:
-    from config import Settings
+    from core.config import Settings
 except ImportError:
     # Fallback for standalone testing
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-    from config import Settings
+    from core.config import Settings
 
 logger = logging.getLogger(__name__)
 

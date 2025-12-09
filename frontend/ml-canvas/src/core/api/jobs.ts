@@ -50,8 +50,12 @@ export const jobsApi = {
     await apiClient.post(`/pipeline/jobs/${jobId}/cancel`);
   },
 
-  getJobs: async (limit: number = 10, skip: number = 0): Promise<JobInfo[]> => {
-    const response = await apiClient.get<JobInfo[]>('/pipeline/jobs', { params: { limit, skip } });
+  getJobs: async (limit: number = 10, skip: number = 0, type?: 'training' | 'tuning'): Promise<JobInfo[]> => {
+    const params: any = { limit, skip };
+    if (type) {
+      params.job_type = type;
+    }
+    const response = await apiClient.get<JobInfo[]>('/pipeline/jobs', { params });
     return response.data;
   },
 
@@ -60,7 +64,7 @@ export const jobsApi = {
     return response.data;
   },
 
-  getDefaultHyperparameters: async (modelType: string): Promise<Record<string, any>> => {
+  getDefaultSearchSpace: async (modelType: string): Promise<Record<string, any>> => {
     const response = await apiClient.get<Record<string, any>>(`/pipeline/hyperparameters/${modelType}/defaults`);
     return response.data;
   },

@@ -61,7 +61,7 @@ def _delete_immediately(path: Path, files_only: bool = True) -> bool:
     try:
         if path.is_file():
             path.unlink()
-            logger.info(f"✓ FILE DELETED SUCCESSFULLY: {path}")
+            logger.info(f"[OK] FILE DELETED SUCCESSFULLY: {path}")
             return True
         elif path.is_dir():
             if files_only:
@@ -70,13 +70,13 @@ def _delete_immediately(path: Path, files_only: bool = True) -> bool:
             else:
                 logger.warning(f"⚠ DELETING DIRECTORY (files_only=False): {path}")
                 shutil.rmtree(path)
-                logger.info(f"✓ DIRECTORY DELETED SUCCESSFULLY: {path}")
+                logger.info(f"[OK] DIRECTORY DELETED SUCCESSFULLY: {path}")
                 return True
         else:
             logger.warning(f"⚠ Unknown path type: {path}")
             return False
     except Exception as e:
-        logger.error(f"❌ FAILED TO DELETE {path}: {e}")
+        logger.error(f"[ERROR] FAILED TO DELETE {path}: {e}")
         return False
 
 

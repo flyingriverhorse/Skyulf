@@ -220,33 +220,38 @@ class JobManager:
         return None
 
     @staticmethod
-    async def list_jobs(session: AsyncSession, limit: int = 50, skip: int = 0) -> List[JobInfo]:
+    async def list_jobs(session: AsyncSession, limit: int = 50, skip: int = 0, job_type: Optional[Literal["training", "tuning"]] = None) -> List[JobInfo]:
         """Lists recent jobs (Async)."""
         # Fetch both and merge? Or just return separate lists?
         # For now, let's fetch TrainingJobs
-        result_train = await session.execute(
-            select(TrainingJob, DataSource.name)
-            .outerjoin(DataSource, or_(
-                TrainingJob.dataset_source_id == DataSource.source_id,
-                TrainingJob.dataset_source_id == cast(DataSource.id, String)
-            ))
-            .order_by(TrainingJob.started_at.desc())
-            .limit(limit)
-            .offset(skip)
-        )
-        train_rows = result_train.all()
+        train_rows = []
+        tune_rows = []
+
+        if job_type is None or job_type == "training":
+            result_train = await session.execute(
+                select(TrainingJob, DataSource.name)
+                .outerjoin(DataSource, or_(
+                    TrainingJob.dataset_source_id == DataSource.source_id,
+                    TrainingJob.dataset_source_id == cast(DataSource.id, String)
+                ))
+                .order_by(TrainingJob.started_at.desc())
+                .limit(limit)
+                .offset(skip)
+            )
+            train_rows = result_train.all()
         
-        result_tune = await session.execute(
-            select(HyperparameterTuningJob, DataSource.name)
-            .outerjoin(DataSource, or_(
-                HyperparameterTuningJob.dataset_source_id == DataSource.source_id,
-                HyperparameterTuningJob.dataset_source_id == cast(DataSource.id, String)
-            ))
-            .order_by(HyperparameterTuningJob.started_at.desc())
-            .limit(limit)
-            .offset(skip)
-        )
-        tune_rows = result_tune.all()
+        if job_type is None or job_type == "tuning":
+            result_tune = await session.execute(
+                select(HyperparameterTuningJob, DataSource.name)
+                .outerjoin(DataSource, or_(
+                    HyperparameterTuningJob.dataset_source_id == DataSource.source_id,
+                    HyperparameterTuningJob.dataset_source_id == cast(DataSource.id, String)
+                ))
+                .order_by(HyperparameterTuningJob.started_at.desc())
+                .limit(limit)
+                .offset(skip)
+            )
+            tune_rows = result_tune.all()
         
         combined = []
         for j, d_name in train_rows:

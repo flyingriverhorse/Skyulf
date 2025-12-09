@@ -13,7 +13,7 @@ ROOT_PATH = Path(__file__).resolve().parents[1]
 if str(ROOT_PATH) not in sys.path:
     sys.path.insert(0, str(ROOT_PATH))
 
-from config import get_settings  # noqa: E402
+from core.config import get_settings  # noqa: E402
 from core.database.engine import Base  # noqa: E402
 from core.database import models  # noqa: F401,E402  # ensure model registration
 

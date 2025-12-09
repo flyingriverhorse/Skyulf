@@ -19,15 +19,15 @@ from typing import AsyncGenerator
 from pathlib import Path
 
 # Use absolute imports to fix import issues
-from config import get_settings
+from core.config import get_settings
 
 from core.health.routes import router as health_router
 # from core.feature_engineering.routes import router as feature_engineering_router
 from core.ml_pipeline.api import router as ml_pipeline_router
 from core.ml_pipeline.deployment.api import router as deployment_router
 from core.data_ingestion.router import router as data_ingestion_router, sources_router as data_sources_router
-from middleware.error_handler import ErrorHandlerMiddleware
-from middleware.logging import LoggingMiddleware
+from core.middleware.error_handler import ErrorHandlerMiddleware
+from core.middleware.logging import LoggingMiddleware
 from core.database.engine import init_db, close_db, create_tables
 from core.exceptions.handlers import (
     not_found_exception_handler,
@@ -208,9 +208,9 @@ def _setup_templates_and_static(app: FastAPI) -> None:
     # Setup static files
     try:
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-        logger.info(f"✅ Static files mounted from: {static_dir}")
+        logger.info(f"[OK] Static files mounted from: {static_dir}")
     except Exception as e:
-        logger.error(f"❌ Failed to mount static files: {e}")
+        logger.error(f"[ERROR] Failed to mount static files: {e}")
 
 
 def _add_middleware(app: FastAPI, settings) -> None:
@@ -247,17 +247,13 @@ def _include_routers(app: FastAPI) -> None:
     # Health check (no prefix, available at /health)
     app.include_router(health_router, tags=["health"])
 
-    # Feature engineering routes (prototype API)
-    try:
-        app.include_router(feature_engineering_router)
-    except Exception:
-        logger.debug("feature_engineering_router not available to include")
-
     # ML Pipeline
-    # Note: ml_pipeline_router already has prefix="/api/pipeline" defined in its file
-    # But we double check to avoid double prefixing if we change it later.
-    # For now, let's remove the prefix here since we added it to the router definition.
-    app.include_router(ml_pipeline_router)
+    # Note: ml_pipeline_router prefix was removed from its file to allow flexible mounting.
+    # We mount it at /api/pipeline for standard access
+    app.include_router(ml_pipeline_router, prefix="/api/pipeline")
+    
+    # And at /ml-workflow/api/pipelines for frontend compatibility
+    app.include_router(ml_pipeline_router, prefix="/ml-workflow/api/pipelines")
     app.include_router(deployment_router, prefix="/api", tags=["Deployment"])
 
     # Root redirect

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import { apiClient } from '../core/api/client';
+import { jobsApi } from '../core/api/jobs';
 
 interface SystemStats {
   total_jobs: number;
@@ -27,12 +27,20 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, jobsRes] = await Promise.all([
+        const [statsRes, recentJobs] = await Promise.all([
           apiClient.get<SystemStats>('/pipeline/stats'),
-          axios.get('/ml-workflow/api/training-jobs?limit=5')
+          jobsApi.getJobs(5, 0, 'training')
         ]);
         setStats(statsRes.data);
-        setJobs(jobsRes.data.jobs);
+        setJobs(
+          recentJobs.map(job => ({
+            id: job.job_id,
+            status: job.status,
+            model_type: job.model_type || 'Unknown',
+            created_at: job.start_time || job.created_at || new Date().toISOString(),
+            metrics: job.metrics || job.result?.metrics
+          }))
+        );
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       } finally {

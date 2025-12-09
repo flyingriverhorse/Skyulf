@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Literal
 from pydantic import BaseModel
 from datetime import datetime
 import tempfile
@@ -10,7 +10,7 @@ import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
-from config import get_settings
+from core.config import get_settings
 from core.database.engine import get_async_session, get_db
 from core.database.models import FeatureEngineeringPipeline, TrainingJob, HyperparameterTuningJob
 from core.data_ingestion.service import DataIngestionService
@@ -32,7 +32,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/pipeline", tags=["ML Pipeline"])
+# Remove prefix here to allow flexible mounting in main.py
+router = APIRouter(tags=["ML Pipeline"])
 
 # --- Pydantic Models for API ---
 # We mirror the dataclasses but use Pydantic for validation
@@ -528,12 +529,14 @@ async def get_job_evaluation(
 @router.get("/jobs", response_model=List[JobInfo])
 async def list_jobs(
     limit: int = 50,
+    skip: int = 0,
+    job_type: Optional[Literal["training", "tuning"]] = None,
     session: AsyncSession = Depends(get_async_session)
 ):
     """
     Lists recent jobs.
     """
-    return await JobManager.list_jobs(session, limit)
+    return await JobManager.list_jobs(session, limit, skip, job_type)
 
 @router.get("/jobs/tuning/latest/{node_id}", response_model=Optional[JobInfo])
 async def get_latest_tuning_job(

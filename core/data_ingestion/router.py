@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from typing import Dict, Any
+from typing import Dict, Any, Union
 
 from .service import DataIngestionService
 from .dependencies import get_data_service
@@ -21,7 +21,7 @@ async def list_sources(
 
 @sources_router.get("/sources/{source_id}", response_model=DataSourceResponse)
 async def get_source(
-    source_id: int,
+    source_id: str,
     service: DataIngestionService = Depends(get_data_service)
 ):
     """
@@ -34,7 +34,7 @@ async def get_source(
 
 @sources_router.get("/sources/{source_id}/sample", response_model=DataSourceSampleResponse)
 async def get_source_sample(
-    source_id: int,
+    source_id: str,
     limit: int = 5,
     service: DataIngestionService = Depends(get_data_service)
 ):
@@ -46,7 +46,7 @@ async def get_source_sample(
 
 @sources_router.delete("/sources/{source_id}")
 async def delete_source(
-    source_id: int,
+    source_id: str,
     service: DataIngestionService = Depends(get_data_service)
 ):
     """

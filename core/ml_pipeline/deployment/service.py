@@ -192,8 +192,20 @@ class DeploymentService:
         # Let's store "pipeline_id/node_id" as the URI if it's not already.
         
         final_uri = artifact_uri
-        if "/" not in artifact_uri and "\\" not in artifact_uri:
-            final_uri = f"{pipeline_id}/{artifact_uri}"
+        
+        # If artifact_uri is a directory (doesn't end with .joblib or similar), we need to point to the specific file.
+        # The PipelineEngine saves the FULL bundled artifact (model + transformers) using the job_id as the key.
+        # It also saves the raw model using node_id, but we want the bundled one for deployment.
+        if artifact_uri:
+            # Check if it looks like a directory path (no extension)
+            if not artifact_uri.endswith(".joblib") and not artifact_uri.endswith(".pkl"):
+                # If it's a directory, append job_id to get the bundled artifact
+                if "/" in artifact_uri or "\\" in artifact_uri:
+                    final_uri = os.path.join(artifact_uri, job_id)
+                else:
+                    # Legacy case: artifact_uri might be just a node_id or partial path
+                    if "/" not in artifact_uri and "\\" not in artifact_uri:
+                        final_uri = f"{pipeline_id}/{artifact_uri}"
 
         deployment = Deployment(
             job_id=job_id,
@@ -231,17 +243,25 @@ class DeploymentService:
             
         # 2. Load Artifact
         # Reconstruct store path
-        # URI format: "pipeline_id/node_id"
         try:
-            parts = deployment.artifact_uri.split("/")
-            if len(parts) >= 2:
-                pipeline_id = parts[0]
-                node_id = parts[1]
-                base_path = os.path.join(os.getcwd(), "exports", "models", pipeline_id)
-            else:
-                # Fallback for absolute paths or other formats
+            # Handle full path (absolute or relative with separators)
+            if os.path.isabs(deployment.artifact_uri) or "/" in deployment.artifact_uri or "\\" in deployment.artifact_uri:
+                # Assume the last part is the node_id (filename) and the rest is the directory
                 base_path = os.path.dirname(deployment.artifact_uri)
                 node_id = os.path.basename(deployment.artifact_uri)
+            else:
+                # Legacy format: "pipeline_id/node_id" (handled by split above if separators exist)
+                # OR just "node_id" (fallback)
+                parts = deployment.artifact_uri.split("/")
+                if len(parts) >= 2:
+                    pipeline_id = parts[0]
+                    node_id = parts[1]
+                    base_path = os.path.join(os.getcwd(), "exports", "models", pipeline_id)
+                else:
+                    # Fallback for just node_id? This shouldn't happen with new logic.
+                    # But if it does, we assume it's in exports/models/{job_id} ??
+                    # No, we can't assume that.
+                    raise ValueError(f"Invalid artifact URI format: {deployment.artifact_uri}")
 
             store = LocalArtifactStore(base_path)
             model = store.load(node_id)
