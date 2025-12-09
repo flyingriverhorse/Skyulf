@@ -38,6 +38,7 @@ class PipelineEngine:
     def __init__(self, artifact_store: ArtifactStore, log_callback=None):
         self.artifact_store = artifact_store
         self.log_callback = log_callback
+        self.executed_transformers = [] # Track fitted transformers for inference pipeline
         self._results: Dict[str, NodeExecutionResult] = {}
 
     def log(self, message: str):
@@ -51,6 +52,7 @@ class PipelineEngine:
         """
         self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
         start_time = datetime.now()
+        self.executed_transformers = [] # Reset for new run
         
         pipeline_result = PipelineExecutionResult(
             pipeline_id=config.pipeline_id,
@@ -147,6 +149,52 @@ class PipelineEngine:
         # We assume the previous node saved an artifact with its node_id.
         return self.artifact_store.load(input_node_id)
 
+    def _bundle_transformers_with_model(self, model_artifact_key: str, job_id: str = "unknown"):
+        """Bundles fitted transformers with the model artifact for inference."""
+        try:
+            model_artifact = self.artifact_store.load(model_artifact_key)
+            
+            # Collect fitted transformer objects
+            transformers = []
+            transformer_plan = []
+            
+            for t_info in self.executed_transformers:
+                try:
+                    fitted_t = self.artifact_store.load(t_info["artifact_key"])
+                    if fitted_t:
+                        transformers.append({
+                            "node_id": t_info["node_id"],
+                            "transformer_name": t_info["transformer_name"],
+                            "column_name": t_info["column_name"],
+                            "transformer": fitted_t
+                        })
+                        transformer_plan.append({
+                            "node_id": t_info["node_id"],
+                            "transformer_name": t_info["transformer_name"],
+                            "column_name": t_info["column_name"],
+                            "transformer_type": t_info["transformer_type"]
+                        })
+                except Exception as e:
+                    logger.warning(f"Failed to load transformer artifact {t_info['artifact_key']}: {e}")
+
+            # Create the bundle
+            full_artifact = {
+                "model": model_artifact,
+                "transformers": transformers,
+                "transformer_plan": transformer_plan,
+                "job_id": job_id
+            }
+            
+            # Save back to the same key (overwriting the raw model)
+            self.artifact_store.save(model_artifact_key, full_artifact)
+            
+            # Also save to job_id key if available
+            if job_id and job_id != "unknown":
+                self.artifact_store.save(job_id, full_artifact)
+                
+        except Exception as e:
+            logger.error(f"Failed to bundle transformers with model: {e}")
+
     # --- Step Implementations ---
 
     def _run_data_loader(self, node: NodeConfig) -> str:
@@ -175,6 +223,17 @@ class PipelineEngine:
         processed_df, metrics = engineer.fit_transform(df, self.artifact_store, node.node_id)
         
         self.artifact_store.save(node.node_id, processed_df)
+        
+        # Track executed transformers
+        for step in node.params.get("steps", []):
+            self.executed_transformers.append({
+                "node_id": node.node_id,
+                "transformer_name": step["name"],
+                "transformer_type": step["transformer"],
+                "artifact_key": f"{node.node_id}_{step['name']}",
+                "column_name": step.get("params", {}).get("new_column")
+            })
+            
         return node.node_id, metrics
 
     def _run_model_training(self, node: NodeConfig, job_id: str = "unknown") -> tuple[str, Dict[str, Any]]:
@@ -230,6 +289,9 @@ class PipelineEngine:
 
         # 2. Train Final Model
         estimator.fit_predict(data, target_col, hyperparameters, job_id=job_id)
+        
+        # Bundle transformers with the model for inference
+        self._bundle_transformers_with_model(node.node_id, job_id=job_id)
         
         # Optional: Evaluate immediately
         metrics = {}
@@ -291,6 +353,9 @@ class PipelineEngine:
         estimator = StatefulEstimator(calculator, applier, self.artifact_store, node.node_id)
         estimator.fit_predict(data, target_col, result.best_params, job_id=job_id)
         
+        # Bundle transformers with the model for inference
+        self._bundle_transformers_with_model(node.node_id, job_id=job_id)
+        
         metrics = {"best_score": result.best_score, "best_params": result.best_params}
         
         # Evaluate the tuned model
@@ -331,6 +396,15 @@ class PipelineEngine:
         processed_data, run_metrics = engineer.fit_transform(data, self.artifact_store, node_id_prefix=f"exec_{node.node_id}")
         
         self.artifact_store.save(node.node_id, processed_data)
+        
+        # Track executed transformer
+        self.executed_transformers.append({
+            "node_id": node.node_id,
+            "transformer_name": "step",
+            "transformer_type": node.step_type,
+            "artifact_key": f"exec_{node.node_id}_step",
+            "column_name": node.params.get("new_column")
+        })
         
         # Load fitted params to get metrics (e.g. dropped columns)
         metrics = run_metrics.copy()

@@ -292,13 +292,6 @@ class NodeRegistry:
                 params={"mode": "negative_to_nan"}
             ),
             RegistryItem(
-                id="DateStandardizer",
-                name="Date Standardizer",
-                category="Preprocessing",
-                description="Standardize date formats.",
-                params={"target_format": "%Y-%m-%d"}
-            ),
-            RegistryItem(
                 id="Deduplicate",
                 name="Deduplicate",
                 category="Preprocessing",

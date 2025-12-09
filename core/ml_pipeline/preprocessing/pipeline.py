@@ -15,8 +15,7 @@ from .cleaning import (
     TextCleaningCalculator, TextCleaningApplier,
     ValueReplacementCalculator, ValueReplacementApplier,
     AliasReplacementCalculator, AliasReplacementApplier,
-    InvalidValueReplacementCalculator, InvalidValueReplacementApplier,
-    DateStandardizerCalculator, DateStandardizerApplier
+    InvalidValueReplacementCalculator, InvalidValueReplacementApplier
 )
 from .drop_and_missing import (
     DeduplicateCalculator, DeduplicateApplier,
@@ -46,6 +45,7 @@ from .outliers import (
     IQRCalculator, IQRApplier,
     ZScoreCalculator, ZScoreApplier,
     WinsorizeCalculator, WinsorizeApplier,
+    ManualBoundsCalculator, ManualBoundsApplier,
     EllipticEnvelopeCalculator, EllipticEnvelopeApplier
 )
 from .transformations import (
@@ -374,8 +374,6 @@ class FeatureEngineer:
             return AliasReplacementCalculator(), AliasReplacementApplier()
         elif type_name == "InvalidValueReplacement":
             return InvalidValueReplacementCalculator(), InvalidValueReplacementApplier()
-        elif type_name == "DateStandardizer":
-            return DateStandardizerCalculator(), DateStandardizerApplier()
         elif type_name == "SimpleImputer":
             return SimpleImputerCalculator(), SimpleImputerApplier()
         elif type_name == "KNNImputer":
@@ -409,6 +407,8 @@ class FeatureEngineer:
             return ZScoreCalculator(), ZScoreApplier()
         elif type_name == "Winsorize":
             return WinsorizeCalculator(), WinsorizeApplier()
+        elif type_name == "ManualBounds":
+            return ManualBoundsCalculator(), ManualBoundsApplier()
         elif type_name == "EllipticEnvelope":
             return EllipticEnvelopeCalculator(), EllipticEnvelopeApplier()
         elif type_name == "PowerTransformer":

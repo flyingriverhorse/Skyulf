@@ -26,44 +26,122 @@ from core.ml_pipeline.preprocessing.transformations import (
 )
 from core.ml_pipeline.preprocessing.bucketing import GeneralBinningApplier
 from core.ml_pipeline.preprocessing.outliers import IQRApplier, ZScoreApplier
-from core.ml_pipeline.preprocessing.cleaning import TextCleaningApplier
-from core.ml_pipeline.preprocessing.feature_generation import PolynomialFeaturesApplier
-from core.ml_pipeline.preprocessing.feature_selection import VarianceThresholdApplier
+from core.ml_pipeline.preprocessing.cleaning import (
+    TextCleaningApplier, ValueReplacementApplier, AliasReplacementApplier, 
+    InvalidValueReplacementApplier
+)
+from core.ml_pipeline.preprocessing.feature_generation import (
+    PolynomialFeaturesApplier, FeatureGenerationApplier
+)
+from core.ml_pipeline.preprocessing.feature_selection import (
+    VarianceThresholdApplier, CorrelationThresholdApplier, 
+    UnivariateSelectionApplier, ModelBasedSelectionApplier, FeatureSelectionApplier
+)
 from core.ml_pipeline.preprocessing.casting import CastingApplier
 from core.ml_pipeline.preprocessing.drop_and_missing import (
     DeduplicateApplier, DropMissingColumnsApplier, DropMissingRowsApplier, MissingIndicatorApplier
+)
+from core.ml_pipeline.preprocessing.outliers import (
+    IQRApplier, ZScoreApplier, WinsorizeApplier, ManualBoundsApplier
 )
 
 logger = logging.getLogger(__name__)
 
 APPLIER_MAP = {
+    # Encoding
     "onehot": OneHotEncoderApplier,
+    "OneHotEncoder": OneHotEncoderApplier,
     "label": LabelEncoderApplier,
+    "LabelEncoder": LabelEncoderApplier,
     "ordinal": OrdinalEncoderApplier,
+    "OrdinalEncoder": OrdinalEncoderApplier,
     "target": TargetEncoderApplier,
+    "TargetEncoder": TargetEncoderApplier,
     "hash": HashEncoderApplier,
+    "HashEncoder": HashEncoderApplier,
     "dummy": DummyEncoderApplier,
+    "DummyEncoder": DummyEncoderApplier,
+    
+    # Scaling
     "standard_scaler": StandardScalerApplier,
+    "StandardScaler": StandardScalerApplier,
     "minmax_scaler": MinMaxScalerApplier,
+    "MinMaxScaler": MinMaxScalerApplier,
     "robust_scaler": RobustScalerApplier,
+    "RobustScaler": RobustScalerApplier,
     "maxabs_scaler": MaxAbsScalerApplier,
+    "MaxAbsScaler": MaxAbsScalerApplier,
+    
+    # Imputation
     "simple_imputer": SimpleImputerApplier,
+    "SimpleImputer": SimpleImputerApplier,
     "iterative_imputer": IterativeImputerApplier,
+    "IterativeImputer": IterativeImputerApplier,
     "knn_imputer": KNNImputerApplier,
+    "KNNImputer": KNNImputerApplier,
+    
+    # Transformations
     "power_transformer": PowerTransformerApplier,
+    "PowerTransformer": PowerTransformerApplier,
     "simple_transformation": SimpleTransformationApplier,
+    "SimpleTransformation": SimpleTransformationApplier,
     "general_transformation": GeneralTransformationApplier,
+    "GeneralTransformation": GeneralTransformationApplier,
+    
+    # Bucketing
     "general_binning": GeneralBinningApplier,
+    "GeneralBinning": GeneralBinningApplier,
+    
+    # Outliers
     "iqr": IQRApplier,
+    "IQR": IQRApplier,
     "zscore": ZScoreApplier,
+    "ZScore": ZScoreApplier,
+    "winsorize": WinsorizeApplier,
+    "Winsorize": WinsorizeApplier,
+    "manual_bounds": ManualBoundsApplier,
+    "ManualBounds": ManualBoundsApplier,
+    
+    # Cleaning
     "text_cleaning": TextCleaningApplier,
+    "TextCleaning": TextCleaningApplier,
+    "value_replacement": ValueReplacementApplier,
+    "ValueReplacement": ValueReplacementApplier,
+    "alias_replacement": AliasReplacementApplier,
+    "AliasReplacement": AliasReplacementApplier,
+    "invalid_value_replacement": InvalidValueReplacementApplier,
+    "InvalidValueReplacement": InvalidValueReplacementApplier,
+    
+    # Feature Engineering
     "polynomial_features": PolynomialFeaturesApplier,
+    "PolynomialFeatures": PolynomialFeaturesApplier,
+    "feature_generation": FeatureGenerationApplier,
+    "FeatureGenerationNode": FeatureGenerationApplier,
+    "FeatureMath": FeatureGenerationApplier,
+    
+    # Feature Selection
     "variance_threshold": VarianceThresholdApplier,
+    "VarianceThreshold": VarianceThresholdApplier,
+    "correlation_threshold": CorrelationThresholdApplier,
+    "CorrelationThreshold": CorrelationThresholdApplier,
+    "univariate_selection": UnivariateSelectionApplier,
+    "UnivariateSelection": UnivariateSelectionApplier,
+    "model_based_selection": ModelBasedSelectionApplier,
+    "ModelBasedSelection": ModelBasedSelectionApplier,
+    "feature_selection": FeatureSelectionApplier,
+    "FeatureSelection": FeatureSelectionApplier,
+    
+    # Others
     "casting": CastingApplier,
+    "Casting": CastingApplier,
     "deduplicate": DeduplicateApplier,
+    "Deduplicate": DeduplicateApplier,
     "drop_missing_columns": DropMissingColumnsApplier,
+    "DropMissingColumns": DropMissingColumnsApplier,
     "drop_missing_rows": DropMissingRowsApplier,
+    "DropMissingRows": DropMissingRowsApplier,
     "missing_indicator": MissingIndicatorApplier,
+    "MissingIndicator": MissingIndicatorApplier,
 }
 
 class DeploymentService:
@@ -199,39 +277,42 @@ class DeploymentService:
             # Apply transformations in order
             for step in plan:
                 node_id = step.get("node_id")
-                for t_spec in step.get("transformers", []):
-                    t_name = t_spec.get("transformer_name")
-                    t_col = t_spec.get("column_name")
-                    metadata = t_spec.get("metadata") or {}
-                    
-                    # Get object
-                    obj = t_objs.get((node_id, t_name, t_col))
-                    
-                    t_type = metadata.get("type")
-                    ApplierCls = APPLIER_MAP.get(t_type)
-                    
-                    if ApplierCls:
-                        try:
-                            applier = ApplierCls()
-                            # Prepare params
-                            params = metadata.copy()
-                            # Inject object into common keys
-                            if obj is not None:
-                                params["encoder_object"] = obj
-                                params["scaler_object"] = obj
-                                params["imputer_object"] = obj
-                                params["transformer_object"] = obj
-                            
-                            # Apply
-                            res = applier.apply(df, params)
-                            
-                            # Unpack result
-                            if isinstance(res, tuple):
-                                df = res[0]
-                            else:
-                                df = res
-                        except Exception as e:
-                            logger.warning(f"Failed to apply transformer {t_type} for {t_col}: {e}")
+                t_name = step.get("transformer_name")
+                t_col = step.get("column_name")
+                t_type = step.get("transformer_type")
+                
+                # Get object
+                obj = t_objs.get((node_id, t_name, t_col))
+                
+                ApplierCls = APPLIER_MAP.get(t_type)
+                
+                if ApplierCls:
+                    try:
+                        applier = ApplierCls()
+                        # Prepare params
+                        # We use the fitted object as the source of truth for params
+                        params = {}
+                        if isinstance(obj, dict):
+                            params = obj.copy()
+                        
+                        # Inject object into common keys for Appliers that need the raw object (like OneHotEncoder)
+                        # Only inject if not already present (to avoid overwriting the real object with the wrapper dict)
+                        if obj is not None:
+                            if "encoder_object" not in params: params["encoder_object"] = obj
+                            if "scaler_object" not in params: params["scaler_object"] = obj
+                            if "imputer_object" not in params: params["imputer_object"] = obj
+                            if "transformer_object" not in params: params["transformer_object"] = obj
+                        
+                        # Apply
+                        res = applier.apply(df, params)
+                        
+                        # Unpack result
+                        if isinstance(res, tuple):
+                            df = res[0]
+                        else:
+                            df = res
+                    except Exception as e:
+                        logger.warning(f"Failed to apply transformer {t_type} for {t_col}: {e}")
                             # Continue? Or fail? 
                             # If we fail, the whole prediction fails. 
                             # If we continue, the model might fail later due to missing columns.
