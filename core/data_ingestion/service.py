@@ -5,10 +5,11 @@ import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Any, Union
-from fastapi import UploadFile, HTTPException
+from fastapi import UploadFile, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 
+from core.config import get_settings
 from core.database.models import DataSource, User
 from core.data_ingestion.schemas.ingestion import DataSourceCreate, IngestionJobResponse
 from core.data_ingestion.tasks import ingest_data_task
@@ -151,9 +152,9 @@ class DataIngestionService:
         # TODO: Handle other source types (SQL, etc.)
         return []
 
-    async def handle_file_upload(self, file: UploadFile, user_id: int) -> IngestionJobResponse:
+    async def handle_file_upload(self, file: UploadFile, user_id: int, background_tasks: Optional[BackgroundTasks] = None) -> IngestionJobResponse:
         """
-        Handle file upload and trigger ingestion task.
+        Handle file upload and create a data source entry.
         """
         # 1. Generate unique filename
         file_ext = os.path.splitext(file.filename)[1]
@@ -194,8 +195,16 @@ class DataIngestionService:
             await self.session.commit()
             await self.session.refresh(new_source)
             
-            # 4. Trigger Celery Task
-            ingest_data_task.delay(new_source.id)
+            # 4. Trigger Task
+            settings = get_settings()
+            if settings.USE_CELERY:
+                ingest_data_task.delay(new_source.id)
+            elif background_tasks:
+                background_tasks.add_task(ingest_data_task, new_source.id)
+            else:
+                # Fallback: Run in thread
+                import asyncio
+                asyncio.create_task(asyncio.to_thread(ingest_data_task, new_source.id))
             
             return IngestionJobResponse(
                 job_id=str(new_source.id), # Using source ID as job ID for now
@@ -211,7 +220,7 @@ class DataIngestionService:
                 file_path.unlink()
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    async def create_database_source(self, data: DataSourceCreate, user_id: int) -> IngestionJobResponse:
+    async def create_database_source(self, data: DataSourceCreate, user_id: int, background_tasks: Optional[BackgroundTasks] = None) -> IngestionJobResponse:
         """
         Create a database source and trigger ingestion.
         """
@@ -239,7 +248,15 @@ class DataIngestionService:
             await self.session.refresh(new_source)
             
             # Trigger ingestion
-            ingest_data_task.delay(new_source.id)
+            settings = get_settings()
+            if settings.USE_CELERY:
+                ingest_data_task.delay(new_source.id)
+            elif background_tasks:
+                background_tasks.add_task(ingest_data_task, new_source.id)
+            else:
+                # Fallback: Run in thread
+                import asyncio
+                asyncio.create_task(asyncio.to_thread(ingest_data_task, new_source.id))
             
             return IngestionJobResponse(
                 job_id=str(new_source.id),

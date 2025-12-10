@@ -174,7 +174,7 @@ export const ExperimentsPage: React.FC = () => {
     // Use top-level metrics field which is normalized for both types (training & tuning)
     const metrics = job.metrics || job.result?.metrics || {};
     return {
-      name: job.job_id.slice(0, 8),
+      name: job.job_id,
       ...metrics
     };
   });
@@ -280,8 +280,8 @@ export const ExperimentsPage: React.FC = () => {
                 }`}
               >
                 <div className="flex justify-between items-start mb-1">
-                  <span className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-300">
-                    #{job.version} - {job.job_id.slice(0, 8)}
+                  <span className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-300 break-all">
+                    #{job.version} - {job.job_id}
                   </span>
                   <div className="flex items-center gap-2">
                     {job.status === 'completed' && (job.job_type === 'training' || job.job_type === 'tuning') && (
@@ -479,8 +479,8 @@ export const ExperimentsPage: React.FC = () => {
                       <tr>
                         <th className="px-4 py-2">Parameter / Metric</th>
                         {selectedJobs.map(job => (
-                          <th key={job.job_id} className="px-4 py-2 font-mono">
-                            {job.job_id.slice(0, 8)}
+                          <th key={job.job_id} className="px-4 py-2 font-mono break-all min-w-[100px]">
+                            {job.job_id}
                           </th>
                         ))}
                       </tr>
@@ -556,13 +556,13 @@ export const ExperimentsPage: React.FC = () => {
                                 <button
                                     key={id}
                                     onClick={() => fetchEvaluationData(id)}
-                                    className={`px-3 py-1 text-xs font-mono rounded border ${
+                                    className={`px-3 py-1 text-xs font-mono rounded border whitespace-nowrap ${
                                         evalJobId === id 
                                             ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300'
                                             : 'bg-white border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400'
                                     }`}
                                 >
-                                    {id.slice(0, 8)}
+                                    {id}
                                 </button>
                             ))}
                         </div>

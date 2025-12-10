@@ -235,6 +235,7 @@ class Settings(BaseSettings):
     DB_EXTRA_PARAMS: Optional[str] = None  # e.g. application_name=mlops
 
     # === BACKGROUND TASKS / CELERY ===
+    USE_CELERY: bool = False
     CELERY_BROKER_URL: str = "redis://127.0.0.1:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://127.0.0.1:6379/0"
     CELERY_TASK_DEFAULT_QUEUE: str = "mlops-training"

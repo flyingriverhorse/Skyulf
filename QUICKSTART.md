@@ -90,13 +90,15 @@ Navigate to:
 - OpenAPI schema: <http://127.0.0.1:8000/openapi.json>
 - Health probes: <http://127.0.0.1:8000/health> (`/health/detailed` for diagnostics)
 
-### 4.4 Start the Celery worker *(optional but recommended)*
+### 4.4 Start the Celery worker *(optional)*
 
-Open a second terminal with the virtual environment activated and run:
+If you want to use Redis and Celery for robust background processing (recommended for production-like setups), open a second terminal with the virtual environment activated and run:
 
 ```powershell
 python -m celery -A celery_worker.celery_app worker --pool=solo --loglevel=info --queues mlops-training
 ```
+
+**Note:** You can also run without Celery/Redis by setting `USE_CELERY=False` in your `.env` file. In this mode, background tasks will run in threads within the main FastAPI process.
 
 You can tail logs in `logs/` to watch training and feature-engineering jobs progress.
 
@@ -115,9 +117,9 @@ You can tail logs in `logs/` to watch training and feature-engineering jobs prog
 1. Open **Feature Canvas** and drag a **Dataset Source** node onto the grid.
 2. Connect it to a **Train/Val/Test Split** node (70/15/15 by default).
 3. Finish with a **Model Trainer** node targeting `RandomForestClassifier`.
-4. Hit **Save & Run** — the job is queued immediately and tracked via Celery.
+4. Hit **Save & Run** — the job is queued immediately.
 
-You can follow progress from the **Runs** page or by watching the worker logs.
+You can follow progress from the **Experiments** page or by watching the worker logs. Once trained, you can register the model and test it on the **Deployments** page.
 
 ---
 

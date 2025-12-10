@@ -85,11 +85,11 @@ export const JobsDrawer: React.FC = () => {
                 <div className="grid grid-cols-12 gap-4 px-6 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
                     <div className="col-span-2">Status</div>
                     <div className="col-span-2">Dataset / Model</div>
-                    <div className="col-span-1">Job ID</div>
+                    <div className="col-span-3">Job ID</div>
                     <div className="col-span-2">Started</div>
                     <div className="col-span-1">Duration</div>
-                    <div className="col-span-2">Model Ready</div>
-                    <div className="col-span-2">Result</div>
+                    <div className="col-span-1">Ready</div>
+                    <div className="col-span-1">Result</div>
                 </div>
 
                 {/* List */}
@@ -433,8 +433,8 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
       </div>
 
       {/* Job ID */}
-      <div className="col-span-1 font-mono text-xs text-gray-500 dark:text-gray-400 truncate" title={job.job_id}>
-        {job.job_id.slice(0, 8)}
+      <div className="col-span-3 font-mono text-xs text-gray-500 dark:text-gray-400 break-all" title={job.job_id}>
+        {job.job_id}
       </div>
 
       {/* Started */}
@@ -448,16 +448,16 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
       </div>
 
       {/* Model Ready */}
-      <div className="col-span-2">
+      <div className="col-span-1">
         {job.status === 'completed' && (
             <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full flex items-center gap-1 border border-green-200 dark:border-green-800 w-fit">
-                <CheckCircle className="w-3 h-3" /> Ready
+                <CheckCircle className="w-3 h-3" />
             </span>
         )}
       </div>
 
       {/* Result / Error */}
-      <div className="col-span-2">
+      <div className="col-span-1">
         {job.error ? (
             <span className="text-red-600 dark:text-red-400 text-xs truncate block" title={job.error}>
                 Error

@@ -59,10 +59,11 @@ class RunPipelineResponse(BaseModel):
 @router.post("/run", response_model=RunPipelineResponse)
 async def run_pipeline(
     config: PipelineConfigModel,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Submit a pipeline for asynchronous execution via Celery.
+    Submit a pipeline for asynchronous execution via Celery or BackgroundTasks.
     """
     # Extract details for Job creation
     pipeline_id = config.pipeline_id
@@ -129,8 +130,13 @@ async def run_pipeline(
         graph=config.dict()
     )
     
-    # Trigger Celery Task
-    run_pipeline_task.delay(job_id, config.dict())
+    # Trigger Task
+    settings = get_settings()
+    if settings.USE_CELERY:
+        run_pipeline_task.delay(job_id, config.dict())
+    else:
+        # Run in background thread if Celery is disabled
+        background_tasks.add_task(run_pipeline_task, job_id, config.dict())
     
     return RunPipelineResponse(
         message="Pipeline execution started",
