@@ -10,8 +10,9 @@ import uuid
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update, or_, cast, String
+from sqlalchemy import select, update, or_, cast, String, func
 from core.database.models import TrainingJob, HyperparameterTuningJob, DataSource
+from core.ml_pipeline.model_registry.service import ModelRegistryService
 
 class JobStatus(str, Enum):
     QUEUED = "queued"
@@ -40,6 +41,10 @@ class JobInfo(BaseModel):
     hyperparameters: Optional[Dict[str, Any]] = None
     created_at: Optional[datetime] = None
     metrics: Optional[Dict[str, Any]] = None
+    search_strategy: Optional[str] = None
+    target_column: Optional[str] = None
+    dropped_columns: Optional[List[str]] = None
+    version: Optional[int] = None
 
 class JobManager:
     
@@ -59,6 +64,8 @@ class JobManager:
         graph = graph or {}
         
         if job_type == "training":
+            next_version = await ModelRegistryService.get_next_version(session, dataset_id, model_type, "training")
+
             job = TrainingJob(
                 id=job_id,
                 pipeline_id=pipeline_id,
@@ -66,11 +73,58 @@ class JobManager:
                 dataset_source_id=dataset_id,
                 user_id=user_id,
                 status=JobStatus.QUEUED.value,
+                version=next_version,
                 model_type=model_type, 
                 graph=graph,
                 started_at=datetime.now()
             )
         else:
+            next_version = await ModelRegistryService.get_next_version(session, dataset_id, model_type, "tuning")
+
+            # Extract search strategy from graph
+            search_strategy = "random"
+            
+            def extract_strategy(node_data):
+                # Check PipelineConfigModel params
+                params = node_data.get("params", {})
+                if "tuning_config" in params and "strategy" in params["tuning_config"]:
+                    return params["tuning_config"]["strategy"]
+                if "tuning" in params and "strategy" in params["tuning"]:
+                    return params["tuning"]["strategy"]
+                if "search_strategy" in params:
+                    return params["search_strategy"]
+                if "strategy" in params:
+                    return params["strategy"]
+                
+                # Check React Flow data/config
+                data = node_data.get("data", {})
+                config = data.get("config", {})
+                if "tuning" in config and "strategy" in config["tuning"]:
+                    return config["tuning"]["strategy"]
+                if "strategy" in config:
+                    return config["strategy"]
+                if "search_strategy" in data:
+                    return data["search_strategy"]
+                return None
+
+            if graph and "nodes" in graph:
+                # 1. Try to find in target node
+                for node in graph["nodes"]:
+                    if node.get("node_id") == node_id or node.get("id") == node_id:
+                        found = extract_strategy(node)
+                        if found:
+                            search_strategy = found
+                        break
+                
+                # 2. If not found (or still random default), look for ANY node with strategy
+                # This handles cases where target_node is downstream (e.g. Evaluation)
+                if search_strategy == "random":
+                    for node in graph["nodes"]:
+                        found = extract_strategy(node)
+                        if found and found != "random":
+                            search_strategy = found
+                            break
+
             job = HyperparameterTuningJob(
                 id=job_id,
                 pipeline_id=pipeline_id,
@@ -78,7 +132,9 @@ class JobManager:
                 dataset_source_id=dataset_id,
                 user_id=user_id,
                 status=JobStatus.QUEUED.value,
+                run_number=next_version,
                 model_type=model_type,
+                search_strategy=search_strategy,
                 graph=graph,
                 started_at=datetime.now()
             )
@@ -192,12 +248,46 @@ class JobManager:
         if job:
             # Extract hyperparameters from graph if possible, or metadata
             hyperparameters = None
+            target_column = None
+            dropped_columns = []
+
             if job.graph and "nodes" in job.graph:
                 # Find the node that matches job.node_id
                 for node in job.graph["nodes"]:
-                    if node.get("id") == job.node_id:
-                        hyperparameters = node.get("data", {}).get("params", {})
-                        break
+                    # Determine structure (PipelineConfigModel vs React Flow)
+                    if "step_type" in node:
+                        # PipelineConfigModel structure
+                        nid = node.get("node_id")
+                        ntype = node.get("step_type")
+                        params = node.get("params", {})
+                    else:
+                        # React Flow structure
+                        nid = node.get("id")
+                        ntype = node.get("type") or node.get("data", {}).get("catalogType")
+                        # Try config, then parameters, then data itself
+                        params = node.get("data", {}).get("config") or node.get("parameters") or node.get("data", {})
+
+                    if nid == job.node_id:
+                        hyperparameters = params
+                    
+                    # Also look for target column in train_test_split node, training node, or tuning node
+                    if ntype in ['train_test_split', 'TrainTestSplitter', 'feature_target_split', 'model_training', 'model_tuning', 'hyperparameter_tuning'] and params.get('target_column'):
+                        target_column = params.get('target_column')
+                        
+                    # Look for dropped columns
+                    if ntype in ['drop_missing_columns', 'DropMissingColumns', 'drop_column_recommendations', 'drop_columns'] and isinstance(params.get('columns'), list):
+                        dropped_columns.extend(params.get('columns'))
+                    if ntype == 'feature_selection' and isinstance(params.get('dropped_columns'), list):
+                        dropped_columns.extend(params.get('dropped_columns'))
+            
+            # Also check job metrics for runtime dropped columns (e.g. from Feature Selection)
+            if job.metrics and isinstance(job.metrics, dict) and "dropped_columns" in job.metrics:
+                metrics_dropped = job.metrics["dropped_columns"]
+                if isinstance(metrics_dropped, list):
+                    dropped_columns.extend(metrics_dropped)
+            
+            # Deduplicate
+            dropped_columns = list(set(dropped_columns))
             
             return JobInfo(
                 job_id=job.id,
@@ -215,7 +305,11 @@ class JobManager:
                 model_type=job.model_type,
                 hyperparameters=hyperparameters,
                 created_at=job.created_at,
-                metrics=job.metrics if job_type == "training" else ({"score": job.best_score} if job.best_score else None)
+                metrics=job.metrics if job_type == "training" else ({"score": job.best_score} if job.best_score else None),
+                search_strategy=job.search_strategy if job_type == "tuning" else None,
+                target_column=target_column,
+                dropped_columns=dropped_columns,
+                version=job.version if job_type == "training" else job.run_number
             )
         return None
 
@@ -278,7 +372,8 @@ class JobManager:
                 model_type=j.model_type,
                 hyperparameters=hyperparameters,
                 created_at=j.created_at,
-                metrics=j.metrics
+                metrics=j.metrics,
+                version=j.version
             ))
         for j, d_name in tune_rows:
             # Extract hyperparameters (search space)
@@ -307,7 +402,9 @@ class JobManager:
                 model_type=j.model_type,
                 hyperparameters=hyperparameters,
                 created_at=j.created_at,
-                metrics=metrics
+                metrics=metrics,
+                search_strategy=j.search_strategy,
+                version=j.run_number
             ))
             
         # Sort by start time
@@ -336,7 +433,8 @@ class JobManager:
                 start_time=job.started_at,
                 end_time=job.finished_at,
                 error=job.error_message,
-                result={"best_params": job.best_params, "best_score": job.best_score}
+                result={"best_params": job.best_params, "best_score": job.best_score},
+                version=job.run_number
             )
         return None
 
@@ -367,7 +465,8 @@ class JobManager:
                 start_time=job.started_at,
                 end_time=job.finished_at,
                 error=job.error_message,
-                result={"best_params": job.best_params, "best_score": job.best_score}
+                result={"best_params": job.best_params, "best_score": job.best_score},
+                version=job.run_number
             )
         return None
 
@@ -396,7 +495,8 @@ class JobManager:
                 start_time=job.started_at,
                 end_time=job.finished_at,
                 error=job.error_message,
-                result={"best_params": job.best_params, "best_score": job.best_score}
+                result={"best_params": job.best_params, "best_score": job.best_score},
+                version=job.run_number
             )
             for job in jobs
         ]

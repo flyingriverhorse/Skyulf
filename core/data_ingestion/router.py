@@ -19,6 +19,16 @@ async def list_sources(
     sources = await service.list_sources(user_id=None)
     return DataSourceListResponse(sources=sources)
 
+@sources_router.get("/sources/usable", response_model=DataSourceListResponse)
+async def list_usable_sources(
+    service: DataIngestionService = Depends(get_data_service)
+):
+    """
+    List only successfully ingested data sources.
+    """
+    sources = await service.list_usable_sources(user_id=None)
+    return DataSourceListResponse(sources=sources)
+
 @sources_router.get("/sources/{source_id}", response_model=DataSourceResponse)
 async def get_source(
     source_id: str,
@@ -91,3 +101,16 @@ async def get_status(
     """
     status_data = await service.get_ingestion_status(source_id)
     return IngestionStatus(**status_data)
+
+@router.post("/{source_id}/cancel")
+async def cancel_ingestion(
+    source_id: str,
+    service: DataIngestionService = Depends(get_data_service)
+):
+    """
+    Cancel an ingestion job.
+    """
+    success = await service.cancel_ingestion(source_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Job could not be cancelled (maybe it's already finished or doesn't exist)")
+    return {"message": "Ingestion job cancelled successfully"}

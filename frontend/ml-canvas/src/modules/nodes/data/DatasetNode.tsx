@@ -22,7 +22,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
 
   const fetchDatasets = () => {
     setLoading(true);
-    DatasetService.getAll()
+    DatasetService.getUsable()
       .then(setDatasets)
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -100,23 +100,29 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
             <div className="text-xs text-muted-foreground animate-pulse">Loading schema...</div>
           ) : schema ? (
             <>
-              <div className="border rounded-md bg-muted/10 max-h-60 overflow-y-auto">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-muted/20 sticky top-0">
+              <div className="border rounded-md bg-muted/10 max-h-60 overflow-auto">
+                <table className="w-full text-xs text-left min-w-max">
+                  <thead className="bg-muted/20 sticky top-0 z-10">
                     <tr>
-                      <th className="p-2 font-medium border-b">Column</th>
-                      <th className="p-2 font-medium border-b">Type</th>
-                      <th className="p-2 font-medium border-b text-right">Missing</th>
-                      <th className="p-2 font-medium border-b text-right">Unique</th>
+                      <th className="p-2 font-medium border-b bg-muted/20">Column</th>
+                      <th className="p-2 font-medium border-b bg-muted/20">Type</th>
+                      <th className="p-2 font-medium border-b text-right bg-muted/20">Missing</th>
+                      <th className="p-2 font-medium border-b text-right bg-muted/20">Unique</th>
+                      <th className="p-2 font-medium border-b text-right bg-muted/20">Min</th>
+                      <th className="p-2 font-medium border-b text-right bg-muted/20">Max</th>
+                      <th className="p-2 font-medium border-b text-right bg-muted/20">Mean</th>
                     </tr>
                   </thead>
                   <tbody>
                     {Object.values(schema.columns).map((col) => (
                       <tr key={col.name} className="border-b last:border-0 hover:bg-muted/20">
-                        <td className="p-2 font-mono font-medium">{col.name}</td>
-                        <td className="p-2 text-muted-foreground">{col.dtype}</td>
+                        <td className="p-2 font-mono font-medium whitespace-nowrap">{col.name}</td>
+                        <td className="p-2 text-muted-foreground whitespace-nowrap">{col.dtype}</td>
                         <td className="p-2 text-right text-muted-foreground">{col.missing_count}</td>
                         <td className="p-2 text-right text-muted-foreground">{col.unique_count}</td>
+                        <td className="p-2 text-right text-muted-foreground">{col.min_value !== undefined ? Number(col.min_value).toFixed(2) : '-'}</td>
+                        <td className="p-2 text-right text-muted-foreground">{col.max_value !== undefined ? Number(col.max_value).toFixed(2) : '-'}</td>
+                        <td className="p-2 text-right text-muted-foreground">{col.mean_value !== undefined ? Number(col.mean_value).toFixed(2) : '-'}</td>
                       </tr>
                     ))}
                   </tbody>

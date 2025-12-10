@@ -22,6 +22,10 @@ export interface JobInfo {
   created_at: string;
   metrics?: Record<string, number>;
   config?: any;
+  search_strategy?: string;
+  target_column?: string;
+  dropped_columns?: string[];
+  version?: number;
 }
 
 export interface RunPipelineRequest extends PipelineConfigModel {

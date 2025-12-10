@@ -1,15 +1,34 @@
-import React from 'react';
-import { X, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Loader2, CheckCircle, XCircle, Clock, Ban } from 'lucide-react';
 import { Dataset } from '../../core/types/api';
+import { DatasetService } from '../../core/api/datasets';
 
 interface IngestionJobsModalProps {
   isOpen: boolean;
   onClose: () => void;
   datasets: Dataset[];
+  onRefresh?: () => void;
 }
 
-export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, onClose, datasets }) => {
+export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, onClose, datasets, onRefresh }) => {
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
   if (!isOpen) return null;
+
+  const handleCancel = async (id: string) => {
+    if (!window.confirm('Are you sure you want to cancel this ingestion job?')) return;
+    
+    setCancellingId(id);
+    try {
+      await DatasetService.cancelIngestion(id);
+      if (onRefresh) onRefresh();
+    } catch (error) {
+      console.error('Failed to cancel ingestion:', error);
+      alert('Failed to cancel ingestion');
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   // Filter to show only items that have ingestion status or are recent
   // For now, we show all as "jobs"
@@ -18,7 +37,8 @@ export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, 
     name: d.name,
     status: d.source_metadata?.ingestion_status?.status || 'completed',
     created_at: d.created_at,
-    message: d.source_metadata?.ingestion_status?.error || 'Ingestion completed successfully'
+    message: d.source_metadata?.ingestion_status?.error || 
+             (d.source_metadata?.ingestion_status?.status === 'cancelled' ? 'Ingestion cancelled' : 'Ingestion completed successfully')
   })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   return (
@@ -44,6 +64,8 @@ export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, 
                       <Loader2 className="text-blue-500 animate-spin" size={20} />
                     ) : job.status === 'failed' ? (
                       <XCircle className="text-red-500" size={20} />
+                    ) : job.status === 'cancelled' ? (
+                      <Ban className="text-slate-500" size={20} />
                     ) : (
                       <CheckCircle className="text-green-500" size={20} />
                     )}
@@ -59,12 +81,30 @@ export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, 
                     <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                       Status: <span className="capitalize">{job.status}</span>
                     </p>
-                    {job.status === 'failed' && (
-                      <p className="text-sm text-red-600 dark:text-red-400 mt-1 bg-red-50 dark:bg-red-900/10 p-2 rounded">
+                    {(job.status === 'failed' || job.status === 'cancelled') && (
+                      <p className={`text-sm mt-1 p-2 rounded ${
+                        job.status === 'failed' 
+                          ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10'
+                          : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800'
+                      }`}>
                         {job.message}
                       </p>
                     )}
                   </div>
+                  {(job.status === 'processing' || job.status === 'pending') && (
+                    <button
+                      onClick={() => handleCancel(job.id)}
+                      disabled={cancellingId === job.id}
+                      className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-colors disabled:opacity-50"
+                      title="Cancel Ingestion"
+                    >
+                      {cancellingId === job.id ? (
+                        <Loader2 className="animate-spin" size={20} />
+                      ) : (
+                        <Ban size={20} />
+                      )}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

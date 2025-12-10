@@ -10,6 +10,7 @@ import { useShallow } from 'zustand/react/shallow';
 import '@xyflow/react/dist/style.css';
 
 import { useGraphStore } from '../../core/store/useGraphStore';
+import { useViewStore } from '../../core/store/useViewStore';
 import { CustomNodeWrapper } from './CustomNodeWrapper';
 import { CustomEdge } from './CustomEdge';
 
@@ -31,7 +32,8 @@ const FlowCanvasContent: React.FC = () => {
     onNodesChange, 
     onEdgesChange, 
     onConnect,
-    addNode 
+    addNode,
+    executionResult
   } = useGraphStore(
     useShallow((state) => ({
       nodes: state.nodes,
@@ -40,8 +42,11 @@ const FlowCanvasContent: React.FC = () => {
       onEdgesChange: state.onEdgesChange,
       onConnect: state.onConnect,
       addNode: state.addNode,
+      executionResult: state.executionResult
     }))
   );
+
+  const { isResultsPanelExpanded } = useViewStore();
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -116,7 +121,14 @@ const FlowCanvasContent: React.FC = () => {
           </defs>
         </svg>
         <Background />
-        <Controls position="top-left" />
+        <Controls 
+          position="bottom-left" 
+          style={
+            (executionResult && !isResultsPanelExpanded) 
+              ? { marginBottom: '40px', transition: 'margin-bottom 0.3s ease-in-out' } 
+              : { transition: 'margin-bottom 0.3s ease-in-out' }
+          }
+        />
       </ReactFlow>
     </div>
   );

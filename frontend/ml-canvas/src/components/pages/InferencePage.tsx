@@ -27,46 +27,9 @@ export const InferencePage: React.FC = () => {
         try {
           const job = await jobsApi.getJob(deployment.job_id);
           if (job.dataset_id) {
-            // 1. Fetch Pipeline to find Target and Dropped Columns
-            let targetColumn: string | null = null;
-            let droppedColumns: string[] = [];
-            
-            try {
-                const pipelineRes = await fetch(`/ml-workflow/api/pipelines/${job.dataset_id}`);
-                if (pipelineRes.ok) {
-                    const pipelineData = await pipelineRes.json();
-                    const nodes = pipelineData.graph?.nodes || [];
-                    
-                    nodes.forEach((node: any) => {
-                        const type = node.data?.catalogType || node.type;
-                        const config = node.data?.config || node.parameters || {};
-
-                        // Find Target Column (usually in train_test_split)
-                        if (type === 'train_test_split' && config.target_column) {
-                            targetColumn = config.target_column;
-                        }
-                        
-                        // Check for drop_missing_columns type
-                        if (type === 'drop_missing_columns' && Array.isArray(config.columns)) {
-                            droppedColumns.push(...config.columns);
-                        }
-                        // Also check for drop_column_recommendations type if it exists in the graph
-                        if (type === 'drop_column_recommendations' && Array.isArray(config.columns)) {
-                            droppedColumns.push(...config.columns);
-                        }
-                        // Check for generic drop_columns if implemented
-                        if (type === 'drop_columns' && Array.isArray(config.columns)) {
-                            droppedColumns.push(...config.columns);
-                        }
-                        // Check for feature_selection type
-                        if (type === 'feature_selection' && Array.isArray(config.dropped_columns)) {
-                            droppedColumns.push(...config.dropped_columns);
-                        }
-                    });
-                }
-            } catch (err) {
-                console.warn("Failed to fetch pipeline for inference filtering", err);
-            }
+            // 1. Use Target and Dropped Columns from Job Info
+            const targetColumn = job.target_column;
+            const droppedColumns = job.dropped_columns || [];
 
             // 2. Fetch Sample Data
             const sample = await DatasetService.getSample(job.dataset_id, 1);

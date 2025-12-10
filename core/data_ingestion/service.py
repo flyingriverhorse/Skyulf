@@ -33,6 +33,17 @@ class DataIngestionService:
         result = await self.session.execute(query)
         return result.scalars().all()
 
+    async def list_usable_sources(self, user_id: int = None) -> list[DataSource]:
+        """
+        List only successfully ingested data sources.
+        """
+        query = select(DataSource).where(DataSource.test_status == 'success')
+        if user_id:
+            query = query.where(DataSource.created_by == user_id)
+        
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
     async def get_source(self, source_id: Union[int, str]) -> Optional[DataSource]:
         """
         Get a data source by ID (PK) or source_id (UUID).
@@ -77,6 +88,31 @@ class DataIngestionService:
         await self.session.delete(source)
         await self.session.commit()
         return True
+
+    async def cancel_ingestion(self, source_id: Union[int, str]) -> bool:
+        """
+        Cancel an ongoing ingestion job.
+        """
+        source = await self.get_source(source_id)
+        if not source:
+            return False
+        
+        metadata = dict(source.source_metadata or {})
+        ingestion_status = metadata.get('ingestion_status', {})
+        current_status = ingestion_status.get('status')
+        
+        if current_status in ['pending', 'processing']:
+            metadata['ingestion_status'] = {
+                'status': 'cancelled',
+                'progress': ingestion_status.get('progress', 0.0),
+                'error': 'Cancelled by user',
+                'updated_at': datetime.utcnow().isoformat()
+            }
+            source.source_metadata = metadata
+            await self.session.commit()
+            return True
+            
+        return False
 
     async def get_sample(self, source_id: Union[int, str], limit: int = 5) -> list[dict]:
         """

@@ -585,8 +585,8 @@ async def get_system_stats(session: AsyncSession = Depends(get_async_session)):
     # 2. Active Deployments
     deployment_count = await session.scalar(select(func.count(Deployment.id)).where(Deployment.is_active == True))
     
-    # 3. Data Sources
-    datasource_count = await session.scalar(select(func.count(DataSource.id)))
+    # 3. Data Sources (Only successful ones)
+    datasource_count = await session.scalar(select(func.count(DataSource.id)).where(DataSource.test_status == 'success'))
 
     return {
         "total_jobs": (training_count or 0) + (tuning_count or 0),

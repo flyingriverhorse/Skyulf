@@ -27,6 +27,7 @@ class DataProfiler:
             col_stats["type"] = dtype
             col_stats["null_count"] = series.null_count()
             col_stats["null_percentage"] = (series.null_count() / len(df)) * 100
+            col_stats["unique_count"] = series.n_unique()
             
             if dtype in ["Int64", "Float64", "Int32", "Float32"]:
                 col_stats["mean"] = series.mean()
@@ -35,7 +36,6 @@ class DataProfiler:
                 col_stats["max"] = series.max()
                 col_stats["median"] = series.median()
             elif dtype in ["Utf8", "String", "Categorical"]:
-                col_stats["unique_count"] = series.n_unique()
                 # Top 5 values
                 try:
                     value_counts = series.value_counts().sort("count", descending=True).head(5)

@@ -1,35 +1,52 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useGraphStore } from '../../core/store/useGraphStore';
+import { useViewStore } from '../../core/store/useViewStore';
 import { registry } from '../../core/registry/NodeRegistry';
-import { X, Settings2, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Maximize2, Minimize2, Settings2 } from 'lucide-react';
 
 export const PropertiesPanel: React.FC = () => {
   const nodes = useGraphStore((state) => state.nodes);
-  const updateNodeData = useGraphStore((state) => state.updateNodeData);
-  const onNodesChange = useGraphStore((state) => state.onNodesChange);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const { isSidebarOpen, isPropertiesPanelExpanded, setPropertiesPanelExpanded } = useViewStore();
   
   // Find the currently selected node
   const selectedNode = nodes.find((n) => n.selected);
 
-  if (!selectedNode) {
-    return (
-      <aside className="w-80 border-l bg-background p-8 flex flex-col items-center justify-center text-muted-foreground text-center shrink-0">
-        <div className="p-4 bg-muted/50 rounded-full mb-4">
-          <Settings2 className="w-8 h-8 opacity-50" />
-        </div>
-        <h3 className="font-medium mb-1">No Node Selected</h3>
-        <p className="text-sm">Select a node on the canvas to configure its properties.</p>
-      </aside>
-    );
-  }
+  // Reset expansion when selection clears (optional, but good UX)
+  React.useEffect(() => {
+    if (!selectedNode) setPropertiesPanelExpanded(false);
+  }, [selectedNode, setPropertiesPanelExpanded]);
+
+  // Calculate width based on sidebar state
+  // Sidebar is w-64 (256px). We leave some buffer.
+  const expandedWidth = isSidebarOpen ? 'w-[calc(100vw-300px)]' : 'w-[calc(100vw-50px)]';
+
+  return (
+    <aside 
+      className={`border-l bg-background shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
+        selectedNode ? (isPropertiesPanelExpanded ? `${expandedWidth} opacity-100` : 'w-80 opacity-100') : 'w-0 opacity-0'
+      }`}
+    >
+      {selectedNode && (
+        <PropertiesContent 
+          selectedNode={selectedNode} 
+          isExpanded={isPropertiesPanelExpanded} 
+          toggleExpand={() => setPropertiesPanelExpanded(!isPropertiesPanelExpanded)} 
+        />
+      )}
+    </aside>
+  );
+};
+
+const PropertiesContent: React.FC<{ 
+  selectedNode: any; 
+  isExpanded: boolean; 
+  toggleExpand: () => void; 
+}> = ({ selectedNode, isExpanded, toggleExpand }) => {
+  const updateNodeData = useGraphStore((state) => state.updateNodeData);
+  const onNodesChange = useGraphStore((state) => state.onNodesChange);
 
   const handleClose = () => {
     onNodesChange([{ id: selectedNode.id, type: 'select', selected: false }]);
-  };
-
-  const toggleExpand = () => {
-    setIsExpanded(!isExpanded);
   };
 
   const definitionType = selectedNode.data.definitionType as string;
@@ -37,70 +54,54 @@ export const PropertiesPanel: React.FC = () => {
 
   if (!definition) {
     return (
-      <aside className="w-80 border-l bg-background p-4 shrink-0">
+      <div className="p-4">
         <div className="text-destructive flex items-center gap-2">
           <X className="w-4 h-4" />
           Error: Node definition '{definitionType}' not found.
         </div>
-      </aside>
+      </div>
     );
   }
 
   const SettingsComponent = definition.settings;
 
   return (
-    <aside 
-      className={`
-        border-l bg-background flex flex-col h-full shadow-xl z-20 transition-all duration-300 ease-in-out
-        ${isExpanded ? 'absolute right-0 top-0 bottom-0 w-[calc(100%-16rem)]' : 'w-80 shrink-0'}
-      `}
-    >
-      <div className="p-4 border-b flex items-center justify-between bg-muted/10">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-md">
-            {definition.icon && <definition.icon className="w-4 h-4 text-primary" />}
+    <div className="h-full flex flex-col">
+      <div className="p-4 border-b flex items-center justify-between bg-muted/30">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-primary/10 rounded-md">
+            <Settings2 className="w-4 h-4 text-primary" />
           </div>
           <div>
-            <h2 className="font-semibold text-sm">{definition.label}</h2>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{definition.category}</p>
+            <h2 className="font-semibold text-sm">{selectedNode.data.label || definition.label}</h2>
+            <div className="text-xs text-muted-foreground font-mono">ID: {selectedNode.id}</div>
           </div>
         </div>
         <div className="flex items-center gap-1">
           <button 
             onClick={toggleExpand}
-            className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
-            title={isExpanded ? "Collapse" : "Expand"}
+            className="p-1.5 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
           >
             {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
           <button 
             onClick={handleClose}
-            className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
-            title="Close"
+            className="p-1.5 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {SettingsComponent ? (
-          <SettingsComponent 
-            config={selectedNode.data} 
-            onChange={(newData) => updateNodeData(selectedNode.id, newData)} 
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="space-y-6">
+          <SettingsComponent
+            config={selectedNode.data}
+            onChange={(data: any) => updateNodeData(selectedNode.id, data)}
             nodeId={selectedNode.id}
           />
-        ) : (
-          <div className="p-8 text-center text-sm text-muted-foreground italic">
-            No configuration options available for this node.
-          </div>
-        )}
+        </div>
       </div>
-      
-      <div className="p-3 border-t bg-muted/5 text-[10px] text-muted-foreground font-mono flex justify-between">
-        <span>ID: {selectedNode.id}</span>
-        <span>v1.0</span>
-      </div>
-    </aside>
+    </div>
   );
 };

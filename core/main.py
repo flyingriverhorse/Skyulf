@@ -20,11 +20,13 @@ from pathlib import Path
 
 # Use absolute imports to fix import issues
 from core.config import get_settings
+from core.celery_app import celery_app  # Initialize Celery app
 
 from core.health.routes import router as health_router
 # from core.feature_engineering.routes import router as feature_engineering_router
 from core.ml_pipeline.api import router as ml_pipeline_router
 from core.ml_pipeline.deployment.api import router as deployment_router
+from core.ml_pipeline.model_registry.api import router as model_registry_router
 from core.data_ingestion.router import router as data_ingestion_router, sources_router as data_sources_router
 from core.middleware.error_handler import ErrorHandlerMiddleware
 from core.middleware.logging import LoggingMiddleware
@@ -255,6 +257,7 @@ def _include_routers(app: FastAPI) -> None:
     # And at /ml-workflow/api/pipelines for frontend compatibility
     app.include_router(ml_pipeline_router, prefix="/ml-workflow/api/pipelines")
     app.include_router(deployment_router, prefix="/api", tags=["Deployment"])
+    app.include_router(model_registry_router, prefix="/api", tags=["Model Registry"])
 
     # Root redirect
     from fastapi.responses import RedirectResponse

@@ -155,7 +155,8 @@ export const ExperimentsPage: React.FC = () => {
   const filteredJobs = jobs.filter(job => {
     const typeMatch = filterType === 'all' || job.job_type === filterType;
     const datasetMatch = selectedDatasetId === 'all' || job.dataset_id === selectedDatasetId;
-    return typeMatch && datasetMatch;
+    const statusMatch = job.status === 'completed';
+    return typeMatch && datasetMatch && statusMatch;
   });
 
   const selectedJobs = jobs.filter(job => selectedJobIds.includes(job.job_id));
@@ -280,7 +281,7 @@ export const ExperimentsPage: React.FC = () => {
               >
                 <div className="flex justify-between items-start mb-1">
                   <span className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-300">
-                    {job.job_id.slice(0, 8)}
+                    #{job.version} - {job.job_id.slice(0, 8)}
                   </span>
                   <div className="flex items-center gap-2">
                     {job.status === 'completed' && (job.job_type === 'training' || job.job_type === 'tuning') && (
@@ -303,9 +304,9 @@ export const ExperimentsPage: React.FC = () => {
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                   {job.model_type} • {job.dataset_name || 'Unknown Dataset'}
-                  {job.job_type === 'tuning' && job.config?.tuning?.strategy && (
+                  {job.job_type === 'tuning' && (job.search_strategy || job.config?.tuning?.strategy) && (
                       <span className="ml-1 text-gray-400">
-                          ({job.config.tuning.strategy})
+                          ({job.search_strategy || job.config?.tuning?.strategy})
                       </span>
                   )}
                 </div>
