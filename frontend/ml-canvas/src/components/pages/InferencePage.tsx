@@ -173,7 +173,7 @@ export const InferencePage: React.FC = () => {
                     </div>
                     <div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">Job ID</div>
-                    <div className="font-mono text-sm text-gray-800 dark:text-gray-200">{activeDeployment.job_id.slice(0, 8)}</div>
+                    <div className="font-mono text-sm text-gray-800 dark:text-gray-200 break-all">{activeDeployment.job_id}</div>
                     </div>
                     <div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">Deployed At</div>

@@ -34,6 +34,11 @@ def setup_logging():
 
 def start_celery_worker():
     """Start the Celery worker in a separate process."""
+    settings = get_settings()
+    if not settings.USE_CELERY:
+        print("🚫 Celery worker disabled by configuration.")
+        return None
+
     if sys.platform == "win32":
         pool_arg = "--pool=solo"
     else:

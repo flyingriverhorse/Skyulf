@@ -39,7 +39,16 @@ pip install -r requirements-fastapi.txt
 python run_fastapi.py
 ```
 
-The `run_fastapi.py` script will automatically start the FastAPI server and the Celery worker (in development mode).
+The `run_skyulf.py` script will automatically start the FastAPI server.
+
+**Optional: Celery & Redis**
+By default, Skyulf uses Celery and Redis for robust background task management. However, for simple local testing or environments where you cannot run Redis, you can disable this dependency.
+
+Add this to your `.env` file:
+```ini
+USE_CELERY=false
+```
+When disabled, background tasks (training, ingestion) will run in background threads within the main application process instead of a separate worker.
 
 ### With Docker Compose (Recommended)
 
@@ -47,17 +56,24 @@ The `run_fastapi.py` script will automatically start the FastAPI server and the 
 docker compose up --pull=always --build
 ```
 
+This will start the full stack:
+- **FastAPI Backend** (Port 8000)
+- **Redis** (Port 6379)
+- **Celery Worker** (Background jobs)
+
 **Open:**
 - API health — http://127.0.0.1:8000/health
 - Docs (dev mode) — http://127.0.0.1:8000/docs
 
 ## Key Features
 
-*   **🎨 Visual Feature Canvas:** A node-based editor to clean, transform, and engineer features without writing spaghetti code. (30+ built-in nodes).
+*   **🎨 Visual Feature Canvas:** A node-based editor to clean, transform, and engineer features without writing spaghetti code. (25+ built-in nodes).
 *   **🚀 Modern Backend:** Built on FastAPI for high performance and easy API extension.
-*   **⚡ Async by Default:** Heavy training jobs run in the background via Celery & Redis—your UI never freezes.
+*   **⚡ Async by Default:** Heavy training jobs run in the background via Celery & Redis (or background threads)—your UI never freezes.
 *   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or SQL. Start with SQLite (zero-config) and scale to PostgreSQL.
 *   **🧠 Model Training:** Built-in support for Scikit-Learn models with hyperparameter search (Grid/Random/Halving) and optional Optuna integration.
+*   **📦 Model Registry & Deployment:** Version control your models, track metrics, and deploy them to a live inference API with a single click.
+*   **📊 Experiment Tracking:** Compare multiple runs side-by-side with interactive charts, confusion matrices, and ROC curves.
 
 ## Roadmap
 

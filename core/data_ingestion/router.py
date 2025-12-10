@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, BackgroundTasks
 from typing import Dict, Any, Union
 
 from .service import DataIngestionService
@@ -70,6 +70,7 @@ async def delete_source(
 @router.post("/database", response_model=IngestionJobResponse)
 async def create_database_source(
     data: DataSourceCreate,
+    background_tasks: BackgroundTasks,
     service: DataIngestionService = Depends(get_data_service)
 ):
     """
@@ -77,10 +78,11 @@ async def create_database_source(
     """
     # TODO: Get real user ID from auth dependency
     user_id = 1
-    return await service.create_database_source(data, user_id)
+    return await service.create_database_source(data, user_id, background_tasks)
 
 @router.post("/upload", response_model=IngestionJobResponse)
 async def upload_file(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     service: DataIngestionService = Depends(get_data_service)
 ):
@@ -89,7 +91,7 @@ async def upload_file(
     """
     # TODO: Get real user ID from auth dependency
     user_id = 1 
-    return await service.handle_file_upload(file, user_id)
+    return await service.handle_file_upload(file, user_id, background_tasks)
 
 @router.get("/{source_id}/status", response_model=IngestionStatus)
 async def get_status(
