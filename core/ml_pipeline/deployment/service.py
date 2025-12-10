@@ -227,6 +227,13 @@ class DeploymentService:
         return result.scalars().first()
 
     @staticmethod
+    async def list_deployments(session: AsyncSession, limit: int = 50, skip: int = 0) -> list[Deployment]:
+        """Lists deployment history."""
+        stmt = select(Deployment).order_by(Deployment.created_at.desc()).limit(limit).offset(skip)
+        result = await session.execute(stmt)
+        return result.scalars().all()
+
+    @staticmethod
     async def deactivate_current_deployment(session: AsyncSession):
         """Deactivates the currently active deployment."""
         await session.execute(

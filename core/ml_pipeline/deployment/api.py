@@ -40,6 +40,18 @@ async def get_active_deployment(
         raise HTTPException(status_code=404, detail="No active deployment found")
     return deployment
 
+@router.get("/history", response_model=List[DeploymentInfo])
+async def list_deployments(
+    limit: int = 50,
+    skip: int = 0,
+    session: AsyncSession = Depends(get_async_session)
+):
+    """
+    Lists deployment history.
+    """
+    deployments = await DeploymentService.list_deployments(session, limit, skip)
+    return deployments
+
 @router.post("/deactivate")
 async def deactivate_deployment(
     session: AsyncSession = Depends(get_async_session)

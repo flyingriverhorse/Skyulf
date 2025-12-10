@@ -4,6 +4,7 @@ import { Dashboard } from './pages/Dashboard';
 import { DataSources } from './pages/DataSources';
 import { CanvasPage } from './pages/CanvasPage';
 import { ModelRegistry } from './pages/ModelRegistry';
+import { DeploymentsPage } from './components/pages/DeploymentsPage';
 
 function App() {
   return (
@@ -15,7 +16,7 @@ function App() {
           <Route path="data" element={<DataSources />} />
           <Route path="canvas" element={<CanvasPage />} />
           <Route path="registry" element={<ModelRegistry />} />
-          <Route path="deployments" element={<div className="p-8">Deployments (Coming Soon)</div>} />
+          <Route path="deployments" element={<DeploymentsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
