@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { DatasetService } from '../core/api/datasets';
 import { Dataset } from '../core/types/api';
 import { FileUpload } from '../modules/nodes/data/FileUpload';
-import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2 } from 'lucide-react';
+import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2, XCircle } from 'lucide-react';
 import { formatBytes } from '../core/utils/format';
 import { DatasetPreviewModal } from '../components/data/DatasetPreviewModal';
 import { AddSourceModal } from '../components/data/AddSourceModal';
@@ -17,7 +17,16 @@ export const DataSources: React.FC = () => {
   const [showAddSource, setShowAddSource] = useState(false);
   const [showIngestionJobs, setShowIngestionJobs] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [previewDataset, setPreviewDataset] = useState<Dataset | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('completed');
+
+  const filteredDatasets = datasets.filter(d => {
+    const status = d.source_metadata?.ingestion_status?.status || 'completed';
+    if (filterStatus === 'all') return true;
+    if (filterStatus === 'active') return ['processing', 'pending'].includes(status);
+    return status === filterStatus;
+  });
 
   const fetchDatasets = async () => {
     // Don't set loading to true on subsequent polls to avoid flickering
@@ -34,6 +43,9 @@ export const DataSources: React.FC = () => {
 
   useEffect(() => {
     fetchDatasets();
+  }, []);
+
+  useEffect(() => {
     // Poll every 5 seconds if there are pending jobs
     const interval = setInterval(() => {
       const hasPending = datasets.some(d => 
@@ -62,6 +74,21 @@ export const DataSources: React.FC = () => {
     }
   };
 
+  const handleCancel = async (id: string) => {
+    if (!window.confirm('Are you sure you want to cancel this ingestion job?')) return;
+    
+    setCancellingId(id);
+    try {
+      await DatasetService.cancelIngestion(id);
+      fetchDatasets();
+    } catch (error) {
+      console.error('Failed to cancel ingestion:', error);
+      alert('Failed to cancel ingestion');
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
   const handleUseInCanvas = (id: string) => {
     navigate(`/canvas?source_id=${id}`);
   };
@@ -84,6 +111,14 @@ export const DataSources: React.FC = () => {
       return (
         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400">
           Failed
+        </span>
+      );
+    }
+
+    if (status === 'cancelled') {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400">
+          Cancelled
         </span>
       );
     }
@@ -114,6 +149,7 @@ export const DataSources: React.FC = () => {
         isOpen={showIngestionJobs}
         onClose={() => setShowIngestionJobs(false)}
         datasets={datasets}
+        onRefresh={fetchDatasets}
       />
 
       <div className="flex justify-between items-center">
@@ -153,6 +189,22 @@ export const DataSources: React.FC = () => {
         </div>
       )}
 
+      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+        {['all', 'active', 'completed', 'failed', 'cancelled'].map(status => (
+          <button
+            key={status}
+            onClick={() => setFilterStatus(status)}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
+              filterStatus === status 
+                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
+                : 'bg-white dark:bg-slate-800 text-slate-600 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
+          >
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </button>
+        ))}
+      </div>
+
       <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -175,16 +227,22 @@ export const DataSources: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ) : datasets.length === 0 ? (
+              ) : filteredDatasets.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
-                    <Database className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                    <p className="text-lg font-medium text-slate-900 dark:text-slate-100">No datasets found</p>
-                    <p className="text-sm">Upload a dataset to get started with your analysis.</p>
+                    {datasets.length === 0 ? (
+                      <>
+                        <Database className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                        <p className="text-lg font-medium text-slate-900 dark:text-slate-100">No datasets found</p>
+                        <p className="text-sm">Upload a dataset to get started with your analysis.</p>
+                      </>
+                    ) : (
+                      <p className="text-lg font-medium text-slate-900 dark:text-slate-100">No datasets match the selected filter</p>
+                    )}
                   </td>
                 </tr>
               ) : (
-                datasets.map((d) => (
+                filteredDatasets.map((d) => (
                   <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -223,21 +281,39 @@ export const DataSources: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => setPreviewDataset(d)}
-                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-                          title="Preview Dataset"
-                        >
-                          <Eye size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleUseInCanvas(d.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-                          title="Use in Canvas"
-                        >
-                          <Play size={16} />
-                          Canvas
-                        </button>
+                        {d.source_metadata?.ingestion_status?.status === 'completed' && (
+                          <>
+                            <button
+                              onClick={() => setPreviewDataset(d)}
+                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                              title="Preview Dataset"
+                            >
+                              <Eye size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleUseInCanvas(d.id)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                              title="Use in Canvas"
+                            >
+                              <Play size={16} />
+                              Canvas
+                            </button>
+                          </>
+                        )}
+                        {(d.source_metadata?.ingestion_status?.status === 'pending' || d.source_metadata?.ingestion_status?.status === 'processing') && (
+                          <button
+                            onClick={() => handleCancel(d.id)}
+                            disabled={cancellingId === d.id}
+                            className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-colors disabled:opacity-50"
+                            title="Cancel Ingestion"
+                          >
+                            {cancellingId === d.id ? (
+                              <div className="w-4 h-4 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <XCircle size={16} />
+                            )}
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDelete(d.id)}
                           disabled={deletingId === d.id}

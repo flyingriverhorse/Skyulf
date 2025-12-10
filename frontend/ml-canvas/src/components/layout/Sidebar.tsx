@@ -1,17 +1,33 @@
 import React, { useState } from 'react';
 import { registry } from '../../core/registry/NodeRegistry';
 import { useGraphStore } from '../../core/store/useGraphStore';
-import { Search } from 'lucide-react';
+import { useViewStore } from '../../core/store/useViewStore';
+import { Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   const nodes = registry.getAll();
   const addNode = useGraphStore((state) => state.addNode);
+  const { isSidebarOpen, setSidebarOpen } = useViewStore();
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleDragStart = (event: React.DragEvent, nodeType: string) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
     event.dataTransfer.effectAllowed = 'move';
   };
+
+  if (!isSidebarOpen) {
+    return (
+      <div className="absolute left-4 top-4 z-50">
+        <button 
+          onClick={() => setSidebarOpen(true)}
+          className="p-2 bg-background border shadow-md rounded-md text-muted-foreground hover:text-foreground transition-colors"
+          title="Expand Components"
+        >
+          <PanelLeftOpen className="w-5 h-5" />
+        </button>
+      </div>
+    );
+  }
 
   const filteredNodes = nodes.filter(n => 
     n.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -21,11 +37,20 @@ export const Sidebar: React.FC = () => {
   const categories = ['Data Source', 'Preprocessing', 'Modeling', 'Evaluation', 'Utility'];
 
   return (
-    <aside className="w-64 shrink-0 border-r bg-background flex flex-col h-full shadow-sm z-10">
+    <aside className="w-64 shrink-0 border-r bg-background flex flex-col h-full shadow-sm z-10 transition-all duration-300">
       <div className="p-4 border-b space-y-3">
-        <div>
-          <h2 className="font-semibold tracking-tight">Components</h2>
-          <p className="text-xs text-muted-foreground">Drag and drop to canvas</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold tracking-tight">Components</h2>
+            <p className="text-xs text-muted-foreground">Drag and drop to canvas</p>
+          </div>
+          <button 
+            onClick={() => setSidebarOpen(false)}
+            className="p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            title="Collapse Sidebar"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </button>
         </div>
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

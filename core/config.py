@@ -66,12 +66,19 @@ def setup_universal_logging(
             )
         else:
             # Default to size-based rotation
-            file_handler = RotatingFileHandler(
-                log_file,
-                maxBytes=max_bytes,
-                backupCount=backup_count,
-                encoding="utf-8",
-            )
+            # On Windows, RotatingFileHandler can cause PermissionError due to file locking
+            if os.name == 'nt':
+                file_handler = logging.FileHandler(
+                    log_file,
+                    encoding="utf-8",
+                )
+            else:
+                file_handler = RotatingFileHandler(
+                    log_file,
+                    maxBytes=max_bytes,
+                    backupCount=backup_count,
+                    encoding="utf-8",
+                )
         file_handler.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
         # Enhanced formatter with more context for debugging

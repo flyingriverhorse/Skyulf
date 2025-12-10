@@ -78,6 +78,13 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):
         # 4. Initialize Engine with Progress Callback
         job_logs = []
         last_log_update = datetime.now()
+
+        # Add version info to logs
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        if isinstance(job, TrainingJob):
+             job_logs.append(f"[{timestamp}] Training Job Version: {job.version}")
+        elif isinstance(job, HyperparameterTuningJob):
+             job_logs.append(f"[{timestamp}] Tuning Job Run: {job.run_number}")
         
         def log_callback(msg):
             nonlocal last_log_update
@@ -113,17 +120,33 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):
             if result.node_results:
                 last_node_id = list(result.node_results.keys())[-1]
                 last_result = result.node_results[last_node_id]
-                if last_result.metrics:
-                    job.metrics = last_result.metrics
+                
+                final_metrics = last_result.metrics.copy() if last_result.metrics else {}
+                
+                # Collect dropped columns from all nodes (e.g. Feature Selection, Drop Columns)
+                all_dropped_columns = []
+                
+                for node_res in result.node_results.values():
+                    if node_res.metrics and "dropped_columns" in node_res.metrics:
+                        cols = node_res.metrics["dropped_columns"]
+                        if isinstance(cols, list):
+                            all_dropped_columns.extend(cols)
+                            
+                if all_dropped_columns:
+                    # Deduplicate
+                    all_dropped_columns = list(set(all_dropped_columns))
+                    final_metrics["dropped_columns"] = all_dropped_columns
+
+                job.metrics = final_metrics
                     
-                    # Special handling for HyperparameterTuningJob
-                    if isinstance(job, HyperparameterTuningJob):
-                        if "best_params" in last_result.metrics:
-                            job.best_params = last_result.metrics["best_params"]
-                        if "best_score" in last_result.metrics:
-                            job.best_score = last_result.metrics["best_score"]
-                        if "trials" in last_result.metrics:
-                            job.results = last_result.metrics["trials"]
+                # Special handling for HyperparameterTuningJob
+                if isinstance(job, HyperparameterTuningJob):
+                    if "best_params" in final_metrics:
+                        job.best_params = final_metrics["best_params"]
+                    if "best_score" in final_metrics:
+                        job.best_score = final_metrics["best_score"]
+                    if "trials" in final_metrics:
+                        job.results = final_metrics["trials"]
             
         else:
             job.status = "failed"

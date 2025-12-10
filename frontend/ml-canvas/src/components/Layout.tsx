@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun } from 'lucide-react';
+import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive } from 'lucide-react';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
@@ -31,42 +31,48 @@ export const Layout: React.FC = () => {
   };
 
   const isActive = (path: string) => location.pathname === path;
+  const isCollapsed = location.pathname === '/canvas';
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
       {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 dark:bg-slate-950 text-white flex flex-col shrink-0 transition-colors duration-200">
-        <div className="p-6 border-b border-slate-800 dark:border-slate-900 flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-lg">S</div>
-          <h1 className="text-xl font-bold tracking-tight">Skyulf ML</h1>
+      <aside className={`${isCollapsed ? 'w-16' : 'w-64'} bg-slate-900 dark:bg-slate-950 text-white flex flex-col shrink-0 transition-all duration-200`}>
+        <div className={`${isCollapsed ? 'p-4' : 'p-6'} border-b border-slate-800 dark:border-slate-900 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center font-bold text-lg shrink-0 shadow-lg shadow-blue-900/20">S</div>
+          {!isCollapsed && (
+            <h1 className="text-xl font-bold tracking-tight whitespace-nowrap bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+              Skyulf ML
+            </h1>
+          )}
         </div>
         
-        <nav className="flex-1 p-4 space-y-2">
-          <NavLink to="/" active={isActive('/')} icon={<LayoutDashboard size={20} />}>
+        <nav className="flex-1 p-2 space-y-2">
+          <NavLink to="/" active={isActive('/')} icon={<LayoutDashboard size={20} />} collapsed={isCollapsed}>
             Dashboard
           </NavLink>
-          <NavLink to="/canvas" active={isActive('/canvas')} icon={<GitBranch size={20} />}>
+          <NavLink to="/canvas" active={isActive('/canvas')} icon={<GitBranch size={20} />} collapsed={isCollapsed}>
             ML Canvas
           </NavLink>
-          <NavLink to="/data" active={isActive('/data')} icon={<Database size={20} />}>
+          <NavLink to="/data" active={isActive('/data')} icon={<Database size={20} />} collapsed={isCollapsed}>
             Data Sources
           </NavLink>
-          <NavLink to="/deployments" active={isActive('/deployments')} icon={<Rocket size={20} />}>
+          <NavLink to="/registry" active={isActive('/registry')} icon={<Archive size={20} />} collapsed={isCollapsed}>
+            Model Registry
+          </NavLink>
+          <NavLink to="/deployments" active={isActive('/deployments')} icon={<Rocket size={20} />} collapsed={isCollapsed}>
             Deployments
           </NavLink>
         </nav>
 
-        <div className="p-4 border-t border-slate-800 space-y-4">
+        <div className={`${isCollapsed ? 'p-2' : 'p-4'} border-t border-slate-800 space-y-4`}>
           <button 
             onClick={toggleTheme}
-            className="flex items-center gap-3 w-full px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
+            className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} w-full ${isCollapsed ? 'px-2' : 'px-4'} py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors`}
+            title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
           >
             {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-            {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            {!isCollapsed && (isDarkMode ? 'Light Mode' : 'Dark Mode')}
           </button>
-          <div className="text-xs text-slate-600 text-center">
-            v2.0.0-alpha
-          </div>
         </div>
       </aside>
 
@@ -78,16 +84,17 @@ export const Layout: React.FC = () => {
   );
 };
 
-const NavLink = ({ to, children, active, icon }: { to: string, children: React.ReactNode, active: boolean, icon?: React.ReactNode }) => (
+const NavLink = ({ to, children, active, icon, collapsed }: { to: string, children: React.ReactNode, active: boolean, icon?: React.ReactNode, collapsed?: boolean }) => (
   <Link
     to={to}
-    className={`flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
+    className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} ${collapsed ? 'px-2' : 'px-4'} py-3 rounded-md text-sm font-medium transition-colors ${
       active 
-        ? 'bg-blue-600 text-white shadow-sm' 
+        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm' 
         : 'text-slate-400 hover:text-white hover:bg-slate-800'
     }`}
+    title={collapsed ? (children as string) : undefined}
   >
     {icon}
-    {children}
+    {!collapsed && children}
   </Link>
 );

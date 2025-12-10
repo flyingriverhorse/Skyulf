@@ -33,11 +33,17 @@ export interface ColumnProfile {
   missing_count: number;
   missing_ratio: number;
   unique_count: number;
+  min_value?: number;
+  max_value?: number;
+  mean_value?: number;
+  std_value?: number;
 }
 
 export interface AnalysisProfile {
   columns: Record<string, ColumnProfile>;
   row_count: number;
+  column_count?: number;
+  duplicate_row_count?: number;
 }
 
 export interface Recommendation {

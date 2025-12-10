@@ -11,7 +11,7 @@ import { ExperimentsPage } from '../pages/ExperimentsPage';
 import { InferencePage } from '../pages/InferencePage';
 
 export const MainLayout: React.FC = () => {
-  const { activeView } = useViewStore();
+  const { activeView, isPropertiesPanelExpanded } = useViewStore();
 
   return (
     <div className="flex h-full w-full bg-background overflow-hidden flex-col">
@@ -22,7 +22,7 @@ export const MainLayout: React.FC = () => {
         <div className="flex flex-1 overflow-hidden relative">
           <Sidebar />
           <main className="flex-1 h-full relative flex flex-col transition-all duration-300 ease-in-out">
-            <Toolbar />
+            {!isPropertiesPanelExpanded && <Toolbar />}
             <div className="flex-1 relative">
               <FlowCanvas />
               <ResultsPanel />
