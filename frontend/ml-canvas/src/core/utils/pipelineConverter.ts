@@ -219,6 +219,9 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                   random_state: node.data.random_state
               }
           };
+      } else if (node.data.definitionType === 'data_preview') {
+          stepType = 'data_preview';
+          params = {};
       } else {
           console.warn(`Unknown node type: ${node.data.definitionType}`);
           // Don't throw, just skip or use generic

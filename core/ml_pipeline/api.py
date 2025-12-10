@@ -49,7 +49,7 @@ class PipelineConfigModel(BaseModel):
     nodes: List[NodeConfigModel]
     metadata: Dict[str, Any] = {}
     target_node_id: Optional[str] = None
-    job_type: Optional[str] = "training" # "training" or "tuning"
+    job_type: Optional[str] = "training" # "training", "tuning", or "preview"
 
 class RunPipelineResponse(BaseModel):
     message: str
@@ -86,6 +86,8 @@ async def run_pipeline(
                 # For tuning nodes, model_type might be in params directly or inside tuning_config?
                 # Usually it's 'algorithm' or 'model_type' in params
                 model_type = node.params.get("algorithm") or node.params.get("model_type", "unknown")
+            elif node.step_type == "data_preview":
+                model_type = "preview"
                 
         # Try to find dataset_id from data_loader node
         if node.step_type == "data_loader":

@@ -12,6 +12,7 @@ from .schemas import PipelineConfig, PipelineExecutionResult, NodeExecutionResul
 
 # Phase 1: Data Loading
 from ..data.loader import DataLoader
+from ..data.container import SplitDataset
 
 # Phase 2: Feature Engineering
 from ..preprocessing.pipeline import FeatureEngineer
@@ -105,6 +106,8 @@ class PipelineEngine:
                 output_artifact_id, metrics = self._run_model_training(node, job_id=job_id)
             elif node.step_type == "model_tuning":
                 output_artifact_id, metrics = self._run_model_tuning(node, job_id=job_id)
+            elif node.step_type == "data_preview":
+                output_artifact_id, metrics = self._run_data_preview(node)
             else:
                 # Try to run as a single transformer step
                 try:
@@ -460,3 +463,67 @@ class PipelineEngine:
             return RandomForestRegressorCalculator(), RandomForestRegressorApplier()
         else:
             raise ValueError(f"Unknown algorithm: {algorithm}")
+
+    def _run_data_preview(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
+        """
+        Generates a detailed preview of the data and pipeline state.
+        """
+        # Input: DataFrame or SplitDataset
+        data = self._resolve_input(node)
+        
+        preview_info = {
+            "timestamp": datetime.now().isoformat(),
+            "data_summary": {},
+            "applied_transformations": [], 
+            "operation_mode": "unknown"
+        }
+        
+        # 1. Analyze Data
+        def get_df_info(df: pd.DataFrame, name: str):
+            return {
+                "name": name,
+                "shape": df.shape,
+                "columns": list(df.columns),
+                # "dtypes": {k: str(v) for k, v in df.dtypes.items()}, # Optional, can be large
+                "sample": df.head(20).replace({np.nan: None}).to_dict(orient='records')
+            }
+
+        if isinstance(data, SplitDataset):
+            preview_info["operation_mode"] = "Train: fit_transform | Test/Val: transform"
+            
+            # Train
+            if isinstance(data.train, tuple):
+                X, y = data.train
+                preview_info["data_summary"]["train"] = get_df_info(X, "Train (X)")
+            else:
+                preview_info["data_summary"]["train"] = get_df_info(data.train, "Train")
+                
+            # Test
+            if data.test is not None:
+                if isinstance(data.test, tuple):
+                    X_test, _ = data.test
+                    preview_info["data_summary"]["test"] = get_df_info(X_test, "Test (X)")
+                elif isinstance(data.test, pd.DataFrame) and not data.test.empty:
+                    preview_info["data_summary"]["test"] = get_df_info(data.test, "Test")
+            
+            # Validation
+            if data.validation is not None:
+                if isinstance(data.validation, tuple):
+                    X_val, _ = data.validation
+                    preview_info["data_summary"]["validation"] = get_df_info(X_val, "Validation (X)")
+                elif isinstance(data.validation, pd.DataFrame):
+                    preview_info["data_summary"]["validation"] = get_df_info(data.validation, "Validation")
+                    
+        elif isinstance(data, pd.DataFrame):
+            preview_info["operation_mode"] = "fit_transform"
+            preview_info["data_summary"]["full"] = get_df_info(data, "Full Dataset")
+            
+        # 2. Get History
+        # Return the list of transformers executed so far
+        preview_info["applied_transformations"] = self.executed_transformers
+        
+        # Save the preview artifact
+        self.artifact_store.save(node.node_id, preview_info)
+        
+        # Return the preview info directly so it's available in the job result
+        return node.node_id, preview_info

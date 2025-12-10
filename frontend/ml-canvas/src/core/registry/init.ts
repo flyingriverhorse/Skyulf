@@ -1,12 +1,11 @@
 import { registry } from './NodeRegistry';
-import { DebugNode } from '../../modules/nodes/base/DebugNode';
+import { DataPreviewNode } from '../../modules/nodes/inspection/DataPreviewNode';
 import { DatasetNode } from '../../modules/nodes/data/DatasetNode';
 import { DropColumnsNode } from '../../modules/nodes/processing/DropColumnsNode';
 import { ImputationNode } from '../../modules/nodes/processing/ImputationNode';
 import { ScalingNode } from '../../modules/nodes/processing/ScalingNode';
 import { ModelTrainingNode } from '../../modules/nodes/modeling/ModelTrainingNode';
 import { HyperparameterTuningNode } from '../../modules/nodes/modeling/HyperparameterTuningNode';
-import { EvaluationNode } from '../../modules/nodes/modeling/EvaluationNode';
 import { FeatureSelectionNode } from '../../modules/nodes/processing/FeatureSelectionNode';
 import { TrainTestSplitNode } from '../../modules/nodes/modeling/TrainTestSplitNode';
 import { FeatureTargetSplitNode } from '../../modules/nodes/modeling/FeatureTargetSplitNode';
@@ -26,7 +25,7 @@ import { AliasReplacementNode } from '../../modules/nodes/processing/AliasReplac
 import { InvalidValueReplacementNode } from '../../modules/nodes/processing/InvalidValueReplacementNode';
 
 export const initializeRegistry = () => {
-  registry.register(DebugNode);
+  registry.register(DataPreviewNode);
   registry.register(DatasetNode);
   registry.register(DropColumnsNode);
   registry.register(ImputationNode);
@@ -50,7 +49,6 @@ export const initializeRegistry = () => {
   registry.register(MissingIndicatorNode);
   registry.register(ModelTrainingNode);
   registry.register(HyperparameterTuningNode);
-  registry.register(EvaluationNode);
   
   console.log('[Registry] Initialization complete. Total nodes:', registry.getAll().length);
 };
