@@ -1,0 +1,1781 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+    © 2025 Murat Unsal — Skyulf Project
+    A passion project for local-first MLOps
+-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Skyulf is a local-first MLOps workspace with a FastAPI backend, drag-and-drop feature canvas, and Celery-powered model training so teams can own every step without third-party clouds.">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://www.skyulf.com/">
+    <title>Skyulf - Own Your ML Pipeline</title>
+    <link rel="icon" type="image/x-icon" href="./static/favicon.ico">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Skyulf · Self-hosted MLOps on your infrastructure">
+    <meta property="og:description" content="Use Skyulf to ingest data, engineer features, and train models locally with FastAPI, Celery, and a drag-and-drop canvas." />
+    <meta property="og:url" content="https://www.skyulf.com/">
+    <meta property="og:image" content="https://www.skyulf.com/static/img/image.png">
+    <meta property="og:image:alt" content="Skyulf feature canvas mockup with nodes connecting data ingestion to training">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Skyulf · Own Your ML Pipeline Locally">
+    <meta name="twitter:description" content="A self-hosted FastAPI + Celery workspace that keeps your ML experiments private and reproducible." />
+    <meta name="twitter:image" content="https://www.skyulf.com/static/img/image.png">
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+    <link rel="stylesheet" href="./static/css/tailwind-site.css">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "Organization",
+                "name": "Skyulf",
+                "url": "https://www.skyulf.com/",
+                "logo": "https://www.skyulf.com/static/img/image.png",
+                "sameAs": [
+                    "https://github.com/flyingriverhorse/skyulf",
+                    "https://github.com/flyingriverhorse/skyulf/discussions"
+                ]
+            },
+            {
+                "@type": "SoftwareApplication",
+                "name": "Skyulf MLOps Workspace",
+                "description": "A self-hosted FastAPI and Celery-based platform for ingesting data, engineering features, and running background model training without sending data to third-party clouds.",
+                "url": "https://www.skyulf.com/",
+                "applicationCategory": "BusinessApplication",
+                "operatingSystem": "Any",
+                "offers": {
+                    "@type": "Offer",
+                    "name": "Self-hosted ML pipeline workspace",
+                    "price": "0.00",
+                    "priceCurrency": "USD"
+                },
+                "feature": [
+                    "Drag-and-drop feature canvas",
+                    "FastAPI backend with SQLite default",
+                    "Celery-powered async training",
+                    "LLM helper integrations planned"
+                ]
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "What is Skyulf?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Skyulf is a local-first MLOps workspace that lets teams build data ingestion, feature engineering, and model training flows on their own infrastructure without uploading sensitive data."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Why build locally with Skyulf?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Skyulf keeps experiments private while still providing a UI for nodes, Celery workers, and export-ready MLflow exports to stay reproducible and compliant."
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/animejs/lib/anime.iife.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        .sr-only:focus-within,
+        .sr-only:focus-visible {
+            position: static;
+            width: auto;
+            height: auto;
+            margin: 0;
+            padding: 0.5rem 1rem;
+            clip: auto;
+            background: rgba(15, 23, 42, 0.8);
+            color: #f8fafc;
+            border-radius: 8px;
+            box-shadow: 0 12px 50px rgba(15, 23, 42, 0.4);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f8fafc;
+        }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 8s ease infinite;
+        }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .floating-card {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .grid-pattern {
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+        
+        .tech-card {
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .tech-card:hover {
+            transform: translateY(-8px);
+            border-color: #3b82f6;
+            box-shadow: 0 20px 40px rgba(59, 130, 246, 0.2);
+        }
+        
+        .pulse-dot {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0.4; transform: scale(1); }
+        }
+        
+        .automation-flow {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .flow-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        }
+        
+        .flow-node {
+            animation: flowMove 3s linear infinite;
+        }
+        
+        @keyframes flowMove {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Feature Canvas Mock - matches actual frontend */
+        .canvas-mock {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            background: linear-gradient(135deg, #0b1628 0%, #0f172a 50%, #1e293b 100%);
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: inset 0 0 48px rgba(15, 18, 26, 0.6);
+        }
+
+        .canvas-mock::-webkit-scrollbar {
+            display: none;
+        }
+
+        .canvas-mock {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .canvas-mock__grid {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.08) 1px, transparent 1px);
+            background-size: 50px 50px;
+            opacity: 0.4;
+        }
+
+        .canvas-mock__nodes {
+            position: absolute;
+            inset: 0;
+            padding: 80px 40px;
+            display: block;
+            z-index: 2;
+        }
+
+        .canvas-mock__node {
+            position: absolute;
+            left: var(--x, 50%);
+            top: var(--y, 50%);
+            min-width: 130px;
+            max-width: 150px;
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            background: radial-gradient(circle at top, rgba(46, 56, 77, 0.95), rgba(17, 24, 39, 0.94));
+            box-shadow: 0 24px 50px rgba(15, 23, 42, 0.45);
+            padding: 10px 12px;
+            color: #e2e8f0;
+            transform: translate(-50%, -50%);
+            cursor: grab;
+            transition: transform 0.18s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+
+        .canvas-mock__node.is-dragging {
+            cursor: grabbing;
+            box-shadow: 0 30px 60px rgba(59, 130, 246, 0.35);
+        }
+
+        .canvas-mock__node:hover {
+            transform: translate(-50%, -50%) scale(1.02);
+            box-shadow: 0 28px 60px rgba(59, 130, 246, 0.3);
+            border-color: rgba(94, 234, 212, 0.5);
+        }
+
+        body.is-dragging,
+        body.is-dragging * {
+            user-select: none !important;
+        }
+
+        .canvas-mock__node::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 18px;
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            pointer-events: none;
+        }
+
+        .canvas-mock__node-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .canvas-mock__node-title {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #f8fafc;
+            line-height: 1.2;
+            flex: 1;
+        }
+
+        .canvas-mock__drag-handle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            background: rgba(30, 41, 59, 0.9);
+            color: rgba(226, 232, 240, 0.85);
+            font-size: 0.7rem;
+            font-weight: 600;
+            cursor: grab;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
+            order: -1;
+            flex-shrink: 0;
+        }
+
+        .canvas-mock__node-desc {
+            font-size: 0.7rem;
+            color: rgba(203, 213, 225, 0.92);
+            line-height: 1.3;
+        }
+
+        .canvas-mock__handle {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-radius: 999px;
+            border: 2px solid #0f172a;
+            z-index: 10;
+            transition: transform 0.18s ease;
+            box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .canvas-mock__handle--left {
+            left: 0;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(148, 163, 184, 0.6);
+            border-color: rgba(100, 116, 139, 1);
+        }
+
+        .canvas-mock__handle--right {
+            right: 0;
+            top: 50%;
+            transform: translate(50%, -50%);
+            background: rgba(45, 212, 191, 0.5);
+            border-color: rgba(20, 184, 166, 1);
+        }
+
+        .canvas-mock__handle:hover {
+            transform: translate(-50%, -50%) scale(1.15);
+        }
+
+        .canvas-mock__handle--right:hover {
+            transform: translate(50%, -50%) scale(1.15);
+        }
+
+        .canvas-mock__handle--top {
+            right: 0;
+            top: 25%;
+            transform: translate(50%, -50%);
+            background: rgba(45, 212, 191, 0.5);
+            border-color: rgba(20, 184, 166, 1);
+        }
+
+        .canvas-mock__handle--middle {
+            right: 0;
+            top: 50%;
+            transform: translate(50%, -50%);
+            background: rgba(45, 212, 191, 0.5);
+            border-color: rgba(20, 184, 166, 1);
+        }
+
+        .canvas-mock__handle--bottom {
+            right: 0;
+            top: 75%;
+            transform: translate(50%, -50%);
+            background: rgba(45, 212, 191, 0.5);
+            border-color: rgba(20, 184, 166, 1);
+        }
+
+        .canvas-mock__handle--top:hover,
+        .canvas-mock__handle--middle:hover,
+        .canvas-mock__handle--bottom:hover {
+            transform: translate(50%, -50%) scale(1.15);
+        }
+
+        .canvas-mock__handle-label {
+            position: absolute;
+            right: -42px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.6rem;
+            color: rgba(203, 213, 225, 0.95);
+            white-space: nowrap;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .canvas-mock__edge {
+            position: absolute;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .canvas-mock__edge path {
+            animation: dashFlow 2s linear infinite;
+        }
+
+        @keyframes dashFlow {
+            0% {
+                stroke-dashoffset: 28;
+            }
+            100% {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .canvas-mock__edge-gradient {
+            stop:nth-child(1) { stop-color: #38bdf8; stop-opacity: 0.85; }
+            stop:nth-child(2) { stop-color: #6366f1; stop-opacity: 0.95; }
+            stop:nth-child(3) { stop-color: #a855f7; stop-opacity: 0.9; }
+        }
+
+        @media (max-width: 1280px) {
+            .canvas-mock {
+                height: 550px;
+            }
+
+            .canvas-mock__nodes {
+                padding: 70px 30px;
+            }
+
+            .canvas-mock__node {
+                min-width: 120px;
+                max-width: 140px;
+                min-height: 75px;
+            }
+        }
+        
+        @media (max-width: 1024px) {
+            .canvas-mock {
+                height: 620px;
+            }
+
+            .canvas-mock__grid {
+                background-size: 40px 40px;
+            }
+
+            .canvas-mock__nodes {
+                padding: 48px 24px;
+                gap: 28px;
+            }
+
+            .canvas-mock__node {
+                min-width: clamp(120px, 42vw, 180px);
+                max-width: clamp(140px, 46vw, 220px);
+                min-height: 90px;
+                font-size: 0.85rem;
+            }
+
+            .canvas-mock__node-title {
+                font-size: 0.82rem;
+            }
+
+            .canvas-mock__node-desc {
+                font-size: 0.65rem;
+            }
+        }
+        
+        @media (max-width: 640px) {
+            .canvas-mock {
+                height: 640px;
+                min-width: 520px;
+                overflow: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .canvas-mock__grid {
+                background-size: 32px 32px;
+            }
+
+            .canvas-mock__nodes {
+                padding: 36px 18px;
+                gap: 22px;
+            }
+
+            .canvas-mock__node {
+                min-width: clamp(130px, 60vw, 210px);
+                max-width: clamp(150px, 68vw, 240px);
+                min-height: 95px;
+            }
+
+            .canvas-mock__node-title {
+                font-size: 0.78rem;
+            }
+            
+            .canvas-mock__node-desc {
+                font-size: 0.68rem;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <a href="#main-content" class="sr-only" aria-label="Skip to main content">Skip to main content</a>
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 glass-effect" aria-label="Primary navigation">
+        <div class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <span class="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+                            Skyulf
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="#features" class="text-gray-300 hover:text-white transition-colors">Platform</a>
+                        <a href="#nodes" class="text-gray-300 hover:text-white transition-colors">Nodes</a>
+                        <a href="#tour" class="text-gray-300 hover:text-white transition-colors">Product Tour</a>
+                        <a href="#roadmap" class="text-gray-300 hover:text-white transition-colors">Roadmap</a>
+                        <a href="#community" class="text-gray-300 hover:text-white transition-colors">Community</a>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="hidden sm:inline-flex text-gray-300 hover:text-white transition-colors">GitHub</a>
+                    <a href="https://github.com/flyingriverhorse/skyulf/discussions" target="_blank" rel="noopener" class="text-gray-300 hover:text-white transition-colors">Discussions</a>
+                    <a href="#community" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all">
+                        Get Involved
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <!-- Hero Section -->
+        <section class="pt-32 pb-16 px-4 sm:px-6 lg:px-8">
+            <!-- When you add hero mockups or screenshots, give each image/visual a descriptive alt text that highlights the local-first canvas and FastAPI workflow. -->
+        <div class="max-w-[1400px] mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                <div class="text-center lg:text-left">
+                    <h1 class="text-5xl md:text-7xl font-bold mb-6" data-aos="fade-up" data-aos-delay="50">
+                        <span class="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                            Own Your ML Pipeline
+                        </span>
+                        <span class="block text-white">Run everything locally</span>
+                    </h1>
+                    <p class="text-xl text-gray-300 mb-8" data-aos="fade-up" data-aos-delay="100">
+                        Skyulf gives you a FastAPI workspace to build ML pipelines—load data, engineer features, train models—all running on your own infrastructure.
+                    </p>
+                    <p class="text-sm text-gray-400 italic mb-8" data-aos="fade-up" data-aos-delay="120">
+                        A passion project.
+                    </p>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10" data-aos="fade-up" data-aos-delay="150">
+                        <div class="relative group cursor-pointer">
+                            <div class="absolute inset-0 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg opacity-0 group-hover:opacity-100 blur transition-opacity duration-300"></div>
+                            <div class="relative glass-effect rounded-lg p-3 text-center border border-blue-500/30 hover:border-blue-400/60 transition-all duration-300 transform group-hover:scale-105">
+                                <svg class="w-6 h-6 mx-auto mb-2 text-blue-400 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                </svg>
+                                <p class="text-xs text-gray-100 font-semibold leading-tight">Drag & drop</p>
+                            </div>
+                        </div>
+                        <div class="relative group cursor-pointer">
+                            <div class="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg opacity-0 group-hover:opacity-100 blur transition-opacity duration-300"></div>
+                            <div class="relative glass-effect rounded-lg p-3 text-center border border-emerald-500/30 hover:border-emerald-400/60 transition-all duration-300 transform group-hover:scale-105">
+                                <svg class="w-6 h-6 mx-auto mb-2 text-emerald-400 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                </svg>
+                                <p class="text-xs text-gray-100 font-semibold leading-tight">Private</p>
+                            </div>
+                        </div>
+                        <div class="relative group cursor-pointer">
+                            <div class="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg opacity-0 group-hover:opacity-100 blur transition-opacity duration-300"></div>
+                            <div class="relative glass-effect rounded-lg p-3 text-center border border-purple-500/30 hover:border-purple-400/60 transition-all duration-300 transform group-hover:scale-105">
+                                <svg class="w-6 h-6 mx-auto mb-2 text-purple-400 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                                <p class="text-xs text-gray-100 font-semibold leading-tight">Fast</p>
+                            </div>
+                        </div>
+                        <div class="relative group cursor-pointer">
+                            <div class="absolute inset-0 bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg opacity-0 group-hover:opacity-100 blur transition-opacity duration-300"></div>
+                            <div class="relative glass-effect rounded-lg p-3 text-center border border-orange-500/30 hover:border-orange-400/60 transition-all duration-300 transform group-hover:scale-105">
+                                <svg class="w-6 h-6 mx-auto mb-2 text-orange-400 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                                </svg>
+                                <p class="text-xs text-gray-100 font-semibold leading-tight">Scalable</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-4 sm:items-center" data-aos="fade-up" data-aos-delay="200">
+                        <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105 text-center">
+                            Star on GitHub
+                        </a>
+                        <a href="https://github.com/flyingriverhorse/skyulf/blob/master/QUICKSTART.md" target="_blank" rel="noopener" class="border border-gray-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:border-white transition-all text-center">
+                            Launch Quickstart
+                        </a>
+                        <a href="#community" class="flex items-center justify-center gap-2 text-lg font-semibold text-gray-200 hover:text-white transition-colors">
+                            <i data-feather="message-circle" class="w-5 h-5"></i>
+                            Join the community
+                        </a>
+                    </div>
+                </div>
+                <div class="relative" data-aos="fade-left" data-aos-delay="200">
+                    <div class="absolute -top-10 -left-10 w-32 h-32 bg-blue-500/20 blur-3xl rounded-full"></div>
+                    <div class="absolute -bottom-16 -right-16 w-48 h-48 bg-purple-500/20 blur-3xl rounded-full"></div>
+                    <div class="glass-effect rounded-3xl p-6 relative overflow-hidden border border-white/10">
+                        <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-transparent pointer-events-none"></div>
+                        <div class="relative rounded-2xl overflow-hidden shadow-2xl border border-white/5">
+                            <!-- Feature Canvas mock matching actual frontend design -->
+                            <div class="canvas-mock">
+                                <div class="canvas-mock__grid"></div>
+                                <svg class="canvas-mock__edge" style="position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 1; pointer-events: none;">
+                                    <defs>
+                                        <linearGradient id="edge-gradient-1" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" style="stop-color:#38bdf8;stop-opacity:1" />
+                                            <stop offset="50%" style="stop-color:#6366f1;stop-opacity:1" />
+                                            <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+                                        </linearGradient>
+                                        <linearGradient id="edge-gradient-2" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" style="stop-color:#38bdf8;stop-opacity:1" />
+                                            <stop offset="50%" style="stop-color:#6366f1;stop-opacity:1" />
+                                            <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+                                        </linearGradient>
+                                        <linearGradient id="edge-gradient-3" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" style="stop-color:#38bdf8;stop-opacity:1" />
+                                            <stop offset="50%" style="stop-color:#6366f1;stop-opacity:1" />
+                                            <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+                                        </linearGradient>
+                                        <filter id="glow">
+                                            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                                            <feMerge>
+                                                <feMergeNode in="coloredBlur"/>
+                                                <feMergeNode in="SourceGraphic"/>
+                                            </feMerge>
+                                        </filter>
+                                    </defs>
+                                    <!-- Connection from node 1 right handle to node 2 left handle -->
+                                    <path data-connection="source->split"
+                                          d="M0 0 C 0 0, 0 0, 0 0"
+                                          fill="none"
+                                          stroke="url(#edge-gradient-1)" 
+                                          stroke-width="2.5" 
+                                          stroke-dasharray="8,6"
+                                          stroke-linecap="round"
+                                          filter="url(#glow)" 
+                                          opacity="0.9" />
+                                    <!-- Connection from node 2 top handle to node 3 left handle -->
+                                    <path data-connection="split-top->trainer"
+                                          d="M0 0 C 0 0, 0 0, 0 0"
+                                          fill="none"
+                                          stroke="url(#edge-gradient-2)" 
+                                          stroke-width="2.5" 
+                                          stroke-dasharray="8,6"
+                                          stroke-linecap="round"
+                                          filter="url(#glow)" 
+                                          opacity="0.9" />
+                                    <!-- Connection from node 2 middle handle to node 3 left handle -->
+                                    <path data-connection="split-middle->trainer"
+                                          d="M0 0 C 0 0, 0 0, 0 0"
+                                          fill="none"
+                                          stroke="url(#edge-gradient-2)" 
+                                          stroke-width="2.5" 
+                                          stroke-dasharray="8,6"
+                                          stroke-linecap="round"
+                                          filter="url(#glow)" 
+                                          opacity="0.8" />
+                                    <!-- Connection from node 2 bottom handle to node 3 left handle -->
+                                    <path data-connection="split-bottom->trainer"
+                                          d="M0 0 C 0 0, 0 0, 0 0"
+                                          fill="none"
+                                          stroke="url(#edge-gradient-2)" 
+                                          stroke-width="2.5" 
+                                          stroke-dasharray="8,6"
+                                          stroke-linecap="round"
+                                          filter="url(#glow)" 
+                                          opacity="0.7" />
+                                </svg>
+                                <div class="canvas-mock__nodes">
+                                    <div class="canvas-mock__node" data-node-id="source" data-initial-y="48">
+                                        <div class="canvas-mock__handle canvas-mock__handle--right"></div>
+                                        <div class="canvas-mock__node-header">
+                                            <span class="canvas-mock__drag-handle">⋮⋮</span>
+                                            <h4 class="canvas-mock__node-title">Dataset Source</h4>
+                                        </div>
+                                        <p class="canvas-mock__node-desc">transactions.csv<br></p>
+                                    </div>
+                                    <div class="canvas-mock__node" data-node-id="split" data-initial-y="55">
+                                        <div class="canvas-mock__handle canvas-mock__handle--left"></div>
+                                        <div class="canvas-mock__handle canvas-mock__handle--top">
+                                            <span class="canvas-mock__handle-label">Train</span>
+                                        </div>
+                                        <div class="canvas-mock__handle canvas-mock__handle--middle">
+                                            <span class="canvas-mock__handle-label">Val</span>
+                                        </div>
+                                        <div class="canvas-mock__handle canvas-mock__handle--bottom">
+                                            <span class="canvas-mock__handle-label">Test</span>
+                                        </div>
+                                        <div class="canvas-mock__node-header">
+                                            <span class="canvas-mock__drag-handle">⋮⋮</span>
+                                            <h4 class="canvas-mock__node-title">Train/Val/Test Split</h4>
+                                        </div>
+                                        <p class="canvas-mock__node-desc"><span style="color: rgba(148,163,184,0.85); font-size: 0.75rem;">70% / 15% / 15%</span></p>
+                                    </div>
+                                    <div class="canvas-mock__node" data-node-id="trainer" data-initial-y="45">
+                                        <div class="canvas-mock__handle canvas-mock__handle--left"></div>
+                                        <div class="canvas-mock__node-header">
+                                            <span class="canvas-mock__drag-handle">⋮⋮</span>
+                                            <h4 class="canvas-mock__node-title">Model Trainer</h4>
+                                        </div>
+                                        <p class="canvas-mock__node-desc">Celery async<br></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-16 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-4xl font-bold mb-4">What's inside</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    A web UI for ingesting data, engineering features, training models, and running background jobs—all without uploading to third-party clouds.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="100">
+                    <div class="w-14 h-14 bg-blue-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="upload" class="w-8 h-8 text-blue-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Data Ingestion</h3>
+                    <p class="text-xs text-blue-300 uppercase tracking-wide mb-2">Available now</p>
+                    <p class="text-gray-400">
+                        Load CSV, Excel, Parquet, or SQL data using <strong>Polars</strong> for high-performance parsing. Schema gets detected automatically and results are cached.
+                    </p>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="150">
+                    <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="grid" class="w-8 h-8 text-purple-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Feature Canvas</h3>
+                    <p class="text-xs text-purple-300 uppercase tracking-wide mb-2">Available now</p>
+                    <p class="text-gray-400">
+                        Drag and drop to wire up feature pipelines, or write Python recipes directly. Includes transforms for scaling, binning, feature selection, and geospatial ops (planned).
+                    </p>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="200">
+                    <div class="w-14 h-14 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="cpu" class="w-8 h-8 text-emerald-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Async Training</h3>
+                    <p class="text-xs text-emerald-300 uppercase tracking-wide mb-2">Available now</p>
+                    <p class="text-gray-400">
+                        Kick off grid searches, random sweeps, or halving trials in the background with Celery workers. Hook in Optuna if you want fancier hyperparameter tuning.
+                    </p>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="250">
+                    <div class="w-14 h-14 bg-pink-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="cpu" class="w-8 h-8 text-pink-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">GenAI & LangChain</h3>
+                    <p class="text-xs text-pink-300 uppercase tracking-wide mb-2">Planned · Roadmap</p>
+                    <p class="text-gray-400">
+                        Visual LLM Builder to drag-and-drop prompts and chains. RAG workflows to chat with your documents locally.
+                    </p>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="300">
+                    <div class="w-14 h-14 bg-orange-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="activity" class="w-8 h-8 text-orange-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Experiment Tracking</h3>
+                    <p class="text-xs text-orange-300 uppercase tracking-wide mb-2">Available now</p>
+                    <p class="text-gray-400">
+                        Built-in Model Registry and Experiment Tracking. Compare runs with interactive charts, confusion matrices, and ROC curves directly in the UI.
+                    </p>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="350">
+                    <div class="w-14 h-14 bg-indigo-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="git-merge" class="w-8 h-8 text-indigo-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Self-hosted DevEx</h3>
+                    <p class="text-xs text-indigo-300 uppercase tracking-wide mb-2">Available now</p>
+                    <p class="text-gray-400">
+                        Configure once via `config.py`, run on SQLite by default, and graduate to PostgreSQL or Docker when you’re ready.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Nodes Section -->
+    <section id="nodes" class="py-16 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-4xl font-bold mb-4">Drag-and-drop ML pipeline builder</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    Wire up your ML workflows with visual nodes—from data cleaning to model training. Each node is a reusable component running locally on your infrastructure. Skyulf ships with 39 node types across preprocessing, encoding, modeling, and inspection.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="100">
+                    <div class="w-14 h-14 bg-blue-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="filter" class="w-8 h-8 text-blue-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Preprocessing</h3>
+                    <p class="text-xs text-blue-300 uppercase tracking-wide mb-2">Extensive toolkit</p>
+                    <ul class="space-y-2 text-gray-400">
+                        <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>Drop missing rows/columns</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>Imputation strategies</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>Train/val/test splits</li>
+                    </ul>
+                    <div class="mt-4 pt-4 border-t border-white/10">
+                        <p class="text-xs text-blue-300 uppercase tracking-wide mb-2">Highlights</p>
+                        <ul class="space-y-2 text-gray-400">
+                            <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>Outlier removal & skewness fixes</li>
+                            <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>Class imbalance handling (under/oversample)</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="150">
+                    <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="hash" class="w-8 h-8 text-purple-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Categorical Encoding</h3>
+                    <p class="text-xs text-purple-300 uppercase tracking-wide mb-2">Alpha nodes available</p>
+                    <ul class="space-y-2 text-gray-400">
+                        <li class="flex items-center"><span class="w-2 h-2 bg-purple-400 rounded-full mr-3"></span>One-hot encoding</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-purple-400 rounded-full mr-3"></span>Target encoding</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-purple-400 rounded-full mr-3"></span>Ordinal & frequency encoding</li>
+                    </ul>
+                    <div class="mt-4 pt-4 border-t border-white/10">
+                        <p class="text-xs text-purple-300 uppercase tracking-wide mb-2">Highlights</p>
+                        <ul class="space-y-2 text-gray-400">
+                            <li class="flex items-center"><span class="w-2 h-2 bg-purple-400 rounded-full mr-3"></span>Feature hashing with configurable buckets</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="200">
+                    <div class="w-14 h-14 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="cpu" class="w-8 h-8 text-emerald-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Modeling</h3>
+                    <p class="text-xs text-emerald-300 uppercase tracking-wide mb-2">Alpha nodes available</p>
+                    <ul class="space-y-2 text-gray-400">
+                        <li class="flex items-center"><span class="w-2 h-2 bg-emerald-400 rounded-full mr-3"></span>Scikit-learn trainers</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-emerald-400 rounded-full mr-3"></span>Grid/random/halving search</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-emerald-400 rounded-full mr-3"></span>Async training via Celery</li>
+                    </ul>
+                </div>
+                <div class="tech-card rounded-2xl p-8" data-aos="fade-up" data-aos-delay="250">
+                    <div class="w-14 h-14 bg-pink-500/20 rounded-xl flex items-center justify-center mb-6">
+                        <i data-feather="bar-chart-2" class="w-8 h-8 text-pink-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-4">Inspection</h3>
+                    <p class="text-xs text-pink-300 uppercase tracking-wide mb-2">Alpha nodes available</p>
+                    <ul class="space-y-2 text-gray-400">
+                        <li class="flex items-center"><span class="w-2 h-2 bg-pink-400 rounded-full mr-3"></span>Dataset profiling</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-pink-400 rounded-full mr-3"></span>Transformer audit trails</li>
+                        <li class="flex items-center"><span class="w-2 h-2 bg-pink-400 rounded-full mr-3"></span>Distribution previews</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Product Tour Section -->
+    <section id="tour" class="py-16 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div class="order-2 lg:order-1" data-aos="fade-right">
+                    <div class="glass-effect rounded-3xl p-6 border border-white/10">
+                        <div class="rounded-2xl border border-white/5 bg-white/5 p-4">
+                            <div class="relative w-full aspect-[16/9] overflow-hidden rounded-xl">
+                                <div class="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-purple-500/10 to-transparent"></div>
+                                <div class="absolute inset-0 opacity-40 blur-3xl scale-110" style="background-image: url('./static/app-preview.gif'); background-size: cover; background-position: center;"></div>
+                                <video id="product-tour-video" class="relative z-10 w-full h-full object-cover rounded-xl opacity-0 transition-opacity duration-500" controls preload="auto" playsinline poster="./static/app-preview.gif" aria-label="Skyulf product tour video showcasing local-first feature engineering, encoding, and training">
+                                    <source src="./static/video/skyulf-product-tour.mp4" type="video/mp4">
+                                    <source src="static/video/skyulf-product-tour.mp4" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>
+                                <div id="product-tour-video-skeleton" class="absolute inset-0 z-0 bg-slate-900/40 animate-pulse transition-opacity duration-500 pointer-events-none"></div>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <p class="text-sm text-gray-400 leading-relaxed max-w-xl">
+                                This demo shows our local Iris classification pipeline in action — from feature engineering and data splits to encoding and training
+                            </p>
+                            <div class="flex flex-wrap items-center justify-end gap-3">
+                                <span class="text-sm text-gray-400">Playback speed</span>
+                                <div class="inline-flex rounded-full bg-white/5 border border-white/10 p-1">
+                                    <button type="button" class="speed-control-button px-3 py-1 text-xs font-semibold text-gray-300 rounded-full transition-all hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" data-video-speed="1">
+                                        1×
+                                    </button>
+                                    <button type="button" class="speed-control-button px-3 py-1 text-xs font-semibold text-gray-300 rounded-full transition-all hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" data-video-speed="1.5">
+                                        1.5×
+                                    </button>
+                                    <button type="button" class="speed-control-button px-3 py-1 text-xs font-semibold text-gray-300 rounded-full transition-all hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" data-video-speed="2">
+                                        2×
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="order-1 lg:order-2" data-aos="fade-left">
+                    <div class="inline-flex items-center px-4 py-2 rounded-full glass-effect border border-white/10 mb-6">
+                        <span class="w-2 h-2 rounded-full bg-blue-400 mr-2"></span>
+                        <span class="text-sm uppercase tracking-wide text-gray-200">Product tour</span>
+                    </div>
+                    <h2 class="text-4xl font-bold mb-6">See Skyulf in action</h2>
+                    <p class="text-lg text-gray-300 mb-10">
+                        From ingestion to deployment, Skyulf keeps your experiments reproducible and private. Here’s a snapshot of how a local-first team moves from raw data to a deployed model.
+                    </p>
+                    <div class="space-y-6">
+                        <div class="glass-effect rounded-2xl p-6 border border-white/10">
+                            <div class="flex items-start gap-4">
+                                <span class="text-lg font-semibold text-blue-300">01.</span>
+                                <div>
+                                    <h3 class="text-xl font-semibold text-white mb-1">Load your data</h3>
+                                    <p class="text-gray-400">Point to CSV, Parquet, or SQL sources. Schema gets detected automatically and everything's cached for repeat runs. REST loaders are coming next.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-effect rounded-2xl p-6 border border-white/10">
+                            <div class="flex items-start gap-4">
+                                <span class="text-lg font-semibold text-purple-300">02.</span>
+                                <div>
+                                    <h3 class="text-xl font-semibold text-white mb-1">Build your pipeline</h3>
+                                    <p class="text-gray-400">Drag nodes around the canvas to wire up transforms. Preview stats at each step before saving to the feature store.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-effect rounded-2xl p-6 border border-white/10">
+                            <div class="flex items-start gap-4">
+                                <span class="text-lg font-semibold text-pink-300">03.</span>
+                                <div>
+                                    <h3 class="text-xl font-semibold text-white mb-1">Train, Track & Deploy</h3>
+                                    <p class="text-gray-400">Launch training runs in the background. Compare metrics in the Experiment Tracker, register the best model, and deploy it to a local inference API for testing and predictions.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Roadmap Section -->
+    <section id="roadmap" class="py-16 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-4xl font-bold mb-4">The Vision</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    Skyulf is evolving from a tool into a complete "App Hub" for AI. Here is where we are going.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div class="glass-effect rounded-3xl p-8 border border-white/10" data-aos="fade-up" data-aos-delay="100">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                            <i data-feather="check-circle" class="w-5 h-5 text-blue-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm uppercase tracking-wide text-blue-300">Phase 1: Polish & Stability</p>
+                            <h3 class="text-2xl font-semibold text-white">Current Focus</h3>
+                        </div>
+                    </div>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Extract Core Library (skyulf-core):</strong> Separate the pure ML logic (transformers, pipeline utils) from the web application.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Hybrid Architecture Strategy:</strong> Solidify the "Island Architecture" approach.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Robustness:</strong> Enhanced type checking, test coverage, and error handling.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-blue-400 rounded-full mt-2"></span><span><strong>Documentation:</strong> The "Skyulf Book" and interactive project templates.</span></li>
+                    </ul>
+                </div>
+                <div class="glass-effect rounded-3xl p-8 border border-white/10" data-aos="fade-up" data-aos-delay="150">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                            <i data-feather="compass" class="w-5 h-5 text-purple-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm uppercase tracking-wide text-purple-300">Phase 2 & 3: The Future</p>
+                            <h3 class="text-2xl font-semibold text-white">Coming Soon</h3>
+                        </div>
+                    </div>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span><strong>Deep Data Science:</strong> Ethics checks, Synthetic Data, and Advanced EDA.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span><strong>Deployment:</strong> One-click export to standalone API (ZIP) or Docker container.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span><strong>App Hub:</strong> Plugin system, Visual LLM Builder, and One-Click Deployments.</span></li>
+                        <li class="flex items-start gap-3"><span class="w-2 h-2 bg-purple-400 rounded-full mt-2"></span><span><strong>Collaboration:</strong> Real-time multiplayer editing ("Figma for ML").</span></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mt-12 text-center" data-aos="fade-up" data-aos-delay="200">
+                <a href="https://github.com/flyingriverhorse/skyulf/blob/master/ROADMAP.md" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-8 py-3 rounded-full transition-all border border-white/10 hover:border-white/30">
+                    <span>View Full Roadmap</span>
+                    <i data-feather="arrow-right" class="w-4 h-4"></i>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases Section -->
+    <section id="solutions" class="py-16 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-4xl font-bold mb-4">Who's using this</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    Teams working with sensitive data who can't upload to cloud services. In the future, will be added more sectors—education, finance, IoT, and beyond. <span class="text-blue-400 font-semibold">Anyone can use it freely.</span>
+                </p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                <div class="glass-effect rounded-3xl p-8 border border-white/10" data-aos="fade-up" data-aos-delay="100">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                            <i data-feather="shield" class="w-5 h-5 text-blue-400"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white">Healthcare & Research</h3>
+                    </div>
+                    <p class="text-gray-400 mb-6">Train models on patient data or research datasets that can't leave your infrastructure due to GDPR or institutional policies.</p>
+                    <p class="text-xs text-blue-300 uppercase tracking-wide mb-4">Target use case</p>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-blue-400 rounded-full"></span>Load CSV/Parquet exports from local databases</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-blue-400 rounded-full"></span>Engineer features without cloud uploads</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-blue-400 rounded-full"></span>Train models with hyperparameter search locally</li>
+                    </ul>
+                </div>
+                <div class="glass-effect rounded-3xl p-8 border border-white/10" data-aos="fade-up" data-aos-delay="150">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                            <i data-feather="globe" class="w-5 h-5 text-purple-400"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white">Government & Public Sector</h3>
+                    </div>
+                    <p class="text-gray-400 mb-6">Municipalities and public institutions working with citizen data that must stay on-premises for privacy and compliance.</p>
+                    <p class="text-xs text-purple-300 uppercase tracking-wide mb-4">Target use case</p>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-purple-400 rounded-full"></span>GDPR-compliant data processing</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-purple-400 rounded-full"></span>No cloud vendor lock-in</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-purple-400 rounded-full"></span>Full audit trails for transparency</li>
+                    </ul>
+                </div>
+                <div class="glass-effect rounded-3xl p-8 border border-white/10" data-aos="fade-up" data-aos-delay="200">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                            <i data-feather="briefcase" class="w-5 h-5 text-emerald-400"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white">SMEs & Startups</h3>
+                    </div>
+                    <p class="text-gray-400 mb-6">Small teams who need ML tooling but want to avoid expensive SaaS subscriptions and keep data under their own control.</p>
+                    <p class="text-xs text-emerald-300 uppercase tracking-wide mb-4">Target use case</p>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full"></span>Run on SQLite to start, scale to Postgres later</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full"></span>Self-host with Docker or bare metal</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full"></span>No per-user licensing or API fees</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Community Section -->
+    <section id="community" class="py-16 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-4xl font-bold mb-4">Build with the Skyulf community</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    Contribute new nodes, test releases, or help shape the roadmap. Here’s where to start.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="tech-card rounded-3xl p-8 border border-white/10 hover:border-blue-500 transition-all" data-aos="fade-up" data-aos-delay="100">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                            <i data-feather="github" class="w-6 h-6 text-blue-400"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white">GitHub</h3>
+                    </div>
+                    <p class="text-gray-400">Explore the source, open issues, and blueprints for new nodes and integrations.</p>
+                </a>
+                <a href="https://github.com/flyingriverhorse/skyulf/blob/master/QUICKSTART.md" target="_blank" rel="noopener" class="tech-card rounded-3xl p-8 border border-white/10 hover:border-purple-500 transition-all" data-aos="fade-up" data-aos-delay="150">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                            <i data-feather="book-open" class="w-6 h-6 text-purple-400"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white">Documentation</h3>
+                    </div>
+                    <p class="text-gray-400">Step-by-step guides to run Skyulf locally, configure environments, and ship your first flow.</p>
+                </a>
+                <a href="https://github.com/flyingriverhorse/skyulf/discussions" target="_blank" rel="noopener" class="tech-card rounded-3xl p-8 border border-white/10 hover:border-emerald-500 transition-all" data-aos="fade-up" data-aos-delay="200">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                            <i data-feather="zap" class="w-6 h-6 text-emerald-400"></i>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white">Discussions</h3>
+                    </div>
+                    <p class="text-gray-400">Join Discussions to propose nodes, share ideas, and coordinate contribution sprints.</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-16 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="hero-gradient rounded-3xl p-12 text-center" data-aos="zoom-in">
+                <h2 class="text-4xl font-bold mb-6">Help shape Skyulf</h2>
+                <p class="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
+                    We’re building a self-hosted, transparent MLOps stack together. Contribute code, docs, or feedback—every commit counts.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="bg-white text-gray-900 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 transition-all">
+                        Contribute on GitHub
+                    </a>
+                    <a href="https://github.com/flyingriverhorse/skyulf/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener" class="border border-white text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-white hover:text-gray-900 transition-all">
+                        Read Contributing Guide
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section id="faq" class="py-16 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="text-center mb-12" data-aos="fade-up">
+                <h2 class="text-4xl md:text-5xl font-bold mb-4">Frequently Asked Questions for Local-first MLOps &amp; Self-hosted Workflows</h2>
+                <p class="text-xl text-gray-400">
+                    Everything you need to understand how Skyulf keeps feature engineering, automation, and training entirely on your infrastructure.
+                </p>
+            </div>
+
+            <div class="max-w-3xl mx-auto mb-10 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl px-6 py-6" data-aos="fade-up" data-aos-delay="80">
+                <h3 class="text-xl font-semibold text-white mb-3">FAQ Snapshot</h3>
+                <p class="text-gray-300 mb-3">
+                    Answers in this section boil down to one promise: everything you build with Skyulf stays on your turf, stays private, and stays under your control.
+                </p>
+                <ul class="space-y-2 text-gray-300 text-sm">
+                    <li class="flex items-start gap-2"><span class="w-2 h-2 bg-blue-400 rounded-full mt-1"></span>Local-first workflows that keep datasets on-premises and out of third-party clouds.</li>
+                    <li class="flex items-start gap-2"><span class="w-2 h-2 bg-purple-400 rounded-full mt-1"></span>Drag-and-drop nodes plus code-friendly hooks so you can compose ingestion, transformation, and training steps however you like.</li>
+                    <li class="flex items-start gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full mt-1"></span>Background jobs that run once you hit play, leaving you to focus on experiments while the stack saves reproducible outputs.</li>
+                </ul>
+            </div>
+
+            <!-- Search Box -->
+            <div class="max-w-4xl mx-auto mb-8" data-aos="fade-up" data-aos-delay="100">
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="faq-search" 
+                        placeholder="Search questions..." 
+                        class="w-full px-6 py-4 pl-14 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-all"
+                    >
+                    <svg class="absolute left-4 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <p id="faq-no-results" class="text-center text-gray-400 mt-4 hidden">No questions found. Try a different search term.</p>
+            </div>
+
+            <div class="max-w-4xl mx-auto space-y-3" data-aos="fade-up" data-aos-delay="150" id="faq-container">
+                <!-- FAQ Item 1 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">What is Skyulf?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Skyulf is a self-hosted MLOps platform. It lets you build, train, and monitor machine learning pipelines entirely on your infrastructure.
+                                Unlike cloud-based solutions, your data never leaves your servers—perfect for privacy-sensitive or regulated environments.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 2 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">Why local-first?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Local-first means complete data sovereignty. No vendor lock-in, no surprise cloud bills, no data privacy concerns. 
+                                You control where your models train, where your data lives, and who can access it. It's MLOps on your terms.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 3 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">How is this different from cloud MLOps platforms?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Cloud platforms require uploading your data to third-party servers and charge based on usage. Skyulf runs 100% on-premise or in your private cloud. 
+                                No data leaves your network, no usage-based pricing, and no vendor dependencies. You own the infrastructure and the workflow.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 4 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">What's the current status?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Skyulf is in <strong>Active Alpha</strong>. Core features like the drag-and-drop Feature Canvas, 
+                                experiment tracking, and model monitoring are functional but actively evolving. Expect breaking changes as we refine the platform. 
+                                Check our <a href="https://github.com/flyingriverhorse/skyulf/blob/master/ROADMAP.md" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">roadmap</a> for what's coming next.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 5 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">Can I use this in production?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Skyulf is currently in <strong>Active Alpha</strong>. It is perfect for internal tools, research, and experimentation. 
+                                We are working towards a stable v1.0 for critical production workloads.
+                                We'll announce production readiness clearly in the docs and releases.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 6 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">How can I contribute?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Contributions are welcome! Check out our 
+                                <a href="https://github.com/flyingriverhorse/skyulf/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">Contributing Guide</a> 
+                                to get started. Whether it's code, documentation, bug reports, or feature ideas—every contribution helps shape Skyulf. 
+                                Join us on <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">GitHub</a>.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 7 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">What's your vision for Skyulf?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                To democratize AI development. We are building an "App Hub" where anyone can drag-and-drop to create powerful AI tools—from traditional ML to GenAI agents—without needing a PhD or a cloud budget.
+                                Skyulf aims to be the go-to self-hosted MLOps stack for teams who value privacy and control.
+                            </p>
+                        </div>
+                    </div> 
+                </div> 
+                <!-- FAQ Item 8 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">Is this really free?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                Yes. Skyulf is open source with a split license model: <strong>Apache 2.0</strong> for the backend (permissive) and <strong>GNU AGPLv3</strong> for the frontend (copyleft). This ensures the core remains easy to integrate, while UI improvements are shared back to the community.
+                                If you find it useful, consider <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">starring the repo</a> 
+                                or contributing back to the project.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 9 -->
+                <div class="faq-item backdrop-blur-xl bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all overflow-hidden">
+                    <button class="faq-question w-full text-left px-6 py-5 flex items-center justify-between group" onclick="toggleFAQ(this)">
+                        <h3 class="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors pr-4">Do you offer a commercial license?</h3>
+                        <svg class="faq-icon w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                        <div class="px-6 pb-5 pt-0">
+                            <p class="text-gray-300">
+                                For the backend (Apache 2.0), commercial use is free. For the frontend (AGPLv3), if you build a proprietary SaaS that modifies the UI, you may need a commercial license exception. For SLAs, indemnification, or partnerships, check 
+                                <a href="https://github.com/flyingriverhorse/skyulf/blob/master/COMMERCIAL-LICENSE.md" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">COMMERCIAL-LICENSE.md</a>. 
+                                Open a “Commercial Partnership Request” discussion or contact us via the README links to start the conversation.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    </main>
+
+    <footer class="py-12 px-4 sm:px-6 lg:px-8 border-t border-gray-800">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <span class="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+                        Skyulf
+                    </span>
+                    <p class="text-gray-400 mt-4">
+                        Local-first MLOps for privacy-preserving teams.
+                    </p>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Product</h4>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full"></span>Automated feature stores</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full"></span>Continuous evaluation hooks</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 bg-emerald-400 rounded-full"></span>Production-grade backfills</li>
+                        <li><a href="#" class="hover:text-white transition-colors">API</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Resources</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="https://github.com/flyingriverhorse/skyulf" class="hover:text-white transition-colors" target="_blank" rel="noopener">GitHub Repository</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Documentation</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Blog</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Community</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Support</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Project</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#roadmap" class="hover:text-white transition-colors">Roadmap</a></li>
+                        <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener" class="hover:text-white transition-colors">Contributing</a></li>
+                        <li><a href="https://github.com/flyingriverhorse/skyulf/tree/master/docs" target="_blank" rel="noopener" class="hover:text-white transition-colors">Documentation</a></li>
+                        <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/SECURITY.md" target="_blank" rel="noopener" class="hover:text-white transition-colors">Security</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-12 pt-8">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+                    <p class="text-gray-400">© 2025 Murat Unsal — Skyulf</p>
+                    <div class="flex space-x-6 mt-4 md:mt-0">
+                    <a href="https://www.linkedin.com/in/murat-u/" class="text-gray-400 hover:text-white transition-colors">
+                        <i data-feather="linkedin" class="w-5 h-5"></i>
+                    </a>
+                    <a href="https://github.com/flyingriverhorse/skyulf" class="text-gray-400 hover:text-white transition-colors">
+                        <i data-feather="github" class="w-5 h-5"></i>
+                    </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scroll Buttons -->
+    <button id="scroll-to-top" class="fixed right-6 bottom-24 bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-full shadow-lg opacity-0 pointer-events-none transition-all duration-300 hover:scale-110 z-50 group" onclick="scrollToTop()">
+        <svg class="w-6 h-6 group-hover:animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+        </svg>
+    </button>
+    
+    <button id="scroll-to-bottom" class="fixed right-6 bottom-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-full shadow-lg opacity-0 pointer-events-none transition-all duration-300 hover:scale-110 z-50 group" onclick="scrollToBottom()">
+        <svg class="w-6 h-6 group-hover:animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+        </svg>
+    </button>
+
+    <script>
+        AOS.init({
+            duration: 800,
+            once: true,
+            offset: 100
+        });
+        
+        feather.replace();
+        
+        // Animation for automation flow
+        document.addEventListener('DOMContentLoaded', function() {
+            const productTourVideo = document.getElementById('product-tour-video');
+            const speedButtons = document.querySelectorAll('[data-video-speed]');
+
+            const productTourSkeleton = document.getElementById('product-tour-video-skeleton');
+
+            if (productTourVideo) {
+                productTourVideo.controls = true;
+                productTourVideo.load();
+
+                productTourVideo.addEventListener('error', () => {
+                    console.warn('Skyulf product tour video could not be loaded. Check that /static/video/skyulf-product-tour.mp4 exists.');
+                });
+
+                const revealVideo = () => {
+                    productTourVideo.classList.add('opacity-100');
+                    if (productTourSkeleton) {
+                        productTourSkeleton.classList.remove('animate-pulse');
+                        productTourSkeleton.classList.add('opacity-0');
+                        setTimeout(() => {
+                            productTourSkeleton.classList.add('hidden');
+                        }, 500);
+                    }
+                };
+
+                productTourVideo.addEventListener('loadeddata', revealVideo, { once: true });
+                productTourVideo.addEventListener('play', revealVideo, { once: true });
+                productTourVideo.addEventListener('canplay', revealVideo, { once: true });
+            }
+
+            if (productTourVideo && speedButtons.length) {
+                const activeClasses = ['bg-white/20', 'text-white'];
+                const inactiveClasses = ['text-gray-300'];
+
+                const setActiveButton = (button) => {
+                    speedButtons.forEach(btn => {
+                        activeClasses.forEach(cls => btn.classList.remove(cls));
+                        inactiveClasses.forEach(cls => btn.classList.add(cls));
+                    });
+
+                    activeClasses.forEach(cls => button.classList.add(cls));
+                    inactiveClasses.forEach(cls => button.classList.remove(cls));
+                };
+
+                speedButtons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        const rate = Number.parseFloat(button.dataset.videoSpeed);
+                        if (!Number.isNaN(rate)) {
+                            productTourVideo.playbackRate = rate;
+                        }
+                        setActiveButton(button);
+                    });
+                });
+
+                const defaultRate = Number.parseFloat(speedButtons[0].dataset.videoSpeed);
+                if (!Number.isNaN(defaultRate)) {
+                    productTourVideo.playbackRate = defaultRate;
+                }
+                setActiveButton(speedButtons[0]);
+            }
+
+            const flowNode = document.querySelector('.flow-node');
+            if (flowNode) {
+                anime({
+                    targets: flowNode,
+                    left: ['0%', '100%'],
+                    duration: 3000,
+                    loop: true,
+                    easing: 'linear'
+                });
+            }
+            
+            // Add floating animation to multiple elements
+            const floatingElements = document.querySelectorAll('.floating-card');
+            floatingElements.forEach((el, index) => {
+                anime({
+                    targets: el,
+                    translateY: [-10, 10],
+                    duration: 2000 + index * 500,
+                    loop: true,
+                    direction: 'alternate',
+                    easing: 'easeInOutSine'
+                });
+            });
+
+            const canvas = document.querySelector('.canvas-mock');
+            if (canvas) {
+                const svg = canvas.querySelector('.canvas-mock__edge');
+                const nodeElements = Array.from(canvas.querySelectorAll('.canvas-mock__node'));
+
+                if (svg && nodeElements.length) {
+                    const connectionConfigs = [
+                        { id: 'source->split', from: 'source', fromHandle: '.canvas-mock__handle--right', to: 'split', toHandle: '.canvas-mock__handle--left' },
+                        { id: 'split-top->trainer', from: 'split', fromHandle: '.canvas-mock__handle--top', to: 'trainer', toHandle: '.canvas-mock__handle--left' },
+                        { id: 'split-middle->trainer', from: 'split', fromHandle: '.canvas-mock__handle--middle', to: 'trainer', toHandle: '.canvas-mock__handle--left' },
+                        { id: 'split-bottom->trainer', from: 'split', fromHandle: '.canvas-mock__handle--bottom', to: 'trainer', toHandle: '.canvas-mock__handle--left' }
+                    ];
+
+                    const nodeMap = new Map(nodeElements.map(node => [node.dataset.nodeId, node]));
+                    const connections = connectionConfigs
+                        .map(cfg => ({
+                            path: svg.querySelector(`[data-connection="${cfg.id}"]`),
+                            sourceHandle: nodeMap.get(cfg.from)?.querySelector(cfg.fromHandle),
+                            targetHandle: nodeMap.get(cfg.to)?.querySelector(cfg.toHandle)
+                        }))
+                        .filter(conn => conn.path && conn.sourceHandle && conn.targetHandle);
+
+                    const updateConnections = () => {
+                        svg.style.opacity = window.innerWidth <= 640 ? '0.85' : '1';
+                        const canvasRect = canvas.getBoundingClientRect();
+                        svg.setAttribute('viewBox', `0 0 ${canvasRect.width} ${canvasRect.height}`);
+                        svg.setAttribute('width', canvasRect.width);
+                        svg.setAttribute('height', canvasRect.height);
+                        svg.setAttribute('preserveAspectRatio', 'none');
+
+                        connections.forEach(({ path, sourceHandle, targetHandle }) => {
+                            const sourceRect = sourceHandle.getBoundingClientRect();
+                            const targetRect = targetHandle.getBoundingClientRect();
+
+                            const startX = (sourceRect.left + sourceRect.width / 2) - canvasRect.left;
+                            const startY = (sourceRect.top + sourceRect.height / 2) - canvasRect.top;
+                            const endX = (targetRect.left + targetRect.width / 2) - canvasRect.left;
+                            const endY = (targetRect.top + targetRect.height / 2) - canvasRect.top;
+
+                            const deltaX = Math.max(Math.abs(endX - startX) * 0.35, 60);
+
+                            const pathData = `M ${startX} ${startY} C ${startX + deltaX} ${startY}, ${endX - deltaX} ${endY}, ${endX} ${endY}`;
+                            path.setAttribute('d', pathData);
+                        });
+                    };
+
+                    const applyInitialLayout = ({ force = false } = {}) => {
+                        if (force) {
+                            nodeElements.forEach(node => delete node.dataset.hasCustomPosition);
+                        }
+
+                        const canvasRect = canvas.getBoundingClientRect();
+                        const useCompactLayout = canvasRect.width < 900;
+
+                        nodeElements.forEach((node, index) => {
+                            if (!force && node.dataset.hasCustomPosition === 'true') {
+                                return;
+                            }
+
+                            let xPercent;
+                            let yPercent;
+
+                            if (useCompactLayout) {
+                                const positions = [
+                                    { x: 30, y: 25 },
+                                    { x: 55, y: 50 },
+                                    { x: 75, y: 75 }
+                                ];
+                                xPercent = positions[index].x;
+                                yPercent = positions[index].y;
+                            } else {
+                                const positions = [
+                                    { x: 18, y: 25 },
+                                    { x: 48, y: 50 },
+                                    { x: 80, y: 75 }
+                                ];
+                                xPercent = positions[index].x;
+                                yPercent = positions[index].y;
+                            }
+
+                            node.style.setProperty('--x', `${xPercent}%`);
+                            node.style.setProperty('--y', `${yPercent}%`);
+                        });
+
+                        requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                                updateConnections();
+                            });
+                        });
+                    };
+
+                    applyInitialLayout({ force: true });
+                    window.addEventListener('resize', () => {
+                        requestAnimationFrame(() => applyInitialLayout());
+                    });
+
+                    if (window.matchMedia('(pointer:fine)').matches) {
+                        nodeElements.forEach(node => {
+                            node.addEventListener('pointerdown', event => {
+                                if (event.button !== 0) {
+                                    return;
+                                }
+
+                                event.preventDefault();
+
+                                const pointerId = event.pointerId;
+                                node.setPointerCapture(pointerId);
+                                node.classList.add('is-dragging');
+                                document.body.classList.add('is-dragging');
+
+                                const nodeRect = node.getBoundingClientRect();
+                                const width = nodeRect.width;
+                                const height = nodeRect.height;
+                                const offsetX = event.clientX - (nodeRect.left + width / 2);
+                                const offsetY = event.clientY - (nodeRect.top + height / 2);
+                                let didDrag = false;
+
+                                const handleMove = moveEvent => {
+                                    const rect = canvas.getBoundingClientRect();
+                                    let centerX = moveEvent.clientX - offsetX;
+                                    let centerY = moveEvent.clientY - offsetY;
+
+                                    const minX = rect.left + width / 2;
+                                    const maxX = rect.right - width / 2;
+                                    const minY = rect.top + height / 2;
+                                    const maxY = rect.bottom - height / 2;
+
+                                    centerX = Math.min(Math.max(centerX, minX), maxX);
+                                    centerY = Math.min(Math.max(centerY, minY), maxY);
+
+                                    const percentX = ((centerX - rect.left) / rect.width) * 100;
+                                    const percentY = ((centerY - rect.top) / rect.height) * 100;
+
+                                    node.style.setProperty('--x', `${percentX.toFixed(2)}%`);
+                                    node.style.setProperty('--y', `${percentY.toFixed(2)}%`);
+
+                                    requestAnimationFrame(() => updateConnections());
+                                    didDrag = true;
+                                };
+
+                                const handleUp = () => {
+                                    node.releasePointerCapture(pointerId);
+                                    node.removeEventListener('pointermove', handleMove);
+                                    node.removeEventListener('pointerup', handleUp);
+                                    node.removeEventListener('pointercancel', handleUp);
+                                    node.classList.remove('is-dragging');
+                                    document.body.classList.remove('is-dragging');
+                                    if (didDrag) {
+                                        node.dataset.hasCustomPosition = 'true';
+                                    }
+                                    updateConnections();
+                                };
+
+                                node.addEventListener('pointermove', handleMove);
+                                node.addEventListener('pointerup', handleUp);
+                                node.addEventListener('pointercancel', handleUp);
+                            });
+                        });
+                    }
+                }
+            }
+        });
+
+        // FAQ Toggle Function
+        function toggleFAQ(button) {
+            const faqItem = button.closest('.faq-item');
+            const answer = faqItem.querySelector('.faq-answer');
+            const icon = faqItem.querySelector('.faq-icon');
+            const isOpen = answer.style.maxHeight && answer.style.maxHeight !== '0px';
+            
+            if (isOpen) {
+                answer.style.maxHeight = '0px';
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                answer.style.maxHeight = answer.scrollHeight + 'px';
+                icon.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        // FAQ Search Function
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('faq-search');
+            const faqItems = document.querySelectorAll('.faq-item');
+            const noResults = document.getElementById('faq-no-results');
+
+            if (searchInput) {
+                searchInput.addEventListener('input', function(e) {
+                    const searchTerm = e.target.value.toLowerCase().trim();
+                    let visibleCount = 0;
+
+                    faqItems.forEach(item => {
+                        const question = item.querySelector('.faq-question h3').textContent.toLowerCase();
+                        const answer = item.querySelector('.faq-answer').textContent.toLowerCase();
+                        
+                        if (question.includes(searchTerm) || answer.includes(searchTerm)) {
+                            item.style.display = 'block';
+                            visibleCount++;
+                        } else {
+                            item.style.display = 'none';
+                            // Close the item if it was open
+                            const answerDiv = item.querySelector('.faq-answer');
+                            const icon = item.querySelector('.faq-icon');
+                            if (answerDiv) {
+                                answerDiv.style.maxHeight = '0px';
+                                icon.style.transform = 'rotate(0deg)';
+                            }
+                        }
+                    });
+
+                    // Show/hide no results message
+                    if (visibleCount === 0 && searchTerm !== '') {
+                        noResults.classList.remove('hidden');
+                    } else {
+                        noResults.classList.add('hidden');
+                    }
+                });
+            }
+        });
+
+        // Scroll Button Functions
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+
+        function scrollToBottom() {
+            window.scrollTo({
+                top: document.body.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+
+        // Show/hide scroll buttons based on scroll position
+        window.addEventListener('scroll', function() {
+            const scrollToTopBtn = document.getElementById('scroll-to-top');
+            const scrollToBottomBtn = document.getElementById('scroll-to-bottom');
+            const scrollPosition = window.scrollY;
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.body.scrollHeight;
+            
+            // Show top button after scrolling down 300px
+            if (scrollPosition > 300) {
+                scrollToTopBtn.style.opacity = '1';
+                scrollToTopBtn.style.pointerEvents = 'auto';
+            } else {
+                scrollToTopBtn.style.opacity = '0';
+                scrollToTopBtn.style.pointerEvents = 'none';
+            }
+            
+            // Show bottom button when not at the bottom (within 100px of bottom)
+            if (scrollPosition + windowHeight < documentHeight - 100) {
+                scrollToBottomBtn.style.opacity = '1';
+                scrollToBottomBtn.style.pointerEvents = 'auto';
+            } else {
+                scrollToBottomBtn.style.opacity = '0';
+                scrollToBottomBtn.style.pointerEvents = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
