@@ -7,7 +7,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 ![](https://img.shields.io/badge/tagline-MLOps%20%3A%20FastAPI%20%2B%20Celery-blue)
 
-> ⚠️ **Status:** Active Development. Expect bugs, but also expect rapid progress. Use at your own risk and please report issues on GitHub!
+> ⚠️ **Status:** Active Development. Expect bugs, but also expect rapid progress.
 
 **Machine Learning Operations (MLOps) shouldn't be this hard.**
 
@@ -20,6 +20,7 @@ Built with a modern stack: **FastAPI** (Backend), **React** (Frontend), **Celery
 - [Quick Start](#quick-start)
 - [Key Features](#key-features)
 - [Roadmap](#roadmap)
+- [Version History](#version-history)
 - [Workflow Overview](#workflow-overview)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -85,6 +86,12 @@ We have a clear vision to turn Skyulf into a complete **App Hub** for AI.
 *   **Phase 4: Expansion** - Real-time collaboration, Edge/IoT export, and Audio support.
 
 👉 **[View the full ROADMAP.md](./ROADMAP.md)** for details.
+
+## Version History
+
+We maintain a detailed changelog of all major updates, new features, and architectural changes.
+
+👉 **[View the full VERSION_UPDATE.md](./VERSION_UPDATE.md)** for the complete history.
 
 ## Workflow Overview
 
