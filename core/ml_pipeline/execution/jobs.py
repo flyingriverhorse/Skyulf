@@ -355,6 +355,7 @@ class JobManager:
                     TrainingJob.dataset_source_id == DataSource.source_id,
                     TrainingJob.dataset_source_id == cast(DataSource.id, String)
                 ))
+                .where(TrainingJob.model_type != "preview")
                 .order_by(TrainingJob.started_at.desc())
                 .limit(limit)
                 .offset(skip)
