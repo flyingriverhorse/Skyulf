@@ -28,7 +28,7 @@ class JobInfo(BaseModel):
     node_id: str
     dataset_id: Optional[str] = None
     dataset_name: Optional[str] = None
-    job_type: Literal["training", "tuning"]
+    job_type: Literal["training", "tuning", "preview"]
     status: JobStatus
     start_time: Optional[datetime]
     end_time: Optional[datetime] = None
@@ -53,7 +53,7 @@ class JobManager:
         session: AsyncSession, 
         pipeline_id: str, 
         node_id: str, 
-        job_type: Literal["training", "tuning"],
+        job_type: Literal["training", "tuning", "preview"],
         dataset_id: str = "unknown",
         user_id: Optional[int] = None,
         model_type: str = "unknown",
@@ -78,7 +78,7 @@ class JobManager:
                 graph=graph,
                 started_at=datetime.now()
             )
-        else:
+        elif job_type == "tuning":
             next_version = await ModelRegistryService.get_next_version(session, dataset_id, model_type, "tuning")
 
             # Extract search strategy from graph
@@ -138,6 +138,33 @@ class JobManager:
                 graph=graph,
                 started_at=datetime.now()
             )
+        elif job_type == "preview":
+            # For preview jobs, we can reuse TrainingJob or create a new table.
+            # Reusing TrainingJob with a special flag or just treating it as a training job 
+            # that doesn't produce a model version is easiest for now.
+            # Or better, just don't save it to DB if it's transient?
+            # But the user wants to see it in the UI, so we need an ID.
+            # Let's use TrainingJob but mark it somehow? Or just let it be a training job.
+            # Actually, if we want to persist it, we should probably use TrainingJob
+            # but maybe with version=0 or something.
+            
+            # For now, let's treat it as a TrainingJob but with model_type="preview"
+            job = TrainingJob(
+                id=job_id,
+                pipeline_id=pipeline_id,
+                node_id=node_id,
+                dataset_source_id=dataset_id,
+                user_id=user_id,
+                status=JobStatus.QUEUED.value,
+                version=0, # Preview doesn't increment version
+                model_type="preview", 
+                graph=graph,
+                started_at=datetime.now()
+            )
+            
+        session.add(job)
+        await session.commit()
+        return job_id
             
         session.add(job)
         await session.commit()
