@@ -32,6 +32,11 @@ export const deploymentApi = {
     }
   },
 
+  getHistory: async (limit: number = 50, skip: number = 0): Promise<DeploymentInfo[]> => {
+    const response = await apiClient.get<DeploymentInfo[]>('/deployment/history', { params: { limit, skip } });
+    return response.data;
+  },
+
   deactivate: async (): Promise<void> => {
     await apiClient.post('/deployment/deactivate');
   },
