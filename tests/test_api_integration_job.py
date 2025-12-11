@@ -5,9 +5,12 @@ import os
 import shutil
 import json
 
-client = TestClient(app, base_url="http://localhost")
+@pytest.fixture(scope="module")
+def client():
+    with TestClient(app, base_url="http://localhost") as c:
+        yield c
 
-def test_run_pipeline_job():
+def test_run_pipeline_job(client):
     # Create a dummy CSV for testing
     os.makedirs("temp_test_data", exist_ok=True)
     csv_path = os.path.abspath("temp_test_data/iris_job.csv")

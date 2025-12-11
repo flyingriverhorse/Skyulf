@@ -227,7 +227,11 @@ class PipelineEngine:
         # Pass artifact_store and node_id to allow internal steps to save state
         processed_df, metrics = engineer.fit_transform(df, self.artifact_store, node.node_id)
         
-        self.log(f"Feature engineering completed. Output shape: {processed_df.shape}")
+        if hasattr(processed_df, "shape"):
+            self.log(f"Feature engineering completed. Output shape: {processed_df.shape}")
+        elif isinstance(processed_df, SplitDataset):
+             self.log(f"Feature engineering completed. SplitDataset created.")
+        
         if isinstance(processed_df, tuple):
              # SplitDataset
              self.log(f"Split details - Train: {processed_df[0].shape}, Test: {processed_df[1].shape if processed_df[1] is not None else 'None'}")
@@ -308,7 +312,16 @@ class PipelineEngine:
         # Optional: Evaluate immediately
         metrics = {}
         if node.params.get("evaluate", True):
-            report = estimator.evaluate(data, target_col, job_id=job_id)
+            # Ensure data is SplitDataset for evaluation
+            eval_data = data
+            if isinstance(data, pd.DataFrame):
+                 from ..data.container import SplitDataset
+                 eval_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+            elif isinstance(data, tuple):
+                 from ..data.container import SplitDataset
+                 eval_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+
+            report = estimator.evaluate(eval_data, target_col, job_id=job_id)
             # Flatten metrics for summary with prefixes
             if "train" in report.splits and report.splits["train"]:
                 for k, v in report.splits["train"].metrics.items():
@@ -343,6 +356,14 @@ class PipelineEngine:
         config = TuningConfig(**tuning_params)
         
         self.log(f"Starting hyperparameter tuning (Strategy: {config.strategy}, Trials: {config.n_trials})")
+
+        # Ensure data is SplitDataset
+        if isinstance(data, pd.DataFrame):
+            from ..data.container import SplitDataset
+            data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+        elif isinstance(data, tuple):
+            from ..data.container import SplitDataset
+            data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
 
         # We need X_train, y_train
         # Assuming data is SplitDataset

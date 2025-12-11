@@ -73,7 +73,7 @@ def test_pipeline_execution_flow(pipeline_data_csv, tmp_path):
     # Check Training Node
     train_res = result.node_results["node_training"]
     assert train_res.status == "success"
-    assert "accuracy" in train_res.metrics
+    assert "test_accuracy" in train_res.metrics
     assert artifact_store.exists("node_training")
 
 def test_pipeline_tuning_flow(pipeline_data_csv, tmp_path):

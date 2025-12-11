@@ -16,7 +16,7 @@ def test_text_cleaning():
         'columns': ['text'],
         'operations': [
             {'op': 'trim'},
-            {'op': 'lower'},
+            {'op': 'case', 'mode': 'lower'},
             {'op': 'regex', 'pattern': '-', 'repl': ''}
         ]
     }

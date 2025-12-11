@@ -216,3 +216,59 @@ class GeneralBinningCalculator(BaseCalculator):
 
 class GeneralBinningApplier(BaseBinningApplier):
     pass
+
+class CustomBinningCalculator(BaseCalculator):
+    """
+    Calculator for CustomBinning node.
+    Applies specific bin edges to selected columns.
+    """
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+        columns = resolve_columns(X, config, detect_numeric_columns)
+        bins = config.get('bins')
+        
+        bin_edges_map = {}
+        if bins:
+            sorted_bins = sorted(bins)
+            for col in columns:
+                if col in X.columns:
+                    bin_edges_map[col] = sorted_bins
+        
+        return {
+            'type': 'general_binning', # Use GeneralBinningApplier
+            'bin_edges': bin_edges_map,
+            'output_suffix': config.get('output_suffix', '_binned'),
+            'drop_original': config.get('drop_original', False),
+            'label_format': config.get('label_format', 'ordinal'),
+            'missing_strategy': config.get('missing_strategy', 'keep'),
+            'missing_label': config.get('missing_label', 'Missing'),
+            'include_lowest': config.get('include_lowest', True),
+            'precision': config.get('precision', 3)
+        }
+
+class CustomBinningApplier(GeneralBinningApplier):
+    pass
+
+class KBinsDiscretizerCalculator(GeneralBinningCalculator):
+    """
+    Calculator for KBinsDiscretizer node.
+    Wraps GeneralBinningCalculator with kbins strategy.
+    """
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        new_config = config.copy()
+        new_config['strategy'] = 'kbins'
+        
+        # Map sklearn params to GeneralBinning params
+        if 'n_bins' in config:
+            new_config['kbins_n_bins'] = config['n_bins']
+        
+        # sklearn strategy: uniform, quantile, kmeans
+        # GeneralBinning kbins_strategy: same
+        if 'strategy' in config and config['strategy'] != 'kbins':
+             new_config['kbins_strategy'] = config['strategy']
+             
+        return super().fit(df, new_config)
+
+class KBinsDiscretizerApplier(GeneralBinningApplier):
+    pass
+

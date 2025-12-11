@@ -22,7 +22,7 @@ def test_standard_scaler(sample_df):
     config = {'columns': ['A', 'B']}
     params = calc.fit(sample_df, config)
     
-    assert params['type'] == 'standard'
+    assert params['type'] == 'standard_scaler'
     assert params['columns'] == ['A', 'B']
     assert np.isclose(params['mean'][0], 3.0) # Mean of 1..5 is 3
     assert np.isclose(params['mean'][1], 30.0) # Mean of 10..50 is 30
@@ -46,7 +46,7 @@ def test_minmax_scaler(sample_df):
     config = {'columns': ['A']}
     params = calc.fit(sample_df, config)
     
-    assert params['type'] == 'minmax'
+    assert params['type'] == 'minmax_scaler'
     
     # 2. Apply
     applier = MinMaxScalerApplier()
@@ -67,7 +67,7 @@ def test_robust_scaler(sample_df):
     config = {'columns': ['A']}
     params = calc.fit(df, config)
     
-    assert params['type'] == 'robust'
+    assert params['type'] == 'robust_scaler'
     
     # 2. Apply
     applier = RobustScalerApplier()
@@ -91,7 +91,7 @@ def test_maxabs_scaler(sample_df):
     config = {'columns': ['A']}
     params = calc.fit(df, config)
     
-    assert params['type'] == 'maxabs'
+    assert params['type'] == 'maxabs_scaler'
     assert np.isclose(params['max_abs'][0], 10.0)
     
     # 2. Apply

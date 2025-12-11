@@ -4,8 +4,50 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Skyulf is a local-first MLOps workspace. Ingest, clean, train, and deploy models without leaving your infrastructure.">
+    <meta name="keywords" content="Local MLOps, Privacy-First Machine Learning, AutoML, Feature Engineering Canvas, Model Registry, Python, FastAPI, On-Premise AI, Data Sovereignty, Scikit-learn, Data Science">
+    <meta name="author" content="Skyulf Team">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.skyulf.com/">
+    <meta property="og:title" content="Skyulf · Own Your ML Pipeline">
+    <meta property="og:description" content="Skyulf is a local-first MLOps workspace. Ingest, clean, train, and deploy models without leaving your infrastructure.">
+    <meta property="og:image" content="https://www.skyulf.com/static/images/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://www.skyulf.com/">
+    <meta property="twitter:title" content="Skyulf · Own Your ML Pipeline">
+    <meta property="twitter:description" content="Skyulf is a local-first MLOps workspace. Ingest, clean, train, and deploy models without leaving your infrastructure.">
+    <meta property="twitter:image" content="https://www.skyulf.com/static/images/og-image.png">
+
     <title>Skyulf · Own Your ML Pipeline</title>
     <link rel="icon" type="image/x-icon" href="./static/favicon.ico">
+
+    <!-- JSON-LD Structured Data for Software -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Skyulf",
+      "operatingSystem": "Windows, Linux, macOS",
+      "applicationCategory": "DeveloperApplication",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR",
+        "availability": "https://schema.org/InStock"
+      },
+      "description": "Skyulf is a local-first MLOps workspace. Ingest, clean, train, and deploy models without leaving your infrastructure.",
+      "author": {
+        "@type": "Organization",
+        "name": "Skyulf",
+        "url": "https://www.skyulf.com"
+      },
+      "featureList": "Visual ML Canvas, Model Registry, Local Deployment, Data Ingestion, Data Science, Experiment Tracking, Model Training, Feature Engineering, Deployment, Monitoring, Visualization, Collaboration, Workflow, Automation, Privacy",
+      "softwareRequirements": "Python 3.10+"
+    }
+    </script>
     
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -106,7 +148,7 @@
                     <a href="#faq" class="text-sm font-medium hover:text-white transition-colors">FAQ</a>
                 </div>
                 <div class="flex items-center gap-4">
-                    <a href="/docs" class="hidden sm:block text-sm font-medium hover:text-white transition-colors">Docs</a>
+                    <a href="./site/index.html" class="hidden sm:block text-sm font-medium hover:text-white transition-colors">Docs</a>
                     <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" class="px-5 py-2 rounded-full bg-white text-slate-900 text-sm font-semibold hover:bg-slate-100 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.3)]">
                         View Source
                     </a>
@@ -528,8 +570,8 @@
                 <div class="order-2 lg:order-1">
                     <div class="rounded-2xl border border-slate-800 bg-slate-950 p-2 shadow-2xl">
                         <div class="relative w-full aspect-video overflow-hidden rounded-xl bg-slate-900">
-                            <video class="w-full h-full object-cover" controls poster="./static/app-preview.gif">
-                                <source src="./static/video/skyulf-product-tour.mp4" type="video/mp4">
+                            <video id="product-tour-video" class="w-full h-full object-cover" controls poster="./static/app-preview.gif">
+                                <source src="./static/video/ML_Canvas.mp4" type="video/mp4">
                                 Your browser does not support the video tag.
                             </video>
                         </div>
@@ -639,7 +681,7 @@
                     <h4 class="text-white font-semibold mb-4">Resources</h4>
                     <ul class="space-y-2 text-slate-400 text-sm">
                         <li><a href="https://github.com/flyingriverhorse/skyulf" target="_blank" class="hover:text-white transition-colors">GitHub Repository</a></li>
-                        <li><a href="#" class="hover:text-white transition-colors">Documentation</a></li>
+                        <li><a href="./site/index.html" class="hover:text-white transition-colors">Documentation</a></li>
                         <li><a href="#" class="hover:text-white transition-colors">Blog</a></li>
                         <li><a href="#" class="hover:text-white transition-colors">Community</a></li>
                     </ul>
@@ -669,6 +711,15 @@
 
     <script>
         feather.replace();
+
+        // Set video playback speed to 2x by default
+        document.addEventListener('DOMContentLoaded', function() {
+            const video = document.getElementById('product-tour-video');
+            if (video) {
+                video.defaultPlaybackRate = 2.0;
+                video.playbackRate = 2.0;
+            }
+        });
     </script>
 </body>
 </html>

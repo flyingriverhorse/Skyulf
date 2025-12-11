@@ -252,10 +252,24 @@ class DeploymentService:
         # Reconstruct store path
         try:
             # Handle full path (absolute or relative with separators)
-            if os.path.isabs(deployment.artifact_uri) or "/" in deployment.artifact_uri or "\\" in deployment.artifact_uri:
-                # Assume the last part is the node_id (filename) and the rest is the directory
+            if os.path.isabs(deployment.artifact_uri):
                 base_path = os.path.dirname(deployment.artifact_uri)
                 node_id = os.path.basename(deployment.artifact_uri)
+            elif "/" in deployment.artifact_uri or "\\" in deployment.artifact_uri:
+                # Check if it's a "pipeline_id/node_id" pattern that maps to exports/models
+                # If the path doesn't exist locally, assume it's the internal format
+                if not os.path.exists(deployment.artifact_uri) and not os.path.exists(os.path.dirname(deployment.artifact_uri)):
+                    parts = deployment.artifact_uri.replace("\\", "/").split("/")
+                    if len(parts) == 2:
+                        pipeline_id = parts[0]
+                        node_id = parts[1]
+                        base_path = os.path.join(os.getcwd(), "exports", "models", pipeline_id)
+                    else:
+                         base_path = os.path.dirname(deployment.artifact_uri)
+                         node_id = os.path.basename(deployment.artifact_uri)
+                else:
+                    base_path = os.path.dirname(deployment.artifact_uri)
+                    node_id = os.path.basename(deployment.artifact_uri)
             else:
                 # Legacy format: "pipeline_id/node_id" (handled by split above if separators exist)
                 # OR just "node_id" (fallback)

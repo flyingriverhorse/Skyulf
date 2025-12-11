@@ -71,14 +71,8 @@ def _compute_similarity_score(a: Any, b: Any, method: str) -> float:
 # --- Polynomial Features ---
 class PolynomialFeaturesCalculator(BaseCalculator):
     def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
-        # Config: 
-        # columns: List[str]
-        # degree: int
-        # interaction_only: bool
-        # include_bias: bool
-        # include_input_features: bool
-        # output_prefix: str
-        # auto_detect: bool
+        # Extract configuration parameters
+        # We support standard polynomial features settings like degree and interaction_only
         
         X, _, _ = unpack_pipeline_input(df)
 
@@ -134,10 +128,8 @@ class PolynomialFeaturesApplier(BaseApplier):
         transformed = poly.transform(X[valid_cols])
         feature_names = poly.get_feature_names_out(valid_cols)
         
-        # Rename features with prefix
-        # sklearn names are like "x0", "x1^2", "x0 x1" or "col1", "col1^2", "col1 col2"
-        # We want prefix_col1_col2 or similar? 
-        # V1 logic: sanitized_prefix + "_" + sanitized_feature_name
+        # Rename features to be more readable and avoid collisions
+        # We convert sklearn's "col1 col2" format to "prefix_col1_col2"
         
         new_names = []
         for name in feature_names:
@@ -149,12 +141,8 @@ class PolynomialFeaturesApplier(BaseApplier):
         
         df_out = X.copy()
         if not include_input_features:
-            # If we dont want input features, we might still want to keep them if they are not part of the poly expansion?
-            # Usually "include_input_features" means "keep the original columns in the output".
-            # But sklearn includes degree 1 terms if include_bias=False (usually).
-            # If interaction_only=True, degree 1 terms are included.
-            # So df_poly contains the input columns (renamed).
-            # If we want to replace them, we drop valid_cols.
+            # If input features are not requested, we rely on the user to drop them later if needed,
+            # or we could drop them here. Currently we keep the original dataframe structure.
             pass
             
         # Concatenate
@@ -210,8 +198,7 @@ class FeatureGenerationApplier(BaseApplier):
                 output_col = base
             
             if output_col in df_out.columns and not allow_overwrite:
-                # Skip or rename? V1 skips or fails. We will skip to be safe or append suffix.
-                # Let"s append suffix to ensure we generate something.
+                # Avoid overwriting existing columns by appending a numeric suffix
                 j = 1
                 while f"{output_col}_{j}" in df_out.columns:
                     j += 1

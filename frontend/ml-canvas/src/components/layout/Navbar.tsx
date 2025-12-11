@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layout, BarChart2, GitBranch, Rocket } from 'lucide-react';
+import { BarChart2, GitBranch, Rocket } from 'lucide-react';
 import { useViewStore } from '../../core/store/useViewStore';
 
 export const Navbar: React.FC = () => {

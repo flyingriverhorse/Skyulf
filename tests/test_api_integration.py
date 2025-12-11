@@ -4,10 +4,14 @@ from core.main import app
 import os
 import shutil
 import json
+import numpy as np
 
-client = TestClient(app, base_url="http://localhost")
+@pytest.fixture(scope="module")
+def client():
+    with TestClient(app, base_url="http://localhost") as c:
+        yield c
 
-def test_get_registry():
+def test_get_registry(client):
     response = client.get("/api/pipeline/registry")
     assert response.status_code == 200
     data = response.json()
@@ -17,7 +21,7 @@ def test_get_registry():
     assert any(item["id"] == "data_loader" for item in data)
     assert any(item["id"] == "random_forest_classifier" for item in data)
 
-def test_preview_pipeline():
+def test_preview_pipeline(client):
     # Create a dummy CSV for testing
     os.makedirs("temp_test_data", exist_ok=True)
     csv_path = os.path.abspath("temp_test_data/iris.csv")
@@ -75,7 +79,7 @@ def test_preview_pipeline():
         if os.path.exists("temp_test_data"):
             shutil.rmtree("temp_test_data")
 
-def test_preview_recommendations():
+def test_preview_recommendations(client):
     # Create a CSV with missing values to trigger recommendations
     os.makedirs("temp_test_data_rec", exist_ok=True)
     csv_path = os.path.abspath("temp_test_data_rec/missing.csv")
@@ -127,7 +131,7 @@ def test_preview_recommendations():
         if os.path.exists("temp_test_data_rec"):
             shutil.rmtree("temp_test_data_rec")
 
-def test_cleaning_recommendations():
+def test_cleaning_recommendations(client):
     # Create a CSV with duplicates and high missing values
     os.makedirs("temp_test_data_clean", exist_ok=True)
     csv_path = os.path.abspath("temp_test_data_clean/dirty.csv")
@@ -176,7 +180,7 @@ def test_cleaning_recommendations():
         if os.path.exists("temp_test_data_clean"):
             shutil.rmtree("temp_test_data_clean")
 
-def test_encoding_outlier_recommendations():
+def test_encoding_outlier_recommendations(client):
     # Create a CSV with categorical data and skewed numeric data
     os.makedirs("temp_test_data_adv", exist_ok=True)
     csv_path = os.path.abspath("temp_test_data_adv/advanced.csv")
@@ -227,7 +231,7 @@ def test_encoding_outlier_recommendations():
         if os.path.exists("temp_test_data_adv"):
             shutil.rmtree("temp_test_data_adv")
 
-def test_transformation_recommendations():
+def test_transformation_recommendations(client):
     # Create a CSV with skewed data for Power Transform
     os.makedirs("temp_test_data_trans", exist_ok=True)
     csv_path = os.path.abspath("temp_test_data_trans/skewed.csv")
@@ -291,7 +295,7 @@ def test_transformation_recommendations():
         if os.path.exists("temp_test_data_trans"):
             shutil.rmtree("temp_test_data_trans")
 
-def test_run_pipeline_submission():
+def test_run_pipeline_submission(client):
     # This test only checks if the job is submitted successfully
     payload = {
         "pipeline_id": "test_run_001",
