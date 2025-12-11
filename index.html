@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Skyulf is a local-first MLOps workspace. Ingest, clean, train, and deploy models without leaving your infrastructure.">
+    <meta name="keywords" content="Local MLOps, Privacy-First Machine Learning, AutoML, Feature Engineering Canvas, Model Registry, Python, FastAPI, On-Premise AI, Data Sovereignty, Scikit-learn, Data Science">
+    <meta name="author" content="Skyulf Team">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.skyulf.com/">
+    <meta property="og:title" content="Skyulf · Own Your ML Pipeline">
+    <meta property="og:description" content="Skyulf is a local-first MLOps workspace. Ingest, clean, train, and deploy models without leaving your infrastructure.">
+    <meta property="og:image" content="https://www.skyulf.com/static/images/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://www.skyulf.com/">
+    <meta property="twitter:title" content="Skyulf · Own Your ML Pipeline">
+    <meta property="twitter:description" content="Skyulf is a local-first MLOps workspace. Ingest, clean, train, and deploy models without leaving your infrastructure.">
+    <meta property="twitter:image" content="https://www.skyulf.com/static/images/og-image.png">
+
+    <title>Skyulf · Own Your ML Pipeline</title>
+    <link rel="icon" type="image/x-icon" href="./static/favicon.ico">
+
+    <!-- JSON-LD Structured Data for Software -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Skyulf",
+      "operatingSystem": "Windows, Linux, macOS",
+      "applicationCategory": "DeveloperApplication",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR",
+        "availability": "https://schema.org/InStock"
+      },
+      "description": "Skyulf is a local-first MLOps workspace. Ingest, clean, train, and deploy models without leaving your infrastructure.",
+      "author": {
+        "@type": "Organization",
+        "name": "Skyulf",
+        "url": "https://www.skyulf.com"
+      },
+      "featureList": "Visual ML Canvas, Model Registry, Local Deployment, Data Ingestion, Data Science, Experiment Tracking, Model Training, Feature Engineering, Deployment, Monitoring, Visualization, Collaboration, Workflow, Automation, Privacy",
+      "softwareRequirements": "Python 3.10+"
+    }
+    </script>
+    
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#151f32',
+                            950: '#020617',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Custom Gradient Text */
+        .text-gradient {
+            background: linear-gradient(to right, #38bdf8, #6366f1, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* Custom Gradient Background */
+        .bg-gradient-brand {
+            background: linear-gradient(135deg, #38bdf8 0%, #6366f1 50%, #a855f7 100%);
+        }
+
+        /* Glass Effect */
+        .glass {
+            background: rgba(2, 6, 23, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Card Hover Glow */
+        .hover-glow {
+            transition: all 0.3s ease;
+        }
+        .hover-glow:hover {
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.15);
+            border-color: rgba(99, 102, 241, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #020617;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-300 antialiased overflow-x-hidden">
+
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 glass">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-2">
+                    <img src="./static/img/logo.png" alt="Skyulf Logo" class="w-8 h-8 rounded-lg">
+                    <span class="font-bold text-xl text-white tracking-tight">Skyulf</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#features" class="text-sm font-medium hover:text-white transition-colors">Features</a>
+                    <a href="#workflow" class="text-sm font-medium hover:text-white transition-colors">Workflow</a>
+                    <a href="#faq" class="text-sm font-medium hover:text-white transition-colors">FAQ</a>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="./site/index.html" class="hidden sm:block text-sm font-medium hover:text-white transition-colors">Docs</a>
+                    <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" class="px-5 py-2 rounded-full bg-white text-slate-900 text-sm font-semibold hover:bg-slate-100 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+                        View Source
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="relative pt-24 pb-16 lg:pt-32 lg:pb-24 overflow-hidden">
+        <!-- Background Glows -->
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] -z-10"></div>
+        <div class="absolute bottom-0 right-0 w-[800px] h-[600px] bg-purple-600/10 rounded-full blur-[100px] -z-10"></div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center"> 
+            <h1 class="text-5xl md:text-7xl font-bold text-white tracking-tight mb-6 leading-tight">
+                Own Your <br class="hidden md:block" />
+                <span class="text-gradient">ML Pipeline</span> Locally.
+            </h1>
+            
+            <p class="max-w-2xl mx-auto text-lg md:text-xl text-slate-400 mb-10 leading-relaxed">
+                The privacy-first MLOps workspace. Ingest data, engineer features visually, and train models without your data ever leaving your infrastructure.
+            </p>
+            
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+                <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-brand text-white font-semibold text-lg hover:opacity-90 transition-opacity shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2">
+                    <i data-feather="github" class="w-5 h-5"></i>
+                    Star on GitHub
+                </a>
+            </div>
+
+            <!-- Hero Image / Dashboard Preview -->
+            <div class="relative max-w-5xl mx-auto animate-float">
+                <div class="absolute -inset-1 bg-gradient-brand rounded-2xl blur opacity-30"></div>
+                <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-900">
+                    <img src="./static/img/dashboard.jpg" alt="Skyulf Dashboard" class="w-full h-auto object-cover">
+                    <!-- Overlay Gradient -->
+                    <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Grid -->
+    <section id="features" class="py-12 bg-slate-950 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Focus on the model, <span class="text-indigo-400">not the infrastructure.</span></h2>
+                <p class="text-slate-400 max-w-2xl mx-auto">Built for teams who want to focus on models, not glue code.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
+                <div class="p-8 rounded-2xl bg-slate-900/50 border border-slate-800 hover-glow group">
+                    <div class="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <i data-feather="layout" class="w-6 h-6 text-blue-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-3">Visual Canvas</h3>
+                    <p class="text-slate-400 leading-relaxed">
+                        Drag, drop, and connect nodes to clean data and engineer features. No more spaghetti code in notebooks.
+                    </p>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="p-8 rounded-2xl bg-slate-900/50 border border-slate-800 hover-glow group">
+                    <div class="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <i data-feather="cpu" class="w-6 h-6 text-indigo-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-3">Async Training</h3>
+                    <p class="text-slate-400 leading-relaxed">
+                        Powered by Celery & Redis. Run heavy training jobs in the background while you keep working.
+                    </p>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="p-8 rounded-2xl bg-slate-900/50 border border-slate-800 hover-glow group">
+                    <div class="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <i data-feather="upload-cloud" class="w-6 h-6 text-purple-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-3">One-Click Deploy</h3>
+                    <p class="text-slate-400 leading-relaxed">
+                        Move from experiment to production instantly. Serve your models via a high-performance FastAPI endpoint.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Deep Dive / Workflow Sections -->
+    <section id="workflow" class="py-12 relative overflow-hidden">
+        <!-- Data Ingestion Section -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
+            <div class="flex flex-col lg:flex-row-reverse items-center gap-16">
+                <div class="lg:w-1/2">
+                    <div class="inline-block px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold mb-6">DATA INGESTION</div>
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Connect your data.<br>Anywhere it lives.</h2>
+                    <p class="text-slate-400 text-lg mb-8 leading-relaxed">
+                        Ingest data from CSVs, Parquet files, or SQL databases. Skyulf automatically detects schemas and caches datasets for rapid iteration.
+                    </p>
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-center gap-3 text-slate-300">
+                            <i data-feather="check-circle" class="w-5 h-5 text-emerald-500"></i>
+                            <span>Zero-copy Polars integration</span>
+                        </li>
+                        <li class="flex items-center gap-3 text-slate-300">
+                            <i data-feather="check-circle" class="w-5 h-5 text-emerald-500"></i>
+                            <span>Automatic type inference</span>
+                        </li>
+                        <li class="flex items-center gap-3 text-slate-300">
+                            <i data-feather="check-circle" class="w-5 h-5 text-emerald-500"></i>
+                            <span>Local file system support</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="lg:w-1/2 relative">
+                    <div class="absolute -inset-4 bg-emerald-500/20 rounded-3xl blur-2xl -z-10"></div>
+                    <img src="./static/img/datasource.jpg" alt="Data Ingestion" class="rounded-2xl border border-slate-800 shadow-2xl w-full">
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas Section -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
+            <div class="flex flex-col lg:flex-row items-center gap-16">
+                <div class="lg:w-1/2">
+                    <div class="inline-block px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-semibold mb-6">FEATURE ENGINEERING</div>
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Stop writing boilerplate.<br>Start designing pipelines.</h2>
+                    <p class="text-slate-400 text-lg mb-8 leading-relaxed">
+                        The Feature Canvas lets you visualize your data flow. Handle missing values, encode categoricals, and scale features with pre-built nodes and more.
+                    </p>
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-center gap-3 text-slate-300">
+                            <i data-feather="check-circle" class="w-5 h-5 text-blue-500"></i>
+                            <span>25+ Built-in processing nodes</span>
+                        </li>
+                        <li class="flex items-center gap-3 text-slate-300">
+                            <i data-feather="check-circle" class="w-5 h-5 text-blue-500"></i>
+                            <span>Real-time schema validation</span>
+                        </li>
+                        <li class="flex items-center gap-3 text-slate-300">
+                            <i data-feather="check-circle" class="w-5 h-5 text-blue-500"></i>
+                            <span>Reproducible pipeline exports</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="lg:w-1/2 relative">
+                    <div class="absolute -inset-4 bg-blue-500/20 rounded-3xl blur-2xl -z-10"></div>
+                    <img src="./static/img/canvas.jpg" alt="Feature Canvas" class="rounded-2xl border border-slate-800 shadow-2xl w-full">
+                </div>
+            </div>
+        </div>
+
+        <!-- Experiments Section -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
+            <div class="flex flex-col lg:flex-row-reverse items-center gap-16">
+                <div class="lg:w-1/2">
+                    <div class="inline-block px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold mb-6">EXPERIMENT TRACKING</div>
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Compare runs.<br>Pick the winner.</h2>
+                    <p class="text-slate-400 text-lg mb-8 leading-relaxed">
+                        Don't guess which model is better. Track every hyperparameter, metric, and artifact. Visualize performance with interactive charts.
+                    </p>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+                            <div class="text-lg font-bold text-white mb-0.5">ROC</div>
+                            <div class="text-xs text-slate-500">Curve Analysis</div>
+                        </div>
+                        <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+                            <div class="text-lg font-bold text-white mb-0.5">F1</div>
+                            <div class="text-xs text-slate-500">Score Tracking</div>
+                        </div>
+                        <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+                            <div class="text-lg font-bold text-white mb-0.5">Acc</div>
+                            <div class="text-xs text-slate-500">Model Accuracy</div>
+                        </div>
+                        <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+                            <div class="text-lg font-bold text-white mb-0.5">MAE</div>
+                            <div class="text-xs text-slate-500">Error Metrics</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="lg:w-1/2 relative">
+                    <div class="absolute -inset-4 bg-indigo-500/20 rounded-3xl blur-2xl -z-10"></div>
+                    <img src="./static/img/experiments.jpg" alt="Experiments" class="rounded-2xl border border-slate-800 shadow-2xl w-full">
+                </div>
+            </div>
+        </div>
+
+        <!-- Deployment Section -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
+            <div class="flex flex-col lg:flex-row items-center gap-16">
+                <div class="lg:w-1/2">
+                    <div class="inline-block px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 text-xs font-semibold mb-6">DEPLOYMENT</div>
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Test your models<br>instantly.</h2>
+                    <p class="text-slate-400 text-lg mb-8 leading-relaxed">
+                        Once you're happy with a model, deploy it to a local inference endpoint. Verify predictions immediately with the built-in JSON editor before moving to production.
+                    </p>
+                </div>
+                <div class="lg:w-1/2 relative">
+                    <div class="absolute -inset-4 bg-purple-500/20 rounded-3xl blur-2xl -z-10"></div>
+                    <img src="./static/img/deployment.jpg" alt="Deployment" class="rounded-2xl border border-slate-800 shadow-2xl w-full">
+                </div>
+            </div>
+        </div>
+
+        <!-- Inference Section -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
+            <div class="flex flex-col lg:flex-row-reverse items-center gap-16">
+                <div class="lg:w-1/2">
+                    <div class="inline-block px-3 py-1 rounded-full bg-teal-500/10 text-teal-400 text-xs font-semibold mb-6">LOCAL INFERENCE</div>
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Validate models<br>before production.</h2>
+                    <p class="text-slate-400 text-lg mb-8 leading-relaxed">
+                        Spin up a local API endpoint to test your model against real data. Debug inputs and outputs in real-time without deploying to a remote environment.
+                    </p>
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-center gap-3 text-slate-300">
+                            <i data-feather="check-circle" class="w-5 h-5 text-teal-500"></i>
+                            <span>Instant local API endpoints</span>
+                        </li>
+                        <li class="flex items-center gap-3 text-slate-300">
+                            <i data-feather="check-circle" class="w-5 h-5 text-teal-500"></i>
+                            <span>Interactive JSON request builder</span>
+                        </li>
+                        <li class="flex items-center gap-3 text-slate-300">
+                            <i data-feather="check-circle" class="w-5 h-5 text-teal-500"></i>
+                            <span>Rapid debugging cycle</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="lg:w-1/2 relative">
+                    <div class="absolute -inset-4 bg-teal-500/20 rounded-3xl blur-2xl -z-10"></div>
+                    <img src="./static/img/inference.jpg" alt="Inference" class="rounded-2xl border border-slate-800 shadow-2xl w-full">
+                </div>
+            </div>
+        </div>
+
+        <!-- Use Cases Section -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Who is this for?</h2>
+                <p class="text-slate-400 max-w-2xl mx-auto">
+                    Teams working with sensitive data who can't upload to cloud services.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="p-8 rounded-2xl bg-slate-900/50 border border-slate-800 hover-glow">
+                    <div class="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-6">
+                        <i data-feather="shield" class="w-6 h-6 text-blue-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-3">Healthcare & Research</h3>
+                    <p class="text-slate-400 leading-relaxed mb-4">
+                        Train models on patient data or research datasets that can't leave your infrastructure due to GDPR or institutional policies.
+                    </p>
+                    <ul class="space-y-2 text-sm text-slate-500">
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>Local CSV/Parquet ingestion</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>No cloud uploads</li>
+                    </ul>
+                </div>
+
+                <div class="p-8 rounded-2xl bg-slate-900/50 border border-slate-800 hover-glow">
+                    <div class="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-6">
+                        <i data-feather="globe" class="w-6 h-6 text-purple-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-3">Government & Public Sector</h3>
+                    <p class="text-slate-400 leading-relaxed mb-4">
+                        Municipalities and public institutions working with citizen data that must stay on-premises for privacy and compliance.
+                    </p>
+                    <ul class="space-y-2 text-sm text-slate-500">
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>GDPR-compliant processing</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>Full audit trails</li>
+                    </ul>
+                </div>
+
+                <div class="p-8 rounded-2xl bg-slate-900/50 border border-slate-800 hover-glow">
+                    <div class="w-12 h-12 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-6">
+                        <i data-feather="briefcase" class="w-6 h-6 text-emerald-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-3">SMEs & Startups</h3>
+                    <p class="text-slate-400 leading-relaxed mb-4">
+                        Small teams who need ML tooling but want to avoid expensive SaaS subscriptions and keep data under their own control.
+                    </p>
+                    <ul class="space-y-2 text-sm text-slate-500">
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>Zero-config SQLite start</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>No per-user fees</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section id="faq" class="py-16 relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Frequently Asked Questions</h2>
+                <p class="text-slate-400 max-w-2xl mx-auto">
+                    Everything you need to know about the platform and how it works.
+                </p>
+            </div>
+            
+            <div class="max-w-3xl mx-auto space-y-4">
+                <!-- FAQ Item 1 -->
+                <div class="rounded-xl bg-slate-900/50 border border-slate-800 overflow-hidden">
+                    <button class="w-full text-left px-6 py-4 flex items-center justify-between group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('i').classList.toggle('rotate-180')">
+                        <span class="font-semibold text-white group-hover:text-blue-400 transition-colors">What is Skyulf?</span>
+                        <i data-feather="chevron-down" class="w-5 h-5 text-slate-500 transition-transform duration-300"></i>
+                    </button>
+                    <div class="hidden px-6 pb-4 pt-0">
+                        <p class="text-slate-400 leading-relaxed">
+                            Skyulf is a self-hosted MLOps platform. It lets you build, train, and monitor machine learning pipelines entirely on your infrastructure.
+                            Unlike cloud-based solutions, your data never leaves your servers—perfect for privacy-sensitive or regulated environments.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 2 -->
+                <div class="rounded-xl bg-slate-900/50 border border-slate-800 overflow-hidden">
+                    <button class="w-full text-left px-6 py-4 flex items-center justify-between group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('i').classList.toggle('rotate-180')">
+                        <span class="font-semibold text-white group-hover:text-blue-400 transition-colors">Why local-first?</span>
+                        <i data-feather="chevron-down" class="w-5 h-5 text-slate-500 transition-transform duration-300"></i>
+                    </button>
+                    <div class="hidden px-6 pb-4 pt-0">
+                        <p class="text-slate-400 leading-relaxed">
+                            Local-first means complete data sovereignty. No vendor lock-in, no surprise cloud bills, no data privacy concerns. 
+                            You control where your models train, where your data lives, and who can access it. It's MLOps on your terms.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 3 -->
+                <div class="rounded-xl bg-slate-900/50 border border-slate-800 overflow-hidden">
+                    <button class="w-full text-left px-6 py-4 flex items-center justify-between group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('i').classList.toggle('rotate-180')">
+                        <span class="font-semibold text-white group-hover:text-blue-400 transition-colors">How is this different from cloud MLOps platforms?</span>
+                        <i data-feather="chevron-down" class="w-5 h-5 text-slate-500 transition-transform duration-300"></i>
+                    </button>
+                    <div class="hidden px-6 pb-4 pt-0">
+                        <p class="text-slate-400 leading-relaxed">
+                            Cloud platforms require uploading your data to third-party servers and charge based on usage. Skyulf runs 100% on-premise or in your private cloud. 
+                            No data leaves your network, no usage-based pricing, and no vendor dependencies. You own the infrastructure and the workflow.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 4 -->
+                <div class="rounded-xl bg-slate-900/50 border border-slate-800 overflow-hidden">
+                    <button class="w-full text-left px-6 py-4 flex items-center justify-between group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('i').classList.toggle('rotate-180')">
+                        <span class="font-semibold text-white group-hover:text-blue-400 transition-colors">Can I use this in production?</span>
+                        <i data-feather="chevron-down" class="w-5 h-5 text-slate-500 transition-transform duration-300"></i>
+                    </button>
+                    <div class="hidden px-6 pb-4 pt-0">
+                        <p class="text-slate-400 leading-relaxed">
+                            Skyulf is currently in <strong>Active Alpha</strong>. It is perfect for internal tools, research, and experimentation. 
+                            We are working towards a stable v1.0 for critical production workloads.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 5 -->
+                <div class="rounded-xl bg-slate-900/50 border border-slate-800 overflow-hidden">
+                    <button class="w-full text-left px-6 py-4 flex items-center justify-between group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('i').classList.toggle('rotate-180')">
+                        <span class="font-semibold text-white group-hover:text-blue-400 transition-colors">Is this really free?</span>
+                        <i data-feather="chevron-down" class="w-5 h-5 text-slate-500 transition-transform duration-300"></i>
+                    </button>
+                    <div class="hidden px-6 pb-4 pt-0">
+                        <p class="text-slate-400 leading-relaxed">
+                            Yes. Skyulf is open source with a split license model: <strong>Apache 2.0</strong> for the backend and <strong>GNU AGPLv3</strong> for the frontend.
+                            This ensures the core remains easy to integrate, while UI improvements are shared back to the community.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 6 -->
+                <div class="rounded-xl bg-slate-900/50 border border-slate-800 overflow-hidden">
+                    <button class="w-full text-left px-6 py-4 flex items-center justify-between group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('i').classList.toggle('rotate-180')">
+                        <span class="font-semibold text-white group-hover:text-blue-400 transition-colors">How can I contribute?</span>
+                        <i data-feather="chevron-down" class="w-5 h-5 text-slate-500 transition-transform duration-300"></i>
+                    </button>
+                    <div class="hidden px-6 pb-4 pt-0">
+                        <p class="text-slate-400 leading-relaxed">
+                            Contributions are welcome! Check out our <a href="https://github.com/flyingriverhorse/skyulf" class="text-blue-400 hover:underline">GitHub</a>.
+                            Whether it's code, documentation, bug reports, or feature ideas—every contribution helps shape Skyulf.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 7 -->
+                <div class="rounded-xl bg-slate-900/50 border border-slate-800 overflow-hidden">
+                    <button class="w-full text-left px-6 py-4 flex items-center justify-between group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('i').classList.toggle('rotate-180')">
+                        <span class="font-semibold text-white group-hover:text-blue-400 transition-colors">What's your vision for Skyulf?</span>
+                        <i data-feather="chevron-down" class="w-5 h-5 text-slate-500 transition-transform duration-300"></i>
+                    </button>
+                    <div class="hidden px-6 pb-4 pt-0">
+                        <p class="text-slate-400 leading-relaxed">
+                            To democratize AI development. We are building an "App Hub" where anyone can drag-and-drop to create powerful AI tools—from traditional ML to GenAI agents—without needing a PhD or a cloud budget.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- FAQ Item 8 -->
+                <div class="rounded-xl bg-slate-900/50 border border-slate-800 overflow-hidden">
+                    <button class="w-full text-left px-6 py-4 flex items-center justify-between group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('i').classList.toggle('rotate-180')">
+                        <span class="font-semibold text-white group-hover:text-blue-400 transition-colors">Do you offer a commercial license?</span>
+                        <i data-feather="chevron-down" class="w-5 h-5 text-slate-500 transition-transform duration-300"></i>
+                    </button>
+                    <div class="hidden px-6 pb-4 pt-0">
+                        <p class="text-slate-400 leading-relaxed">
+                            For the backend (Apache 2.0), commercial use is free. For the frontend (AGPLv3), if you build a proprietary SaaS that modifies the UI, you may need a commercial license exception.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Video Section -->
+    <section class="py-16 bg-slate-900/50 border-y border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <!-- Video Column -->
+                <div class="order-2 lg:order-1">
+                    <div class="rounded-2xl border border-slate-800 bg-slate-950 p-2 shadow-2xl">
+                        <div class="relative w-full aspect-video overflow-hidden rounded-xl bg-slate-900">
+                            <video id="product-tour-video" class="w-full h-full object-cover" controls poster="./static/app-preview.gif">
+                                <source src="./static/video/ML_Canvas.mp4" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Text Column -->
+                <div class="order-1 lg:order-2">
+                    <div class="inline-flex items-center px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 mb-6">
+                        <span class="w-2 h-2 rounded-full bg-blue-400 mr-2"></span>
+                        <span class="text-xs font-semibold uppercase tracking-wide text-blue-300">Product tour</span>
+                    </div>
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">See Skyulf in action</h2>
+                    <p class="text-lg text-slate-400 mb-8 leading-relaxed">
+                        From ingestion to deployment, Skyulf keeps your experiments reproducible and private. Here’s a snapshot of how a local-first team moves from raw data to a deployed model.
+                    </p>
+                    
+                    <div class="space-y-6">
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-blue-400 font-bold text-sm">1</div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-white mb-1">Load your data</h3>
+                                <p class="text-slate-400 text-sm">Point to CSV, Parquet, or SQL sources. Schema gets detected automatically.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-indigo-400 font-bold text-sm">2</div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-white mb-1">Build your pipeline</h3>
+                                <p class="text-slate-400 text-sm">Drag nodes around the canvas to wire up transforms. Preview stats at each step.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-purple-400 font-bold text-sm">3</div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-white mb-1">Train & Deploy</h3>
+                                <p class="text-slate-400 text-sm">Launch training runs in the background. Deploy the best model to a local API.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech Stack -->
+    <section id="stack" class="py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-8">Powered by modern open source</p>
+            <div class="flex flex-wrap justify-center items-center gap-8 opacity-70 grayscale hover:grayscale-0 transition-all duration-500">
+                <!-- Simple text representations for logos to keep it clean/fast without external SVGs -->
+                <div class="flex items-center gap-2">
+                    <span class="text-xl font-bold text-teal-400">FastAPI</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xl font-bold text-blue-400">React</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xl font-bold text-green-400">Celery</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xl font-bold text-red-400">Redis</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xl font-bold text-blue-300">Polars</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="py-16 relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-brand opacity-10"></div>
+        <div class="max-w-4xl mx-auto px-4 text-center relative z-10">
+            <h2 class="text-4xl font-bold text-white mb-6">Ready to build?</h2>
+            <p class="text-xl text-slate-400 mb-10">Join the local-first MLOps revolution. Open source and free forever for local use.</p>
+            <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" class="inline-block px-10 py-4 rounded-xl bg-white text-slate-900 font-bold text-lg hover:bg-slate-100 transition-colors shadow-xl">
+                Launch Skyulf
+            </a>
+        </div>
+    </section>
+
+    <footer class="py-12 border-t border-slate-800 bg-slate-950">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+                <div>
+                    <div class="flex items-center gap-2 mb-4">
+                        <img src="./static/img/logo.png" alt="Skyulf Logo" class="w-8 h-8 rounded-lg">
+                        <span class="font-bold text-xl text-white tracking-tight">Skyulf</span>
+                    </div>
+                    <p class="text-slate-400 text-sm leading-relaxed">
+                        Local-first MLOps for privacy-preserving teams.
+                    </p>
+                </div>
+                
+                <div>
+                    <h4 class="text-white font-semibold mb-4">Product</h4>
+                    <ul class="space-y-2 text-slate-400 text-sm">
+                        <li><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block mr-2"></span>Automated feature stores</li>
+                        <li><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block mr-2"></span>Continuous evaluation</li>
+                        <li><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block mr-2"></span>Production backfills</li>
+                        <li><a href="#" class="hover:text-white transition-colors">API Reference</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-white font-semibold mb-4">Resources</h4>
+                    <ul class="space-y-2 text-slate-400 text-sm">
+                        <li><a href="https://github.com/flyingriverhorse/skyulf" target="_blank" class="hover:text-white transition-colors">GitHub Repository</a></li>
+                        <li><a href="./site/index.html" class="hover:text-white transition-colors">Documentation</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Blog</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Community</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-white font-semibold mb-4">Project</h4>
+                    <ul class="space-y-2 text-slate-400 text-sm">
+                        <li><a href="#roadmap" class="hover:text-white transition-colors">Roadmap</a></li>
+                        <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/CONTRIBUTING.md" target="_blank" class="hover:text-white transition-colors">Contributing</a></li>
+                        <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/SECURITY.md" target="_blank" class="hover:text-white transition-colors">Security</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="text-slate-500 text-sm">
+                    &copy; 2025 Murat Unsal. Apache 2.0 License.
+                </div>
+                <div class="flex gap-6">
+                    <a href="https://www.linkedin.com/in/murat-u/" class="text-slate-500 hover:text-white transition-colors"><i data-feather="linkedin" class="w-5 h-5"></i></a>
+                    <a href="https://github.com/flyingriverhorse/skyulf" class="text-slate-500 hover:text-white transition-colors"><i data-feather="github" class="w-5 h-5"></i></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        feather.replace();
+
+        // Set video playback speed to 2x by default
+        document.addEventListener('DOMContentLoaded', function() {
+            const video = document.getElementById('product-tour-video');
+            if (video) {
+                video.defaultPlaybackRate = 2.0;
+                video.playbackRate = 2.0;
+            }
+        });
+    </script>
+</body>
+</html>
