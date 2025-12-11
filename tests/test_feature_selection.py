@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from core.ml_pipeline.preprocessing.feature_selection import (
     VarianceThresholdCalculator, VarianceThresholdApplier,
-    SelectKBestCalculator, SelectKBestApplier
+    UnivariateSelectionCalculator, UnivariateSelectionApplier
 )
 
 def test_variance_threshold():
@@ -32,8 +32,9 @@ def test_select_k_best():
         'target': [10, 20, 30, 40, 50]
     })
     
-    calc = SelectKBestCalculator()
+    calc = UnivariateSelectionCalculator()
     config = {
+        'method': 'select_k_best',
         'k': 2, 
         'score_func': 'f_regression', 
         'target_column': 'target',
@@ -41,7 +42,7 @@ def test_select_k_best():
     }
     params = calc.fit(df, config)
     
-    applier = SelectKBestApplier()
+    applier = UnivariateSelectionApplier()
     res = applier.apply(df, params)
     
     assert 'A' in res.columns

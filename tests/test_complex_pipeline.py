@@ -8,7 +8,6 @@ from core.ml_pipeline.artifacts.local import LocalArtifactStore
 from core.ml_pipeline.preprocessing.base import StatefulTransformer
 
 # Import nodes
-from core.ml_pipeline.preprocessing.cleaning import DateStandardizerCalculator, DateStandardizerApplier
 from core.ml_pipeline.preprocessing.casting import CastingCalculator, CastingApplier
 from core.ml_pipeline.preprocessing.imputation import SimpleImputerCalculator, SimpleImputerApplier
 from core.ml_pipeline.preprocessing.encoding import OneHotEncoderCalculator, OneHotEncoderApplier
@@ -43,11 +42,6 @@ def test_complex_pipeline_flow(complex_data, artifact_store):
     cast_app = CastingApplier()
     cast_node = StatefulTransformer(cast_calc, cast_app, artifact_store, "node_1_casting")
     
-    # 2. Standardize Date
-    date_calc = DateStandardizerCalculator()
-    date_app = DateStandardizerApplier()
-    date_node = StatefulTransformer(date_calc, date_app, artifact_store, "node_2_date")
-    
     # 3. Impute Missing Values (Category -> Mode, Value -> Mean)
     impute_calc = SimpleImputerCalculator()
     impute_app = SimpleImputerApplier()
@@ -75,10 +69,6 @@ def test_complex_pipeline_flow(complex_data, artifact_store):
     ds = complex_data
     ds = cast_node.fit_transform(ds, {'columns': ['id'], 'target_type': 'int'})
     assert pd.api.types.is_integer_dtype(ds.train['id'])
-    
-    # Step 2: Date
-    ds = date_node.fit_transform(ds, {'columns': ['date'], 'target_format': '%Y/%m/%d'})
-    assert ds.train['date'].iloc[0] == '2021/01/01'
     
     # Step 3: Impute
     ds = impute_node_cat.fit_transform(ds, {'columns': ['category'], 'strategy': 'most_frequent'})

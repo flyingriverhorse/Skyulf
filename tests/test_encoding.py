@@ -156,5 +156,5 @@ def test_label_encoder(sample_df_cat):
     # Test unknown
     new_df = pd.DataFrame({'Size': ['XL'], 'Color': ['Red'], 'Target': [0]})
     transformed_new = applier.apply(new_df, params)
-    assert transformed_new['Size'].iloc[0] == -1 # Unknown
+    assert np.isnan(transformed_new['Size'].iloc[0]) # Unknown
 

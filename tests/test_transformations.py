@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from core.ml_pipeline.preprocessing.transformations import (
     PowerTransformerCalculator, PowerTransformerApplier,
-    LogTransformerCalculator, LogTransformerApplier
+    SimpleTransformationCalculator, SimpleTransformationApplier
 )
 
 def test_power_transformer():
@@ -11,7 +11,7 @@ def test_power_transformer():
     df = pd.DataFrame({'A': np.random.exponential(size=100)})
     
     calc = PowerTransformerCalculator()
-    params = calc.fit(df, {'method': 'yeo-johnson'})
+    params = calc.fit(df, {'method': 'yeo-johnson', 'columns': ['A']})
     
     applier = PowerTransformerApplier()
     res = applier.apply(df, params)
@@ -23,10 +23,10 @@ def test_power_transformer():
 def test_log_transformer():
     df = pd.DataFrame({'A': [0, 1, 10, 100]})
     
-    calc = LogTransformerCalculator()
-    params = calc.fit(df, {})
+    calc = SimpleTransformationCalculator()
+    params = calc.fit(df, {'transformations': [{'column': 'A', 'method': 'log'}]})
     
-    applier = LogTransformerApplier()
+    applier = SimpleTransformationApplier()
     res = applier.apply(df, params)
     
     assert res['A'].iloc[0] == 0 # log1p(0) = 0

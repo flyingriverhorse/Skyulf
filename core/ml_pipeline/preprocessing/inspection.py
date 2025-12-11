@@ -6,9 +6,8 @@ from ..utils import detect_numeric_columns
 
 class DatasetProfileCalculator(BaseCalculator):
     def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        # Calculate basic stats
-        # This is a lightweight profile. For full profile, we might use pandas-profiling or similar,
-        # but here we just want basic stats for the pipeline metadata.
+        # Generate a lightweight dataset profile
+        # We capture shape, types, and basic numeric stats for pipeline metadata
         
         profile = {}
         

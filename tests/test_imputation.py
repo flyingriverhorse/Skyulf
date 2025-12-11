@@ -21,7 +21,7 @@ def test_simple_imputer_mean(sample_df_missing):
     config = {'strategy': 'mean', 'columns': ['A', 'B']}
     params = calc.fit(sample_df_missing, config)
     
-    assert params['type'] == 'simple'
+    assert params['type'] == 'simple_imputer'
     # Mean of A (1,2,4,5) = 3.0
     assert params['fill_values']['A'] == 3.0
     # Mean of B (10,30,40,50) = 32.5
@@ -60,7 +60,7 @@ def test_knn_imputer(sample_df_missing):
     config = {'columns': ['A', 'B'], 'k_neighbors': 2}
     params = calc.fit(df, config)
     
-    assert params['type'] == 'knn'
+    assert params['type'] == 'knn_imputer'
     assert params['imputer_object'] is not None
     
     # 2. Apply
@@ -80,7 +80,7 @@ def test_iterative_imputer(sample_df_missing):
     config = {'columns': ['A', 'B'], 'max_iter': 5}
     params = calc.fit(df, config)
     
-    assert params['type'] == 'iterative'
+    assert params['type'] == 'iterative_imputer'
     assert params['imputer_object'] is not None
     
     # 2. Apply

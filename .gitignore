@@ -93,9 +93,7 @@ app_data/
 backups/
 
 # === Documentation (build artifacts) ===
-docs/_build/
-docs/.doctrees/
-docs/
+
 
 # === Local library bundle ===
 skyulf-mlflow/

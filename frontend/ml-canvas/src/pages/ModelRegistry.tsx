@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Archive, Box, CheckCircle, XCircle, Clock, ChevronRight, X, Play, AlertCircle } from 'lucide-react';
+import { Archive, Box, CheckCircle, ChevronRight, X, Play } from 'lucide-react';
 
 interface ModelVersion {
   job_id: string;

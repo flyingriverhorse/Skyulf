@@ -39,8 +39,7 @@ class PowerTransformerCalculator(BaseCalculator):
         transformer = PowerTransformer(method=method, standardize=standardize)
         transformer.fit(X[valid_cols])
         
-        # Store standardization params if needed
-        # PowerTransformer stores _scaler (StandardScaler) internally if standardize=True
+        # Capture internal scaler parameters if standardization is enabled
         scaler_params = {}
         if standardize and hasattr(transformer, '_scaler'):
             scaler = transformer._scaler
@@ -75,11 +74,9 @@ class PowerTransformerApplier(BaseApplier):
             
         df_out = X.copy()
         
-        # We can't easily reconstruct PowerTransformer with internal scaler state via public API
-        # So we might need to apply manually or hack it.
-        # Manual application:
-        # 1. Apply power transform (Box-Cox or Yeo-Johnson) using lambdas
-        # 2. Apply standardization using scaler_params
+        # Reconstruct PowerTransformer state for application
+        # We manually restore the lambdas and internal scaler to apply the transform
+        # without re-fitting.
         
         X_vals = df_out[valid_cols].values
         # Filter lambdas and scaler params to match valid_cols
@@ -87,13 +84,6 @@ class PowerTransformerApplier(BaseApplier):
         lambdas_arr = np.array(lambdas)[col_indices]
         
         # 1. Power Transform
-        # We can use sklearn's internal functions or reimplement.
-        # Reimplementing Yeo-Johnson/Box-Cox is non-trivial to get exactly right with sklearn's stability checks.
-        # Better to use PowerTransformer but we need to bypass fit.
-        # But PowerTransformer.transform() checks check_is_fitted.
-        
-        # Alternative: Create a PowerTransformer, set attributes, and call transform.
-        # We need to set: lambdas_, _scaler (if standardize)
         
         try:
             pt = PowerTransformer(method=method, standardize=standardize)

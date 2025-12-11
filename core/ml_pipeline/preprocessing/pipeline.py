@@ -54,7 +54,9 @@ from .transformations import (
     GeneralTransformationCalculator, GeneralTransformationApplier
 )
 from .bucketing import (
-    GeneralBinningCalculator, GeneralBinningApplier
+    GeneralBinningCalculator, GeneralBinningApplier,
+    CustomBinningCalculator, CustomBinningApplier,
+    KBinsDiscretizerCalculator, KBinsDiscretizerApplier
 )
 from .feature_selection import (
     VarianceThresholdCalculator, VarianceThresholdApplier,
@@ -124,17 +126,9 @@ class FeatureEngineer:
 
             transformer = StatefulTransformer(calculator, applier, artifact_store, step_node_id)
             
-            # Some transformers return a tuple (train, test) like Splitter
-            # Or (X, y) like FeatureTargetSplitter
-            # We need to handle these special cases or let StatefulTransformer handle them if possible.
-            # But StatefulTransformer expects SplitDataset or DataFrame.
-            
-            # If the transformer is a Splitter, it might return a SplitDataset directly from its apply method
-            # But StatefulTransformer wraps it.
-            
-            # Special handling for Splitters if they don't fit the standard "fit on train, apply on all" pattern
-            # Actually, TrainTestSplitter is a bit unique. It takes a DataFrame and returns a SplitDataset.
-            # It doesn't really "fit" anything.
+            # Handle special transformers that change data structure
+            # Splitters return SplitDataset or (X, y) tuples instead of a simple DataFrame,
+            # so they bypass the standard StatefulTransformer wrapper.
             
             if transformer_type == "TrainTestSplitter":
                 logger.debug("Handling TrainTestSplitter")
@@ -419,6 +413,10 @@ class FeatureEngineer:
             return GeneralTransformationCalculator(), GeneralTransformationApplier()
         elif type_name == "GeneralBinning":
             return GeneralBinningCalculator(), GeneralBinningApplier()
+        elif type_name == "CustomBinning":
+            return CustomBinningCalculator(), CustomBinningApplier()
+        elif type_name == "KBinsDiscretizer":
+            return KBinsDiscretizerCalculator(), KBinsDiscretizerApplier()
         elif type_name == "VarianceThreshold":
             return VarianceThresholdCalculator(), VarianceThresholdApplier()
         elif type_name == "CorrelationThreshold":

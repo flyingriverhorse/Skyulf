@@ -2,13 +2,13 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
         <loc>https://www.skyulf.com/</loc>
-        <lastmod>2025-11-17</lastmod>
+        <lastmod>2025-12-11</lastmod>
         <changefreq>weekly</changefreq>
         <priority>1.00</priority>
     </url>
     <url>
-        <loc>https://www.skyulf.com/docs/</loc>
-        <lastmod>2025-11-17</lastmod>
+        <loc>https://www.skyulf.com/site/</loc>
+        <lastmod>2025-12-11</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.80</priority>
     </url>
