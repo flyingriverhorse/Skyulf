@@ -2945,6 +2945,32 @@ wheels = [
 ]
 
 [[package]]
+name = "networkx"
+version = "3.4.2"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.11'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fd/1d/06475e1cd5264c0b870ea2cc6fdb3e37177c1e565c43f56ff17a10e3937f/networkx-3.4.2.tar.gz", hash = "sha256:307c3669428c5362aab27c8a1260aa8f47c4e91d3891f48be0141738d8d053e1", size = 2151368, upload-time = "2024-10-21T12:39:38.695Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b9/54/dd730b32ea14ea797530a4479b2ed46a6fb250f682a9cfb997e968bf0261/networkx-3.4.2-py3-none-any.whl", hash = "sha256:df5d4365b724cf81b8c6a7312509d0c22386097011ad1abe274afd5e9d3bbc5f", size = 1723263, upload-time = "2024-10-21T12:39:36.247Z" },
+]
+
+[[package]]
+name = "networkx"
+version = "3.6"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.12' and python_full_version < '3.14'",
+    "python_full_version == '3.11.*'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e8/fc/7b6fd4d22c8c4dc5704430140d8b3f520531d4fe7328b8f8d03f5a7950e8/networkx-3.6.tar.gz", hash = "sha256:285276002ad1f7f7da0f7b42f004bcba70d381e936559166363707fdad3d72ad", size = 2511464, upload-time = "2025-11-24T03:03:47.158Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/c7/d64168da60332c17d24c0d2f08bdf3987e8d1ae9d84b5bbd0eec2eb26a55/networkx-3.6-py3-none-any.whl", hash = "sha256:cdb395b105806062473d3be36458d8f1459a4e4b98e236a66c3a48996e07684f", size = 2063713, upload-time = "2025-11-24T03:03:45.21Z" },
+]
+
+[[package]]
 name = "nodeenv"
 version = "1.9.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3370,6 +3396,32 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
+]
+
+[[package]]
+name = "polars"
+version = "1.36.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "polars-runtime-32" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7b/ce/285beb40d17c4fc846aea8781d11e8031a3d8e51cedc94858977333e1f0c/polars-1.36.0.tar.gz", hash = "sha256:68af01d0c2dd2a4d95a1ddcd9d34d34587b77222434b824d3827282c0ac39941", size = 711540, upload-time = "2025-12-08T17:11:50.34Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/24/d8/71544ade68423f75c1ffc0fc31022aa71e4bc2522005db16a4461597d382/polars-1.36.0-py3-none-any.whl", hash = "sha256:32d6f0a033420122874fff8f3d7cb2c0d758624d4def8e1ff2023b061c2ad70e", size = 801937, upload-time = "2025-12-08T17:10:54.619Z" },
+]
+
+[[package]]
+name = "polars-runtime-32"
+version = "1.36.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a6/0b/7e3b4c3845a994f8bd471b66ec505f053f88cad47a1d6aec2a16dc15707b/polars_runtime_32-1.36.0.tar.gz", hash = "sha256:29d3b3282f3c6ca54b147053d8c0da9c7ae23a7cd80c08ecbefa4f1c266310d3", size = 2786015, upload-time = "2025-12-08T17:11:51.78Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/98/06/f18703120e8656f0852710a70f301204c8531f5dd7aa4b57e3e4498c1b04/polars_runtime_32-1.36.0-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:6060d6ca990ee76d7f56aa5377c323e842b2c5f2a3eb98422670e393908a3569", size = 42514626, upload-time = "2025-12-08T17:10:56.601Z" },
+    { url = "https://files.pythonhosted.org/packages/73/51/96a4129d8754a49c1a3aae550a25859432338899ed522e7bd34902c6493d/polars_runtime_32-1.36.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:ab2f15b9de1b2ea78d421703b829a9ffb0b65889a4e6e1dec75c785cebef45f9", size = 38370421, upload-time = "2025-12-08T17:10:59.639Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/d2/3d47a9904ac4d71fa1110594dd99de7c298e5bd6f6a602a42f35c81bebf5/polars_runtime_32-1.36.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:be0aedf1e2c37b2463923f356d688459843e9436fc47e55fa281ce474ddefacc", size = 43489077, upload-time = "2025-12-08T17:11:02.273Z" },
+    { url = "https://files.pythonhosted.org/packages/00/45/ebd063d4d41500cf8140feb49fce9f3b2386103df2ff2cc34569273b9196/polars_runtime_32-1.36.0-cp39-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:2cf5dee05322394fbff6b1e66e9f2653abee1c067a94a3ac5bd1ea389df28b40", size = 39710563, upload-time = "2025-12-08T17:11:04.956Z" },
+    { url = "https://files.pythonhosted.org/packages/cc/30/ddcce6b988f88b445f365ec793e54bc8f843a175eb3b580aebfa6c732976/polars_runtime_32-1.36.0-cp39-abi3-win_amd64.whl", hash = "sha256:cf2be8e2fe2a89e8985845cf25a67e233211c7b6a29256b647df6a261b987374", size = 43547512, upload-time = "2025-12-08T17:11:08.286Z" },
+    { url = "https://files.pythonhosted.org/packages/92/4f/b2350a98a767de31b7872bd1511530cb7eefe68132f64ba1105679346ca4/polars_runtime_32-1.36.0-cp39-abi3-win_arm64.whl", hash = "sha256:b21cb377c86fe5d0b4de6010dfc3f62c65c4b3b34dcbca77cd1a47548f0f1cba", size = 38938352, upload-time = "2025-12-08T17:11:10.922Z" },
 ]
 
 [[package]]
@@ -4669,6 +4721,8 @@ dependencies = [
     { name = "langid" },
     { name = "libpysal" },
     { name = "matplotlib" },
+    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "networkx", version = "3.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "numba" },
     { name = "numpy" },
     { name = "openml" },
@@ -4677,6 +4731,7 @@ dependencies = [
     { name = "pandas" },
     { name = "passlib", extra = ["bcrypt"] },
     { name = "plotly" },
+    { name = "polars" },
     { name = "psutil" },
     { name = "psycopg2-binary" },
     { name = "pydantic" },
@@ -4734,7 +4789,7 @@ requires-dist = [
     { name = "esda", specifier = ">=2.5.0,<3.0.0" },
     { name = "fastapi", specifier = ">=0.104.0,<1.0.0" },
     { name = "flower", specifier = ">=2.0.0,<3.0.0" },
-    { name = "geopandas", specifier = ">=0.14.0,<0.15.0" },
+    { name = "geopandas", specifier = ">=0.14.0,<1.2.0" },
     { name = "httpx", specifier = ">=0.25.0,<1.0.0" },
     { name = "imbalanced-learn", specifier = ">=0.12.0" },
     { name = "jinja2", specifier = ">=3.1.0,<4.0.0" },
@@ -4742,6 +4797,7 @@ requires-dist = [
     { name = "langid", specifier = ">=1.1.6" },
     { name = "libpysal", specifier = ">=4.10.0,<5.0.0" },
     { name = "matplotlib", specifier = ">=3.9.4" },
+    { name = "networkx", specifier = ">=3.4.2" },
     { name = "numba", specifier = ">=0.60.0" },
     { name = "numpy", specifier = ">=1.24.0,<2.0.0" },
     { name = "openml", specifier = ">=0.15.1" },
@@ -4750,13 +4806,14 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4,<2.0.0" },
     { name = "plotly", specifier = ">=6.3.0" },
+    { name = "polars", specifier = ">=1.36.0" },
     { name = "psutil", specifier = ">=5.9.0,<6.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "pydantic", specifier = ">=2.4.0,<3.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0,<3.0.0" },
-    { name = "pyproj", specifier = ">=3.6.0,<3.7.0" },
-    { name = "pytest", specifier = ">=7.4.4" },
-    { name = "pytest-asyncio", specifier = ">=0.23.8" },
+    { name = "pyproj", specifier = ">=3.6.0,<3.8.0" },
+    { name = "pytest", specifier = ">=7.4.4,<10.0.0" },
+    { name = "pytest-asyncio", specifier = ">=0.23.8,<2.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3.0,<4.0.0" },
     { name = "python-multipart", specifier = ">=0.0.6,<1.0.0" },
@@ -4766,7 +4823,7 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.4.0" },
     { name = "scipy", specifier = ">=1.13.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "shapely", specifier = ">=2.0.2,<2.1.0" },
+    { name = "shapely", specifier = ">=2.0.2,<2.2.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0,<3.0.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.24.0,<1.0.0" },
@@ -4785,8 +4842,8 @@ dev = [
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "mypy", specifier = ">=1.6.0,<2.0.0" },
     { name = "pre-commit", specifier = ">=3.4.0" },
-    { name = "pytest", specifier = ">=7.4.0,<8.0.0" },
-    { name = "pytest-asyncio", specifier = ">=0.21.0,<1.0.0" },
+    { name = "pytest", specifier = ">=7.4.0,<10.0.0" },
+    { name = "pytest-asyncio", specifier = ">=0.21.0,<2.0.0" },
     { name = "pytest-cov", specifier = ">=4.1.0,<5.0.0" },
 ]
 

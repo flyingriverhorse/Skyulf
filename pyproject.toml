@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.0.3"
+version = "0.1.0"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -69,6 +69,8 @@ dependencies = [
     "optuna-integration>=4.0,<5",
     "pytest>=7.4.4,<10.0.0",
     "pytest-asyncio>=0.23.8,<2.0.0",
+    "networkx>=3.4.2",
+    "polars>=1.36.0",
 ]
 
 [dependency-groups]

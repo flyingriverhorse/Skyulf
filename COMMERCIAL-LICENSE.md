@@ -1,9 +1,13 @@
 Skyulf Commercial Terms (Overview)
 
-Skyulf is licensed under the Apache License, Version 2.0. You may use it freely for open-source, commercial, on-prem, or hosted products without a separate copyleft exception.
+Skyulf is licensed under a split model: **Apache 2.0** for the backend/core and **GNU AGPLv3** for the frontend.
+
+*   **Backend (Apache 2.0):** You may use it freely for open-source, commercial, on-prem, or hosted products without a separate copyleft exception.
+*   **Frontend (AGPLv3):** If you modify the frontend and provide it as a service (SaaS), you must open-source your modifications.
 
 When would you still contact us?
 
+- **Commercial License Exception:** If you are building a proprietary product that modifies the frontend and you cannot share your source code (bypassing AGPLv3 requirements).
 - **Enterprise support:** If you need SLAs, roadmap commitments, or long-term maintenance guarantees.
 - **Custom licensing:** If your legal/compliance team requires bespoke terms (e.g., indemnification, audit clauses, or private amendments built on top of Apache-2.0).
 - **Partnerships:** If you’d like co-marketing, joint roadmap planning, or early access to unreleased capabilities.

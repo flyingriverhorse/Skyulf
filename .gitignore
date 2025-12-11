@@ -88,15 +88,12 @@ exports/
 logs/
 temp/
 uploads/
-data/
 data_science_examples/
 app_data/
 backups/
 
 # === Documentation (build artifacts) ===
-docs/_build/
-docs/.doctrees/
-docs/
+
 
 # === Local library bundle ===
 skyulf-mlflow/

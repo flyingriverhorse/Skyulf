@@ -6,7 +6,7 @@ By contributing to this repository you agree to the following short-form Contrib
 
 2. You hereby grant the project maintainer(s) a perpetual, worldwide, non-exclusive, royalty-free, transferable license to use, reproduce, modify, distribute, sublicense, and otherwise exploit your contribution, and the right to grant sublicenses and to relicense the contribution as part of the project.
 
-3. Your contributions are released under the project's license (GNU Affero General Public License v3.0). The project may relicense the code (or portions of the repository) under a different license in the future; by contributing you agree that your contribution may be included under such relicensing.
+3. Your contributions are released under the applicable license for the component being modified (Apache 2.0 for backend/core, GNU AGPLv3 for frontend). The project may relicense the code (or portions of the repository) under a different license in the future; by contributing you agree that your contribution may be included under such relicensing.
 
 4. The project will preserve reasonable credit to contributors in project metadata such as the git history, AUTHORS file, or other attribution mechanisms where practical.
 

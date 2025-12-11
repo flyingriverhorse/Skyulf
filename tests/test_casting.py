@@ -1,24 +1,38 @@
+import pytest
 import pandas as pd
+import numpy as np
+from core.ml_pipeline.preprocessing.casting import CastingCalculator, CastingApplier
 
-from core.feature_engineering.preprocessing.casting import _apply_cast_column_types
-
-
-def test_apply_cast_column_types_casts_to_float_and_tracks_signal():
-    frame = pd.DataFrame({"value": ["1.5", "2.0", "bad"]})
-    node = {
-        "data": {
-            "config": {
-                "columns": ["value"],
-                "target_dtype": "float64",
-                "coerce_on_error": True,
-            }
+def test_casting():
+    df = pd.DataFrame({
+        'A': ['1', '2', '3'],
+        'B': [1, 2, 3],
+        'C': ['2021-01-01', '2021-01-02', 'not_a_date']
+    })
+    
+    # 1. Fit
+    calc = CastingCalculator()
+    config = {
+        'column_types': {
+            'A': 'int',
+            'B': 'float',
+            'C': 'datetime'
         }
     }
-
-    result_frame, summary, signal = _apply_cast_column_types(frame, node)
-
-    assert "Cast columns: attempted 1 column(s) to float64" in summary
-    assert result_frame["value"].dtype == "float64"
-    assert signal.applied_columns == ["value"]
-    assert signal.coerced_values == 1
-    assert pd.isna(result_frame.loc[2, "value"])
+    params = calc.fit(df, config)
+    
+    assert params['type_map']['A'] == 'int64'
+    assert params['type_map']['B'] == 'float64'
+    
+    # 2. Apply
+    applier = CastingApplier()
+    transformed = applier.apply(df, params)
+    
+    assert pd.api.types.is_integer_dtype(transformed['A'])
+    assert pd.api.types.is_float_dtype(transformed['B'])
+    assert pd.api.types.is_datetime64_any_dtype(transformed['C'])
+    
+    # Check values
+    assert transformed['A'].iloc[0] == 1
+    assert transformed['B'].iloc[0] == 1.0
+    assert pd.isna(transformed['C'].iloc[2]) # Coerced error

@@ -7,7 +7,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 ![](https://img.shields.io/badge/tagline-MLOps%20%3A%20FastAPI%20%2B%20Celery-blue)
 
-> ⚠️ **Status:** Active Development. Expect bugs, but also expect rapid progress. Use at your own risk and please report issues on GitHub!
+> ⚠️ **Status:** Active Development. Expect bugs, but also expect rapid progress.
 
 **Machine Learning Operations (MLOps) shouldn't be this hard.**
 
@@ -20,6 +20,7 @@ Built with a modern stack: **FastAPI** (Backend), **React** (Frontend), **Celery
 - [Quick Start](#quick-start)
 - [Key Features](#key-features)
 - [Roadmap](#roadmap)
+- [Version History](#version-history)
 - [Workflow Overview](#workflow-overview)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -36,14 +37,19 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install --upgrade pip
 pip install -r requirements-fastapi.txt
-python -m uvicorn main:app --host 127.0.0.1 --port 8000
+python run_fastapi.py
 ```
 
-Optional: start the Celery worker (Redis required)
+The `run_skyulf.py` script will automatically start the FastAPI server.
 
-```powershell
-.\.venv\Scripts\python.exe -m celery -A celery_worker.celery_app worker --pool=solo --loglevel=info --queues mlops-training
+**Optional: Celery & Redis**
+By default, Skyulf uses Celery and Redis for robust background task management. However, for simple local testing or environments where you cannot run Redis, you can disable this dependency.
+
+Add this to your `.env` file:
+```ini
+USE_CELERY=false
 ```
+When disabled, background tasks (training, ingestion) will run in background threads within the main application process instead of a separate worker.
 
 ### With Docker Compose (Recommended)
 
@@ -51,17 +57,24 @@ Optional: start the Celery worker (Redis required)
 docker compose up --pull=always --build
 ```
 
+This will start the full stack:
+- **FastAPI Backend** (Port 8000)
+- **Redis** (Port 6379)
+- **Celery Worker** (Background jobs)
+
 **Open:**
 - API health — http://127.0.0.1:8000/health
 - Docs (dev mode) — http://127.0.0.1:8000/docs
 
 ## Key Features
 
-*   **🎨 Visual Feature Canvas:** A node-based editor to clean, transform, and engineer features without writing spaghetti code. (30+ built-in nodes).
+*   **🎨 Visual Feature Canvas:** A node-based editor to clean, transform, and engineer features without writing spaghetti code. (25+ built-in nodes).
 *   **🚀 Modern Backend:** Built on FastAPI for high performance and easy API extension.
-*   **⚡ Async by Default:** Heavy training jobs run in the background via Celery & Redis—your UI never freezes.
+*   **⚡ Async by Default:** Heavy training jobs run in the background via Celery & Redis (or background threads)—your UI never freezes.
 *   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or SQL. Start with SQLite (zero-config) and scale to PostgreSQL.
 *   **🧠 Model Training:** Built-in support for Scikit-Learn models with hyperparameter search (Grid/Random/Halving) and optional Optuna integration.
+*   **📦 Model Registry & Deployment:** Version control your models, track metrics, and deploy them to a live inference API with a single click.
+*   **📊 Experiment Tracking:** Compare multiple runs side-by-side with interactive charts, confusion matrices, and ROC curves.
 
 ## Roadmap
 
@@ -73,6 +86,12 @@ We have a clear vision to turn Skyulf into a complete **App Hub** for AI.
 *   **Phase 4: Expansion** - Real-time collaboration, Edge/IoT export, and Audio support.
 
 👉 **[View the full ROADMAP.md](./ROADMAP.md)** for details.
+
+## Version History
+
+We maintain a detailed changelog of all major updates, new features, and architectural changes.
+
+👉 **[View the full VERSION_UPDATE.md](./VERSION_UPDATE.md)** for the complete history.
 
 ## Workflow Overview
 
@@ -96,8 +115,14 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and w
 
 ## License
 
-Open Source: Apache-2.0. See `LICENSE` for full terms.
-Commercial: No separate commercial license is required. If you need SLAs, indemnification, or custom terms, see `COMMERCIAL-LICENSE.md` for partnership/support options.
+Skyulf uses a split licensing model to balance open standards with sustainable development:
+
+*   **Backend & Core:** [Apache 2.0](LICENSE) (Permissive) - Ideal for integration and enterprise use.
+*   **Frontend (Feature Canvas):** [GNU AGPLv3](frontend/feature-canvas/LICENSE) (Copyleft) - Ensures UI improvements are shared back to the community.
+
+**Commercial Use:**
+No separate commercial license is required for internal use or building proprietary plugins on the backend.
+However, if you are building a proprietary SaaS that modifies the frontend and cannot comply with AGPLv3, please see [`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md) for partnership options.
 
 ---
 
