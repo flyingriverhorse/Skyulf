@@ -1,5 +1,4 @@
 * text=auto
-
 # Use LF for code and docs across platforms
 *.py  text eol=lf
 *.sh  text eol=lf
@@ -10,11 +9,9 @@
 *.html text eol=lf
 *.css text eol=lf
 *.js  text eol=lf
-
 # Windows-specific scripts
 *.ps1 text eol=crlf
 *.bat text eol=crlf
-
 # Binary files
 *.png binary
 *.jpg binary
@@ -22,3 +19,4 @@
 *.gif binary
 *.ico binary
 *.pdf binary
+static/video/ML_Canvas.mp4 filter=lfs diff=lfs merge=lfs -text

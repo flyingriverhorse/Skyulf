@@ -1,0 +1,196 @@
+.feature-node {
+  position: relative;
+  min-width: 320px;
+  min-height: 170px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: .9rem;
+  border-radius: 18px;
+  border: 1px solid var(--light-border);
+  background: radial-gradient(circle at top, var(--light-bg-card-start), var(--light-bg-card-end));
+  box-shadow: var(--shadow-subtle);
+  padding: 1.45rem 1.6rem 1.35rem;
+  cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+  color: var(--light-text-primary);
+}
+
+.dark .feature-node {
+  border: 1px solid var(--dark-border);
+  background: radial-gradient(circle at top, var(--dark-bg-card-start), var(--dark-bg-card-end));
+  box-shadow: var(--shadow-strong);
+  color: var(--dark-text-primary);
+}
+
+.feature-node:after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 18px;
+  border: 1px solid rgba(148,163,184,.12);
+  pointer-events: none;
+}
+
+.feature-node--selected {
+  border-color: #5eead499;
+  box-shadow: 0 28px 60px #06b6d442;
+  transform: translateY(-4px);
+}
+
+.feature-node--dataset {
+  background: radial-gradient(circle at top,#1e40aff2,#1e3a8aeb);
+  border-color: #60a5faa6;
+}
+
+.feature-node--pending-warning {
+  border-color: #fbbf24d9;
+  box-shadow: 0 24px 55px #fbbf2433;
+}
+
+.feature-node--pending-highlight {
+  border-color: #fde047f2;
+  animation: feature-node-highlight-pulse 1.2s ease-in-out 3;
+}
+
+.feature-node__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .85rem;
+  margin-bottom: .2rem;
+}
+
+.feature-node__title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: .65rem;
+}
+
+.feature-node__drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: #1e293be6;
+  color: #e2e8f0d9;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: grab;
+  transition: background .2s ease, color .2s ease, transform .2s ease;
+  user-select: none;
+  box-shadow: inset 0 0 0 1px #94a3b859;
+}
+
+.feature-node__drag-handle:active {
+  cursor: grabbing;
+  transform: scale(.94);
+  background: #334155eb;
+}
+
+.feature-node__title {
+  font-weight: 600;
+  font-size: 1.15rem;
+  color: inherit;
+  white-space: pre-line;
+}
+
+.feature-node__controls {
+  display: inline-flex;
+  gap: .45rem;
+  align-items: center;
+}
+
+.feature-node__status-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  font-size: 1rem;
+  line-height: 1;
+  box-shadow: inset 0 0 0 1px #94a3b82e;
+}
+
+.feature-node__status-indicator--loading {
+  color: #3b82f6e6;
+}
+
+.feature-node__status-indicator--pending {
+  background: #fbbf2438;
+  border: 1.5px solid rgba(251,191,36,.45);
+  color: #fde047f2;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.feature-node__status-indicator--success {
+  background: #10b98126;
+  border: 1.5px solid rgba(16,185,129,.4);
+  color: #10b981f2;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.feature-node__status-indicator--error {
+  background: #ef444426;
+  border: 1.5px solid rgba(239,68,68,.4);
+  color: #ef4444f2;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.feature-node__spinner {
+  width: 22px;
+  height: 22px;
+  animation: feature-node-spin 1s linear infinite;
+}
+
+.feature-node__control {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,.35);
+  background: #1e293bd9;
+  color: #f8fafcd9;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+
+.feature-node__control:hover {
+  background: #5e687b59;
+  border-color: #94a3b88c;
+}
+
+.feature-node__control--danger {
+  border-color: #ef44448c;
+  color: #f87171e6;
+}
+
+.feature-node__control--danger:hover {
+  background: #ef444440;
+}
+
+.feature-node__description {
+  margin: 0;
+  color: #cbd5e1eb;
+  font-size: 1.02rem;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+.feature-node__pending-hint {
+  margin: .2rem 0 0;
+  font-size: .92rem;
+  line-height: 1.4;
+  color: #fde047e6;
+}

@@ -9,8 +9,8 @@ from pydantic import BaseModel
 import time
 from datetime import datetime, timezone
 
-from dependencies import get_config
-from config import Settings
+from core.dependencies import get_config
+from core.config import Settings
 
 router = APIRouter()
 
@@ -65,7 +65,6 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
     # Check external services
     external_services = {
         "snowflake": "not_configured" if not settings.SNOWFLAKE_ACCOUNT else "healthy",
-        "openai": "not_configured" if not settings.OPENAI_API_KEY else "unknown",
     }
 
     return DetailedHealthResponse(

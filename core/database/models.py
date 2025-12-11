@@ -190,6 +190,9 @@ class TrainingJob(Base, TimestampMixin):
     graph = Column(JSON, nullable=False)
     artifact_uri = Column(String(500), nullable=True)
     error_message = Column(Text, nullable=True)
+    progress = Column(Integer, default=0)
+    current_step = Column(String(100), nullable=True)
+    logs = Column(JSON, nullable=True)
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
 
@@ -210,6 +213,9 @@ class TrainingJob(Base, TimestampMixin):
             "metrics": self.metrics,
             "artifact_uri": self.artifact_uri,
             "error_message": self.error_message,
+            "progress": self.progress,
+            "current_step": self.current_step,
+            "logs": self.logs,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -245,6 +251,9 @@ class HyperparameterTuningJob(Base, TimestampMixin):
     graph = Column(JSON, nullable=False)
     artifact_uri = Column(String(500), nullable=True)
     error_message = Column(Text, nullable=True)
+    progress = Column(Integer, default=0)
+    current_step = Column(String(100), nullable=True)
+    logs = Column(JSON, nullable=True)
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
 
@@ -274,8 +283,37 @@ class HyperparameterTuningJob(Base, TimestampMixin):
             "best_score": self.best_score,
             "artifact_uri": self.artifact_uri,
             "error_message": self.error_message,
+            "progress": self.progress,
+            "current_step": self.current_step,
+            "logs": self.logs,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class Deployment(Base, TimestampMixin):
+    """
+    Tracks deployed models.
+    """
+    __tablename__ = "deployments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(String(64), nullable=False, index=True) # ID of the TrainingJob or HyperparameterTuningJob
+    model_type = Column(String(100), nullable=False)
+    artifact_uri = Column(String(500), nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    deployed_by = Column(Integer, ForeignKey('users.id'), nullable=True)
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "job_id": self.job_id,
+            "model_type": self.model_type,
+            "artifact_uri": self.artifact_uri,
+            "is_active": self.is_active,
+            "deployed_by": self.deployed_by,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

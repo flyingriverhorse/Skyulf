@@ -6,12 +6,11 @@ This module centralizes the logic to write/read/update/delete the
 keeps behavior separate from the generic database CRUD dispatcher.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 import logging
 
-from . import async_sqlite_queries as sqlite_q
-from . import async_postgres_queries as pg_q
-from config import Settings
+from core.config import Settings
+from . import async_sqlite_queries, async_postgres_queries
 
 logger = logging.getLogger(__name__)
 

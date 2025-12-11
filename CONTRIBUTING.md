@@ -7,6 +7,7 @@ Thanks for considering contributing! This repo focuses on the backend (FastAPI +
 - Install uv: `pip install uv`
 - Sync deps (app + dev): `uv sync --dev`
 - Activate the virtualenv if needed: `.venv` is created in the project root by uv.
+- Copy `.env.example` to `.env` and configure it. Set `USE_CELERY=false` if you don't have Redis installed.
 
 Alternatively, without uv:
 - `python -m venv .venv && .venv/Scripts/Activate.ps1` (Windows PowerShell)

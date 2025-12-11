@@ -7,7 +7,7 @@ This module centralizes migration entrypoints for async FastAPI application.
 from typing import Any, Dict, List
 import logging
 
-from config import Settings
+from core.config import Settings
 from .data_sources import async_sqlite_queries, async_postgres_queries
 
 logger = logging.getLogger(__name__)

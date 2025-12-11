@@ -17,7 +17,7 @@ import logging
 from sqlalchemy import text as sa_text
 from .adapter import async_session_or_connection, get_db_type, DatabaseType
 from .data_sources import async_data_sources_crud
-from config import Settings
+from core.config import Settings
 
 logger = logging.getLogger(__name__)
 

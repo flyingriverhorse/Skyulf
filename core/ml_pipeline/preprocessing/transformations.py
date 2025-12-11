@@ -1,0 +1,294 @@
+from typing import Dict, Any, List, Optional, Union, Tuple
+import logging
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import PowerTransformer
+
+from .base import BaseCalculator, BaseApplier
+from ..utils import detect_numeric_columns, resolve_columns, unpack_pipeline_input, pack_pipeline_output
+
+logger = logging.getLogger(__name__)
+
+# --- Power Transformer (Box-Cox, Yeo-Johnson) ---
+class PowerTransformerCalculator(BaseCalculator):
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
+        # Config: {'method': 'yeo-johnson' | 'box-cox', 'standardize': True, 'columns': [...]}
+        method = config.get('method', 'yeo-johnson')
+        standardize = config.get('standardize', True)
+        
+        cols = resolve_columns(X, config, detect_numeric_columns)
+        
+        if not cols:
+            return {}
+            
+        valid_cols = []
+        if method == 'box-cox':
+            for col in cols:
+                # Box-Cox requires strictly positive data
+                if (X[col] <= 0).any():
+                    continue
+                valid_cols.append(col)
+        else:
+            valid_cols = cols
+            
+        if not valid_cols:
+            return {}
+            
+        transformer = PowerTransformer(method=method, standardize=standardize)
+        transformer.fit(X[valid_cols])
+        
+        # Capture internal scaler parameters if standardization is enabled
+        scaler_params = {}
+        if standardize and hasattr(transformer, '_scaler'):
+            scaler = transformer._scaler
+            if scaler:
+                scaler_params = {
+                    'mean': scaler.mean_.tolist() if scaler.mean_ is not None else None,
+                    'scale': scaler.scale_.tolist() if scaler.scale_ is not None else None
+                }
+
+        return {
+            'type': 'power_transformer',
+            'lambdas': transformer.lambdas_.tolist(),
+            'method': method,
+            'standardize': standardize,
+            'columns': valid_cols,
+            'scaler_params': scaler_params
+        }
+
+class PowerTransformerApplier(BaseApplier):
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+
+        cols = params.get('columns', [])
+        lambdas = params.get('lambdas')
+        method = params.get('method', 'yeo-johnson')
+        standardize = params.get('standardize', True)
+        scaler_params = params.get('scaler_params', {})
+        
+        valid_cols = [c for c in cols if c in X.columns]
+        if not valid_cols or lambdas is None:
+            return pack_pipeline_output(X, y, is_tuple)
+            
+        df_out = X.copy()
+        
+        # Reconstruct PowerTransformer state for application
+        # We manually restore the lambdas and internal scaler to apply the transform
+        # without re-fitting.
+        
+        X_vals = df_out[valid_cols].values
+        # Filter lambdas and scaler params to match valid_cols
+        col_indices = [cols.index(c) for c in valid_cols]
+        lambdas_arr = np.array(lambdas)[col_indices]
+        
+        # 1. Power Transform
+        
+        try:
+            pt = PowerTransformer(method=method, standardize=standardize)
+            pt.lambdas_ = lambdas_arr
+            
+            if standardize:
+                from sklearn.preprocessing import StandardScaler
+                scaler = StandardScaler()
+                
+                mean = np.array(scaler_params.get('mean'))
+                scale = np.array(scaler_params.get('scale'))
+                
+                if len(mean) == len(cols):
+                     mean = mean[col_indices]
+                if len(scale) == len(cols):
+                     scale = scale[col_indices]
+                     
+                scaler.mean_ = mean
+                scaler.scale_ = scale
+                scaler.var_ = np.square(scaler.scale_) # Approximate if not stored
+                pt._scaler = scaler
+                
+            # We need to trick sklearn into thinking it's fitted
+            # Usually setting attributes is enough, but let's see.
+            # PowerTransformer checks hasattr(self, "lambdas_")
+            
+            X_trans = pt.transform(X_vals)
+            df_out[valid_cols] = X_trans
+            
+        except Exception as e:
+            logger.error(f"PowerTransformer application failed: {e}")
+            # Fallback?
+            pass
+            
+        return pack_pipeline_output(df_out, y, is_tuple)
+
+# --- Simple Transformations (Log, Sqrt, etc.) ---
+class SimpleTransformationCalculator(BaseCalculator):
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        # Config: {'transformations': [{'column': 'col1', 'method': 'log'}, ...]}
+        return {
+            'type': 'simple_transformation',
+            'transformations': config.get('transformations', [])
+        }
+
+class SimpleTransformationApplier(BaseApplier):
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+
+        transformations = params.get('transformations', [])
+        if not transformations:
+            return pack_pipeline_output(X, y, is_tuple)
+            
+        df_out = X.copy()
+        
+        for item in transformations:
+            col = item.get('column')
+            method = item.get('method')
+            
+            if col not in df_out.columns:
+                continue
+                
+            series = pd.to_numeric(df_out[col], errors='coerce')
+            
+            if method == 'log':
+                # log1p is safer for zeros
+                if (series < 0).any():
+                    series[series < 0] = np.nan
+                df_out[col] = np.log1p(series)
+                
+            elif method == 'square_root':
+                if (series < 0).any():
+                    series[series < 0] = np.nan
+                df_out[col] = np.sqrt(series)
+                
+            elif method == 'cube_root':
+                df_out[col] = np.cbrt(series)
+                
+            elif method == 'reciprocal':
+                df_out[col] = 1.0 / series.replace(0, np.nan)
+                
+            elif method == 'square':
+                df_out[col] = np.square(series)
+                
+            elif method == 'exponential':
+                # Clip to avoid overflow (exp(709) ~ max float64)
+                # We use a slightly lower bound to be safe, or user provided threshold
+                threshold = item.get('clip_threshold', 700)
+                series_clipped = series.clip(upper=threshold)
+                df_out[col] = np.exp(series_clipped)
+                
+        return pack_pipeline_output(df_out, y, is_tuple)
+
+# --- General Transformation (Combined) ---
+class GeneralTransformationCalculator(BaseCalculator):
+    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+        # Config: {'transformations': [{'column': 'col1', 'method': 'log'}, {'column': 'col2', 'method': 'yeo-johnson'}]}
+        X, _, _ = unpack_pipeline_input(df)
+        
+        transformations_config = config.get('transformations', [])
+        fitted_transformations = []
+        
+        for item in transformations_config:
+            col = item.get('column')
+            method = item.get('method')
+            
+            if col not in X.columns:
+                continue
+                
+            fitted_item = {
+                'column': col,
+                'method': method
+            }
+            
+            if method in ['box-cox', 'yeo-johnson']:
+                # Fit PowerTransformer
+                try:
+                    # Box-Cox requires strictly positive
+                    if method == 'box-cox' and (X[col] <= 0).any():
+                        logger.warning(f"Skipping Box-Cox for column {col} because it contains non-positive values.")
+                        continue
+                        
+                    pt = PowerTransformer(method=method, standardize=True) # Default to standardize=True for power transforms
+                    pt.fit(X[[col]])
+                    
+                    fitted_item['lambdas'] = pt.lambdas_.tolist()
+                    
+                    if hasattr(pt, '_scaler') and pt._scaler:
+                        fitted_item['scaler_params'] = {
+                            'mean': pt._scaler.mean_.tolist() if pt._scaler.mean_ is not None else None,
+                            'scale': pt._scaler.scale_.tolist() if pt._scaler.scale_ is not None else None
+                        }
+                except Exception as e:
+                    logger.warning(f"Failed to fit {method} for column {col}: {e}")
+                    continue
+            
+            fitted_transformations.append(fitted_item)
+            
+        return {
+            'type': 'general_transformation',
+            'transformations': fitted_transformations
+        }
+
+class GeneralTransformationApplier(BaseApplier):
+    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        
+        transformations = params.get('transformations', [])
+        if not transformations:
+            return pack_pipeline_output(X, y, is_tuple)
+            
+        df_out = X.copy()
+        
+        for item in transformations:
+            col = item.get('column')
+            method = item.get('method')
+            
+            if col not in df_out.columns:
+                continue
+                
+            series = pd.to_numeric(df_out[col], errors='coerce')
+            
+            if method in ['box-cox', 'yeo-johnson']:
+                lambdas = item.get('lambdas')
+                scaler_params = item.get('scaler_params')
+                
+                if lambdas is None:
+                    continue
+                    
+                try:
+                    pt = PowerTransformer(method=method, standardize=True)
+                    pt.lambdas_ = np.array(lambdas)
+                    
+                    if scaler_params:
+                        from sklearn.preprocessing import StandardScaler
+                        scaler = StandardScaler()
+                        scaler.mean_ = np.array(scaler_params.get('mean'))
+                        scaler.scale_ = np.array(scaler_params.get('scale'))
+                        scaler.var_ = np.square(scaler.scale_)
+                        pt._scaler = scaler
+                    
+                    # Reshape for sklearn
+                    vals = series.values.reshape(-1, 1)
+                    trans_vals = pt.transform(vals)
+                    df_out[col] = trans_vals.flatten()
+                except Exception as e:
+                    logger.warning(f"Failed to apply {method} for column {col}: {e}")
+                    
+            elif method == 'log':
+                if (series < 0).any():
+                    series[series < 0] = np.nan
+                df_out[col] = np.log1p(series)
+            elif method == 'sqrt' or method == 'square_root':
+                if (series < 0).any():
+                    series[series < 0] = np.nan
+                df_out[col] = np.sqrt(series)
+            elif method == 'cube_root':
+                df_out[col] = np.cbrt(series)
+            elif method == 'reciprocal':
+                df_out[col] = 1.0 / series.replace(0, np.nan)
+            elif method == 'square':
+                df_out[col] = np.square(series)
+            elif method == 'exp' or method == 'exponential':
+                threshold = item.get('clip_threshold', 700)
+                series_clipped = series.clip(upper=threshold)
+                df_out[col] = np.exp(series_clipped)
+                
+        return pack_pipeline_output(df_out, y, is_tuple)

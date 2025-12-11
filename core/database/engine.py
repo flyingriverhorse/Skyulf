@@ -20,10 +20,10 @@ from sqlalchemy.pool import StaticPool
 try:
     # Avoid mutating sys.path here which is
     # brittle and hides import problems.
-    from config import get_settings
+    from core.config import get_settings
 except ImportError as exc:
     raise ImportError(
-        "Could not import 'config'. Ensure you're running the project as a package (python -m <package>) "
+        "Could not import 'core.config'. Ensure you're running the project as a package (python -m <package>) "
         "or that the project root is on PYTHONPATH. Original error: "
         + str(exc)
     ) from exc
@@ -89,9 +89,10 @@ async def init_db() -> None:
     )
 
     # Setup sync database for compatibility (convert async URL to sync)
-    sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite:///")
-    if sync_url.startswith("postgresql+asyncpg://"):
-        sync_url = sync_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+    if settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
+        sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
+    else:
+        sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
 
     sync_engine = create_engine(sync_url, echo=settings.DB_ECHO)
     sync_session_factory = sessionmaker(bind=sync_engine)

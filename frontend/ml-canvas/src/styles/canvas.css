@@ -1,0 +1,212 @@
+/* React Flow Overrides */
+.react-flow {
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at top, var(--light-bg-card-start), var(--light-bg-page-end));
+}
+
+.dark .react-flow {
+  background: radial-gradient(circle at top, var(--dark-bg-flow-start), var(--dark-bg-flow-end));
+}
+
+/* React Flow Controls - Dark Mode Support */
+.react-flow__controls {
+  box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.08);
+}
+
+.dark .react-flow__controls {
+  background-color: #1e293b; /* slate-800 */
+  border-color: #334155; /* slate-700 */
+  box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.4);
+}
+
+.react-flow__controls-button {
+  background-color: #ffffff;
+  border-bottom: 1px solid #eeeeee;
+  color: #555;
+}
+
+.dark .react-flow__controls-button {
+  background-color: #1e293b; /* slate-800 */
+  border-bottom: 1px solid #334155; /* slate-700 */
+  color: #94a3b8; /* slate-400 */
+}
+
+.react-flow__controls-button:hover {
+  background-color: #f4f4f4;
+}
+
+.dark .react-flow__controls-button:hover {
+  background-color: #334155; /* slate-700 */
+  color: #e2e8f0; /* slate-200 */
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+.react-flow__handle {
+  width: 22px !important;
+  height: 22px !important;
+  border: 3px solid #0f172a !important;
+  cursor: pointer !important;
+  transition: all .2s ease !important;
+  z-index: 10 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  background: #94a3b847 !important;
+  backdrop-filter: blur(2px);
+}
+
+.react-flow__handle:hover {
+  width: 24px !important;
+  height: 24px !important;
+  transform: scale(1.1) !important;
+  box-shadow: 0 0 0 6px #94a3b840 !important;
+  z-index: 20 !important;
+}
+
+.react-flow__handle-right {
+  right: 0 !important;
+  transform: translate(calc(50% - 4px), -50%) !important;
+  background: #2dd4bf33 !important;
+  border-color: #14b8a6d9 !important;
+}
+
+.react-flow__handle-right:hover {
+  background: #14b8a647 !important;
+  box-shadow: 0 0 0 6px #14b8a64d !important;
+  transform: translate(calc(50% - 4px), -50%) scale(1.1) !important;
+}
+
+.react-flow__handle-left {
+  left: 0 !important;
+  transform: translate(-50%, -50%) !important;
+  background: #94a3b840 !important;
+  border-color: #64748be6 !important;
+}
+
+.react-flow__handle-left:hover {
+  background: #64748b52 !important;
+  box-shadow: 0 0 0 6px #94a3b84d !important;
+  transform: translate(-50%, -50%) scale(1.1) !important;
+}
+
+.react-flow__handle-top {
+  top: 0 !important;
+  transform: translateY(-50%) !important;
+  background: #94a3b840 !important;
+  border-color: #64748be6 !important;
+}
+
+.react-flow__handle-top:hover {
+  background: #64748b52 !important;
+  box-shadow: 0 0 0 6px #94a3b847 !important;
+  transform: translateY(-50%) scale(1.1) !important;
+}
+
+.react-flow__handle-bottom {
+  bottom: 0 !important;
+  transform: translateY(50%) !important;
+  background: #2dd4bf33 !important;
+  border-color: #14b8a6d9 !important;
+}
+
+.react-flow__handle-bottom:hover {
+  background: #14b8a647 !important;
+  box-shadow: 0 0 0 6px #14b8a64d !important;
+  transform: translateY(50%) scale(1.1) !important;
+}
+
+.react-flow__attribution {
+  display: none !important;
+}
+
+/* Edge Animations */
+.animated-edge {
+  pointer-events: visibleStroke;
+  transition: all .2s ease;
+}
+
+.animated-edge--hovered .animated-edge__base {
+  stroke-width: 4 !important;
+}
+
+.animated-edge__interaction {
+  stroke: transparent;
+  stroke-width: 24px;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.animated-edge__base {
+  transition: stroke-width .2s ease;
+}
+
+.animated-edge__trail {
+  animation: feature-edge-dash 1.8s linear infinite;
+  pointer-events: none;
+}
+
+.animated-edge__spark {
+  opacity: .6;
+  animation: feature-edge-spark 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Edge Remove Button */
+.canvas-edge-remove {
+  pointer-events: none;
+  overflow: visible;
+  opacity: 0;
+  transform: scale(.82);
+  transform-origin: center;
+  transition: opacity .16s ease, transform .16s ease;
+}
+
+.canvas-edge-remove--visible {
+  pointer-events: all;
+  opacity: 1;
+  transform: scale(1);
+}
+
+.canvas-edge-remove__wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.canvas-edge-remove__button {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(71,85,105,.65);
+  background: #0f172aeb;
+  color: #e2e8f0e6;
+  font-size: 20px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 10px 20px #02061759;
+  opacity: 0;
+  transform: scale(.86);
+  transition: transform .2s ease, border-color .2s ease, background .2s ease, opacity .16s ease;
+  pointer-events: none;
+}
+
+.canvas-edge-remove--visible .canvas-edge-remove__button {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: all;
+}
+
+.canvas-edge-remove__button:hover {
+  transform: scale(1.08);
+  border-color: #5eead4a6;
+  background: #1e293bf2;
+}
