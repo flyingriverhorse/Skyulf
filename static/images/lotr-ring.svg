@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- stylized original ring SVG — small, lightweight, non-copyright artwork -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="24" height="24" aria-hidden="true">
+  <defs>
+    <linearGradient id="g" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#f2c94c" />
+      <stop offset="100%" stop-color="#b8860b" />
+    </linearGradient>
+  </defs>
+  <!-- outer ring -->
+  <circle cx="32" cy="32" r="22" fill="none" stroke="url(#g)" stroke-width="4" />
+  <!-- inner band shadow -->
+  <ellipse cx="32" cy="34" rx="14" ry="6" fill="#000" opacity="0.06" />
+  <!-- small embellishment to make it distinct -->
+  <path d="M40 22c-2 1-6 2-8 2s-6-1-8-2" stroke="#7a4f02" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.9" />
+</svg>
