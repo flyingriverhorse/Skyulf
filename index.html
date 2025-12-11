@@ -71,11 +71,16 @@
                     animation: {
                         'float': 'float 6s ease-in-out infinite',
                         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'scroll': 'scroll 40s linear infinite',
                     },
                     keyframes: {
                         float: {
                             '0%, 100%': { transform: 'translateY(0)' },
                             '50%': { transform: 'translateY(-20px)' },
+                        },
+                        scroll: {
+                            '0%': { transform: 'translateX(0)' },
+                            '100%': { transform: 'translateX(-50%)' },
                         }
                     }
                 }
@@ -217,9 +222,9 @@
                     <div class="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                         <i data-feather="cpu" class="w-6 h-6 text-indigo-400"></i>
                     </div>
-                    <h3 class="text-xl font-semibold text-white mb-3">Async Training</h3>
+                    <h3 class="text-xl font-semibold text-white mb-3">Background Training</h3>
                     <p class="text-slate-400 leading-relaxed">
-                        Powered by Celery & Redis. Run heavy training jobs in the background while you keep working.
+                        Run heavy training jobs in the background while you keep working. Optionally powered by Celery & Redis.
                     </p>
                 </div>
 
@@ -230,7 +235,7 @@
                     </div>
                     <h3 class="text-xl font-semibold text-white mb-3">One-Click Deploy</h3>
                     <p class="text-slate-400 leading-relaxed">
-                        Move from experiment to production instantly. Serve your models via a high-performance FastAPI endpoint.
+                        Go from experiment to production instantly. Serve predictions via a built-in REST API.
                     </p>
                 </div>
             </div>
@@ -244,22 +249,22 @@
             <div class="flex flex-col lg:flex-row-reverse items-center gap-16">
                 <div class="lg:w-1/2">
                     <div class="inline-block px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold mb-6">DATA INGESTION</div>
-                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Connect your data.<br>Anywhere it lives.</h2>
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Load your data.<br>Keep it on your machine.</h2>
                     <p class="text-slate-400 text-lg mb-8 leading-relaxed">
-                        Ingest data from CSVs, Parquet files, or SQL databases. Skyulf automatically detects schemas and caches datasets for rapid iteration.
+                        Import CSV, Parquet, or SQL datasets directly. Skyulf auto-detects column types and caches everything for fast, repeatable experiments.
                     </p>
                     <ul class="space-y-4 mb-8">
                         <li class="flex items-center gap-3 text-slate-300">
                             <i data-feather="check-circle" class="w-5 h-5 text-emerald-500"></i>
-                            <span>Zero-copy Polars integration</span>
+                            <span>Smart column type detection</span>
                         </li>
                         <li class="flex items-center gap-3 text-slate-300">
                             <i data-feather="check-circle" class="w-5 h-5 text-emerald-500"></i>
-                            <span>Automatic type inference</span>
+                            <span>Built-in dataset caching</span>
                         </li>
                         <li class="flex items-center gap-3 text-slate-300">
                             <i data-feather="check-circle" class="w-5 h-5 text-emerald-500"></i>
-                            <span>Local file system support</span>
+                            <span>No data leaves your network</span>
                         </li>
                     </ul>
                 </div>
@@ -277,7 +282,7 @@
                     <div class="inline-block px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-semibold mb-6">FEATURE ENGINEERING</div>
                     <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Stop writing boilerplate.<br>Start designing pipelines.</h2>
                     <p class="text-slate-400 text-lg mb-8 leading-relaxed">
-                        The Feature Canvas lets you visualize your data flow. Handle missing values, encode categoricals, and scale features with pre-built nodes and more.
+                        The Feature Canvas lets you visualize your data transformations. Handle missing values, encode categories, scale features, and more—all with drag-and-drop nodes.
                     </p>
                     <ul class="space-y-4 mb-8">
                         <li class="flex items-center gap-3 text-slate-300">
@@ -402,8 +407,8 @@
                         Train models on patient data or research datasets that can't leave your infrastructure due to GDPR or institutional policies.
                     </p>
                     <ul class="space-y-2 text-sm text-slate-500">
-                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>Local CSV/Parquet ingestion</li>
-                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>No cloud uploads</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>HIPAA-friendly workflows</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>100% on-premise processing</li>
                     </ul>
                 </div>
 
@@ -618,27 +623,43 @@
     </section>
 
     <!-- Tech Stack -->
-    <section id="stack" class="py-16">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-8">Powered by modern open source</p>
-            <div class="flex flex-wrap justify-center items-center gap-8 opacity-70 grayscale hover:grayscale-0 transition-all duration-500">
-                <!-- Simple text representations for logos to keep it clean/fast without external SVGs -->
-                <div class="flex items-center gap-2">
-                    <span class="text-xl font-bold text-teal-400">FastAPI</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xl font-bold text-blue-400">React</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xl font-bold text-green-400">Celery</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xl font-bold text-red-400">Redis</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xl font-bold text-blue-300">Polars</span>
-                </div>
+    <section id="stack" class="py-16 overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-8">
+            <p class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Powered by modern open source</p>
+        </div>
+        
+        <div class="relative flex overflow-x-hidden group">
+            <div class="animate-scroll whitespace-nowrap flex gap-16 items-center">
+                <!-- First Set -->
+                <span class="text-2xl font-bold text-orange-400/80">Scikit-learn</span>
+                <span class="text-2xl font-bold text-blue-400/80">Pandas</span>
+                <span class="text-2xl font-bold text-teal-400/80">FastAPI</span>
+                <span class="text-2xl font-bold text-cyan-400/80">React</span>
+                <span class="text-2xl font-bold text-purple-400/80">Optuna</span>
+                <span class="text-2xl font-bold text-lime-400/80">Celery</span>
+                <span class="text-2xl font-bold text-red-400/80">Redis</span>
+                <span class="text-2xl font-bold text-indigo-400/80">Polars</span>
+                <span class="text-2xl font-bold text-yellow-400/80">NumPy</span>
+                <span class="text-2xl font-bold text-pink-400/80">Imbalanced-learn</span>
+                <span class="text-2xl font-bold text-emerald-400/80">SQLAlchemy</span>
+
+                <!-- Duplicate Set for Seamless Loop -->
+                <span class="text-2xl font-bold text-orange-400/80">Scikit-learn</span>
+                <span class="text-2xl font-bold text-blue-400/80">Pandas</span>
+                <span class="text-2xl font-bold text-teal-400/80">FastAPI</span>
+                <span class="text-2xl font-bold text-cyan-400/80">React</span>
+                <span class="text-2xl font-bold text-purple-400/80">Optuna</span>
+                <span class="text-2xl font-bold text-lime-400/80">Celery</span>
+                <span class="text-2xl font-bold text-red-400/80">Redis</span>
+                <span class="text-2xl font-bold text-indigo-400/80">Polars</span>
+                <span class="text-2xl font-bold text-yellow-400/80">NumPy</span>
+                <span class="text-2xl font-bold text-pink-400/80">Imbalanced-learn</span>
+                <span class="text-2xl font-bold text-emerald-400/80">SQLAlchemy</span>
             </div>
+            
+            <!-- Fade Edges -->
+            <div class="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-slate-950 to-transparent z-10"></div>
+            <div class="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-slate-950 to-transparent z-10"></div>
         </div>
     </section>
 
