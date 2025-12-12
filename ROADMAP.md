@@ -39,14 +39,13 @@ Since I am building this solo, I am prioritizing **stability and user experience
 *Goal: Make the current experience smooth, predictable, and enjoyable.*
 
 #### UI/UX Consistency & Architecture
-*   **Extract Core Library (`skyulf-core`):** Separate the pure ML logic (transformers, pipeline utils) from the web application. This allows deployed models to run with a lightweight `pip install skyulf-core` instead of the full platform.
 *   **Architecture Strategy:** Use **React + Vite** exclusively for the high-interactivity Feature Canvas and Dashboard. FastAPI serves only JSON APIs.
 *   **Unified Theming:** Ensure consistent styling across the app.
 *   Unify layout, typography, and theming between the Canvas and the rest of the app.
 *   Make node interactions feel "buttery" (dragging, zooming, connecting edges).
 
 #### Robustness
-*   **Type Checking:** Strengthen type hints across `core/feature_engineering`, `core/data_ingestion`, and training code.
+*   **Type Checking:** Strengthen type hints across `core/ml_pipeline`, `core/data_ingestion`.
 *   **Testing:** Grow test coverage for feature engineering pipelines and training jobs (unit + a few end-to-end tests).
 *   **Resilience:** Handle large files, weird encodings, and missing data patterns without crashes.
 
@@ -111,6 +110,27 @@ Since I am building this solo, I am prioritizing **stability and user experience
 ### Phase 3: The "App Hub" Vision (Long-Term)
 *Goal: Turn Skyulf into a hub where people build, share, and deploy ML systems.*
 
+#### The "Serialize Everything" Engine (Skyulf Core)
+The core differentiator of Skyulf is the underlying philosophy of the **Skyulf Core**. We are building the "Holy Grail" of MLOps: a truly portable, self-contained pipeline object.
+
+**The Goal:** `pipe.save("model.skyulf")` → `Pipeline.load("model.skyulf")`
+
+This single file contains **everything**:
+*   **Schema:** Column names and types.
+*   **Preprocessing:** Imputers, scalers, encoders (with their fitted state).
+*   **Model:** The trained binary weights.
+*   **Validation:** Rules and constraints.
+*   **Metadata:** Training date, dataset hash, version.
+
+**Key Features:**
+1.  **Single-Object Pipeline:** Bundle preprocessing and modeling together. No more "pickle hell".
+2.  **Automatic Schema Enforcement:** Catches "schema drift" and bad data types instantly at inference time.
+3.  **Portable Inference Format:** Export to `.skyulf`, `.onnx`, `.wasm`, or `docker/`.
+4.  **Fitted Parameters as First-Class Citizens:** Inspect learned parameters (means, vocabularies) directly as JSON.
+5.  **Built-in Data Validation:** Constraints (`age > 0`) travel with the model.
+6.  **Zero-Dependency "Lite" Mode:** Export a minimal version that runs with **only NumPy**.
+7.  **Pipeline Diffing:** Compare two pipelines to see exactly what changed.
+
 #### Production Serving & Real-time - High-Performance Architecture (Rust Integration): Scale to massive datasets and production-grade latency.
 *   **Rust Model Serving:** Build a low-latency inference API using **Axum** and **ONNX Runtime** to serve models with <10ms latency.
 *   **Real-time Sidecar:** Implement a lightweight Rust sidecar service to handle thousands of concurrent WebSocket connections for live progress updates.
@@ -118,7 +138,9 @@ Since I am building this solo, I am prioritizing **stability and user experience
 #### Advanced Export & Standalone Deployment
 *   **Export Standalone API (ZIP):** Generate a lightweight, self-contained ZIP file containing the trained model, preprocessing pipeline, and a ready-to-run FastAPI/Flask app. Users can unzip and run `python main.py` to serve their model anywhere.
 *   **Notebook Export:** "Export to Jupyter Notebook" button that generates a clean, runnable notebook with all your pipeline steps, so you can tweak the code manually.
-*   **Python SDK:** A developer-friendly Python library (`import skyulf`) to interact with the platform programmatically, trigger pipelines, or fetch predictions.
+*   **Python SDK (Skyulf Core):** The foundation of the "Serialize Everything" engine (see above).
+    *   **Benefit:** Deployed models run with a lightweight `pip install skyulf-core` (zero dependencies on FastAPI/DB).
+    *   **Usage:** `import skyulf` to programmatically build, train, save, and load pipelines.
 *   **One-Click App (Streamlit/Gradio):** Automatically generate a simple web app from trained model so you can demo it to stakeholders instantly.
 *   **Docker Export:** Generate a Dockerfile and build script to containerize the standalone API for cloud deployment (AWS/Azure/GCP).
 *   **ONNX export:** For supported models, export to ONNX so they can be served in non-Python environments.
