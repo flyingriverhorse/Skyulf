@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.casting import CastingCalculator, CastingApplier
+from skyulf.preprocessing.casting import CastingCalculator, CastingApplier
 
 def test_casting():
     df = pd.DataFrame({

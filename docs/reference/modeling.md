@@ -1,19 +1,19 @@
-# Modeling & Preprocessing
+# Modeling Reference
 
-This section covers the feature engineering nodes available in Skyulf.
+This section covers the modeling components available in Skyulf.
 
-## Cleaning
+## Base Classes
 
-::: core.ml_pipeline.preprocessing.cleaning
+::: skyulf.modeling.base
 
-## Feature Generation
+## Classification
 
-::: core.ml_pipeline.preprocessing.feature_generation
+::: skyulf.modeling.classification
 
-## Transformations
+## Regression
 
-::: core.ml_pipeline.preprocessing.transformations
+::: skyulf.modeling.regression
 
-## Outliers
+## Tuning
 
-::: core.ml_pipeline.preprocessing.outliers
+::: skyulf.modeling.tuning

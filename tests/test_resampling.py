@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.resampling import (
+from skyulf.preprocessing.resampling import (
     OversamplingCalculator, OversamplingApplier,
     UndersamplingCalculator, UndersamplingApplier
 )

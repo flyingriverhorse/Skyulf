@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.feature_generation import (
+from skyulf.preprocessing.feature_generation import (
     PolynomialFeaturesCalculator, PolynomialFeaturesApplier,
     FeatureGenerationCalculator, FeatureGenerationApplier
 )

@@ -31,7 +31,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [.]
+          paths: [., skyulf-core]
           options:
             docstring_style: google
             show_source: true
@@ -54,7 +54,8 @@ nav:
   - API Reference:
     - Execution Engine: reference/execution.md
     - Data Ingestion: reference/data.md
-    - Preprocessing Reference: reference/modeling.md
+    - Modeling Reference: reference/modeling.md
+    - Preprocessing Reference: reference/preprocessing.md
     - Modeling:
       - Overview: modeling/index.md
       - Classification: modeling/classification.md

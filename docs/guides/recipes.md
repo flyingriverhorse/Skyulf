@@ -359,7 +359,7 @@ steps = [
 ### Classification with Random Forest
 
 ```python
-from core.ml_pipeline.modeling.classification import RandomForestClassifierCalculator
+from skyulf.modeling.classification import RandomForestClassifierCalculator
 
 config = {
     "n_estimators": 100,
@@ -372,7 +372,7 @@ config = {
 ### Regression with Ridge
 
 ```python
-from core.ml_pipeline.modeling.regression import RidgeRegressionCalculator
+from skyulf.modeling.regression import RidgeRegressionCalculator
 
 config = {
     "alpha": 1.0,
@@ -435,7 +435,7 @@ tuning_config = {
 ## Complete Pipeline Example
 
 ```python
-from core.ml_pipeline.preprocessing.pipeline import FeatureEngineer
+from skyulf.preprocessing.pipeline import FeatureEngineer
 
 # Full preprocessing pipeline
 steps = [

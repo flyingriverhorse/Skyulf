@@ -38,7 +38,7 @@ print(df.head())
 ### Step 2: Create Train/Test Split
 
 ```python
-from core.ml_pipeline.data.container import SplitDataset
+from skyulf.data.dataset import SplitDataset
 from sklearn.model_selection import train_test_split
 
 # Split 80/20
@@ -57,7 +57,7 @@ print(f"Train: {len(dataset.train)}, Test: {len(dataset.test)}")
 ### Step 3: Define Preprocessing Steps
 
 ```python
-from core.ml_pipeline.preprocessing.pipeline import FeatureEngineer
+from skyulf.preprocessing.pipeline import FeatureEngineer
 
 # Define preprocessing steps
 preprocessing_steps = [
@@ -86,18 +86,13 @@ print(f"Processed train shape: {train_processed.shape}")
 ### Step 4: Train a Model
 
 ```python
-from core.ml_pipeline.modeling.classification import RandomForestClassifierCalculator, RandomForestClassifierApplier
-from core.ml_pipeline.modeling.base import StatefulEstimator
-from core.ml_pipeline.artifacts.local import LocalArtifactStore
-
-# Setup artifact store (where models are saved)
-artifact_store = LocalArtifactStore("./tutorial_artifacts")
+from skyulf.modeling.classification import RandomForestClassifierCalculator, RandomForestClassifierApplier
+from skyulf.modeling.base import StatefulEstimator
 
 # Create estimator
 estimator = StatefulEstimator(
     calculator=RandomForestClassifierCalculator(),
     applier=RandomForestClassifierApplier(),
-    artifact_store=artifact_store,
     node_id="iris_classifier"
 )
 

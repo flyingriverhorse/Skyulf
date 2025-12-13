@@ -1,6 +1,6 @@
 # Classification Models
 
-The `core.ml_pipeline.modeling.classification` module provides calculators and appliers for classification tasks.
+The `skyulf.modeling.classification` module provides calculators and appliers for classification tasks.
 
 ## Logistic Regression
 
@@ -8,7 +8,7 @@ A linear model for classification. Wraps `sklearn.linear_model.LogisticRegressio
 
 ### Usage
 ```python
-from core.ml_pipeline.modeling.classification import LogisticRegressionCalculator
+from skyulf.modeling.classification import LogisticRegressionCalculator
 
 calc = LogisticRegressionCalculator()
 # Override default parameters
@@ -30,7 +30,7 @@ An ensemble learning method using multiple decision trees. Wraps `sklearn.ensemb
 
 ### Usage
 ```python
-from core.ml_pipeline.modeling.classification import RandomForestClassifierCalculator
+from skyulf.modeling.classification import RandomForestClassifierCalculator
 
 calc = RandomForestClassifierCalculator()
 # Override default parameters

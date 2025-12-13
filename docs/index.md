@@ -67,11 +67,16 @@ To enable Celery for production workloads:
 
 ## Documentation Structure
 
-*   **[Getting Started](guides/getting_started.md)**: Complete tutorial from data loading to model deployment.
-*   **[Common Recipes](guides/recipes.md)**: Quick reference for common ML tasks.
-*   **[Python API Guide](python_api.md)**: Detailed guide for programmatic usage.
-*   **[Architecture](architecture.md)**: Understand the system design and core components.
-*   **[API Reference](reference/execution.md)**: Detailed API documentation for developers.
+*   **Platform (Backend)**:
+   *   **[Backend Python API Guide](python_api.md)**: Programmatic usage of backend modules (`core.*`).
+   *   **[Data Ingestion](data/index.md)**: Connectors + profiling (`core.data_ingestion`).
+   *   **[Architecture](architecture.md)**: System design and responsibilities.
+*   **Skyulf Core (Library)**:
+   *   **[Modeling Overview](modeling/index.md)**: Training and applying models.
+   *   **[Preprocessing Reference](reference/preprocessing.md)**: Feature engineering nodes.
+   *   **[Modeling Reference](reference/modeling.md)**: Modeling components.
+*   **Reference**:
+   *   **[Backend Execution Engine](reference/execution.md)**
 
 ---
 

@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.drop_and_missing import (
+from skyulf.preprocessing.drop_and_missing import (
     DropMissingColumnsCalculator, DropMissingColumnsApplier,
     DropMissingRowsCalculator, DropMissingRowsApplier,
     DeduplicateCalculator, DeduplicateApplier

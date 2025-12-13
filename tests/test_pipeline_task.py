@@ -2,9 +2,9 @@ import pytest
 import uuid
 from unittest.mock import MagicMock, patch
 from datetime import datetime
-from core.ml_pipeline.tasks import run_pipeline_task
-from core.database.models import TrainingJob, HyperparameterTuningJob
-from core.ml_pipeline.execution.schemas import PipelineExecutionResult, NodeExecutionResult
+from backend.ml_pipeline.tasks import run_pipeline_task
+from backend.database.models import TrainingJob, HyperparameterTuningJob
+from backend.ml_pipeline.execution.schemas import PipelineExecutionResult, NodeExecutionResult
 
 # Mock data
 MOCK_JOB_ID = str(uuid.uuid4())

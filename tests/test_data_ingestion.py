@@ -2,8 +2,8 @@ import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 import polars as pl
 from datetime import datetime
-from core.data_ingestion.tasks import ingest_data_task
-from core.database.models import DataSource
+from backend.data_ingestion.tasks import ingest_data_task
+from backend.database.models import DataSource
 
 @pytest.fixture
 def mock_session():

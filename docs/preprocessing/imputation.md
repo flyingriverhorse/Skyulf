@@ -5,7 +5,7 @@ The `imputation` module provides strategies for filling missing values. These tr
 ## Usage Example
 
 ```python
-from core.ml_pipeline.preprocessing.pipeline import FeatureEngineer
+from skyulf.preprocessing.pipeline import FeatureEngineer
 import pandas as pd
 import numpy as np
 

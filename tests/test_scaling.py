@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.scaling import (
+from skyulf.preprocessing.scaling import (
     StandardScalerCalculator, StandardScalerApplier,
     MinMaxScalerCalculator, MinMaxScalerApplier,
     RobustScalerCalculator, RobustScalerApplier,

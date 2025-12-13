@@ -5,7 +5,7 @@ The `casting` module handles data type conversions. These transformers are typic
 ## Usage Example
 
 ```python
-from core.ml_pipeline.preprocessing.pipeline import FeatureEngineer
+from skyulf.preprocessing.pipeline import FeatureEngineer
 import pandas as pd
 
 # Sample Data

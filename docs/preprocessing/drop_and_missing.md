@@ -5,7 +5,7 @@ The `drop_and_missing` module handles dropping rows/columns and creating missing
 ## Usage Example
 
 ```python
-from core.ml_pipeline.preprocessing.pipeline import FeatureEngineer
+from skyulf.preprocessing.pipeline import FeatureEngineer
 import pandas as pd
 import numpy as np
 

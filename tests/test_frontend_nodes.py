@@ -2,10 +2,10 @@ import pytest
 import pandas as pd
 import numpy as np
 import os
-from core.ml_pipeline.execution.engine import PipelineEngine
-from core.ml_pipeline.execution.schemas import PipelineConfig, NodeConfig
-from core.ml_pipeline.artifacts.local import LocalArtifactStore
-from core.ml_pipeline.registry import NodeRegistry
+from backend.ml_pipeline.execution.engine import PipelineEngine
+from backend.ml_pipeline.execution.schemas import PipelineConfig, NodeConfig
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.ml_pipeline.registry import NodeRegistry
 
 # Get all node IDs to ensure we cover them
 ALL_NODES = {node.id: node for node in NodeRegistry.get_all_nodes()}

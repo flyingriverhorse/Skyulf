@@ -1,10 +1,10 @@
 # Data Ingestion
 
-The `core.ml_pipeline.data` module handles loading datasets from various file formats.
+Skyulf uses a small set of reusable dataset utilities and containers.
 
 ## DataLoader
 
-The `DataLoader` class provides methods to load full datasets or samples for previewing.
+The `DataLoader` helper provides methods to load full datasets or samples for previewing.
 
 ### Supported Formats
 *   **CSV** (`.csv`)
@@ -15,7 +15,7 @@ The `DataLoader` class provides methods to load full datasets or samples for pre
 ```python
 import os
 import tempfile
-from core.ml_pipeline.data.loader import DataLoader
+from core.ml_pipeline.execution.engine import DataLoader
 
 loader = DataLoader()
 
@@ -37,7 +37,7 @@ finally:
 The `SplitDataset` container holds the training, testing, and optional validation splits of your data. This is the standard data object passed through the ML pipeline.
 
 ```python
-from core.ml_pipeline.data.container import SplitDataset
+from skyulf.data.dataset import SplitDataset
 import pandas as pd
 
 train_df = pd.DataFrame({"feature": [1, 2, 3], "target": [0, 1, 0]})

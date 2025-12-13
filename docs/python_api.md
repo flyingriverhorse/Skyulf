@@ -1,6 +1,8 @@
-# Python API Guide
+# Backend Python API Guide (`core.*`)
 
-This guide provides a comprehensive overview of using Skyulf as a standalone Python library. While the platform includes a web interface, the core logic is decoupled and can be used programmatically for research, automation, or integration into other systems.
+This guide documents Skyulf's backend Python modules (the `core.*` package) that power the FastAPI server and Celery worker.
+
+If you want the standalone Python library (imported as `skyulf`), see the Skyulf Core docs under the **API Reference** section.
 
 ## 1. Environment Setup
 
@@ -11,10 +13,10 @@ pip install -r requirements-fastapi.txt
 ```
 
 ```python
-import sys
 import os
+import sys
 
-# Ensure the project root is in your PYTHONPATH
+# Ensure the repo root is on your PYTHONPATH so `import core` works.
 sys.path.append(os.getcwd())
 ```
 
@@ -23,8 +25,7 @@ sys.path.append(os.getcwd())
 The first step is loading your data. Skyulf provides a `DataLoader` that handles various formats efficiently.
 
 ```python
-from core.ml_pipeline.data.loader import DataLoader
-from core.ml_pipeline.data.container import SplitDataset
+from core.ml_pipeline.execution.engine import DataLoader
 import pandas as pd
 
 # Initialize Loader
@@ -130,9 +131,9 @@ Once a pipeline is trained, you can use the saved artifacts to make predictions 
 Note that Skyulf uses a **Stateless Applier** pattern. You load the *parameters* (artifacts) and pass them to an *Applier* instance.
 
 ```python
-from core.ml_pipeline.preprocessing.imputation import SimpleImputerApplier
-from core.ml_pipeline.preprocessing.encoding import OneHotEncoderApplier
-from core.ml_pipeline.modeling.classification import RandomForestClassifierApplier
+from skyulf.preprocessing.imputation import SimpleImputerApplier
+from skyulf.preprocessing.encoding import OneHotEncoderApplier
+from skyulf.modeling.classification import RandomForestClassifierApplier
 
 # 1. Load Artifacts (Parameters)
 # The engine saves artifacts using the node ID.
@@ -155,12 +156,12 @@ new_data = pd.DataFrame({
 })
 
 # 4. Apply Transformations
-# Appliers return (df, metadata) tuple, we take the first element
-step1_out = imputer.apply(new_data, impute_params)
-step2_out = encoder.apply(step1_out, encode_params)
+# Appliers return (df, metadata) tuples; we keep the DataFrame.
+step1_df, _ = imputer.apply(new_data, impute_params)
+step2_df, _ = encoder.apply(step1_df, encode_params)
 
 # 5. Predict
-predictions = model_applier.predict(step2_out, model_params)
+predictions = model_applier.predict(step2_df, model_params)
 
 print("Predictions:", predictions)
 ```

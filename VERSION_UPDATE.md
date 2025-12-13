@@ -1,8 +1,43 @@
 # Version Updates
 
+*   **v0.1.1 (2025-12-xx):** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 (2025-12-10):** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
 
 ------------------------------------------------------------
+
+## v0.1.1 (2025-12-12)
+**"The Observability & Stability Update"**
+
+This release focuses on developer experience, system stability, and deep observability into the training process.
+
+### 🔍 Observability & Live Logging
+- **Granular Tuning Logs:** Replaced black-box Scikit-Learn search engines with a custom execution loop.
+    - **Real-time Updates:** Now shows "Evaluating Candidate X/Y" and "CV Fold N/M Score" in the live dashboard.
+    - **Optuna Integration:** Added explicit logging for Optuna trials with mean CV scores.
+- **Transparent Configuration:**
+    - Fixed the confusing "Fit config params: {}" log.
+    - The system now logs the **exact final parameters** (including defaults) used to initialize every model (e.g., `Initializing RandomForestClassifier with params: {'n_estimators': 100, ...}`).
+- **Cross-Validation Streaming:** CV progress is now streamed fold-by-fold to the frontend logs.
+
+### ✅ Quality Assurance & Testing
+- **100% Test Pass Rate:** Achieved **108/108** passing tests across all modules:
+    - **Core:** Pipeline engine, stateful transformers, and artifact management.
+    - **Modeling:** Classification, Regression, and Hyperparameter Tuning.
+    - **Frontend Nodes:** Dynamic verification of all nodes in the `NodeRegistry`.
+    - **API & Deployment:** Full integration testing of recommendation engine and inference endpoints.
+
+### 🏗️ SDK & Architecture Refactoring
+- **SDK Consolidation:** All core ML logic (preprocessing, modeling, tuning) is now centralized in `skyulf-core/`. This ensures that the `core/ml_pipeline` folder focuses purely on orchestration and API handling.
+- **Tuning Logic Migration:** Moved hyperparameter tuning logic from `ml_pipeline` into `skyulf-core/skyulf/modeling/tuning/`, creating a unified and reusable tuning engine for both the web platform and standalone scripts.
+- **Clean Separation of Concerns:**
+    - `skyulf-core/`: Contains the "Brain" (Calculators, Appliers, Estimators).
+    - `core/ml_pipeline/`: Contains the "Nervous System" (Engine, Registry, API).
+
+### 🛠 Developer Experience
+- **VS Code Integration:** Added `.vscode/settings.json` to resolve Pylance import errors for `skyulf-core/`.
+- **Architecture Cleanup:** Clarified the separation between `NodeRegistry` (static node definitions) and `AdvisorEngine` (dynamic recommendations).
+
+---
 
 ## v0.1.0 (2025-12-10)
 **"The Foundation & Deployment Update"**

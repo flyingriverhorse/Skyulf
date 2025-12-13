@@ -2,9 +2,9 @@ import pytest
 import pandas as pd
 import os
 import shutil
-from core.ml_pipeline.data.container import SplitDataset
-from core.ml_pipeline.artifacts.local import LocalArtifactStore
-from core.ml_pipeline.preprocessing.base import BaseCalculator, BaseApplier, StatefulTransformer
+from skyulf.data.dataset import SplitDataset
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from skyulf.preprocessing.base import BaseCalculator, BaseApplier, StatefulTransformer
 
 # Dummy Scaler Implementation for Testing
 class DummyMeanScalerCalculator(BaseCalculator):
@@ -42,14 +42,14 @@ def test_stateful_transformer_flow(sample_data, artifact_store):
     # Setup
     calculator = DummyMeanScalerCalculator()
     applier = DummyMeanScalerApplier()
-    transformer = StatefulTransformer(calculator, applier, artifact_store, "node_1")
+    # Removed artifact_store from constructor
+    transformer = StatefulTransformer(calculator, applier, "node_1")
     
     # Execute Fit & Transform
     result_dataset = transformer.fit_transform(sample_data, {})
     
-    # Verify Artifact Saved
-    assert artifact_store.exists("node_1")
-    params = artifact_store.load("node_1")
+    # Verify Params Stored in Memory
+    params = transformer.params
     assert params["means"]["A"] == 2.0 # (1+2+3)/3
     assert params["means"]["B"] == 5.0 # (4+5+6)/3
     
@@ -65,10 +65,11 @@ def test_transformer_load_and_transform(sample_data, artifact_store):
     # Setup
     calculator = DummyMeanScalerCalculator()
     applier = DummyMeanScalerApplier()
-    transformer = StatefulTransformer(calculator, applier, artifact_store, "node_1")
+    # Removed artifact_store from constructor
+    transformer = StatefulTransformer(calculator, applier, "node_1")
     
-    # Manually save artifact
-    artifact_store.save("node_1", {"means": {"A": 10.0, "B": 10.0}})
+    # Manually set params (simulating load)
+    transformer.params = {"means": {"A": 10.0, "B": 10.0}}
     
     # Execute Transform only
     result_dataset = transformer.transform(sample_data)

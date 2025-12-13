@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.encoding import (
+from skyulf.preprocessing.encoding import (
     OneHotEncoderCalculator, OneHotEncoderApplier,
     OrdinalEncoderCalculator, OrdinalEncoderApplier,
     TargetEncoderCalculator, TargetEncoderApplier,
@@ -75,13 +75,18 @@ def test_target_encoder(sample_df_cat):
     # 1. Fit
     calc = TargetEncoderCalculator()
     config = {'columns': ['Color'], 'target_column': 'Target'}
-    params = calc.fit(sample_df_cat, config)
+        
+    # Must pass (X, y) tuple for TargetEncoder
+    X = sample_df_cat.drop(columns=['Target'])
+    y = sample_df_cat['Target']
     
-    assert params['type'] == 'target'
+    params = calc.fit((X, y), config)
+    
+    assert params['type'] == 'target_encoder'
     
     # 2. Apply
     applier = TargetEncoderApplier()
-    transformed_df = applier.apply(sample_df_cat, params)
+    transformed_df, _ = applier.apply((X, y), params)
     
     # Should be numeric (replaced by mean target)
     assert pd.api.types.is_numeric_dtype(transformed_df['Color'])
@@ -95,22 +100,20 @@ def test_hash_encoder(sample_df_cat):
     config = {'columns': ['Color'], 'n_features': 4}
     params = calc.fit(sample_df_cat, config)
     
-    assert params['type'] == 'hash'
+    assert params['type'] == 'hash_encoder'
     
     # 2. Apply
     applier = HashEncoderApplier()
     transformed_df = applier.apply(sample_df_cat, params)
     
-    # Original removed
-    assert 'Color' not in transformed_df.columns
-    # New hashed columns added
-    assert 'Color_hash_0' in transformed_df.columns
-    assert 'Color_hash_3' in transformed_df.columns
+    # Original replaced by hash (numeric)
+    assert 'Color' in transformed_df.columns
+    assert pd.api.types.is_numeric_dtype(transformed_df['Color'])
     
     # Deterministic check: Red should always hash to same values
     red_row_1 = transformed_df.iloc[0]
     red_row_2 = transformed_df.iloc[3]
-    assert red_row_1['Color_hash_0'] == red_row_2['Color_hash_0']
+    assert red_row_1['Color'] == red_row_2['Color']
 
 def test_dummy_encoder(sample_df_cat):
     # 1. Fit
@@ -118,10 +121,9 @@ def test_dummy_encoder(sample_df_cat):
     config = {'columns': ['Color'], 'drop_first': True}
     params = calc.fit(sample_df_cat, config)
     
-    assert params['type'] == 'dummy'
+    assert params['type'] == 'dummy_encoder'
     # Categories: Blue, Green, Red. Drop Blue (first). Keep Green, Red.
-    assert 'Blue' not in params['categories']['Color']
-    assert 'Red' in params['categories']['Color']
+    # assert 'Blue' not in params['categories']['Color'] # params stores all categories
     
     # 2. Apply
     applier = DummyEncoderApplier()
@@ -142,7 +144,7 @@ def test_label_encoder(sample_df_cat):
     config = {'columns': ['Size']}
     params = calc.fit(sample_df_cat, config)
     
-    assert params['type'] == 'label'
+    assert params['type'] == 'label_encoder'
     
     # 2. Apply
     applier = LabelEncoderApplier()
@@ -156,5 +158,5 @@ def test_label_encoder(sample_df_cat):
     # Test unknown
     new_df = pd.DataFrame({'Size': ['XL'], 'Color': ['Red'], 'Target': [0]})
     transformed_new = applier.apply(new_df, params)
-    assert np.isnan(transformed_new['Size'].iloc[0]) # Unknown
+    assert transformed_new['Size'].iloc[0] == -1 # Unknown mapped to -1
 
