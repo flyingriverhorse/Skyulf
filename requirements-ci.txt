@@ -1,6 +1,9 @@
 # Minimal dependencies for CI (tests + lint + typecheck)
 # Avoid heavy geospatial stack to keep CI lightweight.
 
+# Local monorepo package (provides the `skyulf` module)
+-e ./skyulf-core
+
 fastapi>=0.104.0,<1.0.0
 uvicorn>=0.24.0,<1.0.0
 pydantic>=2.4.0,<3.0.0

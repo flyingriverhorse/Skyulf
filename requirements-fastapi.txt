@@ -2,6 +2,10 @@
 # This file contains dependencies specific to the FastAPI implementation
 # NOTE: Geospatial stack requires Python >= 3.10 (see libpysal constraint)
 
+# === LOCAL MONOREPO PACKAGES ===
+# Provides the `skyulf` Python package (core preprocessing/modeling/pipeline engine)
+-e ./skyulf-core
+
 # === CORE FASTAPI DEPENDENCIES ===
 fastapi>=0.104.0,<1.0.0
 uvicorn[standard]>=0.24.0,<1.0.0
