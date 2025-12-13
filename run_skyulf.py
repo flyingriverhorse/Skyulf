@@ -55,7 +55,7 @@ def main():
         # Development server with auto-reload
         logger.info("🔧 Running in development mode with auto-reload")
         uvicorn.run(
-            "core.main:app",
+            "backend.main:app",
             host=settings.HOST,
             port=settings.PORT,
             reload=True,
