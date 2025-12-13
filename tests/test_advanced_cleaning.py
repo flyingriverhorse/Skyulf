@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.cleaning import AliasReplacementCalculator, AliasReplacementApplier
+from skyulf.preprocessing.cleaning import AliasReplacementCalculator, AliasReplacementApplier
 
 def test_boolean_normalizer():
     df = pd.DataFrame({

@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.transformations import (
+from skyulf.preprocessing.transformations import (
     PowerTransformerCalculator, PowerTransformerApplier,
     SimpleTransformationCalculator, SimpleTransformationApplier
 )

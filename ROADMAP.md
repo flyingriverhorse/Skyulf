@@ -44,8 +44,15 @@ Since I am building this solo, I am prioritizing **stability and user experience
 *   Unify layout, typography, and theming between the Canvas and the rest of the app.
 *   Make node interactions feel "buttery" (dragging, zooming, connecting edges).
 
+#### Core Architecture Refactoring: The "Serialize Everything" Engine
+*   **Extract `skyulf-core` SDK:** Decouple the pure ML logic (preprocessing, modeling) into a standalone library (`skyulf-core/skyulf`).
+    *   *Why:* Enables strict type checking, faster testing, and allows the backend to just be a consumer of the logic.
+*   **Unified Pipeline Object:** Implement the `SkyulfPipeline` class that bundles preprocessing, modeling, and schema validation into a single object.
+    *   **Goal:** `pipe.save("model.skyulf")` → `Pipeline.load("model.skyulf")`.
+    *   **Features:** Automatic schema enforcement, fitted parameter inspection, and zero-dependency "Lite" mode (NumPy only).
+
 #### Robustness
-*   **Type Checking:** Strengthen type hints across `core/ml_pipeline`, `core/data_ingestion`.
+*   **Type Checking:** Enforce strict type hints on the new `skyulf-core` library.
 *   **Testing:** Grow test coverage for feature engineering pipelines and training jobs (unit + a few end-to-end tests).
 *   **Resilience:** Handle large files, weird encodings, and missing data patterns without crashes.
 
@@ -138,8 +145,7 @@ This single file contains **everything**:
 #### Advanced Export & Standalone Deployment
 *   **Export Standalone API (ZIP):** Generate a lightweight, self-contained ZIP file containing the trained model, preprocessing pipeline, and a ready-to-run FastAPI/Flask app. Users can unzip and run `python main.py` to serve their model anywhere.
 *   **Notebook Export:** "Export to Jupyter Notebook" button that generates a clean, runnable notebook with all your pipeline steps, so you can tweak the code manually.
-*   **Python SDK (Skyulf Core):** The foundation of the "Serialize Everything" engine (see above).
-    *   **Benefit:** Deployed models run with a lightweight `pip install skyulf-core` (zero dependencies on FastAPI/DB).
+*   **Python SDK (Skyulf Core):** Leverage the SDK created in Phase 1 to allow users to interact with the platform programmatically.
     *   **Usage:** `import skyulf` to programmatically build, train, save, and load pipelines.
 *   **One-Click App (Streamlit/Gradio):** Automatically generate a simple web app from trained model so you can demo it to stakeholders instantly.
 *   **Docker Export:** Generate a Dockerfile and build script to containerize the standalone API for cloud deployment (AWS/Azure/GCP).

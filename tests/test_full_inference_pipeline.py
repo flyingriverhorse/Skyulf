@@ -8,10 +8,10 @@ import sys
 # Add project root to path
 sys.path.append(r"c:\Users\Murat\Desktop\skyulf-mlflow")
 
-from core.ml_pipeline.execution.engine import PipelineEngine
-from core.ml_pipeline.artifacts.local import LocalArtifactStore
-from core.ml_pipeline.execution.schemas import PipelineConfig, NodeConfig
-from core.ml_pipeline.deployment.service import APPLIER_MAP
+from backend.ml_pipeline.execution.engine import PipelineEngine
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.ml_pipeline.execution.schemas import PipelineConfig, NodeConfig
+from skyulf.preprocessing.pipeline import FeatureEngineer
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -210,7 +210,15 @@ def test_full_inference_pipeline():
         print(f"Applying {t_name} ({t_type}) on {t_col}...")
         
         obj = t_objs.get((node_id, t_name, t_col))
-        ApplierCls = APPLIER_MAP.get(t_type)
+        
+        ApplierCls = None
+        try:
+            # Use FeatureEngineer factory to get the correct applier class
+            temp_engineer = FeatureEngineer([])
+            _, applier_instance = temp_engineer._get_transformer_components(t_type)
+            ApplierCls = type(applier_instance)
+        except ValueError:
+            print(f"Unknown transformer type: {t_type}")
         
         if ApplierCls:
             applier = ApplierCls()

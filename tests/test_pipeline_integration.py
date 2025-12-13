@@ -1,9 +1,9 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.imputation import SimpleImputerCalculator, SimpleImputerApplier
-from core.ml_pipeline.preprocessing.encoding import OneHotEncoderCalculator, OneHotEncoderApplier
-from core.ml_pipeline.preprocessing.scaling import StandardScalerCalculator, StandardScalerApplier
+from skyulf.preprocessing.imputation import SimpleImputerCalculator, SimpleImputerApplier
+from skyulf.preprocessing.encoding import OneHotEncoderCalculator, OneHotEncoderApplier
+from skyulf.preprocessing.scaling import StandardScalerCalculator, StandardScalerApplier
 
 def test_pipeline_chain():
     # 1. Create Data

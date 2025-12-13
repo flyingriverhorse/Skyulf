@@ -9,7 +9,7 @@ Skyulf uses a **two-library architecture** for optimal performance:
 | Component | Library | Reason |
 |-----------|---------|--------|
 | **Data Ingestion** (`core.data_ingestion`) | **Polars** | Fast I/O, lazy evaluation, low memory |
-| **ML Pipeline** (`core.ml_pipeline`) | **Pandas** | Scikit-learn compatibility, rich ecosystem |
+| **ML Pipeline (Library)** (`skyulf` from `skyulf-core`) | **Pandas** | Scikit-learn compatibility, rich ecosystem |
 
 Data flows from Polars (ingestion) → Pandas (preprocessing/modeling) automatically when you run pipelines.
 

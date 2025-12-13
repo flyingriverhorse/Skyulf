@@ -8,29 +8,24 @@ The modeling module in Skyulf provides a unified interface for training and appl
 The `StatefulEstimator` is the main entry point. It manages:
 1.  **Calculator**: The component responsible for training the model (e.g., `LogisticRegressionCalculator`).
 2.  **Applier**: The component responsible for generating predictions using a trained model (e.g., `LogisticRegressionApplier`).
-3.  **Artifact Store**: Where the trained model binary (e.g., a pickled scikit-learn object) is saved and loaded from.
+3.  **In-memory model**: The trained model is stored on the estimator instance (`estimator.model`). For persistence across processes, use `SkyulfPipeline.save()` / `SkyulfPipeline.load()`.
 
 ### Calculator vs. Applier
-*   **Calculator**: Takes training data (`SplitDataset`), fits the model, and returns a `ModelArtifact`. It does *not* store the model in memory itself; it hands it off to the artifact store.
-*   **Applier**: Loads a `ModelArtifact` from the store and uses it to predict on new data.
+*   **Calculator**: Takes training data (`SplitDataset`), fits the model, and returns a serializable model object.
+*   **Applier**: Uses the trained model object to predict on new data.
 
 ## Usage Example
 
 ```python
-from core.ml_pipeline.modeling.base import StatefulEstimator
-from core.ml_pipeline.modeling.classification import LogisticRegressionCalculator, LogisticRegressionApplier
-from core.ml_pipeline.artifacts.local import LocalArtifactStore
-from core.ml_pipeline.data.container import SplitDataset
+from skyulf.modeling.base import StatefulEstimator
+from skyulf.modeling.classification import LogisticRegressionCalculator, LogisticRegressionApplier
+from skyulf.data.dataset import SplitDataset
 
-# 1. Setup Artifact Store
-store = LocalArtifactStore("./artifacts")
-
-# 2. Initialize Estimator
+# 1. Initialize Estimator
 # We combine a Calculator and an Applier
 estimator = StatefulEstimator(
     calculator=LogisticRegressionCalculator(),
     applier=LogisticRegressionApplier(),
-    artifact_store=store,
     node_id="my_model_node"
 )
 
@@ -51,5 +46,5 @@ predictions = estimator.fit_predict(
     config={"max_iter": 500}
 )
 
-# The trained model is now saved in ./artifacts/my_model_node
+# The trained model is now available at: estimator.model
 ```

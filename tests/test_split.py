@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.split import DataSplitter, FeatureTargetSelector
+from skyulf.preprocessing.split import DataSplitter
 
 @pytest.fixture
 def sample_df():
@@ -37,16 +37,4 @@ def test_data_splitter_stratify(sample_df):
     assert ds.test['target'].value_counts()['A'] == 10
     assert ds.test['target'].value_counts()['B'] == 10
 
-def test_feature_target_selector(sample_df):
-    selector = FeatureTargetSelector(target_column='target')
-    X, y = selector.select(sample_df)
-    
-    assert 'target' not in X.columns
-    assert y.name == 'target'
-    assert X.shape[1] == 2
 
-def test_feature_target_selector_specific_features(sample_df):
-    selector = FeatureTargetSelector(target_column='target', feature_columns=['feature1'])
-    X, y = selector.select(sample_df)
-    
-    assert list(X.columns) == ['feature1']

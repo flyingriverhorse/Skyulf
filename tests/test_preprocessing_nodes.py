@@ -1,8 +1,8 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.feature_selection import CorrelationThresholdCalculator, CorrelationThresholdApplier
-from core.ml_pipeline.preprocessing.feature_generation import DatePartsCalculator, DatePartsApplier
+from skyulf.preprocessing.feature_selection import CorrelationThresholdCalculator, CorrelationThresholdApplier
+from skyulf.preprocessing.feature_generation import FeatureGenerationCalculator, FeatureGenerationApplier
 
 def test_correlation_threshold():
     df = pd.DataFrame({
@@ -28,10 +28,25 @@ def test_correlation_threshold():
 def test_date_parts():
     df = pd.DataFrame({'date': pd.to_datetime(['2021-01-01 10:00:00'])})
     
-    calc = DatePartsCalculator()
-    applier = DatePartsApplier()
+    calc = FeatureGenerationCalculator()
+    applier = FeatureGenerationApplier()
     
-    config = {'columns': ['date'], 'parts': ['year', 'month', 'hour']}
+    config = {
+        "operations": [
+            {
+                "operation_type": "datetime_extract",
+                "input_columns": ["date"],
+                "datetime_features": ["year"],
+                "output_column": "date_year"
+            },
+            {
+                "operation_type": "datetime_extract",
+                "input_columns": ["date"],
+                "datetime_features": ["hour"],
+                "output_column": "date_hour"
+            }
+        ]
+    }
     artifacts = calc.fit(df, config)
     result = applier.apply(df, artifacts)
     

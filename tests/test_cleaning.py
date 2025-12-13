@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.cleaning import (
+from skyulf.preprocessing.cleaning import (
     TextCleaningCalculator, TextCleaningApplier,
     ValueReplacementCalculator, ValueReplacementApplier
 )

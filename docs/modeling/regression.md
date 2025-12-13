@@ -1,6 +1,6 @@
 # Regression Models
 
-The `core.ml_pipeline.modeling.regression` module provides calculators and appliers for regression tasks.
+The `skyulf.modeling.regression` module provides calculators and appliers for regression tasks.
 
 ## Ridge Regression
 
@@ -8,7 +8,7 @@ Linear least squares with l2 regularization. Wraps `sklearn.linear_model.Ridge`.
 
 ### Usage
 ```python
-from core.ml_pipeline.modeling.regression import RidgeRegressionCalculator
+from skyulf.modeling.regression import RidgeRegressionCalculator
 
 calc = RidgeRegressionCalculator()
 # Override default parameters
@@ -28,7 +28,7 @@ A random forest regressor. Wraps `sklearn.ensemble.RandomForestRegressor`.
 
 ### Usage
 ```python
-from core.ml_pipeline.modeling.regression import RandomForestRegressorCalculator
+from skyulf.modeling.regression import RandomForestRegressorCalculator
 
 calc = RandomForestRegressorCalculator()
 # Override default parameters

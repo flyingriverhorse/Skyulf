@@ -3,12 +3,12 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
-from core.database.models import Base, TrainingJob, Deployment
-from core.ml_pipeline.deployment.service import DeploymentService
+from backend.database.models import Base, TrainingJob, Deployment
+from backend.ml_pipeline.deployment.service import DeploymentService
 import os
 import pandas as pd
 import joblib
-from core.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from unittest.mock import patch
 
 # Use an in-memory SQLite for testing
@@ -50,7 +50,8 @@ async def test_deployment_flow(async_session, tmp_path):
     models_dir.mkdir(parents=True, exist_ok=True)
     
     store = LocalArtifactStore(str(models_dir))
-    store.save(node_id, model)
+    # Save with job_id as key, as DeploymentService expects job_id in the URI
+    store.save(job_id, model)
     
     # 2. Create Job in DB
     # We need to insert manually because TrainingJob might have required fields not in init
@@ -69,7 +70,7 @@ async def test_deployment_flow(async_session, tmp_path):
             "version": 1,
             "model_type": "linear_regression",
             "graph": "{}",
-            "artifact_uri": node_id, # The engine saves it as node_id
+            "artifact_uri": job_id, # The engine saves it as job_id now
             "error_message": None,
             "progress": 0,
             "current_step": None,
@@ -84,8 +85,8 @@ async def test_deployment_flow(async_session, tmp_path):
         # 3. Deploy
         deployment = await DeploymentService.deploy_model(async_session, job_id)
         assert deployment.is_active == True
-        # The service constructs the URI as pipeline_id/node_id if it was just node_id
-        assert deployment.artifact_uri == f"{pipeline_id}/{node_id}"
+        # The service constructs the URI as pipeline_id/job_id
+        assert deployment.artifact_uri == f"{pipeline_id}/{job_id}"
         
         # 4. Predict
         data = [{"a": 4}]

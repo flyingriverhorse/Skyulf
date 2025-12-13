@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.inspection import DatasetProfileCalculator, DatasetProfileApplier, DataSnapshotCalculator, DataSnapshotApplier
+from skyulf.preprocessing.inspection import DatasetProfileCalculator, DatasetProfileApplier, DataSnapshotCalculator, DataSnapshotApplier
 
 def test_dataset_profile():
     df = pd.DataFrame({'a': [1, 2, 3, np.nan], 'b': ['x', 'y', 'z', 'w']})

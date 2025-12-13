@@ -3,16 +3,16 @@ import pandas as pd
 import numpy as np
 import os
 import shutil
-from core.ml_pipeline.data.container import SplitDataset
-from core.ml_pipeline.artifacts.local import LocalArtifactStore
-from core.ml_pipeline.preprocessing.base import StatefulTransformer
+from skyulf.data.dataset import SplitDataset
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from skyulf.preprocessing.base import StatefulTransformer
 
 # Import nodes
-from core.ml_pipeline.preprocessing.casting import CastingCalculator, CastingApplier
-from core.ml_pipeline.preprocessing.imputation import SimpleImputerCalculator, SimpleImputerApplier
-from core.ml_pipeline.preprocessing.encoding import OneHotEncoderCalculator, OneHotEncoderApplier
-from core.ml_pipeline.preprocessing.scaling import StandardScalerCalculator, StandardScalerApplier
-from core.ml_pipeline.preprocessing.feature_selection import VarianceThresholdCalculator, VarianceThresholdApplier
+from skyulf.preprocessing.casting import CastingCalculator, CastingApplier
+from skyulf.preprocessing.imputation import SimpleImputerCalculator, SimpleImputerApplier
+from skyulf.preprocessing.encoding import OneHotEncoderCalculator, OneHotEncoderApplier
+from skyulf.preprocessing.scaling import StandardScalerCalculator, StandardScalerApplier
+from skyulf.preprocessing.feature_selection import VarianceThresholdCalculator, VarianceThresholdApplier
 
 @pytest.fixture
 def complex_data():

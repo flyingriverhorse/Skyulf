@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.bucketing import GeneralBinningCalculator, GeneralBinningApplier
+from skyulf.preprocessing.bucketing import GeneralBinningCalculator, GeneralBinningApplier
 
 @pytest.fixture
 def sample_data():

@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.cleaning import (
+from skyulf.preprocessing.cleaning import (
     TextCleaningCalculator, TextCleaningApplier,
     ValueReplacementCalculator, ValueReplacementApplier
 )
@@ -176,7 +176,7 @@ def test_value_replacement_replacements_list():
 
 # --- Alias Replacement Tests ---
 
-from core.ml_pipeline.preprocessing.cleaning import AliasReplacementCalculator, AliasReplacementApplier
+from skyulf.preprocessing.cleaning import AliasReplacementCalculator, AliasReplacementApplier
 
 def test_alias_replacement_custom():
     df = pd.DataFrame({
@@ -200,7 +200,7 @@ def test_alias_replacement_custom():
 
 # --- Invalid Value Replacement Tests ---
 
-from core.ml_pipeline.preprocessing.cleaning import InvalidValueReplacementCalculator, InvalidValueReplacementApplier
+from skyulf.preprocessing.cleaning import InvalidValueReplacementCalculator, InvalidValueReplacementApplier
 
 def test_invalid_value_replacement_negative():
     df = pd.DataFrame({

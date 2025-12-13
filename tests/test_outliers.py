@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.outliers import (
+from skyulf.preprocessing.outliers import (
     IQRCalculator, IQRApplier,
     ZScoreCalculator, ZScoreApplier
 )

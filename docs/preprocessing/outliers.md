@@ -5,7 +5,7 @@ The `outliers` module provides methods for detecting and handling outliers. Thes
 ## Usage Example
 
 ```python
-from core.ml_pipeline.preprocessing.pipeline import FeatureEngineer
+from skyulf.preprocessing.pipeline import FeatureEngineer
 import pandas as pd
 
 # Sample Data

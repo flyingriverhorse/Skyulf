@@ -1,6 +1,6 @@
 # Hyperparameter Tuning
 
-The `core.ml_pipeline.modeling.tuning` module allows you to optimize model hyperparameters using various search strategies.
+The `skyulf.modeling.tuning` module allows you to optimize model hyperparameters using various search strategies.
 
 ## TunerCalculator
 
@@ -16,8 +16,9 @@ The `TunerCalculator` wraps another calculator (like `LogisticRegressionCalculat
 ## Usage Example
 
 ```python
-from core.ml_pipeline.modeling.tuning import TunerCalculator, TuningConfig
-from core.ml_pipeline.modeling.classification import RandomForestClassifierCalculator
+from skyulf.modeling.tuning.tuner import TunerCalculator, TunerApplier
+from skyulf.modeling.tuning.schemas import TuningConfig
+from skyulf.modeling.classification import RandomForestClassifierCalculator
 
 # 1. Define the base model
 base_calc = RandomForestClassifierCalculator()
@@ -41,12 +42,8 @@ tuner = TunerCalculator(
     model_calculator=base_calc
 )
 
-# 4. Use in a StatefulEstimator
-# We use TunerApplier because tuning only produces parameters, not a predictive model
-from core.ml_pipeline.modeling.base import StatefulEstimator
-from core.ml_pipeline.modeling.tuning import TunerApplier
-from core.ml_pipeline.artifacts.local import LocalArtifactStore
-from core.ml_pipeline.data.container import SplitDataset
+from skyulf.modeling.base import StatefulEstimator
+from skyulf.data.dataset import SplitDataset
 import pandas as pd
 
 # Create dummy data for the example
@@ -60,16 +57,18 @@ dataset = SplitDataset(train=df, test=df, validation=df)
 estimator = StatefulEstimator(
     calculator=tuner,
     applier=TunerApplier(),
-    artifact_store=LocalArtifactStore("./artifacts"),
     node_id="tuned_rf_node"
 )
 
 # 5. Train
 # Note: fit_predict will return placeholder predictions as this is a tuning job.
-# The best hyperparameters are stored in the artifact store for later use.
+# The best hyperparameters are available on the estimator model (a TuningResult).
 estimator.fit_predict(
     dataset=dataset,
     target_column="target",
     config=tuning_config
 )
+
+print("Best params:", estimator.model.best_params)
+print("Best score:", estimator.model.best_score)
 ```

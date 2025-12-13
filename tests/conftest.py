@@ -9,7 +9,7 @@ from pathlib import Path
 # via TestClient don't get rejected with "Invalid host header".
 try:
     # Import lazily so tests that don't import config aren't impacted
-    from core.config import get_settings
+    from backend.config import get_settings
 
     settings = get_settings()
     if isinstance(settings, object):

@@ -1,10 +1,10 @@
 
 import pandas as pd
 import pytest
-from core.ml_pipeline.preprocessing.encoding import LabelEncoderCalculator, LabelEncoderApplier
-from core.ml_pipeline.preprocessing.split import TrainTestSplitterCalculator, TrainTestSplitterApplier
-from core.ml_pipeline.data.container import SplitDataset
-from core.ml_pipeline.artifacts.local import LocalArtifactStore
+from skyulf.preprocessing.encoding import LabelEncoderCalculator, LabelEncoderApplier
+from skyulf.preprocessing.split import SplitCalculator, SplitApplier
+from skyulf.data.dataset import SplitDataset
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
 def test_label_encoder_on_target_after_split():
     # 1. Setup Data
@@ -19,8 +19,8 @@ def test_label_encoder_on_target_after_split():
     dataset_tuple = (X, y)
     
     # 3. Train Test Split
-    split_calc = TrainTestSplitterCalculator()
-    split_applier = TrainTestSplitterApplier()
+    split_calc = SplitCalculator()
+    split_applier = SplitApplier()
     
     split_config = {'test_size': 0.2, 'random_state': 42}
     # fit returns empty config
@@ -40,7 +40,7 @@ def test_label_encoder_on_target_after_split():
     le_applier = LabelEncoderApplier()
     
     le_config = {
-        'columns': ['target'], # Explicitly requesting target
+        'columns': [], # Empty to target y
         'drop_original': True
     }
     
@@ -48,8 +48,8 @@ def test_label_encoder_on_target_after_split():
     le_params = le_calc.fit(split_dataset.train, le_config)
     
     # Check if target was detected
-    assert le_params.get('target_column') == 'target'
-    assert 'target' in le_params['encoders']
+    assert '__target__' in le_params.get('encoders', {})
+    # assert 'target' in le_params['encoders'] # Removed as we use __target__
     
     # Apply on Train
     train_transformed = le_applier.apply(split_dataset.train, le_params)
@@ -60,7 +60,7 @@ def test_label_encoder_on_target_after_split():
     assert set(y_train_new.unique()).issubset({0, 1})
 
     # Get the mapping from the encoder
-    encoder = le_params['encoders']['target']
+    encoder = le_params['encoders']['__target__']
     classes = encoder.classes_
     # e.g. classes_ might be ['A', 'B'], so A->0, B->1
     

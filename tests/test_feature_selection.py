@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from core.ml_pipeline.preprocessing.feature_selection import (
+from skyulf.preprocessing.feature_selection import (
     VarianceThresholdCalculator, VarianceThresholdApplier,
     UnivariateSelectionCalculator, UnivariateSelectionApplier
 )

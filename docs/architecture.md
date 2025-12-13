@@ -53,12 +53,11 @@ Handles loading datasets from various sources using Polars:
 *   **Profiler**: `DataProfiler` computes statistics for schema discovery
 *   **Service**: `DataIngestionService` orchestrates uploads and background ingestion
 
-### 2. ML Pipeline Data (`core.ml_pipeline.data`)
-Provides Pandas-based utilities for the ML pipeline:
-*   **DataLoader**: Reads CSV/Parquet into Pandas DataFrames
+### 2. ML Pipeline Data (`skyulf.data`)
+Provided by the Skyulf Core library (`skyulf-core`, imported as `skyulf`):
 *   **SplitDataset**: Container for train/test/validation splits
 
-### 3. Feature Engineering (`core.ml_pipeline.preprocessing`)
+### 3. Feature Engineering (`skyulf.preprocessing`)
 Implements the "Calculator/Applier" pattern:
 *   **Calculator**: Computes statistics (e.g., mean, std, vocabulary) from training data
 *   **Applier**: Applies computed statistics to new data (inference) in a stateless manner
@@ -109,10 +108,7 @@ core/
 │   ├── engine/              # Profiler
 │   └── service.py           # Orchestration
 │
-├── ml_pipeline/             # Pandas-based ML pipeline
-│   ├── data/                # DataLoader, SplitDataset
-│   ├── preprocessing/       # All transformers (Calculator + Applier)
-│   ├── modeling/            # Classification, Regression, Tuning
+├── ml_pipeline/             # Backend orchestration (uses Skyulf Core)
 │   ├── execution/           # PipelineEngine, JobManager
 │   ├── deployment/          # DeploymentService
 │   ├── artifacts/           # ArtifactStore
@@ -120,4 +116,11 @@ core/
 │   └── recommendations/     # AI suggestions
 │
 └── database/                # SQLAlchemy models
+
+skyulf-core/
+└── skyulf/                  # Standalone library (preprocessing/modeling/pipeline)
+    ├── data/
+    ├── preprocessing/
+    ├── modeling/
+    └── pipeline.py
 ```

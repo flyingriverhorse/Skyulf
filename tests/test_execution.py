@@ -1,9 +1,9 @@
 import pytest
 import pandas as pd
 import os
-from core.ml_pipeline.execution.engine import PipelineEngine
-from core.ml_pipeline.execution.schemas import PipelineConfig, NodeConfig
-from core.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.ml_pipeline.execution.engine import PipelineEngine
+from backend.ml_pipeline.execution.schemas import PipelineConfig, NodeConfig
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
 @pytest.fixture
 def pipeline_data_csv(tmp_path):

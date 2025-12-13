@@ -6,9 +6,9 @@ from pathlib import Path
 # Add project root to python path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from core.database import engine
-from core.ml_pipeline.execution.jobs import JobManager
-from core.database.models import TrainingJob, HyperparameterTuningJob
+from backend.database import engine
+from backend.ml_pipeline.execution.jobs import JobManager
+from backend.database.models import TrainingJob, HyperparameterTuningJob
 from sqlalchemy import select, delete
 
 async def test_versioning():

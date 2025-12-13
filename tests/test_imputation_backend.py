@@ -2,7 +2,7 @@
 import pandas as pd
 import numpy as np
 import pytest
-from core.ml_pipeline.preprocessing.imputation import (
+from skyulf.preprocessing.imputation import (
     SimpleImputerCalculator, SimpleImputerApplier,
     KNNImputerCalculator, KNNImputerApplier,
     IterativeImputerCalculator, IterativeImputerApplier

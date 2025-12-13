@@ -13,10 +13,9 @@ The primary method for training is `fit_predict`. This method:
 ### Example
 
 ```python
-from core.ml_pipeline.modeling.base import StatefulEstimator
-from core.ml_pipeline.modeling.classification import RandomForestClassifierCalculator, RandomForestClassifierApplier
-from core.ml_pipeline.artifacts.local import LocalArtifactStore
-from core.ml_pipeline.data.container import SplitDataset
+from skyulf.modeling.base import StatefulEstimator
+from skyulf.modeling.classification import RandomForestClassifierCalculator, RandomForestClassifierApplier
+from skyulf.data.dataset import SplitDataset
 import pandas as pd
 
 # 1. Prepare Data
@@ -29,11 +28,9 @@ df = pd.DataFrame({
 dataset = SplitDataset(train=df, test=df, validation=None)
 
 # 2. Setup Estimator
-store = LocalArtifactStore("./artifacts")
 estimator = StatefulEstimator(
     calculator=RandomForestClassifierCalculator(),
     applier=RandomForestClassifierApplier(),
-    artifact_store=store,
     node_id="rf_model"
 )
 
@@ -47,6 +44,8 @@ predictions = estimator.fit_predict(
 
 print("Training completed.")
 print(f"Train Predictions shape: {predictions['train'].shape}")
+
+# The trained model object is available at: estimator.model
 ```
 
 ## Cross-Validation
