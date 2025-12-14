@@ -5,7 +5,7 @@
 
 ------------------------------------------------------------
 
-## v0.1.1 (2025-12-12)
+## v0.1.1 (2025-12-xx)
 **"The Observability & Stability Update"**
 
 This release focuses on developer experience, system stability, and deep observability into the training process.
