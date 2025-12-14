@@ -20,7 +20,6 @@ from pathlib import Path
 
 # Use absolute imports to fix import issues
 from backend.config import get_settings
-from backend.celery_app import celery_app  # Initialize Celery app
 
 from backend.health.routes import router as health_router
 # from core.feature_engineering.routes import router as feature_engineering_router
@@ -119,7 +118,7 @@ def _configure_openapi(app: FastAPI) -> None:
         app.openapi_schema = openapi_schema
         return app.openapi_schema
 
-    app.openapi = custom_openapi
+    app.openapi = custom_openapi  # type: ignore
 
 
 @asynccontextmanager
@@ -253,7 +252,7 @@ def _include_routers(app: FastAPI) -> None:
     # Note: ml_pipeline_router prefix was removed from its file to allow flexible mounting.
     # We mount it at /api/pipeline for standard access
     app.include_router(ml_pipeline_router, prefix="/api/pipeline")
-    
+
     # And at /ml-workflow/api/pipelines for frontend compatibility
     app.include_router(ml_pipeline_router, prefix="/ml-workflow/api/pipelines")
     app.include_router(deployment_router, prefix="/api", tags=["Deployment"])
@@ -261,10 +260,10 @@ def _include_routers(app: FastAPI) -> None:
 
     # Root redirect
     from fastapi.responses import RedirectResponse
+
     @app.get("/", include_in_schema=False)
     async def root():
         return RedirectResponse(url="/docs")
-
 
 
 def _add_exception_handlers(app: FastAPI) -> None:

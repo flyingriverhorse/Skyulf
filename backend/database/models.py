@@ -300,12 +300,12 @@ class Deployment(Base, TimestampMixin):
     __tablename__ = "deployments"
 
     id = Column(Integer, primary_key=True, index=True)
-    job_id = Column(String(64), nullable=False, index=True) # ID of the TrainingJob or HyperparameterTuningJob
+    job_id = Column(String(64), nullable=False, index=True)  # ID of the TrainingJob or HyperparameterTuningJob
     model_type = Column(String(100), nullable=False)
     artifact_uri = Column(String(500), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     deployed_by = Column(Integer, ForeignKey('users.id'), nullable=True)
-    
+
     def to_dict(self):
         return {
             "id": self.id,

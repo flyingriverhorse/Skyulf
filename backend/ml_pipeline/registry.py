@@ -1,12 +1,14 @@
 from typing import List, Dict, Any
 from pydantic import BaseModel
 
+
 class RegistryItem(BaseModel):
     id: str
     name: str
     category: str
     description: str
     params: Dict[str, Any] = {}
+
 
 class NodeRegistry:
     @staticmethod
@@ -23,7 +25,7 @@ class NodeRegistry:
                     "date_range": "optional[dict]"
                 }
             ),
-            
+
             # --- Preprocessing (Transformers) ---
             RegistryItem(
                 id="TrainTestSplitter",
@@ -270,7 +272,7 @@ class NodeRegistry:
                 description="Basic text cleaning operations.",
                 params={"lowercase": True, "remove_punctuation": True}
             ),
-             RegistryItem(
+            RegistryItem(
                 id="ValueReplacement",
                 name="Value Replacement",
                 category="Preprocessing",

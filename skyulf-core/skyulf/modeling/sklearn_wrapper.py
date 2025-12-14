@@ -21,8 +21,12 @@ class SklearnCalculator(BaseModelCalculator):
         problem_type: str,
     ):
         self.model_class = model_class
-        self.default_params = default_params
+        self._default_params = default_params
         self._problem_type = problem_type
+
+    @property
+    def default_params(self) -> Dict[str, Any]:
+        return self._default_params
 
     @property
     def problem_type(self) -> str:
@@ -47,15 +51,15 @@ class SklearnCalculator(BaseModelCalculator):
 
             # Check for explicit 'params' dictionary first
             overrides = config.get("params", {})
-            
+
             # If 'params' key exists but is None or empty, check if there are other keys at top level
             # that might be params. But be careful not to mix them.
             # If config has 'params', we assume it's the source of truth.
-            
+
             if not overrides and "params" not in config:
-                 # Fallback to flat config if 'params' key is completely missing
-                 reserved_keys = {"type", "target_column", "node_id", "step_type", "inputs"}
-                 overrides = {k: v for k, v in config.items() if k not in reserved_keys and not isinstance(v, dict)}
+                # Fallback to flat config if 'params' key is completely missing
+                reserved_keys = {"type", "target_column", "node_id", "step_type", "inputs"}
+                overrides = {k: v for k, v in config.items() if k not in reserved_keys and not isinstance(v, dict)}
 
             if overrides:
                 params.update(overrides)
@@ -71,9 +75,9 @@ class SklearnCalculator(BaseModelCalculator):
         # (Though sklearn usually ignores extra kwargs in __init__ if **kwargs is present,
         # strict models might not)
         # For now, we assume the user/config provides valid params.
-        
+
         # Handle special cases like 'random_state' if needed, but usually passed directly.
-        
+
         model = self.model_class(**params)
 
         # 3. Fit
@@ -101,7 +105,7 @@ class SklearnApplier(BaseModelApplier):
                 if classes is None:
                     # Fallback if classes_ is missing (unlikely for sklearn classifiers)
                     return pd.DataFrame(probas, index=df.index)
-                
+
                 return pd.DataFrame(probas, columns=classes, index=df.index)
             except Exception:
                 return None

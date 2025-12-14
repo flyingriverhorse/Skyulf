@@ -6,7 +6,7 @@ Provides request/response logging for monitoring and debugging.
 
 import logging
 import time
-from typing import Callable
+from typing import Callable, cast
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
@@ -80,7 +80,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             # Add processing time header
             response.headers["X-Process-Time"] = str(process_time)
 
-            return response
+            return cast(Response, response)
 
         except Exception as exc:
             # Calculate processing time for failed requests

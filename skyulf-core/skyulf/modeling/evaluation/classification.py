@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -15,7 +15,6 @@ from .schemas import (
     ClassificationEvaluation,
     ConfusionMatrixData,
     CurveData,
-    CurvePoint,
     ModelEvaluationReport,
 )
 
@@ -29,10 +28,10 @@ def evaluate_classification_model(
     dataset_name: str = "test",
 ) -> ModelEvaluationReport:
     """Evaluate a classification model and return a structured report."""
-    
+
     # Calculate scalar metrics
     metrics = calculate_classification_metrics(model, X_test, y_test)
-    
+
     # Generate predictions and probabilities
     y_pred = model.predict(X_test)
     y_prob = None
@@ -55,14 +54,14 @@ def evaluate_classification_model(
     # ROC and PR Curves
     roc_curves = []
     pr_curves = []
-    
+
     if y_prob is not None:
         if n_classes == 2:
             # Binary classification
             # Assuming positive class is at index 1
             pos_label = classes[1]
             pos_probs = y_prob[:, 1]
-            
+
             # ROC
             fpr, tpr, _ = roc_curve(y_test, pos_probs, pos_label=pos_label)
             roc_curves.append(
@@ -72,7 +71,7 @@ def evaluate_classification_model(
                     auc=metrics.get("roc_auc")
                 )
             )
-            
+
             # PR
             precision, recall, _ = precision_recall_curve(y_test, pos_probs, pos_label=pos_label)
             pr_curves.append(
@@ -85,7 +84,7 @@ def evaluate_classification_model(
         else:
             # Multiclass classification
             y_test_bin = label_binarize(y_test, classes=classes)
-            
+
             for i, class_name in enumerate(class_names):
                 # ROC
                 fpr, tpr, _ = roc_curve(y_test_bin[:, i], y_prob[:, i])
@@ -95,7 +94,7 @@ def evaluate_classification_model(
                         points=downsample_curve(fpr, tpr)
                     )
                 )
-                
+
                 # PR
                 precision, recall, _ = precision_recall_curve(y_test_bin[:, i], y_prob[:, i])
                 pr_curves.append(
@@ -122,10 +121,10 @@ def evaluate_classification_model(
 def _compute_confusion_matrix(y_true: Any, y_pred: Any, labels: List[str]) -> ConfusionMatrixData:
     """Compute confusion matrix data."""
     cm = confusion_matrix(y_true, y_pred, labels=labels)
-    
+
     # Convert to list of lists for JSON serialization
     matrix_data = cm.tolist()
-    
+
     return ConfusionMatrixData(
         labels=labels,
         matrix=matrix_data

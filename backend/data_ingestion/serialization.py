@@ -7,7 +7,7 @@ Migrated from Flask sync version with improved type handling.
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Union, Optional
+from typing import Any, Dict, List, Union, Optional, cast
 import pandas as pd
 import numpy as np
 from datetime import datetime, date
@@ -75,7 +75,7 @@ class AsyncJSONSafeSerializer:
             return AsyncJSONSafeSerializer._NOT_HANDLED
         if len(obj) > 1000:
             await asyncio.sleep(0)
-        return obj.where(pd.notnull(obj), None).to_dict("records")
+        return obj.where(pd.notnull(obj), cast(Any, None)).to_dict("records")
 
     @staticmethod
     async def _handle_series(obj: Any) -> Any:
@@ -83,7 +83,7 @@ class AsyncJSONSafeSerializer:
             return AsyncJSONSafeSerializer._NOT_HANDLED
         if len(obj) > 1000:
             await asyncio.sleep(0)
-        return obj.where(pd.notnull(obj), None).tolist()
+        return obj.where(pd.notnull(obj), cast(Any, None)).tolist()
 
     @staticmethod
     async def _handle_dict(obj: Any) -> Any:

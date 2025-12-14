@@ -8,10 +8,11 @@ import asyncio
 import logging
 import atexit
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import aiosqlite
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker, AsyncEngine
 
 from backend.config import Settings
 
@@ -144,7 +145,7 @@ class AsyncSQLiteConnectionManager:
             await conn.commit()
             rowcount = cursor.rowcount
             await cursor.close()
-            return rowcount
+            return cast(int, rowcount)
 
     def _sync_close_all(self):
         """Synchronous close for atexit handler"""
@@ -159,8 +160,8 @@ class AsyncPostgreSQLConnectionManager:
     def __init__(self, connection_string: str, pool_size: int = 10):
         self.connection_string = connection_string
         self.pool_size = pool_size
-        self._engine = None
-        self._session_maker = None
+        self._engine: Optional[AsyncEngine] = None
+        self._session_maker: Optional[async_sessionmaker[AsyncSession]] = None
         self._initialized = False
 
     async def initialize(self):
@@ -192,8 +193,9 @@ class AsyncPostgreSQLConnectionManager:
             )
 
             # Test connection
-            async with self._engine.begin() as conn:
-                await conn.execute("SELECT 1")
+            if self._engine:
+                async with self._engine.begin() as conn:
+                    await conn.execute(text("SELECT 1"))
 
             self._initialized = True
             logger.info(f"[OK] Async PostgreSQL connection pool initialized with {self.pool_size} connections")
@@ -251,7 +253,7 @@ class AsyncPostgreSQLConnectionManager:
             from sqlalchemy import text
             result = await conn.execute(text(query), params or {})
             await conn.commit()
-            return result.rowcount
+            return cast(int, result.rowcount)
 
     async def close(self):
         """Close the async engine and all connections"""
@@ -267,8 +269,8 @@ class AsyncDatabaseManager:
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.sqlite_manager = None
-        self.postgres_manager = None
+        self.sqlite_manager: Optional[AsyncSQLiteConnectionManager] = None
+        self.postgres_manager: Optional[AsyncPostgreSQLConnectionManager] = None
         self._initialized = False
 
     async def initialize(self):
@@ -332,7 +334,7 @@ class AsyncDatabaseManager:
 
     async def close_all(self):
         """Close all async database connections"""
-        tasks = []
+        tasks: List[Any] = []
 
         if self.postgres_manager:
             tasks.append(self.postgres_manager.close())

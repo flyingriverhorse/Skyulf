@@ -144,7 +144,7 @@ async def async_session_or_connection(
     elif db_type in (DatabaseType.MYSQL, DatabaseType.MARIADB):
         # MySQL async connection
         try:
-            import aiomysql
+            import aiomysql  # type: ignore
         except ImportError:
             raise RuntimeError("aiomysql package required for MySQL async support")
 
@@ -169,7 +169,7 @@ async def async_session_or_connection(
     elif db_type in (DatabaseType.MONGODB, DatabaseType.MONGO):
         # MongoDB async connection
         try:
-            from motor.motor_asyncio import AsyncIOMotorClient
+            from motor.motor_asyncio import AsyncIOMotorClient  # type: ignore
         except ImportError:
             raise RuntimeError("motor package required for MongoDB async support")
 
@@ -192,7 +192,7 @@ async def async_session_or_connection(
         from concurrent.futures import ThreadPoolExecutor
 
         try:
-            import snowflake.connector
+            import snowflake.connector  # type: ignore
         except ImportError:
             raise RuntimeError("snowflake-connector-python package required for Snowflake support")
 

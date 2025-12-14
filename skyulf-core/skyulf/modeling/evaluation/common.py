@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import numpy as np
 
@@ -38,7 +38,7 @@ def _downsample_indices(length: int, limit: int) -> np.ndarray:
     if length <= limit:
         return np.arange(length, dtype=int)
     indices = np.linspace(0, length - 1, num=limit, dtype=int)
-    return np.unique(indices)
+    return np.unique(indices)  # type: ignore
 
 
 def _align_thresholds(thresholds: np.ndarray, target_size: int) -> np.ndarray:
@@ -56,7 +56,7 @@ def _align_thresholds(thresholds: np.ndarray, target_size: int) -> np.ndarray:
 
 def sanitize_metrics(metrics: Dict[str, float]) -> Dict[str, float]:
     """Sanitize metrics dictionary to ensure JSON compliance."""
-    warnings = []
+    warnings: List[str] = []
     sanitized = _sanitize_structure(metrics, warnings=warnings, context="metrics")
     # Filter out None values that resulted from non-finite numbers
     return {k: v for k, v in sanitized.items() if v is not None}
@@ -65,13 +65,12 @@ def sanitize_metrics(metrics: Dict[str, float]) -> Dict[str, float]:
 def downsample_curve(x: np.ndarray, y: np.ndarray, limit: int = 1000) -> List[CurvePoint]:
     """Downsample curve points to a reasonable limit."""
     indices = _downsample_indices(len(x), limit)
-    
+
     x_sampled = x[indices]
     y_sampled = y[indices]
-    
+
     points = []
     for i in range(len(x_sampled)):
         points.append(CurvePoint(x=float(x_sampled[i]), y=float(y_sampled[i])))
-        
-    return points
 
+    return points

@@ -6,11 +6,11 @@ This module centralizes the logic to write/read/update/delete the
 keeps behavior separate from the generic database CRUD dispatcher.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional, Union, List, cast
 import logging
 
 from backend.config import Settings
-from . import async_sqlite_queries, async_postgres_queries
+from . import async_sqlite_queries as sqlite_q, async_postgres_queries as pg_q
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ async def create(settings: Settings, row: Dict[str, Any]) -> Any:
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
 
 
-async def read(settings: Settings, filter: Optional[Dict[str, Any]] = None, one: bool = False):
+async def read(settings: Settings, filter: Optional[Dict[str, Any]] = None, one: bool = False) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
     """Read data sources from primary database."""
     primary_db = get_primary_database(settings)
 
@@ -111,7 +111,7 @@ async def read(settings: Settings, filter: Optional[Dict[str, Any]] = None, one:
             rows = await sqlite_q.select_data_sources(settings, filter, one=one)
             row_count = len(rows) if isinstance(rows, list) else 1
             logger.debug("Successfully read %s rows from SQLite (primary)", row_count)
-            return rows
+            return cast(Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], rows)
         except Exception:
             logger.exception("Failed reading data_sources from SQLite (primary database)")
             raise RuntimeError("Failed to read from primary database (SQLite)")
@@ -121,7 +121,7 @@ async def read(settings: Settings, filter: Optional[Dict[str, Any]] = None, one:
             rows = await pg_q.select_data_sources(settings, filter, one=one)
             row_count = len(rows) if isinstance(rows, list) else 1
             logger.debug("Successfully read %s rows from PostgreSQL (primary)", row_count)
-            return rows
+            return cast(Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], rows)
         except Exception:
             logger.exception("Failed reading data_sources from PostgreSQL (primary database)")
             raise RuntimeError("Failed to read from primary database (PostgreSQL)")

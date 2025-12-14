@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -8,6 +8,7 @@ from .service import ModelRegistryService
 
 router = APIRouter(prefix="/registry", tags=["Model Registry"])
 
+
 @router.get("/stats", response_model=RegistryStats)
 async def get_registry_stats(
     session: AsyncSession = Depends(get_async_session)
@@ -16,6 +17,7 @@ async def get_registry_stats(
     Get statistics for the model registry.
     """
     return await ModelRegistryService.get_registry_stats(session)
+
 
 @router.get("/models", response_model=List[ModelRegistryEntry])
 async def list_models(
@@ -27,6 +29,7 @@ async def list_models(
     List all models in the registry.
     """
     return await ModelRegistryService.list_models(session, skip=skip, limit=limit)
+
 
 @router.get("/models/{model_type}/versions", response_model=List[ModelVersion])
 async def get_model_versions(

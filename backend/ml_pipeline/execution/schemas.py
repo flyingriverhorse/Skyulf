@@ -4,18 +4,20 @@ from typing import Any, Dict, List, Literal, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 
+
 @dataclass
 class NodeConfig:
     """Configuration for a single pipeline node."""
     node_id: str
     step_type: Literal[
-        "data_loader", 
-        "feature_engineering", 
-        "model_training", 
+        "data_loader",
+        "feature_engineering",
+        "model_training",
         "model_tuning"
     ]
     params: Dict[str, Any] = field(default_factory=dict)
-    inputs: List[str] = field(default_factory=list) # IDs of upstream nodes
+    inputs: List[str] = field(default_factory=list)  # IDs of upstream nodes
+
 
 @dataclass
 class PipelineConfig:
@@ -23,6 +25,7 @@ class PipelineConfig:
     pipeline_id: str
     nodes: List[NodeConfig]
     metadata: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class NodeExecutionResult:
@@ -32,7 +35,8 @@ class NodeExecutionResult:
     output_artifact_id: Optional[str] = None
     metrics: Dict[str, Any] = field(default_factory=dict)
     error: Optional[str] = None
-    execution_time: float = 0.0 # Seconds
+    execution_time: float = 0.0  # Seconds
+
 
 @dataclass
 class PipelineExecutionResult:

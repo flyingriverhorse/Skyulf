@@ -2,11 +2,13 @@ from pydantic import BaseModel, Field, model_validator
 from typing import Optional, Dict, Any
 from datetime import datetime
 
+
 class DataSourceCreate(BaseModel):
     name: str
     type: str = "file"
     config: Dict[str, Any] = {}
     description: Optional[str] = None
+
 
 class IngestionJobResponse(BaseModel):
     job_id: str
@@ -14,12 +16,14 @@ class IngestionJobResponse(BaseModel):
     message: str
     file_id: Optional[str] = None
 
+
 class IngestionStatus(BaseModel):
     status: str  # pending, processing, completed, failed
     progress: float
     error: Optional[str] = None
     details: Optional[Dict[str, Any]] = None
     updated_at: datetime
+
 
 class DataSourceRead(BaseModel):
     id: int
@@ -32,7 +36,7 @@ class DataSourceRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     source_metadata: Optional[Dict[str, Any]] = Field(None, alias="source_metadata")
-    
+
     rows: Optional[int] = None
     columns: Optional[int] = None
     size_bytes: Optional[int] = None
@@ -48,14 +52,14 @@ class DataSourceRead(BaseModel):
     class Config:
         from_attributes = True
 
+
 class DataSourceListResponse(BaseModel):
     sources: list[DataSourceRead]
+
 
 class DataSourceResponse(BaseModel):
     source: DataSourceRead
 
+
 class DataSourceSampleResponse(BaseModel):
     data: list[Dict[str, Any]]
-
-
-

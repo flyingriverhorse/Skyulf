@@ -1,14 +1,13 @@
-import os
 import logging
 from celery import shared_task
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timezone
-import json
 import asyncio
 
 from backend.config import get_settings
 from backend.database.models import DataSource
+from backend.data_ingestion.connectors.base import BaseConnector
 from backend.data_ingestion.connectors.file import LocalFileConnector
 from backend.data_ingestion.connectors.sql import DatabaseConnector
 from backend.data_ingestion.connectors.api import ApiConnector
@@ -17,16 +16,19 @@ from backend.data_ingestion.engine.profiler import DataProfiler
 logger = logging.getLogger(__name__)
 
 # Helper to get sync session
+
+
 def get_db_session():
     settings = get_settings()
     if settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
         sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
     else:
         sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
-    
+
     engine = create_engine(sync_url)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     return SessionLocal()
+
 
 @shared_task(name="core.data_ingestion.tasks.ingest_data_task")
 def ingest_data_task(source_id: int):
@@ -35,7 +37,7 @@ def ingest_data_task(source_id: int):
     """
     logger.info(f"Starting ingestion for source {source_id}")
     session = get_db_session()
-    
+
     try:
         # 1. Get DataSource
         data_source = session.query(DataSource).filter(DataSource.id == source_id).first()
@@ -55,36 +57,36 @@ def ingest_data_task(source_id: int):
 
         # 2. Select Connector
         config = data_source.config or {}
-        connector = None
-        
+        connector: BaseConnector
+
         if data_source.type == 'file':
             file_path = config.get('file_path')
             if not file_path:
                 raise ValueError("Missing file_path in config")
             connector = LocalFileConnector(file_path)
-            
+
         elif data_source.type in ['postgres', 'mysql', 'sqlite', 'snowflake']:
             # For SQL, we expect connection_string in config (or built from credentials)
             # In a real app, we would decrypt credentials here.
             connection_string = config.get('connection_string')
             table_name = config.get('table_name')
             query = config.get('query')
-            
+
             if not connection_string:
                 raise ValueError("Missing connection_string in config")
-                
+
             connector = DatabaseConnector(connection_string, table_name=table_name, query=query)
-            
+
         elif data_source.type == 'api':
             url = config.get('url')
             method = config.get('method', 'GET')
             headers = config.get('headers')
             params = config.get('params')
             data_key = config.get('data_key')
-            
+
             if not url:
                 raise ValueError("Missing url in config")
-                
+
             connector = ApiConnector(url, method=method, headers=headers, params=params, data_key=data_key)
 
         else:
@@ -97,10 +99,10 @@ def ingest_data_task(source_id: int):
             # Note: For very large SQL tables, we might want to avoid fetching everything just for metadata.
             # But for now, we follow the pattern.
             df = await connector.fetch_data()
-            
+
             # Run Profiling
             profile = DataProfiler.profile(df)
-            
+
             return profile
 
         loop = asyncio.new_event_loop()
@@ -118,12 +120,12 @@ def ingest_data_task(source_id: int):
         metadata['schema'] = {col: stats['type'] for col, stats in profile['columns'].items()}
         metadata['row_count'] = profile['row_count']
         metadata['column_count'] = profile['column_count']
-        metadata['profile'] = profile # Store full profile
-        
+        metadata['profile'] = profile  # Store full profile
+
         data_source.source_metadata = metadata
         data_source.test_status = 'success'
         data_source.last_tested = datetime.now(timezone.utc)
-        
+
         session.commit()
         logger.info(f"Ingestion completed for source {source_id}")
 

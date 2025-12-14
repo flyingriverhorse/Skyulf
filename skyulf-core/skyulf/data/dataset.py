@@ -2,12 +2,13 @@ from dataclasses import dataclass
 from typing import Optional, Union, Tuple
 import pandas as pd
 
+
 @dataclass
 class SplitDataset:
     train: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]
     test: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]
     validation: Optional[Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]] = None
-    
+
     def copy(self) -> 'SplitDataset':
         def copy_data(data):
             if isinstance(data, tuple):

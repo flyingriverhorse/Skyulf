@@ -1,5 +1,6 @@
 import polars as pl
-from typing import Dict, Any, List
+from typing import Dict, Any
+
 
 class DataProfiler:
     """
@@ -11,24 +12,24 @@ class DataProfiler:
         """
         Generate a profile of the dataframe.
         """
-        profile = {
+        profile: Dict[str, Any] = {
             "row_count": len(df),
             "column_count": len(df.columns),
             "columns": {},
-            "missing_cells": sum(df[col].null_count() for col in df.columns), # Total missing cells
+            "missing_cells": sum(df[col].null_count() for col in df.columns),  # Total missing cells
             "duplicate_rows": df.is_duplicated().sum()
         }
 
         for col in df.columns:
-            col_stats = {}
+            col_stats: Dict[str, Any] = {}
             series = df[col]
             dtype = str(series.dtype)
-            
+
             col_stats["type"] = dtype
             col_stats["null_count"] = series.null_count()
             col_stats["null_percentage"] = (series.null_count() / len(df)) * 100
             col_stats["unique_count"] = series.n_unique()
-            
+
             if dtype in ["Int64", "Float64", "Int32", "Float32"]:
                 col_stats["mean"] = series.mean()
                 col_stats["std"] = series.std()
@@ -40,9 +41,9 @@ class DataProfiler:
                 try:
                     value_counts = series.value_counts().sort("count", descending=True).head(5)
                     col_stats["top_values"] = value_counts.to_dicts()
-                except:
+                except BaseException:
                     pass
-            
+
             profile["columns"][col] = col_stats
-            
+
         return profile

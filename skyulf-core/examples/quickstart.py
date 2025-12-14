@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 from skyulf import SkyulfPipeline
 
+
 def create_dummy_data():
     """Create a dummy dataset for demonstration."""
     np.random.seed(42)
@@ -26,11 +27,12 @@ def create_dummy_data():
     df.loc[0:10, "income"] = np.nan
     return df
 
+
 def main():
     print("1. Creating dummy data...")
     data = create_dummy_data()
     print(f"   Data shape: {data.shape}")
-    
+
     # 2. Define Pipeline Configuration
     # This config defines the steps for preprocessing and the model to use.
     config = {
@@ -78,14 +80,14 @@ def main():
             }
         }
     }
-    
+
     print("\n2. Initializing Pipeline...")
     pipeline = SkyulfPipeline(config)
-    
+
     print("\n3. Training Pipeline...")
     # fit() runs preprocessing and trains the model
     metrics = pipeline.fit(data, target_column="is_customer")
-    
+
     print("   Training Complete!")
     print("   Metrics:", metrics.keys())
     if "modeling" in metrics:
@@ -94,31 +96,32 @@ def main():
         if "splits" in report and "test" in report["splits"]:
             acc = report["splits"]["test"].metrics.get("accuracy")
             print(f"   Test Accuracy: {acc:.4f}")
-        
+
     # 4. Save Pipeline
     print("\n4. Saving Pipeline to 'my_model.pkl'...")
     pipeline.save("my_model.pkl")
-    
+
     # 5. Load Pipeline
     print("\n5. Loading Pipeline...")
     loaded_pipeline = SkyulfPipeline.load("my_model.pkl")
-    
+
     # 6. Make Predictions
     print("\n6. Making Predictions on new data...")
     new_data = pd.DataFrame({
         "age": [25, 40],
-        "income": [60000, np.nan], # Missing value will be handled by imputer
+        "income": [60000, np.nan],  # Missing value will be handled by imputer
         "city": ["London", "Paris"]
     })
-    
+
     predictions = loaded_pipeline.predict(new_data)
     print("   Predictions:", predictions.tolist())
-    
+
     # Cleanup
     import os
     if os.path.exists("my_model.pkl"):
         os.remove("my_model.pkl")
         print("\n   (Cleaned up 'my_model.pkl')")
+
 
 if __name__ == "__main__":
     main()
