@@ -34,7 +34,6 @@ This release focuses on developer experience, system stability, and deep observa
     - `core/ml_pipeline/`: Contains the "Nervous System" (Engine, Registry, API).
 
 ### 🛠 Developer Experience
-- **VS Code Integration:** Added `.vscode/settings.json` to resolve Pylance import errors for `skyulf-core/`.
 - **Architecture Cleanup:** Clarified the separation between `NodeRegistry` (static node definitions) and `AdvisorEngine` (dynamic recommendations).
 
 ---
