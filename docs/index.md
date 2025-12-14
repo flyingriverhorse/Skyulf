@@ -67,16 +67,24 @@ To enable Celery for production workloads:
 
 ## Documentation Structure
 
-*   **Platform (Backend)**:
-   *   **[Backend Python API Guide](python_api.md)**: Programmatic usage of backend modules (`core.*`).
-   *   **[Data Ingestion](data/index.md)**: Connectors + profiling (`core.data_ingestion`).
+*   **User Guide**:
+   *   **[Getting Started](guides/getting_started.md)**: Installation and basic usage.
+   *   **[Common Recipes](guides/recipes.md)**: How-to guides for common tasks.
+   *   **[Python API Usage](python_api.md)**: Programmatic usage of backend modules.
    *   **[Architecture](architecture.md)**: System design and responsibilities.
-*   **Skyulf Core (Library)**:
-   *   **[Modeling Overview](modeling/index.md)**: Training and applying models.
-   *   **[Preprocessing Reference](reference/preprocessing.md)**: Feature engineering nodes.
-   *   **[Modeling Reference](reference/modeling.md)**: Modeling components.
-*   **Reference**:
-   *   **[Backend Execution Engine](reference/execution.md)**
+   *   **[Experiments](guides/experiments.md)**: Tracking and managing experiments.
+   *   **[Model Registry](guides/model_registry.md)**: Managing model versions.
+   *   **[Inference](guides/inference.md)**: Deploying models for inference.
+*   **Modeling**:
+   *   **[Overview](modeling/index.md)**: Training and applying models.
+   *   **[Classification](modeling/classification.md)**: Classification algorithms.
+   *   **[Regression](modeling/regression.md)**: Regression algorithms.
+   *   **[Training](modeling/training.md)**: Model training process.
+   *   **[Tuning](modeling/tuning.md)**: Hyperparameter tuning.
+*   **Preprocessing**:
+   *   **[Cleaning](preprocessing/cleaning.md)**: Data cleaning operations.
+   *   **[Feature Engineering](preprocessing/feature_generation.md)**: Creating new features.
+   *   **[Transformations](preprocessing/transformations.md)**: Data transformations.
 
 ---
 
