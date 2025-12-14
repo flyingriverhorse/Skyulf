@@ -8,7 +8,6 @@ including database sessions and configuration.
 """
 
 from typing import AsyncGenerator
-from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings, Settings
@@ -87,4 +86,3 @@ def get_pagination_params(
         PaginationParams: Validated pagination parameters
     """
     return PaginationParams(skip=skip, limit=limit)
-

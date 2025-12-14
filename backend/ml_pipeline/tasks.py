@@ -4,11 +4,10 @@ from celery import shared_task
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
-import json
 import os
 
 from backend.config import get_settings
-from backend.database.models import TrainingJob, HyperparameterTuningJob, DataSource
+from backend.database.models import TrainingJob, HyperparameterTuningJob
 from backend.ml_pipeline.execution.engine import PipelineEngine
 from backend.ml_pipeline.execution.schemas import PipelineConfig, NodeConfig
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
@@ -16,16 +15,19 @@ from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 logger = logging.getLogger(__name__)
 
 # Helper to get sync session
+
+
 def get_db_session():
     settings = get_settings()
     if settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
         sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
     else:
         sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
-    
+
     engine = create_engine(sync_url)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     return SessionLocal()
+
 
 @shared_task(name="core.ml_pipeline.tasks.run_pipeline_task")
 def run_pipeline_task(job_id: str, pipeline_config_dict: dict):
@@ -34,13 +36,13 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):
     """
     logger.info(f"Starting pipeline execution for job {job_id}")
     session = get_db_session()
-    
+
     try:
         # 1. Get Job (Try TrainingJob first, then HyperparameterTuningJob)
         job = session.query(TrainingJob).filter(TrainingJob.id == job_id).first()
         if not job:
             job = session.query(HyperparameterTuningJob).filter(HyperparameterTuningJob.id == job_id).first()
-            
+
         if not job:
             logger.error(f"Job {job_id} not found in TrainingJob or HyperparameterTuningJob")
             return
@@ -68,7 +70,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):
                 params=n['params'],
                 inputs=n['inputs']
             ))
-            
+
         pipeline_config = PipelineConfig(
             pipeline_id=pipeline_config_dict['pipeline_id'],
             nodes=nodes,
@@ -82,17 +84,17 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):
         # Add version info to logs
         timestamp = datetime.now().strftime("%H:%M:%S")
         if isinstance(job, TrainingJob):
-             job_logs.append(f"[{timestamp}] Training Job Version: {job.version}")
+            job_logs.append(f"[{timestamp}] Training Job Version: {job.version}")
         elif isinstance(job, HyperparameterTuningJob):
-             job_logs.append(f"[{timestamp}] Tuning Job Run: {job.run_number}")
-        
+            job_logs.append(f"[{timestamp}] Tuning Job Run: {job.run_number}")
+
         def log_callback(msg):
             nonlocal last_log_update
             timestamp = datetime.now().strftime("%H:%M:%S")
             log_entry = f"[{timestamp}] {msg}"
             logger.info(f"[Job {job_id}] {msg}")
             job_logs.append(log_entry)
-            
+
             # Update logs in DB every 2 seconds to avoid locking
             if (datetime.now() - last_log_update).total_seconds() > 2:
                 try:
@@ -108,37 +110,37 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):
         result = engine.run(pipeline_config, job_id=job_id)
 
         # 6. Handle Result
-        job.logs = job_logs # Final log update
-        
+        job.logs = job_logs  # Final log update
+
         if result.status == "success":
             job.status = "completed"
             job.progress = 100
             job.finished_at = datetime.now()
             job.artifact_uri = base_artifact_path
-            
+
             # Extract metrics from the last node if available
             if result.node_results:
                 last_node_id = list(result.node_results.keys())[-1]
                 last_result = result.node_results[last_node_id]
-                
+
                 final_metrics = last_result.metrics.copy() if last_result.metrics else {}
-                
+
                 # Collect dropped columns from all nodes (e.g. Feature Selection, Drop Columns)
                 all_dropped_columns = []
-                
+
                 for node_res in result.node_results.values():
                     if node_res.metrics and "dropped_columns" in node_res.metrics:
                         cols = node_res.metrics["dropped_columns"]
                         if isinstance(cols, list):
                             all_dropped_columns.extend(cols)
-                            
+
                 if all_dropped_columns:
                     # Deduplicate
                     all_dropped_columns = list(set(all_dropped_columns))
                     final_metrics["dropped_columns"] = all_dropped_columns
 
                 job.metrics = final_metrics
-                    
+
                 # Special handling for HyperparameterTuningJob
                 if isinstance(job, HyperparameterTuningJob):
                     if "best_params" in final_metrics:
@@ -147,7 +149,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):
                         job.best_score = final_metrics["best_score"]
                     if "trials" in final_metrics:
                         job.results = final_metrics["trials"]
-            
+
         else:
             job.status = "failed"
             # Extract error from the failed node if possible
@@ -171,7 +173,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):
             job = session.query(TrainingJob).filter(TrainingJob.id == job_id).first()
             if not job:
                 job = session.query(HyperparameterTuningJob).filter(HyperparameterTuningJob.id == job_id).first()
-                
+
             if job:
                 job.status = "failed"
                 job.error_message = str(e)

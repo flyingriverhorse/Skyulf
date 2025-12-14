@@ -10,7 +10,7 @@ Usage (examples):
     await crud.read("users", {"id": 1}, settings, one=True)
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 import re
 import logging
 
@@ -31,7 +31,7 @@ def _check_identifier(name: str) -> None:
         raise ValueError(f"Invalid identifier: {name}")
 
 
-def _row_to_dict(row):
+def _row_to_dict(row: Any) -> Optional[Dict[str, Any]]:
     """Convert SQLAlchemy Row to dict."""
     if row is None:
         return None
@@ -330,11 +330,11 @@ async def create(
         async with async_session_or_connection(settings, config) as conn:
             cols = ", ".join(data.keys())
             placeholders = ", ".join([f"%({k})s" for k in data.keys()])
-            sql = f"INSERT INTO {name} ({cols}) VALUES ({placeholders})"
+            sql_stmt = f"INSERT INTO {name} ({cols}) VALUES ({placeholders})"
 
             if hasattr(conn, 'execute'):
                 # Async connection (MySQL/Snowflake async wrapper)
-                await conn.execute(sql, data)
+                await conn.execute(sql_stmt, data)
                 await conn.commit()
                 # Note: Getting lastrowid in async context depends on the specific driver
                 return {"success": True}
@@ -363,7 +363,7 @@ async def read(
     filter: Optional[Dict[str, Any]] = None,
     config: Optional[Dict] = None,
     one: bool = False,
-) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
     """
     Read records/documents from table/collection.
 
@@ -389,28 +389,28 @@ async def read(
             sql = sa_text(f"SELECT * FROM {name}{clause}")
             result = await session.execute(sql, params)
             rows_raw = result.fetchall()
-            rows = [_row_to_dict(r) for r in rows_raw]
-            return rows[0] if one and rows else rows
+            rows = [cast(Dict[str, Any], _row_to_dict(r)) for r in rows_raw]
+            return cast(Union[Dict[str, Any], List[Dict[str, Any]]], rows[0] if one and rows else rows)
 
     elif db_type in (DatabaseType.MYSQL, DatabaseType.MARIADB, DatabaseType.SNOWFLAKE):
         async with async_session_or_connection(settings, config) as conn:
             clause, params = _build_where_clause_sql(filter or {}, placeholder_style="pyformat")
-            sql = f"SELECT * FROM {name}{clause}"
+            sql_stmt = f"SELECT * FROM {name}{clause}"
 
             if hasattr(conn, 'execute'):
                 # Async connection
-                result = await conn.execute(sql, params)
+                result = await conn.execute(sql_stmt, params)
                 # This would need to be adapted based on the specific async driver
-                rows = result.fetchall() if hasattr(result, 'fetchall') else []
+                rows = cast(List[Dict[str, Any]], result.fetchall() if hasattr(result, 'fetchall') else [])
             else:
                 # Sync wrapper
                 cursor = conn.cursor()
-                cursor.execute(sql, params if isinstance(params, dict) else tuple(params))
+                cursor.execute(sql_stmt, params if isinstance(params, dict) else tuple(params))
                 cols = [c[0] for c in cursor.description] if cursor.description else []
                 rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
                 cursor.close()
 
-            return rows[0] if one and rows else rows
+            return cast(Union[Dict[str, Any], List[Dict[str, Any]]], rows[0] if one and rows else rows)
 
     elif db_type in (DatabaseType.MONGODB, DatabaseType.MONGO):
         async with async_session_or_connection(settings, config) as db_obj:
@@ -432,11 +432,11 @@ async def read(
             else:
                 if one:
                     item = await collection.find_one(filter)
-                    return item
+                    return cast(Optional[Dict[str, Any]], item)
                 cursor = collection.find(filter)
                 items = await cursor.to_list(length=None)
 
-            return items
+            return cast(List[Dict[str, Any]], items)
 
     else:
         raise RuntimeError(f"Unsupported database type: {db_type}")
@@ -493,15 +493,15 @@ async def update(
             if isinstance(where_params, dict):
                 params.update(where_params)
 
-            sql = f"UPDATE {name} SET {set_parts}{clause}"
+            sql_stmt = f"UPDATE {name} SET {set_parts}{clause}"
 
             if hasattr(conn, 'execute'):
-                result = await conn.execute(sql, params)
+                result = await conn.execute(sql_stmt, params)
                 await conn.commit()
                 return {"affected_rows": getattr(result, 'rowcount', 0)}
             else:
                 cursor = conn.cursor()
-                cursor.execute(sql, params)
+                cursor.execute(sql_stmt, params)
                 conn.commit()
                 affected = cursor.rowcount
                 cursor.close()
@@ -565,15 +565,15 @@ async def delete(
     elif db_type in (DatabaseType.MYSQL, DatabaseType.MARIADB, DatabaseType.SNOWFLAKE):
         async with async_session_or_connection(settings, config) as conn:
             clause, params = _build_where_clause_sql(filter, placeholder_style="pyformat")
-            sql = f"DELETE FROM {name}{clause}"
+            sql_stmt = f"DELETE FROM {name}{clause}"
 
             if hasattr(conn, 'execute'):
-                result = await conn.execute(sql, params)
+                result = await conn.execute(sql_stmt, params)
                 await conn.commit()
                 return {"affected_rows": getattr(result, 'rowcount', 0)}
             else:
                 cursor = conn.cursor()
-                cursor.execute(sql, params if isinstance(params, dict) else tuple(params))
+                cursor.execute(sql_stmt, params if isinstance(params, dict) else tuple(params))
                 conn.commit()
                 affected = cursor.rowcount
                 cursor.close()
@@ -615,14 +615,14 @@ async def count(
     elif db_type in (DatabaseType.MYSQL, DatabaseType.MARIADB, DatabaseType.SNOWFLAKE):
         async with async_session_or_connection(settings, config) as conn:
             clause, params = _build_where_clause_sql(filter or {}, placeholder_style="pyformat")
-            sql = f"SELECT COUNT(*) FROM {name}{clause}"
+            sql_stmt = f"SELECT COUNT(*) FROM {name}{clause}"
 
             if hasattr(conn, 'execute'):
-                result = await conn.execute(sql, params)
+                result = await conn.execute(sql_stmt, params)
                 return result.fetchone()[0] if hasattr(result, 'fetchone') else 0
             else:
                 cursor = conn.cursor()
-                cursor.execute(sql, params if isinstance(params, dict) else tuple(params))
+                cursor.execute(sql_stmt, params if isinstance(params, dict) else tuple(params))
                 result = cursor.fetchone()
                 cursor.close()
                 return result[0] if result else 0
@@ -630,7 +630,7 @@ async def count(
     elif db_type in (DatabaseType.MONGODB, DatabaseType.MONGO):
         async with async_session_or_connection(settings, config) as db_obj:
             collection = db_obj[name]
-            return await collection.count_documents(filter or {})
+            return cast(int, await collection.count_documents(filter or {}))
 
     else:
         raise RuntimeError(f"Unsupported database type: {db_type}")

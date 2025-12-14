@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, List, Union
+from typing import Dict, Optional
 import polars as pl
+
 
 class BaseConnector(ABC):
     """
@@ -28,16 +29,16 @@ class BaseConnector(ABC):
     async def fetch_data(self, query: Optional[str] = None, limit: Optional[int] = None) -> pl.DataFrame:
         """
         Fetch data from the source.
-        
+
         Args:
             query: Optional query string (SQL, filter, etc.)
             limit: Optional limit on number of rows
-            
+
         Returns:
             pl.DataFrame: The fetched data
         """
         pass
-    
+
     @abstractmethod
     async def validate(self) -> bool:
         """

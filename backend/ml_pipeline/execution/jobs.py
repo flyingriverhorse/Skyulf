@@ -3,16 +3,18 @@ Job Management for V2 Pipeline.
 Handles persistence of Training and Tuning jobs to the database.
 """
 
-from typing import Dict, Any, Optional, List, Union, Literal
+from typing import Dict, Any, Optional, List, Literal, cast as t_cast, Sequence
 from enum import Enum
 from datetime import datetime
 import uuid
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update, or_, cast, String, func
+from sqlalchemy import select, or_, cast, String
+from sqlalchemy.engine import Row
 from backend.database.models import TrainingJob, HyperparameterTuningJob, DataSource
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
+
 
 class JobStatus(str, Enum):
     QUEUED = "queued"
@@ -21,6 +23,7 @@ class JobStatus(str, Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
 
 class JobInfo(BaseModel):
     job_id: str
@@ -35,7 +38,7 @@ class JobInfo(BaseModel):
     error: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
     logs: Optional[List[str]] = None
-    
+
     # Extended fields for Experiments Page
     model_type: Optional[str] = None
     hyperparameters: Optional[Dict[str, Any]] = None
@@ -46,23 +49,24 @@ class JobInfo(BaseModel):
     dropped_columns: Optional[List[str]] = None
     version: Optional[int] = None
 
+
 class JobManager:
-    
+
     @staticmethod
     async def create_job(
-        session: AsyncSession, 
-        pipeline_id: str, 
-        node_id: str, 
+        session: AsyncSession,
+        pipeline_id: str,
+        node_id: str,
         job_type: Literal["training", "tuning", "preview"],
         dataset_id: str = "unknown",
         user_id: Optional[int] = None,
         model_type: str = "unknown",
-        graph: Dict[str, Any] = None
+        graph: Optional[Dict[str, Any]] = None
     ) -> str:
         """Creates a new job in the database (Async)."""
         job_id = str(uuid.uuid4())
         graph = graph or {}
-        
+
         if job_type == "training":
             next_version = await ModelRegistryService.get_next_version(session, dataset_id, model_type, "training")
 
@@ -74,7 +78,7 @@ class JobManager:
                 user_id=user_id,
                 status=JobStatus.QUEUED.value,
                 version=next_version,
-                model_type=model_type, 
+                model_type=model_type,
                 graph=graph,
                 started_at=datetime.now()
             )
@@ -83,7 +87,7 @@ class JobManager:
 
             # Extract search strategy from graph
             search_strategy = "random"
-            
+
             def extract_strategy(node_data):
                 # Check PipelineConfigModel params
                 params = node_data.get("params", {})
@@ -95,7 +99,7 @@ class JobManager:
                     return params["search_strategy"]
                 if "strategy" in params:
                     return params["strategy"]
-                
+
                 # Check React Flow data/config
                 data = node_data.get("data", {})
                 config = data.get("config", {})
@@ -115,7 +119,7 @@ class JobManager:
                         if found:
                             search_strategy = found
                         break
-                
+
                 # 2. If not found (or still random default), look for ANY node with strategy
                 # This handles cases where target_node is downstream (e.g. Evaluation)
                 if search_strategy == "random":
@@ -140,14 +144,14 @@ class JobManager:
             )
         elif job_type == "preview":
             # For preview jobs, we can reuse TrainingJob or create a new table.
-            # Reusing TrainingJob with a special flag or just treating it as a training job 
+            # Reusing TrainingJob with a special flag or just treating it as a training job
             # that doesn't produce a model version is easiest for now.
             # Or better, just don't save it to DB if it's transient?
             # But the user wants to see it in the UI, so we need an ID.
             # Let's use TrainingJob but mark it somehow? Or just let it be a training job.
             # Actually, if we want to persist it, we should probably use TrainingJob
             # but maybe with version=0 or something.
-            
+
             # For now, let's treat it as a TrainingJob but with model_type="preview"
             job = TrainingJob(
                 id=job_id,
@@ -156,16 +160,16 @@ class JobManager:
                 dataset_source_id=dataset_id,
                 user_id=user_id,
                 status=JobStatus.QUEUED.value,
-                version=0, # Preview doesn't increment version
-                model_type="preview", 
+                version=0,  # Preview doesn't increment version
+                model_type="preview",
                 graph=graph,
                 started_at=datetime.now()
             )
-            
+
         session.add(job)
         await session.commit()
         return job_id
-            
+
         session.add(job)
         await session.commit()
         return job_id
@@ -177,27 +181,27 @@ class JobManager:
         stmt = select(TrainingJob).where(TrainingJob.id == job_id)
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
-        
+
         if not job:
             stmt = select(HyperparameterTuningJob).where(HyperparameterTuningJob.id == job_id)
             result = await session.execute(stmt)
             job = result.scalar_one_or_none()
-            
+
         if job:
             if job.status in [JobStatus.QUEUED.value, JobStatus.RUNNING.value]:
-                job.status = JobStatus.CANCELLED.value
-                job.error_message = "Job cancelled by user."
-                job.finished_at = datetime.now()
+                job.status = JobStatus.CANCELLED.value  # type: ignore
+                job.error_message = "Job cancelled by user."  # type: ignore
+                job.finished_at = datetime.now()  # type: ignore
                 await session.commit()
                 return True
         return False
 
     @staticmethod
     def update_status_sync(
-        session: Session, 
-        job_id: str, 
-        status: Optional[JobStatus] = None, 
-        error: Optional[str] = None, 
+        session: Session,
+        job_id: str,
+        status: Optional[JobStatus] = None,
+        error: Optional[str] = None,
         result: Optional[Dict[str, Any]] = None,
         logs: Optional[List[str]] = None
     ):
@@ -206,20 +210,20 @@ class JobManager:
         job = session.query(TrainingJob).filter(TrainingJob.id == job_id).first()
         if not job:
             job = session.query(HyperparameterTuningJob).filter(HyperparameterTuningJob.id == job_id).first()
-            
+
         if job:
             if status:
-                job.status = status.value
+                job.status = status.value  # type: ignore
             if error:
-                job.error_message = error
-            
+                job.error_message = error  # type: ignore
+
             if logs:
                 # Append logs if existing, or set new
-                current_logs = job.logs or []
-                job.logs = current_logs + logs
-                
+                current_logs: List[Any] = t_cast(List[Any], job.logs) or []
+                job.logs = current_logs + logs  # type: ignore
+
                 # Update specific error fields if they exist
-            
+
             if result:
                 # Map result fields to model columns
                 if isinstance(job, TrainingJob):
@@ -236,42 +240,52 @@ class JobManager:
                         job.best_score = result["best_score"]
                     if "artifact_uri" in result:
                         job.artifact_uri = result["artifact_uri"]
-                    
+
                     # Save all metrics (including train/test/val scores) to the metrics column
                     # Filter out complex objects if necessary, but result usually contains simple types
-                    # We exclude best_params/best_score to avoid duplication if desired, 
+                    # We exclude best_params/best_score to avoid duplication if desired,
                     # but keeping them in metrics is also fine for consistency.
                     # Let's save everything that looks like a metric.
-                    job.metrics = result
-            
+                    job.metrics = result  # type: ignore
+
             if status in [JobStatus.COMPLETED, JobStatus.FAILED]:
-                job.finished_at = datetime.now()
+                job.finished_at = datetime.now()  # type: ignore
                 # job.progress = 100
-            
+
             session.commit()
 
     @staticmethod
     async def get_job(session: AsyncSession, job_id: str) -> Optional[JobInfo]:
         """Retrieves job info (Async)."""
         # Try TrainingJob
-        stmt = select(TrainingJob, DataSource.name).outerjoin(DataSource, TrainingJob.dataset_source_id == DataSource.source_id).where(TrainingJob.id == job_id)
+        stmt = select(
+            TrainingJob,
+            DataSource.name).outerjoin(
+            DataSource,
+            TrainingJob.dataset_source_id == DataSource.source_id).where(
+            TrainingJob.id == job_id)
         result = await session.execute(stmt)
         row = result.first()
-        
+
         job = None
         dataset_name = None
         job_type = "training"
-        
+
         if row:
             job, dataset_name = row
         else:
-            stmt = select(HyperparameterTuningJob, DataSource.name).outerjoin(DataSource, HyperparameterTuningJob.dataset_source_id == DataSource.source_id).where(HyperparameterTuningJob.id == job_id)
+            stmt = select(
+                HyperparameterTuningJob,
+                DataSource.name).outerjoin(
+                DataSource,
+                HyperparameterTuningJob.dataset_source_id == DataSource.source_id).where(
+                HyperparameterTuningJob.id == job_id)
             result = await session.execute(stmt)
             row = result.first()
             if row:
                 job, dataset_name = row
                 job_type = "tuning"
-            
+
         if job:
             # Extract hyperparameters from graph if possible, or metadata
             hyperparameters = None
@@ -296,57 +310,77 @@ class JobManager:
 
                     if nid == job.node_id:
                         hyperparameters = params
-                    
+
                     # Also look for target column in train_test_split node, training node, or tuning node
-                    if ntype in ['train_test_split', 'TrainTestSplitter', 'feature_target_split', 'model_training', 'model_tuning', 'hyperparameter_tuning'] and params.get('target_column'):
+                    if ntype in [
+                        'train_test_split',
+                        'TrainTestSplitter',
+                        'feature_target_split',
+                        'model_training',
+                        'model_tuning',
+                            'hyperparameter_tuning'] and params.get('target_column'):
                         target_column = params.get('target_column')
-                        
+
                     # Look for dropped columns
-                    if ntype in ['drop_missing_columns', 'DropMissingColumns', 'drop_column_recommendations', 'drop_columns'] and isinstance(params.get('columns'), list):
+                    if ntype in [
+                            'drop_missing_columns',
+                            'DropMissingColumns',
+                            'drop_column_recommendations',
+                            'drop_columns'] and isinstance(
+                            params.get('columns'),
+                            list):
                         dropped_columns.extend(params.get('columns'))
                     if ntype == 'feature_selection' and isinstance(params.get('dropped_columns'), list):
                         dropped_columns.extend(params.get('dropped_columns'))
-            
+
             # Also check job metrics for runtime dropped columns (e.g. from Feature Selection)
             if job.metrics and isinstance(job.metrics, dict) and "dropped_columns" in job.metrics:
                 metrics_dropped = job.metrics["dropped_columns"]
                 if isinstance(metrics_dropped, list):
                     dropped_columns.extend(metrics_dropped)
-            
+
             # Deduplicate
             dropped_columns = list(set(dropped_columns))
-            
+
             return JobInfo(
                 job_id=job.id,
                 pipeline_id=job.pipeline_id,
                 node_id=job.node_id,
                 dataset_id=job.dataset_source_id,
                 dataset_name=dataset_name,
-                job_type=job_type,
-                status=JobStatus(job.status),
+                job_type=t_cast(Literal['training', 'tuning', 'preview'], job_type),
+                status=JobStatus(
+                    job.status),
                 start_time=job.started_at,
                 end_time=job.finished_at,
                 error=job.error_message,
-                result={"metrics": job.metrics} if job_type == "training" else {"best_params": job.best_params, "best_score": job.best_score, "metrics": job.metrics, "results": job.results},
+                result={
+                    "metrics": job.metrics} if job_type == "training" else {
+                    "best_params": job.best_params,
+                    "best_score": job.best_score,
+                    "metrics": job.metrics,
+                    "results": job.results},
                 logs=job.logs,
                 model_type=job.model_type,
                 hyperparameters=hyperparameters,
                 created_at=job.created_at,
-                metrics=job.metrics if job_type == "training" else ({"score": job.best_score} if job.best_score else None),
+                metrics=job.metrics if job_type == "training" else (
+                    {
+                        "score": job.best_score} if job.best_score else None),
                 search_strategy=job.search_strategy if job_type == "tuning" else None,
                 target_column=target_column,
                 dropped_columns=dropped_columns,
-                version=job.version if job_type == "training" else job.run_number
-            )
+                version=job.version if job_type == "training" else job.run_number)
         return None
 
     @staticmethod
-    async def list_jobs(session: AsyncSession, limit: int = 50, skip: int = 0, job_type: Optional[Literal["training", "tuning"]] = None) -> List[JobInfo]:
+    async def list_jobs(session: AsyncSession, limit: int = 50, skip: int = 0,
+                        job_type: Optional[Literal["training", "tuning"]] = None) -> List[JobInfo]:
         """Lists recent jobs (Async)."""
         # Fetch both and merge? Or just return separate lists?
         # For now, let's fetch TrainingJobs
-        train_rows = []
-        tune_rows = []
+        train_rows: Sequence[Row] = []
+        tune_rows: Sequence[Row] = []
 
         if job_type is None or job_type == "training":
             result_train = await session.execute(
@@ -361,7 +395,7 @@ class JobManager:
                 .offset(skip)
             )
             train_rows = result_train.all()
-        
+
         if job_type is None or job_type == "tuning":
             result_tune = await session.execute(
                 select(HyperparameterTuningJob, DataSource.name)
@@ -374,7 +408,7 @@ class JobManager:
                 .offset(skip)
             )
             tune_rows = result_tune.all()
-        
+
         combined = []
         for j, d_name in train_rows:
             # Extract hyperparameters
@@ -386,22 +420,22 @@ class JobManager:
                         break
 
             combined.append(JobInfo(
-                job_id=j.id,
-                pipeline_id=j.pipeline_id,
-                node_id=j.node_id,
-                dataset_id=j.dataset_source_id,
+                job_id=t_cast(str, j.id),
+                pipeline_id=t_cast(str, j.pipeline_id),
+                node_id=t_cast(str, j.node_id),
+                dataset_id=t_cast(Optional[str], j.dataset_source_id),
                 dataset_name=d_name,
                 job_type="training",
                 status=JobStatus(j.status),
-                start_time=j.started_at,
-                end_time=j.finished_at,
-                error=j.error_message,
+                start_time=t_cast(Optional[datetime], j.started_at),
+                end_time=t_cast(Optional[datetime], j.finished_at),
+                error=t_cast(Optional[str], j.error_message),
                 result={"metrics": j.metrics},
-                model_type=j.model_type,
-                hyperparameters=hyperparameters,
-                created_at=j.created_at,
-                metrics=j.metrics,
-                version=j.version
+                model_type=t_cast(str, j.model_type),
+                hyperparameters=t_cast(Dict[str, Any], hyperparameters),
+                created_at=t_cast(datetime, j.created_at),
+                metrics=t_cast(Optional[Dict[str, Any]], j.metrics),
+                version=t_cast(Optional[int], j.version)
             ))
         for j, d_name in tune_rows:
             # Extract hyperparameters (search space)
@@ -416,25 +450,29 @@ class JobManager:
             metrics = j.metrics if j.metrics else ({"score": j.best_score} if j.best_score else None)
 
             combined.append(JobInfo(
-                job_id=j.id,
-                pipeline_id=j.pipeline_id,
-                node_id=j.node_id,
-                dataset_id=j.dataset_source_id,
+                job_id=t_cast(str, j.id),
+                pipeline_id=t_cast(str, j.pipeline_id),
+                node_id=t_cast(str, j.node_id),
+                dataset_id=t_cast(Optional[str], j.dataset_source_id),
                 dataset_name=d_name,
                 job_type="tuning",
                 status=JobStatus(j.status),
-                start_time=j.started_at,
-                end_time=j.finished_at,
-                error=j.error_message,
-                result={"best_params": j.best_params, "best_score": j.best_score, "metrics": metrics}, # Ensure metrics are in result too
-                model_type=j.model_type,
-                hyperparameters=hyperparameters,
-                created_at=j.created_at,
-                metrics=metrics,
-                search_strategy=j.search_strategy,
-                version=j.run_number
+                start_time=t_cast(Optional[datetime], j.started_at),
+                end_time=t_cast(Optional[datetime], j.finished_at),
+                error=t_cast(Optional[str], j.error_message),
+                result={
+                    "best_params": j.best_params,
+                    "best_score": j.best_score,
+                    "metrics": metrics},
+                # Ensure metrics are in result too
+                model_type=t_cast(str, j.model_type),
+                hyperparameters=t_cast(Dict[str, Any], hyperparameters),
+                created_at=t_cast(datetime, j.created_at),
+                metrics=t_cast(Optional[Dict[str, Any]], metrics),
+                search_strategy=t_cast(Optional[str], j.search_strategy),
+                version=t_cast(Optional[int], j.run_number)
             ))
-            
+
         # Sort by start time
         combined.sort(key=lambda x: x.start_time or datetime.min, reverse=True)
         return combined[:limit]
@@ -449,20 +487,20 @@ class JobManager:
             .limit(1)
         )
         job = result.scalars().first()
-        
+
         if job:
             return JobInfo(
-                job_id=job.id,
-                pipeline_id=job.pipeline_id,
-                node_id=job.node_id,
-                dataset_id=job.dataset_source_id,
+                job_id=t_cast(str, job.id),
+                pipeline_id=t_cast(str, job.pipeline_id),
+                node_id=t_cast(str, job.node_id),
+                dataset_id=t_cast(Optional[str], job.dataset_source_id),
                 job_type="tuning",
                 status=JobStatus(job.status),
-                start_time=job.started_at,
-                end_time=job.finished_at,
-                error=job.error_message,
+                start_time=t_cast(Optional[datetime], job.started_at),
+                end_time=t_cast(Optional[datetime], job.finished_at),
+                error=t_cast(Optional[str], job.error_message),
                 result={"best_params": job.best_params, "best_score": job.best_score},
-                version=job.run_number
+                version=t_cast(Optional[int], job.run_number)
             )
         return None
 
@@ -477,24 +515,24 @@ class JobManager:
             select(HyperparameterTuningJob)
             .where(HyperparameterTuningJob.model_type == model_type)
             .where(HyperparameterTuningJob.status == JobStatus.COMPLETED.value)
-            .order_by(HyperparameterTuningJob.finished_at.desc()) # Get latest
+            .order_by(HyperparameterTuningJob.finished_at.desc())  # Get latest
             .limit(1)
         )
         job = result.scalars().first()
-        
+
         if job:
             return JobInfo(
-                job_id=job.id,
-                pipeline_id=job.pipeline_id,
-                node_id=job.node_id,
-                dataset_id=job.dataset_source_id,
+                job_id=t_cast(str, job.id),
+                pipeline_id=t_cast(str, job.pipeline_id),
+                node_id=t_cast(str, job.node_id),
+                dataset_id=t_cast(Optional[str], job.dataset_source_id),
                 job_type="tuning",
                 status=JobStatus(job.status),
-                start_time=job.started_at,
-                end_time=job.finished_at,
-                error=job.error_message,
+                start_time=t_cast(Optional[datetime], job.started_at),
+                end_time=t_cast(Optional[datetime], job.finished_at),
+                error=t_cast(Optional[str], job.error_message),
                 result={"best_params": job.best_params, "best_score": job.best_score},
-                version=job.run_number
+                version=t_cast(Optional[int], job.run_number)
             )
         return None
 
@@ -511,20 +549,20 @@ class JobManager:
             .limit(limit)
         )
         jobs = result.scalars().all()
-        
+
         return [
             JobInfo(
-                job_id=job.id,
-                pipeline_id=job.pipeline_id,
-                node_id=job.node_id,
-                dataset_id=job.dataset_source_id,
+                job_id=t_cast(str, job.id),
+                pipeline_id=t_cast(str, job.pipeline_id),
+                node_id=t_cast(str, job.node_id),
+                dataset_id=t_cast(Optional[str], job.dataset_source_id),
                 job_type="tuning",
                 status=JobStatus(job.status),
-                start_time=job.started_at,
-                end_time=job.finished_at,
-                error=job.error_message,
+                start_time=t_cast(Optional[datetime], job.started_at),
+                end_time=t_cast(Optional[datetime], job.finished_at),
+                error=t_cast(Optional[str], job.error_message),
                 result={"best_params": job.best_params, "best_score": job.best_score},
-                version=job.run_number
+                version=t_cast(Optional[int], job.run_number)
             )
             for job in jobs
         ]

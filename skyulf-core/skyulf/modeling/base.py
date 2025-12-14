@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Literal, Callable, Union, Tuple
-from datetime import datetime
+from typing import Any, Dict, Optional, Callable, Union, Tuple
 import pandas as pd
 import logging
 
@@ -10,9 +9,9 @@ from ..data.dataset import SplitDataset
 # from .evaluation.schemas import ModelEvaluationReport, ModelEvaluationSplitPayload
 # from .evaluation.classification import build_classification_split_report
 # from .evaluation.regression import build_regression_split_report
-from .cross_validation import perform_cross_validation
 
 logger = logging.getLogger(__name__)
+
 
 class BaseModelCalculator(ABC):
     @property
@@ -21,18 +20,27 @@ class BaseModelCalculator(ABC):
         """Returns 'classification' or 'regression'."""
         pass
 
+    @property
+    def default_params(self) -> Dict[str, Any]:
+        """Default hyperparameters for the model."""
+        return {}
+
     @abstractmethod
-    def fit(
-        self, 
-        X: pd.DataFrame, 
-        y: pd.Series, 
-        config: Dict[str, Any], 
-        progress_callback: Optional[Callable[[int, int], None]] = None,        log_callback: Optional[Callable[[str], None]] = None,        validation_data: Optional[tuple[pd.DataFrame, pd.Series]] = None
-    ) -> Any:
+    def fit(self,
+            X: pd.DataFrame,
+            y: pd.Series,
+            config: Dict[str,
+                         Any],
+            progress_callback: Optional[Callable[..., None]] = None,
+            log_callback: Optional[Callable[[str],
+                                            None]] = None,
+            validation_data: Optional[tuple[pd.DataFrame,
+                                            pd.Series]] = None) -> Any:
         """
         Trains the model. Returns the model object (serializable).
         """
         pass
+
 
 class BaseModelApplier(ABC):
     @abstractmethod
@@ -49,12 +57,13 @@ class BaseModelApplier(ABC):
         """
         return None
 
+
 class StatefulEstimator:
     def __init__(self, calculator: BaseModelCalculator, applier: BaseModelApplier, node_id: str):
         self.calculator = calculator
         self.applier = applier
         self.node_id = node_id
-        self.model = None # In-memory model storage
+        self.model = None  # In-memory model storage
 
     def _extract_xy(self, data: Any, target_column: str) -> tuple[pd.DataFrame, pd.Series]:
         """Helper to extract X and y from DataFrame or Tuple."""
@@ -68,10 +77,10 @@ class StatefulEstimator:
             raise ValueError(f"Unexpected data type: {type(data)}")
 
     def cross_validate(
-        self, 
-        dataset: SplitDataset, 
-        target_column: str, 
-        config: Dict[str, Any], 
+        self,
+        dataset: SplitDataset,
+        target_column: str,
+        config: Dict[str, Any],
         n_folds: int = 5,
         cv_type: str = "k_fold",
         shuffle: bool = True,
@@ -84,9 +93,9 @@ class StatefulEstimator:
         """
         # Import here to avoid circular dependency if any
         from .cross_validation import perform_cross_validation
-        
+
         X_train, y_train = self._extract_xy(dataset.train, target_column)
-        
+
         return perform_cross_validation(
             calculator=self.calculator,
             applier=self.applier,
@@ -102,9 +111,9 @@ class StatefulEstimator:
         )
 
     def fit_predict(
-        self, 
-        dataset: Union[SplitDataset, pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], 
-        target_column: str, 
+        self,
+        dataset: Union[SplitDataset, pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        target_column: str,
         config: Dict[str, Any],
         progress_callback: Optional[Callable[[int, int], None]] = None,
         log_callback: Optional[Callable[[str], None]] = None,
@@ -118,10 +127,10 @@ class StatefulEstimator:
             dataset = SplitDataset(train=dataset, test=pd.DataFrame(), validation=None)
         elif isinstance(dataset, tuple):
             dataset = SplitDataset(train=dataset, test=pd.DataFrame(), validation=None)
-        
+
         # 1. Prepare Data
         X_train, y_train = self._extract_xy(dataset.train, target_column)
-        
+
         validation_data = None
         if dataset.validation is not None:
             X_val, y_val = self._extract_xy(dataset.validation, target_column)
@@ -129,20 +138,20 @@ class StatefulEstimator:
 
         # 2. Train Model
         self.model = self.calculator.fit(
-            X_train, 
-            y_train, 
-            config, 
+            X_train,
+            y_train,
+            config,
             progress_callback=progress_callback,
             log_callback=log_callback,
             validation_data=validation_data
         )
-        
+
         # 3. Predict on all splits
         predictions = {}
-        
+
         # Train Predictions
         predictions['train'] = self.applier.predict(X_train, self.model)
-        
+
         # Test Predictions
         is_test_empty = False
         if isinstance(dataset.test, tuple):
@@ -159,7 +168,7 @@ class StatefulEstimator:
                 else:
                     X_test = dataset.test
             predictions['test'] = self.applier.predict(X_test, self.model)
-        
+
         # Validation Predictions
         if dataset.validation is not None:
             if isinstance(dataset.validation, tuple):
@@ -170,7 +179,7 @@ class StatefulEstimator:
                 else:
                     X_val = dataset.validation
             predictions['validation'] = self.applier.predict(X_val, self.model)
-            
+
         return predictions
 
     def refit(self, dataset: SplitDataset, target_column: str, config: Dict[str, Any], job_id: str = "unknown") -> None:
@@ -185,10 +194,10 @@ class StatefulEstimator:
         # 1. Prepare Combined Data
         X_train, y_train = self._extract_xy(dataset.train, target_column)
         X_val, y_val = self._extract_xy(dataset.validation, target_column)
-        
+
         X_combined = pd.concat([X_train, X_val], axis=0)
         y_combined = pd.concat([y_train, y_val], axis=0)
-        
+
         # 2. Train Model
         self.model = self.calculator.fit(X_combined, y_combined, config)
 
@@ -199,14 +208,14 @@ class StatefulEstimator:
         # Import here to avoid circular dependency
         from .evaluation.classification import evaluate_classification_model
         from .evaluation.regression import evaluate_regression_model
-        
+
         if self.model is None:
             raise ValueError("Model has not been trained yet. Call fit_predict() first.")
-            
+
         problem_type = self.calculator.problem_type
-        
+
         splits_payload = {}
-        
+
         # Container for raw predictions
         evaluation_data = {
             "job_id": job_id,
@@ -214,21 +223,21 @@ class StatefulEstimator:
             "problem_type": problem_type,
             "splits": {}
         }
-        
+
         # Helper to evaluate a single split
         def evaluate_split(split_name: str, data: Any):
             if isinstance(data, tuple):
                 X, y = data
             elif isinstance(data, pd.DataFrame):
                 if target_column not in data.columns:
-                    return None # Cannot evaluate without target
+                    return None  # Cannot evaluate without target
                 X = data.drop(columns=[target_column])
                 y = data[target_column]
             else:
                 return None
 
             y_pred = self.applier.predict(X, self.model)
-            
+
             # Try to get probabilities for classification
             y_proba = None
             if problem_type == "classification":
@@ -243,10 +252,10 @@ class StatefulEstimator:
                 "y_true": y.tolist() if hasattr(y, "tolist") else list(y),
                 "y_pred": y_pred.tolist() if hasattr(y_pred, "tolist") else list(y_pred)
             }
-            
+
             if y_proba:
                 split_data["y_proba"] = y_proba
-                
+
             evaluation_data["splits"][split_name] = split_data
 
             if problem_type == "classification":
@@ -268,17 +277,17 @@ class StatefulEstimator:
 
         # 2. Evaluate Train
         splits_payload['train'] = evaluate_split('train', dataset.train)
-        
+
         # 3. Evaluate Test
         has_test = False
         if isinstance(dataset.test, pd.DataFrame):
             has_test = not dataset.test.empty
         elif isinstance(dataset.test, tuple):
             has_test = len(dataset.test) == 2 and len(dataset.test[0]) > 0
-            
+
         if has_test:
             splits_payload['test'] = evaluate_split('test', dataset.test)
-        
+
         # 4. Evaluate Validation
         if dataset.validation is not None:
             has_val = False
@@ -286,10 +295,10 @@ class StatefulEstimator:
                 has_val = not dataset.validation.empty
             elif isinstance(dataset.validation, tuple):
                 has_val = len(dataset.validation) == 2 and len(dataset.validation[0]) > 0
-                
+
             if has_val:
                 splits_payload['validation'] = evaluate_split('validation', dataset.validation)
-                
+
         # Return report object (simplified for now, assuming schema matches)
         return {
             "problem_type": problem_type,

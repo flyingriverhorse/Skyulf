@@ -1,11 +1,10 @@
 """FastAPI dependencies for data ingestion."""
 
 from typing import Annotated
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.engine import get_async_session
-from backend.database.models import User
 from .service import DataIngestionService
 from .exceptions import DataIngestionException
 
@@ -33,7 +32,7 @@ def handle_data_ingestion_exception(exc: DataIngestionException) -> HTTPExceptio
         status_code=exc.status_code,
         detail={
             "message": exc.message,
-            "detail": exc.detail,
+            "detail": exc.details,
             "type": exc.__class__.__name__
         }
     )

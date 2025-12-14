@@ -1,7 +1,7 @@
 """Hyperparameter Tuner implementation."""
 
 import logging
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional, List, Union
 
 import numpy as np
 import pandas as pd
@@ -9,11 +9,9 @@ import pandas as pd
 # Explicitly enable experimental halving search cv
 from sklearn.experimental import enable_halving_search_cv  # noqa
 from sklearn.model_selection import (
-    GridSearchCV,
     HalvingGridSearchCV,
     HalvingRandomSearchCV,
     KFold,
-    RandomizedSearchCV,
     ShuffleSplit,
     StratifiedKFold,
     TimeSeriesSplit,
@@ -22,7 +20,6 @@ from sklearn.model_selection import (
 )
 
 from ..base import BaseModelApplier, BaseModelCalculator
-from ..cross_validation import perform_cross_validation
 from .schemas import TuningConfig, TuningResult
 
 logger = logging.getLogger(__name__)
@@ -60,18 +57,22 @@ if HAS_OPTUNA:
                 )
 
 
-class TunerCalculator:
+class TunerCalculator(BaseModelCalculator):
     """Calculator for hyperparameter tuning."""
 
     def __init__(self, model_calculator: BaseModelCalculator):
         self.model_calculator = model_calculator
+
+    @property
+    def problem_type(self) -> str:
+        return self.model_calculator.problem_type
 
     def _clean_search_space(self, search_space: Dict[str, Any]) -> Dict[str, Any]:
         """
         Recursively cleans the search space.
         - Converts "none" string to None.
         """
-        cleaned = {}
+        cleaned: Dict[str, Any] = {}
         for k, v in search_space.items():
             if isinstance(v, list):
                 cleaned[k] = [None if x == "none" else x for x in v]
@@ -103,7 +104,7 @@ class TunerCalculator:
             # Extract valid keys for TuningConfig
             valid_keys = TuningConfig.__annotations__.keys()
             filtered_config = {k: v for k, v in config.items() if k in valid_keys}
-            tuning_config = TuningConfig(**filtered_config)
+            tuning_config = TuningConfig(**filtered_config)  # type: ignore
 
         return self.tune(
             X,
@@ -236,81 +237,88 @@ class TunerCalculator:
             # Use custom loop to support progress and log callbacks
             if log_callback:
                 log_callback(f"Starting {config.strategy} search with custom loop for detailed logging...")
-            
+
             # 1. Generate Candidates
             param_space = self._clean_search_space(config.search_space)
             candidates = []
-            
+
             if config.strategy == "grid":
                 candidates = list(ParameterGrid(param_space))
             else:
                 # Random Search
-                candidates = list(ParameterSampler(param_space, n_iter=config.n_trials, random_state=config.random_state))
-            
+                candidates = list(
+                    ParameterSampler(
+                        param_space,
+                        n_iter=config.n_trials,
+                        random_state=config.random_state))
+
             total_candidates = len(candidates)
             if log_callback:
                 log_callback(f"Total candidates to evaluate: {total_candidates}")
-            
+
+            trials: List[Dict[str, Any]] = []
             best_score = -float("inf")
             best_params = None
-            
+
             # 2. Iterate Candidates
             for i, params in enumerate(candidates):
                 if log_callback:
-                    log_callback(f"Evaluating Candidate {i+1}/{total_candidates}: {params}")
-                
+                    log_callback(f"Evaluating Candidate {i + 1}/{total_candidates}: {params}")
+
                 # Use our custom cross_validate to get per-fold logs!
                 # We need to instantiate a temporary calculator with these params
                 # But wait, calculator.fit takes config.
                 # We can just pass the params in the config to perform_cross_validation
-                
+
                 # We need to call perform_cross_validation directly
                 # But we need 'calculator' and 'applier' instances.
                 # self.model_calculator is available.
                 # We need an applier. TunerCalculator doesn't have it.
                 # We need to assume the caller (engine) has the applier, but we are inside TunerCalculator.
                 # TunerCalculator only takes model_calculator in __init__.
-                
+
                 # Workaround: We can't easily use perform_cross_validation without an applier.
                 # However, we can use sklearn's cross_val_score or similar, but that doesn't give per-fold logs easily.
-                
+
                 # Better: We can instantiate the model and call fit/score manually in a loop over folds.
                 # This duplicates perform_cross_validation logic but gives us control.
-                
+
                 # Actually, let's use the 'cv' object we created above.
-                
+
                 fold_scores = []
-                
+
                 # Ensure numpy
                 X_arr = X_for_search.to_numpy() if hasattr(X_for_search, "to_numpy") else X_for_search
                 y_arr = y_for_search.to_numpy() if hasattr(y_for_search, "to_numpy") else y_for_search
-                
+
                 for fold_idx, (train_idx, val_idx) in enumerate(cv.split(X_arr, y_arr)):
                     # Split
-                    X_train_fold = X_for_search.iloc[train_idx] if hasattr(X_for_search, "iloc") else X_for_search[train_idx]
-                    y_train_fold = y_for_search.iloc[train_idx] if hasattr(y_for_search, "iloc") else y_for_search[train_idx]
+                    X_train_fold = X_for_search.iloc[train_idx] if hasattr(
+                        X_for_search, "iloc") else X_for_search[train_idx]
+                    y_train_fold = y_for_search.iloc[train_idx] if hasattr(
+                        y_for_search, "iloc") else y_for_search[train_idx]
                     X_val_fold = X_for_search.iloc[val_idx] if hasattr(X_for_search, "iloc") else X_for_search[val_idx]
                     y_val_fold = y_for_search.iloc[val_idx] if hasattr(y_for_search, "iloc") else y_for_search[val_idx]
-                    
+
                     # Instantiate and Fit
                     # Note: We must handle potential errors (e.g. incompatible params)
                     try:
                         model = self.model_calculator.model_class(**{**self.model_calculator.default_params, **params})
                         model.fit(X_train_fold, y_train_fold)
-                        
+
                         # Score
                         from sklearn.metrics import get_scorer
                         scorer = get_scorer(metric)
                         score = scorer(model, X_val_fold, y_val_fold)
                         fold_scores.append(score)
-                        
+
                         if log_callback:
                             n_splits = cv.get_n_splits(X_arr, y_arr)
-                            log_callback(f"  [Candidate {i+1}] CV Fold {fold_idx+1}/{n_splits} Score: {score:.4f}")
+                            log_callback(f"  [Candidate {i + 1}] CV Fold {fold_idx + 1}/{n_splits} Score: {score:.4f}")
                     except Exception as e:
                         if log_callback:
                             n_splits = cv.get_n_splits(X_arr, y_arr)
-                            log_callback(f"  [Candidate {i+1}] CV Fold {fold_idx+1}/{n_splits} Failed: {str(e)}")
+                            log_callback(f"  [Candidate {i + 1}] CV Fold {fold_idx + 1}/{n_splits} Failed: {str(e)}")
                         fold_scores.append(-float("inf"))
 
                 # Filter out failed folds for mean calculation if possible, or penalize
@@ -319,21 +327,24 @@ class TunerCalculator:
                     mean_score = np.mean(valid_scores)
                 else:
                     mean_score = -float("inf")
-                
+
                 if log_callback:
-                    log_callback(f"Candidate {i+1} Mean Score: {mean_score:.4f}")
-                
+                    log_callback(f"Candidate {i + 1} Mean Score: {mean_score:.4f}")
+
                 if progress_callback:
                     progress_callback(i + 1, total_candidates, mean_score, params)
-                
+
+                trials.append({'params': params, 'score': mean_score})
+
                 if mean_score > best_score:
                     best_score = mean_score
                     best_params = params
-            
+
             return TuningResult(
-                best_params=best_params,
+                best_params=best_params if best_params is not None else {},
                 best_score=best_score,
-                n_trials=total_candidates
+                n_trials=total_candidates,
+                trials=trials
             )
 
         elif config.strategy == "halving_grid":
@@ -381,10 +392,10 @@ class TunerCalculator:
                     # Optuna doesn't know total trials upfront easily if not set, but we have config.n_trials
                     # trial.value is the score (or None if failed/pruned)
                     score = trial.value if trial.value is not None else None
-                    
+
                     if log_callback:
                         log_callback(f"Optuna Trial {trial.number + 1} finished. Mean CV Score: {score}")
-                        
+
                     progress_callback(
                         trial.number + 1, config.n_trials, score, trial.params
                     )
@@ -396,7 +407,7 @@ class TunerCalculator:
                 param_distributions=distributions,
                 n_trials=config.n_trials,
                 timeout=config.timeout,
-                cv=cv,
+                cv=cv,  # type: ignore
                 scoring=metric,
                 n_jobs=-1,
                 random_state=config.random_state,
@@ -427,7 +438,9 @@ class TunerCalculator:
             error_msg = str(e)
             if "No trials are completed yet" in error_msg:
                 raise ValueError(
-                    "Hyperparameter tuning failed: No trials completed successfully. This usually means the model failed to train with the provided hyperparameter combinations. Please check your search space and data."
+                    "Hyperparameter tuning failed: No trials completed successfully. "
+                    "This usually means the model failed to train with the provided hyperparameter combinations. "
+                    "Please check your search space and data."
                 ) from e
 
             if (
@@ -436,7 +449,9 @@ class TunerCalculator:
                 and "Got 0" in error_msg
             ):
                 raise ValueError(
-                    "Hyperparameter tuning with Halving strategy failed because the dataset is too small for the configured halving parameters. Please try using 'Random Search' or 'Grid Search' instead, or increase your dataset size."
+                    "Hyperparameter tuning with Halving strategy failed because the dataset is too small "
+                    "for the configured halving parameters. Please try using 'Random Search' or 'Grid Search' instead, "
+                    "or increase your dataset size."
                 ) from e
 
             raise e

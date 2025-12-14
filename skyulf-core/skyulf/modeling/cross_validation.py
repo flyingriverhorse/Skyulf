@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, cast
 
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold, ShuffleSplit, StratifiedKFold, TimeSeriesSplit
 
 if TYPE_CHECKING:
-    from ..base import BaseModelApplier, BaseModelCalculator
+    from .base import BaseModelApplier, BaseModelCalculator
 
 from .evaluation.common import sanitize_metrics
 from .evaluation.metrics import calculate_classification_metrics, calculate_regression_metrics
@@ -102,7 +102,7 @@ def perform_cross_validation(
     for fold_idx, (train_idx, val_idx) in enumerate(splitter.split(X_arr, y_arr)):
         if progress_callback:
             progress_callback(fold_idx + 1, n_folds)
-        
+
         if log_callback:
             log_callback(f"Processing Fold {fold_idx + 1}/{n_folds}...")
 
@@ -120,7 +120,7 @@ def perform_cross_validation(
             metrics = calculate_classification_metrics(model_artifact, X_val_fold, y_val_fold)
         else:
             metrics = calculate_regression_metrics(model_artifact, X_val_fold, y_val_fold)
-            
+
         if log_callback:
             # Log a key metric for the fold
             key_metric = "accuracy" if problem_type == "classification" else "r2"
@@ -136,9 +136,9 @@ def perform_cross_validation(
         )
 
     # 3. Aggregate
-    fold_metrics = [r["metrics"] for r in fold_results]
+    fold_metrics = [cast(Dict[str, float], r["metrics"]) for r in fold_results]
     aggregated = _aggregate_metrics(fold_metrics)
-    
+
     if log_callback:
         log_callback(f"Cross-Validation Completed. Aggregated Metrics: {aggregated}")
 

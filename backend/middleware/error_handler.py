@@ -7,7 +7,7 @@ Centralizes error handling and logging for the FastAPI application.
 import logging
 import traceback
 import uuid
-from typing import Callable
+from typing import Callable, cast
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -46,7 +46,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             # Add request ID to response headers
             response.headers["X-Request-ID"] = request_id
 
-            return response
+            return cast(Response, response)
 
         except Exception as exc:
             # Log the error with full traceback

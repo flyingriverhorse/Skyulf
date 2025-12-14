@@ -14,6 +14,9 @@ from backend.config import Settings
 
 router = APIRouter()
 
+# Initialize start time for uptime calculation
+START_TIME = time.time()
+
 
 class HealthResponse(BaseModel):
     """Health check response model."""
@@ -42,7 +45,7 @@ async def health_check(settings: Settings = Depends(get_config)):
         timestamp=datetime.now(timezone.utc),
         version="2.0.0",
         environment="development" if settings.DEBUG else "production",
-        uptime_seconds=time.time() - getattr(health_check, "_start_time", time.time())
+        uptime_seconds=time.time() - START_TIME
     )
 
 
@@ -72,7 +75,7 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
         timestamp=datetime.now(timezone.utc),
         version="2.0.0",
         environment="development" if settings.DEBUG else "production",
-        uptime_seconds=time.time() - getattr(health_check, "_start_time", time.time()),
+        uptime_seconds=time.time() - START_TIME,
         database_status=database_status,
         cache_status=cache_status,
         external_services=external_services
@@ -83,7 +86,3 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
 async def ping():
     """Simple ping endpoint."""
     return {"message": "pong"}
-
-
-# Initialize start time for uptime calculation
-health_check._start_time = time.time()

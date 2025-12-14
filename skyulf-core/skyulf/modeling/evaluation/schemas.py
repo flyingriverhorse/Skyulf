@@ -52,4 +52,3 @@ class ModelEvaluationReport(BaseModel):
     metrics: Dict[str, float]
     classification: Optional[ClassificationEvaluation] = None
     regression: Optional[RegressionEvaluation] = None
-

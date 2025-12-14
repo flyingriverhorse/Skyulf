@@ -3,6 +3,7 @@ import joblib
 from typing import Any
 from .store import ArtifactStore
 
+
 class LocalArtifactStore(ArtifactStore):
     def __init__(self, base_path: str):
         self.base_path = base_path
@@ -39,7 +40,7 @@ class LocalArtifactStore(ArtifactStore):
         keys = []
         for f in files:
             if f.endswith(".joblib"):
-                keys.append(f[:-7]) # Remove .joblib
+                keys.append(f[:-7])  # Remove .joblib
             else:
                 keys.append(f)
         return keys

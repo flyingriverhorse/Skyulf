@@ -292,6 +292,37 @@ class Settings(BaseSettings):
     REDIS_URL: Optional[str] = None
     CACHE_TTL: int = 300  # 5 minutes default
 
+    # === LLM CONFIGURATION ===
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_ORG_ID: Optional[str] = None
+    OPENAI_DEFAULT_MODEL: str = "gpt-4"
+
+    DEEPSEEK_API_KEY: Optional[str] = None
+    DEEPSEEK_API_URL: str = "https://api.deepseek.com"
+    DEEPSEEK_DEFAULT_MODEL: str = "deepseek-chat"
+    DEEPSEEK_CODE_MODEL: str = "deepseek-coder"
+    DEEPSEEK_MATH_MODEL: str = "deepseek-math"
+    DEEPSEEK_TIMEOUT_SECONDS: int = 60
+    DEEPSEEK_MAX_RETRIES: int = 3
+    DEEPSEEK_RETRY_BACKOFF_SECONDS: int = 2
+
+    ANTHROPIC_API_KEY: Optional[str] = None
+    CLAUDE_DEFAULT_MODEL: str = "claude-3-opus-20240229"
+
+    LOCAL_LLM_URL: str = "http://localhost:11434"
+    LOCAL_LLM_MODEL: str = "llama3"
+    LOCAL_LLM_TYPE: str = "ollama"
+
+    DEFAULT_LLM_PROVIDER: str = "openai"
+    DEFAULT_LLM_MODEL: str = "gpt-4"
+    LLM_MAX_HISTORY_MESSAGES: int = 10
+    LLM_MAX_HISTORY_CHAR_LENGTH: int = 4000
+    LLM_SYSTEM_PROMPT_CHAR_LIMIT: int = 2000
+    LLM_USER_HISTORY_MESSAGES: int = 5
+    LLM_USER_HISTORY_CHAR_LENGTH: int = 1000
+    LLM_CELL_HISTORY_MESSAGES: int = 5
+    LLM_CELL_HISTORY_CHAR_LENGTH: int = 1000
+
     # === BACKGROUND TASKS ===
     @field_validator("SECRET_KEY")
     @classmethod
@@ -513,7 +544,6 @@ class Settings(BaseSettings):
     def is_field_set(self, field_name: str) -> bool:
         """Return True if the given settings field was explicitly provided by the user."""
         return field_name in getattr(self, "model_fields_set", set())
-
 
 
 class DevelopmentSettings(Settings):

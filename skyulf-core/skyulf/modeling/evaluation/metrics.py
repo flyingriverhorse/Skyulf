@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib
 import math
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
@@ -35,12 +35,12 @@ if _imblearn_metrics is not None:
 
 def calculate_classification_metrics(model: Any, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
     """Compute classification metrics for predictions."""
-    
+
     # Use DataFrame directly if possible to preserve feature names
     # Only convert to numpy if model doesn't support pandas or if X is not pandas
-    
+
     predictions = model.predict(X)
-    
+
     # For metrics calculation, we might need numpy arrays for y
     y_arr = y.to_numpy() if hasattr(y, "to_numpy") else y
 
@@ -97,10 +97,10 @@ def calculate_classification_metrics(model: Any, X: pd.DataFrame, y: pd.Series) 
 
 def calculate_regression_metrics(model: Any, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
     """Compute regression metrics for predictions."""
-    
+
     # Use DataFrame directly if possible to preserve feature names
     predictions = model.predict(X)
-    
+
     y_arr = y.to_numpy() if hasattr(y, "to_numpy") else y
 
     mse_value = mean_squared_error(y_arr, predictions)
@@ -111,5 +111,5 @@ def calculate_regression_metrics(model: Any, X: pd.DataFrame, y: pd.Series) -> D
         "r2": float(r2_score(y_arr, predictions)),
         "mape": float(mean_absolute_percentage_error(y_arr, predictions)),
     }
-    
+
     return metrics

@@ -2,13 +2,14 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 
+
 class ModelVersion(BaseModel):
     job_id: str
     pipeline_id: str
     node_id: str
     model_type: str
     version: Union[int, str]  # version for training, run_number for tuning
-    source: str # "training" or "tuning"
+    source: str  # "training" or "tuning"
     status: str
     metrics: Optional[Dict[str, Any]] = None
     hyperparameters: Optional[Dict[str, Any]] = None
@@ -17,6 +18,7 @@ class ModelVersion(BaseModel):
     is_deployed: bool = False
     deployment_id: Optional[int] = None
 
+
 class ModelRegistryEntry(BaseModel):
     model_type: str
     dataset_id: str
@@ -24,6 +26,7 @@ class ModelRegistryEntry(BaseModel):
     latest_version: Optional[ModelVersion] = None
     versions: List[ModelVersion] = []
     deployment_count: int = 0
+
 
 class RegistryStats(BaseModel):
     total_models: int

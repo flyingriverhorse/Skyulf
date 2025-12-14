@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, Optional, Union, Tuple
 import pandas as pd
 import numpy as np
 from .base import BaseCalculator, BaseApplier
@@ -27,6 +27,7 @@ TYPE_ALIASES = {
     "datetime64[ns]": "datetime64[ns]",
 }
 
+
 def _coerce_boolean_value(value: Any) -> Optional[bool]:
     """
     Robustly coerce a value to a boolean.
@@ -34,82 +35,105 @@ def _coerce_boolean_value(value: Any) -> Optional[bool]:
     """
     if pd.isna(value):
         return None
-    
+
     if isinstance(value, (bool, np.bool_)):
         return bool(value)
-        
+
     if isinstance(value, (int, float, np.number)):
-        if value == 1: return True
-        if value == 0: return False
+        if value == 1:
+            return True
+        if value == 0:
+            return False
         return None
-        
+
     s = str(value).strip().lower()
     if s in ('true', 'yes', '1', 'on', 'y', 't'):
         return True
     if s in ('false', 'no', '0', 'off', 'n', 'f'):
         return False
-        
+
     return None
 
+
 class CastingCalculator(BaseCalculator):
-    def fit(self, df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-        # Config: {'columns': ['col1'], 'target_type': 'float'} 
+    def fit(self, df: Union[pd.DataFrame, Tuple[Any, ...]], config: Dict[str, Any]) -> Dict[str, Any]:
+        # Config: {'columns': ['col1'], 'target_type': 'float'}
         # OR {'column_types': {'col1': 'float', 'col2': 'int'}}
         
+        if isinstance(df, tuple):
+            if len(df) > 0 and isinstance(df[0], pd.DataFrame):
+                df = df[0]
+            else:
+                return {
+                    'type': 'casting',
+                    'type_map': {},
+                    'coerce_on_error': config.get('coerce_on_error', True)
+                }
+
         target_type = config.get('target_type')
         columns = config.get('columns', [])
         column_types = config.get('column_types', {})
-        
+
         # Normalize to column_types map
         final_map = {}
-        
+
         # 1. Process explicit map
         for col, dtype in column_types.items():
             if col in df.columns:
                 final_map[col] = TYPE_ALIASES.get(str(dtype).lower(), dtype)
-                
+
         # 2. Process list + single type
         if target_type and columns:
             resolved_type = TYPE_ALIASES.get(str(target_type).lower(), target_type)
             for col in columns:
                 if col in df.columns:
                     final_map[col] = resolved_type
-                    
+
         return {
             'type': 'casting',
             'type_map': final_map,
             'coerce_on_error': config.get('coerce_on_error', True)
         }
 
+
 class CastingApplier(BaseApplier):
-    def apply(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
+    def apply(self, df: Union[pd.DataFrame, Tuple[Any, ...]], params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[Any, ...]]:
+        if isinstance(df, tuple):
+            if len(df) > 0 and isinstance(df[0], pd.DataFrame):
+                X = df[0]
+                X_new = self._apply_dataframe(X, params)
+                return (X_new,) + df[1:]
+            return df
+        return self._apply_dataframe(df, params)
+
+    def _apply_dataframe(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
         type_map = params.get('type_map', {})
         coerce_on_error = params.get('coerce_on_error', True)
-        
+
         if not type_map:
             return df
-            
+
         df_out = df.copy()
-        
+
         for col, target_dtype in type_map.items():
             if col not in df_out.columns:
                 continue
-                
+
             try:
                 series = df_out[col]
-                
+
                 # Determine family
                 dtype_str = str(target_dtype).lower()
-                
+
                 if dtype_str.startswith('float'):
                     # Float Family
                     numeric = pd.to_numeric(series, errors='coerce' if coerce_on_error else 'raise')
                     df_out[col] = numeric.astype(target_dtype)
-                    
+
                 elif dtype_str.startswith('int'):
                     # Int Family
                     numeric = pd.to_numeric(series, errors='coerce' if coerce_on_error else 'raise')
-                    
+
                     # Check for fractional values
                     if coerce_on_error:
                         # If coercing, we set fractional to NaN
@@ -134,7 +158,7 @@ class CastingApplier(BaseApplier):
                             df_out[col] = numeric.astype(target_dtype)
                     else:
                         df_out[col] = numeric.astype(target_dtype)
-                        
+
                 elif dtype_str.startswith('bool'):
                     # Boolean Family
                     try:
@@ -148,20 +172,20 @@ class CastingApplier(BaseApplier):
                             for val in series
                         ]
                         df_out[col] = pd.Series(coerced_values, index=series.index, dtype="boolean")
-                        
+
                 elif dtype_str.startswith('datetime'):
                     # Datetime Family
                     errors = 'coerce' if coerce_on_error else 'raise'
-                    df_out[col] = pd.to_datetime(series, errors=errors)
-                    
+                    df_out[col] = pd.to_datetime(series, errors=errors)  # type: ignore
+
                 else:
                     # String / Category / Other
                     df_out[col] = series.astype(target_dtype)
-                    
+
             except Exception:
                 if not coerce_on_error:
                     raise
                 # If coercion is on, we might leave it as is or try best effort?
                 pass
-                
+
         return df_out

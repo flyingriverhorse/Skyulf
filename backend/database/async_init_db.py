@@ -19,7 +19,6 @@ import logging
 from typing import Optional
 
 from backend.config import Settings
-from .async_registry import ensure_registry_tables
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +91,6 @@ async def initialize(settings: Optional[Settings] = None):
     if settings is None:
         from backend.config import Settings
         settings = Settings()
-
-    db_type = settings.DB_TYPE.lower() if settings.DB_TYPE else "postgres"
 
 
 # For standalone testing
