@@ -20,9 +20,9 @@ def mock_data_source():
     )
     return ds
 
-@patch('core.data_ingestion.tasks.get_db_session')
-@patch('core.data_ingestion.tasks.LocalFileConnector')
-@patch('core.data_ingestion.tasks.DataProfiler')
+@patch('backend.data_ingestion.tasks.get_db_session')
+@patch('backend.data_ingestion.tasks.LocalFileConnector')
+@patch('backend.data_ingestion.tasks.DataProfiler')
 def test_ingest_file_task(mock_profiler, mock_connector_cls, mock_get_session, mock_session, mock_data_source):
     # Setup mocks
     mock_get_session.return_value = mock_session
@@ -60,9 +60,9 @@ def test_ingest_file_task(mock_profiler, mock_connector_cls, mock_get_session, m
     assert mock_data_source.source_metadata['column_count'] == 2
     assert 'profile' in mock_data_source.source_metadata
 
-@patch('core.data_ingestion.tasks.get_db_session')
-@patch('core.data_ingestion.tasks.DatabaseConnector')
-@patch('core.data_ingestion.tasks.DataProfiler')
+@patch('backend.data_ingestion.tasks.get_db_session')
+@patch('backend.data_ingestion.tasks.DatabaseConnector')
+@patch('backend.data_ingestion.tasks.DataProfiler')
 def test_ingest_sql_task(mock_profiler, mock_connector_cls, mock_get_session, mock_session):
     # Setup SQL DataSource
     ds = DataSource(
@@ -93,9 +93,9 @@ def test_ingest_sql_task(mock_profiler, mock_connector_cls, mock_get_session, mo
     mock_connector.connect.assert_called_once()
     assert ds.test_status == 'success'
 
-@patch('core.data_ingestion.tasks.get_db_session')
-@patch('core.data_ingestion.tasks.ApiConnector')
-@patch('core.data_ingestion.tasks.DataProfiler')
+@patch('backend.data_ingestion.tasks.get_db_session')
+@patch('backend.data_ingestion.tasks.ApiConnector')
+@patch('backend.data_ingestion.tasks.DataProfiler')
 def test_ingest_api_task(mock_profiler, mock_connector_cls, mock_get_session, mock_session):
     # Setup API DataSource
     ds = DataSource(

@@ -28,12 +28,12 @@ def mock_session():
 
 @pytest.fixture
 def mock_engine_class():
-    with patch("core.ml_pipeline.tasks.PipelineEngine") as mock:
+    with patch("backend.ml_pipeline.tasks.PipelineEngine") as mock:
         yield mock
 
 @pytest.fixture
 def mock_get_db_session():
-    with patch("core.ml_pipeline.tasks.get_db_session") as mock:
+    with patch("backend.ml_pipeline.tasks.get_db_session") as mock:
         yield mock
 
 def test_run_pipeline_task_training_job(mock_get_db_session, mock_engine_class):
