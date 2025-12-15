@@ -14,43 +14,6 @@
 pip install skyulf-core
 ```
 
-## Usage Example
-
-```python
-import pandas as pd
-
-from skyulf.preprocessing.pipeline import FeatureEngineer
-from skyulf.pipeline import SkyulfPipeline
-
-# --- 1) Preprocessing only ---
-df = pd.DataFrame({
-    "x1": [1, 2, 2, None],
-    "x2": [10, 20, 20, 40],
-    "target": [0, 1, 1, 0],
-})
-
-steps = [
-    {"name": "dedupe", "transformer": "Deduplicate", "params": {}},
-    {"name": "impute", "transformer": "SimpleImputer", "params": {"strategy": "mean"}},
-]
-
-fe = FeatureEngineer(steps)
-df_transformed, fe_metrics = fe.fit_transform(df)
-
-# --- 2) End-to-end pipeline (preprocessing + modeling) ---
-config = {
-    "preprocessing": steps,
-    "modeling": {"type": "random_forest_classifier", "node_id": "rf"},
-}
-
-pipe = SkyulfPipeline(config)
-metrics = pipe.fit(df_transformed, target_column="target")
-preds = pipe.predict(df_transformed.drop(columns=["target"]))
-
-print("metrics keys:", metrics.keys())
-print("preds shape:", preds.shape)
-```
-
 ## Features
 
 - **Type-Safe**: Built with modern Python type hints and Pydantic models.
