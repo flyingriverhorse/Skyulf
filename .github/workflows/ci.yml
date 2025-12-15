@@ -53,4 +53,10 @@ jobs:
           python -m mypy run_fastapi.py run_skyulf.py celery_worker.py
 
       - name: Run tests
-        run: pytest -q --maxfail=1 --disable-warnings --cov --cov-report=term-missing
+        run: pytest -q --maxfail=1 --disable-warnings --cov --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: flyingriverhorse/Skyulf

@@ -5,7 +5,9 @@
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](#quick-start)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](.pre-commit-config.yaml)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-![](https://img.shields.io/badge/tagline-MLOps%20%3A%20FastAPI%20%2B%20Celery-blue)
+[![Skyulf](https://img.shields.io/badge/Skyulf-Privacy--First_MLOps_Hub-blueviolet)](#key-features)
+[![codecov](https://codecov.io/gh/flyingriverhorse/Skyulf/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/flyingriverhorse/Skyulf)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/51e3ad3ce18e41b2922cf62a6dd6ce99)](https://app.codacy.com/gh/flyingriverhorse/Skyulf/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
 > ⚠️ **Status:** Active Development. Expect bugs, but also expect rapid progress.
 
@@ -32,11 +34,20 @@ Prerequisites: **Python 3.10+**
 
 ### On Windows PowerShell
 
+**Using pip:**
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install --upgrade pip
 pip install -r requirements-fastapi.txt
+python run_fastapi.py
+```
+
+**Using uv (Faster):**
+```powershell
+uv venv
+.\.venv\Scripts\Activate.ps1
+uv pip install -r requirements-fastapi.txt
 python run_fastapi.py
 ```
 
@@ -65,6 +76,16 @@ This will start the full stack:
 **Open:**
 - API health — http://127.0.0.1:8000/health
 - Docs (dev mode) — http://127.0.0.1:8000/docs
+
+## Skyulf Core Library
+
+The core machine learning logic of Skyulf (preprocessing, modeling, tuning) is available as a standalone library on PyPI. You can use it to build reproducible pipelines in your own scripts or notebooks, independent of the web platform.
+
+```bash
+pip install skyulf-core
+# or
+uv add skyulf-core
+```
 
 ## Key Features
 

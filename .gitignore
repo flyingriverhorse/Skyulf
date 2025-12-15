@@ -107,3 +107,6 @@ skyulf-mlflow/
 #.tests
 testingdb/
 .testingdb
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md
