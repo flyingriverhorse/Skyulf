@@ -4967,6 +4967,7 @@ dependencies = [
     { name = "scipy" },
     { name = "seaborn" },
     { name = "shapely" },
+    { name = "skyulf-core" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "tqdm" },
     { name = "twine" },
@@ -5044,6 +5045,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.13.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "shapely", specifier = ">=2.0.2,<2.2.0" },
+    { name = "skyulf-core", specifier = ">=0.1.2" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0,<3.0.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
     { name = "twine", specifier = ">=6.2.0" },
@@ -5066,6 +5068,25 @@ dev = [
     { name = "pytest", specifier = ">=7.4.0,<10.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.21.0,<2.0.0" },
     { name = "pytest-cov", specifier = ">=4.1.0,<5.0.0" },
+]
+
+[[package]]
+name = "skyulf-core"
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "imbalanced-learn" },
+    { name = "numpy" },
+    { name = "optuna" },
+    { name = "optuna-integration" },
+    { name = "pandas" },
+    { name = "polars" },
+    { name = "pydantic" },
+    { name = "scikit-learn" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8c/7c/c0da1ed75b21a3a19782722ac6773a74fac47c77d7b734aea02788daf542/skyulf_core-0.1.2.tar.gz", hash = "sha256:07e7fe3fa54a0945f1c28af0fb4bab92c36e25756cf03bb8f15668fd0f2a535b", size = 63243, upload-time = "2025-12-15T08:25:58.866Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/61/13/61c15f4ccf08c2ba53f9a8d438f1b197f6804e2aa9694955d6ffe90fcecf/skyulf_core-0.1.2-py3-none-any.whl", hash = "sha256:5f774ddd1c54a9bc88b682abe3885e403ff38a92bcb4378cd0454fe0fa2c4062", size = 76222, upload-time = "2025-12-15T08:25:57.214Z" },
 ]
 
 [[package]]
