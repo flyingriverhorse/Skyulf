@@ -1,0 +1,17 @@
+---
+engines:
+  flake8:
+    enabled: true
+  pylint:
+    enabled: true
+    python_version: 3
+  bandit:
+    enabled: true
+  trivy:
+    enabled: false
+
+exclude_paths:
+  - "tests/**"
+  - "testingdb/**"
+  - "temp/**"
+  - "migrations/**"
