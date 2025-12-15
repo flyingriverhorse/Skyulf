@@ -15,3 +15,8 @@ exclude_paths:
   - "testingdb/**"
   - "temp/**"
   - "migrations/**"
+  - "uv.lock"
+  - "site/**"
+  - "static/**"
+  - "**/*.min.css"
+  - "**/*.min.js"
