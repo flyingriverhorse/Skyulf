@@ -11,20 +11,25 @@ class ModelRegistryService:
     @staticmethod
     async def get_next_version(session: AsyncSession, dataset_id: str, model_type: str, job_type: str) -> int:
         """Calculates the next version number for a given dataset and model type."""
-        if job_type == "training":
-            model_class = TrainingJob
-            col = TrainingJob.version
-        else:
-            model_class = HyperparameterTuningJob
-            col = HyperparameterTuningJob.run_number
-
-        stmt = select(func.max(col)).where(
-            model_class.dataset_source_id == dataset_id,
-            model_class.model_type == model_type
+        # Unified versioning: Query both tables and take the max
+        
+        # 1. Get max version from TrainingJob
+        stmt_train = select(func.max(TrainingJob.version)).where(
+            TrainingJob.dataset_source_id == dataset_id,
+            TrainingJob.model_type == model_type
         )
-        result = await session.execute(stmt)
-        max_version = result.scalar() or 0
-        return max_version + 1
+        result_train = await session.execute(stmt_train)
+        max_train = result_train.scalar() or 0
+
+        # 2. Get max run_number from HyperparameterTuningJob
+        stmt_tune = select(func.max(HyperparameterTuningJob.run_number)).where(
+            HyperparameterTuningJob.dataset_source_id == dataset_id,
+            HyperparameterTuningJob.model_type == model_type
+        )
+        result_tune = await session.execute(stmt_tune)
+        max_tune = result_tune.scalar() or 0
+
+        return max(max_train, max_tune) + 1
 
     @staticmethod
     async def get_registry_stats(session: AsyncSession) -> RegistryStats:

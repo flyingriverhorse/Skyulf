@@ -1,7 +1,7 @@
 """Pipeline Execution Engine."""
 
 from skyulf.modeling.tuning.schemas import TuningConfig
-from skyulf.modeling.tuning.tuner import TunerCalculator
+from skyulf.modeling.tuning.tuner import TunerCalculator, TunerApplier
 from skyulf.modeling.regression import (
     RidgeRegressionCalculator, RidgeRegressionApplier,
     RandomForestRegressorCalculator, RandomForestRegressorApplier
@@ -362,7 +362,13 @@ class PipelineEngine:
                 cv_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
             elif isinstance(data, tuple):
                 from skyulf.data.dataset import SplitDataset
-                cv_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+                # Check if it's (train_df, test_df) or (X, y)
+                elem0 = data[0]
+                if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
+                    train_df, test_df = data
+                    cv_data = SplitDataset(train=train_df, test=test_df, validation=None)
+                else:
+                    cv_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
 
             cv_results = estimator.cross_validate(
                 cv_data,
@@ -416,7 +422,13 @@ class PipelineEngine:
                 eval_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
             elif isinstance(data, tuple):
                 from skyulf.data.dataset import SplitDataset
-                eval_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+                # Check if it's (train_df, test_df) or (X, y)
+                elem0 = data[0]
+                if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
+                    train_df, test_df = data
+                    eval_data = SplitDataset(train=train_df, test=test_df, validation=None)
+                else:
+                    eval_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
 
             report = estimator.evaluate(eval_data, target_col, job_id=job_id)
 
@@ -460,12 +472,16 @@ class PipelineEngine:
         tuning_params = node.params["tuning_config"]  # Dict matching TuningConfig
 
         calculator, applier = self._get_model_components(algorithm)
-        tuner = TunerCalculator(calculator)
+        
+        # Create Tuner components
+        tuner_calc = TunerCalculator(calculator)
+        tuner_applier = TunerApplier(applier)
 
-        # Convert dict to TuningConfig object
-        config = TuningConfig(**tuning_params)
+        # Create StatefulEstimator wrapping the Tuner
+        # This ensures consistency with how standard models are trained and evaluated
+        estimator = StatefulEstimator(tuner_calc, tuner_applier, node.node_id)
 
-        self.log(f"Starting hyperparameter tuning (Strategy: {config.strategy}, Trials: {config.n_trials})")
+        self.log(f"Starting hyperparameter tuning (Strategy: {tuning_params.get('strategy', 'random')}, Trials: {tuning_params.get('n_trials', 10)})")
 
         # Ensure data is SplitDataset
         if isinstance(data, pd.DataFrame):
@@ -473,24 +489,13 @@ class PipelineEngine:
             data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
         elif isinstance(data, tuple):
             from skyulf.data.dataset import SplitDataset
-            data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
-
-        # We need X_train, y_train
-        # Assuming data is SplitDataset
-        if isinstance(data.train, tuple):
-            X_train, y_train = data.train
-        else:
-            X_train = data.train.drop(columns=[target_col])
-            y_train = data.train[target_col]
-
-        validation_data = None
-        if data.validation is not None:
-            if isinstance(data.validation, tuple):
-                X_val, y_val = data.validation
+            # Check if it's (train_df, test_df) or (X, y)
+            elem0 = data[0]
+            if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
+                train_df, test_df = data
+                data = SplitDataset(train=train_df, test=test_df, validation=None)
             else:
-                X_val = data.validation.drop(columns=[target_col])
-                y_val = data.validation[target_col]
-            validation_data = (X_val, y_val)
+                data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
 
         def progress_callback(current, total, score=None, params=None):
             msg = f"Tuning progress: Trial {current}/{total}"
@@ -498,41 +503,38 @@ class PipelineEngine:
                 msg += f" - Score: {score:.4f}"
             self.log(msg)
 
-        result = tuner.tune(
-            X_train,
-            y_train,
-            config,
-            validation_data=validation_data,
+        # Run fit_predict
+        # This will:
+        # 1. Run tuning (TunerCalculator.fit)
+        # 2. Refit the best model on the full training set (TunerCalculator.fit)
+        # 3. Generate predictions on train/test/val splits (TunerApplier.predict)
+        estimator.fit_predict(
+            data, 
+            target_col, 
+            tuning_params, 
             progress_callback=progress_callback,
-            log_callback=self.log
+            log_callback=self.log,
+            job_id=job_id
         )
 
-        self.log(f"Tuning completed. Best Score: {result.best_score:.4f}")
-        self.log(f"Best Params: {result.best_params}")
-
-        # Train final model with best params
-        self.log("Retraining final model with best parameters...")
-        # SDK StatefulEstimator(calculator, applier, node_id)
-        estimator = StatefulEstimator(calculator, applier, node.node_id)
-
-        fit_config = {"params": result.best_params}
-        self.log(f"Fit config params: {fit_config}")
-        estimator.fit_predict(data, target_col, fit_config, log_callback=self.log)
-
-        # Manually save model
+        # Save model artifact
+        # The model artifact is a tuple: (fitted_model, tuning_result)
         self.artifact_store.save(node.node_id, estimator.model)
         if job_id and job_id != "unknown":
             self.artifact_store.save(job_id, estimator.model)
 
-        self.log("Final model retraining finished.")
+        self.log("Tuning and final model retraining finished.")
 
         # Bundle transformers with the model for inference
         self._bundle_transformers_with_model(node.node_id, job_id=job_id)
 
+        # Extract metrics from tuning result
+        _, tuning_result = estimator.model
+        
         metrics = {
-            "best_score": result.best_score,
-            "best_params": result.best_params,
-            "trials": result.trials
+            "best_score": tuning_result.best_score,
+            "best_params": tuning_result.best_params,
+            "trials": tuning_result.trials
         }
 
         # Evaluate the tuned model

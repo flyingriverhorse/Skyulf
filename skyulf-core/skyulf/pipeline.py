@@ -82,18 +82,23 @@ class SkyulfPipeline:
             base_model_type = base_model_config.get("type")
 
             base_calc: Optional[BaseModelCalculator] = None
+            base_applier: Optional[BaseModelApplier] = None
             if base_model_type == "logistic_regression":
                 base_calc = LogisticRegressionCalculator()
+                base_applier = LogisticRegressionApplier()
             elif base_model_type == "random_forest_classifier":
                 base_calc = RandomForestClassifierCalculator()
+                base_applier = RandomForestClassifierApplier()
             elif base_model_type == "ridge_regression":
                 base_calc = RidgeRegressionCalculator()
+                base_applier = RidgeRegressionApplier()
             elif base_model_type == "random_forest_regressor":
                 base_calc = RandomForestRegressorCalculator()
+                base_applier = RandomForestRegressorApplier()
 
-            if base_calc:
+            if base_calc and base_applier:
                 calculator = TunerCalculator(base_calc)
-                applier = TunerApplier()
+                applier = TunerApplier(base_applier)
             else:
                 raise ValueError(f"Unknown base model type for tuner: {base_model_type}")
         else:
