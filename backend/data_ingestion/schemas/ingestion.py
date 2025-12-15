@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field, model_validator
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, Optional
+
+from pydantic import BaseModel, Field, model_validator
 
 
 class DataSourceCreate(BaseModel):
@@ -41,12 +42,12 @@ class DataSourceRead(BaseModel):
     columns: Optional[int] = None
     size_bytes: Optional[int] = None
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def extract_metadata_fields(self):
         if self.source_metadata:
-            self.rows = self.source_metadata.get('row_count')
-            self.columns = self.source_metadata.get('column_count')
-            self.size_bytes = self.source_metadata.get('file_size')
+            self.rows = self.source_metadata.get("row_count")
+            self.columns = self.source_metadata.get("column_count")
+            self.size_bytes = self.source_metadata.get("file_size")
         return self
 
     class Config:

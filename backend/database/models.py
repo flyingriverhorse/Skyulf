@@ -7,18 +7,32 @@ These models are compatible with the existing database schema.
 
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Optional
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, JSON, ForeignKey
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from .engine import Base
 
 
 class TimestampMixin:
     """Mixin to add created_at and updated_at timestamps to models."""
+
     created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime, default=func.now(), onupdate=func.now(), nullable=False
+    )
 
 
 class User(Base, TimestampMixin):
@@ -26,6 +40,7 @@ class User(Base, TimestampMixin):
     User model - mirrors the Flask user table structure.
     Compatible with existing Flask-Login users.
     """
+
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -73,10 +88,13 @@ class DataSource(Base, TimestampMixin):
     Data Source model for data ingestion connections.
     Compatible with existing data_sources table.
     """
+
     __tablename__ = "data_sources"
 
     id = Column(Integer, primary_key=True, index=True)
-    source_id = Column(String(50), unique=True, nullable=True, index=True)  # UUID string identifier for file naming
+    source_id = Column(
+        String(50), unique=True, nullable=True, index=True
+    )  # UUID string identifier for file naming
     name = Column(String(100), nullable=False, index=True)
     type = Column(String(50), nullable=False)  # 'snowflake', 'postgres', 'api', etc.
 
@@ -89,10 +107,14 @@ class DataSource(Base, TimestampMixin):
     # Status and metadata
     is_active = Column(Boolean, default=True, nullable=False)
     last_tested = Column(DateTime, nullable=True)
-    test_status = Column(String(20), default="untested", nullable=False)  # 'success', 'failed', 'untested'
+    test_status = Column(
+        String(20), default="untested", nullable=False
+    )  # 'success', 'failed', 'untested'
 
     # User who created this source
-    created_by = Column(Integer, ForeignKey('users.id'), nullable=True)  # Foreign key to users.id
+    created_by = Column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )  # Foreign key to users.id
 
     # Relationship to User model
     creator = relationship("User", back_populates="data_sources")
@@ -297,14 +319,17 @@ class Deployment(Base, TimestampMixin):
     """
     Tracks deployed models.
     """
+
     __tablename__ = "deployments"
 
     id = Column(Integer, primary_key=True, index=True)
-    job_id = Column(String(64), nullable=False, index=True)  # ID of the TrainingJob or HyperparameterTuningJob
+    job_id = Column(
+        String(64), nullable=False, index=True
+    )  # ID of the TrainingJob or HyperparameterTuningJob
     model_type = Column(String(100), nullable=False)
     artifact_uri = Column(String(500), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    deployed_by = Column(Integer, ForeignKey('users.id'), nullable=True)
+    deployed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     def to_dict(self):
         return {

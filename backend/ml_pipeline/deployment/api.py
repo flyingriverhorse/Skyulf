@@ -1,8 +1,10 @@
+from typing import AsyncGenerator, List, cast
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, AsyncGenerator, cast
 
 from backend.database.models import get_database_session
+
 from .schemas import DeploymentInfo, PredictionRequest, PredictionResponse
 from .service import DeploymentService
 
@@ -15,10 +17,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 @router.post("/deploy/{job_id}", response_model=DeploymentInfo)
-async def deploy_model(
-    job_id: str,
-    session: AsyncSession = Depends(get_async_session)
-):
+async def deploy_model(job_id: str, session: AsyncSession = Depends(get_async_session)):
     """
     Deploys a model from a completed job.
     """
@@ -32,9 +31,7 @@ async def deploy_model(
 
 
 @router.get("/active", response_model=DeploymentInfo)
-async def get_active_deployment(
-    session: AsyncSession = Depends(get_async_session)
-):
+async def get_active_deployment(session: AsyncSession = Depends(get_async_session)):
     """
     Returns the currently active deployment.
     """
@@ -46,9 +43,7 @@ async def get_active_deployment(
 
 @router.get("/history", response_model=List[DeploymentInfo])
 async def list_deployments(
-    limit: int = 50,
-    skip: int = 0,
-    session: AsyncSession = Depends(get_async_session)
+    limit: int = 50, skip: int = 0, session: AsyncSession = Depends(get_async_session)
 ):
     """
     Lists deployment history.
@@ -58,9 +53,7 @@ async def list_deployments(
 
 
 @router.post("/deactivate")
-async def deactivate_deployment(
-    session: AsyncSession = Depends(get_async_session)
-):
+async def deactivate_deployment(session: AsyncSession = Depends(get_async_session)):
     """
     Deactivates the currently active deployment.
     """
@@ -70,8 +63,7 @@ async def deactivate_deployment(
 
 @router.post("/predict", response_model=PredictionResponse)
 async def predict(
-    request: PredictionRequest,
-    session: AsyncSession = Depends(get_async_session)
+    request: PredictionRequest, session: AsyncSession = Depends(get_async_session)
 ):
     """
     Makes predictions using the active model.
@@ -84,8 +76,7 @@ async def predict(
         predictions = await DeploymentService.predict(session, request.data)
 
         return PredictionResponse(
-            predictions=predictions,
-            model_version=cast(str, deployment.job_id)
+            predictions=predictions, model_version=cast(str, deployment.job_id)
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

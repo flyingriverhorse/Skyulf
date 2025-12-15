@@ -24,6 +24,7 @@ class RidgeRegressionCalculator(SklearnCalculator):
 
 class RidgeRegressionApplier(SklearnApplier):
     """Ridge Regression Applier."""
+
     pass
 
 
@@ -48,4 +49,5 @@ class RandomForestRegressorCalculator(SklearnCalculator):
 
 class RandomForestRegressorApplier(SklearnApplier):
     """Random Forest Regressor Applier."""
+
     pass

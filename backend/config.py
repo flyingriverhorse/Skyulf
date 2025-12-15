@@ -7,14 +7,14 @@ Comprehensive configuration system migrated from Flask with modern Pydantic vali
 Includes ML platform settings, LLM configurations, and feature management.
 """
 
-import os
 import logging
+import os
 import secrets
 from functools import lru_cache
-from pathlib import Path
-from typing import Any, Dict, List, Optional
 from logging import Handler
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -67,7 +67,7 @@ def setup_universal_logging(
         else:
             # Default to size-based rotation
             # On Windows, RotatingFileHandler can cause PermissionError due to file locking
-            if os.name == 'nt':
+            if os.name == "nt":
                 file_handler = logging.FileHandler(
                     log_file,
                     encoding="utf-8",
@@ -137,7 +137,9 @@ class Settings(BaseSettings):
     # === CORE APPLICATION METADATA ===
     APP_NAME: str = "Skyulf"
     APP_VERSION: str = "0.1.0"
-    APP_SUMMARY: str = "Skyulf MLops service surface for data, experimentation, and automation."
+    APP_SUMMARY: str = (
+        "Skyulf MLops service surface for data, experimentation, and automation."
+    )
     APP_DESCRIPTION: str = (
         "Programmatic interface for Skyulf's MLops platform covering data ingestion, model lifecycle, "
         "feature engineering, and analysis workflows."
@@ -247,8 +249,17 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads/data"
     MAX_UPLOAD_SIZE: int = 1024 * 1024 * 1024  # 1GB for large ML datasets
     ALLOWED_EXTENSIONS: List[str] = [
-        ".csv", ".xlsx", ".xls", ".parquet", ".json", ".txt",
-        ".pkl", ".pickle", ".feather", ".h5", ".hdf5"
+        ".csv",
+        ".xlsx",
+        ".xls",
+        ".parquet",
+        ".json",
+        ".txt",
+        ".pkl",
+        ".pickle",
+        ".feather",
+        ".h5",
+        ".hdf5",
     ]
 
     # Data processing directories
@@ -275,7 +286,9 @@ class Settings(BaseSettings):
     # === LOGGING ===
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "logs/fastapi_app.log"
-    LOG_FORMAT: str = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s [%(filename)s:%(lineno)d in %(funcName)s()]"
+    LOG_FORMAT: str = (
+        "%(asctime)s [%(levelname)8s] %(name)s: %(message)s [%(filename)s:%(lineno)d in %(funcName)s()]"
+    )
     LOG_MAX_SIZE: int = 50 * 1024 * 1024  # 50MB
     LOG_BACKUP_COUNT: int = 5
     # Rotation strategy: 'size' (default) or 'time'
@@ -366,7 +379,9 @@ class Settings(BaseSettings):
         if self.DB_TYPE == "postgres":
             if not self.DATABASE_URL.startswith("postgresql"):
                 # Construct PostgreSQL URL from individual settings
-                if not all([self.DB_USER, self.DB_PASSWORD, self.DB_HOST, self.DB_NAME]):
+                if not all(
+                    [self.DB_USER, self.DB_PASSWORD, self.DB_HOST, self.DB_NAME]
+                ):
                     raise ValueError(
                         "For PostgreSQL, either provide DATABASE_URL or all of: "
                         "DB_USER, DB_PASSWORD, DB_HOST, DB_NAME"
@@ -424,8 +439,11 @@ class Settings(BaseSettings):
         for i, config in enumerate(required_configs):
             if not config or config in ["x", "your-account", "your-user"]:
                 config_names = [
-                    "SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD",
-                    "SNOWFLAKE_WAREHOUSE", "SNOWFLAKE_DATABASE"
+                    "SNOWFLAKE_ACCOUNT",
+                    "SNOWFLAKE_USER",
+                    "SNOWFLAKE_PASSWORD",
+                    "SNOWFLAKE_WAREHOUSE",
+                    "SNOWFLAKE_DATABASE",
                 ]
                 missing_configs.append(config_names[i])
 
@@ -459,7 +477,6 @@ class Settings(BaseSettings):
             "OPENAI_API_KEY": self.OPENAI_API_KEY,
             "OPENAI_ORG_ID": self.OPENAI_ORG_ID,
             "OPENAI_DEFAULT_MODEL": self.OPENAI_DEFAULT_MODEL,
-
             # DeepSeek
             "DEEPSEEK_API_KEY": self.DEEPSEEK_API_KEY,
             "DEEPSEEK_API_URL": self.DEEPSEEK_API_URL,
@@ -469,16 +486,13 @@ class Settings(BaseSettings):
             "DEEPSEEK_TIMEOUT_SECONDS": self.DEEPSEEK_TIMEOUT_SECONDS,
             "DEEPSEEK_MAX_RETRIES": self.DEEPSEEK_MAX_RETRIES,
             "DEEPSEEK_RETRY_BACKOFF_SECONDS": self.DEEPSEEK_RETRY_BACKOFF_SECONDS,
-
             # Anthropic
             "ANTHROPIC_API_KEY": self.ANTHROPIC_API_KEY,
             "CLAUDE_DEFAULT_MODEL": self.CLAUDE_DEFAULT_MODEL,
-
             # Local LLM
             "LOCAL_LLM_URL": self.LOCAL_LLM_URL,
             "LOCAL_LLM_MODEL": self.LOCAL_LLM_MODEL,
             "LOCAL_LLM_TYPE": self.LOCAL_LLM_TYPE,
-
             # Defaults
             "DEFAULT_LLM_PROVIDER": self.DEFAULT_LLM_PROVIDER,
             "DEFAULT_LLM_MODEL": self.DEFAULT_LLM_MODEL,
@@ -502,7 +516,9 @@ class Settings(BaseSettings):
     def get_postgresql_url(self) -> str:
         """Get PostgreSQL database URL from configuration."""
         if not all([self.DB_USER, self.DB_PASSWORD, self.DB_HOST, self.DB_NAME]):
-            raise ValueError("PostgreSQL configuration incomplete: missing DB_USER, DB_PASSWORD, DB_HOST, or DB_NAME")
+            raise ValueError(
+                "PostgreSQL configuration incomplete: missing DB_USER, DB_PASSWORD, DB_HOST, or DB_NAME"
+            )
 
         port = self.DB_PORT or 5432
         url = f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{port}/{self.DB_NAME}"
@@ -526,7 +542,9 @@ class Settings(BaseSettings):
         """Get database configuration information for admin dashboard."""
         return {
             "primary_db": self.DB_PRIMARY,
-            "current_db_type": "sqlite" if self.DATABASE_URL.startswith("sqlite") else "postgresql",
+            "current_db_type": (
+                "sqlite" if self.DATABASE_URL.startswith("sqlite") else "postgresql"
+            ),
             "sqlite_configured": True,  # SQLite is always available
             "postgresql_configured": all([self.DB_USER, self.DB_HOST, self.DB_NAME]),
             "sqlite_label": "SQLite",
@@ -534,7 +552,7 @@ class Settings(BaseSettings):
             "sqlite_path": self.DB_PATH,
             "postgres_host": self.DB_HOST,
             "postgres_port": self.DB_PORT or 5432,
-            "postgres_database": self.DB_NAME
+            "postgres_database": self.DB_NAME,
         }
 
     def setup_logging(self) -> None:
@@ -548,6 +566,7 @@ class Settings(BaseSettings):
 
 class DevelopmentSettings(Settings):
     """Development environment settings."""
+
     DEBUG: bool = True
     LOG_LEVEL: str = "DEBUG"
     DB_ECHO: bool = False  # Disable SQL query logging
@@ -568,15 +587,13 @@ class DevelopmentSettings(Settings):
 
 class ProductionSettings(Settings):
     """Production environment settings with enhanced security."""
+
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
     DB_ECHO: bool = False
 
     # More restrictive CORS in production
-    CORS_ORIGINS: List[str] = [
-        "https://www.skyulf.com",
-        "https://app.yourdomain.com"
-    ]
+    CORS_ORIGINS: List[str] = ["https://www.skyulf.com", "https://app.yourdomain.com"]
 
     # Security headers and restrictions
     ALLOWED_HOSTS: List[str] = ["skyulf.com", "app.yourdomain.com"]
@@ -613,6 +630,7 @@ class ProductionSettings(Settings):
 
 class TestingSettings(Settings):
     """Testing environment settings."""
+
     TESTING: bool = True
     DEBUG: bool = True
     DATABASE_URL: str = "sqlite+aiosqlite:///./test_mlops.db"

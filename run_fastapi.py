@@ -8,10 +8,10 @@ It replaces the Flask run.py with modern async server capabilities.
 """
 
 import logging
-import sys
-import subprocess
 import os
 import signal
+import subprocess
+import sys
 
 from backend.config import get_settings, setup_universal_logging
 from backend.main import app
@@ -45,14 +45,18 @@ def start_celery_worker():
         pool_arg = "--pool=prefork"
 
     cmd = [
-        sys.executable, "-m", "celery",
-        "-A", "celery_worker.celery_app",
+        sys.executable,
+        "-m",
+        "celery",
+        "-A",
+        "celery_worker.celery_app",
         "worker",
         pool_arg,
         "--loglevel=info",
-        "--queues", "mlops-training"
+        "--queues",
+        "mlops-training",
     ]
-    
+
     print(f"👷 Starting Celery worker: {' '.join(cmd)}")
     return subprocess.Popen(cmd, cwd=os.getcwd())
 
@@ -62,13 +66,13 @@ def check_redis_availability():
     settings = get_settings()
     try:
         import redis
+
         # Use a short timeout to avoid hanging
         client = redis.from_url(settings.CELERY_BROKER_URL, socket_connect_timeout=1)
         client.ping()
         return True
     except Exception:
         return False
-
 
 
 def main():
@@ -82,14 +86,18 @@ def main():
 
     # Log startup information
     logger.info(f"[START] Starting {settings.APP_NAME}")
-    logger.info(f"[ENV] Environment: {'Development' if settings.DEBUG else 'Production'}")
+    logger.info(
+        f"[ENV] Environment: {'Development' if settings.DEBUG else 'Production'}"
+    )
     logger.info(f"[HOST] Host: {settings.HOST}:{settings.PORT}")
 
     # Import uvicorn here to avoid import errors if not installed
     try:
         import uvicorn
     except ImportError:
-        logger.error("[ERROR] uvicorn not installed. Please run: pip install uvicorn[standard]")
+        logger.error(
+            "[ERROR] uvicorn not installed. Please run: pip install uvicorn[standard]"
+        )
         sys.exit(1)
 
     celery_process = None
@@ -104,7 +112,9 @@ def main():
                 logger.error(f"[ERROR] Failed to start Celery worker: {e}")
         else:
             logger.warning("[WARN] Redis not found. Celery worker will NOT be started.")
-            logger.warning("   To enable background tasks, start Redis: docker-compose up -d redis")
+            logger.warning(
+                "   To enable background tasks, start Redis: docker-compose up -d redis"
+            )
 
         # Development server with auto-reload
         logger.info("[DEV] Running in development mode with auto-reload")
@@ -117,7 +127,7 @@ def main():
                 reload_dirs=["."],
                 log_level="info",
                 access_log=True,
-                use_colors=True
+                use_colors=True,
             )
         finally:
             if celery_process:
@@ -135,7 +145,7 @@ def main():
             log_level="warning",
             access_log=False,
             server_header=False,
-            date_header=False
+            date_header=False,
         )
 
 

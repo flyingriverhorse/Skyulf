@@ -43,8 +43,9 @@ async def _try_init_postgres(settings: Settings):
 async def _try_init_sqlite(settings: Settings):
     """Initialize SQLite with async connection."""
     try:
-        import aiosqlite
         import os
+
+        import aiosqlite
 
         # Get SQLite database path from settings
         db_path = getattr(settings, "DB_PATH", "mlops_database.db")
@@ -90,6 +91,7 @@ async def initialize(settings: Optional[Settings] = None):
     """
     if settings is None:
         from backend.config import Settings
+
         settings = Settings()
 
 

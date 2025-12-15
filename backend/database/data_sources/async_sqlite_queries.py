@@ -3,12 +3,14 @@ Async SQLite-specific queries for data_sources table.
 This is the async equivalent of the Flask db/data_sources/sqlite_queries.py
 """
 
-from typing import Any, Dict, List, Optional
 import logging
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy import text as sa_text
 
-from ..adapter import async_session_or_connection
 from backend.config import Settings
+
+from ..adapter import async_session_or_connection
 
 logger = logging.getLogger(__name__)
 
@@ -29,20 +31,20 @@ async def insert_data_source(settings: Settings, row: Dict[str, Any]) -> Dict[st
             # Fetch the inserted row back
             if "id" in row:
                 result = await session.execute(
-                    sa_text(f"SELECT * FROM {TABLE} WHERE id = :id"),
-                    {"id": row["id"]}
+                    sa_text(f"SELECT * FROM {TABLE} WHERE id = :id"), {"id": row["id"]}
                 )
                 fetched = result.fetchone()
                 if fetched:
                     return dict(fetched._mapping)
 
             # If no ID provided, get by last_insert_rowid for SQLite
-            rid_result = await session.execute(sa_text("SELECT last_insert_rowid() AS rid"))
+            rid_result = await session.execute(
+                sa_text("SELECT last_insert_rowid() AS rid")
+            )
             rid = rid_result.scalar()
             if rid:
                 result = await session.execute(
-                    sa_text(f"SELECT * FROM {TABLE} WHERE rowid = :rid"),
-                    {"rid": rid}
+                    sa_text(f"SELECT * FROM {TABLE} WHERE rowid = :rid"), {"rid": rid}
                 )
                 fetched = result.fetchone()
                 if fetched:
@@ -91,9 +93,7 @@ async def select_data_sources(
 
 
 async def update_data_source(
-    settings: Settings,
-    filter_dict: Dict[str, Any],
-    update_data: Dict[str, Any]
+    settings: Settings, filter_dict: Dict[str, Any], update_data: Dict[str, Any]
 ):
     """Update data source records."""
     async with async_session_or_connection(settings) as session:
@@ -152,8 +152,7 @@ async def delete_data_source(settings: Settings, filter_dict: Dict[str, Any]):
 
 
 async def count_data_sources(
-    settings: Settings,
-    filter_dict: Optional[Dict[str, Any]] = None
+    settings: Settings, filter_dict: Optional[Dict[str, Any]] = None
 ) -> int:
     """Count data sources with optional filtering."""
     async with async_session_or_connection(settings) as session:
@@ -179,8 +178,7 @@ async def count_data_sources(
 
 
 async def select_data_source_by_file_hash(
-    settings: Settings,
-    file_hash: str
+    settings: Settings, file_hash: str
 ) -> Optional[Dict[str, Any]]:
     """Select a single data source by the stored file hash (JSON field)."""
     if not file_hash:

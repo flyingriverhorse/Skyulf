@@ -1,19 +1,23 @@
+import logging
 import os
 import uuid
-import aiofiles  # type: ignore
-import logging
-from pathlib import Path
 from datetime import datetime
-from typing import Optional, Union, Sequence, Any, cast, Dict
-from fastapi import UploadFile, HTTPException, BackgroundTasks
-from sqlalchemy.ext.asyncio import AsyncSession
+from pathlib import Path
+from typing import Any, Dict, Optional, Sequence, Union, cast
+
+import aiofiles  # type: ignore
+from fastapi import BackgroundTasks, HTTPException, UploadFile
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
-from backend.database.models import DataSource
-from backend.data_ingestion.schemas.ingestion import DataSourceCreate, IngestionJobResponse
-from backend.data_ingestion.tasks import ingest_data_task
 from backend.data_ingestion.connectors.file import LocalFileConnector
+from backend.data_ingestion.schemas.ingestion import (
+    DataSourceCreate,
+    IngestionJobResponse,
+)
+from backend.data_ingestion.tasks import ingest_data_task
+from backend.database.models import DataSource
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +39,13 @@ class DataIngestionService:
         result = await self.session.execute(query)
         return result.scalars().all()
 
-    async def list_usable_sources(self, user_id: Optional[int] = None) -> Sequence[DataSource]:
+    async def list_usable_sources(
+        self, user_id: Optional[int] = None
+    ) -> Sequence[DataSource]:
         """
         List only successfully ingested data sources.
         """
-        query = select(DataSource).where(DataSource.test_status == 'success')
+        query = select(DataSource).where(DataSource.test_status == "success")
         if user_id:
             query = query.where(DataSource.created_by == user_id)
 
@@ -76,8 +82,8 @@ class DataIngestionService:
             return False
 
         # Delete file if it exists
-        if source.type == 'file' and source.config:
-            file_path = source.config.get('file_path')
+        if source.type == "file" and source.config:
+            file_path = source.config.get("file_path")
             if file_path:
                 try:
                     path = Path(file_path)
@@ -100,15 +106,15 @@ class DataIngestionService:
             return False
 
         metadata = dict(source.source_metadata or {})
-        ingestion_status = metadata.get('ingestion_status', {})
-        current_status = ingestion_status.get('status')
+        ingestion_status = metadata.get("ingestion_status", {})
+        current_status = ingestion_status.get("status")
 
-        if current_status in ['pending', 'processing']:
-            metadata['ingestion_status'] = {
-                'status': 'cancelled',
-                'progress': ingestion_status.get('progress', 0.0),
-                'error': 'Cancelled by user',
-                'updated_at': datetime.utcnow().isoformat()
+        if current_status in ["pending", "processing"]:
+            metadata["ingestion_status"] = {
+                "status": "cancelled",
+                "progress": ingestion_status.get("progress", 0.0),
+                "error": "Cancelled by user",
+                "updated_at": datetime.utcnow().isoformat(),
             }
             cast(Any, source).source_metadata = metadata
             await self.session.commit()
@@ -116,7 +122,9 @@ class DataIngestionService:
 
         return False
 
-    async def get_sample(self, source_id: Union[int, str], limit: int = 5) -> list[dict]:
+    async def get_sample(
+        self, source_id: Union[int, str], limit: int = 5
+    ) -> list[dict]:
         """
         Get a sample of data from the source.
         """
@@ -126,8 +134,8 @@ class DataIngestionService:
 
         config: Dict[str, Any] = cast(Dict[str, Any], source.config) or {}
 
-        if source.type == 'file' or source.type == 'csv' or source.type == 'txt':
-            file_path = config.get('file_path')
+        if source.type == "file" or source.type == "csv" or source.type == "txt":
+            file_path = config.get("file_path")
             if not file_path:
                 raise HTTPException(status_code=400, detail="Missing file path")
 
@@ -148,16 +156,19 @@ class DataIngestionService:
                 return df.to_dicts()
             except Exception as e:
                 logger.error(f"Failed to get sample: {e}")
-                raise HTTPException(status_code=500, detail=f"Failed to read data sample: {str(e)}")
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to read data sample: {str(e)}"
+                )
 
         # TODO: Handle other source types (SQL, etc.)
         return []
 
     async def handle_file_upload(
-            self,
-            file: UploadFile,
-            user_id: int,
-            background_tasks: Optional[BackgroundTasks] = None) -> IngestionJobResponse:
+        self,
+        file: UploadFile,
+        user_id: int,
+        background_tasks: Optional[BackgroundTasks] = None,
+    ) -> IngestionJobResponse:
         """
         Handle file upload and create a data source entry.
         """
@@ -170,7 +181,7 @@ class DataIngestionService:
 
         # 2. Save file
         try:
-            async with aiofiles.open(file_path, 'wb') as out_file:
+            async with aiofiles.open(file_path, "wb") as out_file:
                 while content := await file.read(1024 * 1024):  # 1MB chunks
                     await out_file.write(content)
         except Exception as e:
@@ -191,11 +202,11 @@ class DataIngestionService:
                     "ingestion_status": {
                         "status": "pending",
                         "progress": 0.0,
-                        "updated_at": datetime.utcnow().isoformat()
+                        "updated_at": datetime.utcnow().isoformat(),
                     },
                     "original_filename": file.filename,
-                    "file_size": os.path.getsize(file_path)
-                }
+                    "file_size": os.path.getsize(file_path),
+                },
             )
             self.session.add(new_source)
             await self.session.commit()
@@ -210,13 +221,14 @@ class DataIngestionService:
             else:
                 # Fallback: Run in thread
                 import asyncio
+
                 asyncio.create_task(asyncio.to_thread(ingest_data_task, new_source.id))
 
             return IngestionJobResponse(
                 job_id=str(new_source.id),  # Using source ID as job ID for now
                 status="pending",
                 message="File uploaded and ingestion started",
-                file_id=file_id
+                file_id=file_id,
             )
 
         except Exception as e:
@@ -226,8 +238,12 @@ class DataIngestionService:
                 file_path.unlink()
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    async def create_database_source(self, data: DataSourceCreate, user_id: int,
-                                     background_tasks: Optional[BackgroundTasks] = None) -> IngestionJobResponse:
+    async def create_database_source(
+        self,
+        data: DataSourceCreate,
+        user_id: int,
+        background_tasks: Optional[BackgroundTasks] = None,
+    ) -> IngestionJobResponse:
         """
         Create a database source and trigger ingestion.
         """
@@ -246,9 +262,9 @@ class DataIngestionService:
                     "ingestion_status": {
                         "status": "pending",
                         "progress": 0.0,
-                        "updated_at": datetime.utcnow().isoformat()
+                        "updated_at": datetime.utcnow().isoformat(),
                     }
-                }
+                },
             )
             self.session.add(new_source)
             await self.session.commit()
@@ -263,16 +279,19 @@ class DataIngestionService:
             else:
                 # Fallback: Run in thread
                 import asyncio
+
                 asyncio.create_task(asyncio.to_thread(ingest_data_task, new_source.id))
 
             return IngestionJobResponse(
                 job_id=str(new_source.id),
                 status="pending",
-                message="Database source created and ingestion started"
+                message="Database source created and ingestion started",
             )
         except Exception as e:
             logger.error(f"Failed to create database source: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to create source: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to create source: {str(e)}"
+            )
 
     async def get_ingestion_status(self, source_id: int) -> Dict[str, Any]:
         """
@@ -287,4 +306,6 @@ class DataIngestionService:
             raise HTTPException(status_code=404, detail="DataSource not found")
 
         metadata: Dict[str, Any] = cast(Dict[str, Any], source.source_metadata) or {}
-        return cast(Dict[str, Any], metadata.get("ingestion_status", {"status": "unknown"}))
+        return cast(
+            Dict[str, Any], metadata.get("ingestion_status", {"status": "unknown"})
+        )

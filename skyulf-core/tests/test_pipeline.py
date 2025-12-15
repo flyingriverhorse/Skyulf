@@ -4,7 +4,6 @@ import os
 import tempfile
 
 import pandas as pd
-
 from skyulf.pipeline import SkyulfPipeline
 
 
@@ -17,23 +16,20 @@ def test_end_to_end_pipeline(sample_classification_data):
             {
                 "name": "imputer",
                 "transformer": "SimpleImputer",
-                "params": {"strategy": "mean"}
+                "params": {"strategy": "mean"},
             },
             {
                 "name": "encoder",
                 "transformer": "OneHotEncoder",
-                "params": {"columns": ["category"]}
+                "params": {"columns": ["category"]},
             },
             {
                 "name": "scaler",
                 "transformer": "StandardScaler",
-                "params": {"columns": ["feature1", "feature2"]}
-            }
+                "params": {"columns": ["feature1", "feature2"]},
+            },
         ],
-        "modeling": {
-            "type": "logistic_regression",
-            "params": {"C": 1.0}
-        }
+        "modeling": {"type": "logistic_regression", "params": {"C": 1.0}},
     }
 
     # Initialize

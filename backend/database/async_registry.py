@@ -6,12 +6,15 @@ exists in the configured registry backend (async SQLAlchemy engine or local sqli
 This centralizes creation of registry-related tables so other modules don't
 duplicate DDL logic.
 """
+
 import logging
 import os
+
 import aiosqlite
-from sqlalchemy import MetaData, Table, Column, String, Text
+from sqlalchemy import Column, MetaData, String, Table, Text
 
 from backend.config import Settings
+
 from .engine import get_engine
 
 logger = logging.getLogger(__name__)
@@ -48,7 +51,9 @@ async def ensure_registry_tables(settings: Settings) -> None:
                     executed = True
                     logger.info("Successfully created registry tables via async engine")
                 except Exception:
-                    logger.exception("Failed to create registry tables via async engine")
+                    logger.exception(
+                        "Failed to create registry tables via async engine"
+                    )
                     executed = False
         except Exception:
             logger.exception("Failed to setup registry table metadata")
@@ -87,10 +92,14 @@ async def ensure_registry_tables(settings: Settings) -> None:
                         """
                     )
                     await conn.commit()
-                    logger.info(f"Successfully created registry tables in SQLite at {dbpath}")
+                    logger.info(
+                        f"Successfully created registry tables in SQLite at {dbpath}"
+                    )
 
             except Exception:
-                logger.exception("Failed to create registry tables in async SQLite fallback")
+                logger.exception(
+                    "Failed to create registry tables in async SQLite fallback"
+                )
 
     except Exception:
         logger.exception("Unexpected error in ensure_registry_tables")

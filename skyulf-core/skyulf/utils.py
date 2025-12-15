@@ -1,10 +1,14 @@
-import pandas as pd
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+
 import numpy as np
-from typing import List, Set, Union, Tuple, Optional, Dict, Any, Callable
+import pandas as pd
+
 from .data.dataset import SplitDataset
 
 
-def get_data_stats(data: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series], SplitDataset]) -> Tuple[int, Set[str]]:
+def get_data_stats(
+    data: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series], SplitDataset],
+) -> Tuple[int, Set[str]]:
     """
     Calculates row count and column set for various data structures.
     Supports DataFrame, (X, y) tuple, and SplitDataset.
@@ -18,9 +22,9 @@ def get_data_stats(data: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series], Spl
     elif isinstance(data, tuple) and len(data) == 2:
         # Handle (X, y) tuple
         # Check if first element is DataFrame/Series
-        if hasattr(data[0], 'shape'):
+        if hasattr(data[0], "shape"):
             rows = len(data[0])
-            if hasattr(data[0], 'columns'):
+            if hasattr(data[0], "columns"):
                 cols = set(data[0].columns)
     elif isinstance(data, SplitDataset):
         # Sum rows from all splits
@@ -41,8 +45,9 @@ def get_data_stats(data: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series], Spl
     return rows, cols
 
 
-def unpack_pipeline_input(data: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]
-                          ) -> Tuple[pd.DataFrame, Optional[pd.Series], bool]:
+def unpack_pipeline_input(
+    data: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+) -> Tuple[pd.DataFrame, Optional[pd.Series], bool]:
     """
     Unpacks input which might be a DataFrame or a (X, y) tuple.
     Returns: (X, y, is_tuple)
@@ -52,11 +57,9 @@ def unpack_pipeline_input(data: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Serie
     return data, None, False
 
 
-def pack_pipeline_output(X: pd.DataFrame,
-                         y: Optional[pd.Series],
-                         was_tuple: bool) -> Union[pd.DataFrame,
-                                                   Tuple[pd.DataFrame,
-                                                         pd.Series]]:
+def pack_pipeline_output(
+    X: pd.DataFrame, y: Optional[pd.Series], was_tuple: bool
+) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
     """
     Packs output back into a tuple if the input was a tuple and y is present.
     Otherwise, if y is present, concatenates it back to X.
@@ -134,7 +137,7 @@ def resolve_columns(
     df: pd.DataFrame,
     config: Dict[str, Any],
     default_selection_func: Optional[Callable[[pd.DataFrame], List[str]]] = None,
-    target_column_key: str = 'target_column'
+    target_column_key: str = "target_column",
 ) -> List[str]:
     """
     Resolves the list of columns to process based on configuration and auto-detection.
@@ -147,7 +150,7 @@ def resolve_columns(
        - Exclude the target column (if specified in config) from this auto-detected list.
     3. Filter to ensure all columns exist in the dataframe.
     """
-    cols = config.get('columns')
+    cols = config.get("columns")
 
     # Case 1: Explicit columns provided
     if cols:

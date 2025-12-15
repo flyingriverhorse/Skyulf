@@ -24,6 +24,7 @@ class LogisticRegressionCalculator(SklearnCalculator):
 
 class LogisticRegressionApplier(SklearnApplier):
     """Logistic Regression Applier."""
+
     pass
 
 
@@ -48,4 +49,5 @@ class RandomForestClassifierCalculator(SklearnCalculator):
 
 class RandomForestClassifierApplier(SklearnApplier):
     """Random Forest Classifier Applier."""
+
     pass

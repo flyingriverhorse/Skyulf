@@ -1,6 +1,8 @@
 import os
-import polars as pl
 from typing import Dict, Optional
+
+import polars as pl
+
 from .base import BaseConnector
 
 
@@ -9,7 +11,7 @@ class LocalFileConnector(BaseConnector):
     Connector for local files (CSV, Excel, Parquet, JSON).
     """
 
-    SUPPORTED_EXTENSIONS = {'.csv', '.xlsx', '.xls', '.parquet', '.json'}
+    SUPPORTED_EXTENSIONS = {".csv", ".xlsx", ".xls", ".parquet", ".json"}
 
     def __init__(self, file_path: str, **kwargs):
         self.file_path = file_path
@@ -33,13 +35,13 @@ class LocalFileConnector(BaseConnector):
         ext = os.path.splitext(self.file_path)[1].lower()
 
         try:
-            if ext == '.csv':
+            if ext == ".csv":
                 self._df = pl.read_csv(self.file_path, **self.kwargs)
-            elif ext in ['.xlsx', '.xls']:
+            elif ext in [".xlsx", ".xls"]:
                 self._df = pl.read_excel(self.file_path, **self.kwargs)
-            elif ext == '.parquet':
+            elif ext == ".parquet":
                 self._df = pl.read_parquet(self.file_path, **self.kwargs)
-            elif ext == '.json':
+            elif ext == ".json":
                 self._df = pl.read_json(self.file_path, **self.kwargs)
         except Exception as e:
             raise RuntimeError(f"Failed to read file {self.file_path}: {str(e)}")
@@ -51,7 +53,9 @@ class LocalFileConnector(BaseConnector):
 
         return {col: str(dtype) for col, dtype in self._df.schema.items()}
 
-    async def fetch_data(self, query: Optional[str] = None, limit: Optional[int] = None) -> pl.DataFrame:
+    async def fetch_data(
+        self, query: Optional[str] = None, limit: Optional[int] = None
+    ) -> pl.DataFrame:
         await self._load_data()
         if self._df is None:
             raise RuntimeError("Data not loaded")

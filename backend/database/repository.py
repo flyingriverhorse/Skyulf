@@ -14,8 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.utils.datetime import utcnow
+
 from .engine import Base
-from .models import User, DataSource
+from .models import DataSource, User
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class BaseRepository(Generic[ModelType]):
         skip: int = 0,
         limit: int = 100,
         filters: Optional[Dict[str, Any]] = None,
-        order_by: Optional[str] = None
+        order_by: Optional[str] = None,
     ) -> List[ModelType]:
         """
         Get multiple records with pagination and filtering.
@@ -208,9 +209,7 @@ class UserRepository(BaseRepository[User]):
 
     async def get_by_email(self, email: str) -> Optional[User]:
         """Get user by email."""
-        result = await self.session.execute(
-            select(User).where(User.email == email)
-        )
+        result = await self.session.execute(select(User).where(User.email == email))
         return result.scalar_one_or_none()
 
     async def get_active_users(self) -> List[User]:
@@ -225,10 +224,7 @@ class UserRepository(BaseRepository[User]):
         result = await self.session.execute(
             update(User)
             .where(User.id == user_id)
-            .values(
-                last_login=utcnow(),
-                login_count=User.login_count + 1
-            )
+            .values(last_login=utcnow(), login_count=User.login_count + 1)
         )
 
         cursor = cast(CursorResult[Any], result)

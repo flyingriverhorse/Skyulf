@@ -5,20 +5,18 @@ Provides safe file and folder deletion functionality with backup options,
 plus file cleanup and maintenance utilities.
 """
 
+import logging
 import os
 import shutil
-import logging
-from pathlib import Path
-from typing import Optional, Union, List
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
 
 def safe_delete_path(
-    path: Union[str, Path],
-    force_delete: bool = True,
-    files_only: bool = True
+    path: Union[str, Path], force_delete: bool = True, files_only: bool = True
 ) -> bool:
     """
     Safely delete a file or directory.
@@ -65,7 +63,9 @@ def _delete_immediately(path: Path, files_only: bool = True) -> bool:
             return True
         elif path.is_dir():
             if files_only:
-                logger.warning(f"⚠ DIRECTORY DELETION BLOCKED (files_only=True): {path}")
+                logger.warning(
+                    f"⚠ DIRECTORY DELETION BLOCKED (files_only=True): {path}"
+                )
                 return False
             else:
                 logger.warning(f"⚠ DELETING DIRECTORY (files_only=False): {path}")
@@ -132,32 +132,38 @@ def extract_file_path_from_source(source_data: dict) -> Optional[Path]:
     """
     # Check various possible path fields
     path_candidates = [
-        source_data.get('file_path'),
-        source_data.get('path'),
-        source_data.get('source_path'),
-        source_data.get('location'),
-        source_data.get('file_location'),
+        source_data.get("file_path"),
+        source_data.get("path"),
+        source_data.get("source_path"),
+        source_data.get("location"),
+        source_data.get("file_location"),
     ]
 
     # Check connection_info for file path (this is where uploaded files store their paths)
-    connection_info = source_data.get('connection_info', {})
+    connection_info = source_data.get("connection_info", {})
     if isinstance(connection_info, dict):
-        path_candidates.extend([
-            connection_info.get('file_path'),  # This is the main one for uploaded files
-            connection_info.get('filepath'),
-            connection_info.get('path'),
-            connection_info.get('upload_path'),
-        ])
+        path_candidates.extend(
+            [
+                connection_info.get(
+                    "file_path"
+                ),  # This is the main one for uploaded files
+                connection_info.get("filepath"),
+                connection_info.get("path"),
+                connection_info.get("upload_path"),
+            ]
+        )
 
     # Also check config field (legacy data sources)
-    config = source_data.get('config', {})
+    config = source_data.get("config", {})
     if isinstance(config, dict):
-        path_candidates.extend([
-            config.get('file_path'),
-            config.get('filepath'),
-            config.get('path'),
-            config.get('upload_path'),
-        ])
+        path_candidates.extend(
+            [
+                config.get("file_path"),
+                config.get("filepath"),
+                config.get("path"),
+                config.get("upload_path"),
+            ]
+        )
 
     for candidate in path_candidates:
         if candidate and isinstance(candidate, (str, Path)):
@@ -167,8 +173,8 @@ def extract_file_path_from_source(source_data: dict) -> Optional[Path]:
                 return path
 
     # Also check if source_name contains a path
-    source_name = source_data.get('source_name', '')
-    if source_name and ('/' in source_name or '\\' in source_name):
+    source_name = source_data.get("source_name", "")
+    if source_name and ("/" in source_name or "\\" in source_name):
         path = Path(source_name)
         if path.exists():
             return path
@@ -180,7 +186,7 @@ def cleanup_old_files(
     directory: Union[str, Path],
     max_files: int = 10,
     max_age_days: int = 7,
-    file_pattern: str = "*"
+    file_pattern: str = "*",
 ) -> dict:
     """
     Clean up old files in a directory based on count and age limits.
@@ -196,7 +202,11 @@ def cleanup_old_files(
     """
     directory = Path(directory)
     if not directory.exists():
-        return {"status": "skipped", "reason": "directory_not_found", "files_removed": 0}
+        return {
+            "status": "skipped",
+            "reason": "directory_not_found",
+            "files_removed": 0,
+        }
 
     try:
         # Get all files matching the pattern
@@ -211,7 +221,9 @@ def cleanup_old_files(
         cutoff_date = datetime.now() - timedelta(days=max_age_days)
 
         # Sort files by modification time (newest first)
-        files_by_mtime = sorted(files_only, key=lambda f: f.stat().st_mtime, reverse=True)
+        files_by_mtime = sorted(
+            files_only, key=lambda f: f.stat().st_mtime, reverse=True
+        )
 
         # Remove files older than max_age_days
         for file_path in files_only:
@@ -242,7 +254,8 @@ def cleanup_old_files(
             "status": "success",
             "files_removed": removed_count,
             "removed_files": removed_files,
-            "remaining_files": len([f for f in files_only if f.exists()]) - removed_count
+            "remaining_files": len([f for f in files_only if f.exists()])
+            - removed_count,
         }
 
     except Exception as e:
@@ -254,7 +267,7 @@ def cleanup_uploads_directory(
     uploads_dir: Union[str, Path],
     max_files: int = 10,
     max_age_days: int = 7,
-    file_extensions: Optional[List[str]] = None
+    file_extensions: Optional[List[str]] = None,
 ) -> dict:
     """
     Clean up uploaded files based on settings.
@@ -269,7 +282,16 @@ def cleanup_uploads_directory(
         dict: Cleanup summary
     """
     if file_extensions is None:
-        file_extensions = ['.csv', '.xlsx', '.xls', '.json', '.parquet', '.txt', '.pkl', '.feather']
+        file_extensions = [
+            ".csv",
+            ".xlsx",
+            ".xls",
+            ".json",
+            ".parquet",
+            ".txt",
+            ".pkl",
+            ".feather",
+        ]
 
     uploads_dir = Path(uploads_dir)
     total_removed = 0
@@ -280,16 +302,18 @@ def cleanup_uploads_directory(
         pattern = f"*{ext}"
         result = cleanup_old_files(uploads_dir, max_files, max_age_days, pattern)
         results[ext] = result
-        total_removed += result.get('files_removed', 0)
+        total_removed += result.get("files_removed", 0)
 
     # Also clean up any temporary files
-    temp_result = cleanup_old_files(uploads_dir, max_files=5, max_age_days=1, file_pattern="*.tmp")
-    results['temp_files'] = temp_result
-    total_removed += temp_result.get('files_removed', 0)
+    temp_result = cleanup_old_files(
+        uploads_dir, max_files=5, max_age_days=1, file_pattern="*.tmp"
+    )
+    results["temp_files"] = temp_result
+    total_removed += temp_result.get("files_removed", 0)
 
     return {
         "status": "success",
         "total_files_removed": total_removed,
         "results_by_extension": results,
-        "directory": str(uploads_dir)
+        "directory": str(uploads_dir),
     }

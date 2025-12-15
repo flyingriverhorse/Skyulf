@@ -1,48 +1,49 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 
-from .service import DataIngestionService
 from .dependencies import get_data_service
 from .schemas.ingestion import (
-    IngestionJobResponse,
-    IngestionStatus,
     DataSourceCreate,
     DataSourceListResponse,
+    DataSourceRead,
     DataSourceResponse,
     DataSourceSampleResponse,
-    DataSourceRead
+    IngestionJobResponse,
+    IngestionStatus,
 )
+from .service import DataIngestionService
 
 router = APIRouter(prefix="/api/ingestion", tags=["Data Ingestion"])
 sources_router = APIRouter(prefix="/data/api", tags=["Data Sources"])
 
 
 @sources_router.get("/sources", response_model=DataSourceListResponse)
-async def list_sources(
-    service: DataIngestionService = Depends(get_data_service)
-):
+async def list_sources(service: DataIngestionService = Depends(get_data_service)):
     """
     List all available data sources.
     """
     # TODO: Get real user ID from auth dependency. For now, list all sources.
     sources = await service.list_sources(user_id=None)
-    return DataSourceListResponse(sources=[DataSourceRead.model_validate(s) for s in sources])
+    return DataSourceListResponse(
+        sources=[DataSourceRead.model_validate(s) for s in sources]
+    )
 
 
 @sources_router.get("/sources/usable", response_model=DataSourceListResponse)
 async def list_usable_sources(
-    service: DataIngestionService = Depends(get_data_service)
+    service: DataIngestionService = Depends(get_data_service),
 ):
     """
     List only successfully ingested data sources.
     """
     sources = await service.list_usable_sources(user_id=None)
-    return DataSourceListResponse(sources=[DataSourceRead.model_validate(s) for s in sources])
+    return DataSourceListResponse(
+        sources=[DataSourceRead.model_validate(s) for s in sources]
+    )
 
 
 @sources_router.get("/sources/{source_id}", response_model=DataSourceResponse)
 async def get_source(
-    source_id: str,
-    service: DataIngestionService = Depends(get_data_service)
+    source_id: str, service: DataIngestionService = Depends(get_data_service)
 ):
     """
     Get a specific data source.
@@ -53,11 +54,13 @@ async def get_source(
     return DataSourceResponse(source=source)
 
 
-@sources_router.get("/sources/{source_id}/sample", response_model=DataSourceSampleResponse)
+@sources_router.get(
+    "/sources/{source_id}/sample", response_model=DataSourceSampleResponse
+)
 async def get_source_sample(
     source_id: str,
     limit: int = 5,
-    service: DataIngestionService = Depends(get_data_service)
+    service: DataIngestionService = Depends(get_data_service),
 ):
     """
     Get a sample of data from the source.
@@ -68,8 +71,7 @@ async def get_source_sample(
 
 @sources_router.delete("/sources/{source_id}")
 async def delete_source(
-    source_id: str,
-    service: DataIngestionService = Depends(get_data_service)
+    source_id: str, service: DataIngestionService = Depends(get_data_service)
 ):
     """
     Delete a data source.
@@ -84,7 +86,7 @@ async def delete_source(
 async def create_database_source(
     data: DataSourceCreate,
     background_tasks: BackgroundTasks,
-    service: DataIngestionService = Depends(get_data_service)
+    service: DataIngestionService = Depends(get_data_service),
 ):
     """
     Create a database source and start ingestion.
@@ -98,7 +100,7 @@ async def create_database_source(
 async def upload_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    service: DataIngestionService = Depends(get_data_service)
+    service: DataIngestionService = Depends(get_data_service),
 ):
     """
     Upload a file and start ingestion process.
@@ -110,8 +112,7 @@ async def upload_file(
 
 @router.get("/{source_id}/status", response_model=IngestionStatus)
 async def get_status(
-    source_id: int,
-    service: DataIngestionService = Depends(get_data_service)
+    source_id: int, service: DataIngestionService = Depends(get_data_service)
 ):
     """
     Get the status of an ingestion job.
@@ -122,8 +123,7 @@ async def get_status(
 
 @router.post("/{source_id}/cancel")
 async def cancel_ingestion(
-    source_id: str,
-    service: DataIngestionService = Depends(get_data_service)
+    source_id: str, service: DataIngestionService = Depends(get_data_service)
 ):
     """
     Cancel an ingestion job.
@@ -132,5 +132,6 @@ async def cancel_ingestion(
     if not success:
         raise HTTPException(
             status_code=400,
-            detail="Job could not be cancelled (maybe it's already finished or doesn't exist)")
+            detail="Job could not be cancelled (maybe it's already finished or doesn't exist)",
+        )
     return {"message": "Ingestion job cancelled successfully"}

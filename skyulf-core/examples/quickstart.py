@@ -8,8 +8,8 @@ This script demonstrates how to:
 4. Load it back and make predictions.
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from skyulf import SkyulfPipeline
 
 
@@ -17,12 +17,14 @@ def create_dummy_data():
     """Create a dummy dataset for demonstration."""
     np.random.seed(42)
     n = 200
-    df = pd.DataFrame({
-        "age": np.random.randint(18, 80, n),
-        "income": np.random.normal(50000, 15000, n),
-        "city": np.random.choice(["New York", "London", "Paris"], n),
-        "is_customer": np.random.choice([0, 1], n)
-    })
+    df = pd.DataFrame(
+        {
+            "age": np.random.randint(18, 80, n),
+            "income": np.random.normal(50000, 15000, n),
+            "city": np.random.choice(["New York", "London", "Paris"], n),
+            "is_customer": np.random.choice([0, 1], n),
+        }
+    )
     # Add some missing values
     df.loc[0:10, "income"] = np.nan
     return df
@@ -41,44 +43,31 @@ def main():
             {
                 "name": "split_data",
                 "transformer": "TrainTestSplitter",
-                "params": {
-                    "test_size": 0.2,
-                    "target_column": "is_customer"
-                }
+                "params": {"test_size": 0.2, "target_column": "is_customer"},
             },
             # Step 1: Impute missing income with mean
             {
                 "name": "impute_income",
                 "transformer": "SimpleImputer",
-                "params": {
-                    "columns": ["income"],
-                    "strategy": "mean"
-                }
+                "params": {"columns": ["income"], "strategy": "mean"},
             },
             # Step 2: One-Hot Encode 'city'
             {
                 "name": "encode_city",
                 "transformer": "OneHotEncoder",
-                "params": {
-                    "columns": ["city"]
-                }
+                "params": {"columns": ["city"]},
             },
             # Step 3: Scale numerical features
             {
                 "name": "scale_features",
                 "transformer": "StandardScaler",
-                "params": {
-                    "columns": ["age", "income"]
-                }
-            }
+                "params": {"columns": ["age", "income"]},
+            },
         ],
         "modeling": {
             "type": "random_forest_classifier",
-            "params": {
-                "n_estimators": 50,
-                "max_depth": 5
-            }
-        }
+            "params": {"n_estimators": 50, "max_depth": 5},
+        },
     }
 
     print("\n2. Initializing Pipeline...")
@@ -107,17 +96,20 @@ def main():
 
     # 6. Make Predictions
     print("\n6. Making Predictions on new data...")
-    new_data = pd.DataFrame({
-        "age": [25, 40],
-        "income": [60000, np.nan],  # Missing value will be handled by imputer
-        "city": ["London", "Paris"]
-    })
+    new_data = pd.DataFrame(
+        {
+            "age": [25, 40],
+            "income": [60000, np.nan],  # Missing value will be handled by imputer
+            "city": ["London", "Paris"],
+        }
+    )
 
     predictions = loaded_pipeline.predict(new_data)
     print("   Predictions:", predictions.tolist())
 
     # Cleanup
     import os
+
     if os.path.exists("my_model.pkl"):
         os.remove("my_model.pkl")
         print("\n   (Cleaned up 'my_model.pkl')")

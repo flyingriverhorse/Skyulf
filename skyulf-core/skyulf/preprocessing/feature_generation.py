@@ -1,15 +1,18 @@
-from typing import Dict, Any, List, Optional, Union, Tuple
-import pandas as pd
-import math
 import builtins
+import math
 from difflib import SequenceMatcher
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import pandas as pd
 from sklearn.preprocessing import PolynomialFeatures
-from .base import BaseCalculator, BaseApplier
-from ..utils import unpack_pipeline_input, pack_pipeline_output
+
+from ..utils import pack_pipeline_output, unpack_pipeline_input
+from .base import BaseApplier, BaseCalculator
 
 # --- Optional Dependencies ---
 try:
     from rapidfuzz import fuzz
+
     _HAS_RAPIDFUZZ = True
 except ImportError:
     fuzz = None  # type: ignore
@@ -26,8 +29,20 @@ FEATURE_MATH_ALLOWED_TYPES = {
     "polynomial",
 }
 ALLOWED_DATETIME_FEATURES = {
-    "year", "quarter", "month", "month_name", "week", "day", "day_name",
-    "weekday", "is_weekend", "hour", "minute", "second", "season", "time_of_day",
+    "year",
+    "quarter",
+    "month",
+    "month_name",
+    "week",
+    "day",
+    "day_name",
+    "weekday",
+    "is_weekend",
+    "hour",
+    "minute",
+    "second",
+    "season",
+    "time_of_day",
 }
 
 # --- Helpers ---
@@ -47,7 +62,9 @@ def _coerce_float(value: Any) -> Optional[float]:
         return None
 
 
-def _safe_divide(numerator: pd.Series, denominator: pd.Series, epsilon: float) -> pd.Series:
+def _safe_divide(
+    numerator: pd.Series, denominator: pd.Series, epsilon: float
+) -> pd.Series:
     adjusted = denominator.copy()
     adjusted = adjusted.replace({0: epsilon, -0.0: epsilon})
     adjusted = adjusted.fillna(epsilon)
@@ -76,11 +93,16 @@ def _compute_similarity_score(a: Any, b: Any, method: str) -> float:
     # Fallback
     return SequenceMatcher(None, text_a, text_b).ratio() * 100.0
 
+
 # --- Polynomial Features ---
 
 
 class PolynomialFeaturesCalculator(BaseCalculator):
-    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
         # Extract configuration parameters
         # We support standard polynomial features settings like degree and interaction_only
 
@@ -102,7 +124,9 @@ class PolynomialFeaturesCalculator(BaseCalculator):
         include_bias = config.get("include_bias", False)
 
         # We use sklearn to get feature names
-        poly = PolynomialFeatures(degree=degree, interaction_only=interaction_only, include_bias=include_bias)
+        poly = PolynomialFeatures(
+            degree=degree, interaction_only=interaction_only, include_bias=include_bias
+        )
         poly.fit(X[cols])
 
         return {
@@ -113,13 +137,16 @@ class PolynomialFeaturesCalculator(BaseCalculator):
             "include_bias": include_bias,
             "include_input_features": config.get("include_input_features", False),
             "output_prefix": config.get("output_prefix", "poly"),
-            "feature_names": poly.get_feature_names_out(cols).tolist()
+            "feature_names": poly.get_feature_names_out(cols).tolist(),
         }
 
 
 class PolynomialFeaturesApplier(BaseApplier):
-    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-              params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
         cols = params.get("columns", [])
@@ -134,7 +161,9 @@ class PolynomialFeaturesApplier(BaseApplier):
         include_input_features = params.get("include_input_features", False)
         output_prefix = params.get("output_prefix", "poly")
 
-        poly = PolynomialFeatures(degree=degree, interaction_only=interaction_only, include_bias=include_bias)
+        poly = PolynomialFeatures(
+            degree=degree, interaction_only=interaction_only, include_bias=include_bias
+        )
         poly.fit(X[valid_cols])  # Cheap fit
 
         transformed = poly.transform(X[valid_cols])
@@ -162,11 +191,16 @@ class PolynomialFeaturesApplier(BaseApplier):
 
         return pack_pipeline_output(df_out, y, is_tuple)
 
+
 # --- Feature Generation ---
 
 
 class FeatureGenerationCalculator(BaseCalculator):
-    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
         # Config:
         # operations: List[Dict]
         # epsilon: float
@@ -176,13 +210,16 @@ class FeatureGenerationCalculator(BaseCalculator):
             "type": "feature_generation",
             "operations": config.get("operations", []),
             "epsilon": config.get("epsilon", DEFAULT_EPSILON),
-            "allow_overwrite": config.get("allow_overwrite", False)
+            "allow_overwrite": config.get("allow_overwrite", False),
         }
 
 
 class FeatureGenerationApplier(BaseApplier):
-    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-              params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
         operations = params.get("operations", [])
@@ -230,9 +267,11 @@ class FeatureGenerationApplier(BaseApplier):
                         continue
 
                     series_list = [
-                        pd.to_numeric(
-                            df_out[c], errors="coerce").fillna(
-                            fillna if fillna is not None else 0) for c in valid_inputs]
+                        pd.to_numeric(df_out[c], errors="coerce").fillna(
+                            fillna if fillna is not None else 0
+                        )
+                        for c in valid_inputs
+                    ]
 
                     if method == "add":
                         res: pd.Series = pd.Series(0.0, index=df_out.index)
@@ -288,10 +327,16 @@ class FeatureGenerationApplier(BaseApplier):
                 elif op_type == "ratio":
                     # input_cols (numerator) / secondary_cols (denominator)
                     # Sum of numerators / Sum of denominators
-                    nums = [pd.to_numeric(df_out[c], errors="coerce").fillna(0)
-                            for c in input_cols if c in df_out.columns]
-                    dens = [pd.to_numeric(df_out[c], errors="coerce").fillna(0)
-                            for c in secondary_cols if c in df_out.columns]
+                    nums = [
+                        pd.to_numeric(df_out[c], errors="coerce").fillna(0)
+                        for c in input_cols
+                        if c in df_out.columns
+                    ]
+                    dens = [
+                        pd.to_numeric(df_out[c], errors="coerce").fillna(0)
+                        for c in secondary_cols
+                        if c in df_out.columns
+                    ]
 
                     if not nums or not dens:
                         continue
@@ -309,12 +354,26 @@ class FeatureGenerationApplier(BaseApplier):
                 elif op_type == "similarity":
                     # input_cols[0] vs secondary_cols[0] (or input_cols[1])
                     col_a = input_cols[0] if input_cols else None
-                    col_b = secondary_cols[0] if secondary_cols else (input_cols[1] if len(input_cols) > 1 else None)
+                    col_b = (
+                        secondary_cols[0]
+                        if secondary_cols
+                        else (input_cols[1] if len(input_cols) > 1 else None)
+                    )
 
-                    if not col_a or not col_b or col_a not in df_out.columns or col_b not in df_out.columns:
+                    if (
+                        not col_a
+                        or not col_b
+                        or col_a not in df_out.columns
+                        or col_b not in df_out.columns
+                    ):
                         continue
 
-                    result = df_out.apply(lambda row: _compute_similarity_score(row[col_a], row[col_b], method), axis=1)
+                    result = df_out.apply(
+                        lambda row: _compute_similarity_score(
+                            row[col_a], row[col_b], method
+                        ),
+                        axis=1,
+                    )
 
                 elif op_type == "datetime_extract":
                     valid_inputs = [c for c in input_cols if c in df_out.columns]

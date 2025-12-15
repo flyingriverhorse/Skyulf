@@ -2,20 +2,30 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, cast
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import KFold, ShuffleSplit, StratifiedKFold, TimeSeriesSplit
+from sklearn.model_selection import (
+    KFold,
+    ShuffleSplit,
+    StratifiedKFold,
+    TimeSeriesSplit,
+)
 
 if TYPE_CHECKING:
     from .base import BaseModelApplier, BaseModelCalculator
 
 from .evaluation.common import sanitize_metrics
-from .evaluation.metrics import calculate_classification_metrics, calculate_regression_metrics
+from .evaluation.metrics import (
+    calculate_classification_metrics,
+    calculate_regression_metrics,
+)
 
 
-def _aggregate_metrics(fold_metrics: List[Dict[str, float]]) -> Dict[str, Dict[str, float]]:
+def _aggregate_metrics(
+    fold_metrics: List[Dict[str, float]],
+) -> Dict[str, Dict[str, float]]:
     """Aggregates metrics across folds (mean and std)."""
     if not fold_metrics:
         return {}
@@ -81,15 +91,21 @@ def perform_cross_validation(
     if cv_type == "time_series_split":
         splitter = TimeSeriesSplit(n_splits=n_folds)
     elif cv_type == "shuffle_split":
-        splitter = ShuffleSplit(n_splits=n_folds, test_size=0.2, random_state=random_state)
+        splitter = ShuffleSplit(
+            n_splits=n_folds, test_size=0.2, random_state=random_state
+        )
     elif cv_type == "stratified_k_fold" and problem_type == "classification":
         splitter = StratifiedKFold(
-            n_splits=n_folds, shuffle=shuffle, random_state=random_state if shuffle else None
+            n_splits=n_folds,
+            shuffle=shuffle,
+            random_state=random_state if shuffle else None,
         )
     else:
         # Default to KFold
         splitter = KFold(
-            n_splits=n_folds, shuffle=shuffle, random_state=random_state if shuffle else None
+            n_splits=n_folds,
+            shuffle=shuffle,
+            random_state=random_state if shuffle else None,
         )
 
     fold_results = []
@@ -117,9 +133,13 @@ def perform_cross_validation(
 
         # Evaluate
         if problem_type == "classification":
-            metrics = calculate_classification_metrics(model_artifact, X_val_fold, y_val_fold)
+            metrics = calculate_classification_metrics(
+                model_artifact, X_val_fold, y_val_fold
+            )
         else:
-            metrics = calculate_regression_metrics(model_artifact, X_val_fold, y_val_fold)
+            metrics = calculate_regression_metrics(
+                model_artifact, X_val_fold, y_val_fold
+            )
 
         if log_callback:
             # Log a key metric for the fold

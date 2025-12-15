@@ -10,14 +10,16 @@ Usage (examples):
     await crud.read("users", {"id": 1}, settings, one=True)
 """
 
-from typing import Any, Dict, List, Optional, Union, cast
-import re
 import logging
+import re
+from typing import Any, Dict, List, Optional, Union, cast
 
 from sqlalchemy import text as sa_text
-from .adapter import async_session_or_connection, get_db_type, DatabaseType
-from .data_sources import async_data_sources_crud
+
 from backend.config import Settings
+
+from .adapter import DatabaseType, async_session_or_connection, get_db_type
+from .data_sources import async_data_sources_crud
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,7 @@ def _row_to_dict(row: Any) -> Optional[Dict[str, Any]]:
         return None
 
     # Handle SQLAlchemy 2.0+ Row objects
-    if hasattr(row, '_mapping'):
+    if hasattr(row, "_mapping"):
         return dict(row._mapping)
 
     # Fallback for older versions or other row types
@@ -102,7 +104,9 @@ def _build_in_clause(field: str, values, style: str, counter: int):
     return clause, params, counter
 
 
-def _build_comparison_clause(field: str, operator: str, value, style: str, counter: int):
+def _build_comparison_clause(
+    field: str, operator: str, value, style: str, counter: int
+):
     sql_op = {
         "$gt": ">",
         "$lt": "<",
@@ -156,9 +160,13 @@ def _build_field_clauses(field: str, value, style: str, counter: int):
     if isinstance(value, dict):
         for op, val in value.items():
             if op == "$in":
-                clause, subparams, counter = _build_in_clause(field, val, style, counter)
+                clause, subparams, counter = _build_in_clause(
+                    field, val, style, counter
+                )
             else:
-                clause, subparams, counter = _build_comparison_clause(field, op, val, style, counter)
+                clause, subparams, counter = _build_comparison_clause(
+                    field, op, val, style, counter
+                )
             parts.append(clause)
             _merge_params(params, subparams, style)
     else:
@@ -182,7 +190,9 @@ def _build_logical_filter_clause(filt: Dict[str, Any], style: str, counter: int)
 
         subparts = []
         for subfilter in subfilters:
-            clause, subparams, counter = _build_sql_from_filter(subfilter, style, counter)
+            clause, subparams, counter = _build_sql_from_filter(
+                subfilter, style, counter
+            )
             if clause:
                 subparts.append(f"({_clean_clause_prefix(clause)})")
                 _merge_params(params, _coerce_params(subparams, style), style)
@@ -201,7 +211,9 @@ def _build_field_filter_clause(filt: Dict[str, Any], style: str, counter: int):
 
     for key, value in filt.items():
         _check_identifier(key)
-        field_parts, field_params, counter = _build_field_clauses(key, value, style, counter)
+        field_parts, field_params, counter = _build_field_clauses(
+            key, value, style, counter
+        )
         parts.extend(field_parts)
         _merge_params(params, field_params, style)
 
@@ -229,34 +241,26 @@ def _select_filter_handler(filt: Any):
     return _handle_unknown_filter
 
 
-def _handle_empty_filter(
-    _filt: Any, placeholder_style: str, _counter: int
-):
+def _handle_empty_filter(_filt: Any, placeholder_style: str, _counter: int):
     params = _init_params_container(placeholder_style)
     return "", params, _counter
 
 
-def _handle_logical_filter(
-    filt: Any, placeholder_style: str, counter: int
-):
+def _handle_logical_filter(filt: Any, placeholder_style: str, counter: int):
     clause, params, counter = _build_logical_filter_clause(
         filt, placeholder_style, counter
     )
     return clause, params, counter
 
 
-def _handle_field_filter(
-    filt: Any, placeholder_style: str, counter: int
-):
+def _handle_field_filter(filt: Any, placeholder_style: str, counter: int):
     clause, params, counter = _build_field_filter_clause(
         filt, placeholder_style, counter
     )
     return clause, params, counter
 
 
-def _handle_unknown_filter(
-    _filt: Any, placeholder_style: str, counter: int
-):
+def _handle_unknown_filter(_filt: Any, placeholder_style: str, counter: int):
     params = _init_params_container(placeholder_style)
     return "", params, counter
 
@@ -268,10 +272,7 @@ def _build_where_clause_sql(filter: Dict[str, Any], placeholder_style: str = ":"
 
 
 async def create(
-    name: str,
-    data: Dict[str, Any],
-    settings: Settings,
-    config: Optional[Dict] = None
+    name: str, data: Dict[str, Any], settings: Settings, config: Optional[Dict] = None
 ) -> Any:
     """
     Insert a record/document into table/collection.
@@ -307,20 +308,24 @@ async def create(
                 await session.commit()
 
                 # Get last inserted row
-                rid_result = await session.execute(sa_text("SELECT last_insert_rowid() AS rid"))
+                rid_result = await session.execute(
+                    sa_text("SELECT last_insert_rowid() AS rid")
+                )
                 rid = rid_result.scalar()
 
                 if rid is not None:
                     sel_result = await session.execute(
                         sa_text(f"SELECT * FROM {name} WHERE rowid = :rid"),
-                        {"rid": rid}
+                        {"rid": rid},
                     )
                     row = sel_result.fetchone()
                     return _row_to_dict(row) if row else None
                 return None
             else:
                 # PostgreSQL: Use RETURNING
-                sql = sa_text(f"INSERT INTO {name} ({cols}) VALUES ({placeholders}) RETURNING *")
+                sql = sa_text(
+                    f"INSERT INTO {name} ({cols}) VALUES ({placeholders}) RETURNING *"
+                )
                 result = await session.execute(sql, data)
                 await session.commit()
                 row = result.fetchone()
@@ -332,7 +337,7 @@ async def create(
             placeholders = ", ".join([f"%({k})s" for k in data.keys()])
             sql_stmt = f"INSERT INTO {name} ({cols}) VALUES ({placeholders})"
 
-            if hasattr(conn, 'execute'):
+            if hasattr(conn, "execute"):
                 # Async connection (MySQL/Snowflake async wrapper)
                 await conn.execute(sql_stmt, data)
                 await conn.commit()
@@ -343,7 +348,7 @@ async def create(
                 cursor = conn.cursor()
                 cursor.execute(sql, data)
                 conn.commit()
-                lastrowid = getattr(cursor, 'lastrowid', None)
+                lastrowid = getattr(cursor, "lastrowid", None)
                 cursor.close()
                 return {"lastrowid": lastrowid}
 
@@ -385,32 +390,47 @@ async def read(
 
     if db_type in (DatabaseType.POSTGRES, DatabaseType.POSTGRESQL, DatabaseType.SQLITE):
         async with async_session_or_connection(settings, config) as session:
-            clause, params = _build_where_clause_sql(filter or {}, placeholder_style=":")
+            clause, params = _build_where_clause_sql(
+                filter or {}, placeholder_style=":"
+            )
             sql = sa_text(f"SELECT * FROM {name}{clause}")
             result = await session.execute(sql, params)
             rows_raw = result.fetchall()
             rows = [cast(Dict[str, Any], _row_to_dict(r)) for r in rows_raw]
-            return cast(Union[Dict[str, Any], List[Dict[str, Any]]], rows[0] if one and rows else rows)
+            return cast(
+                Union[Dict[str, Any], List[Dict[str, Any]]],
+                rows[0] if one and rows else rows,
+            )
 
     elif db_type in (DatabaseType.MYSQL, DatabaseType.MARIADB, DatabaseType.SNOWFLAKE):
         async with async_session_or_connection(settings, config) as conn:
-            clause, params = _build_where_clause_sql(filter or {}, placeholder_style="pyformat")
+            clause, params = _build_where_clause_sql(
+                filter or {}, placeholder_style="pyformat"
+            )
             sql_stmt = f"SELECT * FROM {name}{clause}"
 
-            if hasattr(conn, 'execute'):
+            if hasattr(conn, "execute"):
                 # Async connection
                 result = await conn.execute(sql_stmt, params)
                 # This would need to be adapted based on the specific async driver
-                rows = cast(List[Dict[str, Any]], result.fetchall() if hasattr(result, 'fetchall') else [])
+                rows = cast(
+                    List[Dict[str, Any]],
+                    result.fetchall() if hasattr(result, "fetchall") else [],
+                )
             else:
                 # Sync wrapper
                 cursor = conn.cursor()
-                cursor.execute(sql_stmt, params if isinstance(params, dict) else tuple(params))
+                cursor.execute(
+                    sql_stmt, params if isinstance(params, dict) else tuple(params)
+                )
                 cols = [c[0] for c in cursor.description] if cursor.description else []
                 rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
                 cursor.close()
 
-            return cast(Union[Dict[str, Any], List[Dict[str, Any]]], rows[0] if one and rows else rows)
+            return cast(
+                Union[Dict[str, Any], List[Dict[str, Any]]],
+                rows[0] if one and rows else rows,
+            )
 
     elif db_type in (DatabaseType.MONGODB, DatabaseType.MONGO):
         async with async_session_or_connection(settings, config) as db_obj:
@@ -477,7 +497,9 @@ async def update(
         async with async_session_or_connection(settings, config) as session:
             set_parts = ", ".join(f"{k} = :u_{k}" for k in update_data.keys())
             params = {f"u_{k}": v for k, v in update_data.items()}
-            clause, where_params = _build_where_clause_sql(filter, placeholder_style=":")
+            clause, where_params = _build_where_clause_sql(
+                filter, placeholder_style=":"
+            )
             params.update(where_params)
 
             sql = sa_text(f"UPDATE {name} SET {set_parts}{clause}")
@@ -488,17 +510,19 @@ async def update(
     elif db_type in (DatabaseType.MYSQL, DatabaseType.MARIADB, DatabaseType.SNOWFLAKE):
         async with async_session_or_connection(settings, config) as conn:
             set_parts = ", ".join(f"{k} = %({k})s" for k in update_data.keys())
-            clause, where_params = _build_where_clause_sql(filter, placeholder_style="pyformat")
+            clause, where_params = _build_where_clause_sql(
+                filter, placeholder_style="pyformat"
+            )
             params = dict(update_data)
             if isinstance(where_params, dict):
                 params.update(where_params)
 
             sql_stmt = f"UPDATE {name} SET {set_parts}{clause}"
 
-            if hasattr(conn, 'execute'):
+            if hasattr(conn, "execute"):
                 result = await conn.execute(sql_stmt, params)
                 await conn.commit()
-                return {"affected_rows": getattr(result, 'rowcount', 0)}
+                return {"affected_rows": getattr(result, "rowcount", 0)}
             else:
                 cursor = conn.cursor()
                 cursor.execute(sql_stmt, params)
@@ -518,7 +542,7 @@ async def update(
 
             return {
                 "matched_count": result.matched_count,
-                "modified_count": result.modified_count
+                "modified_count": result.modified_count,
             }
 
     else:
@@ -564,16 +588,20 @@ async def delete(
 
     elif db_type in (DatabaseType.MYSQL, DatabaseType.MARIADB, DatabaseType.SNOWFLAKE):
         async with async_session_or_connection(settings, config) as conn:
-            clause, params = _build_where_clause_sql(filter, placeholder_style="pyformat")
+            clause, params = _build_where_clause_sql(
+                filter, placeholder_style="pyformat"
+            )
             sql_stmt = f"DELETE FROM {name}{clause}"
 
-            if hasattr(conn, 'execute'):
+            if hasattr(conn, "execute"):
                 result = await conn.execute(sql_stmt, params)
                 await conn.commit()
-                return {"affected_rows": getattr(result, 'rowcount', 0)}
+                return {"affected_rows": getattr(result, "rowcount", 0)}
             else:
                 cursor = conn.cursor()
-                cursor.execute(sql_stmt, params if isinstance(params, dict) else tuple(params))
+                cursor.execute(
+                    sql_stmt, params if isinstance(params, dict) else tuple(params)
+                )
                 conn.commit()
                 affected = cursor.rowcount
                 cursor.close()
@@ -599,7 +627,7 @@ async def count(
     name: str,
     settings: Settings,
     filter: Optional[Dict[str, Any]] = None,
-    config: Optional[Dict] = None
+    config: Optional[Dict] = None,
 ) -> int:
     """Count records matching filter."""
     _check_identifier(name)
@@ -607,22 +635,28 @@ async def count(
 
     if db_type in (DatabaseType.POSTGRES, DatabaseType.POSTGRESQL, DatabaseType.SQLITE):
         async with async_session_or_connection(settings, config) as session:
-            clause, params = _build_where_clause_sql(filter or {}, placeholder_style=":")
+            clause, params = _build_where_clause_sql(
+                filter or {}, placeholder_style=":"
+            )
             sql = sa_text(f"SELECT COUNT(*) FROM {name}{clause}")
             result = await session.execute(sql, params)
             return result.scalar() or 0
 
     elif db_type in (DatabaseType.MYSQL, DatabaseType.MARIADB, DatabaseType.SNOWFLAKE):
         async with async_session_or_connection(settings, config) as conn:
-            clause, params = _build_where_clause_sql(filter or {}, placeholder_style="pyformat")
+            clause, params = _build_where_clause_sql(
+                filter or {}, placeholder_style="pyformat"
+            )
             sql_stmt = f"SELECT COUNT(*) FROM {name}{clause}"
 
-            if hasattr(conn, 'execute'):
+            if hasattr(conn, "execute"):
                 result = await conn.execute(sql_stmt, params)
-                return result.fetchone()[0] if hasattr(result, 'fetchone') else 0
+                return result.fetchone()[0] if hasattr(result, "fetchone") else 0
             else:
                 cursor = conn.cursor()
-                cursor.execute(sql_stmt, params if isinstance(params, dict) else tuple(params))
+                cursor.execute(
+                    sql_stmt, params if isinstance(params, dict) else tuple(params)
+                )
                 result = cursor.fetchone()
                 cursor.close()
                 return result[0] if result else 0

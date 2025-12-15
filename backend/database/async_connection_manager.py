@@ -3,16 +3,21 @@ Async Database Connection Manager
 Handles async connection pooling and concurrent access optimization for SQLite and PostgreSQL
 """
 
-import os
 import asyncio
-import logging
 import atexit
+import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, cast
 
 import aiosqlite
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker, AsyncEngine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from backend.config import Settings
 
@@ -44,7 +49,9 @@ class AsyncSQLiteConnectionManager:
             await self._setup_database_optimizations()
 
             self._initialized = True
-            logger.info(f"[OK] Async SQLite manager initialized for {self.database_path}")
+            logger.info(
+                f"[OK] Async SQLite manager initialized for {self.database_path}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to initialize async SQLite manager: {e}")
@@ -53,22 +60,26 @@ class AsyncSQLiteConnectionManager:
     async def _setup_database_optimizations(self):
         """Setup WAL mode and performance optimizations"""
         try:
-            async with aiosqlite.connect(self.database_path, timeout=self.timeout) as conn:
+            async with aiosqlite.connect(
+                self.database_path, timeout=self.timeout
+            ) as conn:
                 # Enable WAL mode (Write-Ahead Logging)
                 await conn.execute("PRAGMA journal_mode=WAL")
 
                 # Optimize for concurrent access
                 await conn.execute("PRAGMA synchronous=NORMAL")  # Faster than FULL
-                await conn.execute("PRAGMA cache_size=10000")     # 10MB cache
-                await conn.execute("PRAGMA temp_store=MEMORY")    # Use memory for temp
-                await conn.execute("PRAGMA mmap_size=268435456")  # 256MB memory-mapped I/O
+                await conn.execute("PRAGMA cache_size=10000")  # 10MB cache
+                await conn.execute("PRAGMA temp_store=MEMORY")  # Use memory for temp
+                await conn.execute(
+                    "PRAGMA mmap_size=268435456"
+                )  # 256MB memory-mapped I/O
 
                 # WAL checkpoint settings
                 await conn.execute("PRAGMA wal_autocheckpoint=1000")  # Every 1000 pages
 
                 # Connection-specific settings
-                await conn.execute("PRAGMA busy_timeout=30000")      # 30 second timeout
-                await conn.execute("PRAGMA foreign_keys=ON")         # Enable FK constraints
+                await conn.execute("PRAGMA busy_timeout=30000")  # 30 second timeout
+                await conn.execute("PRAGMA foreign_keys=ON")  # Enable FK constraints
 
                 await conn.commit()
 
@@ -87,10 +98,7 @@ class AsyncSQLiteConnectionManager:
         async with self._semaphore:  # Limit concurrent connections
             conn = None
             try:
-                conn = await aiosqlite.connect(
-                    self.database_path,
-                    timeout=self.timeout
-                )
+                conn = await aiosqlite.connect(self.database_path, timeout=self.timeout)
 
                 # Set connection-specific pragmas
                 await conn.execute("PRAGMA busy_timeout=30000")
@@ -124,7 +132,9 @@ class AsyncSQLiteConnectionManager:
             else:
                 cursor = await conn.execute(query)
 
-            columns = [desc[0] for desc in cursor.description] if cursor.description else []
+            columns = (
+                [desc[0] for desc in cursor.description] if cursor.description else []
+            )
             rows = await cursor.fetchall()
             await cursor.close()
 
@@ -172,15 +182,15 @@ class AsyncPostgreSQLConnectionManager:
                 self.connection_string,
                 pool_size=self.pool_size,
                 max_overflow=20,
-                pool_pre_ping=True,        # Validate connections before use
-                pool_recycle=3600,         # Recycle connections every hour
-                echo=False,                # Set to True for SQL debugging
+                pool_pre_ping=True,  # Validate connections before use
+                pool_recycle=3600,  # Recycle connections every hour
+                echo=False,  # Set to True for SQL debugging
                 connect_args={
                     "server_settings": {
                         "application_name": "MLOps_FastAPI",
-                        "statement_timeout": "300000"  # 5 minute timeout
+                        "statement_timeout": "300000",  # 5 minute timeout
                     }
-                }
+                },
             )
 
             # Create session maker
@@ -189,7 +199,7 @@ class AsyncPostgreSQLConnectionManager:
                 class_=AsyncSession,
                 autoflush=False,
                 autocommit=False,
-                expire_on_commit=False
+                expire_on_commit=False,
             )
 
             # Test connection
@@ -198,7 +208,9 @@ class AsyncPostgreSQLConnectionManager:
                     await conn.execute(text("SELECT 1"))
 
             self._initialized = True
-            logger.info(f"[OK] Async PostgreSQL connection pool initialized with {self.pool_size} connections")
+            logger.info(
+                f"[OK] Async PostgreSQL connection pool initialized with {self.pool_size} connections"
+            )
 
         except Exception as e:
             logger.error(f"Failed to initialize async PostgreSQL connection pool: {e}")
@@ -238,6 +250,7 @@ class AsyncPostgreSQLConnectionManager:
         """Execute a SELECT query and return results as list of dicts"""
         async with self.get_connection() as conn:
             from sqlalchemy import text
+
             result = await conn.execute(text(query), params or {})
             columns = result.keys()
             rows = result.fetchall()
@@ -251,6 +264,7 @@ class AsyncPostgreSQLConnectionManager:
         """Execute an INSERT/UPDATE/DELETE query and return affected rows"""
         async with self.get_connection() as conn:
             from sqlalchemy import text
+
             result = await conn.execute(text(query), params or {})
             await conn.commit()
             return cast(int, result.rowcount)
@@ -277,22 +291,26 @@ class AsyncDatabaseManager:
         """Initialize database managers based on settings"""
         try:
             # Initialize SQLite if configured
-            sqlite_path = getattr(self.settings, 'DB_PATH', None)
+            sqlite_path = getattr(self.settings, "DB_PATH", None)
             if sqlite_path:
                 if not os.path.isabs(sqlite_path):
                     sqlite_path = os.path.join(os.getcwd(), sqlite_path)
 
-                pool_size = getattr(self.settings, 'sqlite_pool_size', 10)
-                timeout = getattr(self.settings, 'sqlite_timeout', 30)
+                pool_size = getattr(self.settings, "sqlite_pool_size", 10)
+                timeout = getattr(self.settings, "sqlite_timeout", 30)
 
-                self.sqlite_manager = AsyncSQLiteConnectionManager(sqlite_path, pool_size, timeout)
+                self.sqlite_manager = AsyncSQLiteConnectionManager(
+                    sqlite_path, pool_size, timeout
+                )
                 await self.sqlite_manager.initialize()
 
             # Initialize PostgreSQL if configured
-            postgres_url = getattr(self.settings, 'postgres_url', None)
+            postgres_url = getattr(self.settings, "postgres_url", None)
             if postgres_url:
-                pool_size = getattr(self.settings, 'postgres_pool_size', 10)
-                self.postgres_manager = AsyncPostgreSQLConnectionManager(postgres_url, pool_size)
+                pool_size = getattr(self.settings, "postgres_pool_size", 10)
+                self.postgres_manager = AsyncPostgreSQLConnectionManager(
+                    postgres_url, pool_size
+                )
                 await self.postgres_manager.initialize()
 
             self._initialized = True
@@ -307,13 +325,13 @@ class AsyncDatabaseManager:
         if not self._initialized:
             raise RuntimeError("Async database manager not initialized")
 
-        primary = getattr(self.settings, 'DB_PRIMARY', 'sqlite').lower()
+        primary = getattr(self.settings, "DB_PRIMARY", "sqlite").lower()
 
-        if primary == 'sqlite':
+        if primary == "sqlite":
             if not self.sqlite_manager:
                 raise RuntimeError("SQLite manager not available")
             return self.sqlite_manager
-        elif primary == 'postgres':
+        elif primary == "postgres":
             if not self.postgres_manager:
                 raise RuntimeError("PostgreSQL manager not available")
             return self.postgres_manager

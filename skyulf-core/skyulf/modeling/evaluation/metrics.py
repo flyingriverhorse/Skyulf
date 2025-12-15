@@ -16,9 +16,9 @@ from sklearn.metrics import (
     mean_absolute_percentage_error,
     mean_squared_error,
     precision_score,
+    r2_score,
     recall_score,
     roc_auc_score,
-    r2_score,
 )
 from sklearn.preprocessing import label_binarize
 
@@ -33,7 +33,9 @@ if _imblearn_metrics is not None:
     geometric_mean_score = getattr(_imblearn_metrics, "geometric_mean_score", None)
 
 
-def calculate_classification_metrics(model: Any, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+def calculate_classification_metrics(
+    model: Any, X: pd.DataFrame, y: pd.Series
+) -> Dict[str, float]:
     """Compute classification metrics for predictions."""
 
     # Use DataFrame directly if possible to preserve feature names
@@ -46,24 +48,38 @@ def calculate_classification_metrics(model: Any, X: pd.DataFrame, y: pd.Series) 
 
     metrics: Dict[str, float] = {
         "accuracy": float(accuracy_score(y_arr, predictions)),
-        "precision_weighted": float(precision_score(y_arr, predictions, average="weighted", zero_division=0)),
-        "recall_weighted": float(recall_score(y_arr, predictions, average="weighted", zero_division=0)),
-        "f1_weighted": float(f1_score(y_arr, predictions, average="weighted", zero_division=0)),
+        "precision_weighted": float(
+            precision_score(y_arr, predictions, average="weighted", zero_division=0)
+        ),
+        "recall_weighted": float(
+            recall_score(y_arr, predictions, average="weighted", zero_division=0)
+        ),
+        "f1_weighted": float(
+            f1_score(y_arr, predictions, average="weighted", zero_division=0)
+        ),
     }
 
     # Add unweighted metrics for binary classification
     try:
         unique_classes = np.unique(y_arr)
         if len(unique_classes) == 2:
-            metrics["precision"] = float(precision_score(y_arr, predictions, average="binary", zero_division=0))
-            metrics["recall"] = float(recall_score(y_arr, predictions, average="binary", zero_division=0))
-            metrics["f1"] = float(f1_score(y_arr, predictions, average="binary", zero_division=0))
+            metrics["precision"] = float(
+                precision_score(y_arr, predictions, average="binary", zero_division=0)
+            )
+            metrics["recall"] = float(
+                recall_score(y_arr, predictions, average="binary", zero_division=0)
+            )
+            metrics["f1"] = float(
+                f1_score(y_arr, predictions, average="binary", zero_division=0)
+            )
     except Exception:
         pass
 
     if geometric_mean_score is not None:
         try:
-            metrics["g_score"] = float(geometric_mean_score(y_arr, predictions, average="weighted"))
+            metrics["g_score"] = float(
+                geometric_mean_score(y_arr, predictions, average="weighted")
+            )
         except Exception:
             pass
 
@@ -75,17 +91,23 @@ def calculate_classification_metrics(model: Any, X: pd.DataFrame, y: pd.Series) 
                 try:
                     if class_count == 2:
                         metrics["roc_auc"] = float(roc_auc_score(y_arr, proba[:, 1]))
-                        metrics["pr_auc"] = float(average_precision_score(y_arr, proba[:, 1]))
+                        metrics["pr_auc"] = float(
+                            average_precision_score(y_arr, proba[:, 1])
+                        )
                     else:
                         metrics["roc_auc_weighted"] = float(
-                            roc_auc_score(y_arr, proba, multi_class="ovr", average="weighted")
+                            roc_auc_score(
+                                y_arr, proba, multi_class="ovr", average="weighted"
+                            )
                         )
                         classes = getattr(model, "classes_", None)
                         if classes is None or len(classes) != class_count:
                             classes = np.arange(class_count)
                         y_indicator = label_binarize(y_arr, classes=classes)
                         metrics["pr_auc_weighted"] = float(
-                            average_precision_score(y_indicator, proba, average="weighted")
+                            average_precision_score(
+                                y_indicator, proba, average="weighted"
+                            )
                         )
                 except Exception:
                     pass
@@ -95,7 +117,9 @@ def calculate_classification_metrics(model: Any, X: pd.DataFrame, y: pd.Series) 
     return metrics
 
 
-def calculate_regression_metrics(model: Any, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+def calculate_regression_metrics(
+    model: Any, X: pd.DataFrame, y: pd.Series
+) -> Dict[str, float]:
     """Compute regression metrics for predictions."""
 
     # Use DataFrame directly if possible to preserve feature names

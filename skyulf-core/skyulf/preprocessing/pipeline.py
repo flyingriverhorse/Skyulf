@@ -1,86 +1,130 @@
 """Feature Engineering Pipeline Orchestrator."""
 
-from typing import Any, Dict, List, Union, cast
-import pandas as pd
 import logging
+from typing import Any, Dict, List, Union, cast
+
+import pandas as pd
+
 from ..data.dataset import SplitDataset
 from ..utils import get_data_stats
+from .base import StatefulTransformer
+from .bucketing import (
+    CustomBinningApplier,
+    CustomBinningCalculator,
+    GeneralBinningApplier,
+    GeneralBinningCalculator,
+    KBinsDiscretizerApplier,
+    KBinsDiscretizerCalculator,
+)
+from .casting import CastingApplier, CastingCalculator
+from .cleaning import (
+    AliasReplacementApplier,
+    AliasReplacementCalculator,
+    InvalidValueReplacementApplier,
+    InvalidValueReplacementCalculator,
+    TextCleaningApplier,
+    TextCleaningCalculator,
+    ValueReplacementApplier,
+    ValueReplacementCalculator,
+)
+from .drop_and_missing import (
+    DeduplicateApplier,
+    DeduplicateCalculator,
+    DropMissingColumnsApplier,
+    DropMissingColumnsCalculator,
+    DropMissingRowsApplier,
+    DropMissingRowsCalculator,
+    MissingIndicatorApplier,
+    MissingIndicatorCalculator,
+)
+from .encoding import (
+    HashEncoderApplier,
+    HashEncoderCalculator,
+    LabelEncoderApplier,
+    LabelEncoderCalculator,
+    OneHotEncoderApplier,
+    OneHotEncoderCalculator,
+    OrdinalEncoderApplier,
+    OrdinalEncoderCalculator,
+    TargetEncoderApplier,
+    TargetEncoderCalculator,
+)
+from .feature_generation import (
+    FeatureGenerationApplier,
+    FeatureGenerationCalculator,
+    PolynomialFeaturesApplier,
+    PolynomialFeaturesCalculator,
+)
+from .feature_selection import (
+    CorrelationThresholdApplier,
+    CorrelationThresholdCalculator,
+    FeatureSelectionApplier,
+    FeatureSelectionCalculator,
+    ModelBasedSelectionApplier,
+    ModelBasedSelectionCalculator,
+    UnivariateSelectionApplier,
+    UnivariateSelectionCalculator,
+    VarianceThresholdApplier,
+    VarianceThresholdCalculator,
+)
+from .imputation import (
+    IterativeImputerApplier,
+    IterativeImputerCalculator,
+    KNNImputerApplier,
+    KNNImputerCalculator,
+    SimpleImputerApplier,
+    SimpleImputerCalculator,
+)
+from .inspection import (
+    DatasetProfileApplier,
+    DatasetProfileCalculator,
+    DataSnapshotApplier,
+    DataSnapshotCalculator,
+)
+from .outliers import (
+    EllipticEnvelopeApplier,
+    EllipticEnvelopeCalculator,
+    IQRApplier,
+    IQRCalculator,
+    ManualBoundsApplier,
+    ManualBoundsCalculator,
+    WinsorizeApplier,
+    WinsorizeCalculator,
+    ZScoreApplier,
+    ZScoreCalculator,
+)
+from .resampling import (
+    OversamplingApplier,
+    OversamplingCalculator,
+    UndersamplingApplier,
+    UndersamplingCalculator,
+)
+from .scaling import (
+    MaxAbsScalerApplier,
+    MaxAbsScalerCalculator,
+    MinMaxScalerApplier,
+    MinMaxScalerCalculator,
+    RobustScalerApplier,
+    RobustScalerCalculator,
+    StandardScalerApplier,
+    StandardScalerCalculator,
+)
 
 # Import all transformers
 from .split import (
-    SplitCalculator, SplitApplier,
-    FeatureTargetSplitCalculator, FeatureTargetSplitApplier
-)
-from .cleaning import (
-    TextCleaningCalculator, TextCleaningApplier,
-    ValueReplacementCalculator, ValueReplacementApplier,
-    AliasReplacementCalculator, AliasReplacementApplier,
-    InvalidValueReplacementCalculator, InvalidValueReplacementApplier
-)
-from .drop_and_missing import (
-    DeduplicateCalculator, DeduplicateApplier,
-    DropMissingColumnsCalculator, DropMissingColumnsApplier,
-    DropMissingRowsCalculator, DropMissingRowsApplier,
-    MissingIndicatorCalculator, MissingIndicatorApplier
-)
-from .imputation import (
-    SimpleImputerCalculator, SimpleImputerApplier,
-    KNNImputerCalculator, KNNImputerApplier,
-    IterativeImputerCalculator, IterativeImputerApplier
-)
-from .encoding import (
-    OneHotEncoderCalculator, OneHotEncoderApplier,
-    OrdinalEncoderCalculator, OrdinalEncoderApplier,
-    LabelEncoderCalculator, LabelEncoderApplier,
-    TargetEncoderCalculator, TargetEncoderApplier,
-    HashEncoderCalculator, HashEncoderApplier
-)
-from .scaling import (
-    StandardScalerCalculator, StandardScalerApplier,
-    MinMaxScalerCalculator, MinMaxScalerApplier,
-    RobustScalerCalculator, RobustScalerApplier,
-    MaxAbsScalerCalculator, MaxAbsScalerApplier
-)
-from .outliers import (
-    IQRCalculator, IQRApplier,
-    ZScoreCalculator, ZScoreApplier,
-    WinsorizeCalculator, WinsorizeApplier,
-    ManualBoundsCalculator, ManualBoundsApplier,
-    EllipticEnvelopeCalculator, EllipticEnvelopeApplier
+    FeatureTargetSplitApplier,
+    FeatureTargetSplitCalculator,
+    SplitApplier,
+    SplitCalculator,
 )
 from .transformations import (
-    PowerTransformerCalculator, PowerTransformerApplier,
-    SimpleTransformationCalculator, SimpleTransformationApplier,
-    GeneralTransformationCalculator, GeneralTransformationApplier
+    GeneralTransformationApplier,
+    GeneralTransformationCalculator,
+    PowerTransformerApplier,
+    PowerTransformerCalculator,
+    SimpleTransformationApplier,
+    SimpleTransformationCalculator,
 )
-from .bucketing import (
-    GeneralBinningCalculator, GeneralBinningApplier,
-    CustomBinningCalculator, CustomBinningApplier,
-    KBinsDiscretizerCalculator, KBinsDiscretizerApplier
-)
-from .feature_selection import (
-    VarianceThresholdCalculator, VarianceThresholdApplier,
-    CorrelationThresholdCalculator, CorrelationThresholdApplier,
-    UnivariateSelectionCalculator, UnivariateSelectionApplier,
-    ModelBasedSelectionCalculator, ModelBasedSelectionApplier,
-    FeatureSelectionCalculator, FeatureSelectionApplier
-)
-from .casting import (
-    CastingCalculator, CastingApplier
-)
-from .feature_generation import (
-    PolynomialFeaturesCalculator, PolynomialFeaturesApplier,
-    FeatureGenerationCalculator, FeatureGenerationApplier
-)
-from .resampling import (
-    OversamplingCalculator, OversamplingApplier,
-    UndersamplingCalculator, UndersamplingApplier
-)
-from .inspection import (
-    DatasetProfileCalculator, DatasetProfileApplier,
-    DataSnapshotCalculator, DataSnapshotApplier
-)
-from .base import StatefulTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +151,12 @@ class FeatureEngineer:
             artifact = step["artifact"]
 
             # Skip splitters during inference/transform
-            if transformer_type in ["TrainTestSplitter", "feature_target_split", "Oversampling", "Undersampling"]:
+            if transformer_type in [
+                "TrainTestSplitter",
+                "feature_target_split",
+                "Oversampling",
+                "Undersampling",
+            ]:
                 continue
 
             logger.debug(f"Applying step: {name} ({transformer_type})")
@@ -130,7 +179,9 @@ class FeatureEngineer:
             params = step.get("params", {})
 
             logger.info(f"Running step {i}: {name} ({transformer_type})")
-            logger.debug(f"FeatureEngineer running step {i}: {name} ({transformer_type})")
+            logger.debug(
+                f"FeatureEngineer running step {i}: {name} ({transformer_type})"
+            )
             logger.debug(f"current_data type: {type(current_data)}")
 
             # Capture metrics before
@@ -165,8 +216,12 @@ class FeatureEngineer:
                     # In SDK, params are returned but not auto-saved to artifact store here.
                     # The Pipeline object will handle state persistence.
                 else:
-                    logger.debug(f"Skipping TrainTestSplitter. current_data is {type(current_data)}")
-                    logger.warning("Attempting to split an already split dataset. Skipping TrainTestSplitter.")
+                    logger.debug(
+                        f"Skipping TrainTestSplitter. current_data is {type(current_data)}"
+                    )
+                    logger.warning(
+                        "Attempting to split an already split dataset. Skipping TrainTestSplitter."
+                    )
 
             elif transformer_type == "feature_target_split":
                 logger.debug("Handling feature_target_split")
@@ -181,12 +236,14 @@ class FeatureEngineer:
                 # In SDK, transformer.params holds the state.
                 fitted_params = transformer.params
 
-                self.fitted_steps.append({
-                    "name": name,
-                    "type": transformer_type,
-                    "applier": applier,
-                    "artifact": fitted_params
-                })
+                self.fitted_steps.append(
+                    {
+                        "name": name,
+                        "type": transformer_type,
+                        "applier": applier,
+                        "artifact": fitted_params,
+                    }
+                )
 
             logger.debug(f"Step {i} complete. New data type: {type(current_data)}")
 
@@ -194,7 +251,11 @@ class FeatureEngineer:
             try:
                 if fitted_params:
                     # Imputation Metrics
-                    if transformer_type in ["SimpleImputer", "KNNImputer", "IterativeImputer"]:
+                    if transformer_type in [
+                        "SimpleImputer",
+                        "KNNImputer",
+                        "IterativeImputer",
+                    ]:
                         if "missing_counts" in fitted_params:
                             metrics["missing_counts"] = fitted_params["missing_counts"]
                         if "total_missing" in fitted_params:
@@ -207,22 +268,32 @@ class FeatureEngineer:
                         "feature_selection",
                         "UnivariateSelection",
                         "ModelBasedSelection",
-                            "VarianceThreshold"]:
+                        "VarianceThreshold",
+                    ]:
                         if "feature_scores" in fitted_params:
                             metrics["feature_scores"] = fitted_params["feature_scores"]
                         if "p_values" in fitted_params:
                             metrics["p_values"] = fitted_params["p_values"]
                         if "feature_importances" in fitted_params:
-                            metrics["feature_importances"] = fitted_params["feature_importances"]
+                            metrics["feature_importances"] = fitted_params[
+                                "feature_importances"
+                            ]
                         if "variances" in fitted_params:
                             metrics["variances"] = fitted_params["variances"]
                         if "ranking" in fitted_params:
                             metrics["ranking"] = fitted_params["ranking"]
                         if "selected_columns" in fitted_params:
-                            metrics["selected_columns"] = fitted_params["selected_columns"]
+                            metrics["selected_columns"] = fitted_params[
+                                "selected_columns"
+                            ]
 
                     # Scaling Metrics
-                    if transformer_type in ["StandardScaler", "MinMaxScaler", "RobustScaler", "MaxAbsScaler"]:
+                    if transformer_type in [
+                        "StandardScaler",
+                        "MinMaxScaler",
+                        "RobustScaler",
+                        "MaxAbsScaler",
+                    ]:
                         if "mean" in fitted_params:
                             metrics["mean"] = fitted_params["mean"]
                         if "scale" in fitted_params:
@@ -243,7 +314,12 @@ class FeatureEngineer:
                             metrics["columns"] = fitted_params["columns"]
 
                     # Outlier Metrics
-                    if transformer_type in ["IQR", "Winsorize", "ZScore", "EllipticEnvelope"]:
+                    if transformer_type in [
+                        "IQR",
+                        "Winsorize",
+                        "ZScore",
+                        "EllipticEnvelope",
+                    ]:
                         if "warnings" in fitted_params:
                             metrics["warnings"] = fitted_params["warnings"]
 
@@ -265,7 +341,8 @@ class FeatureEngineer:
                         "EqualWidthBinning",
                         "EqualFrequencyBinning",
                         "CustomBinning",
-                            "KBinsDiscretizer"]:
+                        "KBinsDiscretizer",
+                    ]:
                         if "bin_edges" in fitted_params:
                             metrics["bin_edges"] = fitted_params["bin_edges"]
                         if "n_bins" in fitted_params:
@@ -274,27 +351,42 @@ class FeatureEngineer:
                     # Feature Generation Metrics
                     if transformer_type in ["FeatureMath", "FeatureGenerationNode"]:
                         if "operations" in fitted_params:
-                            metrics["operations_count"] = len(fitted_params["operations"])
+                            metrics["operations_count"] = len(
+                                fitted_params["operations"]
+                            )
                             metrics["operations"] = fitted_params["operations"]
                         # Calculate generated features by comparing columns
-                        if isinstance(data_before, pd.DataFrame) and isinstance(current_data, pd.DataFrame):
-                            new_cols = list(set(current_data.columns) - set(data_before.columns))
+                        if isinstance(data_before, pd.DataFrame) and isinstance(
+                            current_data, pd.DataFrame
+                        ):
+                            new_cols = list(
+                                set(current_data.columns) - set(data_before.columns)
+                            )
                             metrics["generated_features"] = new_cols
-                        elif isinstance(data_before, SplitDataset) and isinstance(current_data, SplitDataset):
+                        elif isinstance(data_before, SplitDataset) and isinstance(
+                            current_data, SplitDataset
+                        ):
                             # Check train set
                             if isinstance(
-                                    data_before.train,
-                                    pd.DataFrame) and isinstance(
-                                    current_data.train,
-                                    pd.DataFrame):
-                                new_cols = list(set(current_data.train.columns) - set(data_before.train.columns))
+                                data_before.train, pd.DataFrame
+                            ) and isinstance(current_data.train, pd.DataFrame):
+                                new_cols = list(
+                                    set(current_data.train.columns)
+                                    - set(data_before.train.columns)
+                                )
                                 metrics["generated_features"] = new_cols
-                            elif isinstance(data_before.train, tuple) and isinstance(current_data.train, tuple):
+                            elif isinstance(data_before.train, tuple) and isinstance(
+                                current_data.train, tuple
+                            ):
                                 # (X, y) tuple
                                 X_before, _ = data_before.train
                                 X_after, _ = current_data.train
-                                if isinstance(X_before, pd.DataFrame) and isinstance(X_after, pd.DataFrame):
-                                    new_cols = list(set(X_after.columns) - set(X_before.columns))
+                                if isinstance(X_before, pd.DataFrame) and isinstance(
+                                    X_after, pd.DataFrame
+                                ):
+                                    new_cols = list(
+                                        set(X_after.columns) - set(X_before.columns)
+                                    )
                                     metrics["generated_features"] = new_cols
 
             except Exception as e:
@@ -326,7 +418,9 @@ class FeatureEngineer:
                     if y_res is not None:
                         counts = y_res.value_counts().to_dict()
                         # Convert keys to string to ensure JSON serializability
-                        metrics["class_counts"] = {str(k): int(v) for k, v in counts.items()}
+                        metrics["class_counts"] = {
+                            str(k): int(v) for k, v in counts.items()
+                        }
                         metrics["total_samples"] = int(len(y_res))
                 except Exception as e:
                     logger.warning(f"Failed to calculate resampling metrics: {e}")
@@ -338,7 +432,8 @@ class FeatureEngineer:
                     "IQR",
                     "ZScore",
                     "EllipticEnvelope",
-                        "Winsorize"]:
+                    "Winsorize",
+                ]:
                     dropped = rows_before - rows_after
                     metrics[f"{transformer_type}_rows_removed"] = dropped
                     metrics[f"{transformer_type}_rows_remaining"] = rows_after
@@ -353,51 +448,77 @@ class FeatureEngineer:
 
                             # Helper to count diffs
                             def count_diffs(df1, df2):
-                                if isinstance(df1, pd.DataFrame) and isinstance(df2, pd.DataFrame):
+                                if isinstance(df1, pd.DataFrame) and isinstance(
+                                    df2, pd.DataFrame
+                                ):
                                     if df1.shape == df2.shape:
                                         return int(df1.ne(df2).sum().sum())
-                                elif (isinstance(df1, tuple) and isinstance(df2, tuple) and
-                                      len(df1) == 2 and len(df2) == 2):
+                                elif (
+                                    isinstance(df1, tuple)
+                                    and isinstance(df2, tuple)
+                                    and len(df1) == 2
+                                    and len(df2) == 2
+                                ):
                                     # Handle (X, y) tuple
                                     diffs = 0
                                     # Compare X (index 0)
-                                    if isinstance(df1[0], pd.DataFrame) and isinstance(df2[0], pd.DataFrame):
+                                    if isinstance(df1[0], pd.DataFrame) and isinstance(
+                                        df2[0], pd.DataFrame
+                                    ):
                                         if df1[0].shape == df2[0].shape:
                                             diffs += int(df1[0].ne(df2[0]).sum().sum())
                                     # Compare y (index 1) - usually Series
                                     if isinstance(
-                                            df1[1], (pd.DataFrame, pd.Series)) and isinstance(
-                                            df2[1], (pd.DataFrame, pd.Series)):
+                                        df1[1], (pd.DataFrame, pd.Series)
+                                    ) and isinstance(df2[1], (pd.DataFrame, pd.Series)):
                                         if df1[1].shape == df2[1].shape:
                                             diffs += int(df1[1].ne(df2[1]).sum().sum())  # type: ignore
                                     return diffs
                                 return 0
 
-                            if isinstance(data_before, pd.DataFrame) and isinstance(current_data, pd.DataFrame):
+                            if isinstance(data_before, pd.DataFrame) and isinstance(
+                                current_data, pd.DataFrame
+                            ):
                                 clipped_count = count_diffs(data_before, current_data)
-                            elif isinstance(data_before, SplitDataset) and isinstance(current_data, SplitDataset):
-                                clipped_count += count_diffs(data_before.train, current_data.train)
-                                clipped_count += count_diffs(data_before.test, current_data.test)
-                                clipped_count += count_diffs(data_before.validation, current_data.validation)
+                            elif isinstance(data_before, SplitDataset) and isinstance(
+                                current_data, SplitDataset
+                            ):
+                                clipped_count += count_diffs(
+                                    data_before.train, current_data.train
+                                )
+                                clipped_count += count_diffs(
+                                    data_before.test, current_data.test
+                                )
+                                clipped_count += count_diffs(
+                                    data_before.validation, current_data.validation
+                                )
 
                             metrics["values_clipped"] = clipped_count
                         except Exception as e:
-                            logger.warning(f"Failed to calculate values_clipped for Winsorize: {e}")
+                            logger.warning(
+                                f"Failed to calculate values_clipped for Winsorize: {e}"
+                            )
                             pass
 
                 if transformer_type == "MissingIndicator":
                     new_cols_set = cols_after - cols_before
                     metrics["missing_indicators_created"] = len(new_cols_set)
-                    cast(Dict[str, Any], metrics)["missing_indicators_columns"] = list(new_cols_set)
+                    cast(Dict[str, Any], metrics)["missing_indicators_columns"] = list(
+                        new_cols_set
+                    )
 
                 if transformer_type == "DropMissingColumns":
                     dropped_cols_set = cols_before - cols_after
-                    cast(Dict[str, Any], metrics)["dropped_columns"] = list(dropped_cols_set)
+                    cast(Dict[str, Any], metrics)["dropped_columns"] = list(
+                        dropped_cols_set
+                    )
                     metrics["dropped_columns_count"] = len(dropped_cols_set)
 
                 if transformer_type == "feature_selection":
                     dropped_cols_set = cols_before - cols_after
-                    cast(Dict[str, Any], metrics)["dropped_columns"] = list(dropped_cols_set)
+                    cast(Dict[str, Any], metrics)["dropped_columns"] = list(
+                        dropped_cols_set
+                    )
                     metrics["dropped_columns_count"] = len(dropped_cols_set)
 
                 if transformer_type in [
@@ -406,7 +527,8 @@ class FeatureEngineer:
                     "OrdinalEncoder",
                     "TargetEncoder",
                     "HashEncoder",
-                        "DummyEncoder"]:
+                    "DummyEncoder",
+                ]:
                     new_cols_set = cols_after - cols_before
                     metrics["new_features_count"] = len(new_cols_set)
                     metrics["encoded_columns_count"] = len(params.get("columns", []))
@@ -448,7 +570,8 @@ class FeatureEngineer:
         elif type_name == "OneHotEncoder":
             return OneHotEncoderCalculator(), OneHotEncoderApplier()
         elif type_name == "DummyEncoder":
-            from .encoding import DummyEncoderCalculator, DummyEncoderApplier
+            from .encoding import DummyEncoderApplier, DummyEncoderCalculator
+
             return DummyEncoderCalculator(), DummyEncoderApplier()
         elif type_name == "OrdinalEncoder":
             return OrdinalEncoderCalculator(), OrdinalEncoderApplier()

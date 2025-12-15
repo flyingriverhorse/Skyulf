@@ -1,5 +1,6 @@
-from setuptools import setup, find_packages
 from pathlib import Path
+
+from setuptools import find_packages, setup
 
 this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text(encoding="utf-8")
@@ -21,10 +22,8 @@ setup(
         "imbalanced-learn>=0.12.0",
         "pydantic>=2.0.0",
         "optuna>=3.0.0",
-        "optuna-integration>=3.0.0"
+        "optuna-integration>=3.0.0",
     ],
-    extras_require={
-        "dev": ["pytest", "twine", "build"]
-    },
+    extras_require={"dev": ["pytest", "twine", "build"]},
     python_requires=">=3.9",
 )
