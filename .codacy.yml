@@ -12,6 +12,7 @@ engines:
 
 exclude_paths:
   - "tests/**"
+  - "skyulf-core/tests/**"
   - "testingdb/**"
   - "temp/**"
   - "migrations/**"

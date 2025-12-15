@@ -6,6 +6,7 @@ This is the async equivalent of the Flask db/data_sources/postgres_queries.py
 import logging
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy import column, literal_column, table
 from sqlalchemy import text as sa_text
 
 from backend.config import Settings
@@ -21,12 +22,9 @@ async def insert_data_source(settings: Settings, row: Dict[str, Any]) -> Dict[st
     """Insert a row into the PostgreSQL data_sources table. Returns the inserted row dict."""
     async with async_session_or_connection(settings) as session:
         try:
-            cols = ", ".join(row.keys())
-            placeholders = ", ".join([f":{k}" for k in row.keys()])
-            sql = sa_text(
-                f"INSERT INTO {TABLE} ({cols}) VALUES ({placeholders}) RETURNING *"
-            )
-            result = await session.execute(sql, row)
+            tbl = table(TABLE, *[column(c) for c in row.keys()])
+            stmt = tbl.insert().values(**row).returning(literal_column("*"))
+            result = await session.execute(stmt)
             await session.commit()
 
             fetched = result.fetchone()

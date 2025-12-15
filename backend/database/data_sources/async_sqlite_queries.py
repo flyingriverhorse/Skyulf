@@ -6,6 +6,7 @@ This is the async equivalent of the Flask db/data_sources/sqlite_queries.py
 import logging
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy import column, table
 from sqlalchemy import text as sa_text
 
 from backend.config import Settings
@@ -22,10 +23,9 @@ async def insert_data_source(settings: Settings, row: Dict[str, Any]) -> Dict[st
     async with async_session_or_connection(settings) as session:
         try:
             # Use SQLAlchemy async session
-            cols = ", ".join(row.keys())
-            placeholders = ", ".join([f":{k}" for k in row.keys()])
-            sql = sa_text(f"INSERT INTO {TABLE} ({cols}) VALUES ({placeholders})")
-            await session.execute(sql, row)
+            tbl = table(TABLE, *[column(c) for c in row.keys()])
+            stmt = tbl.insert().values(**row)
+            await session.execute(stmt)
             await session.commit()
 
             # Fetch the inserted row back
