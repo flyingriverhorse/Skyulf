@@ -49,11 +49,8 @@ jobs:
 
       - name: Type check (mypy)
         run: |
-          mypy \
-            core/feature_engineering/routes.py \
-            core/feature_engineering/modeling/training/tasks.py \
-            core/feature_engineering/modeling/hyperparameter_tuning/tasks.py \
-            core/feature_engineering/modeling/training/evaluation.py
+          python -m mypy -p backend
+          python -m mypy run_fastapi.py run_skyulf.py celery_worker.py
 
       - name: Run tests
         run: pytest -q --maxfail=1 --disable-warnings --cov --cov-report=term-missing
