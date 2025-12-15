@@ -7,11 +7,12 @@ Migrated from Flask sync version with improved type handling.
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Union, Optional, cast
-import pandas as pd
-import numpy as np
-from datetime import datetime, date
+from datetime import date, datetime
 from decimal import Decimal
+from typing import Any, Dict, List, Optional, Union, cast
+
+import numpy as np
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +145,7 @@ class AsyncJSONSafeSerializer:
         if not isinstance(obj, bytes):
             return AsyncJSONSafeSerializer._NOT_HANDLED
         try:
-            return obj.decode('utf-8')
+            return obj.decode("utf-8")
         except UnicodeDecodeError:
             return str(obj)
 
@@ -170,9 +171,7 @@ class AsyncJSONSafeSerializer:
 
     @staticmethod
     async def safe_dict_from_dataframe(
-        df: pd.DataFrame,
-        records_format: bool = True,
-        max_rows: Optional[int] = None
+        df: pd.DataFrame, records_format: bool = True, max_rows: Optional[int] = None
     ) -> Union[List[Dict], Dict]:
         """
         Convert DataFrame to JSON-safe dictionary format.
@@ -213,7 +212,9 @@ class AsyncJSONSafeSerializer:
         column_result: Dict[str, Any] = {}
         for col in clean_df.columns:
             column_data = clean_df[col].tolist()
-            column_result[str(col)] = await AsyncJSONSafeSerializer.clean_for_json(column_data)
+            column_result[str(col)] = await AsyncJSONSafeSerializer.clean_for_json(
+                column_data
+            )
         return column_result
 
     @staticmethod
@@ -233,7 +234,7 @@ class AsyncJSONSafeSerializer:
                 "columns": [],
                 "dtypes": {},
                 "memory_usage": 0,
-                "has_nulls": False
+                "has_nulls": False,
             }
 
         # Basic info
@@ -242,7 +243,7 @@ class AsyncJSONSafeSerializer:
             "columns": [str(col) for col in df.columns],
             "memory_usage": int(df.memory_usage(deep=True).sum()),
             "has_nulls": df.isnull().any().any(),
-            "null_counts": df.isnull().sum().to_dict()
+            "null_counts": df.isnull().sum().to_dict(),
         }
 
         # Data types
@@ -271,9 +272,7 @@ class AsyncJSONSafeSerializer:
 
     @staticmethod
     async def serialize_query_result(
-        df: pd.DataFrame,
-        include_metadata: bool = True,
-        max_rows: Optional[int] = None
+        df: pd.DataFrame, include_metadata: bool = True, max_rows: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Serialize a query result DataFrame with optional metadata.
@@ -289,7 +288,7 @@ class AsyncJSONSafeSerializer:
         result: Dict[str, Any] = {
             "success": True,
             "row_count": len(df),
-            "column_count": len(df.columns)
+            "column_count": len(df.columns),
         }
 
         # Serialize the data
@@ -299,7 +298,9 @@ class AsyncJSONSafeSerializer:
 
         # Add metadata if requested
         if include_metadata:
-            result["metadata"] = await AsyncJSONSafeSerializer.serialize_dataframe_metadata(df)
+            result["metadata"] = (
+                await AsyncJSONSafeSerializer.serialize_dataframe_metadata(df)
+            )
 
         # Add truncation info
         if max_rows and len(df) > max_rows:
@@ -355,17 +356,17 @@ class JSONSafeSerializer:
 
     @staticmethod
     def _handle_pandas_object(obj: Any) -> Any:
-        if not hasattr(obj, 'dtype'):
+        if not hasattr(obj, "dtype"):
             return JSONSafeSerializer._NOT_HANDLED
-        if hasattr(obj, 'isna'):
+        if hasattr(obj, "isna"):
             try:
                 if obj.isna():
                     return None
             except Exception:
                 pass
-        if hasattr(obj, 'tolist'):
+        if hasattr(obj, "tolist"):
             return JSONSafeSerializer.clean_for_json(obj.tolist())
-        if hasattr(obj, 'item'):
+        if hasattr(obj, "item"):
             return JSONSafeSerializer.clean_for_json(obj.item())
         return JSONSafeSerializer._NOT_HANDLED
 
@@ -374,20 +375,29 @@ class JSONSafeSerializer:
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         if isinstance(obj, np.generic):
-            if hasattr(obj, 'item'):
+            if hasattr(obj, "item"):
                 return obj.item()
             return str(obj)
         if str(type(obj)).startswith("<class 'numpy."):
-            if hasattr(obj, 'tolist'):
+            if hasattr(obj, "tolist"):
                 return obj.tolist()
-            if hasattr(obj, 'item'):
+            if hasattr(obj, "item"):
                 return obj.item()
             return str(obj)
         return JSONSafeSerializer._NOT_HANDLED
 
     @staticmethod
     def _handle_special_string_values(obj: Any) -> Any:
-        if str(obj) in ['nan', 'NaN', 'NaT', '<NA>', 'inf', '-inf', 'infinity', '-infinity']:
+        if str(obj) in [
+            "nan",
+            "NaN",
+            "NaT",
+            "<NA>",
+            "inf",
+            "-inf",
+            "infinity",
+            "-infinity",
+        ]:
             return None
         return JSONSafeSerializer._NOT_HANDLED
 
@@ -397,7 +407,7 @@ class JSONSafeSerializer:
             return JSONSafeSerializer._NOT_HANDLED
         if obj != obj:
             return None
-        if obj in (float('inf'), float('-inf')):
+        if obj in (float("inf"), float("-inf")):
             return None
         try:
             if np.isinf(obj) or np.isnan(obj):
@@ -429,16 +439,16 @@ class JSONSafeSerializer:
 
     @staticmethod
     def _handle_dataframe_like(obj: Any) -> Any:
-        if hasattr(obj, 'to_dict'):
+        if hasattr(obj, "to_dict"):
             try:
-                return JSONSafeSerializer.clean_for_json(obj.to_dict('records'))
+                return JSONSafeSerializer.clean_for_json(obj.to_dict("records"))
             except Exception:
                 return JSONSafeSerializer._NOT_HANDLED
         return JSONSafeSerializer._NOT_HANDLED
 
     @staticmethod
     def _handle_datetime(obj: Any) -> Any:
-        if hasattr(obj, 'isoformat'):
+        if hasattr(obj, "isoformat"):
             try:
                 return obj.isoformat()
             except Exception:
@@ -447,7 +457,7 @@ class JSONSafeSerializer:
 
     @staticmethod
     def _handle_decimal_like(obj: Any) -> Any:
-        if hasattr(obj, '__float__'):
+        if hasattr(obj, "__float__"):
             try:
                 value = float(obj)
                 return None if value != value else value
@@ -464,8 +474,7 @@ class JSONSafeSerializer:
 
     @staticmethod
     def safe_dict_from_dataframe(
-        df,
-        records_format: bool = True
+        df, records_format: bool = True
     ) -> Union[List[Dict], Dict]:
         """Synchronous version of safe_dict_from_dataframe."""
         if df is None or df.empty:
@@ -473,7 +482,7 @@ class JSONSafeSerializer:
 
         if records_format:
             # Convert to records format and clean each record
-            records = df.to_dict('records')
+            records = df.to_dict("records")
             cleaned_records = []
             for record in records:
                 cleaned_record = {}
@@ -510,27 +519,36 @@ class DataTypeConverter:
             series = df[col]
             col_str = str(col)
 
-            if series.dtype == 'object':
+            if series.dtype == "object":
                 # Check for dates
-                if series.dropna().apply(lambda x: isinstance(x, (datetime, date))).all():
-                    type_mapping[col_str] = 'datetime'
+                if (
+                    series.dropna()
+                    .apply(lambda x: isinstance(x, (datetime, date)))
+                    .all()
+                ):
+                    type_mapping[col_str] = "datetime"
                 # Check for numeric strings
-                elif series.dropna().str.match(r'^-?\d+\.?\d*$').all():
-                    type_mapping[col_str] = 'numeric_string'
+                elif series.dropna().str.match(r"^-?\d+\.?\d*$").all():
+                    type_mapping[col_str] = "numeric_string"
                 # Check for boolean-like strings
-                elif series.dropna().str.lower().isin(['true', 'false', 'yes', 'no', '1', '0']).all():
-                    type_mapping[col_str] = 'boolean_string'
+                elif (
+                    series.dropna()
+                    .str.lower()
+                    .isin(["true", "false", "yes", "no", "1", "0"])
+                    .all()
+                ):
+                    type_mapping[col_str] = "boolean_string"
                 else:
-                    type_mapping[col_str] = 'text'
+                    type_mapping[col_str] = "text"
             elif pd.api.types.is_numeric_dtype(series):
                 if pd.api.types.is_integer_dtype(series):
-                    type_mapping[col_str] = 'integer'
+                    type_mapping[col_str] = "integer"
                 else:
-                    type_mapping[col_str] = 'float'
+                    type_mapping[col_str] = "float"
             elif pd.api.types.is_datetime64_any_dtype(series):
-                type_mapping[col_str] = 'datetime'
+                type_mapping[col_str] = "datetime"
             elif pd.api.types.is_bool_dtype(series):
-                type_mapping[col_str] = 'boolean'
+                type_mapping[col_str] = "boolean"
             else:
                 type_mapping[col_str] = str(series.dtype)
 
@@ -538,8 +556,7 @@ class DataTypeConverter:
 
     @staticmethod
     async def convert_dataframe_types(
-        df: pd.DataFrame,
-        type_mapping: Dict[str, str]
+        df: pd.DataFrame, type_mapping: Dict[str, str]
     ) -> pd.DataFrame:
         """
         Convert DataFrame columns to specified types.
@@ -558,16 +575,18 @@ class DataTypeConverter:
                 continue
 
             try:
-                if target_type == 'integer':
-                    result_df[col] = pd.to_numeric(result_df[col], errors='coerce').astype('Int64')
-                elif target_type == 'float':
-                    result_df[col] = pd.to_numeric(result_df[col], errors='coerce')
-                elif target_type == 'datetime':
-                    result_df[col] = pd.to_datetime(result_df[col], errors='coerce')
-                elif target_type == 'boolean':
-                    result_df[col] = result_df[col].astype('boolean')
-                elif target_type == 'text':
-                    result_df[col] = result_df[col].astype('string')
+                if target_type == "integer":
+                    result_df[col] = pd.to_numeric(
+                        result_df[col], errors="coerce"
+                    ).astype("Int64")
+                elif target_type == "float":
+                    result_df[col] = pd.to_numeric(result_df[col], errors="coerce")
+                elif target_type == "datetime":
+                    result_df[col] = pd.to_datetime(result_df[col], errors="coerce")
+                elif target_type == "boolean":
+                    result_df[col] = result_df[col].astype("boolean")
+                elif target_type == "text":
+                    result_df[col] = result_df[col].astype("string")
 
             except Exception as e:
                 logger.warning(f"Failed to convert column {col} to {target_type}: {e}")
@@ -593,11 +612,11 @@ class DataTypeConverter:
             "overview": {
                 "total_rows": len(df),
                 "total_columns": len(df.columns),
-                "memory_usage_mb": df.memory_usage(deep=True).sum() / 1024 / 1024
+                "memory_usage_mb": df.memory_usage(deep=True).sum() / 1024 / 1024,
             },
             "columns": columns_report,
             "data_types": DataTypeConverter.infer_column_types(df),
-            "quality_score": 0.0
+            "quality_score": 0.0,
         }
 
         total_quality = 0.0
@@ -611,7 +630,7 @@ class DataTypeConverter:
                 "null_count": int(series.isnull().sum()),
                 "null_percentage": float(series.isnull().sum() / len(series) * 100),
                 "unique_count": int(series.nunique()),
-                "unique_percentage": float(series.nunique() / len(series) * 100)
+                "unique_percentage": float(series.nunique() / len(series) * 100),
             }
 
             # Calculate quality score (1.0 = perfect, 0.0 = all nulls)
@@ -628,7 +647,9 @@ class DataTypeConverter:
             columns_report[col_str] = col_report
 
         # Overall quality score
-        report["quality_score"] = total_quality / len(df.columns) if len(df.columns) > 0 else 0
+        report["quality_score"] = (
+            total_quality / len(df.columns) if len(df.columns) > 0 else 0
+        )
 
         return report
 
@@ -638,7 +659,7 @@ async def serialize_api_response(
     data: Any,
     success: bool = True,
     message: Optional[str] = None,
-    metadata: Optional[Dict] = None
+    metadata: Optional[Dict] = None,
 ) -> Dict[str, Any]:
     """
     Serialize data into a standard API response format.
@@ -676,7 +697,7 @@ def serialize_api_response_sync(
     data: Any,
     success: bool = True,
     message: Optional[str] = None,
-    metadata: Optional[Dict] = None
+    metadata: Optional[Dict] = None,
 ) -> Dict[str, Any]:
     """Synchronous version of serialize_api_response."""
     return asyncio.run(serialize_api_response(data, success, message, metadata))

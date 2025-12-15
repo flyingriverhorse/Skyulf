@@ -7,6 +7,7 @@ Provides request/response logging for monitoring and debugging.
 import logging
 import time
 from typing import Callable, cast
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
@@ -52,8 +53,8 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                 "url": url,
                 "client_ip": client_ip,
                 "user_agent": user_agent,
-                "event_type": "request_start"
-            }
+                "event_type": "request_start",
+            },
         )
 
         try:
@@ -73,8 +74,8 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                     "status_code": response.status_code,
                     "process_time": process_time,
                     "client_ip": client_ip,
-                    "event_type": "request_complete"
-                }
+                    "event_type": "request_complete",
+                },
             )
 
             # Add processing time header
@@ -96,8 +97,8 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                     "process_time": process_time,
                     "client_ip": client_ip,
                     "error": str(exc),
-                    "event_type": "request_error"
-                }
+                    "event_type": "request_error",
+                },
             )
 
             # Re-raise the exception to be handled by error middleware

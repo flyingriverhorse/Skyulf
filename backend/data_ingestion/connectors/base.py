@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Optional
+
 import polars as pl
 
 
@@ -26,7 +27,9 @@ class BaseConnector(ABC):
         pass
 
     @abstractmethod
-    async def fetch_data(self, query: Optional[str] = None, limit: Optional[int] = None) -> pl.DataFrame:
+    async def fetch_data(
+        self, query: Optional[str] = None, limit: Optional[int] = None
+    ) -> pl.DataFrame:
         """
         Fetch data from the source.
 

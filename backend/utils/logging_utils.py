@@ -2,6 +2,7 @@
 Simple logging utility for data actions
 Replaces the Flask log_data_action function
 """
+
 import logging
 from typing import Optional
 

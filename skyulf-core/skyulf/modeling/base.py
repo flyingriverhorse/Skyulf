@@ -1,10 +1,12 @@
-from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Callable, Union, Tuple
-import pandas as pd
 import logging
+from abc import ABC, abstractmethod
+from typing import Any, Callable, Dict, Optional, Tuple, Union
+
+import pandas as pd
 
 # Use relative imports assuming the structure is preserved
 from ..data.dataset import SplitDataset
+
 # Evaluation imports - we will migrate these next
 # from .evaluation.schemas import ModelEvaluationReport, ModelEvaluationSplitPayload
 # from .evaluation.classification import build_classification_split_report
@@ -26,16 +28,15 @@ class BaseModelCalculator(ABC):
         return {}
 
     @abstractmethod
-    def fit(self,
-            X: pd.DataFrame,
-            y: pd.Series,
-            config: Dict[str,
-                         Any],
-            progress_callback: Optional[Callable[..., None]] = None,
-            log_callback: Optional[Callable[[str],
-                                            None]] = None,
-            validation_data: Optional[tuple[pd.DataFrame,
-                                            pd.Series]] = None) -> Any:
+    def fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        config: Dict[str, Any],
+        progress_callback: Optional[Callable[..., None]] = None,
+        log_callback: Optional[Callable[[str], None]] = None,
+        validation_data: Optional[tuple[pd.DataFrame, pd.Series]] = None,
+    ) -> Any:
         """
         Trains the model. Returns the model object (serializable).
         """
@@ -50,7 +51,9 @@ class BaseModelApplier(ABC):
         """
         pass
 
-    def predict_proba(self, df: pd.DataFrame, model_artifact: Any) -> Optional[pd.DataFrame]:
+    def predict_proba(
+        self, df: pd.DataFrame, model_artifact: Any
+    ) -> Optional[pd.DataFrame]:
         """
         Generates prediction probabilities if supported.
         Returns DataFrame where columns are classes.
@@ -59,13 +62,17 @@ class BaseModelApplier(ABC):
 
 
 class StatefulEstimator:
-    def __init__(self, calculator: BaseModelCalculator, applier: BaseModelApplier, node_id: str):
+    def __init__(
+        self, calculator: BaseModelCalculator, applier: BaseModelApplier, node_id: str
+    ):
         self.calculator = calculator
         self.applier = applier
         self.node_id = node_id
         self.model = None  # In-memory model storage
 
-    def _extract_xy(self, data: Any, target_column: str) -> tuple[pd.DataFrame, pd.Series]:
+    def _extract_xy(
+        self, data: Any, target_column: str
+    ) -> tuple[pd.DataFrame, pd.Series]:
         """Helper to extract X and y from DataFrame or Tuple."""
         if isinstance(data, tuple) and len(data) == 2:
             return data[0], data[1]
@@ -86,7 +93,7 @@ class StatefulEstimator:
         shuffle: bool = True,
         random_state: int = 42,
         progress_callback: Optional[Callable[[int, int], None]] = None,
-        log_callback: Optional[Callable[[str], None]] = None
+        log_callback: Optional[Callable[[str], None]] = None,
     ) -> Dict[str, Any]:
         """
         Performs cross-validation on the training split.
@@ -107,7 +114,7 @@ class StatefulEstimator:
             shuffle=shuffle,
             random_state=random_state,
             progress_callback=progress_callback,
-            log_callback=log_callback
+            log_callback=log_callback,
         )
 
     def fit_predict(
@@ -117,7 +124,7 @@ class StatefulEstimator:
         config: Dict[str, Any],
         progress_callback: Optional[Callable[[int, int], None]] = None,
         log_callback: Optional[Callable[[str], None]] = None,
-        job_id: str = "unknown"
+        job_id: str = "unknown",
     ) -> Dict[str, pd.Series]:
         """
         Fits the model on training data and returns predictions for all splits.
@@ -134,7 +141,9 @@ class StatefulEstimator:
                 dataset = SplitDataset(train=train_df, test=test_df, validation=None)
             else:
                 # It's (X, y) or something else, treat as train set
-                dataset = SplitDataset(train=dataset, test=pd.DataFrame(), validation=None)
+                dataset = SplitDataset(
+                    train=dataset, test=pd.DataFrame(), validation=None
+                )
 
         # 1. Prepare Data
         X_train, y_train = self._extract_xy(dataset.train, target_column)
@@ -151,14 +160,14 @@ class StatefulEstimator:
             config,
             progress_callback=progress_callback,
             log_callback=log_callback,
-            validation_data=validation_data
+            validation_data=validation_data,
         )
 
         # 3. Predict on all splits
         predictions = {}
 
         # Train Predictions
-        predictions['train'] = self.applier.predict(X_train, self.model)
+        predictions["train"] = self.applier.predict(X_train, self.model)
 
         # Test Predictions
         is_test_empty = False
@@ -175,7 +184,7 @@ class StatefulEstimator:
                     X_test = dataset.test.drop(columns=[target_column])
                 else:
                     X_test = dataset.test
-            predictions['test'] = self.applier.predict(X_test, self.model)
+            predictions["test"] = self.applier.predict(X_test, self.model)
 
         # Validation Predictions
         if dataset.validation is not None:
@@ -186,11 +195,17 @@ class StatefulEstimator:
                     X_val = dataset.validation.drop(columns=[target_column])
                 else:
                     X_val = dataset.validation
-            predictions['validation'] = self.applier.predict(X_val, self.model)
+            predictions["validation"] = self.applier.predict(X_val, self.model)
 
         return predictions
 
-    def refit(self, dataset: SplitDataset, target_column: str, config: Dict[str, Any], job_id: str = "unknown") -> None:
+    def refit(
+        self,
+        dataset: SplitDataset,
+        target_column: str,
+        config: Dict[str, Any],
+        job_id: str = "unknown",
+    ) -> None:
         """
         Refits the model on Train + Validation data and updates the artifact.
         """
@@ -209,7 +224,9 @@ class StatefulEstimator:
         # 2. Train Model
         self.model = self.calculator.fit(X_combined, y_combined, config)
 
-    def evaluate(self, dataset: SplitDataset, target_column: str, job_id: str = "unknown") -> Any:
+    def evaluate(
+        self, dataset: SplitDataset, target_column: str, job_id: str = "unknown"
+    ) -> Any:
         """
         Evaluates the model on all splits and returns a detailed report.
         """
@@ -218,7 +235,9 @@ class StatefulEstimator:
         from .evaluation.regression import evaluate_regression_model
 
         if self.model is None:
-            raise ValueError("Model has not been trained yet. Call fit_predict() first.")
+            raise ValueError(
+                "Model has not been trained yet. Call fit_predict() first."
+            )
 
         problem_type = self.calculator.problem_type
 
@@ -229,7 +248,7 @@ class StatefulEstimator:
             "job_id": job_id,
             "node_id": self.node_id,
             "problem_type": problem_type,
-            "splits": {}
+            "splits": {},
         }
 
         # Helper to evaluate a single split
@@ -253,12 +272,14 @@ class StatefulEstimator:
                 if y_proba_df is not None:
                     y_proba = {
                         "classes": y_proba_df.columns.tolist(),
-                        "values": y_proba_df.values.tolist()
+                        "values": y_proba_df.values.tolist(),
                     }
 
             split_data = {
                 "y_true": y.tolist() if hasattr(y, "tolist") else list(y),
-                "y_pred": y_pred.tolist() if hasattr(y_pred, "tolist") else list(y_pred)
+                "y_pred": (
+                    y_pred.tolist() if hasattr(y_pred, "tolist") else list(y_pred)
+                ),
             }
 
             if y_proba:
@@ -275,23 +296,17 @@ class StatefulEstimator:
 
             if problem_type == "classification":
                 return evaluate_classification_model(
-                    model=model_to_evaluate,
-                    dataset_name=split_name,
-                    X_test=X,
-                    y_test=y
+                    model=model_to_evaluate, dataset_name=split_name, X_test=X, y_test=y
                 )
             elif problem_type == "regression":
                 return evaluate_regression_model(
-                    model=model_to_evaluate,
-                    dataset_name=split_name,
-                    X_test=X,
-                    y_test=y
+                    model=model_to_evaluate, dataset_name=split_name, X_test=X, y_test=y
                 )
             else:
                 raise ValueError(f"Unknown problem type: {problem_type}")
 
         # 2. Evaluate Train
-        splits_payload['train'] = evaluate_split('train', dataset.train)
+        splits_payload["train"] = evaluate_split("train", dataset.train)
 
         # 3. Evaluate Test
         has_test = False
@@ -301,7 +316,7 @@ class StatefulEstimator:
             has_test = len(dataset.test) == 2 and len(dataset.test[0]) > 0
 
         if has_test:
-            splits_payload['test'] = evaluate_split('test', dataset.test)
+            splits_payload["test"] = evaluate_split("test", dataset.test)
 
         # 4. Evaluate Validation
         if dataset.validation is not None:
@@ -309,14 +324,18 @@ class StatefulEstimator:
             if isinstance(dataset.validation, pd.DataFrame):
                 has_val = not dataset.validation.empty
             elif isinstance(dataset.validation, tuple):
-                has_val = len(dataset.validation) == 2 and len(dataset.validation[0]) > 0
+                has_val = (
+                    len(dataset.validation) == 2 and len(dataset.validation[0]) > 0
+                )
 
             if has_val:
-                splits_payload['validation'] = evaluate_split('validation', dataset.validation)
+                splits_payload["validation"] = evaluate_split(
+                    "validation", dataset.validation
+                )
 
         # Return report object (simplified for now, assuming schema matches)
         return {
             "problem_type": problem_type,
             "splits": splits_payload,
-            "raw_data": evaluation_data
+            "raw_data": evaluation_data,
         }

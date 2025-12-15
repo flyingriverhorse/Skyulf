@@ -1,17 +1,23 @@
-from typing import Dict, Any, Union, Tuple
 import logging
+from typing import Any, Dict, Tuple, Union
+
 import pandas as pd
-from sklearn.impute import SimpleImputer, KNNImputer
+from sklearn.ensemble import ExtraTreesRegressor
+
 # Enable experimental IterativeImputer
 from sklearn.experimental import enable_iterative_imputer  # noqa
-from sklearn.impute import IterativeImputer
+from sklearn.impute import IterativeImputer, KNNImputer, SimpleImputer
 from sklearn.linear_model import BayesianRidge
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.tree import DecisionTreeRegressor
 
-from .base import BaseCalculator, BaseApplier
-from ..utils import detect_numeric_columns, resolve_columns, unpack_pipeline_input, pack_pipeline_output
+from ..utils import (
+    detect_numeric_columns,
+    pack_pipeline_output,
+    resolve_columns,
+    unpack_pipeline_input,
+)
+from .base import BaseApplier, BaseCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -19,19 +25,27 @@ logger = logging.getLogger(__name__)
 
 
 class SimpleImputerCalculator(BaseCalculator):
-    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
 
         # Config: {'strategy': 'mean' | 'median' | 'most_frequent' | 'constant', 'columns': [...], 'fill_value': ...}
-        strategy = config.get('strategy', 'mean')
+        strategy = config.get("strategy", "mean")
         # Map 'mode' to 'most_frequent' for sklearn compatibility
-        if strategy == 'mode':
-            strategy = 'most_frequent'
+        if strategy == "mode":
+            strategy = "most_frequent"
 
-        fill_value = config.get('fill_value', None)
+        fill_value = config.get("fill_value", None)
 
         # Determine detection function based on strategy
-        detect_func = detect_numeric_columns if strategy in ['mean', 'median'] else (lambda d: d.columns.tolist())
+        detect_func = (
+            detect_numeric_columns
+            if strategy in ["mean", "median"]
+            else (lambda d: d.columns.tolist())
+        )
 
         cols = resolve_columns(X, config, detect_func)
 
@@ -43,7 +57,7 @@ class SimpleImputerCalculator(BaseCalculator):
         imputer = SimpleImputer(strategy=strategy, fill_value=fill_value)
 
         # Handle potential errors with non-numeric data for mean/median
-        if strategy in ['mean', 'median']:
+        if strategy in ["mean", "median"]:
             # Filter for numeric columns only to be safe (double check)
             numeric_cols = detect_numeric_columns(X)
             cols = [c for c in cols if c in numeric_cols]
@@ -63,22 +77,25 @@ class SimpleImputerCalculator(BaseCalculator):
         total_missing = int(sum(missing_counts.values()))
 
         return {
-            'type': 'simple_imputer',
-            'strategy': strategy,
-            'fill_values': fill_values,
-            'columns': cols,
-            'missing_counts': missing_counts,
-            'total_missing': total_missing
+            "type": "simple_imputer",
+            "strategy": strategy,
+            "fill_values": fill_values,
+            "columns": cols,
+            "missing_counts": missing_counts,
+            "total_missing": total_missing,
         }
 
 
 class SimpleImputerApplier(BaseApplier):
-    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-              params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
-        cols = params.get('columns', [])
-        fill_values = params.get('fill_values', {})
+        cols = params.get("columns", [])
+        fill_values = params.get("fill_values", {})
 
         if not cols:
             return pack_pipeline_output(X, y, is_tuple)
@@ -100,16 +117,21 @@ class SimpleImputerApplier(BaseApplier):
 
         return pack_pipeline_output(X_out, y, is_tuple)
 
+
 # --- KNN Imputer ---
 
 
 class KNNImputerCalculator(BaseCalculator):
-    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
 
         # Config: {'n_neighbors': 5, 'weights': 'uniform'|'distance', 'columns': [...]}
-        n_neighbors = config.get('n_neighbors', 5)
-        weights = config.get('weights', 'uniform')
+        n_neighbors = config.get("n_neighbors", 5)
+        weights = config.get("weights", "uniform")
 
         cols = resolve_columns(X, config, detect_numeric_columns)
 
@@ -124,21 +146,24 @@ class KNNImputerCalculator(BaseCalculator):
         imputer.fit(X[cols])
 
         return {
-            'type': 'knn_imputer',
-            'imputer_object': imputer,  # Not JSON serializable
-            'columns': cols,
-            'n_neighbors': n_neighbors,
-            'weights': weights
+            "type": "knn_imputer",
+            "imputer_object": imputer,  # Not JSON serializable
+            "columns": cols,
+            "n_neighbors": n_neighbors,
+            "weights": weights,
         }
 
 
 class KNNImputerApplier(BaseApplier):
-    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-              params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
-        cols = params.get('columns', [])
-        imputer = params.get('imputer_object')
+        cols = params.get("columns", [])
+        imputer = params.get("imputer_object")
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or not imputer:
@@ -168,17 +193,22 @@ class KNNImputerApplier(BaseApplier):
 
         return pack_pipeline_output(X_out, y, is_tuple)
 
+
 # --- Iterative Imputer (MICE) ---
 
 
 class IterativeImputerCalculator(BaseCalculator):
-    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
 
         # Config: {'max_iter': 10, 'estimator': 'BayesianRidge'|'DecisionTree'|'ExtraTrees'|'KNeighbors',
         #          'columns': [...]}
-        max_iter = config.get('max_iter', 10)
-        estimator_name = config.get('estimator', 'BayesianRidge')
+        max_iter = config.get("max_iter", 10)
+        estimator_name = config.get("estimator", "BayesianRidge")
 
         cols = resolve_columns(X, config, detect_numeric_columns)
 
@@ -186,33 +216,38 @@ class IterativeImputerCalculator(BaseCalculator):
             return {}
 
         estimator = None
-        if estimator_name == 'DecisionTree':
-            estimator = DecisionTreeRegressor(max_features='sqrt', random_state=0)
-        elif estimator_name == 'ExtraTrees':
+        if estimator_name == "DecisionTree":
+            estimator = DecisionTreeRegressor(max_features="sqrt", random_state=0)
+        elif estimator_name == "ExtraTrees":
             estimator = ExtraTreesRegressor(n_estimators=10, random_state=0)
-        elif estimator_name == 'KNeighbors':
+        elif estimator_name == "KNeighbors":
             estimator = KNeighborsRegressor(n_neighbors=5)
         else:
             estimator = BayesianRidge()
 
-        imputer = IterativeImputer(estimator=estimator, max_iter=max_iter, random_state=0)
+        imputer = IterativeImputer(
+            estimator=estimator, max_iter=max_iter, random_state=0
+        )
         imputer.fit(X[cols])
 
         return {
-            'type': 'iterative_imputer',
-            'imputer_object': imputer,  # Not JSON serializable
-            'columns': cols,
-            'estimator': estimator_name
+            "type": "iterative_imputer",
+            "imputer_object": imputer,  # Not JSON serializable
+            "columns": cols,
+            "estimator": estimator_name,
         }
 
 
 class IterativeImputerApplier(BaseApplier):
-    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-              params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
-        cols = params.get('columns', [])
-        imputer = params.get('imputer_object')
+        cols = params.get("columns", [])
+        imputer = params.get("imputer_object")
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or not imputer:

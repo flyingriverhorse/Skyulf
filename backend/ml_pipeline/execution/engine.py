@@ -1,30 +1,40 @@
 """Pipeline Execution Engine."""
 
-from skyulf.modeling.tuning.schemas import TuningConfig
-from skyulf.modeling.tuning.tuner import TunerCalculator, TunerApplier
-from skyulf.modeling.regression import (
-    RidgeRegressionCalculator, RidgeRegressionApplier,
-    RandomForestRegressorCalculator, RandomForestRegressorApplier
-)
-from skyulf.modeling.classification import (
-    LogisticRegressionCalculator, LogisticRegressionApplier,
-    RandomForestClassifierCalculator, RandomForestClassifierApplier
-)
-from skyulf.modeling.base import StatefulEstimator
-from skyulf.preprocessing.pipeline import FeatureEngineer
 import logging
 import time
 from datetime import datetime
 from typing import Any, Dict, List
-import pandas as pd
-import numpy as np
 
-from ..artifacts.store import ArtifactStore
-from .schemas import PipelineConfig, PipelineExecutionResult, NodeExecutionResult, NodeConfig
+import numpy as np
+import pandas as pd
 
 # Phase 1: Data Loading
 # from ..data.loader import DataLoader
 from skyulf.data.dataset import SplitDataset
+from skyulf.modeling.base import StatefulEstimator
+from skyulf.modeling.classification import (
+    LogisticRegressionApplier,
+    LogisticRegressionCalculator,
+    RandomForestClassifierApplier,
+    RandomForestClassifierCalculator,
+)
+from skyulf.modeling.regression import (
+    RandomForestRegressorApplier,
+    RandomForestRegressorCalculator,
+    RidgeRegressionApplier,
+    RidgeRegressionCalculator,
+)
+from skyulf.modeling.tuning.schemas import TuningConfig
+from skyulf.modeling.tuning.tuner import TunerApplier, TunerCalculator
+from skyulf.preprocessing.pipeline import FeatureEngineer
+
+from ..artifacts.store import ArtifactStore
+from .schemas import (
+    NodeConfig,
+    NodeExecutionResult,
+    PipelineConfig,
+    PipelineExecutionResult,
+)
 
 
 class DataLoader:
@@ -69,7 +79,9 @@ class PipelineEngine:
     def __init__(self, artifact_store: ArtifactStore, log_callback=None):
         self.artifact_store = artifact_store
         self.log_callback = log_callback
-        self.executed_transformers: List[Any] = []  # Track fitted transformers for inference pipeline
+        self.executed_transformers: List[Any] = (
+            []
+        )  # Track fitted transformers for inference pipeline
         self._results: Dict[str, NodeExecutionResult] = {}
 
     def log(self, message: str):
@@ -77,7 +89,9 @@ class PipelineEngine:
         if self.log_callback:
             self.log_callback(message)
 
-    def run(self, config: PipelineConfig, job_id: str = "unknown") -> PipelineExecutionResult:
+    def run(
+        self, config: PipelineConfig, job_id: str = "unknown"
+    ) -> PipelineExecutionResult:
         """
         Executes the pipeline defined by the configuration.
         """
@@ -88,7 +102,7 @@ class PipelineEngine:
         pipeline_result = PipelineExecutionResult(
             pipeline_id=config.pipeline_id,
             status="success",  # Optimistic default
-            start_time=start_time
+            start_time=start_time,
         )
 
         for node in config.nodes:
@@ -104,9 +118,7 @@ class PipelineEngine:
             except Exception as e:
                 logger.exception(f"Unexpected error executing node {node.node_id}")
                 pipeline_result.node_results[node.node_id] = NodeExecutionResult(
-                    node_id=node.node_id,
-                    status="failed",
-                    error=str(e)
+                    node_id=node.node_id, status="failed", error=str(e)
                 )
                 pipeline_result.status = "failed"
                 break
@@ -114,7 +126,9 @@ class PipelineEngine:
         pipeline_result.end_time = datetime.now()
         return pipeline_result
 
-    def _execute_node(self, node: NodeConfig, job_id: str = "unknown") -> NodeExecutionResult:
+    def _execute_node(
+        self, node: NodeConfig, job_id: str = "unknown"
+    ) -> NodeExecutionResult:
         """Executes a single node based on its type."""
         self.log(f"Executing node: {node.node_id} ({node.step_type})")
         start_ts = time.time()
@@ -136,9 +150,13 @@ class PipelineEngine:
                 else:
                     output_artifact_id, metrics = self._run_feature_engineering(node)
             elif node.step_type == "model_training":
-                output_artifact_id, metrics = self._run_model_training(node, job_id=job_id)
+                output_artifact_id, metrics = self._run_model_training(
+                    node, job_id=job_id
+                )
             elif node.step_type == "model_tuning":
-                output_artifact_id, metrics = self._run_model_tuning(node, job_id=job_id)
+                output_artifact_id, metrics = self._run_model_tuning(
+                    node, job_id=job_id
+                )
             elif node.step_type == "data_preview":
                 output_artifact_id, metrics = self._run_data_preview(node)
             else:
@@ -158,7 +176,7 @@ class PipelineEngine:
                 status="success",
                 output_artifact_id=output_artifact_id,
                 metrics=metrics,
-                execution_time=duration
+                execution_time=duration,
             )
 
         except Exception as e:
@@ -168,7 +186,7 @@ class PipelineEngine:
                 node_id=node.node_id,
                 status="failed",
                 error=str(e),
-                execution_time=duration
+                execution_time=duration,
             )
 
     def _resolve_input(self, node: NodeConfig, index: int = 0) -> Any:
@@ -185,7 +203,9 @@ class PipelineEngine:
         # We assume the previous node saved an artifact with its node_id.
         return self.artifact_store.load(input_node_id)
 
-    def _bundle_transformers_with_model(self, model_artifact_key: str, job_id: str = "unknown"):
+    def _bundle_transformers_with_model(
+        self, model_artifact_key: str, job_id: str = "unknown"
+    ):
         """Bundles fitted transformers with the model artifact for inference."""
         try:
             model_artifact = self.artifact_store.load(model_artifact_key)
@@ -209,7 +229,9 @@ class PipelineEngine:
                 if key.endswith("_pipeline"):
                     try:
                         obj = self.artifact_store.load(key)
-                        if hasattr(obj, "transform"):  # It's a FeatureEngineer or similar
+                        if hasattr(
+                            obj, "transform"
+                        ):  # It's a FeatureEngineer or similar
                             feature_engineer = obj
                             break
                     except BaseException:
@@ -220,7 +242,7 @@ class PipelineEngine:
                 full_artifact = {
                     "model": model_artifact,
                     "feature_engineer": feature_engineer,
-                    "job_id": job_id
+                    "job_id": job_id,
                 }
             else:
                 # Fallback to old logic if no FeatureEngineer found (e.g. manual steps)
@@ -231,26 +253,32 @@ class PipelineEngine:
                     try:
                         fitted_t = self.artifact_store.load(t_info["artifact_key"])
                         if fitted_t:
-                            transformers.append({
-                                "node_id": t_info["node_id"],
-                                "transformer_name": t_info["transformer_name"],
-                                "column_name": t_info["column_name"],
-                                "transformer": fitted_t
-                            })
-                            transformer_plan.append({
-                                "node_id": t_info["node_id"],
-                                "transformer_name": t_info["transformer_name"],
-                                "column_name": t_info["column_name"],
-                                "transformer_type": t_info["transformer_type"]
-                            })
+                            transformers.append(
+                                {
+                                    "node_id": t_info["node_id"],
+                                    "transformer_name": t_info["transformer_name"],
+                                    "column_name": t_info["column_name"],
+                                    "transformer": fitted_t,
+                                }
+                            )
+                            transformer_plan.append(
+                                {
+                                    "node_id": t_info["node_id"],
+                                    "transformer_name": t_info["transformer_name"],
+                                    "column_name": t_info["column_name"],
+                                    "transformer_type": t_info["transformer_type"],
+                                }
+                            )
                     except Exception as e:
-                        logger.warning(f"Failed to load transformer artifact {t_info['artifact_key']}: {e}")
+                        logger.warning(
+                            f"Failed to load transformer artifact {t_info['artifact_key']}: {e}"
+                        )
 
                 full_artifact = {
                     "model": model_artifact,
                     "transformers": transformers,
                     "transformer_plan": transformer_plan,
-                    "job_id": job_id
+                    "job_id": job_id,
                 }
 
             # Save to job_id key if available - this is the final artifact for the job
@@ -276,7 +304,9 @@ class PipelineEngine:
             self.log(f"Loading full data from {path}")
             df = loader.load_full(path)
 
-        self.log(f"Data loaded successfully. Shape: {df.shape} ({len(df)} rows, {len(df.columns)} columns)")
+        self.log(
+            f"Data loaded successfully. Shape: {df.shape} ({len(df)} rows, {len(df.columns)} columns)"
+        )
         self.artifact_store.save(node.node_id, df)
         return node.node_id
 
@@ -299,7 +329,9 @@ class PipelineEngine:
         self.artifact_store.save(f"{node.node_id}_pipeline", engineer)
 
         if hasattr(processed_df, "shape"):
-            self.log(f"Feature engineering completed. Output shape: {processed_df.shape}")
+            self.log(
+                f"Feature engineering completed. Output shape: {processed_df.shape}"
+            )
         elif isinstance(processed_df, SplitDataset):
             self.log("Feature engineering completed. SplitDataset created.")
 
@@ -308,24 +340,29 @@ class PipelineEngine:
             self.log(
                 f"Split details - Train: {
                     processed_df[0].shape}, Test: {
-                    processed_df[1].shape if processed_df[1] is not None else 'None'}")
+                    processed_df[1].shape if processed_df[1] is not None else 'None'}"
+            )
 
         self.artifact_store.save(node.node_id, processed_df)
 
         # Track executed transformers
         for step in node.params.get("steps", []):
-            self.executed_transformers.append({
-                "node_id": node.node_id,
-                "transformer_name": step["name"],
-                "transformer_type": step["transformer"],
-                # This key might need adjustment if we save the whole engineer
-                "artifact_key": f"{node.node_id}_{step['name']}",
-                "column_name": step.get("params", {}).get("new_column")
-            })
+            self.executed_transformers.append(
+                {
+                    "node_id": node.node_id,
+                    "transformer_name": step["name"],
+                    "transformer_type": step["transformer"],
+                    # This key might need adjustment if we save the whole engineer
+                    "artifact_key": f"{node.node_id}_{step['name']}",
+                    "column_name": step.get("params", {}).get("new_column"),
+                }
+            )
 
         return node.node_id, metrics
 
-    def _run_model_training(self, node: NodeConfig, job_id: str = "unknown") -> tuple[str, Dict[str, Any]]:
+    def _run_model_training(
+        self, node: NodeConfig, job_id: str = "unknown"
+    ) -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset (from Feature Engineering) or DataFrame
         # Wait, FeatureEngineer returns SplitDataset if split=True, or DataFrame if not.
         # Modeling expects SplitDataset usually.
@@ -359,16 +396,22 @@ class PipelineEngine:
             cv_data = data
             if isinstance(data, pd.DataFrame):
                 from skyulf.data.dataset import SplitDataset
+
                 cv_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
             elif isinstance(data, tuple):
                 from skyulf.data.dataset import SplitDataset
+
                 # Check if it's (train_df, test_df) or (X, y)
                 elem0 = data[0]
                 if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
                     train_df, test_df = data
-                    cv_data = SplitDataset(train=train_df, test=test_df, validation=None)
+                    cv_data = SplitDataset(
+                        train=train_df, test=test_df, validation=None
+                    )
                 else:
-                    cv_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+                    cv_data = SplitDataset(
+                        train=data, test=pd.DataFrame(), validation=None
+                    )
 
             cv_results = estimator.cross_validate(
                 cv_data,
@@ -378,7 +421,7 @@ class PipelineEngine:
                 cv_type=node.params.get("cv_type", "k_fold"),
                 shuffle=node.params.get("cv_shuffle", True),
                 random_state=node.params.get("cv_random_state", 42),
-                log_callback=self.log
+                log_callback=self.log,
             )
 
             # Aggregate metrics for the return value
@@ -419,16 +462,24 @@ class PipelineEngine:
             eval_data = data
             if isinstance(data, pd.DataFrame):
                 from skyulf.data.dataset import SplitDataset
-                eval_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+
+                eval_data = SplitDataset(
+                    train=data, test=pd.DataFrame(), validation=None
+                )
             elif isinstance(data, tuple):
                 from skyulf.data.dataset import SplitDataset
+
                 # Check if it's (train_df, test_df) or (X, y)
                 elem0 = data[0]
                 if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
                     train_df, test_df = data
-                    eval_data = SplitDataset(train=train_df, test=test_df, validation=None)
+                    eval_data = SplitDataset(
+                        train=train_df, test=test_df, validation=None
+                    )
                 else:
-                    eval_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+                    eval_data = SplitDataset(
+                        train=data, test=pd.DataFrame(), validation=None
+                    )
 
             report = estimator.evaluate(eval_data, target_col, job_id=job_id)
 
@@ -462,7 +513,9 @@ class PipelineEngine:
 
         return node.node_id, metrics
 
-    def _run_model_tuning(self, node: NodeConfig, job_id: str = "unknown") -> tuple[str, Dict[str, Any]]:
+    def _run_model_tuning(
+        self, node: NodeConfig, job_id: str = "unknown"
+    ) -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset
         data = self._resolve_input(node)
         target_col = node.params["target_column"]
@@ -472,7 +525,7 @@ class PipelineEngine:
         tuning_params = node.params["tuning_config"]  # Dict matching TuningConfig
 
         calculator, applier = self._get_model_components(algorithm)
-        
+
         # Create Tuner components
         tuner_calc = TunerCalculator(calculator)
         tuner_applier = TunerApplier(applier)
@@ -481,14 +534,18 @@ class PipelineEngine:
         # This ensures consistency with how standard models are trained and evaluated
         estimator = StatefulEstimator(tuner_calc, tuner_applier, node.node_id)
 
-        self.log(f"Starting hyperparameter tuning (Strategy: {tuning_params.get('strategy', 'random')}, Trials: {tuning_params.get('n_trials', 10)})")
+        self.log(
+            f"Starting hyperparameter tuning (Strategy: {tuning_params.get('strategy', 'random')}, Trials: {tuning_params.get('n_trials', 10)})"
+        )
 
         # Ensure data is SplitDataset
         if isinstance(data, pd.DataFrame):
             from skyulf.data.dataset import SplitDataset
+
             data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
         elif isinstance(data, tuple):
             from skyulf.data.dataset import SplitDataset
+
             # Check if it's (train_df, test_df) or (X, y)
             elem0 = data[0]
             if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
@@ -509,12 +566,12 @@ class PipelineEngine:
         # 2. Refit the best model on the full training set (TunerCalculator.fit)
         # 3. Generate predictions on train/test/val splits (TunerApplier.predict)
         estimator.fit_predict(
-            data, 
-            target_col, 
-            tuning_params, 
+            data,
+            target_col,
+            tuning_params,
             progress_callback=progress_callback,
             log_callback=self.log,
-            job_id=job_id
+            job_id=job_id,
         )
 
         # Save model artifact
@@ -530,11 +587,11 @@ class PipelineEngine:
 
         # Extract metrics from tuning result
         _, tuning_result = estimator.model
-        
+
         metrics = {
             "best_score": tuning_result.best_score,
             "best_params": tuning_result.best_params,
-            "trials": tuning_result.trials
+            "trials": tuning_result.trials,
         }
 
         # Evaluate the tuned model
@@ -574,7 +631,7 @@ class PipelineEngine:
         step_config = {
             "name": "step",  # Generic name, the artifact will be saved by engine anyway
             "transformer": node.step_type,
-            "params": node.params
+            "params": node.params,
         }
 
         engineer = FeatureEngineer([step_config])
@@ -588,13 +645,15 @@ class PipelineEngine:
         self.artifact_store.save(node.node_id, processed_data)
 
         # Track executed transformer
-        self.executed_transformers.append({
-            "node_id": node.node_id,
-            "transformer_name": "step",
-            "transformer_type": node.step_type,
-            "artifact_key": f"exec_{node.node_id}_step",
-            "column_name": node.params.get("new_column")
-        })
+        self.executed_transformers.append(
+            {
+                "node_id": node.node_id,
+                "transformer_name": "step",
+                "transformer_type": node.step_type,
+                "artifact_key": f"exec_{node.node_id}_step",
+                "column_name": node.params.get("new_column"),
+            }
+        )
 
         # Load fitted params to get metrics (e.g. dropped columns)
         metrics = run_metrics.copy()
@@ -610,7 +669,11 @@ class PipelineEngine:
 
         if algo in ["logistic_regression", "logisticregression"]:
             return LogisticRegressionCalculator(), LogisticRegressionApplier()
-        elif algo in ["random_forest_classifier", "randomforestclassifier", "random_forest"]:
+        elif algo in [
+            "random_forest_classifier",
+            "randomforestclassifier",
+            "random_forest",
+        ]:
             return RandomForestClassifierCalculator(), RandomForestClassifierApplier()
         elif algo in ["ridge_regression", "ridgeregression", "ridge"]:
             return RidgeRegressionCalculator(), RidgeRegressionApplier()
@@ -630,7 +693,7 @@ class PipelineEngine:
             "timestamp": datetime.now().isoformat(),
             "data_summary": {},
             "applied_transformations": [],
-            "operation_mode": "unknown"
+            "operation_mode": "unknown",
         }
 
         # 1. Analyze Data
@@ -640,11 +703,13 @@ class PipelineEngine:
                 "shape": df.shape,
                 "columns": list(df.columns),
                 # "dtypes": {k: str(v) for k, v in df.dtypes.items()}, # Optional, can be large
-                "sample": df.head(20).replace({np.nan: None}).to_dict(orient='records')
+                "sample": df.head(20).replace({np.nan: None}).to_dict(orient="records"),
             }
 
         if isinstance(data, SplitDataset):
-            preview_info["operation_mode"] = "Train: fit_transform | Test/Val: transform"
+            preview_info["operation_mode"] = (
+                "Train: fit_transform | Test/Val: transform"
+            )
 
             # Train
             if isinstance(data.train, tuple):
@@ -657,17 +722,25 @@ class PipelineEngine:
             if data.test is not None:
                 if isinstance(data.test, tuple):
                     X_test, _ = data.test
-                    preview_info["data_summary"]["test"] = get_df_info(X_test, "Test (X)")
+                    preview_info["data_summary"]["test"] = get_df_info(
+                        X_test, "Test (X)"
+                    )
                 elif isinstance(data.test, pd.DataFrame) and not data.test.empty:
-                    preview_info["data_summary"]["test"] = get_df_info(data.test, "Test")
+                    preview_info["data_summary"]["test"] = get_df_info(
+                        data.test, "Test"
+                    )
 
             # Validation
             if data.validation is not None:
                 if isinstance(data.validation, tuple):
                     X_val, _ = data.validation
-                    preview_info["data_summary"]["validation"] = get_df_info(X_val, "Validation (X)")
+                    preview_info["data_summary"]["validation"] = get_df_info(
+                        X_val, "Validation (X)"
+                    )
                 elif isinstance(data.validation, pd.DataFrame):
-                    preview_info["data_summary"]["validation"] = get_df_info(data.validation, "Validation")
+                    preview_info["data_summary"]["validation"] = get_df_info(
+                        data.validation, "Validation"
+                    )
 
         elif isinstance(data, pd.DataFrame):
             preview_info["operation_mode"] = "fit_transform"

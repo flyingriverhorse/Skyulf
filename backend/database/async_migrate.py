@@ -4,11 +4,12 @@ Async migration utilities for registry-related data.
 This module centralizes migration entrypoints for async FastAPI application.
 """
 
-from typing import Any, Dict, List
 import logging
+from typing import Any, Dict, List
 
 from backend.config import Settings
-from .data_sources import async_sqlite_queries, async_postgres_queries
+
+from .data_sources import async_postgres_queries, async_sqlite_queries
 
 logger = logging.getLogger(__name__)
 

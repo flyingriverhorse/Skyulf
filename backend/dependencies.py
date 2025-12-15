@@ -8,9 +8,10 @@ including database sessions and configuration.
 """
 
 from typing import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.config import get_settings, Settings
+from backend.config import Settings, get_settings
 from backend.database.engine import get_async_session
 
 
@@ -54,12 +55,7 @@ class PaginationParams:
     Common pagination parameters.
     """
 
-    def __init__(
-        self,
-        skip: int = 0,
-        limit: int = 20,
-        max_limit: int = 100
-    ):
+    def __init__(self, skip: int = 0, limit: int = 20, max_limit: int = 100):
         if limit > max_limit:
             limit = max_limit
         if skip < 0:
@@ -71,10 +67,7 @@ class PaginationParams:
         self.limit = limit
 
 
-def get_pagination_params(
-    skip: int = 0,
-    limit: int = 20
-) -> PaginationParams:
+def get_pagination_params(skip: int = 0, limit: int = 20) -> PaginationParams:
     """
     Pagination dependency for list endpoints.
 

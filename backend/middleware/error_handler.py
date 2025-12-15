@@ -8,6 +8,7 @@ import logging
 import traceback
 import uuid
 from typing import Callable, cast
+
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -57,9 +58,9 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                     "method": request.method,
                     "url": str(request.url),
                     "client": request.client.host if request.client else "unknown",
-                    "traceback": traceback.format_exc()
+                    "traceback": traceback.format_exc(),
                 },
-                exc_info=True
+                exc_info=True,
             )
 
             # Return standardized error response
@@ -69,7 +70,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                     "success": False,
                     "message": "Internal server error",
                     "error": "An unexpected error occurred. Please try again later.",
-                    "request_id": request_id
+                    "request_id": request_id,
                 },
-                headers={"X-Request-ID": request_id}
+                headers={"X-Request-ID": request_id},
             )

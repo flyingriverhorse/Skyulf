@@ -3,19 +3,21 @@ Async PostgreSQL connection module for FastAPI.
 This is the async equivalent of the Flask db/connections/postgres_db_connection/connection.py
 """
 
-import os
-from urllib.parse import quote_plus
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
+from urllib.parse import quote_plus
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import declarative_base
 
 logger = logging.getLogger(__name__)
 
 # Load .env into environment when present (development convenience)
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     # dotenv is optional; environment variables may already be set in production
@@ -62,7 +64,9 @@ def build_async_database_url_from_env() -> str:
 
     # If required components are missing, fallback to async SQLite for local dev
     if not any([user, password, host, dbname]):
-        logger.warning("No DB connection info found in environment; using async SQLite fallback.")
+        logger.warning(
+            "No DB connection info found in environment; using async SQLite fallback."
+        )
         return "sqlite+aiosqlite:///mlops_postgres_fallback.db"
 
     # Use asyncpg dialect for PostgreSQL async
@@ -78,7 +82,9 @@ def build_async_database_url_from_env() -> str:
 
     # Optional SSL mode and extra params
     sslmode = os.environ.get("DB_SSLMODE")  # e.g. require, verify-full
-    extra = os.environ.get("DB_EXTRA_PARAMS")  # e.g. application_name=mlops&connect_timeout=10
+    extra = os.environ.get(
+        "DB_EXTRA_PARAMS"
+    )  # e.g. application_name=mlops&connect_timeout=10
 
     query_parts = []
     if sslmode:
@@ -111,7 +117,7 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
     autoflush=False,
     autocommit=False,
-    expire_on_commit=False
+    expire_on_commit=False,
 )
 
 # Base for declarative models

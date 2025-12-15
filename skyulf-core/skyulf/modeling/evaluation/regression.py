@@ -9,11 +9,7 @@ import pandas as pd
 
 from .common import sanitize_metrics
 from .metrics import calculate_regression_metrics
-from .schemas import (
-    ModelEvaluationReport,
-    RegressionEvaluation,
-    ResidualsData,
-)
+from .schemas import ModelEvaluationReport, RegressionEvaluation, ResidualsData
 
 
 def evaluate_regression_model(

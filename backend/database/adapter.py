@@ -12,9 +12,9 @@ Supports:
 - Snowflake (async wrapper)
 """
 
-from contextlib import asynccontextmanager
-from typing import Optional, Dict, Any
 import logging
+from contextlib import asynccontextmanager
+from typing import Any, Dict, Optional
 
 # Import settings with fallback
 try:
@@ -23,6 +23,7 @@ except ImportError:
     # Fallback for standalone testing
     import sys
     from pathlib import Path
+
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
     from backend.config import Settings
 
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 class DatabaseType:
     """Database type constants."""
+
     POSTGRES = "postgres"
     POSTGRESQL = "postgresql"
     SQLITE = "sqlite"
@@ -51,13 +53,21 @@ def get_db_type_from_url(database_url: str) -> str:
     Returns:
         str: Database type identifier
     """
-    if database_url.startswith("postgresql://") or database_url.startswith("postgresql+asyncpg://"):
+    if database_url.startswith("postgresql://") or database_url.startswith(
+        "postgresql+asyncpg://"
+    ):
         return DatabaseType.POSTGRES
-    elif database_url.startswith("sqlite://") or database_url.startswith("sqlite+aiosqlite://"):
+    elif database_url.startswith("sqlite://") or database_url.startswith(
+        "sqlite+aiosqlite://"
+    ):
         return DatabaseType.SQLITE
-    elif database_url.startswith("mysql://") or database_url.startswith("mysql+aiomysql://"):
+    elif database_url.startswith("mysql://") or database_url.startswith(
+        "mysql+aiomysql://"
+    ):
         return DatabaseType.MYSQL
-    elif database_url.startswith("mongodb://") or database_url.startswith("mongodb+srv://"):
+    elif database_url.startswith("mongodb://") or database_url.startswith(
+        "mongodb+srv://"
+    ):
         return DatabaseType.MONGODB
     elif "snowflake" in database_url.lower():
         return DatabaseType.SNOWFLAKE
@@ -106,8 +116,7 @@ def build_connection_config(settings: Settings) -> Dict[str, Any]:
 
 @asynccontextmanager
 async def async_session_or_connection(
-    settings: Settings,
-    config: Optional[Dict[str, Any]] = None
+    settings: Settings, config: Optional[Dict[str, Any]] = None
 ):
     """
     Async context manager that yields appropriate database connection/session.
@@ -150,6 +159,7 @@ async def async_session_or_connection(
 
         # Parse connection details from URL or config
         import urllib.parse as urlparse
+
         parsed = urlparse.urlparse(cfg["database_url"])
 
         conn = await aiomysql.connect(
@@ -158,7 +168,7 @@ async def async_session_or_connection(
             user=parsed.username,
             password=parsed.password,
             db=parsed.path.lstrip("/") if parsed.path else None,
-            autocommit=False
+            autocommit=False,
         )
 
         try:
@@ -178,6 +188,7 @@ async def async_session_or_connection(
         try:
             # Extract database name from URL or config
             import urllib.parse as urlparse
+
             parsed = urlparse.urlparse(cfg["database_url"])
             db_name = parsed.path.lstrip("/") if parsed.path else "default"
 
@@ -194,7 +205,9 @@ async def async_session_or_connection(
         try:
             import snowflake.connector  # type: ignore
         except ImportError:
-            raise RuntimeError("snowflake-connector-python package required for Snowflake support")
+            raise RuntimeError(
+                "snowflake-connector-python package required for Snowflake support"
+            )
 
         # Create connection in thread pool since Snowflake is sync-only
         executor = ThreadPoolExecutor(max_workers=1)
@@ -217,9 +230,7 @@ async def async_session_or_connection(
             # Wrap connection with async interface
             yield AsyncSnowflakeConnection(conn, executor)
         finally:
-            await asyncio.get_event_loop().run_in_executor(
-                executor, conn.close
-            )
+            await asyncio.get_event_loop().run_in_executor(executor, conn.close)
             executor.shutdown(wait=True)
 
     else:
@@ -251,13 +262,12 @@ class AsyncSnowflakeConnection:
             finally:
                 cursor.close()
 
-        return await asyncio.get_event_loop().run_in_executor(
-            self._executor, _execute
-        )
+        return await asyncio.get_event_loop().run_in_executor(self._executor, _execute)
 
     async def commit(self):
         """Commit transaction asynchronously."""
         import asyncio
+
         return await asyncio.get_event_loop().run_in_executor(
             self._executor, self._connection.commit
         )
@@ -265,6 +275,7 @@ class AsyncSnowflakeConnection:
     async def rollback(self):
         """Rollback transaction asynchronously."""
         import asyncio
+
         return await asyncio.get_event_loop().run_in_executor(
             self._executor, self._connection.rollback
         )

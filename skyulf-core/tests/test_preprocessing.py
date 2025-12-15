@@ -2,7 +2,6 @@
 
 import numpy as np
 import pandas as pd
-
 from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
@@ -13,18 +12,13 @@ def test_feature_engineer_simple_flow(sample_classification_data):
         {
             "name": "imputer",
             "transformer": "SimpleImputer",
-            "params": {
-                "columns": ["feature1"],
-                "strategy": "mean"
-            }
+            "params": {"columns": ["feature1"], "strategy": "mean"},
         },
         {
             "name": "scaler",
             "transformer": "StandardScaler",
-            "params": {
-                "columns": ["feature1", "feature2"]
-            }
-        }
+            "params": {"columns": ["feature1", "feature2"]},
+        },
     ]
 
     fe = FeatureEngineer(config)
@@ -52,26 +46,18 @@ def test_feature_engineer_with_splitting(sample_classification_data):
         {
             "name": "target_split",
             "transformer": "feature_target_split",
-            "params": {
-                "target_column": "target"
-            }
+            "params": {"target_column": "target"},
         },
         {
             "name": "train_test_split",
             "transformer": "TrainTestSplitter",
-            "params": {
-                "test_size": 0.2,
-                "random_state": 42
-            }
+            "params": {"test_size": 0.2, "random_state": 42},
         },
         {
             "name": "imputer",
             "transformer": "SimpleImputer",
-            "params": {
-                "columns": ["feature1"],
-                "strategy": "mean"
-            }
-        }
+            "params": {"columns": ["feature1"], "strategy": "mean"},
+        },
     ]
 
     fe = FeatureEngineer(config)
@@ -99,9 +85,7 @@ def test_one_hot_encoding(sample_classification_data):
         {
             "name": "encoder",
             "transformer": "OneHotEncoder",
-            "params": {
-                "columns": ["category"]
-            }
+            "params": {"columns": ["category"]},
         }
     ]
 
@@ -111,7 +95,9 @@ def test_one_hot_encoding(sample_classification_data):
     # Check for new columns
     assert "category_A" in transformed_data.columns
     assert "category_B" in transformed_data.columns
-    assert "category" not in transformed_data.columns  # Should be dropped by default usually, or kept depending on impl
+    assert (
+        "category" not in transformed_data.columns
+    )  # Should be dropped by default usually, or kept depending on impl
     # Checking implementation: OneHotEncoder usually drops original if not configured otherwise.
 
     # Test inference

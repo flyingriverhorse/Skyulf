@@ -7,14 +7,15 @@ with support for the same databases as the Flask version (SQLite, PostgreSQL).
 
 import logging
 from typing import AsyncGenerator, Optional
+
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import (
-    AsyncSession,
     AsyncEngine,
+    AsyncSession,
     async_sessionmaker,
-    create_async_engine
+    create_async_engine,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
 try:
@@ -24,8 +25,7 @@ try:
 except ImportError as exc:
     raise ImportError(
         "Could not import 'core.config'. Ensure you're running the project as a package (python -m <package>) "
-        "or that the project root is on PYTHONPATH. Original error: "
-        + str(exc)
+        "or that the project root is on PYTHONPATH. Original error: " + str(exc)
     ) from exc
 
 logger = logging.getLogger(__name__)
@@ -92,12 +92,16 @@ async def init_db() -> None:
     if settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
         sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
     else:
-        sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+        sync_url = settings.DATABASE_URL.replace(
+            "postgresql+asyncpg://", "postgresql+psycopg2://"
+        )
 
     sync_engine = create_engine(sync_url, echo=settings.DB_ECHO)
     sync_session_factory = sessionmaker(bind=sync_engine)
 
-    logger.info(f"✅ Database engine initialized: {settings.DATABASE_URL.split('://')[0]}")
+    logger.info(
+        f"✅ Database engine initialized: {settings.DATABASE_URL.split('://')[0]}"
+    )
 
 
 async def close_db() -> None:
@@ -189,6 +193,7 @@ async def health_check() -> bool:
 
     try:
         from sqlalchemy import text
+
         async with async_engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
         return True

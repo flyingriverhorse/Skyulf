@@ -1,6 +1,8 @@
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
+
 import polars as pl
-from sqlalchemy import create_engine, text, Engine
+from sqlalchemy import Engine, create_engine, text
+
 from .base import BaseConnector
 
 
@@ -10,7 +12,12 @@ class DatabaseConnector(BaseConnector):
     Uses SQLAlchemy for connection and Polars for data fetching.
     """
 
-    def __init__(self, connection_string: str, table_name: Optional[str] = None, query: Optional[str] = None):
+    def __init__(
+        self,
+        connection_string: str,
+        table_name: Optional[str] = None,
+        query: Optional[str] = None,
+    ):
         self.connection_string = connection_string
         self.table_name = table_name
         self.query = query
@@ -34,7 +41,7 @@ class DatabaseConnector(BaseConnector):
     async def get_schema(self) -> Dict[str, str]:
         if not self._engine:
             await self.connect()
-        
+
         if not self._engine:
             raise ConnectionError("Database engine not initialized")
 
@@ -57,10 +64,12 @@ class DatabaseConnector(BaseConnector):
         except Exception as e:
             raise RuntimeError(f"Failed to get schema: {str(e)}")
 
-    async def fetch_data(self, query: Optional[str] = None, limit: Optional[int] = None) -> pl.DataFrame:
+    async def fetch_data(
+        self, query: Optional[str] = None, limit: Optional[int] = None
+    ) -> pl.DataFrame:
         if not self._engine:
             await self.connect()
-        
+
         if not self._engine:
             raise ConnectionError("Database engine not initialized")
 

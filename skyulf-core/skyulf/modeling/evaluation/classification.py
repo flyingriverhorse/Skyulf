@@ -6,7 +6,7 @@ from typing import Any, List, Optional
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import confusion_matrix, roc_curve, precision_recall_curve
+from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
 from sklearn.preprocessing import label_binarize
 
 from .common import downsample_curve, sanitize_metrics
@@ -68,17 +68,19 @@ def evaluate_classification_model(
                 CurveData(
                     name=f"ROC (Class {class_names[1]})",
                     points=downsample_curve(fpr, tpr),
-                    auc=metrics.get("roc_auc")
+                    auc=metrics.get("roc_auc"),
                 )
             )
 
             # PR
-            precision, recall, _ = precision_recall_curve(y_test, pos_probs, pos_label=pos_label)
+            precision, recall, _ = precision_recall_curve(
+                y_test, pos_probs, pos_label=pos_label
+            )
             pr_curves.append(
                 CurveData(
                     name=f"PR (Class {class_names[1]})",
                     points=downsample_curve(recall, precision),
-                    auc=metrics.get("pr_auc")
+                    auc=metrics.get("pr_auc"),
                 )
             )
         else:
@@ -91,16 +93,18 @@ def evaluate_classification_model(
                 roc_curves.append(
                     CurveData(
                         name=f"ROC (Class {class_name})",
-                        points=downsample_curve(fpr, tpr)
+                        points=downsample_curve(fpr, tpr),
                     )
                 )
 
                 # PR
-                precision, recall, _ = precision_recall_curve(y_test_bin[:, i], y_prob[:, i])
+                precision, recall, _ = precision_recall_curve(
+                    y_test_bin[:, i], y_prob[:, i]
+                )
                 pr_curves.append(
                     CurveData(
                         name=f"PR (Class {class_name})",
-                        points=downsample_curve(recall, precision)
+                        points=downsample_curve(recall, precision),
                     )
                 )
 
@@ -118,14 +122,13 @@ def evaluate_classification_model(
     )
 
 
-def _compute_confusion_matrix(y_true: Any, y_pred: Any, labels: List[str]) -> ConfusionMatrixData:
+def _compute_confusion_matrix(
+    y_true: Any, y_pred: Any, labels: List[str]
+) -> ConfusionMatrixData:
     """Compute confusion matrix data."""
     cm = confusion_matrix(y_true, y_pred, labels=labels)
 
     # Convert to list of lists for JSON serialization
     matrix_data = cm.tolist()
 
-    return ConfusionMatrixData(
-        labels=labels,
-        matrix=matrix_data
-    )
+    return ConfusionMatrixData(labels=labels, matrix=matrix_data)

@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Union
 import pandas as pd
 
 from .data.dataset import SplitDataset
-from .modeling.base import StatefulEstimator, BaseModelCalculator, BaseModelApplier
+from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator
 from .modeling.classification import (
     LogisticRegressionApplier,
     LogisticRegressionCalculator,
@@ -100,17 +100,19 @@ class SkyulfPipeline:
                 calculator = TunerCalculator(base_calc)
                 applier = TunerApplier(base_applier)
             else:
-                raise ValueError(f"Unknown base model type for tuner: {base_model_type}")
+                raise ValueError(
+                    f"Unknown base model type for tuner: {base_model_type}"
+                )
         else:
             raise ValueError(f"Unknown model type: {model_type}")
 
         self.model_estimator = StatefulEstimator(
-            node_id=node_id,
-            calculator=calculator,
-            applier=applier
+            node_id=node_id, calculator=calculator, applier=applier
         )
 
-    def fit(self, data: Union[pd.DataFrame, SplitDataset], target_column: str) -> Dict[str, Any]:
+    def fit(
+        self, data: Union[pd.DataFrame, SplitDataset], target_column: str
+    ) -> Dict[str, Any]:
         """
         Fit the pipeline.
 
@@ -138,7 +140,9 @@ class SkyulfPipeline:
                 # But we can fit on it.
                 # Ideally, the user should provide a SplitDataset or use a Splitter node in preprocessing.
                 # If preprocessing didn't split, we wrap it.
-                dataset = SplitDataset(train=transformed_data, test=pd.DataFrame(), validation=None)
+                dataset = SplitDataset(
+                    train=transformed_data, test=pd.DataFrame(), validation=None
+                )
             else:
                 dataset = transformed_data
 
@@ -147,15 +151,14 @@ class SkyulfPipeline:
             _ = self.model_estimator.fit_predict(
                 dataset=dataset,
                 target_column=target_column,
-                config=self.modeling_config
+                config=self.modeling_config,
             )
 
             # Evaluate
             # We can run evaluation if we have test/validation sets
             try:
                 eval_report = self.model_estimator.evaluate(
-                    dataset=dataset,
-                    target_column=target_column
+                    dataset=dataset, target_column=target_column
                 )
                 metrics["modeling"] = eval_report
             except Exception as e:
@@ -177,10 +180,11 @@ class SkyulfPipeline:
         # 1. Feature Engineering (Transform only)
         transformed_data = self.feature_engineer.transform(data)
 
-
         # 2. Modeling
         if self.model_estimator and self.model_estimator.model is not None:
-            return self.model_estimator.applier.predict(transformed_data, self.model_estimator.model)
+            return self.model_estimator.applier.predict(
+                transformed_data, self.model_estimator.model
+            )
         else:
             raise ValueError("Pipeline not fitted or no model configured.")
 

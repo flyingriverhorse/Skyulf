@@ -1,7 +1,7 @@
 """Wrapper for Scikit-Learn models."""
 
-from typing import Any, Dict, Optional, Type
 import logging
+from typing import Any, Dict, Optional, Type
 
 import pandas as pd
 from sklearn.base import BaseEstimator
@@ -58,8 +58,18 @@ class SklearnCalculator(BaseModelCalculator):
 
             if not overrides and "params" not in config:
                 # Fallback to flat config if 'params' key is completely missing
-                reserved_keys = {"type", "target_column", "node_id", "step_type", "inputs"}
-                overrides = {k: v for k, v in config.items() if k not in reserved_keys and not isinstance(v, dict)}
+                reserved_keys = {
+                    "type",
+                    "target_column",
+                    "node_id",
+                    "step_type",
+                    "inputs",
+                }
+                overrides = {
+                    k: v
+                    for k, v in config.items()
+                    if k not in reserved_keys and not isinstance(v, dict)
+                }
 
             if overrides:
                 params.update(overrides)
@@ -94,7 +104,9 @@ class SklearnApplier(BaseModelApplier):
         # model_artifact is the fitted sklearn estimator
         return pd.Series(model_artifact.predict(df), index=df.index)
 
-    def predict_proba(self, df: pd.DataFrame, model_artifact: Any) -> Optional[pd.DataFrame]:
+    def predict_proba(
+        self, df: pd.DataFrame, model_artifact: Any
+    ) -> Optional[pd.DataFrame]:
         """Generate prediction probabilities."""
         if hasattr(model_artifact, "predict_proba"):
             try:

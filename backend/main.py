@@ -7,41 +7,41 @@ This module creates and configures the FastAPI application instance.
 It provides better concurrency support compared to the Flask implementation.
 """
 
+import logging
+import time
 from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import AsyncGenerator
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.utils import get_openapi
-import logging
-import time
-from typing import AsyncGenerator
-from pathlib import Path
+from fastapi.staticfiles import StaticFiles
 
 # Use absolute imports to fix import issues
 from backend.config import get_settings
-
+from backend.data_ingestion.router import router as data_ingestion_router
+from backend.data_ingestion.router import sources_router as data_sources_router
+from backend.database.engine import close_db, create_tables, init_db
+from backend.exceptions.handlers import (
+    generic_http_exception_handler,
+    method_not_allowed_exception_handler,
+    not_found_exception_handler,
+    validation_exception_handler,
+)
 from backend.health.routes import router as health_router
+from backend.middleware.error_handler import ErrorHandlerMiddleware
+from backend.middleware.logging import LoggingMiddleware
+
 # from core.feature_engineering.routes import router as feature_engineering_router
 from backend.ml_pipeline.api import router as ml_pipeline_router
 from backend.ml_pipeline.deployment.api import router as deployment_router
 from backend.ml_pipeline.model_registry.api import router as model_registry_router
-from backend.data_ingestion.router import router as data_ingestion_router, sources_router as data_sources_router
-from backend.middleware.error_handler import ErrorHandlerMiddleware
-from backend.middleware.logging import LoggingMiddleware
-from backend.database.engine import init_db, close_db, create_tables
-from backend.exceptions.handlers import (
-    not_found_exception_handler,
-    validation_exception_handler,
-    method_not_allowed_exception_handler,
-    generic_http_exception_handler
-)
-
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -55,9 +55,18 @@ OPENAPI_DESCRIPTION = (
 )
 
 OPENAPI_TAGS = [
-    {"name": "Data Management", "description": "Dataset ingestion, lifecycle, and catalog management APIs."},
-    {"name": "ml-workflow", "description": "Feature engineering and ML workflow orchestration endpoints."},
-    {"name": "health", "description": "Health and readiness probes consumed by monitoring systems."},
+    {
+        "name": "Data Management",
+        "description": "Dataset ingestion, lifecycle, and catalog management APIs.",
+    },
+    {
+        "name": "ml-workflow",
+        "description": "Feature engineering and ML workflow orchestration endpoints.",
+    },
+    {
+        "name": "health",
+        "description": "Health and readiness probes consumed by monitoring systems.",
+    },
 ]
 
 
@@ -219,10 +228,7 @@ def _add_middleware(app: FastAPI, settings) -> None:
 
     # Security middleware
     if settings.ALLOWED_HOSTS:
-        app.add_middleware(
-            TrustedHostMiddleware,
-            allowed_hosts=settings.ALLOWED_HOSTS
-        )
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
 
     # CORS middleware
     app.add_middleware(
@@ -294,8 +300,7 @@ def _add_exception_handlers(app: FastAPI) -> None:
         logger.error(f"Unexpected error: {exc}", exc_info=True)
         # Convert to HTTPException for consistent handling
         http_exc = HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(exc)}"
+            status_code=500, detail=f"Internal server error: {str(exc)}"
         )
         return await generic_http_exception_handler(request, http_exc)
 
@@ -307,6 +312,7 @@ app = create_app()
 # For development server
 if __name__ == "__main__":
     import uvicorn
+
     settings = get_settings()
 
     uvicorn.run(
@@ -314,5 +320,5 @@ if __name__ == "__main__":
         host=settings.HOST,
         port=settings.PORT,
         reload=settings.DEBUG,
-        log_level="info" if settings.DEBUG else "warning"
+        log_level="info" if settings.DEBUG else "warning",
     )

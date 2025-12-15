@@ -1,7 +1,7 @@
 """Hyperparameter Tuner implementation."""
 
 import logging
-from typing import Any, Callable, Dict, Optional, List, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -12,11 +12,11 @@ from sklearn.model_selection import (
     HalvingGridSearchCV,
     HalvingRandomSearchCV,
     KFold,
+    ParameterGrid,
+    ParameterSampler,
     ShuffleSplit,
     StratifiedKFold,
     TimeSeriesSplit,
-    ParameterGrid,
-    ParameterSampler,
 )
 
 from ..base import BaseModelApplier, BaseModelCalculator
@@ -120,7 +120,9 @@ class TunerCalculator(BaseModelCalculator):
         final_params = {**self.model_calculator.default_params, **best_params}
 
         # Ensure random_state is passed if available in config and not in params
-        if "random_state" not in final_params and hasattr(tuning_config, "random_state"):
+        if "random_state" not in final_params and hasattr(
+            tuning_config, "random_state"
+        ):
             final_params["random_state"] = tuning_config.random_state
 
         if log_callback:
@@ -252,7 +254,9 @@ class TunerCalculator(BaseModelCalculator):
         if config.strategy in ["grid", "random"]:
             # Use custom loop to support progress and log callbacks
             if log_callback:
-                log_callback(f"Starting {config.strategy} search with custom loop for detailed logging...")
+                log_callback(
+                    f"Starting {config.strategy} search with custom loop for detailed logging..."
+                )
 
             # 1. Generate Candidates
             param_space = self._clean_search_space(config.search_space)
@@ -266,7 +270,9 @@ class TunerCalculator(BaseModelCalculator):
                     ParameterSampler(
                         param_space,
                         n_iter=config.n_trials,
-                        random_state=config.random_state))
+                        random_state=config.random_state,
+                    )
+                )
 
             total_candidates = len(candidates)
             if log_callback:
@@ -279,46 +285,76 @@ class TunerCalculator(BaseModelCalculator):
             # 2. Iterate Candidates
             for i, params in enumerate(candidates):
                 if log_callback:
-                    log_callback(f"Evaluating Candidate {i + 1}/{total_candidates}: {params}")
+                    log_callback(
+                        f"Evaluating Candidate {i + 1}/{total_candidates}: {params}"
+                    )
 
                 # Use custom cross-validation loop to enable per-fold logging and progress tracking.
                 # We instantiate the model with the current candidate parameters and evaluate it using the configured CV strategy.
 
-
                 fold_scores = []
 
                 # Ensure numpy
-                X_arr = X_for_search.to_numpy() if hasattr(X_for_search, "to_numpy") else X_for_search
-                y_arr = y_for_search.to_numpy() if hasattr(y_for_search, "to_numpy") else y_for_search
+                X_arr = (
+                    X_for_search.to_numpy()
+                    if hasattr(X_for_search, "to_numpy")
+                    else X_for_search
+                )
+                y_arr = (
+                    y_for_search.to_numpy()
+                    if hasattr(y_for_search, "to_numpy")
+                    else y_for_search
+                )
 
                 for fold_idx, (train_idx, val_idx) in enumerate(cv.split(X_arr, y_arr)):
                     # Split
-                    X_train_fold = X_for_search.iloc[train_idx] if hasattr(
-                        X_for_search, "iloc") else X_for_search[train_idx]
-                    y_train_fold = y_for_search.iloc[train_idx] if hasattr(
-                        y_for_search, "iloc") else y_for_search[train_idx]
-                    X_val_fold = X_for_search.iloc[val_idx] if hasattr(X_for_search, "iloc") else X_for_search[val_idx]
-                    y_val_fold = y_for_search.iloc[val_idx] if hasattr(y_for_search, "iloc") else y_for_search[val_idx]
+                    X_train_fold = (
+                        X_for_search.iloc[train_idx]
+                        if hasattr(X_for_search, "iloc")
+                        else X_for_search[train_idx]
+                    )
+                    y_train_fold = (
+                        y_for_search.iloc[train_idx]
+                        if hasattr(y_for_search, "iloc")
+                        else y_for_search[train_idx]
+                    )
+                    X_val_fold = (
+                        X_for_search.iloc[val_idx]
+                        if hasattr(X_for_search, "iloc")
+                        else X_for_search[val_idx]
+                    )
+                    y_val_fold = (
+                        y_for_search.iloc[val_idx]
+                        if hasattr(y_for_search, "iloc")
+                        else y_for_search[val_idx]
+                    )
 
                     # Instantiate and Fit
                     # Note: We must handle potential errors (e.g. incompatible params)
                     try:
-                        model = self.model_calculator.model_class(**{**self.model_calculator.default_params, **params})
+                        model = self.model_calculator.model_class(
+                            **{**self.model_calculator.default_params, **params}
+                        )
                         model.fit(X_train_fold, y_train_fold)
 
                         # Score
                         from sklearn.metrics import get_scorer
+
                         scorer = get_scorer(metric)
                         score = scorer(model, X_val_fold, y_val_fold)
                         fold_scores.append(score)
 
                         if log_callback:
                             n_splits = cv.get_n_splits(X_arr, y_arr)
-                            log_callback(f"  [Candidate {i + 1}] CV Fold {fold_idx + 1}/{n_splits} Score: {score:.4f}")
+                            log_callback(
+                                f"  [Candidate {i + 1}] CV Fold {fold_idx + 1}/{n_splits} Score: {score:.4f}"
+                            )
                     except Exception as e:
                         if log_callback:
                             n_splits = cv.get_n_splits(X_arr, y_arr)
-                            log_callback(f"  [Candidate {i + 1}] CV Fold {fold_idx + 1}/{n_splits} Failed: {str(e)}")
+                            log_callback(
+                                f"  [Candidate {i + 1}] CV Fold {fold_idx + 1}/{n_splits} Failed: {str(e)}"
+                            )
                         fold_scores.append(-float("inf"))
 
                 # Filter out failed folds for mean calculation if possible, or penalize
@@ -334,7 +370,7 @@ class TunerCalculator(BaseModelCalculator):
                 if progress_callback:
                     progress_callback(i + 1, total_candidates, mean_score, params)
 
-                trials.append({'params': params, 'score': mean_score})
+                trials.append({"params": params, "score": mean_score})
 
                 if mean_score > best_score:
                     best_score = mean_score
@@ -344,7 +380,7 @@ class TunerCalculator(BaseModelCalculator):
                 best_params=best_params if best_params is not None else {},
                 best_score=best_score,
                 n_trials=total_candidates,
-                trials=trials
+                trials=trials,
             )
 
         elif config.strategy == "halving_grid":
@@ -394,7 +430,9 @@ class TunerCalculator(BaseModelCalculator):
                     score = trial.value if trial.value is not None else None
 
                     if log_callback:
-                        log_callback(f"Optuna Trial {trial.number + 1} finished. Mean CV Score: {score}")
+                        log_callback(
+                            f"Optuna Trial {trial.number + 1} finished. Mean CV Score: {score}"
+                        )
 
                     progress_callback(
                         trial.number + 1, config.n_trials, score, trial.params
@@ -510,7 +548,9 @@ class TunerApplier(BaseModelApplier):
         # Fallback if artifact is just the result (legacy)
         return pd.Series(np.nan, index=df.index)
 
-    def predict_proba(self, df: pd.DataFrame, model_artifact: Any) -> Optional[pd.DataFrame]:
+    def predict_proba(
+        self, df: pd.DataFrame, model_artifact: Any
+    ) -> Optional[pd.DataFrame]:
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
             model, _ = model_artifact
             return self.base_applier.predict_proba(df, model)

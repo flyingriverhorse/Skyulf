@@ -1,5 +1,6 @@
+from typing import Any, Dict
+
 import polars as pl
-from typing import Dict, Any
 
 
 class DataProfiler:
@@ -16,8 +17,10 @@ class DataProfiler:
             "row_count": len(df),
             "column_count": len(df.columns),
             "columns": {},
-            "missing_cells": sum(df[col].null_count() for col in df.columns),  # Total missing cells
-            "duplicate_rows": df.is_duplicated().sum()
+            "missing_cells": sum(
+                df[col].null_count() for col in df.columns
+            ),  # Total missing cells
+            "duplicate_rows": df.is_duplicated().sum(),
         }
 
         for col in df.columns:
@@ -39,7 +42,9 @@ class DataProfiler:
             elif dtype in ["Utf8", "String", "Categorical"]:
                 # Top 5 values
                 try:
-                    value_counts = series.value_counts().sort("count", descending=True).head(5)
+                    value_counts = (
+                        series.value_counts().sort("count", descending=True).head(5)
+                    )
                     col_stats["top_values"] = value_counts.to_dicts()
                 except BaseException:
                     pass

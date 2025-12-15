@@ -6,11 +6,13 @@ This module centralizes the logic to write/read/update/delete the
 keeps behavior separate from the generic database CRUD dispatcher.
 """
 
-from typing import Any, Dict, Optional, Union, List, cast
 import logging
+from typing import Any, Dict, List, Optional, Union, cast
 
 from backend.config import Settings
-from . import async_sqlite_queries as sqlite_q, async_postgres_queries as pg_q
+
+from . import async_postgres_queries as pg_q
+from . import async_sqlite_queries as sqlite_q
 
 logger = logging.getLogger(__name__)
 
@@ -38,31 +40,45 @@ async def create(settings: Settings, row: Dict[str, Any]) -> Any:
         # SQLite as primary
         try:
             sqlite_res = await sqlite_q.insert_data_source(settings, row)
-            logger.info(f"Successfully inserted data source into SQLite (primary): {row.get('id', 'unknown')}")
+            logger.info(
+                f"Successfully inserted data source into SQLite (primary): {row.get('id', 'unknown')}"
+            )
         except Exception as e:
             # Handle duplicate key errors
             msg = str(e).lower()
             if "unique" in msg or "duplicate" in msg or "constraint" in msg:
                 try:
-                    existing = await sqlite_q.select_data_sources(settings, {"id": row.get("id")})
+                    existing = await sqlite_q.select_data_sources(
+                        settings, {"id": row.get("id")}
+                    )
                     if isinstance(existing, list) and existing:
-                        logger.info(f"Data source already exists in SQLite: {row.get('id')}")
+                        logger.info(
+                            f"Data source already exists in SQLite: {row.get('id')}"
+                        )
                         return existing[0]
                     if isinstance(existing, dict):
-                        logger.info(f"Data source already exists in SQLite: {row.get('id')}")
+                        logger.info(
+                            f"Data source already exists in SQLite: {row.get('id')}"
+                        )
                         return existing
                 except Exception:
                     pass
 
             logger.exception("SQLite insert failed for data_sources")
-            raise RuntimeError("Failed to persist data_sources row to primary database (SQLite)")
+            raise RuntimeError(
+                "Failed to persist data_sources row to primary database (SQLite)"
+            )
 
         # Secondary sync to PostgreSQL (best-effort)
         try:
             await pg_q.insert_data_source(settings, row)
-            logger.info(f"Successfully synced data source to PostgreSQL (secondary): {row.get('id', 'unknown')}")
+            logger.info(
+                f"Successfully synced data source to PostgreSQL (secondary): {row.get('id', 'unknown')}"
+            )
         except Exception:
-            logger.warning(f"Failed to sync data source to PostgreSQL (non-critical): {row.get('id', 'unknown')}")
+            logger.warning(
+                f"Failed to sync data source to PostgreSQL (non-critical): {row.get('id', 'unknown')}"
+            )
 
         return sqlite_res
 
@@ -70,31 +86,45 @@ async def create(settings: Settings, row: Dict[str, Any]) -> Any:
         # PostgreSQL as primary
         try:
             pg_res = await pg_q.insert_data_source(settings, row)
-            logger.info(f"Successfully inserted data source into PostgreSQL (primary): {row.get('id', 'unknown')}")
+            logger.info(
+                f"Successfully inserted data source into PostgreSQL (primary): {row.get('id', 'unknown')}"
+            )
         except Exception as e:
             # Handle duplicate key errors
             msg = str(e).lower()
             if "unique" in msg or "duplicate" in msg or "constraint" in msg:
                 try:
-                    existing = await pg_q.select_data_sources(settings, {"id": row.get("id")})
+                    existing = await pg_q.select_data_sources(
+                        settings, {"id": row.get("id")}
+                    )
                     if isinstance(existing, list) and existing:
-                        logger.info(f"Data source already exists in PostgreSQL: {row.get('id')}")
+                        logger.info(
+                            f"Data source already exists in PostgreSQL: {row.get('id')}"
+                        )
                         return existing[0]
                     if isinstance(existing, dict):
-                        logger.info(f"Data source already exists in PostgreSQL: {row.get('id')}")
+                        logger.info(
+                            f"Data source already exists in PostgreSQL: {row.get('id')}"
+                        )
                         return existing
                 except Exception:
                     pass
 
             logger.exception("PostgreSQL insert failed for data_sources")
-            raise RuntimeError("Failed to persist data_sources row to primary database (PostgreSQL)")
+            raise RuntimeError(
+                "Failed to persist data_sources row to primary database (PostgreSQL)"
+            )
 
         # Secondary sync to SQLite (best-effort)
         try:
             await sqlite_q.insert_data_source(settings, row)
-            logger.info(f"Successfully synced data source to SQLite (secondary): {row.get('id', 'unknown')}")
+            logger.info(
+                f"Successfully synced data source to SQLite (secondary): {row.get('id', 'unknown')}"
+            )
         except Exception:
-            logger.warning(f"Failed to sync data source to SQLite (non-critical): {row.get('id', 'unknown')}")
+            logger.warning(
+                f"Failed to sync data source to SQLite (non-critical): {row.get('id', 'unknown')}"
+            )
 
         return pg_res
 
@@ -102,7 +132,9 @@ async def create(settings: Settings, row: Dict[str, Any]) -> Any:
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
 
 
-async def read(settings: Settings, filter: Optional[Dict[str, Any]] = None, one: bool = False) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
+async def read(
+    settings: Settings, filter: Optional[Dict[str, Any]] = None, one: bool = False
+) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
     """Read data sources from primary database."""
     primary_db = get_primary_database(settings)
 
@@ -113,24 +145,32 @@ async def read(settings: Settings, filter: Optional[Dict[str, Any]] = None, one:
             logger.debug("Successfully read %s rows from SQLite (primary)", row_count)
             return cast(Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], rows)
         except Exception:
-            logger.exception("Failed reading data_sources from SQLite (primary database)")
+            logger.exception(
+                "Failed reading data_sources from SQLite (primary database)"
+            )
             raise RuntimeError("Failed to read from primary database (SQLite)")
 
     elif primary_db == "postgres":
         try:
             rows = await pg_q.select_data_sources(settings, filter, one=one)
             row_count = len(rows) if isinstance(rows, list) else 1
-            logger.debug("Successfully read %s rows from PostgreSQL (primary)", row_count)
+            logger.debug(
+                "Successfully read %s rows from PostgreSQL (primary)", row_count
+            )
             return cast(Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], rows)
         except Exception:
-            logger.exception("Failed reading data_sources from PostgreSQL (primary database)")
+            logger.exception(
+                "Failed reading data_sources from PostgreSQL (primary database)"
+            )
             raise RuntimeError("Failed to read from primary database (PostgreSQL)")
 
     else:
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
 
 
-async def update(settings: Settings, filter: Dict[str, Any], update_data: Dict[str, Any]):
+async def update(
+    settings: Settings, filter: Dict[str, Any], update_data: Dict[str, Any]
+):
     """Update data sources with configurable primary database.
 
     Strategy: Primary database-first approach
@@ -154,8 +194,12 @@ async def update(settings: Settings, filter: Dict[str, Any], update_data: Dict[s
     if primary_db == "sqlite":
         # Primary update in SQLite
         try:
-            sqlite_rows = await sqlite_q.update_data_source(settings, filter, update_data)
-            logger.info(f"Successfully updated data source in SQLite (primary): {filter}")
+            sqlite_rows = await sqlite_q.update_data_source(
+                settings, filter, update_data
+            )
+            logger.info(
+                f"Successfully updated data source in SQLite (primary): {filter}"
+            )
         except Exception:
             logger.exception("SQLite update failed for data_sources")
             raise RuntimeError("Failed to update in primary database (SQLite)")
@@ -163,9 +207,13 @@ async def update(settings: Settings, filter: Dict[str, Any], update_data: Dict[s
         # Optional PostgreSQL sync (best-effort, non-blocking)
         try:
             await pg_q.update_data_source(settings, filter, update_data)
-            logger.info(f"Successfully synced update to PostgreSQL (secondary): {filter}")
+            logger.info(
+                f"Successfully synced update to PostgreSQL (secondary): {filter}"
+            )
         except Exception:
-            logger.warning(f"Failed to sync update to PostgreSQL (non-critical): {filter}")
+            logger.warning(
+                f"Failed to sync update to PostgreSQL (non-critical): {filter}"
+            )
 
         return sqlite_rows
 
@@ -173,7 +221,9 @@ async def update(settings: Settings, filter: Dict[str, Any], update_data: Dict[s
         # Primary update in PostgreSQL
         try:
             pg_rows = await pg_q.update_data_source(settings, filter, update_data)
-            logger.info(f"Successfully updated data source in PostgreSQL (primary): {filter}")
+            logger.info(
+                f"Successfully updated data source in PostgreSQL (primary): {filter}"
+            )
         except Exception:
             logger.exception("PostgreSQL update failed for data_sources")
             raise RuntimeError("Failed to update in primary database (PostgreSQL)")
@@ -216,7 +266,9 @@ async def delete(settings: Settings, filter: Dict[str, Any]):
         # Primary delete from SQLite
         try:
             sqlite_rows = await sqlite_q.delete_data_source(settings, filter)
-            logger.info(f"Successfully deleted data source from SQLite (primary): {filter}")
+            logger.info(
+                f"Successfully deleted data source from SQLite (primary): {filter}"
+            )
         except Exception:
             logger.exception("SQLite delete failed for data_sources")
             raise RuntimeError("Failed to delete from primary database (SQLite)")
@@ -224,9 +276,13 @@ async def delete(settings: Settings, filter: Dict[str, Any]):
         # Optional PostgreSQL sync (best-effort, non-blocking)
         try:
             await pg_q.delete_data_source(settings, filter)
-            logger.info(f"Successfully synced delete to PostgreSQL (secondary): {filter}")
+            logger.info(
+                f"Successfully synced delete to PostgreSQL (secondary): {filter}"
+            )
         except Exception:
-            logger.warning(f"Failed to sync delete to PostgreSQL (non-critical): {filter}")
+            logger.warning(
+                f"Failed to sync delete to PostgreSQL (non-critical): {filter}"
+            )
 
         return sqlite_rows
 
@@ -234,7 +290,9 @@ async def delete(settings: Settings, filter: Dict[str, Any]):
         # Primary delete from PostgreSQL
         try:
             pg_rows = await pg_q.delete_data_source(settings, filter)
-            logger.info(f"Successfully deleted data source from PostgreSQL (primary): {filter}")
+            logger.info(
+                f"Successfully deleted data source from PostgreSQL (primary): {filter}"
+            )
         except Exception:
             logger.exception("PostgreSQL delete failed for data_sources")
             raise RuntimeError("Failed to delete from primary database (PostgreSQL)")
@@ -252,7 +310,9 @@ async def delete(settings: Settings, filter: Dict[str, Any]):
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
 
 
-async def get_by_file_hash(settings: Settings, file_hash: str) -> Optional[Dict[str, Any]]:
+async def get_by_file_hash(
+    settings: Settings, file_hash: str
+) -> Optional[Dict[str, Any]]:
     """Retrieve a data source row by the stored file hash in the JSON config."""
     if not file_hash:
         return None
@@ -270,7 +330,9 @@ async def get_by_file_hash(settings: Settings, file_hash: str) -> Optional[Dict[
         try:
             return await pg_q.select_data_source_by_file_hash(settings, file_hash)
         except Exception:
-            logger.warning("Secondary PostgreSQL file-hash lookup failed", exc_info=True)
+            logger.warning(
+                "Secondary PostgreSQL file-hash lookup failed", exc_info=True
+            )
             return None
 
     elif primary_db == "postgres":
@@ -320,7 +382,7 @@ async def get_database_status(settings: Settings) -> Dict[str, Any]:
     status: Dict[str, Any] = {
         "sqlite": {"connected": False, "count": 0, "error": None, "path": None},
         "postgres": {"connected": False, "count": 0, "error": None},
-        "primary": primary_db
+        "primary": primary_db,
     }
 
     # Check SQLite status

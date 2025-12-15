@@ -1,18 +1,18 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from backend.database.engine import get_async_session
-from .schemas import ModelRegistryEntry, RegistryStats, ModelVersion
+
+from .schemas import ModelRegistryEntry, ModelVersion, RegistryStats
 from .service import ModelRegistryService
 
 router = APIRouter(prefix="/registry", tags=["Model Registry"])
 
 
 @router.get("/stats", response_model=RegistryStats)
-async def get_registry_stats(
-    session: AsyncSession = Depends(get_async_session)
-):
+async def get_registry_stats(session: AsyncSession = Depends(get_async_session)):
     """
     Get statistics for the model registry.
     """
@@ -21,9 +21,7 @@ async def get_registry_stats(
 
 @router.get("/models", response_model=List[ModelRegistryEntry])
 async def list_models(
-    skip: int = 0,
-    limit: int = 10,
-    session: AsyncSession = Depends(get_async_session)
+    skip: int = 0, limit: int = 10, session: AsyncSession = Depends(get_async_session)
 ):
     """
     List all models in the registry.
@@ -33,8 +31,7 @@ async def list_models(
 
 @router.get("/models/{model_type}/versions", response_model=List[ModelVersion])
 async def get_model_versions(
-    model_type: str,
-    session: AsyncSession = Depends(get_async_session)
+    model_type: str, session: AsyncSession = Depends(get_async_session)
 ):
     """
     Get all versions for a specific model type.

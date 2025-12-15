@@ -1,6 +1,7 @@
 import socket
 import sys
 
+
 def check_port(host, port):
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -13,6 +14,7 @@ def check_port(host, port):
         sock.close()
     except Exception as e:
         print(f"Exception connecting to {host}:{port}: {e}")
+
 
 print("Testing localhost...")
 check_port("localhost", 6379)

@@ -1,39 +1,44 @@
-from typing import Dict, Any, Union, Tuple
+from typing import Any, Dict, Tuple, Union
+
 import pandas as pd
-from .base import BaseCalculator, BaseApplier
-from ..utils import unpack_pipeline_input, pack_pipeline_output
+
+from ..utils import pack_pipeline_output, unpack_pipeline_input
+from .base import BaseApplier, BaseCalculator
 
 # --- Deduplicate ---
 
 
 class DeduplicateCalculator(BaseCalculator):
-    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
 
         # Config: {'subset': [...], 'keep': 'first'|'last'|False}
         # Deduplication is an operation that doesn't learn parameters from data,
         # it just applies logic. So fit just passes through the config.
 
-        subset = config.get('subset')
-        keep = config.get('keep', 'first')
+        subset = config.get("subset")
+        keep = config.get("keep", "first")
 
-        return {
-            'type': 'deduplicate',
-            'subset': subset,
-            'keep': keep
-        }
+        return {"type": "deduplicate", "subset": subset, "keep": keep}
 
 
 class DeduplicateApplier(BaseApplier):
-    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-              params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
-        subset = params.get('subset')
-        keep = params.get('keep', 'first')
+        subset = params.get("subset")
+        keep = params.get("keep", "first")
 
         # Handle 'none' string from config
-        if keep == 'none':
+        if keep == "none":
             keep = False
 
         if subset:
@@ -50,18 +55,23 @@ class DeduplicateApplier(BaseApplier):
 
         return pack_pipeline_output(X_dedup, y, is_tuple)
 
+
 # --- Drop Missing Columns ---
 
 
 class DropMissingColumnsCalculator(BaseCalculator):
-    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
 
         # Config: {'threshold': 50.0 (percent), 'columns': [...]}
         # Threshold is percentage of missing values allowed. If missing > threshold, drop.
 
-        threshold = config.get('missing_threshold')
-        explicit_cols = config.get('columns', [])
+        threshold = config.get("missing_threshold")
+        explicit_cols = config.get("columns", [])
 
         cols_to_drop = set()
 
@@ -78,24 +88,29 @@ class DropMissingColumnsCalculator(BaseCalculator):
                 # However, to fix the "0 rows" bug where everything is dropped because default is 0:
                 if threshold_val > 0:
                     missing_pct = X.isna().mean() * 100
-                    auto_dropped = missing_pct[missing_pct >= threshold_val].index.tolist()
+                    auto_dropped = missing_pct[
+                        missing_pct >= threshold_val
+                    ].index.tolist()
                     cols_to_drop.update(auto_dropped)
             except (TypeError, ValueError):
                 pass
 
         return {
-            'type': 'drop_missing_columns',
-            'columns_to_drop': list(cols_to_drop),
-            'threshold': threshold
+            "type": "drop_missing_columns",
+            "columns_to_drop": list(cols_to_drop),
+            "threshold": threshold,
         }
 
 
 class DropMissingColumnsApplier(BaseApplier):
-    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-              params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
-        cols_to_drop = params.get('columns_to_drop', [])
+        cols_to_drop = params.get("columns_to_drop", [])
         cols_to_drop_X = [c for c in cols_to_drop if c in X.columns]
 
         if cols_to_drop_X:
@@ -103,32 +118,40 @@ class DropMissingColumnsApplier(BaseApplier):
 
         return pack_pipeline_output(X, y, is_tuple)
 
+
 # --- Drop Missing Rows ---
 
 
 class DropMissingRowsCalculator(BaseCalculator):
-    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
         # Config: {'subset': [...], 'how': 'any'|'all', 'threshold': int}
-        subset = config.get('subset')
-        how = config.get('how', 'any')
-        threshold = config.get('threshold')
+        subset = config.get("subset")
+        how = config.get("how", "any")
+        threshold = config.get("threshold")
 
         return {
-            'type': 'drop_missing_rows',
-            'subset': subset,
-            'how': how,
-            'threshold': threshold
+            "type": "drop_missing_rows",
+            "subset": subset,
+            "how": how,
+            "threshold": threshold,
         }
 
 
 class DropMissingRowsApplier(BaseApplier):
-    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-              params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
-        subset = params.get('subset')
-        how = params.get('how', 'any')
-        threshold = params.get('threshold')
+        subset = params.get("subset")
+        how = params.get("how", "any")
+        threshold = params.get("threshold")
 
         if subset:
             subset = [c for c in subset if c in X.columns]
@@ -149,35 +172,40 @@ class DropMissingRowsApplier(BaseApplier):
 
         return pack_pipeline_output(X_clean, y, is_tuple)
 
+
 # --- Missing Indicator ---
 
 
 class MissingIndicatorCalculator(BaseCalculator):
-    def fit(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
 
         # Config: {'columns': [...]}
         # If columns not provided, maybe detect columns with missing values?
 
-        cols = config.get('columns')
+        cols = config.get("columns")
         if not cols:
             # Auto-detect columns with missing values
             cols = X.columns[X.isna().any()].tolist()
         else:
             cols = [c for c in cols if c in X.columns]
 
-        return {
-            'type': 'missing_indicator',
-            'columns': cols
-        }
+        return {"type": "missing_indicator", "columns": cols}
 
 
 class MissingIndicatorApplier(BaseApplier):
-    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-              params: Dict[str, Any]) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
-        cols = params.get('columns', [])
+        cols = params.get("columns", [])
         valid_cols = [c for c in cols if c in X.columns]
 
         if not valid_cols:

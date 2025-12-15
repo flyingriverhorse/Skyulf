@@ -3,12 +3,14 @@ Async PostgreSQL-specific queries for data_sources table.
 This is the async equivalent of the Flask db/data_sources/postgres_queries.py
 """
 
-from typing import Any, Dict, List, Optional
 import logging
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy import text as sa_text
 
-from ..adapter import async_session_or_connection
 from backend.config import Settings
+
+from ..adapter import async_session_or_connection
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,9 @@ async def insert_data_source(settings: Settings, row: Dict[str, Any]) -> Dict[st
         try:
             cols = ", ".join(row.keys())
             placeholders = ", ".join([f":{k}" for k in row.keys()])
-            sql = sa_text(f"INSERT INTO {TABLE} ({cols}) VALUES ({placeholders}) RETURNING *")
+            sql = sa_text(
+                f"INSERT INTO {TABLE} ({cols}) VALUES ({placeholders}) RETURNING *"
+            )
             result = await session.execute(sql, row)
             await session.commit()
 
@@ -71,9 +75,7 @@ async def select_data_sources(
 
 
 async def update_data_source(
-    settings: Settings,
-    filter_dict: Dict[str, Any],
-    update_data: Dict[str, Any]
+    settings: Settings, filter_dict: Dict[str, Any], update_data: Dict[str, Any]
 ):
     """Update data source records."""
     async with async_session_or_connection(settings) as session:
@@ -129,8 +131,7 @@ async def delete_data_source(settings: Settings, filter_dict: Dict[str, Any]):
 
 
 async def select_data_source_by_file_hash(
-    settings: Settings,
-    file_hash: str
+    settings: Settings, file_hash: str
 ) -> Optional[Dict[str, Any]]:
     """Select a single data source by file hash using PostgreSQL JSON extraction."""
     if not file_hash:

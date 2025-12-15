@@ -1,7 +1,9 @@
-from typing import Dict, Optional, Any
-import polars as pl
-import httpx
 import io
+from typing import Any, Dict, Optional
+
+import httpx
+import polars as pl
+
 from .base import BaseConnector
 
 
@@ -11,24 +13,28 @@ class ApiConnector(BaseConnector):
     Fetches data from a URL and parses it into a Polars DataFrame.
     """
 
-    def __init__(self,
-                 url: str,
-                 method: str = "GET",
-                 headers: Optional[Dict[str,
-                                        str]] = None,
-                 params: Optional[Dict[str,
-                                       Any]] = None,
-                 data_key: Optional[str] = None):
+    def __init__(
+        self,
+        url: str,
+        method: str = "GET",
+        headers: Optional[Dict[str, str]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        data_key: Optional[str] = None,
+    ):
         self.url = url
         self.method = method
         self.headers = headers or {}
         self.params = params or {}
-        self.data_key = data_key  # Key to extract data from JSON response (e.g. "items" or "data")
+        self.data_key = (
+            data_key  # Key to extract data from JSON response (e.g. "items" or "data")
+        )
 
     async def connect(self) -> bool:
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.request(self.method, self.url, headers=self.headers, params=self.params)
+                response = await client.request(
+                    self.method, self.url, headers=self.headers, params=self.params
+                )
                 response.raise_for_status()
             return True
         except Exception as e:
@@ -43,7 +49,9 @@ class ApiConnector(BaseConnector):
         df = await self.fetch_data(limit=1)
         return {col: str(dtype) for col, dtype in df.schema.items()}
 
-    async def fetch_data(self, query: Optional[str] = None, limit: Optional[int] = None) -> pl.DataFrame:
+    async def fetch_data(
+        self, query: Optional[str] = None, limit: Optional[int] = None
+    ) -> pl.DataFrame:
         try:
             async with httpx.AsyncClient() as client:
                 # Merge query params if provided
@@ -54,9 +62,11 @@ class ApiConnector(BaseConnector):
                     pass
 
                 if limit:
-                    params['limit'] = limit
+                    params["limit"] = limit
 
-                response = await client.request(self.method, self.url, headers=self.headers, params=params)
+                response = await client.request(
+                    self.method, self.url, headers=self.headers, params=params
+                )
                 response.raise_for_status()
 
                 content_type = response.headers.get("content-type", "")
@@ -67,7 +77,9 @@ class ApiConnector(BaseConnector):
                         if self.data_key in data:
                             data = data[self.data_key]
                         else:
-                            raise ValueError(f"Key '{self.data_key}' not found in response")
+                            raise ValueError(
+                                f"Key '{self.data_key}' not found in response"
+                            )
 
                     # Polars can read list of dicts
                     return pl.DataFrame(data)

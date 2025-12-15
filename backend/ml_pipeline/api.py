@@ -1,32 +1,42 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
-from typing import Dict, Any, List, Optional, Union, Literal, cast
-from pydantic import BaseModel
-import tempfile
-import shutil
-import os
 import json
+import logging
+import os
+import shutil
+import tempfile
+from typing import Any, Dict, List, Literal, Optional, Union, cast
+
 import pandas as pd
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel
+from skyulf.data.dataset import SplitDataset
+from skyulf.modeling.hyperparameters import (
+    get_default_search_space,
+    get_hyperparameters,
+)
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
-from backend.database.engine import get_async_session
-from backend.database.models import FeatureEngineeringPipeline, TrainingJob, HyperparameterTuningJob
 from backend.data_ingestion.service import DataIngestionService
-from backend.utils.file_utils import extract_file_path_from_source
+from backend.database.engine import get_async_session
+from backend.database.models import (
+    FeatureEngineeringPipeline,
+    HyperparameterTuningJob,
+    TrainingJob,
+)
 from backend.ml_pipeline.tasks import run_pipeline_task
+from backend.utils.file_utils import extract_file_path_from_source
 
-from .execution.engine import PipelineEngine, DataLoader
-from .execution.schemas import PipelineConfig, NodeConfig
 from .artifacts.local import LocalArtifactStore
-from skyulf.data.dataset import SplitDataset
-# from .data.loader import DataLoader
-from .registry import NodeRegistry, RegistryItem
+from .execution.engine import DataLoader, PipelineEngine
+
 # from .data.profiler import DataProfiler
 # from .recommendations.schemas import Recommendation, AnalysisProfile
-from .execution.jobs import JobManager, JobInfo
-from skyulf.modeling.hyperparameters import get_hyperparameters, get_default_search_space
-import logging
+from .execution.jobs import JobInfo, JobManager
+from .execution.schemas import NodeConfig, PipelineConfig
+
+# from .data.loader import DataLoader
+from .registry import NodeRegistry, RegistryItem
 
 logger = logging.getLogger(__name__)
 
@@ -64,17 +74,37 @@ class DataProfiler:
                 "missing_count": int(df[col].isnull().sum()),
                 "missing_ratio": float(df[col].isnull().mean()),
                 "unique_count": int(df[col].nunique()),
-                "min_value": float(cast(Union[float, int], df[col].min())) if is_numeric else None,
-                "max_value": float(cast(Union[float, int], df[col].max())) if is_numeric else None,
-                "mean_value": float(cast(Union[float, int], df[col].mean())) if is_numeric else None,
-                "std_value": float(cast(Union[float, int], df[col].std())) if is_numeric else None,
-                "skewness": float(cast(Union[float, int], df[col].skew())) if is_numeric else None,
+                "min_value": (
+                    float(cast(Union[float, int], df[col].min()))
+                    if is_numeric
+                    else None
+                ),
+                "max_value": (
+                    float(cast(Union[float, int], df[col].max()))
+                    if is_numeric
+                    else None
+                ),
+                "mean_value": (
+                    float(cast(Union[float, int], df[col].mean()))
+                    if is_numeric
+                    else None
+                ),
+                "std_value": (
+                    float(cast(Union[float, int], df[col].std()))
+                    if is_numeric
+                    else None
+                ),
+                "skewness": (
+                    float(cast(Union[float, int], df[col].skew()))
+                    if is_numeric
+                    else None
+                ),
             }
         return AnalysisProfile(
             row_count=len(df),
             column_count=len(df.columns),
             duplicate_row_count=int(df.duplicated().sum()),
-            columns=columns
+            columns=columns,
         )
 
 
@@ -84,76 +114,94 @@ class AdvisorEngine:
 
         # 1. Imputation
         missing_cols = [
-            col for col, stats in profile.columns.items()
-            if stats["missing_count"] > 0
+            col for col, stats in profile.columns.items() if stats["missing_count"] > 0
         ]
         if missing_cols:
-            recs.append(Recommendation(
-                type="imputation",
-                rule_id="imputation_mean",  # Default rule id
-                target_columns=missing_cols,
-                message=f"Found {len(missing_cols)} columns with missing values.",
-                suggestion="Consider using SimpleImputer or KNNImputer."
-            ))
+            recs.append(
+                Recommendation(
+                    type="imputation",
+                    rule_id="imputation_mean",  # Default rule id
+                    target_columns=missing_cols,
+                    message=f"Found {len(missing_cols)} columns with missing values.",
+                    suggestion="Consider using SimpleImputer or KNNImputer.",
+                )
+            )
 
         # 2. Cleaning (Duplicates & High Missing)
         if profile.duplicate_row_count > 0:
-            recs.append(Recommendation(
-                type="cleaning",
-                rule_id="duplicate_rows_drop",
-                target_columns=[],
-                action="drop_duplicates",
-                message=f"Found {profile.duplicate_row_count} duplicate rows.",
-                suggestion="Add a DropDuplicates node."
-            ))
+            recs.append(
+                Recommendation(
+                    type="cleaning",
+                    rule_id="duplicate_rows_drop",
+                    target_columns=[],
+                    action="drop_duplicates",
+                    message=f"Found {profile.duplicate_row_count} duplicate rows.",
+                    suggestion="Add a DropDuplicates node.",
+                )
+            )
 
         high_missing_cols = [
-            col for col, stats in profile.columns.items()
+            col
+            for col, stats in profile.columns.items()
             if stats["missing_ratio"] > 0.5
         ]
         if high_missing_cols:
-            recs.append(Recommendation(
-                type="cleaning",
-                rule_id="high_missing_drop",
-                target_columns=high_missing_cols,
-                action="drop_columns",
-                message=f"Found {len(high_missing_cols)} columns with >50% missing values.",
-                suggestion="Consider dropping these columns."
-            ))
+            recs.append(
+                Recommendation(
+                    type="cleaning",
+                    rule_id="high_missing_drop",
+                    target_columns=high_missing_cols,
+                    action="drop_columns",
+                    message=f"Found {len(high_missing_cols)} columns with >50% missing values.",
+                    suggestion="Consider dropping these columns.",
+                )
+            )
 
         # 3. Encoding (Categorical columns)
         # Test expects "one_hot_encoding" for low cardinality
         cat_cols = [
-            col for col, stats in profile.columns.items()
-            if stats["column_type"] == "categorical" and stats["unique_count"] < 20  # Arbitrary threshold for OHE
+            col
+            for col, stats in profile.columns.items()
+            if stats["column_type"] == "categorical"
+            and stats["unique_count"] < 20  # Arbitrary threshold for OHE
         ]
         if cat_cols:
-            recs.append(Recommendation(
-                type="encoding",
-                rule_id="one_hot_encoding",
-                target_columns=cat_cols,
-                message=f"Found {len(cat_cols)} categorical columns suitable for OneHotEncoding.",
-                suggestion="Consider OneHotEncoder."
-            ))
+            recs.append(
+                Recommendation(
+                    type="encoding",
+                    rule_id="one_hot_encoding",
+                    target_columns=cat_cols,
+                    message=f"Found {len(cat_cols)} categorical columns suitable for OneHotEncoding.",
+                    suggestion="Consider OneHotEncoder.",
+                )
+            )
 
         # 4. Outliers (Simple Z-score check proxy)
         # If max is > mean + 3*std or min < mean - 3*std
         outlier_cols = []
         for col, stats in profile.columns.items():
-            if stats["column_type"] == "numeric" and stats["std_value"] and stats["std_value"] > 0:
+            if (
+                stats["column_type"] == "numeric"
+                and stats["std_value"]
+                and stats["std_value"] > 0
+            ):
                 mean = stats["mean_value"]
                 std = stats["std_value"]
-                if (stats["max_value"] > mean + 3 * std) or (stats["min_value"] < mean - 3 * std):
+                if (stats["max_value"] > mean + 3 * std) or (
+                    stats["min_value"] < mean - 3 * std
+                ):
                     outlier_cols.append(col)
 
         if outlier_cols:
-            recs.append(Recommendation(
-                type="outlier",
-                rule_id="outlier_removal_iqr",
-                target_columns=outlier_cols,
-                message=f"Found {len(outlier_cols)} columns with potential outliers.",
-                suggestion="Consider using IsolationForest or Z-score filtering."
-            ))
+            recs.append(
+                Recommendation(
+                    type="outlier",
+                    rule_id="outlier_removal_iqr",
+                    target_columns=outlier_cols,
+                    message=f"Found {len(outlier_cols)} columns with potential outliers.",
+                    suggestion="Consider using IsolationForest or Z-score filtering.",
+                )
+            )
 
         # 5. Transformation (Skewness)
         # Test expects "power_transform_box_cox" or "power_transform_yeo_johnson"
@@ -161,29 +209,37 @@ class AdvisorEngine:
         neg_skewed_cols = []
 
         for col, stats in profile.columns.items():
-            if stats["column_type"] == "numeric" and stats["skewness"] and abs(stats["skewness"]) > 1.0:
+            if (
+                stats["column_type"] == "numeric"
+                and stats["skewness"]
+                and abs(stats["skewness"]) > 1.0
+            ):
                 if stats["min_value"] > 0:
                     pos_skewed_cols.append(col)
                 else:
                     neg_skewed_cols.append(col)
 
         if pos_skewed_cols:
-            recs.append(Recommendation(
-                type="transformation",
-                rule_id="power_transform_box_cox",
-                target_columns=pos_skewed_cols,
-                message=f"Found {len(pos_skewed_cols)} positively skewed columns (strictly positive).",
-                suggestion="Consider Box-Cox transformation."
-            ))
+            recs.append(
+                Recommendation(
+                    type="transformation",
+                    rule_id="power_transform_box_cox",
+                    target_columns=pos_skewed_cols,
+                    message=f"Found {len(pos_skewed_cols)} positively skewed columns (strictly positive).",
+                    suggestion="Consider Box-Cox transformation.",
+                )
+            )
 
         if neg_skewed_cols:
-            recs.append(Recommendation(
-                type="transformation",
-                rule_id="power_transform_yeo_johnson",
-                target_columns=neg_skewed_cols,
-                message=f"Found {len(neg_skewed_cols)} skewed columns (with non-positive values).",
-                suggestion="Consider Yeo-Johnson transformation."
-            ))
+            recs.append(
+                Recommendation(
+                    type="transformation",
+                    rule_id="power_transform_yeo_johnson",
+                    target_columns=neg_skewed_cols,
+                    message=f"Found {len(neg_skewed_cols)} skewed columns (with non-positive values).",
+                    suggestion="Consider Yeo-Johnson transformation.",
+                )
+            )
 
         return recs
 
@@ -220,7 +276,7 @@ class RunPipelineResponse(BaseModel):
 async def run_pipeline(
     config: PipelineConfigModel,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_session),
 ):
     """
     Submit a pipeline for asynchronous execution via Celery or BackgroundTasks.
@@ -245,7 +301,9 @@ async def run_pipeline(
             elif node.step_type == "model_tuning":
                 # For tuning nodes, model_type might be in params directly or inside tuning_config?
                 # Usually it's 'algorithm' or 'model_type' in params
-                model_type = node.params.get("algorithm") or node.params.get("model_type", "unknown")
+                model_type = node.params.get("algorithm") or node.params.get(
+                    "model_type", "unknown"
+                )
             elif node.step_type == "data_preview":
                 model_type = "preview"
 
@@ -263,19 +321,26 @@ async def run_pipeline(
                 if ds:
                     # Use the UUID source_id for consistency with the database join
                     if ds.source_id:
-                        dataset_id = cast(str, ds.source_id)  # Update dataset_id for job record
+                        dataset_id = cast(
+                            str, ds.source_id
+                        )  # Update dataset_id for job record
 
                     ds_dict = {
                         "connection_info": ds.config,
-                        "file_path": ds.config.get("file_path") if ds.config else None
+                        "file_path": ds.config.get("file_path") if ds.config else None,
                     }
                     path = extract_file_path_from_source(ds_dict)
                     if path:
                         node.params["path"] = str(path)
                     else:
-                        raise HTTPException(status_code=400, detail=f"Could not resolve path for dataset {ds_id}")
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Could not resolve path for dataset {ds_id}",
+                        )
                 else:
-                    raise HTTPException(status_code=404, detail=f"Dataset {ds_id} not found")
+                    raise HTTPException(
+                        status_code=404, detail=f"Dataset {ds_id} not found"
+                    )
             except ValueError:
                 # If it's not an int, assume it's already a UUID or string ID
                 pass
@@ -286,10 +351,10 @@ async def run_pipeline(
         session=db,
         pipeline_id=pipeline_id,
         node_id=target_node_id or "unknown",
-        job_type=cast(Literal['training', 'tuning', 'preview'], config.job_type),
+        job_type=cast(Literal["training", "tuning", "preview"], config.job_type),
         dataset_id=dataset_id,
         model_type=model_type,
-        graph=config.dict()
+        graph=config.dict(),
     )
 
     # Trigger Task
@@ -301,9 +366,7 @@ async def run_pipeline(
         background_tasks.add_task(run_pipeline_task, job_id, config.dict())
 
     return RunPipelineResponse(
-        message="Pipeline execution started",
-        pipeline_id=pipeline_id,
-        job_id=job_id
+        message="Pipeline execution started", pipeline_id=pipeline_id, job_id=job_id
     )
 
 
@@ -321,6 +384,7 @@ class SavedPipelineModel(BaseModel):
     description: Optional[str] = None
     graph: Dict[str, Any]
 
+
 # --- Endpoints ---
 
 
@@ -328,7 +392,7 @@ class SavedPipelineModel(BaseModel):
 async def save_pipeline(
     dataset_id: str,
     payload: SavedPipelineModel,
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """Saves the pipeline configuration (supports DB or JSON based on config)."""
     settings = get_settings()
@@ -342,14 +406,16 @@ async def save_pipeline(
                 json.dump(payload.dict(), f, indent=2)
             return {"status": "success", "id": dataset_id, "storage": "json"}
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to save pipeline to JSON: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to save pipeline to JSON: {str(e)}"
+            )
 
     # Default: Database Storage
     try:
         # Check if pipeline exists for this dataset
         stmt = select(FeatureEngineeringPipeline).where(
             FeatureEngineeringPipeline.dataset_source_id == dataset_id,
-            FeatureEngineeringPipeline.is_active
+            FeatureEngineeringPipeline.is_active,
         )
         result = await session.execute(stmt)
         existing_pipeline = result.scalar_one_or_none()
@@ -368,7 +434,7 @@ async def save_pipeline(
                 name=payload.name,
                 description=payload.description,
                 graph=payload.graph,
-                is_active=True
+                is_active=True,
             )
             session.add(new_pipeline)
 
@@ -376,13 +442,14 @@ async def save_pipeline(
         return {"status": "success", "id": dataset_id, "storage": "database"}
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to save pipeline: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to save pipeline: {str(e)}"
+        )
 
 
 @router.get("/load/{dataset_id}")
 async def load_pipeline(
-    dataset_id: str,
-    session: AsyncSession = Depends(get_async_session)
+    dataset_id: str, session: AsyncSession = Depends(get_async_session)
 ):
     """Loads the pipeline configuration (supports DB or JSON based on config)."""
     settings = get_settings()
@@ -398,13 +465,15 @@ async def load_pipeline(
                 data = json.load(f)
             return data
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to load pipeline from JSON: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to load pipeline from JSON: {str(e)}"
+            )
 
     # Default: Database Storage
     try:
         stmt = select(FeatureEngineeringPipeline).where(
             FeatureEngineeringPipeline.dataset_source_id == dataset_id,
-            FeatureEngineeringPipeline.is_active
+            FeatureEngineeringPipeline.is_active,
         )
         result = await session.execute(stmt)
         pipeline = result.scalar_one_or_none()
@@ -414,13 +483,14 @@ async def load_pipeline(
 
         return pipeline.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load pipeline: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to load pipeline: {str(e)}"
+        )
 
 
 @router.post("/preview", response_model=PreviewResponse)
 async def preview_pipeline(
-    config: PipelineConfigModel,
-    session: AsyncSession = Depends(get_async_session)
+    config: PipelineConfigModel, session: AsyncSession = Depends(get_async_session)
 ):
     """
     Runs the pipeline in Preview Mode:
@@ -440,17 +510,25 @@ async def preview_pipeline(
                     # Note: DataSource model stores connection info in 'config' column
                     ds_dict = {
                         "connection_info": ds.config,
-                        "file_path": ds.config.get("file_path") if ds.config else None
+                        "file_path": ds.config.get("file_path") if ds.config else None,
                     }
                     path = extract_file_path_from_source(ds_dict)
                     if path:
                         node.params["path"] = str(path)
                     else:
-                        raise HTTPException(status_code=400, detail=f"Could not resolve path for dataset {ds_id}")
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Could not resolve path for dataset {ds_id}",
+                        )
                 else:
-                    raise HTTPException(status_code=404, detail=f"Dataset {ds_id} not found")
+                    raise HTTPException(
+                        status_code=404, detail=f"Dataset {ds_id} not found"
+                    )
             except ValueError:
-                raise HTTPException(status_code=400, detail=f"Invalid dataset ID: {node.params['dataset_id']}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid dataset ID: {node.params['dataset_id']}",
+                )
 
     # 1. Create Temporary Artifact Store
     temp_dir = tempfile.mkdtemp(prefix="skyulf_preview_")
@@ -472,17 +550,25 @@ async def preview_pipeline(
                 params["sample"] = True
                 params["limit"] = 1000  # Default preview limit
 
-            nodes.append(NodeConfig(
-                node_id=node.node_id,
-                step_type=cast(Literal['data_loader', 'feature_engineering', 'model_training', 'model_tuning'], node.step_type),
-                params=params,
-                inputs=node.inputs
-            ))
+            nodes.append(
+                NodeConfig(
+                    node_id=node.node_id,
+                    step_type=cast(
+                        Literal[
+                            "data_loader",
+                            "feature_engineering",
+                            "model_training",
+                            "model_tuning",
+                        ],
+                        node.step_type,
+                    ),
+                    params=params,
+                    inputs=node.inputs,
+                )
+            )
 
         pipeline_config = PipelineConfig(
-            pipeline_id=config.pipeline_id,
-            nodes=nodes,
-            metadata=config.metadata
+            pipeline_id=config.pipeline_id, nodes=nodes, metadata=config.metadata
         )
 
         # 3. Run Engine
@@ -504,13 +590,17 @@ async def preview_pipeline(
                 if target_node.inputs:
                     # Use the input node's output
                     target_node_id = target_node.inputs[0]
-                    logger.info(f"Last node is {target_node.step_type}, previewing input node {target_node_id} instead")
+                    logger.info(
+                        f"Last node is {target_node.step_type}, previewing input node {target_node_id} instead"
+                    )
 
             if artifact_store.exists(target_node_id):
                 artifact = artifact_store.load(target_node_id)
 
                 # Debug logging
-                logger.debug(f"Loaded artifact for node {target_node_id}. Type: {type(artifact)}")
+                logger.debug(
+                    f"Loaded artifact for node {target_node_id}. Type: {type(artifact)}"
+                )
                 if isinstance(artifact, SplitDataset):
                     logger.debug(f"SplitDataset Train Type: {type(artifact.train)}")
 
@@ -525,13 +615,15 @@ async def preview_pipeline(
                         y = y.to_frame()
                     return {
                         f"{prefix}_X": json.loads(X.head(50).to_json(orient="records")),
-                        f"{prefix}_y": json.loads(y.head(50).to_json(orient="records"))
+                        f"{prefix}_y": json.loads(y.head(50).to_json(orient="records")),
                     }
 
                 # Handle different artifact types
                 if isinstance(artifact, pd.DataFrame):
                     logger.debug("Handling DataFrame artifact")
-                    preview_data = json.loads(artifact.head(50).to_json(orient="records"))
+                    preview_data = json.loads(
+                        artifact.head(50).to_json(orient="records")
+                    )
                     df_for_analysis = artifact
                 elif isinstance(artifact, SplitDataset):
                     logger.debug("Handling SplitDataset artifact")
@@ -544,22 +636,29 @@ async def preview_pipeline(
                         df_for_analysis = artifact.train[0]
                     else:
                         logger.debug("Train is DataFrame")
-                        preview_data["train"] = json.loads(artifact.train.head(50).to_json(orient="records"))
+                        preview_data["train"] = json.loads(
+                            artifact.train.head(50).to_json(orient="records")
+                        )
                         df_for_analysis = artifact.train
 
                     # Handle Test
                     if isinstance(artifact.test, tuple):
                         preview_data.update(process_xy(artifact.test, "test"))
                     else:
-                        preview_data["test"] = json.loads(artifact.test.head(50).to_json(orient="records"))
+                        preview_data["test"] = json.loads(
+                            artifact.test.head(50).to_json(orient="records")
+                        )
 
                     # Handle Validation
                     if artifact.validation is not None:
                         if isinstance(artifact.validation, tuple):
-                            preview_data.update(process_xy(artifact.validation, "validation"))
+                            preview_data.update(
+                                process_xy(artifact.validation, "validation")
+                            )
                         else:
                             preview_data["validation"] = json.loads(
-                                artifact.validation.head(50).to_json(orient="records"))
+                                artifact.validation.head(50).to_json(orient="records")
+                            )
 
                 elif isinstance(artifact, tuple) and len(artifact) == 2:
                     logger.debug("Handling Tuple artifact")
@@ -570,15 +669,23 @@ async def preview_pipeline(
                     if isinstance(X, (pd.DataFrame, pd.Series)):
                         if isinstance(X, pd.Series):
                             X = X.to_frame()
-                        preview_data["X"] = json.loads(X.head(50).to_json(orient="records"))
+                        preview_data["X"] = json.loads(
+                            X.head(50).to_json(orient="records")
+                        )
 
                     if isinstance(y, (pd.DataFrame, pd.Series)):
                         if isinstance(y, pd.Series):
                             y = y.to_frame()
-                        preview_data["y"] = json.loads(y.head(50).to_json(orient="records"))
+                        preview_data["y"] = json.loads(
+                            y.head(50).to_json(orient="records")
+                        )
 
                     df_for_analysis = X if isinstance(X, pd.DataFrame) else None
-                elif isinstance(artifact, dict) and "train" in artifact and isinstance(artifact["train"], tuple):
+                elif (
+                    isinstance(artifact, dict)
+                    and "train" in artifact
+                    and isinstance(artifact["train"], tuple)
+                ):
                     # Handle FeatureTargetSplitter result on SplitDataset OR TrainTestSplitter result on (X, y)
                     # Both result in {'train': (X, y), 'test': (X, y)}
                     preview_data = {}
@@ -591,7 +698,9 @@ async def preview_pipeline(
                         preview_data.update(process_xy(artifact["test"], "test"))
 
                     if "validation" in artifact:
-                        preview_data.update(process_xy(artifact["validation"], "validation"))
+                        preview_data.update(
+                            process_xy(artifact["validation"], "validation")
+                        )
 
                 # Generate Recommendations
                 if df_for_analysis is not None:
@@ -607,7 +716,7 @@ async def preview_pipeline(
             status=result.status,
             node_results={k: v.__dict__ for k, v in result.node_results.items()},
             preview_data=preview_data,
-            recommendations=recommendations
+            recommendations=recommendations,
         )
 
     except Exception as e:
@@ -619,8 +728,7 @@ async def preview_pipeline(
 
 @router.get("/jobs/{job_id}", response_model=JobInfo)
 async def get_job_status(
-    job_id: str,
-    session: AsyncSession = Depends(get_async_session)
+    job_id: str, session: AsyncSession = Depends(get_async_session)
 ):
     """
     Returns the status of a background job.
@@ -632,10 +740,7 @@ async def get_job_status(
 
 
 @router.post("/jobs/{job_id}/cancel")
-async def cancel_job(
-    job_id: str,
-    session: AsyncSession = Depends(get_async_session)
-):
+async def cancel_job(job_id: str, session: AsyncSession = Depends(get_async_session)):
     """
     Cancels a running or queued job.
     """
@@ -643,14 +748,14 @@ async def cancel_job(
     if not success:
         raise HTTPException(
             status_code=400,
-            detail="Job could not be cancelled (maybe it's already finished or doesn't exist)")
+            detail="Job could not be cancelled (maybe it's already finished or doesn't exist)",
+        )
     return {"message": "Job cancelled successfully"}
 
 
 @router.get("/jobs/{job_id}/evaluation")
 async def get_job_evaluation(
-    job_id: str,
-    session: AsyncSession = Depends(get_async_session)
+    job_id: str, session: AsyncSession = Depends(get_async_session)
 ):
     """Retrieves the raw evaluation data (y_true, y_pred) for a job."""
 
@@ -661,7 +766,9 @@ async def get_job_evaluation(
 
     if not job:
         # Try Tuning Job
-        stmt = select(HyperparameterTuningJob).where(HyperparameterTuningJob.id == job_id)
+        stmt = select(HyperparameterTuningJob).where(
+            HyperparameterTuningJob.id == job_id
+        )
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
 
@@ -688,11 +795,17 @@ async def get_job_evaluation(
     if not artifact_store.exists(key):
         # Fallback: Check if the job failed or is still running
         if job.status != "completed" and job.status != "succeeded":
-            raise HTTPException(status_code=400, detail=f"Job is {job.status}, evaluation data not available yet.")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Job is {job.status}, evaluation data not available yet.",
+            )
 
         # Debug info
         path = artifact_store._get_path(key)
-        raise HTTPException(status_code=404, detail=f"Evaluation data artifact not found. Key: {key}, Path: {path}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Evaluation data artifact not found. Key: {key}, Path: {path}",
+        )
 
     try:
         data = artifact_store.load(key)
@@ -702,11 +815,15 @@ async def get_job_evaluation(
             # If the ID doesn't match, it means a newer job overwrote it.
             # We return it anyway with a warning in the logs, or we accept it as "latest for this pipeline".
             # For now, let's return it but log a warning.
-            logger.warning(f"Evaluation data job_id mismatch. Requested: {job_id}, Found: {data.get('job_id')}")
+            logger.warning(
+                f"Evaluation data job_id mismatch. Requested: {job_id}, Found: {data.get('job_id')}"
+            )
 
         return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load evaluation data: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to load evaluation data: {str(e)}"
+        )
 
 
 @router.get("/jobs", response_model=List[JobInfo])
@@ -714,7 +831,7 @@ async def list_jobs(
     limit: int = 50,
     skip: int = 0,
     job_type: Optional[Literal["training", "tuning"]] = None,
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Lists recent jobs.
@@ -724,8 +841,7 @@ async def list_jobs(
 
 @router.get("/jobs/tuning/latest/{node_id}", response_model=Optional[JobInfo])
 async def get_latest_tuning_job(
-    node_id: str,
-    session: AsyncSession = Depends(get_async_session)
+    node_id: str, session: AsyncSession = Depends(get_async_session)
 ):
     """
     Retrieves the latest completed tuning job for a specific node.
@@ -735,8 +851,7 @@ async def get_latest_tuning_job(
 
 @router.get("/jobs/tuning/best/{model_type}", response_model=Optional[JobInfo])
 async def get_best_tuning_job_model(
-    model_type: str,
-    session: AsyncSession = Depends(get_async_session)
+    model_type: str, session: AsyncSession = Depends(get_async_session)
 ):
     """
     Retrieves the latest completed tuning job for a specific model type.
@@ -746,8 +861,7 @@ async def get_best_tuning_job_model(
 
 @router.get("/jobs/tuning/history/{model_type}", response_model=List[JobInfo])
 async def get_tuning_jobs_history(
-    model_type: str,
-    session: AsyncSession = Depends(get_async_session)
+    model_type: str, session: AsyncSession = Depends(get_async_session)
 ):
     """
     Retrieves a history of completed tuning jobs for a specific model type.
@@ -761,7 +875,13 @@ async def get_system_stats(session: AsyncSession = Depends(get_async_session)):
     Returns high-level system statistics for the dashboard.
     """
     from sqlalchemy import func, select
-    from backend.database.models import TrainingJob, HyperparameterTuningJob, Deployment, DataSource
+
+    from backend.database.models import (
+        DataSource,
+        Deployment,
+        HyperparameterTuningJob,
+        TrainingJob,
+    )
 
     # Execute queries in parallel or sequence
     # 1. Total Jobs (Training + Tuning)
@@ -769,11 +889,13 @@ async def get_system_stats(session: AsyncSession = Depends(get_async_session)):
     tuning_count = await session.scalar(select(func.count(HyperparameterTuningJob.id)))
 
     # 2. Active Deployments
-    deployment_count = await session.scalar(select(func.count(Deployment.id)).where(Deployment.is_active))
+    deployment_count = await session.scalar(
+        select(func.count(Deployment.id)).where(Deployment.is_active)
+    )
 
     # 3. Data Sources (Only successful ones)
     datasource_count = await session.scalar(
-        select(func.count(DataSource.id)).where(DataSource.test_status == 'success')
+        select(func.count(DataSource.id)).where(DataSource.test_status == "success")
     )
 
     return {
@@ -781,7 +903,7 @@ async def get_system_stats(session: AsyncSession = Depends(get_async_session)):
         "active_deployments": deployment_count or 0,
         "data_sources": datasource_count or 0,
         "training_jobs": training_count or 0,
-        "tuning_jobs": tuning_count or 0
+        "tuning_jobs": tuning_count or 0,
     }
 
 
@@ -795,8 +917,7 @@ def get_node_registry():
 
 @router.get("/datasets/{dataset_id}/schema", response_model=AnalysisProfile)
 async def get_dataset_schema(
-    dataset_id: int,
-    session: AsyncSession = Depends(get_async_session)
+    dataset_id: int, session: AsyncSession = Depends(get_async_session)
 ):
     """
     Returns the schema (columns, types, stats) of a dataset.
@@ -809,17 +930,19 @@ async def get_dataset_schema(
         raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found")
 
     # Check if we have a cached profile in metadata
-    if ds.source_metadata and 'profile' in ds.source_metadata:
+    if ds.source_metadata and "profile" in ds.source_metadata:
         try:
-            cached_profile = ds.source_metadata['profile']
+            cached_profile = ds.source_metadata["profile"]
             columns = {}
-            for col_name, stats in cached_profile.get('columns', {}).items():
+            for col_name, stats in cached_profile.get("columns", {}).items():
                 # Map stats to ColumnProfile
-                dtype = str(stats.get('type', 'unknown'))
+                dtype = str(stats.get("type", "unknown"))
                 col_type = "unknown"
                 if any(x in dtype for x in ["Int", "Float", "Decimal"]):
                     col_type = "numeric"
-                elif any(x in dtype for x in ["Utf8", "String", "Categorical", "Object"]):
+                elif any(
+                    x in dtype for x in ["Utf8", "String", "Categorical", "Object"]
+                ):
                     col_type = "categorical"
                 elif "Date" in dtype or "Time" in dtype:
                     col_type = "datetime"
@@ -830,20 +953,20 @@ async def get_dataset_schema(
                     "name": col_name,
                     "dtype": dtype,
                     "column_type": col_type,
-                    "missing_count": stats.get('null_count', 0),
-                    "missing_ratio": stats.get('null_percentage', 0) / 100.0,
-                    "unique_count": stats.get('unique_count', 0),
-                    "min_value": stats.get('min'),
-                    "max_value": stats.get('max'),
-                    "mean_value": stats.get('mean'),
-                    "std_value": stats.get('std'),
+                    "missing_count": stats.get("null_count", 0),
+                    "missing_ratio": stats.get("null_percentage", 0) / 100.0,
+                    "unique_count": stats.get("unique_count", 0),
+                    "min_value": stats.get("min"),
+                    "max_value": stats.get("max"),
+                    "mean_value": stats.get("mean"),
+                    "std_value": stats.get("std"),
                 }
 
             return {
-                "row_count": cached_profile.get('row_count', 0),
-                "column_count": cached_profile.get('column_count', 0),
-                "duplicate_row_count": cached_profile.get('duplicate_rows', 0),
-                "columns": columns
+                "row_count": cached_profile.get("row_count", 0),
+                "column_count": cached_profile.get("column_count", 0),
+                "duplicate_row_count": cached_profile.get("duplicate_rows", 0),
+                "columns": columns,
             }
         except Exception as e:
             logger.warning(f"Failed to parse cached profile for {dataset_id}: {e}")
@@ -854,12 +977,15 @@ async def get_dataset_schema(
         # Resolve path
         ds_dict = {
             "connection_info": ds.config,
-            "file_path": ds.config.get("file_path") if ds.config else None
+            "file_path": ds.config.get("file_path") if ds.config else None,
         }
         path = extract_file_path_from_source(ds_dict)
 
         if not path:
-            raise HTTPException(status_code=400, detail=f"Could not resolve path for dataset {dataset_id}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not resolve path for dataset {dataset_id}",
+            )
 
         # Load sample
         loader = DataLoader()
@@ -870,7 +996,9 @@ async def get_dataset_schema(
         return profile
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to profile dataset: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to profile dataset: {str(e)}"
+        )
 
 
 @router.get("/hyperparameters/{model_type}")
@@ -890,13 +1018,12 @@ def get_model_default_search_space(model_type: str):
 
 
 @router.get("/datasets/list", response_model=List[Dict[str, Any]])
-async def list_datasets(
-    session: AsyncSession = Depends(get_async_session)
-):
+async def list_datasets(session: AsyncSession = Depends(get_async_session)):
     """
     Returns a simple list of available datasets for filtering.
     """
     from backend.database.models import DataSource
+
     stmt = select(DataSource.source_id, DataSource.name).where(DataSource.is_active)
     result = await session.execute(stmt)
     return [{"id": row.source_id, "name": row.name} for row in result.all()]

@@ -1,7 +1,6 @@
 """Tests for modeling module."""
 
 import pandas as pd
-
 from skyulf.data.dataset import SplitDataset
 from skyulf.modeling.base import StatefulEstimator
 from skyulf.modeling.classification import (
@@ -22,16 +21,12 @@ def test_logistic_regression_training(sample_classification_data):
     # Drop non-numeric for simple test
     data = data.drop(columns=["category"])
 
-    dataset = SplitDataset(
-        train=data.iloc[:80],
-        test=data.iloc[80:],
-        validation=None
-    )
+    dataset = SplitDataset(train=data.iloc[:80], test=data.iloc[80:], validation=None)
 
     estimator = StatefulEstimator(
         node_id="test_lr",
         calculator=LogisticRegressionCalculator(),
-        applier=LogisticRegressionApplier()
+        applier=LogisticRegressionApplier(),
     )
 
     config = {"params": {"C": 0.5}}
@@ -54,16 +49,12 @@ def test_random_forest_regression(sample_regression_data):
     """Test Random Forest Regression."""
     data = sample_regression_data.drop(columns=["category"])
 
-    dataset = SplitDataset(
-        train=data.iloc[:80],
-        test=data.iloc[80:],
-        validation=None
-    )
+    dataset = SplitDataset(train=data.iloc[:80], test=data.iloc[80:], validation=None)
 
     estimator = StatefulEstimator(
         node_id="test_rf",
         calculator=RandomForestRegressorCalculator(),
-        applier=RandomForestRegressorApplier()
+        applier=RandomForestRegressorApplier(),
     )
 
     config = {"params": {"n_estimators": 10}}
@@ -84,14 +75,11 @@ def test_cross_validation(sample_classification_data):
     estimator = StatefulEstimator(
         node_id="test_cv",
         calculator=LogisticRegressionCalculator(),
-        applier=LogisticRegressionApplier()
+        applier=LogisticRegressionApplier(),
     )
 
     cv_results = estimator.cross_validate(
-        dataset=dataset,
-        target_column="target",
-        config={},
-        n_folds=3
+        dataset=dataset, target_column="target", config={}, n_folds=3
     )
 
     assert "aggregated_metrics" in cv_results

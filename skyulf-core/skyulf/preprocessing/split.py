@@ -1,21 +1,29 @@
-from typing import Optional, Tuple, Union, Dict, Any
 import logging
+from typing import Any, Dict, Optional, Tuple, Union
+
 import pandas as pd
 from sklearn.model_selection import train_test_split
+
 from ..data.dataset import SplitDataset
-from .base import BaseCalculator, BaseApplier
+from .base import BaseApplier, BaseCalculator
 
 logger = logging.getLogger(__name__)
 
 
 class SplitCalculator(BaseCalculator):
-    def fit(self, df: Union[pd.DataFrame, Tuple[Any, ...]], config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(
+        self, df: Union[pd.DataFrame, Tuple[Any, ...]], config: Dict[str, Any]
+    ) -> Dict[str, Any]:
         # No learning from data, just pass through config
         return config
 
 
 class SplitApplier(BaseApplier):
-    def apply(self, df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]], params: Dict[str, Any]) -> SplitDataset:
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> SplitDataset:
         stratify = params.get("stratify", False)
         target_col = params.get("target_column")
 
@@ -31,7 +39,7 @@ class SplitApplier(BaseApplier):
             validation_size=params.get("validation_size", 0.0),
             random_state=params.get("random_state", 42),
             shuffle=params.get("shuffle", True),
-            stratify_col=stratify_col
+            stratify_col=stratify_col,
         )
 
         # Handle (X, y) tuple input
@@ -47,12 +55,14 @@ class DataSplitter:
     Splits a DataFrame into Train, Test, and optionally Validation sets.
     """
 
-    def __init__(self,
-                 test_size: float = 0.2,
-                 validation_size: float = 0.0,
-                 random_state: int = 42,
-                 shuffle: bool = True,
-                 stratify_col: Optional[str] = None):
+    def __init__(
+        self,
+        test_size: float = 0.2,
+        validation_size: float = 0.0,
+        random_state: int = 42,
+        shuffle: bool = True,
+        stratify_col: Optional[str] = None,
+    ):
         self.test_size = test_size
         self.validation_size = validation_size
         self.random_state = random_state
@@ -70,16 +80,18 @@ class DataSplitter:
             if class_counts.min() < 2:
                 logger.warning(
                     f"Stratified split requested but the least populated class has only {
-                        class_counts.min()} member(s). Stratification will be disabled.")
+                        class_counts.min()} member(s). Stratification will be disabled."
+                )
                 stratify = None
 
         # First split: Train+Val vs Test
         X_train_val, X_test, y_train_val, y_test = train_test_split(
-            X, y,
+            X,
+            y,
             test_size=self.test_size,
             random_state=self.random_state,
             shuffle=self.shuffle,
-            stratify=stratify
+            stratify=stratify,
         )
 
         validation = None
@@ -92,24 +104,24 @@ class DataSplitter:
                 if class_counts_val.min() < 2:
                     logger.warning(
                         f"Stratified validation split requested but the least populated class has only {
-                            class_counts_val.min()} member(s). Stratification will be disabled for validation split.")
+                            class_counts_val.min()} member(s). Stratification will be disabled for validation split."
+                    )
                     stratify_val = None
 
             X_train, X_val, y_train, y_val = train_test_split(
-                X_train_val, y_train_val,
+                X_train_val,
+                y_train_val,
                 test_size=relative_val_size,
                 random_state=self.random_state,
                 shuffle=self.shuffle,
-                stratify=stratify_val
+                stratify=stratify_val,
             )
             validation = (X_val, y_val)
         else:
             X_train, y_train = X_train_val, y_train_val
 
         return SplitDataset(
-            train=(X_train, y_train),
-            test=(X_test, y_test),
-            validation=validation
+            train=(X_train, y_train), test=(X_test, y_test), validation=validation
         )
 
     def split(self, df: pd.DataFrame) -> SplitDataset:
@@ -123,7 +135,8 @@ class DataSplitter:
             if class_counts.min() < 2:
                 logger.warning(
                     f"Stratified split requested but the least populated class has only {
-                        class_counts.min()} member(s). Stratification will be disabled.")
+                        class_counts.min()} member(s). Stratification will be disabled."
+                )
                 stratify = None
 
         train_val, test = train_test_split(
@@ -131,7 +144,7 @@ class DataSplitter:
             test_size=self.test_size,
             random_state=self.random_state,
             shuffle=self.shuffle,
-            stratify=stratify
+            stratify=stratify,
         )
 
         validation = None
@@ -145,7 +158,8 @@ class DataSplitter:
                 if class_counts_val.min() < 2:
                     logger.warning(
                         f"Stratified validation split requested but the least populated class has only {
-                            class_counts_val.min()} member(s). Stratification will be disabled for validation split.")
+                            class_counts_val.min()} member(s). Stratification will be disabled for validation split."
+                    )
                     stratify_val = None
 
             train, val = train_test_split(
@@ -153,7 +167,7 @@ class DataSplitter:
                 test_size=relative_val_size,
                 random_state=self.random_state,
                 shuffle=self.shuffle,
-                stratify=stratify_val
+                stratify=stratify_val,
             )
             validation = val
         else:
@@ -163,16 +177,25 @@ class DataSplitter:
 
 
 class FeatureTargetSplitCalculator(BaseCalculator):
-    def fit(self, df: Union[pd.DataFrame, SplitDataset, Tuple[Any, ...]], config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(
+        self,
+        df: Union[pd.DataFrame, SplitDataset, Tuple[Any, ...]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
         return config
 
 
 class FeatureTargetSplitApplier(BaseApplier):
-    def apply(self, df: Union[pd.DataFrame, SplitDataset, Tuple[Any, ...]], params: Dict[str, Any]
-              ) -> Union[Tuple[pd.DataFrame, pd.Series], SplitDataset]:
+    def apply(
+        self,
+        df: Union[pd.DataFrame, SplitDataset, Tuple[Any, ...]],
+        params: Dict[str, Any],
+    ) -> Union[Tuple[pd.DataFrame, pd.Series], SplitDataset]:
         target_col = params.get("target_column")
         if not target_col:
-            raise ValueError("Target column must be specified for FeatureTargetSplitter")
+            raise ValueError(
+                "Target column must be specified for FeatureTargetSplitter"
+            )
 
         def split_one(data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
             if target_col not in data.columns:
@@ -183,15 +206,21 @@ class FeatureTargetSplitApplier(BaseApplier):
 
         if isinstance(df, SplitDataset):
             # Apply to all splits
-            train = split_one(df.train) if isinstance(df.train, pd.DataFrame) else df.train
+            train = (
+                split_one(df.train) if isinstance(df.train, pd.DataFrame) else df.train
+            )
             test = split_one(df.test) if isinstance(df.test, pd.DataFrame) else df.test
             validation = None
             if df.validation is not None:
-                validation = split_one(df.validation) if isinstance(df.validation, pd.DataFrame) else df.validation
+                validation = (
+                    split_one(df.validation)
+                    if isinstance(df.validation, pd.DataFrame)
+                    else df.validation
+                )
 
             return SplitDataset(train=train, test=test, validation=validation)
 
         if isinstance(df, pd.DataFrame):
             return split_one(df)
-        
+
         return df
