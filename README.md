@@ -1,5 +1,6 @@
 # Skyulf 🐺
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/236456e9c6284500831f6e022b11cc22)](https://app.codacy.com/gh/flyingriverhorse/Skyulf?utm_source=github.com&utm_medium=referral&utm_content=flyingriverhorse/Skyulf&utm_campaign=Badge_Grade)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Commercial](https://img.shields.io/badge/enterprise-support-blueviolet)](COMMERCIAL-LICENSE.md)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](#quick-start)
