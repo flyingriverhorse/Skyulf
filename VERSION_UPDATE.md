@@ -1,11 +1,34 @@
 # Version Updates
 
+*   **v0.1.2 (2025-12-15):** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
 *   **v0.1.1 (2025-12-xx):** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 (2025-12-10):** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
 
 ------------------------------------------------------------
 
-## v0.1.1 (2025-12-xx)
+## v0.1.2 (2025-12-15)
+**"The Tuning (Advanced Training) & Versioning Consistency Update"**
+
+This release resolves critical discrepancies between Training and Tuning workflows, ensuring consistent versioning and full metric visibility.
+
+### 🎯 Tuning & Evaluation Overhaul
+- **Automatic Refit:** `TunerCalculator` now automatically refits the best model on the full dataset after tuning completes.
+- **Unified Execution:** The Backend Engine now uses `StatefulEstimator` for tuning jobs, ensuring the exact same execution path as standard training.
+- **Robust Evaluation:**
+    - Fixed evaluation logic to correctly unpack tuning results `(model, result)`.
+    - Resolved issues with `(X, y)` vs `(train, test)` tuple handling that caused evaluation failures.
+    - **Full Metrics:** Tuning jobs now report full evaluation metrics (Accuracy, F1, Precision, Recall) in the UI, not just the optimization score.
+
+### 🔢 Unified Versioning
+- **Sequential Versioning:** Implemented a unified version counter across `TrainingJob` and `HyperparameterTuningJob` (Advanced Training).
+- **Consistency:** New jobs (whether Training or Tuning) now increment from the single highest version number (e.g., v1 -> v2 -> v3), eliminating disjoint version sequences (v10 vs v40).
+
+### 📦 Distribution
+- **PyPI Release:** `skyulf-core` version `0.1.2` has been successfully built and published to PyPI.
+
+---
+
+## v0.1.1 
 **"The Observability & Stability Update"**
 
 This release focuses on developer experience, system stability, and deep observability into the training process.
