@@ -57,11 +57,9 @@ class OneHotEncoderCalculator(BaseCalculator):
                 # If drop='first' and n_cats == 1, we get 0 features (1-1=0)
                 # If n_cats == 0, we get 0 features
 
-                # We can check the actual output feature names to be sure, but checking categories is a good proxy
-                # Actually, sklearn's get_feature_names_out handles the drop logic.
+                # We can check the actual output feature names to be sure, but checking categories is a good proxy.
+                # Sklearn's get_feature_names_out handles the drop logic.
 
-                # Let's check if this specific column generated any features in the output
-                # This is a bit tricky with the bulk encoder, but we can infer.
 
                 if n_cats == 0:
                     logger.warning(
@@ -370,24 +368,11 @@ class HashEncoderApplier(BaseApplier):
 
         # hasher = FeatureHasher(n_features=n_features, input_type='string')
 
-        # Hashing usually done row by row or on a specific column
-        # FeatureHasher expects list of strings or dicts.
-        # If we apply to multiple columns, do we hash them together or separately?
-        # Usually separately if we want to replace the column.
+        # Apply hashing to each column separately.
+        # We use a simple deterministic hash() % n_features approach.
 
         for col in valid_cols:
-            # Convert to string list
-            # col_data = X_out[col].astype(str).tolist()
-            # Wrap in list for hasher? No, hasher expects iterable of iterables (like list of tokens)
-            # Or iterable of strings if input_type='string'
 
-            # Actually FeatureHasher with input_type='string' expects an iterable of strings.
-            # hashed = hasher.transform([[x] for x in col_data])  # Hack to treat each value as a document?
-            # No, standard usage for categorical is usually DictVectorizer or HashingVectorizer.
-            # FeatureHasher is for "list of features".
-
-            # Let's use a simpler approach: Apply hash() and mod n_features
-            # This is deterministic and stateless.
 
             X_out[col] = X_out[col].astype(str).apply(lambda x: hash(x) % n_features)
 

@@ -170,28 +170,8 @@ class SkyulfPipeline:
             Series of predictions.
         """
         # 1. Feature Engineering (Transform only)
-        # FeatureEngineer.fit_transform handles stateful transformation if already fitted?
-        # Wait, FeatureEngineer currently re-fits or uses stored state?
-        # In the current implementation of FeatureEngineer (which I need to verify),
-        # it creates StatefulTransformers.
-        # I need to ensure FeatureEngineer persists the fitted transformers.
-
-        # Actually, FeatureEngineer.fit_transform returns (data, metrics).
-        # It stores the fitted transformers in `self.steps_config`? No, that's config.
-        # I need to check `FeatureEngineer` implementation again.
-
-        # ... checking FeatureEngineer ...
-        # It seems FeatureEngineer in `core` was designed to run linearly and maybe didn't keep state
-        # for inference in the same object easily, or it relied on ArtifactStore to load them.
-        # Since I removed ArtifactStore, I need to make sure FeatureEngineer keeps the fitted transformers.
-
-        # Let's assume for now FeatureEngineer needs to be updated to store fitted transformers
-        # so we can call `transform` later.
-
-        # For now, I will implement `predict` assuming `feature_engineer` has a `transform` method.
-        # If not, I will need to add it.
-
         transformed_data = self.feature_engineer.transform(data)
+
 
         # 2. Modeling
         if self.model_estimator and self.model_estimator.model is not None:

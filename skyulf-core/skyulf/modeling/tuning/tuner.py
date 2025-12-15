@@ -265,25 +265,9 @@ class TunerCalculator(BaseModelCalculator):
                 if log_callback:
                     log_callback(f"Evaluating Candidate {i + 1}/{total_candidates}: {params}")
 
-                # Use our custom cross_validate to get per-fold logs!
-                # We need to instantiate a temporary calculator with these params
-                # But wait, calculator.fit takes config.
-                # We can just pass the params in the config to perform_cross_validation
+                # Use custom cross-validation loop to enable per-fold logging and progress tracking.
+                # We instantiate the model with the current candidate parameters and evaluate it using the configured CV strategy.
 
-                # We need to call perform_cross_validation directly
-                # But we need 'calculator' and 'applier' instances.
-                # self.model_calculator is available.
-                # We need an applier. TunerCalculator doesn't have it.
-                # We need to assume the caller (engine) has the applier, but we are inside TunerCalculator.
-                # TunerCalculator only takes model_calculator in __init__.
-
-                # Workaround: We can't easily use perform_cross_validation without an applier.
-                # However, we can use sklearn's cross_val_score or similar, but that doesn't give per-fold logs easily.
-
-                # Better: We can instantiate the model and call fit/score manually in a loop over folds.
-                # This duplicates perform_cross_validation logic but gives us control.
-
-                # Actually, let's use the 'cv' object we created above.
 
                 fold_scores = []
 
