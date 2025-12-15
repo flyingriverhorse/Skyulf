@@ -2,142 +2,114 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/architecture/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/python_api/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/contributing/writing_docs/</loc>
-         <lastmod>2025-12-11</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/data/</loc>
-         <lastmod>2025-12-11</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/data/connectors/</loc>
-         <lastmod>2025-12-11</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/data/service/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/guides/experiments/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/guides/getting_started/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/guides/inference/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/guides/model_registry/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/guides/recipes/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/modeling/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/modeling/classification/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/modeling/regression/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/modeling/training/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/modeling/tuning/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/bucketing/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/casting/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/cleaning/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/drop_and_missing/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/encoding/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/feature_generation/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/feature_selection/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/imputation/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/inspection/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/outliers/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/resampling/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/scaling/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/split/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
     <url>
          <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/transformations/</loc>
-         <lastmod>2025-12-11</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/recommendations/</loc>
-         <lastmod>2025-12-11</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/data/</loc>
-         <lastmod>2025-12-11</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/execution/</loc>
-         <lastmod>2025-12-11</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/modeling/</loc>
-         <lastmod>2025-12-11</lastmod>
+         <lastmod>2025-12-15</lastmod>
     </url>
 </urlset>
