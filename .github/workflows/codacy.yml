@@ -1,10 +1,6 @@
 name: Codacy Analysis
 
 on:
-  #push:
-    #branches: [ "master", "main" ]
-  #pull_request:
-    #branches: [ "master", "main" ]
   workflow_dispatch:
 
 jobs:
@@ -20,14 +16,12 @@ jobs:
         with:
           project-token: ${{ secrets.CODACY_API_TOKEN }}
           verbose: true
-          output: results.sarif
-          format: sarif
-          # Adjust the tool if needed, or let it auto-detect
+          output: codacy_results.json
+          format: json
           # tool: flake8 
-          # If you want to fail the build on issues:
-          # fail-if-incomplete: true
 
-      - name: Upload SARIF results file
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Upload Analysis Results
+        uses: actions/upload-artifact@v4
         with:
-          sarif_file: results.sarif
+          name: codacy-results
+          path: codacy_results.json
