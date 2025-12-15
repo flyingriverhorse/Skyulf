@@ -14,6 +14,7 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Union, cast
 
+from sqlalchemy import column, literal_column, table
 from sqlalchemy import text as sa_text
 
 from backend.config import Settings
@@ -298,13 +299,14 @@ async def create(
 
     if db_type in (DatabaseType.POSTGRES, DatabaseType.POSTGRESQL, DatabaseType.SQLITE):
         async with async_session_or_connection(settings, config) as session:
-            cols = ", ".join(data.keys())
-            placeholders = ", ".join(f":{k}" for k in data.keys())
+            # Use SQLAlchemy Core to construct the INSERT statement safely
+            # This avoids SQL injection warnings from tools like Semgrep
+            tbl = table(name, *[column(c) for c in data.keys()])
+            stmt = tbl.insert().values(**data)
 
             if db_type == DatabaseType.SQLITE:
                 # SQLite: Insert then fetch by rowid
-                sql = sa_text(f"INSERT INTO {name} ({cols}) VALUES ({placeholders})")
-                await session.execute(sql, data)
+                await session.execute(stmt)
                 await session.commit()
 
                 # Get last inserted row
@@ -318,15 +320,14 @@ async def create(
                         sa_text(f"SELECT * FROM {name} WHERE rowid = :rid"),
                         {"rid": rid},
                     )
+
                     row = sel_result.fetchone()
                     return _row_to_dict(row) if row else None
                 return None
             else:
                 # PostgreSQL: Use RETURNING
-                sql = sa_text(
-                    f"INSERT INTO {name} ({cols}) VALUES ({placeholders}) RETURNING *"
-                )
-                result = await session.execute(sql, data)
+                stmt = stmt.returning(literal_column("*"))
+                result = await session.execute(stmt)
                 await session.commit()
                 row = result.fetchone()
                 return _row_to_dict(row) if row else None
