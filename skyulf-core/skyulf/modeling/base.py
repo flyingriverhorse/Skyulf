@@ -126,7 +126,15 @@ class StatefulEstimator:
         if isinstance(dataset, pd.DataFrame):
             dataset = SplitDataset(train=dataset, test=pd.DataFrame(), validation=None)
         elif isinstance(dataset, tuple):
-            dataset = SplitDataset(train=dataset, test=pd.DataFrame(), validation=None)
+            # Check if it's (train_df, test_df) or (X, y)
+            elem0 = dataset[0]
+            if isinstance(elem0, pd.DataFrame) and target_column in elem0.columns:
+                # It's (train_df, test_df)
+                train_df, test_df = dataset
+                dataset = SplitDataset(train=train_df, test=test_df, validation=None)
+            else:
+                # It's (X, y) or something else, treat as train set
+                dataset = SplitDataset(train=dataset, test=pd.DataFrame(), validation=None)
 
         # 1. Prepare Data
         X_train, y_train = self._extract_xy(dataset.train, target_column)
@@ -258,16 +266,23 @@ class StatefulEstimator:
 
             evaluation_data["splits"][split_name] = split_data
 
+            # Unpack model if it's a tuple (from Tuner)
+            model_to_evaluate = self.model
+            if isinstance(self.model, tuple) and len(self.model) == 2:
+                # Check if first element looks like a model (has fit/predict)
+                # or if it's just a convention from TunerCalculator
+                model_to_evaluate = self.model[0]
+
             if problem_type == "classification":
                 return evaluate_classification_model(
-                    model=self.model,
+                    model=model_to_evaluate,
                     dataset_name=split_name,
                     X_test=X,
                     y_test=y
                 )
             elif problem_type == "regression":
                 return evaluate_regression_model(
-                    model=self.model,
+                    model=model_to_evaluate,
                     dataset_name=split_name,
                     X_test=X,
                     y_test=y

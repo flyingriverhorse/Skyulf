@@ -106,7 +106,7 @@ class TunerCalculator(BaseModelCalculator):
             filtered_config = {k: v for k, v in config.items() if k in valid_keys}
             tuning_config = TuningConfig(**filtered_config)  # type: ignore
 
-        return self.tune(
+        tuning_result = self.tune(
             X,
             y,
             tuning_config,
@@ -114,6 +114,22 @@ class TunerCalculator(BaseModelCalculator):
             log_callback=log_callback,
             validation_data=validation_data,
         )
+
+        # Refit the best model on the full dataset
+        best_params = tuning_result.best_params
+        final_params = {**self.model_calculator.default_params, **best_params}
+
+        # Ensure random_state is passed if available in config and not in params
+        if "random_state" not in final_params and hasattr(tuning_config, "random_state"):
+            final_params["random_state"] = tuning_config.random_state
+
+        if log_callback:
+            log_callback(f"Refitting best model with params: {final_params}")
+
+        model = self.model_calculator.model_class(**final_params)
+        model.fit(X, y)
+
+        return (model, tuning_result)
 
     def tune(
         self,
@@ -480,10 +496,22 @@ class TunerCalculator(BaseModelCalculator):
 class TunerApplier(BaseModelApplier):
     """
     Applier for TunerCalculator.
-    Since Tuning does not produce a predictive model (it produces params),
-    this applier returns dummy predictions.
+    Wraps the base model applier to provide predictions using the refitted best model.
     """
 
+    def __init__(self, base_applier: BaseModelApplier):
+        self.base_applier = base_applier
+
     def predict(self, df: pd.DataFrame, model_artifact: Any) -> pd.Series:
-        # Return empty predictions or NaNs
+        # model_artifact is (fitted_model, tuning_result)
+        if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
+            model, _ = model_artifact
+            return self.base_applier.predict(df, model)
+        # Fallback if artifact is just the result (legacy)
         return pd.Series(np.nan, index=df.index)
+
+    def predict_proba(self, df: pd.DataFrame, model_artifact: Any) -> Optional[pd.DataFrame]:
+        if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
+            model, _ = model_artifact
+            return self.base_applier.predict_proba(df, model)
+        return None

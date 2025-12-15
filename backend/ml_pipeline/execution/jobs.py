@@ -365,8 +365,7 @@ class JobManager:
                 hyperparameters=hyperparameters,
                 created_at=job.created_at,
                 metrics=job.metrics if job_type == "training" else (
-                    {
-                        "score": job.best_score} if job.best_score else None),
+                    job.metrics if job.metrics else {"score": job.best_score} if job.best_score else None),
                 search_strategy=job.search_strategy if job_type == "tuning" else None,
                 target_column=target_column,
                 dropped_columns=dropped_columns,
