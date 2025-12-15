@@ -1,12 +1,12 @@
 # Version Updates
 
-*   **v0.1.2 (2025-12-15):** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
-*   **v0.1.1 (2025-12-xx):** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
-*   **v0.1.0 (2025-12-10):** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
+*   **v0.1.2 :** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
+*   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
+*   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
 
 ------------------------------------------------------------
 
-## v0.1.2 (2025-12-15)
+## v0.1.2 
 **"The Tuning (Advanced Training) & Versioning Consistency Update"**
 
 This release resolves critical discrepancies between Training and Tuning workflows, ensuring consistent versioning and full metric visibility.
@@ -61,7 +61,7 @@ This release focuses on developer experience, system stability, and deep observa
 
 ---
 
-## v0.1.0 (2025-12-10)
+## v0.1.0 
 **"The Foundation & Deployment Update"**
 
 This release marks a major milestone, solidifying the core architecture and completing the end-to-end MLOps loop from ingestion to deployment.
