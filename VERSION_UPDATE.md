@@ -50,7 +50,7 @@ This release focuses on developer experience, system stability, and deep observa
     - **API & Deployment:** Full integration testing of recommendation engine and inference endpoints.
 
 ### 🏗️ Skyulf-core & Architecture Refactoring
-- **SDK Consolidation:** All core ML logic (preprocessing, modeling, tuning) is now centralized in `skyulf-core/`. This ensures that the `core/ml_pipeline` folder focuses purely on orchestration and API handling.
+- **skyulf-core Consolidation:** All core ML logic (preprocessing, modeling, tuning) is now centralized in `skyulf-core/`. This ensures that the `core/ml_pipeline` folder focuses purely on orchestration and API handling.
 - **Tuning Logic Migration:** Moved hyperparameter tuning logic from `ml_pipeline` into `skyulf-core/skyulf/modeling/tuning/`, creating a unified and reusable tuning engine for both the web platform and standalone scripts.
 - **Clean Separation of Concerns:**
     - `skyulf-core/`: Contains the "Brain" (Calculators, Appliers, Estimators).
