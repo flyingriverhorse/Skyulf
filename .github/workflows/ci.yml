@@ -54,15 +54,3 @@ jobs:
 
       - name: Run tests
         run: pytest -q --maxfail=1 --disable-warnings --cov --cov-report=term-missing --cov-report=xml
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          slug: flyingriverhorse/Skyulf
-
-      - name: Upload coverage to Codacy
-        run: |
-          bash <(curl -Ls https://coverage.codacy.com/get.sh) report -r coverage.xml
-        env:
-          CODACY_API_TOKEN: ${{ secrets.CODACY_API_TOKEN }}
