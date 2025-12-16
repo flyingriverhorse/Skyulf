@@ -6,7 +6,7 @@ This is the async equivalent of the Flask db/data_sources/postgres_queries.py
 import logging
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import column, literal_column, table
+from sqlalchemy import column, literal_column, select, table, update
 from sqlalchemy import text as sa_text
 
 from backend.config import Settings
@@ -47,18 +47,18 @@ async def select_data_sources(
     """Select data sources with optional filtering."""
     async with async_session_or_connection(settings) as session:
         try:
+            tbl = table(TABLE)
             if filter_dict:
+                # Build WHERE clause dynamically using SQLAlchemy Core
                 conditions = []
-                params = {}
                 for k, v in filter_dict.items():
-                    conditions.append(f"{k} = :{k}")
-                    params[k] = v
-                where_clause = " WHERE " + " AND ".join(conditions)
-                sql = sa_text(f"SELECT * FROM {TABLE}{where_clause}")
-                result = await session.execute(sql, params)
+                    conditions.append(column(k) == v)
+                
+                stmt = select(literal_column("*")).select_from(tbl).where(*conditions)
+                result = await session.execute(stmt)
             else:
-                sql = sa_text(f"SELECT * FROM {TABLE}")
-                result = await session.execute(sql)
+                stmt = select(literal_column("*")).select_from(tbl)
+                result = await session.execute(stmt)
 
             rows = result.fetchall()
             data = [dict(row._mapping) for row in rows]
@@ -78,22 +78,15 @@ async def update_data_source(
     """Update data source records."""
     async with async_session_or_connection(settings) as session:
         try:
-            set_parts = []
-            params = {}
-            for k, v in update_data.items():
-                set_parts.append(f"{k} = :u_{k}")
-                params[f"u_{k}"] = v
-
-            where_parts = []
+            # Use SQLAlchemy Core for UPDATE
+            tbl = table(TABLE, *[column(c) for c in update_data.keys()] + [column(c) for c in filter_dict.keys()])
+            
+            stmt = update(tbl).values(**update_data)
+            
             for k, v in filter_dict.items():
-                where_parts.append(f"{k} = :w_{k}")
-                params[f"w_{k}"] = v
+                stmt = stmt.where(column(k) == v)
 
-            set_clause = ", ".join(set_parts)
-            where_clause = " WHERE " + " AND ".join(where_parts)
-
-            sql = sa_text(f"UPDATE {TABLE} SET {set_clause}{where_clause}")
-            result = await session.execute(sql, params)
+            result = await session.execute(stmt)
             await session.commit()
 
             return {"affected_rows": result.rowcount}

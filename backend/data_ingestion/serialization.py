@@ -4,6 +4,7 @@ FastAPI-compatible serialization utilities.
 JSON-safe data conversion utilities with enhanced async support.
 Migrated from Flask sync version with improved type handling.
 """
+# pylint: disable=broad-exception-caught
 
 import asyncio
 import logging

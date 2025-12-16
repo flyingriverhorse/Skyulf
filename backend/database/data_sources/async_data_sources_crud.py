@@ -5,6 +5,7 @@ This module centralizes the logic to write/read/update/delete the
 `data_sources` registry across PostgreSQL and SQLite. It intentionally
 keeps behavior separate from the generic database CRUD dispatcher.
 """
+# pylint: disable=broad-exception-caught
 
 import logging
 from typing import Any, Dict, List, Optional, Union, cast
@@ -133,14 +134,14 @@ async def create(settings: Settings, row: Dict[str, Any]) -> Any:
 
 
 async def read(
-    settings: Settings, filter: Optional[Dict[str, Any]] = None, one: bool = False
+    settings: Settings, filter_dict: Optional[Dict[str, Any]] = None, one: bool = False
 ) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
     """Read data sources from primary database."""
     primary_db = get_primary_database(settings)
 
     if primary_db == "sqlite":
         try:
-            rows = await sqlite_q.select_data_sources(settings, filter, one=one)
+            rows = await sqlite_q.select_data_sources(settings, filter_dict, one=one)
             row_count = len(rows) if isinstance(rows, list) else 1
             logger.debug("Successfully read %s rows from SQLite (primary)", row_count)
             return cast(Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], rows)
@@ -152,7 +153,7 @@ async def read(
 
     elif primary_db == "postgres":
         try:
-            rows = await pg_q.select_data_sources(settings, filter, one=one)
+            rows = await pg_q.select_data_sources(settings, filter_dict, one=one)
             row_count = len(rows) if isinstance(rows, list) else 1
             logger.debug(
                 "Successfully read %s rows from PostgreSQL (primary)", row_count
@@ -169,7 +170,7 @@ async def read(
 
 
 async def update(
-    settings: Settings, filter: Dict[str, Any], update_data: Dict[str, Any]
+    settings: Settings, filter_dict: Dict[str, Any], update_data: Dict[str, Any]
 ):
     """Update data sources with configurable primary database.
 
@@ -179,15 +180,15 @@ async def update(
     """
 
     # Normalize filter (map 'source_id' -> 'id')
-    if filter is None:
-        filter = {}
+    if filter_dict is None:
+        filter_dict = {}
     normalized_filter = {}
-    for k, v in (filter or {}).items():
+    for k, v in (filter_dict or {}).items():
         if k == "source_id":
             normalized_filter["id"] = v
         else:
             normalized_filter[k] = v
-    filter = normalized_filter
+    filter_dict = normalized_filter
 
     primary_db = get_primary_database(settings)
 
@@ -195,10 +196,10 @@ async def update(
         # Primary update in SQLite
         try:
             sqlite_rows = await sqlite_q.update_data_source(
-                settings, filter, update_data
+                settings, filter_dict, update_data
             )
             logger.info(
-                f"Successfully updated data source in SQLite (primary): {filter}"
+                f"Successfully updated data source in SQLite (primary): {filter_dict}"
             )
         except Exception:
             logger.exception("SQLite update failed for data_sources")
@@ -206,13 +207,13 @@ async def update(
 
         # Optional PostgreSQL sync (best-effort, non-blocking)
         try:
-            await pg_q.update_data_source(settings, filter, update_data)
+            await pg_q.update_data_source(settings, filter_dict, update_data)
             logger.info(
-                f"Successfully synced update to PostgreSQL (secondary): {filter}"
+                f"Successfully synced update to PostgreSQL (secondary): {filter_dict}"
             )
         except Exception:
             logger.warning(
-                f"Failed to sync update to PostgreSQL (non-critical): {filter}"
+                f"Failed to sync update to PostgreSQL (non-critical): {filter_dict}"
             )
 
         return sqlite_rows
@@ -220,9 +221,9 @@ async def update(
     elif primary_db == "postgres":
         # Primary update in PostgreSQL
         try:
-            pg_rows = await pg_q.update_data_source(settings, filter, update_data)
+            pg_rows = await pg_q.update_data_source(settings, filter_dict, update_data)
             logger.info(
-                f"Successfully updated data source in PostgreSQL (primary): {filter}"
+                f"Successfully updated data source in PostgreSQL (primary): {filter_dict}"
             )
         except Exception:
             logger.exception("PostgreSQL update failed for data_sources")
@@ -230,10 +231,10 @@ async def update(
 
         # Optional SQLite sync (best-effort, non-blocking)
         try:
-            await sqlite_q.update_data_source(settings, filter, update_data)
-            logger.info(f"Successfully synced update to SQLite (secondary): {filter}")
+            await sqlite_q.update_data_source(settings, filter_dict, update_data)
+            logger.info(f"Successfully synced update to SQLite (secondary): {filter_dict}")
         except Exception:
-            logger.warning(f"Failed to sync update to SQLite (non-critical): {filter}")
+            logger.warning(f"Failed to sync update to SQLite (non-critical): {filter_dict}")
 
         return pg_rows
 
@@ -241,7 +242,7 @@ async def update(
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
 
 
-async def delete(settings: Settings, filter: Dict[str, Any]):
+async def delete(settings: Settings, filter_dict: Dict[str, Any]):
     """Delete data sources with configurable primary database.
 
     Strategy: Primary database-first approach
@@ -250,24 +251,24 @@ async def delete(settings: Settings, filter: Dict[str, Any]):
     """
 
     # Normalize filter (map 'source_id' -> 'id')
-    if filter is None:
-        filter = {}
+    if filter_dict is None:
+        filter_dict = {}
     normalized_filter = {}
-    for k, v in (filter or {}).items():
+    for k, v in (filter_dict or {}).items():
         if k == "source_id":
             normalized_filter["id"] = v
         else:
             normalized_filter[k] = v
-    filter = normalized_filter
+    filter_dict = normalized_filter
 
     primary_db = get_primary_database(settings)
 
     if primary_db == "sqlite":
         # Primary delete from SQLite
         try:
-            sqlite_rows = await sqlite_q.delete_data_source(settings, filter)
+            sqlite_rows = await sqlite_q.delete_data_source(settings, filter_dict)
             logger.info(
-                f"Successfully deleted data source from SQLite (primary): {filter}"
+                f"Successfully deleted data source from SQLite (primary): {filter_dict}"
             )
         except Exception:
             logger.exception("SQLite delete failed for data_sources")
@@ -275,13 +276,13 @@ async def delete(settings: Settings, filter: Dict[str, Any]):
 
         # Optional PostgreSQL sync (best-effort, non-blocking)
         try:
-            await pg_q.delete_data_source(settings, filter)
+            await pg_q.delete_data_source(settings, filter_dict)
             logger.info(
-                f"Successfully synced delete to PostgreSQL (secondary): {filter}"
+                f"Successfully synced delete to PostgreSQL (secondary): {filter_dict}"
             )
         except Exception:
             logger.warning(
-                f"Failed to sync delete to PostgreSQL (non-critical): {filter}"
+                f"Failed to sync delete to PostgreSQL (non-critical): {filter_dict}"
             )
 
         return sqlite_rows
@@ -289,9 +290,9 @@ async def delete(settings: Settings, filter: Dict[str, Any]):
     elif primary_db == "postgres":
         # Primary delete from PostgreSQL
         try:
-            pg_rows = await pg_q.delete_data_source(settings, filter)
+            pg_rows = await pg_q.delete_data_source(settings, filter_dict)
             logger.info(
-                f"Successfully deleted data source from PostgreSQL (primary): {filter}"
+                f"Successfully deleted data source from PostgreSQL (primary): {filter_dict}"
             )
         except Exception:
             logger.exception("PostgreSQL delete failed for data_sources")
@@ -299,10 +300,10 @@ async def delete(settings: Settings, filter: Dict[str, Any]):
 
         # Optional SQLite sync (best-effort, non-blocking)
         try:
-            await sqlite_q.delete_data_source(settings, filter)
-            logger.info(f"Successfully synced delete to SQLite (secondary): {filter}")
+            await sqlite_q.delete_data_source(settings, filter_dict)
+            logger.info(f"Successfully synced delete to SQLite (secondary): {filter_dict}")
         except Exception:
-            logger.warning(f"Failed to sync delete to SQLite (non-critical): {filter}")
+            logger.warning(f"Failed to sync delete to SQLite (non-critical): {filter_dict}")
 
         return pg_rows
 
