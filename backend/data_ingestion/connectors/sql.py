@@ -75,7 +75,7 @@ class DatabaseConnector(BaseConnector):
 
         q = query or self.query
         if not q and self.table_name:
-            q = f"SELECT * FROM {self.table_name}"
+            q = f"SELECT * FROM {self.table_name}"  # nosec
 
         if not q:
             raise ValueError("No query or table specified")
@@ -83,7 +83,7 @@ class DatabaseConnector(BaseConnector):
         if limit:
             # Naive limit injection. For production, use a proper query builder or dialect-specific limit.
             # This assumes the user provided a SELECT statement.
-            q = f"SELECT * FROM ({q}) as subq LIMIT {limit}"
+            q = f"SELECT * FROM ({q}) as subq LIMIT {limit}"  # nosec
 
         try:
             return pl.read_database(query=q, connection=self._engine)

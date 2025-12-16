@@ -5,11 +5,9 @@ Provides exception handlers that return JSON responses for API errors.
 """
 
 import logging
-from typing import Union
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = logging.getLogger(__name__)
 
