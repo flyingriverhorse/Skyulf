@@ -52,7 +52,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
       }
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, []);
   
   const recommendations = useRecommendations(nodeId || '', {
@@ -305,7 +305,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
               placeholder="Search columns..."
               className="w-full text-xs p-1.5 border rounded bg-background"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); }}
             />
           </div>
           

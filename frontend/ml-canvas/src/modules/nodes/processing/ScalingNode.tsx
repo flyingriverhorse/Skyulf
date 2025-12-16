@@ -49,7 +49,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
       }
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, []);
 
   // Filter for numeric columns only, as scaling only applies to them
@@ -274,7 +274,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
                 placeholder="Search columns..."
                 className="w-full text-xs p-1.5 border rounded bg-background"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); }}
               />
            </div>
            <div className="flex-1 overflow-y-auto p-2 space-y-1">

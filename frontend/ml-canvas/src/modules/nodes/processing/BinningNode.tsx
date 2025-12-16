@@ -41,7 +41,7 @@ const CustomBinInput: React.FC<{
       className="w-full p-1 text-xs border rounded bg-background text-foreground"
       placeholder="0, 10, 20, 100..."
       value={text}
-      onChange={(e) => setText(e.target.value)}
+      onChange={(e) => { setText(e.target.value); }}
       onBlur={handleBlur}
     />
   );
@@ -69,7 +69,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
       }
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, []);
 
   // Filter for numeric columns only
@@ -233,7 +233,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
               className="w-full px-2 py-1 text-xs border rounded bg-background text-foreground" 
               placeholder="Search columns..." 
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={e => { setSearchTerm(e.target.value); }}
             />
           </div>
 
@@ -258,7 +258,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
                     <input
                       type="checkbox"
                       checked={config.columns.includes(col)}
-                      onChange={() => toggleColumn(col)}
+                      onChange={() => { toggleColumn(col); }}
                       className="rounded border-gray-300 text-primary focus:ring-primary"
                     />
                     <span className="truncate" title={col}>{col}</span>

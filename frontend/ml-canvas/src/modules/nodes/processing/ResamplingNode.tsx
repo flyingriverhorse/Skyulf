@@ -132,7 +132,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
       }
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, []);
 
   // Recommendations
@@ -175,7 +175,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                 <select 
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.type}
-                    onChange={(e) => handleChange('type', e.target.value)}
+                    onChange={(e) => { handleChange('type', e.target.value); }}
                 >
                     <option value="oversampling">Oversampling (Minority)</option>
                     <option value="undersampling">Undersampling (Majority)</option>
@@ -187,7 +187,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                 <select 
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.method}
-                    onChange={(e) => handleChange('method', e.target.value)}
+                    onChange={(e) => { handleChange('method', e.target.value); }}
                 >
                     {config.type === 'oversampling' ? (
                         <>
@@ -222,7 +222,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                         className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         placeholder="e.g., target"
                         value={config.target_column}
-                        onChange={(e) => handleChange('target_column', e.target.value)}
+                        onChange={(e) => { handleChange('target_column', e.target.value); }}
                         list="target-column-suggestions"
                     />
                     {schema?.columns && (
@@ -243,7 +243,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                 <select 
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.sampling_strategy}
-                    onChange={(e) => handleChange('sampling_strategy', e.target.value)}
+                    onChange={(e) => { handleChange('sampling_strategy', e.target.value); }}
                 >
                     <option value="auto">Auto (Resample all classes but majority)</option>
                     <option value="minority">Minority (Resample only minority class)</option>
@@ -260,7 +260,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     type="number"
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.random_state}
-                    onChange={(e) => handleChange('random_state', parseInt(e.target.value))}
+                    onChange={(e) => { handleChange('random_state', parseInt(e.target.value)); }}
                 />
             </div>
 
@@ -279,7 +279,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                                 type="number"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.k_neighbors ?? 5}
-                                onChange={(e) => handleChange('k_neighbors', parseInt(e.target.value))}
+                                onChange={(e) => { handleChange('k_neighbors', parseInt(e.target.value)); }}
                             />
                         </div>
                     )}
@@ -291,7 +291,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                                 type="number"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.m_neighbors ?? 10}
-                                onChange={(e) => handleChange('m_neighbors', parseInt(e.target.value))}
+                                onChange={(e) => { handleChange('m_neighbors', parseInt(e.target.value)); }}
                             />
                         </div>
                     )}
@@ -302,7 +302,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                             <select 
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.kind ?? 'borderline-1'}
-                                onChange={(e) => handleChange('kind', e.target.value)}
+                                onChange={(e) => { handleChange('kind', e.target.value); }}
                             >
                                 <option value="borderline-1">Borderline-1</option>
                                 <option value="borderline-2">Borderline-2</option>
@@ -318,7 +318,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                                 step="0.1"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.out_step ?? 0.5}
-                                onChange={(e) => handleChange('out_step', parseFloat(e.target.value))}
+                                onChange={(e) => { handleChange('out_step', parseFloat(e.target.value)); }}
                             />
                         </div>
                     )}
@@ -332,7 +332,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                                     step="0.1"
                                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                     value={config.cluster_balance_threshold ?? 0.1}
-                                    onChange={(e) => handleChange('cluster_balance_threshold', parseFloat(e.target.value))}
+                                    onChange={(e) => { handleChange('cluster_balance_threshold', parseFloat(e.target.value)); }}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -341,7 +341,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                                     type="text"
                                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                     value={config.density_exponent ?? 'auto'}
-                                    onChange={(e) => handleChange('density_exponent', e.target.value)}
+                                    onChange={(e) => { handleChange('density_exponent', e.target.value); }}
                                 />
                             </div>
                         </>
@@ -359,7 +359,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                         type="checkbox"
                         className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
                         checked={config.replacement ?? false}
-                        onChange={(e) => handleChange('replacement', e.target.checked)}
+                        onChange={(e) => { handleChange('replacement', e.target.checked); }}
                     />
                 </div>
             )}
@@ -370,7 +370,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     <select 
                         className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         value={config.version ?? 1}
-                        onChange={(e) => handleChange('version', parseInt(e.target.value))}
+                        onChange={(e) => { handleChange('version', parseInt(e.target.value)); }}
                     >
                         <option value="1">1</option>
                         <option value="2">2</option>
@@ -387,7 +387,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                             type="number"
                             className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             value={config.n_neighbors ?? 3}
-                            onChange={(e) => handleChange('n_neighbors', parseInt(e.target.value))}
+                            onChange={(e) => { handleChange('n_neighbors', parseInt(e.target.value)); }}
                         />
                     </div>
                     <div className="space-y-2">
@@ -395,7 +395,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                         <select 
                             className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             value={config.kind_sel ?? 'all'}
-                            onChange={(e) => handleChange('kind_sel', e.target.value)}
+                            onChange={(e) => { handleChange('kind_sel', e.target.value); }}
                         >
                             <option value="all">All</option>
                             <option value="mode">Mode</option>
@@ -408,7 +408,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                 <div className="mt-0 border rounded-md overflow-hidden border-gray-200 dark:border-gray-700">
                     <button 
                         className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                        onClick={() => setShowRecommendations(!showRecommendations)}
+                        onClick={() => { setShowRecommendations(!showRecommendations); }}
                     >
                         <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                             Recommendations ({recommendations.length})

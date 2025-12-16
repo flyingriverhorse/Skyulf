@@ -203,7 +203,7 @@ const BestParamsModal: React.FC<{
                 console.error("Failed to fetch jobs", err);
                 setError("Failed to load history.");
             })
-            .finally(() => setIsLoading(false));
+            .finally(() => { setIsLoading(false); });
     }, [currentModelType]);
 
     useEffect(() => {
@@ -230,7 +230,7 @@ const BestParamsModal: React.FC<{
                                 <span className="text-xs text-gray-500 dark:text-gray-400">View parameters for:</span>
                                 <select 
                                     value={currentModelType}
-                                    onChange={(e) => setCurrentModelType(e.target.value)}
+                                    onChange={(e) => { setCurrentModelType(e.target.value); }}
                                     className="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-purple-500 outline-none"
                                 >
                                     <option value="random_forest_classifier">Random Forest Classifier</option>
@@ -553,7 +553,7 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
             {/* Cross Validation Toggle */}
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                 <button 
-                    onClick={() => setShowCV(!showCV)}
+                    onClick={() => { setShowCV(!showCV); }}
                     className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
                     <div className="flex items-center gap-2">
@@ -689,7 +689,7 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
                 ? 'border-purple-500 text-purple-600 dark:text-purple-400' 
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
-            onClick={() => setActiveTab('config')}
+            onClick={() => { setActiveTab('config'); }}
           >
             Configuration
           </button>
@@ -699,7 +699,7 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
                 ? 'border-purple-500 text-purple-600 dark:text-purple-400' 
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
-            onClick={() => setActiveTab('search_space')}
+            onClick={() => { setActiveTab('search_space'); }}
           >
             Search Space
           </button>
@@ -732,7 +732,7 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
         </button>
 
         <button 
-            onClick={() => setShowParamsModal(true)}
+            onClick={() => { setShowParamsModal(true); }}
             className="text-xs text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 flex items-center gap-1.5 transition-colors px-3 py-1 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800"
         >
             <Activity className="w-3.5 h-3.5" />
@@ -742,7 +742,7 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
 
       <BestParamsModal 
         isOpen={showParamsModal}
-        onClose={() => setShowParamsModal(false)}
+        onClose={() => { setShowParamsModal(false); }}
         modelType={config.model_type}
       />
     </div>

@@ -123,7 +123,7 @@ export const InferencePage: React.FC = () => {
           <textarea
             className="flex-1 w-full p-4 font-mono text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
             value={inputData}
-            onChange={(e) => setInputData(e.target.value)}
+            onChange={(e) => { setInputData(e.target.value); }}
             placeholder='[{"col1": 1, "col2": "A"}]'
           />
           <div className="mt-4 flex justify-end">

@@ -44,7 +44,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
       }
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, []);
 
   const handleAdd = () => {
@@ -113,7 +113,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
                 <select
                   className="w-full p-1.5 text-sm border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
                   value={col}
-                  onChange={(e) => handleUpdateColumn(col, e.target.value)}
+                  onChange={(e) => { handleUpdateColumn(col, e.target.value); }}
                 >
                   {columns.map(c => (
                     <option key={c} value={c} disabled={c !== col && !!config.column_types[c]}>
@@ -124,7 +124,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
                 <select
                   className="w-full p-1.5 text-sm border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
                   value={type}
-                  onChange={(e) => handleUpdateType(col, e.target.value)}
+                  onChange={(e) => { handleUpdateType(col, e.target.value); }}
                 >
                   {TARGET_TYPES.map(t => (
                     <option key={t.value} value={t.value}>{t.label}</option>
@@ -132,7 +132,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
                 </select>
               </div>
               <button
-                onClick={() => handleRemove(col)}
+                onClick={() => { handleRemove(col); }}
                 className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
                 title="Remove Rule"
               >

@@ -93,7 +93,7 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
       }
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, []);
 
   return (

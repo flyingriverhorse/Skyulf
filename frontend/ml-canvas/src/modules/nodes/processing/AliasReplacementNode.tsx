@@ -39,7 +39,7 @@ const ColumnSelector: React.FC<{
           className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/70"
           placeholder="Search columns..."
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); }}
         />
       </div>
       <div className="overflow-y-auto p-1 space-y-0.5">
@@ -49,7 +49,7 @@ const ColumnSelector: React.FC<{
             return (
               <div
                 key={col}
-                onClick={() => toggle(col)}
+                onClick={() => { toggle(col); }}
                 className={`
                   flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors
                   ${isSelected ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'}
@@ -103,7 +103,7 @@ const CustomPairEditor: React.FC<{
             className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
             placeholder="e.g. NY"
             value={newKey}
-            onChange={(e) => setNewKey(e.target.value)}
+            onChange={(e) => { setNewKey(e.target.value); }}
           />
         </div>
         <div className="flex-1 space-y-1">
@@ -112,8 +112,8 @@ const CustomPairEditor: React.FC<{
             className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
             placeholder="e.g. New York"
             value={newValue}
-            onChange={(e) => setNewValue(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addPair()}
+            onChange={(e) => { setNewValue(e.target.value); }}
+            
           />
         </div>
         <button
@@ -136,7 +136,7 @@ const CustomPairEditor: React.FC<{
                 <ArrowLeftRight size={12} className="text-gray-400 shrink-0" />
                 <span className="font-medium text-green-600 truncate max-w-[80px]">{val}</span>
               </div>
-              <button onClick={() => removePair(key)} className="text-gray-400 hover:text-red-500">
+              <button onClick={() => { removePair(key); }} className="text-gray-400 hover:text-red-500">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -175,7 +175,7 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
       }
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, []);
 
   return (
@@ -201,7 +201,7 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pl-2 border-l border-gray-100 dark:border-gray-700' : 'shrink-0 pt-4 border-t border-gray-100 dark:border-gray-700'}`}>
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-800 overflow-hidden">
             <button 
-              onClick={() => setShowInfo(!showInfo)}
+              onClick={() => { setShowInfo(!showInfo); }}
               className="w-full flex items-center gap-2 p-3 text-left hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors"
             >
               <Info className="text-blue-600 dark:text-blue-400 shrink-0" size={16} />

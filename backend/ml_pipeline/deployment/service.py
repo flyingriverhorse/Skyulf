@@ -191,6 +191,11 @@ class DeploymentService:
                 f"Could not load model artifact: {deployment.artifact_uri}"
             )
 
+        # Handle tuple artifact (model, metadata/tuning_result) from TunerCalculator
+        if isinstance(artifact, tuple) and len(artifact) >= 1:
+            logger.info("Artifact is a tuple, using the first element as the model.")
+            artifact = artifact[0]
+
         # 3. Prepare Data
         df = pd.DataFrame(data)
 
@@ -203,6 +208,11 @@ class DeploymentService:
         ):
             feature_engineer = artifact["feature_engineer"]
             estimator = artifact["model"]
+
+            # Handle tuple estimator inside dict (e.g. from TunerCalculator)
+            if isinstance(estimator, tuple) and len(estimator) >= 1:
+                logger.info("Estimator inside artifact is a tuple, using the first element.")
+                estimator = estimator[0]
 
             # Transform
             try:

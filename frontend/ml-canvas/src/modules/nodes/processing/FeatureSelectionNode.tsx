@@ -107,7 +107,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
       }
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, []);
 
   // Helper to determine available score functions based on problem type

@@ -17,7 +17,7 @@ export function useElementSize<T extends HTMLElement = HTMLDivElement>(): [
     if (!ref) return;
     const observer = new ResizeObserver(handleResize);
     observer.observe(ref);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, [ref, handleResize]);
 
   return [setRef, size];

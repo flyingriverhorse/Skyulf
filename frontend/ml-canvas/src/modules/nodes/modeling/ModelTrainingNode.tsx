@@ -77,7 +77,7 @@ const BestParamsModal: React.FC<{
                 console.error("Failed to fetch jobs", err);
                 setError("Failed to load history.");
             })
-            .finally(() => setIsLoading(false));
+            .finally(() => { setIsLoading(false); });
     }, [currentModelType]);
 
     useEffect(() => {
@@ -104,7 +104,7 @@ const BestParamsModal: React.FC<{
                                 <span className="text-xs text-gray-500 dark:text-gray-400">Select parameters for:</span>
                                 <select 
                                     value={currentModelType}
-                                    onChange={(e) => setCurrentModelType(e.target.value)}
+                                    onChange={(e) => { setCurrentModelType(e.target.value); }}
                                     className="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-blue-500 outline-none"
                                 >
                                     <option value="random_forest_classifier">Random Forest Classifier</option>
@@ -250,7 +250,7 @@ const HyperparameterInput: React.FC<{
         <input
             type="text"
             value={localValue}
-            onChange={(e) => setLocalValue(e.target.value)}
+            onChange={(e) => { setLocalValue(e.target.value); }}
             onBlur={handleBlur}
             placeholder={value === null ? 'None' : ''}
             className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
@@ -330,7 +330,7 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
       jobsApi.getHyperparameters(config.model_type)
         .then(setHyperparameters)
         .catch(console.error)
-        .finally(() => setIsLoadingDefs(false));
+        .finally(() => { setIsLoadingDefs(false); });
     }
   }, [config.model_type]);
 
@@ -424,7 +424,7 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
             {/* CV Settings */}
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                 <button 
-                    onClick={() => setShowCV(!showCV)}
+                    onClick={() => { setShowCV(!showCV); }}
                     className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
                     <div className="flex items-center gap-2">
@@ -521,7 +521,7 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
                    <input 
                         type="checkbox" 
                         checked={useCustomParams}
-                        onChange={(e) => toggleCustomParams(e.target.checked)}
+                        onChange={(e) => { toggleCustomParams(e.target.checked); }}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                    />
                    Customize
@@ -535,7 +535,7 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
                     Using default hyperparameters.
                 </p>
                 <button
-                    onClick={() => setShowParamsModal(true)}
+                    onClick={() => { setShowParamsModal(true); }}
                     className="mt-3 text-xs flex items-center gap-1.5 px-3 py-1.5 mx-auto bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-md border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors shadow-sm"
                 >
                     <Download className="w-3 h-3" />
@@ -626,7 +626,7 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
 
       <BestParamsModal 
         isOpen={showParamsModal} 
-        onClose={() => setShowParamsModal(false)} 
+        onClose={() => { setShowParamsModal(false); }}
         modelType={config.model_type}
         onSelect={(result) => {
             // result contains { params, modelType }
@@ -652,7 +652,7 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
-            onClick={() => setActiveTab('model')}
+            onClick={() => { setActiveTab('model'); }}
           >
             Configuration
           </button>
@@ -662,7 +662,7 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
-            onClick={() => setActiveTab('params')}
+            onClick={() => { setActiveTab('params'); }}
           >
             Hyperparameters
           </button>

@@ -54,7 +54,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
       }
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, []);
 
   const categoricalColumns = schema 
@@ -243,7 +243,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
             placeholder="Search columns..." 
             className="block w-full px-3 py-1.5 text-sm bg-background border rounded-md shadow-sm focus:ring-1 focus:ring-primary outline-none"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); }}
           />
           <div className="flex gap-2 text-xs justify-end">
             <button onClick={handleSelectAll} className="text-primary hover:text-primary/80 font-medium transition-colors">Select All</button>
