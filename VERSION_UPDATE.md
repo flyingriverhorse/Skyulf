@@ -1,10 +1,34 @@
 # Version Updates
 
+*   **v0.1.3 :** "The Code Quality & Stability Update" — Extensive static analysis fixes, safer type handling, and backend runtime stability improvements.
 *   **v0.1.2 :** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
 
 ------------------------------------------------------------
+
+## v0.1.3
+**"The Code Quality & Stability Update"**
+
+This release focuses on hardening the codebase against runtime errors and improving maintainability through extensive static analysis fixes (Codacy).
+
+### 🛡️ Backend Stability
+- **Robust Artifact Handling:** Fixed a critical runtime error where Hyperparameter Tuning jobs saved artifacts as tuples `(model, metadata)`, causing prediction failures. The system now correctly unwraps these artifacts.
+- **Database Safety:**
+    - Fixed a variable shadowing issue in `crud.py` where the built-in `filter` was being overridden.
+    - Corrected SQL statement execution logic for MySQL/Snowflake paths.
+    - Cleaned up unused imports and variables across the backend.
+
+### 🧹 Frontend Code Quality (Codacy)
+- **Type Safety:**
+    - Replaced dangerous non-null assertions (`!`) with proper runtime checks to prevent crashes when data is missing.
+    - Removed redundant conditional checks (e.g., checking if a required array exists) to clean up "dead code".
+- **Best Practices:**
+    - Enforced explicit `void` return types for Promise-returning functions to prevent "floating promises".
+    - Standardized arrow function syntax in event handlers for better readability and safety.
+    - Replaced the `delete` operator with `Reflect.deleteProperty` for safer object manipulation.
+
+---
 
 ## v0.1.2 
 **"The Tuning (Advanced Training) & Versioning Consistency Update"**

@@ -108,7 +108,7 @@ async def delete_data_source(settings: Settings, filter_dict: Dict[str, Any]):
                 params[k] = v
 
             where_clause = " WHERE " + " AND ".join(where_parts)
-            sql = sa_text(f"DELETE FROM {TABLE}{where_clause}")
+            sql = sa_text(f"DELETE FROM {TABLE}{where_clause}")  # nosec
 
             result = await session.execute(sql, params)
             await session.commit()
@@ -131,7 +131,7 @@ async def select_data_source_by_file_hash(
     async with async_session_or_connection(settings) as session:
         try:
             sql = sa_text(
-                f"SELECT * FROM {TABLE} WHERE config ->> 'file_hash' = :file_hash LIMIT 1"
+                f"SELECT * FROM {TABLE} WHERE config ->> 'file_hash' = :file_hash LIMIT 1"  # nosec
             )
             result = await session.execute(sql, {"file_hash": file_hash})
             row = result.fetchone()

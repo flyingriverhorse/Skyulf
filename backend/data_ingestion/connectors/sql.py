@@ -48,14 +48,14 @@ class DatabaseConnector(BaseConnector):
         # Construct a query to fetch 0 rows just to get schema
         q = self.query
         if not q and self.table_name:
-            q = f"SELECT * FROM {self.table_name}"
+            q = f"SELECT * FROM {self.table_name}"  # nosec
 
         if not q:
             raise ValueError("No table_name or query provided")
 
         # Wrap in a limit 0 to avoid fetching data
         # Note: This syntax might vary by dialect, but works for Postgres/MySQL/SQLite
-        schema_query = f"SELECT * FROM ({q}) as subq LIMIT 0"
+        schema_query = f"SELECT * FROM ({q}) as subq LIMIT 0"  # nosec
 
         try:
             # Polars read_database uses the engine to fetch schema

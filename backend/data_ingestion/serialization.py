@@ -364,6 +364,7 @@ class JSONSafeSerializer:
                 if obj.isna():
                     return None
             except Exception:
+                # Some objects might have isna but fail when called or return array
                 pass
         if hasattr(obj, "tolist"):
             return JSONSafeSerializer.clean_for_json(obj.tolist())
