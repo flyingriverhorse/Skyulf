@@ -64,7 +64,7 @@ async def create(settings: Settings, row: Dict[str, Any]) -> Any:
                         return existing
                 except Exception:
                     # Ignore if check fails, try insert
-                    pass
+                    logger.debug("Failed to check for existing data source in SQLite", exc_info=True)
 
             logger.exception("SQLite insert failed for data_sources")
             raise RuntimeError(
