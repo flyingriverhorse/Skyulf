@@ -52,18 +52,18 @@ class BaseRepository(Generic[ModelType]):
         logger.debug(f"Created {self.model.__name__} with id {db_obj.id}")
         return cast(ModelType, db_obj)
 
-    async def get(self, id: int) -> Optional[ModelType]:
+    async def get(self, record_id: int) -> Optional[ModelType]:
         """
         Get a record by ID.
 
         Args:
-            id: Record ID
+            record_id: Record ID
 
         Returns:
             Optional[ModelType]: Model instance or None
         """
         result = await self.session.execute(
-            select(self.model).where(self.model.id == id)
+            select(self.model).where(self.model.id == record_id)
         )
         return result.scalar_one_or_none()
 
@@ -106,19 +106,19 @@ class BaseRepository(Generic[ModelType]):
         records = result.scalars().all()
         return list(records)
 
-    async def update(self, id: int, obj_in: Dict[str, Any]) -> Optional[ModelType]:
+    async def update(self, record_id: int, obj_in: Dict[str, Any]) -> Optional[ModelType]:
         """
         Update a record by ID.
 
         Args:
-            id: Record ID
+            record_id: Record ID
             obj_in: Dictionary of field values to update
 
         Returns:
             Optional[ModelType]: Updated model instance or None
         """
         # First check if record exists
-        db_obj = await self.get(id)
+        db_obj = await self.get(record_id)
         if not db_obj:
             return None
 
@@ -130,28 +130,28 @@ class BaseRepository(Generic[ModelType]):
         await self.session.commit()
         await self.session.refresh(db_obj)
 
-        logger.debug(f"Updated {self.model.__name__} with id {id}")
+        logger.debug(f"Updated {self.model.__name__} with id {record_id}")
         return db_obj
 
-    async def delete(self, id: int) -> bool:
+    async def delete(self, record_id: int) -> bool:
         """
         Delete a record by ID.
 
         Args:
-            id: Record ID
+            record_id: Record ID
 
         Returns:
             bool: True if deleted, False if not found
         """
         result = await self.session.execute(
-            delete(self.model).where(self.model.id == id)
+            delete(self.model).where(self.model.id == record_id)
         )
 
         cursor = cast(CursorResult[Any], result)
         affected = cursor.rowcount or 0
         if affected > 0:
             await self.session.commit()
-            logger.debug(f"Deleted {self.model.__name__} with id {id}")
+            logger.debug(f"Deleted {self.model.__name__} with id {record_id}")
             return True
 
         return False
@@ -177,18 +177,18 @@ class BaseRepository(Generic[ModelType]):
         count_value = result.scalar_one()
         return int(count_value)
 
-    async def exists(self, id: int) -> bool:
+    async def exists(self, record_id: int) -> bool:
         """
         Check if a record exists.
 
         Args:
-            id: Record ID
+            record_id: Record ID
 
         Returns:
             bool: True if exists, False otherwise
         """
         result = await self.session.execute(
-            select(func.count(self.model.id)).where(self.model.id == id)
+            select(func.count(self.model.id)).where(self.model.id == record_id)
         )
         count_value = result.scalar_one()
         return int(count_value) > 0

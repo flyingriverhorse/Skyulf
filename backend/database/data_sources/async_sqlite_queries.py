@@ -6,7 +6,7 @@ This is the async equivalent of the Flask db/data_sources/sqlite_queries.py
 import logging
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import column, table
+from sqlalchemy import column, delete, func, literal_column, select, table, update
 from sqlalchemy import text as sa_text
 
 from backend.config import Settings
@@ -30,9 +30,10 @@ async def insert_data_source(settings: Settings, row: Dict[str, Any]) -> Dict[st
 
             # Fetch the inserted row back
             if "id" in row:
-                result = await session.execute(
-                    sa_text(f"SELECT * FROM {TABLE} WHERE id = :id"), {"id": row["id"]}
-                )
+                # Use SQLAlchemy Core for SELECT
+                tbl_select = table(TABLE, column("id"))
+                stmt_select = select(literal_column("*")).select_from(tbl_select).where(column("id") == row["id"])
+                result = await session.execute(stmt_select)
                 fetched = result.fetchone()
                 if fetched:
                     return dict(fetched._mapping)
@@ -43,9 +44,10 @@ async def insert_data_source(settings: Settings, row: Dict[str, Any]) -> Dict[st
             )
             rid = rid_result.scalar()
             if rid:
-                result = await session.execute(
-                    sa_text(f"SELECT * FROM {TABLE} WHERE rowid = :rid"), {"rid": rid}
-                )
+                # Use SQLAlchemy Core for SELECT by rowid
+                tbl_select = table(TABLE, column("rowid"))
+                stmt_select = select(literal_column("*")).select_from(tbl_select).where(column("rowid") == rid)
+                result = await session.execute(stmt_select)
                 fetched = result.fetchone()
                 if fetched:
                     return dict(fetched._mapping)
@@ -66,19 +68,18 @@ async def select_data_sources(
     """Select data sources with optional filtering."""
     async with async_session_or_connection(settings) as session:
         try:
+            tbl = table(TABLE)
             if filter_dict:
                 # Build WHERE clause
                 conditions = []
-                params = {}
                 for k, v in filter_dict.items():
-                    conditions.append(f"{k} = :{k}")
-                    params[k] = v
-                where_clause = " WHERE " + " AND ".join(conditions)
-                sql = sa_text(f"SELECT * FROM {TABLE}{where_clause}")
-                result = await session.execute(sql, params)
+                    conditions.append(column(k) == v)
+                
+                stmt = select(literal_column("*")).select_from(tbl).where(*conditions)
+                result = await session.execute(stmt)
             else:
-                sql = sa_text(f"SELECT * FROM {TABLE}")
-                result = await session.execute(sql)
+                stmt = select(literal_column("*")).select_from(tbl)
+                result = await session.execute(stmt)
 
             rows = result.fetchall()
             data = [dict(row._mapping) for row in rows]
@@ -98,24 +99,15 @@ async def update_data_source(
     """Update data source records."""
     async with async_session_or_connection(settings) as session:
         try:
-            # Build SET clause
-            set_parts = []
-            params = {}
-            for k, v in update_data.items():
-                set_parts.append(f"{k} = :u_{k}")
-                params[f"u_{k}"] = v
-
-            # Build WHERE clause
-            where_parts = []
+            # Use SQLAlchemy Core for UPDATE
+            tbl = table(TABLE, *[column(c) for c in update_data.keys()] + [column(c) for c in filter_dict.keys()])
+            
+            stmt = update(tbl).values(**update_data)
+            
             for k, v in filter_dict.items():
-                where_parts.append(f"{k} = :w_{k}")
-                params[f"w_{k}"] = v
+                stmt = stmt.where(column(k) == v)
 
-            set_clause = ", ".join(set_parts)
-            where_clause = " WHERE " + " AND ".join(where_parts)
-
-            sql = sa_text(f"UPDATE {TABLE} SET {set_clause}{where_clause}")
-            result = await session.execute(sql, params)
+            result = await session.execute(stmt)
             await session.commit()
 
             return {"affected_rows": result.rowcount}
@@ -130,17 +122,14 @@ async def delete_data_source(settings: Settings, filter_dict: Dict[str, Any]):
     """Delete data source records."""
     async with async_session_or_connection(settings) as session:
         try:
-            # Build WHERE clause
-            where_parts = []
-            params = {}
+            # Use SQLAlchemy Core for DELETE
+            tbl = table(TABLE, *[column(c) for c in filter_dict.keys()])
+            stmt = delete(tbl)
+            
             for k, v in filter_dict.items():
-                where_parts.append(f"{k} = :{k}")
-                params[k] = v
+                stmt = stmt.where(column(k) == v)
 
-            where_clause = " WHERE " + " AND ".join(where_parts)
-            sql = sa_text(f"DELETE FROM {TABLE}{where_clause}")
-
-            result = await session.execute(sql, params)
+            result = await session.execute(stmt)
             await session.commit()
 
             return {"affected_rows": result.rowcount}
@@ -157,19 +146,14 @@ async def count_data_sources(
     """Count data sources with optional filtering."""
     async with async_session_or_connection(settings) as session:
         try:
+            tbl = table(TABLE)
+            stmt = select(func.count()).select_from(tbl)
+            
             if filter_dict:
-                conditions = []
-                params = {}
                 for k, v in filter_dict.items():
-                    conditions.append(f"{k} = :{k}")
-                    params[k] = v
-                where_clause = " WHERE " + " AND ".join(conditions)
-                sql = sa_text(f"SELECT COUNT(*) FROM {TABLE}{where_clause}")
-                result = await session.execute(sql, params)
-            else:
-                sql = sa_text(f"SELECT COUNT(*) FROM {TABLE}")
-                result = await session.execute(sql)
+                    stmt = stmt.where(column(k) == v)
 
+            result = await session.execute(stmt)
             return result.scalar() or 0
 
         except Exception as e:
@@ -186,10 +170,13 @@ async def select_data_source_by_file_hash(
 
     async with async_session_or_connection(settings) as session:
         try:
-            sql = sa_text(
-                f"SELECT * FROM {TABLE} WHERE json_extract(config, '$.file_hash') = :file_hash LIMIT 1"
-            )
-            result = await session.execute(sql, {"file_hash": file_hash})
+            # Use SQLAlchemy Core with json_extract
+            tbl = table(TABLE)
+            stmt = select(literal_column("*")).select_from(tbl).where(
+                func.json_extract(column("config"), "$.file_hash") == file_hash
+            ).limit(1)
+            
+            result = await session.execute(stmt)
             row = result.fetchone()
             return dict(row._mapping) if row else None
         except Exception as e:
