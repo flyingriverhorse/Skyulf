@@ -83,7 +83,7 @@ const ColumnSelector: React.FC<{
              className="w-full pl-7 pr-2 py-1 text-xs border rounded bg-background" 
              placeholder="Search columns..." 
              value={search}
-             onChange={e => setSearch(e.target.value)}
+             onChange={e => { setSearch(e.target.value); }}
            />
         </div>
       </div>
@@ -102,7 +102,7 @@ const ColumnSelector: React.FC<{
                 <input
                   type="checkbox"
                   checked={selectedColumns.includes(col)}
-                  onChange={() => toggleColumn(col)}
+                  onChange={() => { toggleColumn(col); }}
                   className="rounded border-gray-300 text-primary focus:ring-primary"
                 />
                 <span className="truncate" title={col}>{col}</span>
@@ -137,7 +137,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
       }
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, []);
 
   const upstreamData = useUpstreamData(nodeId || '');
@@ -212,7 +212,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
               {/* Header */}
               <div 
                 className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent/50 transition-colors"
-                onClick={() => toggleRule(idx)}
+                onClick={() => { toggleRule(idx); }}
               >
                 <div className="flex items-center gap-2 overflow-hidden">
                   {isExpanded ? <ChevronDown size={16} className="text-muted-foreground flex-shrink-0" /> : <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />}
@@ -243,8 +243,8 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                       <select
                         className="w-full p-1.5 border rounded text-xs bg-background font-medium"
                         value={currentType}
-                        onChange={(e) => handleTypeChange(idx, e.target.value as 'power' | 'simple')}
-                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => { handleTypeChange(idx, e.target.value as 'power' | 'simple'); }}
+                        onClick={(e) => { e.stopPropagation(); }}
                       >
                         <option value="simple">Simple Math</option>
                         <option value="power">Power Transform</option>
@@ -253,7 +253,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                       <select
                         className="w-full p-1.5 border rounded text-xs bg-background"
                         value={rule.method}
-                        onChange={(e) => updateRule(idx, { method: e.target.value as any })}
+                        onChange={(e) => { updateRule(idx, { method: e.target.value as any }); }}
                         onClick={(e) => e.stopPropagation()}
                       >
                         {TRANSFORMATION_TYPES[currentType].methods.map(m => (
@@ -263,37 +263,37 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                     </div>
 
                     {(rule.method === 'yeo-johnson' || rule.method === 'box-cox') && (
-                      <div className="flex items-center gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 pt-1" onClick={(e) => { e.stopPropagation(); }}>
                         <input
                           type="checkbox"
                           id={`std-${idx}`}
                           checked={rule.params?.standardize !== false}
-                          onChange={(e) => updateRule(idx, { params: { ...rule.params, standardize: e.target.checked } })}
+                          onChange={(e) => { updateRule(idx, { params: { ...rule.params, standardize: e.target.checked } }); }}
                         />
                         <label htmlFor={`std-${idx}`} className="text-xs text-muted-foreground">Standardize result</label>
                       </div>
                     )}
                     
                     {rule.method === 'exponential' && (
-                       <div className="flex flex-col gap-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                       <div className="flex flex-col gap-1 pt-1" onClick={(e) => { e.stopPropagation(); }}>
                          <label className="text-xs text-muted-foreground">Clip Threshold:</label>
                          <input
                            type="number"
                            className="w-full p-1 border rounded text-xs"
                            value={rule.params?.clip_threshold || 700}
-                           onChange={(e) => updateRule(idx, { params: { ...rule.params, clip_threshold: parseFloat(e.target.value) } })}
+                           onChange={(e) => { updateRule(idx, { params: { ...rule.params, clip_threshold: parseFloat(e.target.value) } }); }}
                          />
                        </div>
                     )}
                   </div>
 
                   {/* Right Column: Columns */}
-                  <div className="space-y-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+                  <div className="space-y-1 min-w-0" onClick={(e) => { e.stopPropagation(); }}>
                     <label className="text-xs font-medium text-muted-foreground">Target Columns</label>
                     <ColumnSelector 
                       allColumns={columns}
                       selectedColumns={rule.columns || []}
-                      onChange={(newCols) => updateRule(idx, { columns: newCols })}
+                      onChange={(newCols) => { updateRule(idx, { columns: newCols }); }}
                     />
                   </div>
                 </div>

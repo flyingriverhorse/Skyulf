@@ -126,7 +126,7 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
         {/* Tabs */}
         <div className="flex border-b border-slate-200 dark:border-slate-700 px-6">
           <button
-            onClick={() => setActiveTab('sample')}
+            onClick={() => { setActiveTab('sample'); }}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'sample'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
@@ -136,7 +136,7 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
             Data Sample
           </button>
           <button
-            onClick={() => setActiveTab('stats')}
+            onClick={() => { setActiveTab('stats'); }}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'stats'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'

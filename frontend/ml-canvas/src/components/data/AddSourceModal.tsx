@@ -66,7 +66,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
         <div className="p-4">
           <div className="flex gap-2 mb-6">
             <button
-              onClick={() => setType('database')}
+              onClick={() => { setType('database'); }}
               className={`flex-1 py-2 px-4 rounded-md flex items-center justify-center gap-2 border ${
                 type === 'database'
                   ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-900/20 dark:border-blue-400 dark:text-blue-400'
@@ -76,7 +76,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
               <Database size={16} /> Database
             </button>
             <button
-              onClick={() => setType('api')}
+              onClick={() => { setType('api'); }}
               className={`flex-1 py-2 px-4 rounded-md flex items-center justify-center gap-2 border ${
                 type === 'api'
                   ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-900/20 dark:border-blue-400 dark:text-blue-400'
@@ -94,7 +94,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                 type="text"
                 required
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => { setName(e.target.value); }}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
                 placeholder="My Dataset"
               />
@@ -108,7 +108,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                     type="text"
                     required
                     value={connectionString}
-                    onChange={(e) => setConnectionString(e.target.value)}
+                    onChange={(e) => { setConnectionString(e.target.value); }}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
                     placeholder="postgresql://user:pass@localhost:5432/db"
                   />
@@ -118,7 +118,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                   <textarea
                     required
                     value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    onChange={(e) => { setQuery(e.target.value); }}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 h-24"
                     placeholder="SELECT * FROM users"
                   />
@@ -132,7 +132,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                     type="url"
                     required
                     value={apiUrl}
-                    onChange={(e) => setApiUrl(e.target.value)}
+                    onChange={(e) => { setApiUrl(e.target.value); }}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
                     placeholder="https://api.example.com/data"
                   />
@@ -141,7 +141,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Method</label>
                   <select
                     value={method}
-                    onChange={(e) => setMethod(e.target.value)}
+                    onChange={(e) => { setMethod(e.target.value); }}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="GET">GET</option>

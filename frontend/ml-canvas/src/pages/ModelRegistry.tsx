@@ -128,11 +128,11 @@ export const ModelRegistry: React.FC = () => {
     const mainElement = document.querySelector('main');
     if (mainElement) {
       mainElement.addEventListener('scroll', handleScroll);
-      return () => mainElement.removeEventListener('scroll', handleScroll);
+      return () => { mainElement.removeEventListener('scroll', handleScroll); };
     } else {
       // Fallback to window if main not found (though it should be there)
       window.addEventListener('scroll', handleScroll as any);
-      return () => window.removeEventListener('scroll', handleScroll as any);
+      return () => { window.removeEventListener('scroll', handleScroll as any); };
     }
   }, [loading, hasMore]);
 
@@ -269,7 +269,7 @@ export const ModelRegistry: React.FC = () => {
             type="text" 
             placeholder="e.g. RandomForest" 
             value={modelTypeFilter}
-            onChange={(e) => setModelTypeFilter(e.target.value)}
+            onChange={(e) => { setModelTypeFilter(e.target.value); }}
             className="w-full px-4 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
@@ -279,7 +279,7 @@ export const ModelRegistry: React.FC = () => {
             type="text" 
             placeholder="e.g. Iris Dataset" 
             value={datasetFilter}
-            onChange={(e) => setDatasetFilter(e.target.value)}
+            onChange={(e) => { setDatasetFilter(e.target.value); }}
             className="w-full px-4 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
@@ -356,11 +356,11 @@ export const ModelRegistry: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2" onClick={(e) => { e.stopPropagation(); }}>
                           <input 
                             type="checkbox" 
                             checked={isDeployed} 
-                            onChange={() => toggleManualDeployment(rowKey)}
+                            onChange={() => { toggleManualDeployment(rowKey); }}
                             disabled={isSystemDeployed}
                             className={`w-4 h-4 rounded border-gray-300 focus:ring-green-500 ${isSystemDeployed ? 'text-green-600 opacity-50 cursor-not-allowed' : 'text-blue-600 cursor-pointer'}`} 
                           />
@@ -375,7 +375,7 @@ export const ModelRegistry: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button 
-                          onClick={() => setSelectedModel(model)}
+                          onClick={() => { setSelectedModel(model); }}
                           className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 flex items-center justify-end gap-1 ml-auto"
                         >
                           View Versions <ChevronRight size={16} />
@@ -399,14 +399,14 @@ export const ModelRegistry: React.FC = () => {
 
       {/* Versions Modal/Drawer */}
       {selectedModel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedModel(null)}>
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => { setSelectedModel(null); }}>
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700" onClick={e => { e.stopPropagation(); }}>
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
               <div>
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white">{selectedModel.model_type}</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Version History</p>
               </div>
-              <button onClick={() => setSelectedModel(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+              <button onClick={() => { setSelectedModel(null); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
                 <X size={24} />
               </button>
             </div>
@@ -475,7 +475,7 @@ export const ModelRegistry: React.FC = () => {
             
             <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end">
               <button 
-                onClick={() => setSelectedModel(null)}
+                onClick={() => { setSelectedModel(null); }}
                 className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
                 Close

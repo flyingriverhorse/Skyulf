@@ -94,7 +94,7 @@ export const ResultsPanel: React.FC = () => {
               {tabNames.map(name => (
                 <button
                   key={name}
-                  onClick={() => setActiveTab(name)}
+                  onClick={() => { setActiveTab(name); }}
                   className={`px-3 py-1 text-xs font-medium rounded-t-md border-t border-l border-r transition-colors ${
                     activeTab === name 
                       ? 'bg-background text-primary border-b-background translate-y-[1px]' 

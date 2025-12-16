@@ -245,7 +245,7 @@ export const ExperimentsPage: React.FC = () => {
            <select 
              className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
              value={selectedDatasetId}
-             onChange={(e) => setSelectedDatasetId(e.target.value)}
+             onChange={(e) => { setSelectedDatasetId(e.target.value); }}
            >
              <option value="all">All Datasets</option>
              {datasets.map(ds => (
@@ -255,7 +255,7 @@ export const ExperimentsPage: React.FC = () => {
            <select 
              className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
              value={filterType}
-             onChange={(e) => setFilterType(e.target.value as any)}
+             onChange={(e) => { setFilterType(e.target.value as any); }}
            >
              <option value="all">All Experiments</option>
              <option value="tuning">Model Optimization</option>
@@ -274,7 +274,7 @@ export const ExperimentsPage: React.FC = () => {
             {filteredJobs.map(job => (
               <div 
                 key={job.job_id}
-                onClick={() => toggleJobSelection(job.job_id)}
+                onClick={() => { toggleJobSelection(job.job_id); }}
                 className={`p-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${
                   selectedJobIds.includes(job.job_id) ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500' : 'border-l-4 border-l-transparent'
                 }`}
@@ -352,7 +352,7 @@ export const ExperimentsPage: React.FC = () => {
                               ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                               : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
                       }`}
-                      onClick={() => setActiveView('charts')}
+                      onClick={() => { setActiveView('charts'); }}
                   >
                       Visual Comparison
                   </button>
@@ -362,7 +362,7 @@ export const ExperimentsPage: React.FC = () => {
                               ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                               : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
                       }`}
-                      onClick={() => setActiveView('table')}
+                      onClick={() => { setActiveView('table'); }}
                   >
                       Detailed Metrics & Params
                   </button>
@@ -372,7 +372,7 @@ export const ExperimentsPage: React.FC = () => {
                               ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                               : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
                       }`}
-                      onClick={() => setActiveView('evaluation')}
+                      onClick={() => { setActiveView('evaluation'); }}
                   >
                       Model Evaluation
                   </button>
@@ -388,7 +388,7 @@ export const ExperimentsPage: React.FC = () => {
                             <input 
                                 type="checkbox" 
                                 checked={showTrainMetrics} 
-                                onChange={e => setShowTrainMetrics(e.target.checked)}
+                                onChange={e => { setShowTrainMetrics(e.target.checked); }}
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                             <span className="text-gray-700 dark:text-gray-300">Train</span>
@@ -397,7 +397,7 @@ export const ExperimentsPage: React.FC = () => {
                             <input 
                                 type="checkbox" 
                                 checked={showTestMetrics} 
-                                onChange={e => setShowTestMetrics(e.target.checked)}
+                                onChange={e => { setShowTestMetrics(e.target.checked); }}
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                             <span className="text-gray-700 dark:text-gray-300">Test</span>
@@ -406,7 +406,7 @@ export const ExperimentsPage: React.FC = () => {
                             <input 
                                 type="checkbox" 
                                 checked={showValMetrics} 
-                                onChange={e => setShowValMetrics(e.target.checked)}
+                                onChange={e => { setShowValMetrics(e.target.checked); }}
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                             <span className="text-gray-700 dark:text-gray-300">Validation</span>
@@ -420,7 +420,7 @@ export const ExperimentsPage: React.FC = () => {
                         {availableMetrics.map(metric => (
                             <button
                                 key={metric}
-                                onClick={() => setSelectedMetric(metric)}
+                                onClick={() => { setSelectedMetric(metric); }}
                                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                                     activeMetric === metric
                                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
@@ -498,7 +498,7 @@ export const ExperimentsPage: React.FC = () => {
                       {/* Metrics Section in Table */}
                       <tr 
                         className="bg-gray-50/50 dark:bg-gray-900/20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
-                        onClick={() => setIsMetricsExpanded(!isMetricsExpanded)}
+                        onClick={() => { setIsMetricsExpanded(!isMetricsExpanded); }}
                       >
                         <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2" colSpan={selectedJobs.length + 1}>
                           {isMetricsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
@@ -522,7 +522,7 @@ export const ExperimentsPage: React.FC = () => {
                       {/* Hyperparameters */}
                       <tr 
                         className="bg-gray-50/50 dark:bg-gray-900/20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
-                        onClick={() => setIsParamsExpanded(!isParamsExpanded)}
+                        onClick={() => { setIsParamsExpanded(!isParamsExpanded); }}
                       >
                         <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2" colSpan={selectedJobs.length + 1}>
                           {isParamsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
@@ -623,7 +623,7 @@ export const ExperimentsPage: React.FC = () => {
                                         <select 
                                             className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5"
                                             value={selectedRocClass || ''}
-                                            onChange={(e) => setSelectedRocClass(e.target.value)}
+                                            onChange={(e) => { setSelectedRocClass(e.target.value); }}
                                         >
                                             {evaluationData.splits.train.y_proba.classes.map((c: any) => (
                                                 <option key={c} value={c}>{c}</option>

@@ -437,7 +437,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
                 placeholder="Search columns..."
                 className="w-full text-xs p-1.5 border rounded bg-background"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); }}
               />
            </div>
            <div className="flex-1 overflow-y-auto p-2 space-y-1">

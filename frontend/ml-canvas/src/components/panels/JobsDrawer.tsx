@@ -34,7 +34,7 @@ export const JobsDrawer: React.FC = () => {
       <div className="relative w-[900px] h-[85vh] bg-white dark:bg-gray-800 shadow-2xl rounded-lg flex flex-col border border-gray-200 dark:border-gray-700 overflow-hidden transition-all">
         
         {selectedJob ? (
-            <JobDetailsView job={selectedJob} onBack={() => setSelectedJob(null)} onClose={() => toggleDrawer(false)} />
+            <JobDetailsView job={selectedJob} onBack={() => { setSelectedJob(null); }} onClose={() => toggleDrawer(false)} />
         ) : (
             <>
                 {/* Header */}
@@ -101,7 +101,7 @@ export const JobsDrawer: React.FC = () => {
                 ) : (
                     <>
                         {filteredJobs.map(job => (
-                            <JobRow key={job.job_id} job={job} onClick={() => setSelectedJob(job)} />
+                            <JobRow key={job.job_id} job={job} onClick={() => { setSelectedJob(job); }} />
                         ))}
                         
                         {hasMore && (
@@ -218,7 +218,7 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                         ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
                         : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                     }`}
-                    onClick={() => setActiveTab('overview')}
+                    onClick={() => { setActiveTab('overview'); }}
                 >
                     <LayoutDashboard className="w-4 h-4" />
                     Overview
@@ -229,7 +229,7 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                         ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
                         : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                     }`}
-                    onClick={() => setActiveTab('logs')}
+                    onClick={() => { setActiveTab('logs'); }}
                 >
                     <FileText className="w-4 h-4" />
                     Live Logs

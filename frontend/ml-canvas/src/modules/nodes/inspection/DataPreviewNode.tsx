@@ -69,7 +69,7 @@ const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange: (c: D
 
     fetchJob();
     const interval = setInterval(fetchJob, 2000);
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); };
   }, [config.lastRunJobId]);
 
   const handleRunPreview = async () => {
@@ -146,7 +146,7 @@ const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange: (c: D
                                         ? 'border-primary font-medium text-primary' 
                                         : 'border-transparent text-muted-foreground hover:text-foreground'
                                     }`}
-                                    onClick={() => setActiveTab(t as any)}
+                                    onClick={() => { setActiveTab(t as any); }}
                                 >
                                     {t.charAt(0).toUpperCase() + t.slice(1)}
                                 </button>

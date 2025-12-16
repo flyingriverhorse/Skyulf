@@ -78,7 +78,7 @@ const ColumnSelector: React.FC<{
             className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/70"
             placeholder="Search columns..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); }}
           />
         </div>
         <div className="max-h-32 overflow-y-auto p-1 space-y-0.5">
@@ -88,7 +88,7 @@ const ColumnSelector: React.FC<{
               return (
                 <div
                   key={col}
-                  onClick={() => toggle(col)}
+                  onClick={() => { toggle(col); }}
                   className={`
                     flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors
                     ${isSelected ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-accent text-foreground'}
@@ -206,7 +206,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
         {OPERATION_TYPES.map(t => (
           <button
             key={t.value}
-            onClick={() => addOperation(t.value as any)}
+            onClick={() => { addOperation(t.value as any); }}
             className="flex flex-col items-center justify-center gap-1 p-1.5 rounded-md border bg-card hover:bg-accent hover:border-primary/50 transition-all group w-16 h-14 shadow-sm"
             title={t.label}
           >
@@ -224,7 +224,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
       {recommendations.length > 0 && (
         <div className="border-b bg-muted/10">
           <button 
-            onClick={() => setShowRecommendations(!showRecommendations)}
+            onClick={() => { setShowRecommendations(!showRecommendations); }}
             className="w-full flex items-center justify-between px-4 py-2 text-xs font-medium text-muted-foreground hover:text-primary hover:bg-muted/20 transition-colors"
           >
             <div className="flex items-center gap-2">
@@ -255,7 +255,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
             {/* Header */}
             <div 
               className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => toggleExpand(idx)}
+              onClick={() => { toggleExpand(idx); }}
             >
               <div className="flex items-center gap-2">
                 {op.isExpanded ? <ChevronDown size={14} className="text-muted-foreground" /> : <ChevronRight size={14} className="text-muted-foreground" />}
@@ -266,8 +266,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                   <select
                     className="text-sm border-none bg-transparent font-semibold focus:ring-0 cursor-pointer hover:text-primary"
                     value={op.method}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => updateOperation(idx, { method: e.target.value })}
+                    onClick={(e) => { e.stopPropagation(); }}
+                    onChange={(e) => { updateOperation(idx, { method: e.target.value }); }}
                   >
                     {(op.operation_type === 'arithmetic' ? ARITHMETIC_METHODS : 
                       op.operation_type === 'similarity' ? SIMILARITY_METHODS :
@@ -279,7 +279,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                 )}
               </div>
               <button
-                onClick={(e) => removeOperation(idx, e)}
+                onClick={(e) => { removeOperation(idx, e); }}
                 className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded-full hover:bg-destructive/10"
               >
                 <Trash2 size={14} />
@@ -304,7 +304,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     label="Column A (Left Operand)"
                     columns={numericColumns}
                     selected={op.input_columns.slice(0, 1)}
-                    onChange={(cols) => updateOperation(idx, { input_columns: cols })}
+                    onChange={(cols) => { updateOperation(idx, { input_columns: cols }); }}
                     single
                   />
                   
@@ -320,7 +320,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     label="Column B (Right Operand)"
                     columns={numericColumns}
                     selected={op.secondary_columns?.slice(0, 1) || []}
-                    onChange={(cols) => updateOperation(idx, { secondary_columns: cols })}
+                    onChange={(cols) => { updateOperation(idx, { secondary_columns: cols }); }}
                     single
                   />
                 </div>
@@ -410,7 +410,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                         max="5"
                         className="w-full text-xs border rounded p-1.5"
                         value={op.degree || 2}
-                        onChange={(e) => updateOperation(idx, { degree: parseInt(e.target.value) })}
+                        onChange={(e) => { updateOperation(idx, { degree: parseInt(e.target.value) }); }}
                       />
                     </div>
                     <div className="space-y-1 pt-5">
@@ -418,7 +418,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                         <input
                           type="checkbox"
                           checked={op.interaction_only || false}
-                          onChange={(e) => updateOperation(idx, { interaction_only: e.target.checked })}
+                          onChange={(e) => { updateOperation(idx, { interaction_only: e.target.checked }); }}
                         />
                         Interaction Only
                       </label>
@@ -500,7 +500,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                   className="w-full text-xs border rounded px-2 py-1.5 bg-background focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                   placeholder={generateDefaultName(op, idx)}
                   value={op.output_column || ''}
-                  onChange={(e) => updateOperation(idx, { output_column: e.target.value })}
+                  onChange={(e) => { updateOperation(idx, { output_column: e.target.value }); }}
                 />
               </div>
             </div>

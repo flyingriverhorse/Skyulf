@@ -56,7 +56,7 @@ export const DataSources: React.FC = () => {
         fetchDatasets();
       }
     }, 5000);
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); };
   }, [datasets]); // Re-run effect when datasets change to update "hasPending" check
 
   const handleDelete = async (id: string) => {
@@ -136,18 +136,18 @@ export const DataSources: React.FC = () => {
       <DatasetPreviewModal 
         dataset={previewDataset} 
         isOpen={!!previewDataset} 
-        onClose={() => setPreviewDataset(null)} 
+        onClose={() => { setPreviewDataset(null); }}
       />
 
       <AddSourceModal
         isOpen={showAddSource}
-        onClose={() => setShowAddSource(false)}
+        onClose={() => { setShowAddSource(false); }}
         onSuccess={handleSourceCreated}
       />
 
       <IngestionJobsModal
         isOpen={showIngestionJobs}
-        onClose={() => setShowIngestionJobs(false)}
+        onClose={() => { setShowIngestionJobs(false); }}
         datasets={datasets}
         onRefresh={fetchDatasets}
       />
@@ -159,21 +159,21 @@ export const DataSources: React.FC = () => {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={() => setShowIngestionJobs(true)}
+            onClick={() => { setShowIngestionJobs(true); }}
             className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-200"
           >
             <Calendar size={18} />
             Ingestion Jobs
           </button>
           <button
-            onClick={() => setShowAddSource(true)}
+            onClick={() => { setShowAddSource(true); }}
             className="flex items-center gap-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 px-4 py-2 rounded-md shadow-sm transition-all hover:bg-slate-50 dark:hover:bg-slate-700"
           >
             <Database size={18} />
             Add Source
           </button>
           <button
-            onClick={() => setShowUpload(!showUpload)}
+            onClick={() => { setShowUpload(!showUpload); }}
             className="flex items-center gap-2 text-white px-4 py-2 rounded-md shadow-sm transition-all hover:opacity-90"
             style={{ background: 'var(--main-gradient)' }}
           >
@@ -185,7 +185,7 @@ export const DataSources: React.FC = () => {
 
       {showUpload && (
         <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm animate-in fade-in slide-in-from-top-4">
-          <FileUpload onUploadComplete={handleUploadComplete} onCancel={() => setShowUpload(false)} />
+          <FileUpload onUploadComplete={handleUploadComplete} onCancel={() => { setShowUpload(false); }} />
         </div>
       )}
 
@@ -193,7 +193,7 @@ export const DataSources: React.FC = () => {
         {['all', 'active', 'completed', 'failed', 'cancelled'].map(status => (
           <button
             key={status}
-            onClick={() => setFilterStatus(status)}
+            onClick={() => { setFilterStatus(status); }}
             className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
               filterStatus === status 
                 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
@@ -284,14 +284,14 @@ export const DataSources: React.FC = () => {
                         {d.source_metadata?.ingestion_status?.status === 'completed' && (
                           <>
                             <button
-                              onClick={() => setPreviewDataset(d)}
+                              onClick={() => { setPreviewDataset(d); }}
                               className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
                               title="Preview Dataset"
                             >
                               <Eye size={16} />
                             </button>
                             <button
-                              onClick={() => handleUseInCanvas(d.id)}
+                              onClick={() => { handleUseInCanvas(d.id); }}
                               className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
                               title="Use in Canvas"
                             >

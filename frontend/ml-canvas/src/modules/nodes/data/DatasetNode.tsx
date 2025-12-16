@@ -25,7 +25,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
     DatasetService.getUsable()
       .then(setDatasets)
       .catch(console.error)
-      .finally(() => setLoading(false));
+      .finally(() => { setLoading(false); });
   };
 
   useEffect(() => {
@@ -53,7 +53,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
   };
 
   if (showUpload) {
-    return <FileUpload onUploadComplete={handleUploadComplete} onCancel={() => setShowUpload(false)} />;
+    return <FileUpload onUploadComplete={handleUploadComplete} onCancel={() => { setShowUpload(false); }} />;
   }
 
   return (
@@ -62,7 +62,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
         <div className="flex justify-between items-center">
           <label className="block text-sm font-medium">Select Dataset</label>
           <button 
-            onClick={() => setShowUpload(true)}
+            onClick={() => { setShowUpload(true); }}
             className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium"
           >
             <Plus size={14} />
@@ -149,8 +149,8 @@ const DatasetNodeComponent: React.FC<{ data: DatasetNodeConfig }> = ({ data }) =
     // Only fetch if we have an ID but no Name, and haven't fetched yet
     if (data.datasetId && !data.datasetName && fetchedName === undefined) {
       DatasetService.getById(data.datasetId)
-        .then(d => setFetchedName(d.name))
-        .catch(() => setFetchedName(data.datasetId)); // Fallback to ID on error
+        .then(d => { setFetchedName(d.name); })
+        .catch(() => { setFetchedName(data.datasetId); }); // Fallback to ID on error
     }
   }, [data.datasetId, data.datasetName, fetchedName]);
 

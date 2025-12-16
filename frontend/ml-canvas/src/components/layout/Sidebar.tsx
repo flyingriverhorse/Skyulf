@@ -58,7 +58,7 @@ export const Sidebar: React.FC = () => {
             placeholder="Search nodes..."
             className="w-full pl-9 pr-3 py-2 text-sm border rounded-md bg-muted/50 focus:bg-background focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); }}
           />
         </div>
       </div>
@@ -79,7 +79,7 @@ export const Sidebar: React.FC = () => {
                     key={node.type}
                     className="group flex items-center p-3 border rounded-lg bg-card hover:border-primary/50 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all"
                     draggable
-                    onDragStart={(e) => handleDragStart(e, node.type)}
+                    onDragStart={(e) => { handleDragStart(e, node.type); }}
                     onClick={() => addNode(node.type, { x: 100, y: 100 })}
                   >
                     <div className="p-2 bg-primary/5 group-hover:bg-primary/10 rounded-md mr-3 transition-colors">
