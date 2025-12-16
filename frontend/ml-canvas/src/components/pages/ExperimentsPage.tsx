@@ -36,7 +36,7 @@ export const ExperimentsPage: React.FC = () => {
 
   useEffect(() => {
     fetchJobs();
-    fetchDatasets();
+    void fetchDatasets();
   }, [fetchJobs]);
 
   useEffect(() => {
@@ -96,7 +96,7 @@ export const ExperimentsPage: React.FC = () => {
   };
 
   const calculateROC = (y_true: any[], y_proba: { classes: any[], values: number[][] }, targetClass: any) => {
-      if (!y_proba || !y_proba.values) return null;
+      if (!y_proba.values) return null;
       
       // Find index of target class
       const classIndex = y_proba.classes.indexOf(targetClass);
@@ -141,7 +141,7 @@ export const ExperimentsPage: React.FC = () => {
           // If we have a specific eval job selected, use it
           // Otherwise default to the first selected job
           if (!evalJobId && selectedJobIds.length > 0) {
-              fetchEvaluationData(selectedJobIds[0]);
+              void fetchEvaluationData(selectedJobIds[0]);
           } else if (evalJobId && !selectedJobIds.includes(evalJobId) && selectedJobIds.length > 0) {
               // If current eval job is deselected, switch to another
               fetchEvaluationData(selectedJobIds[0]);
@@ -219,7 +219,7 @@ export const ExperimentsPage: React.FC = () => {
   metricKeys.forEach(key => {
       const { base } = parseMetricKey(key);
       if (!metricGroups.has(base)) metricGroups.set(base, []);
-      metricGroups.get(base)!.push(key);
+      metricGroups.get(base)?.push(key);
   });
 
   metricGroups.forEach((keys, base) => {
@@ -448,7 +448,7 @@ export const ExperimentsPage: React.FC = () => {
                                 itemStyle={{ color: '#F3F4F6' }}
                             />
                             <Legend />
-                            {metricGroups.get(activeMetric)!.map((key) => {
+                            {metricGroups.get(activeMetric)?.map((key) => {
                                 const { type } = parseMetricKey(key);
                                 // Colors: Train=Blue, Test=Green, Val=Orange, Other=Purple
                                 let color = '#8884d8';

@@ -147,7 +147,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
   const columns = useMemo(() => {
     if (!schema?.columns) return [];
     return Object.values(schema.columns)
-        .filter(c => ['int', 'float', 'number'].some(t => c.dtype?.toLowerCase().includes(t)))
+        .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
         .map(c => c.name);
   }, [schema]);
 
@@ -292,7 +292,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                     <label className="text-xs font-medium text-muted-foreground">Target Columns</label>
                     <ColumnSelector 
                       allColumns={columns}
-                      selectedColumns={rule.columns || []}
+                      selectedColumns={rule.columns}
                       onChange={(newCols) => { updateRule(idx, { columns: newCols }); }}
                     />
                   </div>
@@ -342,11 +342,11 @@ export const TransformationNode: NodeDefinition = {
   inputs: [{ id: 'in', type: 'dataset', label: 'Dataset' }],
   outputs: [{ id: 'out', type: 'dataset', label: 'Transformed' }],
   validate: (config: TransformationConfig) => {
-    if (!config?.transformations || config.transformations.length === 0) {
+    if (config.transformations.length === 0) {
       return { isValid: false, message: 'Add at least one transformation rule.' };
     }
     for (const rule of config.transformations) {
-        if (!rule.columns || rule.columns.length === 0) {
+        if (rule.columns.length === 0) {
             return { isValid: false, message: 'Each rule must have at least one column selected.' };
         }
     }

@@ -53,11 +53,12 @@ const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange: (c: D
 
   // Poll for job status if we have a job ID
   useEffect(() => {
-    if (!config.lastRunJobId) return;
+    const jobId = config.lastRunJobId;
+    if (!jobId) return;
 
     const fetchJob = async () => {
       try {
-        const j = await jobsApi.getJob(config.lastRunJobId!);
+        const j = await jobsApi.getJob(jobId);
         setJob(j);
         if (j.status !== 'completed' && j.status !== 'failed') {
            // Keep polling if not done
@@ -67,7 +68,7 @@ const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange: (c: D
       }
     };
 
-    fetchJob();
+    void fetchJob();
     const interval = setInterval(fetchJob, 2000);
     return () => { clearInterval(interval); };
   }, [config.lastRunJobId]);
@@ -187,18 +188,19 @@ const DataPreviewComponent: React.FC<{ data: DataPreviewConfig }> = ({ data }) =
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!data.lastRunJobId) return;
+    const jobId = data.lastRunJobId;
+    if (!jobId) return;
     
     const checkStatus = async () => {
         try {
-            const job = await jobsApi.getJob(data.lastRunJobId!);
+            const job = await jobsApi.getJob(jobId);
             setStatus(job.status);
         } catch (e) {
             setStatus('error');
         }
     };
     
-    checkStatus();
+    void checkStatus();
     // Poll if not final
     const interval = setInterval(() => {
         checkStatus();

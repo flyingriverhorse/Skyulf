@@ -349,7 +349,7 @@ async def create(
             else:
                 # Fallback for sync wrapper
                 cursor = conn.cursor()
-                cursor.execute(sql, data)
+                cursor.execute(sql_stmt, data)
                 conn.commit()
                 lastrowid = getattr(cursor, "lastrowid", None)
                 cursor.close()
@@ -368,7 +368,7 @@ async def create(
 async def read(
     name: str,
     settings: Settings,
-    filter: Optional[Dict[str, Any]] = None,
+    filters: Optional[Dict[str, Any]] = None,
     config: Optional[Dict] = None,
     one: bool = False,
 ) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
@@ -377,7 +377,7 @@ async def read(
 
     Args:
         name: Table or collection name
-        filter: Filter conditions
+        filters: Filter conditions
         settings: Application settings
         config: Optional connection config override
         one: Return single record if True
@@ -389,12 +389,12 @@ async def read(
     db_type = get_db_type(settings)
 
     if name == "data_sources":
-        return await async_data_sources_crud.read(settings, filter, one=one)
+        return await async_data_sources_crud.read(settings, filters, one=one)
 
     if db_type in (DatabaseType.POSTGRES, DatabaseType.POSTGRESQL, DatabaseType.SQLITE):
         async with async_session_or_connection(settings, config) as session:
             clause, params = _build_where_clause_sql(
-                filter or {}, placeholder_style=":"
+                filters or {}, placeholder_style=":"
             )
             sql = sa_text(f"SELECT * FROM {name}{clause}")
             result = await session.execute(sql, params)
@@ -408,7 +408,7 @@ async def read(
     elif db_type in (DatabaseType.MYSQL, DatabaseType.MARIADB, DatabaseType.SNOWFLAKE):
         async with async_session_or_connection(settings, config) as conn:
             clause, params = _build_where_clause_sql(
-                filter or {}, placeholder_style="pyformat"
+                filters or {}, placeholder_style="pyformat"
             )
             sql_stmt = f"SELECT * FROM {name}{clause}"
 
@@ -439,24 +439,24 @@ async def read(
         async with async_session_or_connection(settings, config) as db_obj:
             collection = db_obj[name]
 
-            if filter is None:
+            if filters is None:
                 cursor = collection.find()
                 items = await cursor.to_list(length=None)
-            elif isinstance(filter, list):
+            elif isinstance(filters, list):
                 # Aggregation pipeline
-                cursor = collection.aggregate(filter)
+                cursor = collection.aggregate(filters)
                 items = await cursor.to_list(length=None)
-            elif isinstance(filter, dict) and "$pipeline" in filter:
-                pipeline = filter["$pipeline"]
+            elif isinstance(filters, dict) and "$pipeline" in filters:
+                pipeline = filters["$pipeline"]
                 if not isinstance(pipeline, list):
                     raise ValueError("$pipeline must be a list")
                 cursor = collection.aggregate(pipeline)
                 items = await cursor.to_list(length=None)
             else:
                 if one:
-                    item = await collection.find_one(filter)
+                    item = await collection.find_one(filters)
                     return cast(Optional[Dict[str, Any]], item)
-                cursor = collection.find(filter)
+                cursor = collection.find(filters)
                 items = await cursor.to_list(length=None)
 
             return cast(List[Dict[str, Any]], items)
@@ -467,7 +467,7 @@ async def read(
 
 async def update(
     name: str,
-    filter: Dict[str, Any],
+    filters: Dict[str, Any],
     update_data: Dict[str, Any],
     settings: Settings,
     config: Optional[Dict] = None,
@@ -478,7 +478,7 @@ async def update(
 
     Args:
         name: Table or collection name
-        filter: Filter conditions for records to update
+        filters: Filter conditions for records to update
         update_data: Data to update
         settings: Application settings
         config: Optional connection config override
@@ -487,21 +487,21 @@ async def update(
     Returns:
         Update result (affected count or result object)
     """
-    if not isinstance(filter, dict) or not isinstance(update_data, dict):
-        raise ValueError("filter and update_data must be dicts")
+    if not isinstance(filters, dict) or not isinstance(update_data, dict):
+        raise ValueError("filters and update_data must be dicts")
 
     _check_identifier(name)
     db_type = get_db_type(settings)
 
     if name == "data_sources":
-        return await async_data_sources_crud.update(settings, filter, update_data)
+        return await async_data_sources_crud.update(settings, filters, update_data)
 
     if db_type in (DatabaseType.POSTGRES, DatabaseType.POSTGRESQL, DatabaseType.SQLITE):
         async with async_session_or_connection(settings, config) as session:
             set_parts = ", ".join(f"{k} = :u_{k}" for k in update_data.keys())
             params = {f"u_{k}": v for k, v in update_data.items()}
             clause, where_params = _build_where_clause_sql(
-                filter, placeholder_style=":"
+                filters, placeholder_style=":"
             )
             params.update(where_params)
 
@@ -514,7 +514,7 @@ async def update(
         async with async_session_or_connection(settings, config) as conn:
             set_parts = ", ".join(f"{k} = %({k})s" for k in update_data.keys())
             clause, where_params = _build_where_clause_sql(
-                filter, placeholder_style="pyformat"
+                filters, placeholder_style="pyformat"
             )
             params = dict(update_data)
             if isinstance(where_params, dict):
@@ -539,9 +539,9 @@ async def update(
             collection = db_obj[name]
 
             if many:
-                result = await collection.update_many(filter, {"$set": update_data})
+                result = await collection.update_many(filters, {"$set": update_data})
             else:
-                result = await collection.update_one(filter, {"$set": update_data})
+                result = await collection.update_one(filters, {"$set": update_data})
 
             return {
                 "matched_count": result.matched_count,

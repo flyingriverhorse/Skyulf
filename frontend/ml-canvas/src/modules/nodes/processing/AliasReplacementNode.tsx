@@ -90,7 +90,7 @@ const CustomPairEditor: React.FC<{
 
   const removePair = (key: string) => {
     const newPairs = { ...pairs };
-    delete newPairs[key];
+    Reflect.deleteProperty(newPairs, key);
     onChange(newPairs);
   };
 

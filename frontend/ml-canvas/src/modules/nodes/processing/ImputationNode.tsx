@@ -62,7 +62,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
   });
 
   const handleApplyRecommendation = (rec: Recommendation) => {
-    if (rec.target_columns && rec.target_columns.length > 0) {
+    if (rec.target_columns.length > 0) {
       const newCols = Array.from(new Set([...config.columns, ...rec.target_columns]));
       // Apply strategy if recommended (assuming recommendation might contain params)
       // For now just columns
@@ -360,7 +360,7 @@ export const ImputationNode: NodeDefinition<ImputationConfig> = {
   settings: ImputationSettings,
   validate: (config) => {
     if (config.columns.length === 0) return { isValid: false, message: 'Select at least one column' };
-    if ((config.method === 'simple' || !config.method) && config.strategy === 'constant' && (config.fill_value === undefined || config.fill_value === '')) {
+    if (config.method === 'simple' && config.strategy === 'constant' && (config.fill_value === undefined || config.fill_value === '')) {
       return { isValid: false, message: 'Fill value is required for Constant strategy' };
     }
     return { isValid: true };

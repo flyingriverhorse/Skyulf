@@ -42,7 +42,7 @@ export const DataSources: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchDatasets();
+    void fetchDatasets();
   }, []);
 
   useEffect(() => {

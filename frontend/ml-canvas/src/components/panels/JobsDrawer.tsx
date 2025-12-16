@@ -146,7 +146,7 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
             }
         };
 
-        fetchDetails(); // Initial fetch
+        void fetchDetails(); // Initial fetch
 
         if (job.status === 'running' || job.status === 'queued') {
             interval = setInterval(fetchDetails, 2000);

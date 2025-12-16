@@ -24,7 +24,8 @@ const FeatureTargetSplitSettings: React.FC<{ config: FeatureTargetSplitConfig; o
     const queue = [currentNodeId];
     
     while (queue.length > 0) {
-      const id = queue.shift()!;
+      const id = queue.shift();
+      if (!id) continue;
       if (visited.has(id)) continue;
       visited.add(id);
       

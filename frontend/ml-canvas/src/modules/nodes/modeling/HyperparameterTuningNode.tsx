@@ -197,7 +197,7 @@ const BestParamsModal: React.FC<{
         jobsApi.getTuningHistory(currentModelType)
             .then(data => {
                 console.log("Fetched jobs for", currentModelType, data);
-                setJobs(data || []);
+                setJobs(data);
             })
             .catch(err => {
                 console.error("Failed to fetch jobs", err);
@@ -413,7 +413,7 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
           }
       };
 
-      loadModelData();
+      void loadModelData();
   }, [config.model_type]);
 
 

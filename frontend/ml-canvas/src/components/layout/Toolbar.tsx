@@ -81,7 +81,7 @@ export const Toolbar: React.FC = () => {
     setIsLoading(true);
     try {
       const pipeline = await fetchPipeline(datasetId);
-      if (pipeline && pipeline.graph) {
+      if (pipeline) {
         setGraph(pipeline.graph.nodes, pipeline.graph.edges);
         alert('Pipeline loaded successfully!');
       } else {

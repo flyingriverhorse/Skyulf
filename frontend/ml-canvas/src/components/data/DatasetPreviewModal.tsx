@@ -44,7 +44,7 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
 
   useEffect(() => {
     if (isOpen && dataset) {
-      fetchData(100);
+      void fetchData(100);
     } else {
       setSampleData([]);
       setProfile(null);
@@ -76,7 +76,7 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
   const handleLoadMore = () => {
     const newSize = sampleSize + 500;
     setSampleSize(newSize);
-    fetchData(newSize);
+    void fetchData(newSize);
   };
 
   if (!isOpen || !dataset) return null;
@@ -249,16 +249,16 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
                         </td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{col.distinct_count}</td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs">
-                          {col.numeric_summary?.minimum?.toFixed(2) ?? '-'}
+                          {col.numeric_summary?.minimum.toFixed(2) ?? '-'}
                         </td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs">
-                          {col.numeric_summary?.maximum?.toFixed(2) ?? '-'}
+                          {col.numeric_summary?.maximum.toFixed(2) ?? '-'}
                         </td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs">
-                          {col.numeric_summary?.mean?.toFixed(2) ?? '-'}
+                          {col.numeric_summary?.mean.toFixed(2) ?? '-'}
                         </td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs">
-                          {col.numeric_summary?.std?.toFixed(2) ?? '-'}
+                          {col.numeric_summary?.std.toFixed(2) ?? '-'}
                         </td>
                       </tr>
                     ))}
