@@ -59,7 +59,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
 
   const handleRemove = (col: string) => {
     const newTypes = { ...config.column_types };
-    delete newTypes[col];
+    Reflect.deleteProperty(newTypes, col);
     onChange({ ...config, column_types: newTypes });
   };
 
@@ -67,7 +67,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
     if (oldCol === newCol) return;
     const type = config.column_types[oldCol];
     const newTypes = { ...config.column_types };
-    delete newTypes[oldCol];
+    Reflect.deleteProperty(newTypes, oldCol);
     newTypes[newCol] = type;
     onChange({ ...config, column_types: newTypes });
   };

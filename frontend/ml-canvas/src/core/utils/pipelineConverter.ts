@@ -14,7 +14,8 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
     }
 
     while (queue.length > 0) {
-      const nodeId = queue.shift()!;
+      const nodeId = queue.shift();
+      if (!nodeId) continue;
       if (visited.has(nodeId)) continue;
       visited.add(nodeId);
 

@@ -108,8 +108,8 @@ export const ModelRegistry: React.FC = () => {
 
   // Initial load
   useEffect(() => {
-    fetchStats();
-    fetchModels(0, true);
+    void fetchStats();
+    void fetchModels(0, true);
   }, []);
 
   // Infinite scroll listener
@@ -139,7 +139,7 @@ export const ModelRegistry: React.FC = () => {
   // Fetch on page change
   useEffect(() => {
     if (page > 0) {
-      fetchModels(page, false);
+      void fetchModels(page, false);
     }
   }, [page]);
 
@@ -233,7 +233,7 @@ export const ModelRegistry: React.FC = () => {
           <p className="text-slate-600 dark:text-slate-400 mt-1">Manage versions, track metrics, and deploy your best models.</p>
         </div>
         <button 
-          onClick={() => { setPage(0); fetchModels(0, true); fetchStats(); }} 
+          onClick={() => { setPage(0); void fetchModels(0, true); fetchStats(); }} 
           className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
         >
           Refresh

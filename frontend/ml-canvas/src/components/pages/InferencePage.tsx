@@ -14,7 +14,7 @@ export const InferencePage: React.FC = () => {
   const [autoFilterInfo, setAutoFilterInfo] = useState<string | null>(null);
 
   useEffect(() => {
-    loadActiveDeployment();
+    void loadActiveDeployment();
   }, []);
 
   const loadActiveDeployment = async () => {
@@ -41,7 +41,7 @@ export const InferencePage: React.FC = () => {
                   
                   // Remove target column
                   if (targetColumn && targetColumn in newRow) {
-                      delete newRow[targetColumn];
+                      Reflect.deleteProperty(newRow, targetColumn);
                   }
                   
                   // Remove dropped columns

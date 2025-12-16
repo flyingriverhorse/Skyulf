@@ -40,7 +40,8 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
     const queue = [currentNodeId];
     
     while (queue.length > 0) {
-      const id = queue.shift()!;
+      const id = queue.shift();
+      if (!id) continue;
       if (visited.has(id)) continue;
       visited.add(id);
       
@@ -85,13 +86,13 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
       }
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); };
   }, []);
 
   // Filter for numeric columns only
   const numericColumns = schema 
     ? Object.values(schema.columns)
-        .filter(c => ['int', 'float', 'number'].some(t => c.dtype?.toLowerCase().includes(t)))
+        .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
         .map(c => c.name)
     : [];
 
@@ -489,7 +490,7 @@ export const OutlierNode: NodeDefinition = {
   outputs: [{ id: 'out', type: 'dataset', label: 'Cleaned' }],
   settings: OutlierSettings,
   validate: (config: OutlierConfig) => {
-    if (!config.columns || config.columns.length === 0) {
+    if (config.columns.length === 0) {
       return { isValid: false, message: 'Select at least one column.' };
     }
     return { isValid: true };

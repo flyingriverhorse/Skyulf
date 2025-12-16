@@ -27,7 +27,7 @@ export const DeploymentsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
   const handleDeactivate = async () => {

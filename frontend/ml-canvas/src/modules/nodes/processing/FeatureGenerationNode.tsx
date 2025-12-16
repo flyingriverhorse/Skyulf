@@ -133,17 +133,17 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
   const allColumns = schema ? Object.values(schema.columns).map(c => c.name) : [];
   const numericColumns = schema 
     ? Object.values(schema.columns)
-        .filter(c => ['int', 'float', 'number'].some(t => c.dtype?.toLowerCase().includes(t)))
+        .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
         .map(c => c.name)
     : [];
   const dateColumns = schema
     ? Object.values(schema.columns)
-        .filter(c => ['date', 'time'].some(t => c.dtype?.toLowerCase().includes(t)))
+        .filter(c => ['date', 'time'].some(t => c.dtype.toLowerCase().includes(t)))
         .map(c => c.name)
     : [];
   const stringColumns = schema
     ? Object.values(schema.columns)
-        .filter(c => ['string', 'object', 'text'].some(t => c.dtype?.toLowerCase().includes(t)))
+        .filter(c => ['string', 'object', 'text'].some(t => c.dtype.toLowerCase().includes(t)))
         .map(c => c.name)
     : [];
 

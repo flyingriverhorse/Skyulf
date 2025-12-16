@@ -71,7 +71,7 @@ const BestParamsModal: React.FC<{
         // Use getTuningHistory instead of getTuningJobsForModel
         jobsApi.getTuningHistory(currentModelType)
             .then(data => {
-                setJobs(data || []);
+                setJobs(data);
             })
             .catch(err => {
                 console.error("Failed to fetch jobs", err);
@@ -281,7 +281,8 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
     const queue = [currentNodeId];
     
     while (queue.length > 0) {
-      const id = queue.shift()!;
+      const id = queue.shift();
+      if (!id) continue;
       if (visited.has(id)) continue;
       visited.add(id);
       

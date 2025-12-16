@@ -55,7 +55,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
   // Filter for numeric columns only, as scaling only applies to them
   const numericColumns = schema 
     ? Object.values(schema.columns)
-        .filter(c => ['int', 'float', 'number'].some(t => c.dtype?.toLowerCase().includes(t)))
+        .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
         .map(c => c.name)
     : [];
 
@@ -99,19 +99,19 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
           {cols.map((col, idx) => {
             let details = "";
             if (config.method === 'standard') {
-               const mean = (m.mean as number[])?.[idx];
-               const scale = (m.scale as number[])?.[idx];
+               const mean = (m.mean as number[])[idx];
+               const scale = (m.scale as number[])[idx];
                if (typeof mean === 'number') details = `μ=${mean.toFixed(2)}, σ=${typeof scale === 'number' ? scale.toFixed(2) : '-'}`;
             } else if (config.method === 'minmax') {
-               const min = (m.data_min as number[])?.[idx];
-               const max = (m.data_max as number[])?.[idx];
+               const min = (m.data_min as number[])[idx];
+               const max = (m.data_max as number[])[idx];
                if (typeof min === 'number') details = `Min=${min.toFixed(2)}, Max=${typeof max === 'number' ? max.toFixed(2) : '-'}`;
             } else if (config.method === 'robust') {
-               const center = (m.center as number[])?.[idx];
+               const center = (m.center as number[])[idx];
                const scale = (m.scale as number[])?.[idx];
                if (typeof center === 'number') details = `Med=${center.toFixed(2)}, IQR=${typeof scale === 'number' ? scale.toFixed(2) : '-'}`;
             } else if (config.method === 'maxabs') {
-               const maxAbs = (m.max_abs as number[])?.[idx];
+               const maxAbs = (m.max_abs as number[])[idx];
                if (typeof maxAbs === 'number') details = `MaxAbs=${maxAbs.toFixed(2)}`;
             }
 

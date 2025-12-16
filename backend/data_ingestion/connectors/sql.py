@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 import polars as pl
 from sqlalchemy import Engine, create_engine, text

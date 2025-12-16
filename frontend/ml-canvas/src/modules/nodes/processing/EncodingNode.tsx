@@ -59,7 +59,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
 
   const categoricalColumns = schema 
     ? Object.values(schema.columns)
-        .filter(c => ['object', 'string', 'category', 'bool'].some(t => c.dtype?.toLowerCase().includes(t)))
+        .filter(c => ['object', 'string', 'category', 'bool'].some(t => c.dtype.toLowerCase().includes(t)))
         .map(c => c.name)
     : [];
 

@@ -75,7 +75,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
   // Filter for numeric columns only
   const numericColumns = schema 
     ? Object.values(schema.columns)
-        .filter(c => ['int', 'float', 'number'].some(t => c.dtype?.toLowerCase().includes(t)))
+        .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
         .map(c => c.name)
     : [];
 
@@ -282,7 +282,7 @@ export const BinningNode: NodeDefinition = {
   inputs: [{ id: 'in', type: 'dataset', label: 'Dataset' }],
   outputs: [{ id: 'out', type: 'dataset', label: 'Binned' }],
   validate: (config: BinningConfig) => {
-    if (!config.columns || config.columns.length === 0) {
+    if (config.columns.length === 0) {
       return { isValid: false, message: 'Select at least one column to bin.' };
     }
     if (config.n_bins < 2) {

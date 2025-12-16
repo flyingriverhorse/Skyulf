@@ -48,7 +48,7 @@ export const Dashboard: React.FC = () => {
       }
     };
 
-    fetchData();
+    void fetchData();
   }, []);
 
   return (
