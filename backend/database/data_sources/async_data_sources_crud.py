@@ -63,6 +63,7 @@ async def create(settings: Settings, row: Dict[str, Any]) -> Any:
                         )
                         return existing
                 except Exception:
+                    # Ignore if check fails, try insert
                     pass
 
             logger.exception("SQLite insert failed for data_sources")

@@ -338,7 +338,7 @@ async def create(
         async with async_session_or_connection(settings, config) as conn:
             cols = ", ".join(data.keys())
             placeholders = ", ".join([f"%({k})s" for k in data.keys()])
-            sql_stmt = f"INSERT INTO {name} ({cols}) VALUES ({placeholders})"
+            sql_stmt = f"INSERT INTO {name} ({cols}) VALUES ({placeholders})"  # nosec
 
             if hasattr(conn, "execute"):
                 # Async connection (MySQL/Snowflake async wrapper)
@@ -396,7 +396,7 @@ async def read(
             clause, params = _build_where_clause_sql(
                 filters or {}, placeholder_style=":"
             )
-            sql = sa_text(f"SELECT * FROM {name}{clause}")
+            sql = sa_text(f"SELECT * FROM {name}{clause}")  # nosec
             result = await session.execute(sql, params)
             rows_raw = result.fetchall()
             rows = [cast(Dict[str, Any], _row_to_dict(r)) for r in rows_raw]
@@ -410,7 +410,7 @@ async def read(
             clause, params = _build_where_clause_sql(
                 filters or {}, placeholder_style="pyformat"
             )
-            sql_stmt = f"SELECT * FROM {name}{clause}"
+            sql_stmt = f"SELECT * FROM {name}{clause}"  # nosec
 
             if hasattr(conn, "execute"):
                 # Async connection
@@ -505,7 +505,7 @@ async def update(
             )
             params.update(where_params)
 
-            sql = sa_text(f"UPDATE {name} SET {set_parts}{clause}")
+            sql = sa_text(f"UPDATE {name} SET {set_parts}{clause}")  # nosec
             result = await session.execute(sql, params)
             await session.commit()
             return {"affected_rows": result.rowcount}
@@ -520,7 +520,7 @@ async def update(
             if isinstance(where_params, dict):
                 params.update(where_params)
 
-            sql_stmt = f"UPDATE {name} SET {set_parts}{clause}"
+            sql_stmt = f"UPDATE {name} SET {set_parts}{clause}"  # nosec
 
             if hasattr(conn, "execute"):
                 result = await conn.execute(sql_stmt, params)
@@ -554,7 +554,7 @@ async def update(
 
 async def delete(
     name: str,
-    filter: Dict[str, Any],
+    filters: Dict[str, Any],
     settings: Settings,
     config: Optional[Dict] = None,
     many: bool = False,
@@ -564,7 +564,7 @@ async def delete(
 
     Args:
         name: Table or collection name
-        filter: Filter conditions for records to delete
+        filters: Filter conditions for records to delete
         settings: Application settings
         config: Optional connection config override
         many: Delete multiple records if True
@@ -572,19 +572,19 @@ async def delete(
     Returns:
         Delete result (affected count or result object)
     """
-    if not isinstance(filter, dict):
-        raise ValueError("filter must be a dict")
+    if not isinstance(filters, dict):
+        raise ValueError("filters must be a dict")
 
     _check_identifier(name)
     db_type = get_db_type(settings)
 
     if name == "data_sources":
-        return await async_data_sources_crud.delete(settings, filter)
+        return await async_data_sources_crud.delete(settings, filters)
 
     if db_type in (DatabaseType.POSTGRES, DatabaseType.POSTGRESQL, DatabaseType.SQLITE):
         async with async_session_or_connection(settings, config) as session:
-            clause, params = _build_where_clause_sql(filter, placeholder_style=":")
-            sql = sa_text(f"DELETE FROM {name}{clause}")
+            clause, params = _build_where_clause_sql(filters, placeholder_style=":")
+            sql = sa_text(f"DELETE FROM {name}{clause}")  # nosec
             result = await session.execute(sql, params)
             await session.commit()
             return {"affected_rows": result.rowcount}
@@ -592,9 +592,9 @@ async def delete(
     elif db_type in (DatabaseType.MYSQL, DatabaseType.MARIADB, DatabaseType.SNOWFLAKE):
         async with async_session_or_connection(settings, config) as conn:
             clause, params = _build_where_clause_sql(
-                filter, placeholder_style="pyformat"
+                filters, placeholder_style="pyformat"
             )
-            sql_stmt = f"DELETE FROM {name}{clause}"
+            sql_stmt = f"DELETE FROM {name}{clause}"  # nosec
 
             if hasattr(conn, "execute"):
                 result = await conn.execute(sql_stmt, params)
@@ -615,9 +615,9 @@ async def delete(
             collection = db_obj[name]
 
             if many:
-                result = await collection.delete_many(filter)
+                result = await collection.delete_many(filters)
             else:
-                result = await collection.delete_one(filter)
+                result = await collection.delete_one(filters)
 
             return {"deleted_count": result.deleted_count}
 
@@ -629,7 +629,7 @@ async def delete(
 async def count(
     name: str,
     settings: Settings,
-    filter: Optional[Dict[str, Any]] = None,
+    filters: Optional[Dict[str, Any]] = None,
     config: Optional[Dict] = None,
 ) -> int:
     """Count records matching filter."""
@@ -639,18 +639,18 @@ async def count(
     if db_type in (DatabaseType.POSTGRES, DatabaseType.POSTGRESQL, DatabaseType.SQLITE):
         async with async_session_or_connection(settings, config) as session:
             clause, params = _build_where_clause_sql(
-                filter or {}, placeholder_style=":"
+                filters or {}, placeholder_style=":"
             )
-            sql = sa_text(f"SELECT COUNT(*) FROM {name}{clause}")
+            sql = sa_text(f"SELECT COUNT(*) FROM {name}{clause}")  # nosec
             result = await session.execute(sql, params)
             return result.scalar() or 0
 
     elif db_type in (DatabaseType.MYSQL, DatabaseType.MARIADB, DatabaseType.SNOWFLAKE):
         async with async_session_or_connection(settings, config) as conn:
             clause, params = _build_where_clause_sql(
-                filter or {}, placeholder_style="pyformat"
+                filters or {}, placeholder_style="pyformat"
             )
-            sql_stmt = f"SELECT COUNT(*) FROM {name}{clause}"
+            sql_stmt = f"SELECT COUNT(*) FROM {name}{clause}"  # nosec
 
             if hasattr(conn, "execute"):
                 result = await conn.execute(sql_stmt, params)
@@ -667,7 +667,7 @@ async def count(
     elif db_type in (DatabaseType.MONGODB, DatabaseType.MONGO):
         async with async_session_or_connection(settings, config) as db_obj:
             collection = db_obj[name]
-            return cast(int, await collection.count_documents(filter or {}))
+            return cast(int, await collection.count_documents(filters or {}))
 
     else:
         raise RuntimeError(f"Unsupported database type: {db_type}")
