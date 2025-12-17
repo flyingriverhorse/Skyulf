@@ -599,7 +599,7 @@ export const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
             <div className="space-y-3">
               <div className="flex justify-end mb-2">
                    <button
-                      onClick={() => setShowParamsModal(true)}
+                      onClick={() => { setShowParamsModal(true); }}
                       className="text-xs flex items-center gap-1.5 px-2 py-1 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded transition-colors"
                     >
                       <Download className="w-3 h-3" />

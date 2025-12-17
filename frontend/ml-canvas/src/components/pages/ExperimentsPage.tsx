@@ -56,7 +56,7 @@ export const ExperimentsPage: React.FC = () => {
   }, [fetchJobs]);
 
   useEffect(() => {
-    if (evaluationData?.splits?.train?.y_proba?.classes && evaluationData.splits.train.y_proba.classes.length > 0) {
+    if (evaluationData?.splits.train?.y_proba?.classes && evaluationData.splits.train.y_proba.classes.length > 0) {
                 const proba = evaluationData.splits.train.y_proba;
                 const first = proba.labels?.[0] ?? proba.classes[0];
                 setSelectedRocClass(String(first));
@@ -94,7 +94,7 @@ export const ExperimentsPage: React.FC = () => {
           setEvaluationData(res.data);
       } catch (err: unknown) {
           console.error("Failed to fetch evaluation data", err);
-          setEvalError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Failed to fetch evaluation data");
+          setEvalError((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || "Failed to fetch evaluation data");
       } finally {
           setIsEvalLoading(false);
       }
@@ -120,8 +120,10 @@ export const ExperimentsPage: React.FC = () => {
   };
 
     const calculateROC = (y_true: (string | number)[], y_proba: { classes: (string | number)[], labels?: (string | number)[], values: number[][] }, targetClass: string | number) => {
-      if (!y_proba.values) return null;
-
+      // y_proba.values is typed as number[][], so it's always truthy if it exists on the type.
+      // If the type definition allows undefined, then the check is valid. Assuming strict null checks.
+      // Based on the error "Unnecessary conditional, value is always truthy", y_proba.values is not optional in the type definition above.
+      
       const targetClassStr = String(targetClass);
       
       // Find index of target class (normalize types because <select> values are strings)
@@ -333,9 +335,9 @@ export const ExperimentsPage: React.FC = () => {
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                   {job.model_type} • {job.dataset_name || 'Unknown Dataset'}
-                  {job.job_type === 'tuning' && (job.search_strategy || (job.config as { tuning?: { strategy?: string } })?.tuning?.strategy) && (
+                  {job.job_type === 'tuning' && (job.search_strategy || (job.config as { tuning?: { strategy?: string } }).tuning?.strategy) && (
                       <span className="ml-1 text-gray-400">
-                          ({job.search_strategy || (job.config as { tuning?: { strategy?: string } })?.tuning?.strategy})
+                          ({job.search_strategy || (job.config as { tuning?: { strategy?: string } }).tuning?.strategy})
                       </span>
                   )}
                 </div>
@@ -622,7 +624,7 @@ export const ExperimentsPage: React.FC = () => {
                                             <input
                                                 type="checkbox"
                                                 checked={showTrainMetrics}
-                                                onChange={e => setShowTrainMetrics(e.target.checked)}
+                                                onChange={e => { setShowTrainMetrics(e.target.checked); }}
                                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                             />
                                             <span className="text-gray-700 dark:text-gray-300">Train</span>
@@ -631,7 +633,7 @@ export const ExperimentsPage: React.FC = () => {
                                             <input
                                                 type="checkbox"
                                                 checked={showTestMetrics}
-                                                onChange={e => setShowTestMetrics(e.target.checked)}
+                                                onChange={e => { setShowTestMetrics(e.target.checked); }}
                                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                             />
                                             <span className="text-gray-700 dark:text-gray-300">Test</span>
@@ -640,14 +642,14 @@ export const ExperimentsPage: React.FC = () => {
                                             <input
                                                 type="checkbox"
                                                 checked={showValMetrics}
-                                                onChange={e => setShowValMetrics(e.target.checked)}
+                                                onChange={e => { setShowValMetrics(e.target.checked); }}
                                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                             />
                                             <span className="text-gray-700 dark:text-gray-300">Validation</span>
                                         </label>
                                     </div>
 
-                                    {evaluationData.problem_type === 'classification' && evaluationData.splits?.train?.y_proba && (() => {
+                                    {evaluationData.problem_type === 'classification' && evaluationData.splits.train?.y_proba && (() => {
                                         const proba = evaluationData.splits.train.y_proba!;
                                         return (
                                             <div className="flex items-center gap-2">
@@ -669,7 +671,7 @@ export const ExperimentsPage: React.FC = () => {
                                     })()}
                                 </div>
 
-                                {evaluationData.problem_type === 'classification' && evaluationData.splits?.train?.y_proba?.labels && (() => {
+                                {evaluationData.problem_type === 'classification' && evaluationData.splits.train?.y_proba?.labels && (() => {
                                     const proba = evaluationData.splits.train.y_proba!;
                                     return (
                                         <div className="w-full text-xs text-gray-500 dark:text-gray-400">
@@ -681,7 +683,7 @@ export const ExperimentsPage: React.FC = () => {
 
                             <div className="flex flex-col gap-6">
                             {/* Render charts for each split */}
-                            {Object.entries(evaluationData.splits || {})
+                            {Object.entries(evaluationData.splits)
                                 .filter(([splitName]) => {
                                     if (splitName === 'train' && !showTrainMetrics) return false;
                                     if (splitName === 'test' && !showTestMetrics) return false;

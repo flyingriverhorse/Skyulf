@@ -15,6 +15,8 @@ export interface ValueReplacementConfig {
   replacements: ReplacementItem[];
 }
 
+type ValueReplacementValueType = ReplacementItem['oldType'];
+
 const ColumnSelector: React.FC<{
   columns: string[];
   selected: string[];
@@ -76,12 +78,12 @@ const ColumnSelector: React.FC<{
 
 const TypedInput: React.FC<{
   value: unknown;
-  type: string;
-  onChange: (val: unknown, type: unknown) => void;
+  type: ValueReplacementValueType;
+  onChange: (val: unknown, type: ValueReplacementValueType) => void;
   placeholder?: string;
 }> = ({ value, type, onChange, placeholder }) => {
   
-  const handleTypeChange = (newType: string) => {
+  const handleTypeChange = (newType: ValueReplacementValueType) => {
     let newValue = value;
     if (newType === 'number') newValue = Number(value) || 0;
     if (newType === 'boolean') newValue = Boolean(value);
@@ -103,7 +105,7 @@ const TypedInput: React.FC<{
       <select
         className="w-20 text-[10px] rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-1"
         value={type}
-        onChange={(e) => { handleTypeChange(e.target.value); }}
+        onChange={(e) => { handleTypeChange(e.target.value as ValueReplacementValueType); }}
       >
         <option value="string">Text</option>
         <option value="number">Num</option>
@@ -192,8 +194,9 @@ export const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig
   nodeId
 }) => {
   const upstreamData = useUpstreamData(nodeId || '');
-  const { data: schema } = useDatasetSchema(upstreamData[0]?.dataset_id as string | undefined);
-  const availableColumns = schema ? Object.keys(schema.columns) : [];
+  const datasetId = upstreamData.find((d: unknown) => (d as Record<string, unknown>)?.datasetId)?.datasetId as string | undefined;
+  const { data: schema } = useDatasetSchema(datasetId);
+  const availableColumns = schema ? Object.values(schema.columns).map((c) => c.name) : [];
 
   const addReplacement = () => {
     onChange({
@@ -246,8 +249,8 @@ export const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig
             <ReplacementEditor
               key={i}
               item={item}
-              onChange={(newItem) => updateReplacement(i, newItem)}
-              onDelete={() => removeReplacement(i)}
+              onChange={(newItem) => { updateReplacement(i, newItem); }}
+              onDelete={() => { removeReplacement(i); }}
             />
           ))}
           {config.replacements.length === 0 && (

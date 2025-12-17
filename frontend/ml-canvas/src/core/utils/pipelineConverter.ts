@@ -23,7 +23,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       if (!node) continue;
 
       let stepType = 'unknown';
-      let params: unknown = {};
+          let params: Record<string, unknown> = {};
       const incomingEdges = edges.filter(e => e.target === nodeId);
       const inputs = incomingEdges.map(e => e.source);
 
@@ -90,8 +90,9 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
             flag_suffix: node.data.flag_suffix
           };
       } else if (node.data.definitionType === 'scale_numeric_features') {
-          const config = node.data as unknown || {};
-          const method = (config as Record<string, unknown>).method || 'standard';
+                    const config: Record<string, unknown> =
+                        (node.data && typeof node.data === 'object') ? (node.data as Record<string, unknown>) : {};
+                    const method = config.method || 'standard';
           if (method === 'minmax') stepType = 'MinMaxScaler';
           else if (method === 'maxabs') stepType = 'MaxAbsScaler';
           else if (method === 'robust') stepType = 'RobustScaler';
@@ -228,7 +229,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           console.warn(`Unknown node type: ${node.data.definitionType}`);
           // Don't throw, just skip or use generic
           stepType = 'Unknown';
-          params = node.data;
+              params = (node.data && typeof node.data === 'object') ? (node.data as Record<string, unknown>) : {};
       }
 
       sortedNodes.push({

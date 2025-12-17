@@ -88,10 +88,10 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
   const { data: schema } = useDatasetSchema(datasetId);
   
   // Filter for numeric columns only
-  const numericColumns = schema 
+  const numericColumns: string[] = schema 
     ? Object.values(schema.columns)
-        .filter((c: unknown) => ['int', 'float', 'number'].some(t => ((c as Record<string, unknown>).dtype as string)?.toLowerCase().includes(t)))
-        .map((c: unknown) => (c as Record<string, unknown>).name)
+        .filter((c: unknown) => ['int', 'float', 'number'].some(t => ((c as Record<string, unknown>).dtype as string).toLowerCase().includes(t)))
+        .map((c: unknown) => String((c as Record<string, unknown>).name))
     : [];
 
   useEffect(() => {

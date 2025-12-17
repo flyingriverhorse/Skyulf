@@ -22,7 +22,10 @@ const DeduplicationSettings: React.FC<{ config: DeduplicationConfig; onChange: (
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics = nodeResult?.metrics;
+  const metrics: Record<string, unknown> | null =
+    nodeResult?.metrics && typeof nodeResult.metrics === 'object'
+      ? (nodeResult.metrics as Record<string, unknown>)
+      : null;
 
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -137,15 +140,15 @@ const DeduplicationSettings: React.FC<{ config: DeduplicationConfig; onChange: (
           <div className="space-y-1 text-xs">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Duplicates Removed:</span>
-              <span className="font-medium text-destructive">{metrics.Deduplicate_rows_removed}</span>
+              <span className="font-medium text-destructive">{String(metrics.Deduplicate_rows_removed)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Rows Remaining:</span>
-              <span className="font-medium">{metrics.Deduplicate_rows_remaining}</span>
+              <span className="font-medium">{String(metrics.Deduplicate_rows_remaining)}</span>
             </div>
             <div className="flex justify-between pt-1 border-t">
               <span className="text-muted-foreground">Total Rows:</span>
-              <span className="font-medium">{metrics.Deduplicate_rows_total}</span>
+              <span className="font-medium">{String(metrics.Deduplicate_rows_total)}</span>
             </div>
           </div>
         </div>

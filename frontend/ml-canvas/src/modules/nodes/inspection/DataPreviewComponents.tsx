@@ -8,17 +8,34 @@ export interface DataPreviewConfig {
   lastRunJobId?: string;
 }
 
+const asRecord = (value: unknown): Record<string, unknown> | null => {
+  if (value && typeof value === 'object') return value as Record<string, unknown>;
+  return null;
+};
+
 // Helper to render a mini table
 const renderTable = (summary: unknown) => {
-  if (!summary || !(summary as Record<string, unknown>).sample) return <div className="text-xs text-muted-foreground italic">No data available</div>;
-  
-  const cols = Object.keys((summary as Record<string, unknown>).sample[0] || {}).slice(0, 5); // Show max 5 cols
+  const s = asRecord(summary);
+  const sample = s?.sample;
+  if (!s || !Array.isArray(sample) || sample.length === 0) {
+    return <div className="text-xs text-muted-foreground italic">No data available</div>;
+  }
+
+  const firstRow = asRecord(sample[0]) ?? {};
+  const cols = Object.keys(firstRow).slice(0, 5); // Show max 5 cols
+
+  const name = typeof s.name === 'string' ? s.name : 'Dataset';
+  const shape = Array.isArray(s.shape) ? s.shape : null;
+  const rows = shape && shape.length > 0 ? shape[0] : undefined;
+  const colsCount = shape && shape.length > 1 ? shape[1] : undefined;
   
   return (
     <div className="overflow-x-auto rounded border border-border">
       <div className="text-xs font-semibold mb-1 flex justify-between p-2 bg-muted/50 border-b border-border">
-          <span>{(summary as Record<string, unknown>).name}</span>
-          <span className="text-muted-foreground">{(summary as Record<string, unknown>).shape[0]} rows x {(summary as Record<string, unknown>).shape[1]} cols</span>
+          <span>{name}</span>
+          <span className="text-muted-foreground">
+            {rows ?? '?'} rows x {colsCount ?? '?'} cols
+          </span>
       </div>
       <table className="w-full text-[10px] border-collapse">
         <thead>
@@ -27,10 +44,12 @@ const renderTable = (summary: unknown) => {
           </tr>
         </thead>
         <tbody>
-          {(summary as Record<string, unknown>).sample.slice(0, 5).map((row: unknown, i: number) => (
+          {sample.slice(0, 5).map((row: unknown, i: number) => (
             <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/20">
               {cols.map(c => (
-                <td key={c} className="p-2 border-r border-border truncate max-w-[80px] last:border-r-0">{String((row as Record<string, unknown>)[c])}</td>
+                <td key={c} className="p-2 border-r border-border truncate max-w-[80px] last:border-r-0">
+                  {String((asRecord(row)?.[c] ?? ''))}
+                </td>
               ))}
             </tr>
           ))}
@@ -93,9 +112,11 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
     }
   };
 
-  const result = job?.result?.metrics || job?.result;
-  const dataSummary = (result as Record<string, unknown>)?.data_summary;
-  const operationMode = (result as Record<string, unknown>)?.operation_mode;
+  const rawResult = job?.result?.metrics ?? job?.result;
+  const resultRec = asRecord(rawResult);
+  const dataSummary = resultRec ? asRecord(resultRec.data_summary) : null;
+  const operationMode = resultRec?.operation_mode;
+  const operationModeText = typeof operationMode === 'string' ? operationMode : undefined;
 
   return (
     <div className="p-4 space-y-4 h-full overflow-y-auto">
@@ -125,52 +146,56 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
       )}
 
       {/* Results Area */}
-      {job?.status === 'completed' && result && (
+      {job?.status === 'completed' && rawResult && (
         <div className="space-y-4 border-t border-border pt-4 animate-in fade-in slide-in-from-top-2 duration-300">
              {/* Operation Mode */}
              <div className="text-[10px] bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 p-2 rounded border border-blue-100 dark:border-blue-900/50">
                 <strong className="block mb-0.5">Operation Mode</strong>
-                {operationMode || 'Unknown'}
+                {operationModeText || 'Unknown'}
             </div>
 
             {/* Tabs */}
             {dataSummary && (
                 <div className="space-y-2">
                     <div className="flex border-b border-border">
-                        {['train', 'test', 'validation'].map(t => (
-                            dataSummary[t] && (
+                        {['train', 'test', 'validation'].map((t) =>
+                          dataSummary[t]
+                            ? (
                                 <button
-                                    key={t}
-                                    className={`text-[10px] px-3 py-1.5 border-b-2 transition-colors ${
-                                      activeTab === t 
-                                        ? 'border-primary font-medium text-primary' 
-                                        : 'border-transparent text-muted-foreground hover:text-foreground'
-                                    }`}
-                                    onClick={() => { setActiveTab(t as 'train' | 'test' | 'validation'); }}
+                                  key={t}
+                                  className={`text-[10px] px-3 py-1.5 border-b-2 transition-colors ${
+                                    activeTab === t
+                                      ? 'border-primary font-medium text-primary'
+                                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                                  }`}
+                                  onClick={() => {
+                                    setActiveTab(t as 'train' | 'test' | 'validation');
+                                  }}
                                 >
-                                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                                  {t.charAt(0).toUpperCase() + t.slice(1)}
                                 </button>
-                            )
-                        ))}
+                              )
+                            : null
+                        )}
                     </div>
                     
-                    {dataSummary[activeTab] ? renderTable(dataSummary[activeTab]) : (
+                {dataSummary[activeTab] ? renderTable(dataSummary[activeTab]) : (
                         <div className="text-xs text-muted-foreground p-4 text-center border border-dashed border-border rounded">No {activeTab} data available</div>
                     )}
                 </div>
             )}
             
             {/* Transformations */}
-            {(result as Record<string, unknown>).applied_transformations && (result as Record<string, unknown>).applied_transformations.length > 0 && (
+            {Array.isArray(resultRec?.applied_transformations) && resultRec.applied_transformations.length > 0 && (
                 <div className="pt-2 border-t border-border">
                     <div className="text-[10px] font-semibold mb-2 text-foreground">Applied Steps</div>
                     <div className="space-y-1.5">
-                        {(result as Record<string, unknown>).applied_transformations.map((t: unknown, i: number) => (
+                  {(resultRec.applied_transformations as unknown[]).map((t: unknown, i: number) => (
                             <div key={i} className="text-[10px] flex items-center gap-2 text-muted-foreground p-1.5 bg-muted/30 rounded border border-border">
                                 <span className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-[8px] font-medium text-foreground">{i+1}</span>
                                 <div className="flex flex-col">
-                                  <span className="font-medium text-foreground">{(t as Record<string, unknown>).transformer_name as string}</span>
-                                  <span className="text-[9px] opacity-80">{(t as Record<string, unknown>).transformer_type as string}</span>
+                        <span className="font-medium text-foreground">{String(asRecord(t)?.transformer_name ?? '')}</span>
+                        <span className="text-[9px] opacity-80">{String(asRecord(t)?.transformer_type ?? '')}</span>
                                 </div>
                             </div>
                         ))}

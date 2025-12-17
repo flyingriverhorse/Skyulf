@@ -293,7 +293,7 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                     )}
                                 </div>
                                 
-                                {job.job_type === 'training' && (job.result as Record<string, unknown>).metrics && (
+                                {job.job_type === 'training' && !!(job.result as Record<string, unknown>).metrics && (
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                         {Object.entries((job.result as Record<string, unknown>).metrics as Record<string, unknown>).map(([k, v]) => (
                                             <div key={k} className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
@@ -319,7 +319,7 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                         )}
 
                                         {/* Full Metrics (Train/Test/Val) */}
-                                        {(job.result as Record<string, unknown>)?.metrics && (
+                                        {!!(job.result as Record<string, unknown>).metrics && (
                                             <div className="space-y-2">
                                                 <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Evaluation Metrics</h4>
                                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -338,7 +338,7 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                         )}
                                         
                                         {/* Best Params */}
-                                        {(job.result as Record<string, unknown>)?.best_params && (
+                                        {!!(job.result as Record<string, unknown>).best_params && (
                                             <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
                                                 <div className="text-gray-500 mb-2"># Best Hyperparameters</div>
                                                 <pre>{JSON.stringify((job.result as Record<string, unknown>).best_params, null, 2)}</pre>
@@ -426,8 +426,8 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
         </div>
         <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500">
             <span className="font-medium truncate">{job.model_type || 'Unknown Model'}</span>
-            {job.job_type === 'tuning' && (job.config as Record<string, unknown>)?.tuning && (
-                <span className="text-gray-400 truncate">({((job.config as Record<string, unknown>).tuning as Record<string, unknown>).strategy as string})</span>
+            {job.job_type === 'tuning' && !!job.config && !!(job.config as Record<string, unknown>).tuning && (
+                <span className="text-gray-400 truncate">({((job.config as Record<string, unknown>).tuning as Record<string, unknown>)?.strategy as string})</span>
             )}
         </div>
       </div>
@@ -462,10 +462,10 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
             <span className="text-red-600 dark:text-red-400 text-xs truncate block" title={job.error}>
                 Error
             </span>
-        ) : job.status === 'completed' && job.result ? (
-             job.job_type === 'training' && job.result.metrics ? (
+                ) : job.status === 'completed' && job.result ? (
+                         job.job_type === 'training' && !!(job.result as { metrics?: Record<string, unknown> }).metrics ? (
                <div className="flex flex-wrap gap-1">
-                 {Object.entries(job.result.metrics).slice(0, 1).map(([k, v]) => (
+                                 {Object.entries((job.result as { metrics: Record<string, unknown> }).metrics).slice(0, 1).map(([k, v]) => (
                    <span key={k} className="text-[10px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 truncate max-w-full">
                      {k}: {Number(v).toFixed(3)}
                    </span>
@@ -473,12 +473,12 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
                </div>
              ) : job.job_type === 'tuning' ? (
                <div className="flex flex-wrap gap-1">
-                   {job.result.best_score !== undefined && (
+                                     {(job.result as { best_score?: number }).best_score !== undefined && (
                        <span className="text-[10px] bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 truncate">
-                           Score: {Number(job.result.best_score).toFixed(4)}
+                                                     Score: {Number((job.result as { best_score?: number }).best_score).toFixed(4)}
                        </span>
                    )}
-                   {!(job.result as Record<string, unknown>).best_score && (job.result as Record<string, unknown>).best_params && (
+                                     {!(job.result as Record<string, unknown>).best_score && !!(job.result as Record<string, unknown>).best_params && (
                        <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate">Params found</span>
                    )}
                </div>

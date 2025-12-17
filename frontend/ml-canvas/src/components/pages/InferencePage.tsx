@@ -34,19 +34,21 @@ export const InferencePage: React.FC = () => {
             // 2. Fetch Sample Data
             const sample = await DatasetService.getSample(job.dataset_id, 1);
             
-            if (sample && sample.length > 0) {
+            if (sample.length > 0) {
               // 3. Filter the sample data
-              const filteredSample = sample.map(row => {
-                  const newRow = { ...row };
+                const filteredSample = sample.map((row) => {
+                  const rowObj: Record<string, unknown> =
+                  (row && typeof row === 'object') ? (row as Record<string, unknown>) : {};
+                  const newRow: Record<string, unknown> = { ...rowObj };
                   
                   // Remove target column
-                  if (targetColumn && targetColumn in newRow) {
-                      Reflect.deleteProperty(newRow, targetColumn);
+                  if (typeof targetColumn === 'string' && targetColumn in newRow) {
+                    Reflect.deleteProperty(newRow, targetColumn);
                   }
                   
                   // Remove dropped columns
-                  droppedColumns.forEach(col => {
-                      if (col in newRow) delete newRow[col];
+                  droppedColumns.forEach((col) => {
+                    if (typeof col === 'string' && col in newRow) Reflect.deleteProperty(newRow, col);
                   });
                   
                   return newRow;

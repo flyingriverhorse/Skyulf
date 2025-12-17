@@ -36,7 +36,18 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
   
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics = nodeResult?.metrics;
+  const metrics: Record<string, unknown> | null =
+    nodeResult?.metrics && typeof nodeResult.metrics === 'object'
+      ? (nodeResult.metrics as Record<string, unknown>)
+      : null;
+  const categoriesCount: Record<string, unknown> | null =
+    metrics?.categories_count && typeof metrics.categories_count === 'object'
+      ? (metrics.categories_count as Record<string, unknown>)
+      : null;
+  const classesCount: Record<string, unknown> | null =
+    metrics?.classes_count && typeof metrics.classes_count === 'object'
+      ? (metrics.classes_count as Record<string, unknown>)
+      : null;
   const recommendations = executionResult?.recommendations || [];
 
   const filteredRecommendations = recommendations.filter(rec => 
@@ -299,38 +310,38 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
             {metrics.encoded_columns_count !== undefined && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Columns Encoded:</span>
-                <span className="font-medium">{metrics.encoded_columns_count}</span>
+                <span className="font-medium">{String(metrics.encoded_columns_count)}</span>
               </div>
             )}
             {metrics.new_features_count !== undefined && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">New Features Created:</span>
-                <span className="font-medium text-primary">{metrics.new_features_count}</span>
+                <span className="font-medium text-primary">{String(metrics.new_features_count)}</span>
               </div>
             )}
             
             {/* Detailed Counts */}
-            {metrics.categories_count && (
+            {categoriesCount && (
               <div className="mt-2 border-t pt-2">
                 <span className="text-muted-foreground block mb-1 font-medium">Categories Found:</span>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                  {Object.entries(metrics.categories_count).map(([col, count]) => (
+                  {Object.entries(categoriesCount).map(([col, count]) => (
                     <div key={col} className="flex justify-between text-[10px]">
                       <span className="truncate max-w-[100px]" title={col}>{col}:</span>
-                      <span className="font-mono">{count as number}</span>
+                      <span className="font-mono">{String(count)}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-            {metrics.classes_count && (
+            {classesCount && (
               <div className="mt-2 border-t pt-2">
                 <span className="text-muted-foreground block mb-1 font-medium">Classes Found:</span>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                  {Object.entries(metrics.classes_count).map(([col, count]) => (
+                  {Object.entries(classesCount).map(([col, count]) => (
                     <div key={col} className="flex justify-between text-[10px]">
                       <span className="truncate max-w-[100px]" title={col}>{col}:</span>
-                      <span className="font-mono">{count as number}</span>
+                      <span className="font-mono">{String(count)}</span>
                     </div>
                   ))}
                 </div>

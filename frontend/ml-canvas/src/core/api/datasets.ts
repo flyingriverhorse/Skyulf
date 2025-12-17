@@ -95,16 +95,8 @@ export const DatasetService = {
     return data.data;
   },
 
-  delete: async (id: string): Promise<void> => {
-    const response = await fetch(`${API_BASE}/sources/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) {
-      throw new Error('Failed to delete dataset');
-    }
-  },
-
-  getProfile: async (id: string): Promise<unknown> => {
+  // UI-friendly dataset profiling (schema + basic stats)
+  getProfile: async (id: string): Promise<DatasetProfile> => {
     const response = await fetch(`/api/pipeline/datasets/${encodeURIComponent(id)}/schema`);
     if (!response.ok) {
       throw new Error('Failed to fetch dataset profile');
@@ -137,9 +129,41 @@ export const DatasetService = {
         row_count: data.row_count,
         column_count: data.column_count,
         missing_cells: missingCells,
-        missing_percentage: totalCells > 0 ? (missingCells / totalCells * 100).toFixed(2) : 0
+        missing_percentage: totalCells > 0 ? Number((missingCells / totalCells * 100).toFixed(2)) : 0
       },
       columns: columns
     };
-  }
+  },
+
+  delete: async (id: string): Promise<void> => {
+    const response = await fetch(`${API_BASE}/sources/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete dataset');
+    }
+  },
+
+};
+
+export interface DatasetProfile {
+  metrics: {
+    row_count: number;
+    column_count: number;
+    missing_cells: number;
+    missing_percentage: number;
+  };
+  columns: Array<{
+    name: string;
+    dtype: string;
+    missing_count: number;
+    missing_percentage: number;
+    distinct_count: number;
+    numeric_summary?: {
+      mean: number;
+      std: number;
+      minimum: number;
+      maximum: number;
+    };
+  }>;
 };

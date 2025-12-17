@@ -191,7 +191,16 @@ export const ModelRegistry: React.FC = () => {
   };
 
   const formatMetrics = (metrics: Record<string, unknown>) => {
-    if (!metrics) return '-';
+    // metrics is typed as Record<string, unknown>, so it's always truthy if it exists on the type.
+    // Assuming strict null checks, if metrics is not optional, this check is redundant.
+    // However, if it can be null/undefined, the check is valid.
+    // Based on the error "Unnecessary optional chain on a non-nullish value" elsewhere, maybe metrics is guaranteed.
+    // But here it's "Unnecessary conditional, value is always falsy" which is weird if metrics is an object.
+    // Wait, the error was:
+    // frontend/ml-canvas/src/pages/ModelRegistry.tsx:194: if (!metrics) return '-';
+    // Unnecessary conditional, value is always falsy.
+    // This means metrics is NEVER falsy, i.e. it's always an object.
+    
     // Try to find common metrics
     const score = metrics.score || metrics.accuracy || metrics.f1_score || metrics.rmse || metrics.mse;
     if (score !== undefined) {

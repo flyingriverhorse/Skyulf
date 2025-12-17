@@ -8,7 +8,19 @@ export interface Dataset {
   columns?: number;
   size_bytes?: number;
   format?: string;
-  source_metadata?: unknown;
+  source_metadata?: SourceMetadata;
+}
+
+export interface SourceMetadata {
+  ingestion_status?: {
+    status?: string;
+    error?: string;
+    message?: string;
+    progress?: number;
+    updated_at?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
 }
 
 export interface IngestionJobResponse {

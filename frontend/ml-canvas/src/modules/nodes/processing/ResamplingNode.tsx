@@ -34,13 +34,21 @@ interface ResamplingConfig {
 
 const LastRunResults: React.FC<{ nodeId: string }> = ({ nodeId }) => {
   const executionResult = useGraphStore((state) => state.executionResult);
-  const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
+    const nodeResult = nodeId
+        ? (executionResult?.node_results?.[nodeId] as
+                | { metrics?: Record<string, unknown>; error?: string }
+                | undefined)
+        : undefined;
   
   if (!nodeResult) return null;
 
   // Helper to format metrics
   const renderMetrics = (metrics: Record<string, unknown>) => {
-    if (!metrics) return null;
+    // metrics is typed as Record<string, unknown>, so it's always truthy if it exists on the type.
+    // Assuming strict null checks, if metrics is not optional, this check is redundant.
+    // However, if it can be null/undefined, the check is valid.
+    // Based on the error "Unnecessary conditional, value is always truthy", metrics is guaranteed.
+    
     return (
       <div className="space-y-1">
         {Object.entries(metrics).map(([key, value]) => {
@@ -98,19 +106,32 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
   const [showRecommendations, setShowRecommendations] = useState(true);
 
   // Upstream Data for Target Column Suggestion
-  const upstreamData = useUpstreamData(nodeId || '') as Record<string, unknown>[];
-  const datasetId = upstreamData.find((d: Record<string, unknown>) => d.datasetId)?.datasetId as string | undefined;
+    const upstreamDataRaw = useUpstreamData(nodeId || '') as unknown;
+    const upstreamData: Record<string, unknown>[] = Array.isArray(upstreamDataRaw)
+        ? (upstreamDataRaw.filter(Boolean) as Record<string, unknown>[])
+        : [];
+
+    const datasetId = upstreamData.find((d) => typeof d.datasetId === 'string')?.datasetId as
+        | string
+        | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
   
   // Try to find a target column from upstream nodes configuration
-  const upstreamTarget = upstreamData.find((d: Record<string, unknown>) => (d.config as Record<string, unknown>)?.target_column);
-  const targetColumn = upstreamTarget ? ((upstreamTarget.config as Record<string, unknown>).target_column as string) : undefined;
+    const upstreamTarget = upstreamData.find((d) => {
+        const cfg = d.config;
+        if (!cfg || typeof cfg !== 'object') return false;
+        const target = (cfg as Record<string, unknown>).target_column;
+        return typeof target === 'string' && target.trim().length > 0;
+    });
+    const targetColumn = upstreamTarget
+        ? (((upstreamTarget.config as Record<string, unknown>).target_column as string) ?? undefined)
+        : undefined;
 
   // Auto-fill target column if empty and available in schema or upstream
   useEffect(() => {
       if (!config.target_column) {
-          if (upstreamTarget) {
-               onChange({ ...config, target_column: upstreamTarget });
+          if (upstreamTarget && targetColumn) {
+               onChange({ ...config, target_column: targetColumn });
           } else if (schema?.columns) {
                // Simple heuristic: check for 'target' or 'class' or column_type
                const potentialTarget = Object.values(schema.columns).find((c: ColumnProfile) => 
@@ -123,7 +144,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                }
           }
       }
-  }, [schema, upstreamTarget, config.target_column]);
+    }, [schema, upstreamTarget, targetColumn, config.target_column, config, onChange]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -458,7 +479,7 @@ export const ResamplingNode: NodeDefinition<ResamplingConfig> = {
   label: 'Resampling',
   category: 'Preprocessing',
   description: 'Balance dataset classes using oversampling or undersampling techniques.',
-  icon: Activity,
+    icon: Activity as unknown as React.FC<any>,
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Balanced Data', type: 'dataset' }],
   settings: ResamplingSettings,

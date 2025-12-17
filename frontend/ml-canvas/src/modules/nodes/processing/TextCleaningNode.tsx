@@ -227,11 +227,11 @@ const TextCleaningSettings: React.FC<{ config: TextCleaningConfig; onChange: (c:
   // Filter for text columns only
   const textColumns = schema 
     ? Object.values(schema.columns)
-        .filter((c: unknown) => {
-            const dtype = (c as Record<string, unknown>).dtype;
-            return dtype === 'object' || dtype === 'string' || dtype === 'category';
-        })
-        .map((c: Record<string, unknown>) => c.name)
+      .filter((c) => {
+        const dtype = String(c.dtype).toLowerCase();
+        return dtype.includes('object') || dtype.includes('string') || dtype.includes('category') || dtype.includes('text');
+      })
+      .map((c) => c.name)
     : [];
 
   useEffect(() => {

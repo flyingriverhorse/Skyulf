@@ -57,11 +57,21 @@ export interface Recommendation {
   reasoning: string;
 }
 
+export interface NodeExecutionResult {
+  status?: string;
+  error?: string;
+  metrics?: Record<string, unknown>;
+  output?: unknown;
+}
+
+export type PreviewDataRows = Array<Record<string, unknown>>;
+export type PreviewData = PreviewDataRows | Record<string, PreviewDataRows>;
+
 export interface PreviewResponse {
   pipeline_id: string;
   status: string;
-  node_results: Record<string, unknown>;
-  preview_data: unknown;
+  node_results: Record<string, NodeExecutionResult>;
+  preview_data: PreviewData | null;
   recommendations: Recommendation[];
 }
 

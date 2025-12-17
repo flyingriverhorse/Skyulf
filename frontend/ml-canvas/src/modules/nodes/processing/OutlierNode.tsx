@@ -174,7 +174,6 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
                 </div>
              </div>
         ) : (
-            (rowsRemoved !== undefined || rowsTotal !== undefined) && (
             <div className="flex justify-between items-center p-2 bg-background rounded border">
                 <span className="text-muted-foreground">Rows Removed</span>
                 <div className="text-right">
@@ -193,7 +192,6 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
                 )}
                 </div>
             </div>
-            )
         )}
 
         {contamination !== undefined && (

@@ -38,7 +38,18 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
   
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics = nodeResult?.metrics;
+  const metrics: Record<string, unknown> | null =
+    nodeResult?.metrics && typeof nodeResult.metrics === 'object'
+      ? (nodeResult.metrics as Record<string, unknown>)
+      : null;
+  const fillValues: Record<string, unknown> | null =
+    metrics?.fill_values && typeof metrics.fill_values === 'object'
+      ? (metrics.fill_values as Record<string, unknown>)
+      : null;
+  const missingCounts: Record<string, unknown> | null =
+    metrics?.missing_counts && typeof metrics.missing_counts === 'object'
+      ? (metrics.missing_counts as Record<string, unknown>)
+      : null;
 
   // Responsive Layout Logic
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,11 +101,11 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
       <div className="mt-4 p-3 bg-muted/50 rounded border text-xs">
         <div className="font-medium text-muted-foreground mb-2">Execution Feedback</div>
         
-        {metrics.fill_values && (
+        {fillValues && (
           <div className="space-y-1">
             <span className="text-muted-foreground block mb-1 font-medium">Imputed Values:</span>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 max-h-32 overflow-y-auto">
-              {Object.entries(metrics.fill_values).map(([col, val]) => (
+              {Object.entries(fillValues).map(([col, val]) => (
                 <div key={col} className="flex justify-between text-[10px]">
                   <span className="truncate max-w-[100px]" title={col}>{col}:</span>
                   <span className="font-mono">{typeof val === 'number' ? val.toFixed(4) : String(val)}</span>
@@ -104,11 +115,11 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
           </div>
         )}
 
-        {metrics.missing_counts && (
+        {missingCounts && (
           <div className="space-y-1 mt-2">
             <span className="text-muted-foreground block mb-1 font-medium">Missing Values Filled:</span>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 max-h-32 overflow-y-auto">
-              {Object.entries(metrics.missing_counts).map(([col, count]) => (
+              {Object.entries(missingCounts).map(([col, count]) => (
                 <div key={col} className="flex justify-between text-[10px]">
                   <span className="truncate max-w-[100px]" title={col}>{col}:</span>
                   <span className="font-mono">{String(count)}</span>
@@ -117,14 +128,14 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
             </div>
             {metrics.total_missing !== undefined && (
                <div className="text-[10px] text-muted-foreground mt-1 pt-1 border-t">
-                  Total Filled: <span className="font-mono font-medium">{metrics.total_missing}</span>
+                  Total Filled: <span className="font-mono font-medium">{String(metrics.total_missing)}</span>
                </div>
             )}
           </div>
         )}
         
         {/* Generic success message if no specific metrics but successful */}
-        {!metrics.fill_values && !metrics.missing_counts && nodeResult?.status === 'success' && (
+        {!fillValues && !missingCounts && nodeResult?.status === 'success' && (
           <div className="text-green-600">Imputation completed successfully.</div>
         )}
       </div>
@@ -327,9 +338,12 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
                     />
                     <span className="truncate" title={col}>{col}</span>
                   </div>
-                  {metrics?.missing_counts && metrics.missing_counts[col] !== undefined && (
-                    <span className="text-[10px] text-muted-foreground font-mono shrink-0 bg-muted px-1.5 py-0.5 rounded" title={`${metrics.missing_counts[col]} missing values filled`}>
-                      {metrics.missing_counts[col]}
+                  {missingCounts && missingCounts[col] !== undefined && (
+                    <span
+                      className="text-[10px] text-muted-foreground font-mono shrink-0 bg-muted px-1.5 py-0.5 rounded"
+                      title={`${String(missingCounts[col])} missing values filled`}
+                    >
+                      {String(missingCounts[col])}
                     </span>
                   )}
                 </label>

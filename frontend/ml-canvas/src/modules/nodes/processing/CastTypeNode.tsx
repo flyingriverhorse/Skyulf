@@ -30,7 +30,10 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics = nodeResult?.metrics;
+  const metrics: Record<string, unknown> | null =
+    nodeResult?.metrics && typeof nodeResult.metrics === 'object'
+      ? (nodeResult.metrics as Record<string, unknown>)
+      : null;
 
   // Responsive Layout Logic
   const containerRef = useRef<HTMLDivElement>(null);
@@ -160,13 +163,13 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
             {metrics.casted_columns_count !== undefined && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Columns Casted:</span>
-                <span className="font-medium">{metrics.casted_columns_count}</span>
+                <span className="font-medium">{String(metrics.casted_columns_count)}</span>
               </div>
             )}
             {metrics.cast_errors !== undefined && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Errors Encountered:</span>
-                <span className="font-medium text-destructive">{metrics.cast_errors}</span>
+                <span className="font-medium text-destructive">{String(metrics.cast_errors)}</span>
               </div>
             )}
           </div>

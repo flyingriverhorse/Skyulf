@@ -25,7 +25,10 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
   
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics = nodeResult?.metrics;
+  const metrics: Record<string, unknown> | null =
+    nodeResult?.metrics && typeof nodeResult.metrics === 'object'
+      ? (nodeResult.metrics as Record<string, unknown>)
+      : null;
   
   // Responsive Layout Logic
   const containerRef = useRef<HTMLDivElement>(null);
@@ -49,7 +52,7 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
   });
 
   const handleApplyRecommendation = (rec: Recommendation) => {
-    if (rec.target_columns && rec.target_columns.length > 0) {
+    if (rec.target_columns?.length) {
       const newCols = Array.from(new Set([...config.columns, ...rec.target_columns]));
       onChange({ ...config, columns: newCols });
     }
@@ -136,17 +139,20 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Columns Dropped:</span>
-                  <span className="font-medium text-destructive">{metrics.dropped_columns_count}</span>
+                  <span className="font-medium text-destructive">{String(metrics.dropped_columns_count)}</span>
                 </div>
-                {metrics.dropped_columns && Array.isArray(metrics.dropped_columns) && metrics.dropped_columns.length > 0 && (
+                {Array.isArray(metrics.dropped_columns) && metrics.dropped_columns.length > 0 && (
                   <div className="pt-1 border-t mt-1">
                     <span className="text-muted-foreground block mb-1">Dropped Names:</span>
                     <div className="flex flex-wrap gap-1">
-                      {metrics.dropped_columns.map((col: string) => (
-                        <span key={col} className="px-1.5 py-0.5 bg-background border rounded text-[10px] font-mono">
-                          {col}
-                        </span>
-                      ))}
+                      {metrics.dropped_columns.map((col: unknown) => {
+                        const colKey = String(col);
+                        return (
+                          <span key={colKey} className="px-1.5 py-0.5 bg-background border rounded text-[10px] font-mono">
+                            {colKey}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
