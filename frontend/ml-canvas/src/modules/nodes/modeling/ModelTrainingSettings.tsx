@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { NodeDefinition } from '../../../core/types/nodes';
 import { 
-    BrainCircuit, Play, Download, Loader2, Settings2, Database, Activity, 
+    Play, Download, Loader2, Settings2, Database, Activity, 
     BarChart3, X, Check, ChevronRight, ChevronDown, HelpCircle, AlertCircle, RefreshCw, AlertTriangle
 } from 'lucide-react';
 import { jobsApi, JobInfo } from '../../../core/api/jobs';
@@ -13,7 +12,7 @@ import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { getIncomers } from '@xyflow/react';
 
-interface ModelTrainingConfig {
+export interface ModelTrainingConfig {
   target_column: string;
   model_type: string;
   hyperparameters: Record<string, unknown>;
@@ -178,12 +177,6 @@ const BestParamsModal: React.FC<{
                                     <button 
                                         onClick={() => {
                                             if (job.result?.best_params) {
-                                                // If the selected model type is different from the node's current model type,
-                                                // we should probably warn the user or handle it. 
-                                                // But for now, we just pass the params. 
-                                                // The parent component might need to switch the model type too if we want to be really smart.
-                                                // However, the user might just want to see params.
-                                                // Ideally, we should pass back the model type too.
                                                 onSelect({
                                                     params: job.result.best_params,
                                                     modelType: currentModelType
@@ -259,7 +252,7 @@ const HyperparameterInput: React.FC<{
     );
 };
 
-const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (c: ModelTrainingConfig) => void; nodeId?: string }> = ({
+export const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (c: ModelTrainingConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
   nodeId,
@@ -698,29 +691,4 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
       </div>
     </div>
   );
-};
-
-export const ModelTrainingNode: NodeDefinition = {
-  type: 'model_training',
-  label: 'Standard Training',
-  category: 'Modeling',
-  description: 'Train a model with fixed or default parameters.',
-  icon: BrainCircuit,
-  inputs: [{ id: 'in', label: 'Training Data', type: 'dataset' }],
-  outputs: [{ id: 'model', label: 'Trained Model', type: 'model' }],
-  settings: ModelTrainingSettings,
-  validate: (config) => {
-    if (!config.target_column) return { isValid: false, message: 'Target column is required.' };
-    return { isValid: true };
-  },
-  getDefaultConfig: () => ({
-    target_column: '',
-    model_type: 'random_forest_classifier',
-    hyperparameters: {},
-    cv_enabled: true,
-    cv_folds: 5,
-    cv_type: 'k_fold',
-    cv_shuffle: true,
-    cv_random_state: 42
-  })
 };

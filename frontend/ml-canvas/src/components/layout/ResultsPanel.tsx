@@ -131,11 +131,11 @@ export const ResultsPanel: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {currentRows.map((row: any, idx: number) => (
+                {currentRows.map((row: unknown, idx: number) => (
                   <tr key={idx} className="border-b hover:bg-muted/10">
                     {columns.map((col) => (
                       <td key={`${idx}-${col}`} className="px-4 py-2 whitespace-nowrap font-mono text-xs">
-                        {row[col] !== null ? String(row[col]) : <span className="text-muted-foreground italic">null</span>}
+                        {(row as Record<string, unknown>)[col] !== null ? String((row as Record<string, unknown>)[col]) : <span className="text-muted-foreground italic">null</span>}
                       </td>
                     ))}
                   </tr>

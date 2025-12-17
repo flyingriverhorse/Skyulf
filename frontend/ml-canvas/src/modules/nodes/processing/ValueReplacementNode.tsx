@@ -7,8 +7,8 @@ import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 // --- Types ---
 
 interface ReplacementItem {
-  old: any;
-  new: any;
+  old: unknown;
+  new: unknown;
   oldType: 'string' | 'number' | 'boolean' | 'null' | 'nan';
   newType: 'string' | 'number' | 'boolean' | 'null' | 'nan';
 }
@@ -80,9 +80,9 @@ const ColumnSelector: React.FC<{
 };
 
 const TypedInput: React.FC<{
-  value: any;
+  value: unknown;
   type: string;
-  onChange: (val: any, type: any) => void;
+  onChange: (val: unknown, type: any) => void;
   placeholder?: string;
 }> = ({ value, type, onChange, placeholder }) => {
   
@@ -102,8 +102,8 @@ const TypedInput: React.FC<{
   };
 
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    let val: any = e.target.value;
-    if (type === 'number') val = parseFloat(val);
+    let val: unknown = e.target.value;
+    if (type === 'number') val = parseFloat(val as string);
     onChange(val, type);
   };
 
@@ -124,7 +124,7 @@ const TypedInput: React.FC<{
         <input
           type="text"
           className="flex-1 min-w-0 text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1"
-          value={value || ''}
+          value={(value as string) || ''}
           onChange={handleValueChange}
           placeholder={placeholder}
         />
@@ -133,7 +133,7 @@ const TypedInput: React.FC<{
         <input
           type="number"
           className="flex-1 min-w-0 text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1"
-          value={value}
+          value={(value as number) || ''}
           onChange={handleValueChange}
           placeholder={placeholder}
         />
@@ -205,11 +205,11 @@ const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig; onCha
   const [showInfo, setShowInfo] = useState(true);
 
   const upstreamData = useUpstreamData(nodeId || '');
-  const datasetId = upstreamData.find((d: any) => d.datasetId)?.datasetId as string | undefined;
+  const datasetId = upstreamData.find((d: Record<string, any>) => d.datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
   
   const columns = schema 
-    ? Object.values(schema.columns).map((c: any) => c.name)
+    ? Object.values(schema.columns).map((c: Record<string, any>) => c.name)
     : [];
 
   useEffect(() => {

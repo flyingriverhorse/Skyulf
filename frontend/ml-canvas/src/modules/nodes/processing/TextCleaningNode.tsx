@@ -92,7 +92,7 @@ const OperationEditor: React.FC<{
           className="text-xs font-medium bg-transparent border-none focus:ring-0 p-0 text-gray-900 dark:text-gray-100"
           value={operation.op}
           onChange={(e) => {
-            const newOp = e.target.value as any;
+            const newOp = e.target.value as TextOperation['op'];
             let defaultMode = 'both';
             if (newOp === 'case') defaultMode = 'lower';
             if (newOp === 'remove_special') defaultMode = 'keep_alphanumeric';
@@ -221,14 +221,14 @@ const TextCleaningSettings: React.FC<{ config: TextCleaningConfig; onChange: (c:
   const [showInfo, setShowInfo] = useState(true);
 
   const upstreamData = useUpstreamData(nodeId || '');
-  const datasetId = upstreamData.find((d: any) => d.datasetId)?.datasetId as string | undefined;
+  const datasetId = upstreamData.find((d: Record<string, any>) => d.datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
   
   // Filter for text columns only
   const textColumns = schema 
     ? Object.values(schema.columns)
-        .filter((c: any) => c.dtype === 'object' || c.dtype === 'string' || c.dtype === 'category')
-        .map((c: any) => c.name)
+        .filter((c: Record<string, any>) => c.dtype === 'object' || c.dtype === 'string' || c.dtype === 'category')
+        .map((c: Record<string, any>) => c.name)
     : [];
 
   useEffect(() => {

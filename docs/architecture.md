@@ -1,126 +1,33 @@
 # Architecture
 
-Skyulf is built on a modular architecture designed for scalability and flexibility.
+Skyulf is split into a FastAPI backend (the running application) and a standalone Python SDK (skyulf-core).
 
-## High-Level Overview
+## Components
 
-The system consists of three main components:
+1. Frontend: a React UI for interacting with the platform (feature canvas, dataset views).
+2. Backend API: a FastAPI service that manages ingestion, jobs, artifacts, and deployments.
+3. Worker (optional): Celery + Redis for long-running tasks (training, tuning). The backend can also run without Celery for simple development setups.
+4. Storage: SQLite/PostgreSQL for metadata and an artifact store (local filesystem by default).
 
-1.  **Frontend (Feature Canvas)**: A React + Vite Single Page Application (SPA) that provides the visual interface for data cleaning and feature engineering.
-2.  **Backend (API)**: A FastAPI application that handles data ingestion, pipeline execution, and model management.
-3.  **Async Worker**: A Celery worker (backed by Redis) that executes long-running tasks like model training and hyperparameter tuning.
+## Data flow (high level)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Frontend (React)                        │
-│                    Visual Feature Canvas UI                     │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     FastAPI Backend                             │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │   Data      │  │  ML Pipeline │  │    Model Registry      │  │
-│  │  Ingestion  │  │   Engine     │  │    & Deployment        │  │
-│  │  (Polars)   │  │  (Pandas)    │  │                        │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                    ┌───────────┴───────────┐
-                    ▼                       ▼
-           ┌──────────────┐        ┌──────────────┐
-           │   SQLite/    │        │    Redis     │
-           │  PostgreSQL  │        │   + Celery   │
-           └──────────────┘        └──────────────┘
+1. Data is ingested and profiled.
+2. A job executes a preprocessing + modeling pipeline.
+3. Fitted transformers and trained models are stored as artifacts.
+4. Deployments load those artifacts to serve predictions.
+
+## Repository layout
+
+```text
+backend/        # FastAPI app (routes, ingestion, pipeline execution, registry, deployment)
+frontend/       # React UI
+skyulf-core/    # Python SDK (imported as skyulf)
+tests/          # Backend + SDK tests
 ```
 
-## Data Flow: Polars vs Pandas
+## Key code areas
 
-Skyulf uses two data libraries for optimal performance:
-
-| Stage | Library | Why |
-|-------|---------|-----|
-| **Data Ingestion** | Polars | Fast I/O, lazy evaluation, low memory footprint |
-| **ML Pipeline** | Pandas | Scikit-learn compatibility, rich ML ecosystem |
-
-Data automatically converts from Polars → Pandas when moving from ingestion to preprocessing.
-
-## Core Components
-
-### 1. Data Ingestion (`core.data_ingestion`)
-Handles loading datasets from various sources using Polars:
-*   **Connectors**: `LocalFileConnector` (CSV, Excel, Parquet, JSON), `DatabaseConnector` (SQL), `ApiConnector` (REST)
-*   **Profiler**: `DataProfiler` computes statistics for schema discovery
-*   **Service**: `DataIngestionService` orchestrates uploads and background ingestion
-
-### 2. ML Pipeline Data (`skyulf.data`)
-Provided by the Skyulf Core library (`skyulf-core`, imported as `skyulf`):
-*   **SplitDataset**: Container for train/test/validation splits
-
-### 3. Feature Engineering (`skyulf.preprocessing`)
-Implements the "Calculator/Applier" pattern:
-*   **Calculator**: Computes statistics (e.g., mean, std, vocabulary) from training data
-*   **Applier**: Applies computed statistics to new data (inference) in a stateless manner
-
-### 4. Execution Engine (`core.ml_pipeline.execution`)
-Orchestrates pipeline execution:
-*   **PipelineEngine**: Runs the DAG of nodes (data_loader → feature_engineering → model_training)
-*   **JobManager**: Tracks job status, progress, and cancellation
-
-### 5. Model Registry (`core.ml_pipeline.model_registry`)
-Manages model versions and lineage:
-*   Tracks which job produced which model
-*   Handles version incrementing per dataset/model type
-
-### 6. Artifact Store (`core.ml_pipeline.artifacts`)
-Abstracts storage of model binaries and fitted transformers:
-*   `LocalArtifactStore`: Filesystem storage (joblib serialization)
-*   Extensible to S3/Azure Blob for production deployments
-
-### 7. Deployment (`core.ml_pipeline.deployment`)
-Handles model serving:
-*   `DeploymentService`: Deploys models and handles predictions
-*   `APPLIER_MAP`: Registry of all transformer appliers for pipeline reconstruction
-
-### 8. Recommendations (`core.ml_pipeline.recommendations`)
-AI-powered preprocessing suggestions:
-*   `AdvisorEngine`: Analyzes data profiles and suggests transformations
-*   Plugins: CleaningAdvisor, ImputationAdvisor, ScalingAdvisor, etc.
-
-## Database Schema
-
-Skyulf uses SQLAlchemy (async) with Alembic for migrations. Core entities:
-
-| Entity | Description |
-|--------|-------------|
-| `DataSource` | Uploaded/connected data with metadata and profiling results |
-| `TrainingJob` | Training run with parameters, metrics, and artifact URI |
-| `HyperparameterTuningJob` | Tuning job with search space and best results |
-| `Deployment` | Active/historical model deployments |
-| `User` | User accounts (optional authentication) |
-
-## File Structure
-
-```
-core/
-├── data_ingestion/          # Polars-based data loading
-│   ├── connectors/          # File, SQL, API connectors
-│   ├── engine/              # Profiler
-│   └── service.py           # Orchestration
-│
-├── ml_pipeline/             # Backend orchestration (uses Skyulf Core)
-│   ├── execution/           # PipelineEngine, JobManager
-│   ├── deployment/          # DeploymentService
-│   ├── artifacts/           # ArtifactStore
-│   ├── model_registry/      # Version management
-│   └── recommendations/     # AI suggestions
-│
-└── database/                # SQLAlchemy models
-
-skyulf-core/
-└── skyulf/                  # Standalone library (preprocessing/modeling/pipeline)
-    ├── data/
-    ├── preprocessing/
-    ├── modeling/
-    └── pipeline.py
-```
+- backend/data_ingestion: connectors and profiling (Polars-based ingestion)
+- backend/ml_pipeline: pipeline execution, artifacts, model registry, deployments
+- skyulf-core/skyulf/preprocessing: calculators/appliers (fit/transform pattern)
+- skyulf-core/skyulf/modeling: estimators and model wrappers

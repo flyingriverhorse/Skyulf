@@ -77,7 +77,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
   };
 
   const upstreamDatasetId = findUpstreamDatasetId(nodeId || '');
-  const upstreamTargetColumn = upstreamData.find((d: any) => d.target_column)?.target_column as string | undefined;
+  const upstreamTargetColumn = upstreamData.find((d: Record<string, any>) => d.target_column)?.target_column as string | undefined;
 
   // Auto-detect target and dataset
   useEffect(() => {
@@ -261,7 +261,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
             <select
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.method}
-              onChange={(e) => onChange({ ...config, method: e.target.value as any })}
+              onChange={(e) => onChange({ ...config, method: e.target.value as FeatureSelectionConfig['method'] })}
             >
               <optgroup label="Simple">
                 <option value="variance_threshold">Variance Threshold</option>
@@ -311,7 +311,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                <select
                  className="w-full p-2 border rounded bg-background text-sm"
                  value={config.problem_type ?? 'auto'}
-                 onChange={(e) => onChange({ ...config, problem_type: e.target.value as any })}
+                 onChange={(e) => onChange({ ...config, problem_type: e.target.value as FeatureSelectionConfig['problem_type'] })}
                >
                  <option value="auto">Auto-detect</option>
                  <option value="classification">Classification</option>
@@ -363,7 +363,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 <select
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.correlation_method ?? 'pearson'}
-                  onChange={(e) => onChange({ ...config, correlation_method: e.target.value as any })}
+                  onChange={(e) => onChange({ ...config, correlation_method: e.target.value as FeatureSelectionConfig['correlation_method'] })}
                 >
                   <option value="pearson">Pearson</option>
                   <option value="spearman">Spearman</option>
@@ -438,7 +438,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 <select
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.mode ?? 'k_best'}
-                  onChange={(e) => onChange({ ...config, mode: e.target.value as any })}
+                  onChange={(e) => onChange({ ...config, mode: e.target.value as FeatureSelectionConfig['mode'] })}
                 >
                   <option value="k_best">K Best</option>
                   <option value="percentile">Percentile</option>
@@ -468,7 +468,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
               <select
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.estimator ?? 'auto'}
-                onChange={(e) => onChange({ ...config, estimator: e.target.value as any })}
+                onChange={(e) => onChange({ ...config, estimator: e.target.value as FeatureSelectionConfig['estimator'] })}
               >
                 <option value="auto">Auto</option>
                 <option value="RandomForest">Random Forest</option>
