@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { NodeDefinition } from '../../../core/types/nodes';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { 
-    BrainCircuit, Play, Download, Loader2, Settings2, Database, Activity, 
-    BarChart3, X, Check, ChevronRight, ChevronDown, HelpCircle, AlertCircle, RefreshCw, AlertTriangle
+    Play, Loader2, Database, Activity, 
+    Settings2, BarChart3, X, RefreshCw, ChevronRight, ChevronDown,
+    HelpCircle, AlertCircle, AlertTriangle, Check
 } from 'lucide-react';
 import { jobsApi, JobInfo } from '../../../core/api/jobs';
+import { RegistryItem, registryApi } from '../../../core/api/registry';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useElementSize } from '../../../core/hooks/useElementSize';
@@ -13,15 +14,19 @@ import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { getIncomers } from '@xyflow/react';
 
-interface ModelTrainingConfig {
+export interface TuningConfig {
   target_column: string;
   model_type: string;
-  hyperparameters: Record<string, unknown>;
+  search_space: Record<string, unknown>;
+  n_trials: number;
+  metric: string;
+  search_strategy: string;
   cv_enabled: boolean;
   cv_folds: number;
   cv_type: string;
   cv_shuffle: boolean;
   cv_random_state: number;
+  random_state: number;
 }
 
 interface HyperparameterDef {
@@ -33,7 +38,6 @@ interface HyperparameterDef {
     options?: { label: string; value: unknown }[];
     min?: number;
     max?: number;
-    step?: number;
 }
 
 const Tooltip: React.FC<{ text: string }> = ({ text }) => (
@@ -46,18 +50,135 @@ const Tooltip: React.FC<{ text: string }> = ({ text }) => (
     </div>
 );
 
+const SearchSpaceInput: React.FC<{
+    def: HyperparameterDef;
+    value: unknown[];
+    onChange: (values: unknown[]) => void;
+}> = ({ def, value, onChange }) => {
+    const [localValue, setLocalValue] = useState('');
+    const [error, setError] = useState<string | null>(null);
+
+    // Sync local state with props when props change
+    useEffect(() => {
+        setLocalValue(Array.isArray(value) ? value.map(v => v === null ? 'None' : v).join(', ') : '');
+    }, [value]);
+
+    const validateAndParse = (input: string) => {
+        if (!input.trim()) return [];
+        
+        const parts = input.split(',').map(s => s.trim()).filter(s => s !== '');
+        const parsed: unknown[] = [];
+        
+        for (const part of parts) {
+            if (part.toLowerCase() === 'none') {
+                parsed.push(null);
+                continue;
+            }
+
+            if (def.type === 'number') {
+                const num = Number(part);
+                if (isNaN(num)) {
+                    throw new Error(`"${part}" is not a valid number`);
+                }
+                parsed.push(num);
+            } else if (def.type === 'boolean') {
+                const lower = part.toLowerCase();
+                if (lower === 'true') parsed.push(true);
+                else if (lower === 'false') parsed.push(false);
+                else throw new Error(`"${part}" must be true or false`);
+            } else {
+                parsed.push(part);
+            }
+        }
+        return parsed;
+    };
+
+    const handleBlur = () => {
+        try {
+            const parsed = validateAndParse(localValue);
+            setError(null);
+            // Only trigger change if values actually changed to avoid loops
+            if (JSON.stringify(parsed) !== JSON.stringify(value)) {
+                onChange(parsed);
+            }
+        } catch (err: unknown) {
+            setError((err as Error).message);
+        }
+    };
+
+    return (
+        <div className="space-y-1">
+            <div className="flex justify-between items-center">
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                    {def.label}
+                    {def.description && <Tooltip text={def.description} />}
+                </label>
+                <span className="text-[10px] text-gray-400 uppercase">{def.type}</span>
+            </div>
+            
+            <div className="relative">
+                <input 
+                    type="text" 
+                    className={`w-full border rounded px-2 py-1.5 text-sm font-mono bg-white dark:bg-gray-900 dark:text-gray-100 outline-none transition-all ${
+                        error 
+                            ? 'border-red-500 focus:ring-2 focus:ring-red-500/20' 
+                            : 'border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500'
+                    }`}
+                    placeholder={def.type === 'select' ? "e.g. lbfgs, liblinear" : "e.g. 10, 50, 100"}
+                    value={localValue}
+                    onChange={(e) => {
+                        setLocalValue(e.target.value);
+                        setError(null); // Clear error while typing
+                    }}
+                    onBlur={handleBlur}
+                />
+                {def.type === 'select' && def.options && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                        {def.options.map(opt => (
+                            <button
+                                key={String(opt.value)}
+                                onClick={() => {
+                                    // Toggle option
+                                    const current = validateAndParse(localValue);
+                                    const exists = current.includes(opt.value);
+                                    const newValue = exists 
+                                        ? current.filter(v => v !== opt.value)
+                                        : [...current, opt.value];
+                                    onChange(newValue);
+                                }}
+                                className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                                    value.includes(opt.value)
+                                        ? 'bg-purple-100 border-purple-200 text-purple-700 dark:bg-purple-900/30 dark:border-purple-800 dark:text-purple-300'
+                                        : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+            {error && (
+                <p className="text-[10px] text-red-500 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {error}
+                </p>
+            )}
+        </div>
+    );
+};
+
 const BestParamsModal: React.FC<{ 
     isOpen: boolean; 
     onClose: () => void; 
     modelType: string; 
-    onSelect: (params: unknown) => void;
-}> = ({ isOpen, onClose, modelType: initialModelType, onSelect }) => {
+}> = ({ isOpen, onClose, modelType: initialModelType }) => {
     const [currentModelType, setCurrentModelType] = useState(initialModelType);
     const [jobs, setJobs] = useState<JobInfo[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Update currentModelType when initialModelType changes
+    // Update currentModelType when initialModelType changes (e.g. when opening modal)
     useEffect(() => {
         if (isOpen) {
             setCurrentModelType(initialModelType);
@@ -71,6 +192,7 @@ const BestParamsModal: React.FC<{
         // Use getTuningHistory instead of getTuningJobsForModel
         jobsApi.getTuningHistory(currentModelType)
             .then(data => {
+                console.log("Fetched jobs for", currentModelType, data);
                 setJobs(data);
             })
             .catch(err => {
@@ -95,17 +217,17 @@ const BestParamsModal: React.FC<{
                 {/* Header */}
                 <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                            <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                            <Activity className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                         </div>
                         <div>
                             <h3 className="font-semibold text-gray-900 dark:text-gray-100">Best Parameters History</h3>
                             <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs text-gray-500 dark:text-gray-400">Select parameters for:</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">View parameters for:</span>
                                 <select 
                                     value={currentModelType}
                                     onChange={(e) => { setCurrentModelType(e.target.value); }}
-                                    className="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-blue-500 outline-none"
+                                    className="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-purple-500 outline-none"
                                 >
                                     <option value="random_forest_classifier">Random Forest Classifier</option>
                                     <option value="logistic_regression">Logistic Regression</option>
@@ -133,7 +255,7 @@ const BestParamsModal: React.FC<{
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/30 dark:bg-gray-900/30">
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                            <Loader2 className="w-8 h-8 animate-spin mb-2 text-blue-500" />
+                            <Loader2 className="w-8 h-8 animate-spin mb-2 text-purple-500" />
                             <p className="text-sm">Loading history...</p>
                         </div>
                     ) : error ? (
@@ -150,7 +272,7 @@ const BestParamsModal: React.FC<{
                         </div>
                     ) : (
                         jobs.map(job => (
-                            <div key={job.job_id} className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 transition-all">
+                            <div key={job.job_id} className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:shadow-md hover:border-purple-200 dark:hover:border-purple-800 transition-all">
                                 <div className="flex justify-between items-start mb-3">
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
@@ -175,27 +297,6 @@ const BestParamsModal: React.FC<{
                                             </span>
                                         </div>
                                     </div>
-                                    <button 
-                                        onClick={() => {
-                                            if (job.result?.best_params) {
-                                                // If the selected model type is different from the node's current model type,
-                                                // we should probably warn the user or handle it. 
-                                                // But for now, we just pass the params. 
-                                                // The parent component might need to switch the model type too if we want to be really smart.
-                                                // However, the user might just want to see params.
-                                                // Ideally, we should pass back the model type too.
-                                                onSelect({
-                                                    params: job.result.best_params,
-                                                    modelType: currentModelType
-                                                });
-                                                onClose();
-                                            }
-                                        }}
-                                        className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors flex items-center gap-1 shadow-sm shadow-blue-500/20"
-                                    >
-                                        <Check className="w-3 h-3" />
-                                        Apply
-                                    </button>
                                 </div>
                             </div>
                         ))
@@ -206,111 +307,46 @@ const BestParamsModal: React.FC<{
     );
 };
 
-const HyperparameterInput: React.FC<{
-    value: unknown;
-    type: string;
-    onChange: (value: unknown) => void;
-    step?: number;
-    min?: number;
-    max?: number;
-}> = ({ value, type, onChange, step, min, max }) => {
-    const [localValue, setLocalValue] = useState<string>('');
-
-    useEffect(() => {
-        setLocalValue(value === null ? 'None' : value?.toString() ?? '');
-    }, [value]);
-
-    const handleBlur = () => {
-        const trimmed = localValue.trim();
-        
-        if (trimmed.toLowerCase() === 'none') {
-            onChange(null);
-            return;
-        }
-
-        if (type === 'number') {
-            if (trimmed === '') return;
-            const num = Number(trimmed);
-            if (!isNaN(num)) {
-                onChange(num);
-            } else {
-                // Revert if invalid
-                setLocalValue(value === null ? 'None' : value?.toString() ?? '');
-            }
-        } else if (type === 'boolean') {
-            if (trimmed.toLowerCase() === 'true') onChange(true);
-            else if (trimmed.toLowerCase() === 'false') onChange(false);
-            else setLocalValue(value?.toString() ?? '');
-        } else {
-            onChange(trimmed);
-        }
-    };
-
-    return (
-        <input
-            type="text"
-            value={localValue}
-            onChange={(e) => { setLocalValue(e.target.value); }}
-            onBlur={handleBlur}
-            placeholder={value === null ? 'None' : ''}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-            {...(type === 'number' ? { step, min, max } : {})}
-        />
-    );
-};
-
-const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (c: ModelTrainingConfig) => void; nodeId?: string }> = ({
+export const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
   nodeId,
 }) => {
-  const [hyperparameters, setHyperparameters] = useState<HyperparameterDef[]>([]);
-  const [showParamsModal, setShowParamsModal] = useState(false);
+  const [searchSpaceDefs, setSearchSpaceDefs] = useState<HyperparameterDef[]>([]);
   const [isLoadingDefs, setIsLoadingDefs] = useState(false);
-  const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_model_training'));
+  const [showParamsModal, setShowParamsModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'config' | 'search_space'>('config');
+  const [showCV, setShowCV] = useState(false);
+  const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_model_optimizer'));
   
+  const [containerRef, { width }] = useElementSize();
+  const isWide = width > 450;
+
+  // --- Upstream Data Logic ---
   const { toggleDrawer, setTab } = useJobStore();
   const upstreamData = useUpstreamData(nodeId || '');
-  
-  // Recursive search for datasetId
   const nodes = useGraphStore((state) => state.nodes);
   const edges = useGraphStore((state) => state.edges);
 
   const findUpstreamDatasetId = (currentNodeId: string): string | undefined => {
     const visited = new Set<string>();
     const queue = [currentNodeId];
-    
     while (queue.length > 0) {
-      const id = queue.shift();
-      if (!id) continue;
+      const id = queue.shift()!;
       if (visited.has(id)) continue;
       visited.add(id);
-      
       const node = nodes.find(n => n.id === id);
       if (!node) continue;
-      
-      // If this is NOT the current node, check if it has datasetId
       if (id !== currentNodeId) {
         if (node.data?.datasetId) return node.data.datasetId as string;
         if (node.data?.dataset_id) return node.data.dataset_id as string;
-        
-        if (node.data?.config) {
-            const config = node.data.config as Record<string, unknown>;
-            if (config.datasetId) return config.datasetId as string;
-            if (config.dataset_id) return config.dataset_id as string;
-        }
-        
-        if (node.data?.params) {
-            const params = node.data.params as Record<string, unknown>;
-            if (params.datasetId) return params.datasetId as string;
-            if (params.dataset_id) return params.dataset_id as string;
-        }
+        // Check config/params
+        const anyData = node.data as unknown;
+        if ((anyData as Record<string, any>)?.config?.datasetId) return (anyData as Record<string, any>).config.datasetId;
+        if ((anyData as Record<string, any>)?.config?.dataset_id) return (anyData as Record<string, any>).config.dataset_id;
       }
-      
       const incomers = getIncomers(node, nodes, edges);
-      for (const incomer of incomers) {
-        queue.push(incomer.id);
-      }
+      for (const incomer of incomers) queue.push(incomer.id);
     }
     return undefined;
   };
@@ -318,24 +354,34 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
   const datasetId = findUpstreamDatasetId(nodeId || '');
   const { data: schema } = useDatasetSchema(datasetId);
   const availableColumns = schema ? Object.values(schema.columns) : [];
+  const [availableModels, setAvailableModels] = useState<RegistryItem[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
 
-  const [containerRef, { width }] = useElementSize();
-  const isWide = width > 450; 
-  const [activeTab, setActiveTab] = useState<'model' | 'params'>('model');
-  const [showCV, setShowCV] = useState(false);
-
-  // Fetch hyperparameter definitions when model type changes
+  // Fetch available models from registry
   useEffect(() => {
-    if (config.model_type) {
-      setIsLoadingDefs(true);
-      jobsApi.getHyperparameters(config.model_type)
-        .then((defs) => setHyperparameters(defs as HyperparameterDef[]))
-        .catch(console.error)
-        .finally(() => { setIsLoadingDefs(false); });
-    }
-  }, [config.model_type]);
+      const fetchModels = async () => {
+          setIsLoadingModels(true);
+          try {
+              const nodes = await registryApi.getAllNodes();
+              const models = nodes.filter(n => n.category === 'Model');
+              setAvailableModels(models);
+          } catch (error) {
+              console.error("Failed to fetch models:", error);
+              // Fallback
+              setAvailableModels([
+                  { id: 'random_forest_classifier', name: 'Random Forest Classifier', category: 'Model', description: '', params: {} },
+                  { id: 'logistic_regression', name: 'Logistic Regression', category: 'Model', description: '', params: {} },
+                  { id: 'ridge_regression', name: 'Ridge Regression', category: 'Model', description: '', params: {} },
+                  { id: 'random_forest_regressor', name: 'Random Forest Regressor', category: 'Model', description: '', params: {} },
+              ]);
+          } finally {
+              setIsLoadingModels(false);
+          }
+      };
+      fetchModels();
+  }, []);
 
-  // Auto-select target column from upstream
+  // Auto-select target
   useEffect(() => {
     const upstreamTarget = upstreamData.find(d => d.target_column)?.target_column as string | undefined;
     if (upstreamTarget && config.target_column !== upstreamTarget) {
@@ -343,25 +389,75 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
     }
   }, [upstreamData, config.target_column]);
 
-  const handleTrain = async () => {
+  // --- Model & Search Space Logic ---
+
+  // We use a ref to track the last model type we successfully loaded defaults for
+  // This prevents infinite loops and ensures we only load defaults when the user actually changes the model
+  const loadedModelTypeRef = useRef<string | null>(null);
+
+  useEffect(() => {
+      const loadModelData = async () => {
+          const modelType = config.model_type;
+          if (!modelType) return;
+
+          // If we already loaded data for this model type, just ensure defs are present
+          // But if the user switched models (config.model_type !== loadedModelTypeRef.current), we MUST reload defaults
+          const isNewModel = modelType !== loadedModelTypeRef.current;
+
+          if (!isNewModel && searchSpaceDefs.length > 0) return;
+
+          setIsLoadingDefs(true);
+          try {
+              // 1. Fetch Definitions
+              const defs = await jobsApi.getHyperparameters(modelType);
+              setSearchSpaceDefs(defs as HyperparameterDef[]);
+
+              // 2. Fetch Defaults ONLY if it's a new model selection
+              if (isNewModel) {
+                  const defaults = await jobsApi.getDefaultSearchSpace(modelType);
+                  
+                  // Update config with new defaults
+                  // We use a functional update to ensure we don't lose other concurrent changes
+                  // BUT since we are calling onChange from parent prop, we just pass the new object
+                  onChange({
+                      ...config,
+                      search_space: defaults || {}
+                  });
+                  
+                  loadedModelTypeRef.current = modelType;
+              }
+          } catch (error) {
+              console.error("Failed to load model hyperparameters:", error);
+          } finally {
+              setIsLoadingDefs(false);
+          }
+      };
+
+      void loadModelData();
+  }, [config.model_type]);
+
+
+  const handleTune = async () => {
     if (!nodeId) return;
     try {
         const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
         await jobsApi.runPipeline({
             ...pipelineConfig,
             target_node_id: nodeId,
-            job_type: 'training'
+            job_type: 'tuning'
         });
-        alert("Training job submitted successfully!");
-        setTab('training');
+        alert("Tuning job submitted successfully!");
+        setTab('tuning');
         toggleDrawer(true);
     } catch (error) {
-        console.error("Failed to submit training job:", error);
-        alert("Failed to submit training job. Check console for details.");
+        console.error("Failed to submit tuning job:", error);
+        alert("Failed to submit tuning job.");
     }
   };
 
-  const ModelConfigSection = (
+  // --- Render Sections ---
+
+  const configSectionContent = (
     <div className="space-y-5 animate-in fade-in duration-300">
         {/* Model & Target */}
         <div className="space-y-4">
@@ -373,13 +469,17 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
                         <div className="relative">
                             <select
                                 value={config.model_type}
-                                onChange={(e) => onChange({ ...config, model_type: e.target.value, hyperparameters: {} })}
-                                className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                onChange={(e) => {
+                                    // We don't reset loadedModelTypeRef here anymore, 
+                                    // the useEffect will handle the change detection.
+                                    onChange({ ...config, model_type: e.target.value, search_space: {} });
+                                }}
+                                className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                                disabled={isLoadingModels}
                             >
-                                <option value="random_forest_classifier">Random Forest Classifier</option>
-                                <option value="logistic_regression">Logistic Regression</option>
-                                <option value="ridge_regression">Ridge Regression</option>
-                                <option value="random_forest_regressor">Random Forest Regressor</option>
+                                {availableModels.map(model => (
+                                    <option key={model.id} value={model.id}>{model.name}</option>
+                                ))}
                             </select>
                             <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
                         </div>
@@ -398,7 +498,7 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
                                 <select
                                     value={config.target_column}
                                     onChange={(e) => onChange({ ...config, target_column: e.target.value })}
-                                    className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                    className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
                                 >
                                     <option value="">Select target...</option>
                                     {availableColumns.map((col) => (
@@ -422,14 +522,62 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
 
             <div className="border-t border-gray-100 dark:border-gray-700" />
 
-            {/* CV Settings */}
+            {/* Strategy & Metrics */}
+            <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tuning Strategy</label>
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Search Method</label>
+                        <select
+                            value={config.search_strategy ?? 'random'}
+                            onChange={(e) => onChange({ ...config, search_strategy: e.target.value })}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+                        >
+                            <option value="random">Random Search</option>
+                            <option value="grid">Grid Search</option>
+                            <option value="halving_grid">Successive Halving (Grid)</option>
+                            <option value="halving_random">Successive Halving (Randomized)</option>
+                            <option value="optuna">Optuna Search</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Metric</label>
+                        <select
+                            value={config.metric}
+                            onChange={(e) => onChange({ ...config, metric: e.target.value })}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+                        >
+                            <option value="accuracy">Accuracy</option>
+                            <option value="f1">F1 Score</option>
+                            <option value="roc_auc">ROC AUC</option>
+                            <option value="mse">MSE</option>
+                            <option value="r2">R2 Score</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Trials</label>
+                        <input
+                            type="number"
+                            value={config.n_trials}
+                            onChange={(e) => onChange({ ...config, n_trials: Number(e.target.value) })}
+                            disabled={['grid', 'halving_grid'].includes(config.search_strategy)}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 disabled:opacity-50"
+                            min={1}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Cross Validation Toggle */}
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                 <button 
                     onClick={() => { setShowCV(!showCV); }}
                     className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
                     <div className="flex items-center gap-2">
-                        <BarChart3 className="w-4 h-4 text-blue-500" />
+                        <BarChart3 className="w-4 h-4 text-purple-500" />
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Cross Validation</span>
                     </div>
                     <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${showCV ? 'rotate-90' : ''}`} />
@@ -443,7 +591,7 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
                                 id="cv_enabled"
                                 checked={config.cv_enabled !== false}
                                 onChange={(e) => onChange({ ...config, cv_enabled: e.target.checked })}
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                             />
                             <label htmlFor="cv_enabled" className="text-sm text-gray-700 dark:text-gray-300">Enable Cross-Validation</label>
                         </div>
@@ -471,7 +619,6 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
                                             <option value="k_fold">K-Fold</option>
                                             <option value="stratified_k_fold">Stratified</option>
                                             <option value="time_series_split">Time Series</option>
-                                            <option value="shuffle_split">Shuffle Split</option>
                                         </select>
                                     </div>
                                 </div>
@@ -481,7 +628,7 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
                                         id="cv_shuffle"
                                         checked={config.cv_shuffle !== false}
                                         onChange={(e) => onChange({ ...config, cv_shuffle: e.target.checked })}
-                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                                     />
                                     <label htmlFor="cv_shuffle" className="text-xs text-gray-600 dark:text-gray-400">Shuffle Data</label>
                                 </div>
@@ -494,179 +641,87 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
     </div>
   );
 
-  const HyperparametersSection = () => {
-    const useCustomParams = Object.keys(config.hyperparameters).length > 0;
-
-    const toggleCustomParams = (enabled: boolean) => {
-        if (enabled) {
-            // Initialize with defaults if empty
-            const defaults: Record<string, any> = {};
-            hyperparameters.forEach(p => {
-                defaults[p.name] = p.default;
-            });
-            onChange({ ...config, hyperparameters: defaults });
-        } else {
-            onChange({ ...config, hyperparameters: {} });
-        }
-    };
-
-    return (
+  const searchSpaceSectionContent = (
     <div className="space-y-4 animate-in fade-in duration-300">
         <div className="flex items-center justify-between">
-           <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-             <Settings2 className="w-4 h-4 text-blue-500" />
-             Hyperparameters
-           </h4>
-           <div className="flex items-center gap-2">
-               <label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2 cursor-pointer select-none">
-                   <input 
-                        type="checkbox" 
-                        checked={useCustomParams}
-                        onChange={(e) => { toggleCustomParams(e.target.checked); }}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                   />
-                   Customize
-               </label>
-           </div>
+            <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-purple-500" />
+                Hyperparameters
+            </h4>
         </div>
-        
-        {!useCustomParams ? (
-            <div className="text-center py-8 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-200 dark:border-gray-700">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Using default hyperparameters.
-                </p>
-                <button
-                    onClick={() => { setShowParamsModal(true); }}
-                    className="mt-3 text-xs flex items-center gap-1.5 px-3 py-1.5 mx-auto bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-md border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors shadow-sm"
-                >
-                    <Download className="w-3 h-3" />
-                    Load Best Params
-                </button>
+
+        {isLoadingDefs ? (
+            <div className="flex justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
             </div>
         ) : (
             <div className="space-y-3">
-              <div className="flex justify-end mb-2">
-                   <button
-                      onClick={() => setShowParamsModal(true)}
-                      className="text-xs flex items-center gap-1.5 px-2 py-1 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded transition-colors"
-                    >
-                      <Download className="w-3 h-3" />
-                      Load Best
-                   </button>
-              </div>
-              
-              {isLoadingDefs ? (
-                  <div className="flex justify-center py-4">
-                      <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                  </div>
-              ) : (
-                  hyperparameters.map((param) => (
-                    <div key={param.name} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-                      <div className="flex justify-between items-center mb-2">
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                            {param.label}
-                          </label>
-                          {param.description && <Tooltip text={param.description} />}
-                      </div>
-                      {param.type === 'select' ? (
-                        <select
-                          value={(config.hyperparameters[param.name] ?? param.default) as string | number | readonly string[] | undefined}
-                          onChange={(e) => onChange({
-                            ...config,
-                            hyperparameters: { ...config.hyperparameters, [param.name]: e.target.value }
-                          })}
-                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                        >
-                          {param.options?.map((opt: { label: string; value: unknown }) => (
-                            <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <HyperparameterInput
-                          type={param.type}
-                          value={config.hyperparameters[param.name] ?? param.default}
-                          onChange={(val) => onChange({
-                            ...config,
-                            hyperparameters: { ...config.hyperparameters, [param.name]: val }
-                          })}
-                          step={param.step}
-                          min={param.min}
-                          max={param.max}
+                {searchSpaceDefs.map(def => (
+                    <div key={`${config.model_type}-${def.name}`} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                        <SearchSpaceInput
+                            def={def}
+                            value={(config.search_space?.[def.name] || []) as unknown[]}
+                            onChange={(newValues) => {
+                                onChange({
+                                    ...config,
+                                    search_space: {
+                                        ...config.search_space,
+                                        [def.name]: newValues
+                                    }
+                                });
+                            }}
                         />
-                      )}
                     </div>
-                  ))
-              )}
-              {hyperparameters.length === 0 && !isLoadingDefs && (
-                 <p className="text-sm text-gray-500 dark:text-gray-400 italic text-center py-4">
-                   No parameters available.
-                 </p>
-              )}
+                ))}
+                {searchSpaceDefs.length === 0 && (
+                    <div className="text-center py-8 text-gray-500 text-sm">
+                        No hyperparameters available for this model.
+                    </div>
+                )}
             </div>
         )}
     </div>
   );
-  };
 
   return (
     <div className="flex flex-col h-full" ref={containerRef}>
       {showInfo && (
-        <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded text-xs text-blue-700 dark:text-blue-300 flex justify-between items-start gap-2">
-          <span>Train a model using fixed parameters or defaults.</span>
+        <div className="mb-4 p-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded text-xs text-purple-700 dark:text-purple-300 flex justify-between items-start gap-2">
+          <span>Automatically explore configurations to find the best performing model.</span>
           <button 
             onClick={() => {
                 setShowInfo(false);
-                sessionStorage.setItem('hide_info_model_training', 'true');
+                sessionStorage.setItem('hide_info_model_optimizer', 'true');
             }} 
-            className="text-blue-400 hover:text-blue-600 dark:hover:text-blue-200"
+            className="text-purple-400 hover:text-purple-600 dark:hover:text-purple-200"
           >
             <X className="w-3 h-3" />
           </button>
         </div>
       )}
 
-      <BestParamsModal 
-        isOpen={showParamsModal} 
-        onClose={() => { setShowParamsModal(false); }}
-        modelType={config.model_type}
-        onSelect={(result) => {
-            // result contains { params, modelType }
-            // If model type differs, we update it too
-            const res = result as { modelType?: string; params: Record<string, unknown> };
-            if (res.modelType && res.modelType !== config.model_type) {
-                onChange({ 
-                    ...config, 
-                    model_type: res.modelType,
-                    hyperparameters: res.params 
-                });
-            } else {
-                onChange({ ...config, hyperparameters: res.params });
-            }
-        }}
-      />
-      
       {/* Mobile/Narrow Tabs */}
       {!isWide && (
         <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
           <button
             className={`flex-1 py-2.5 text-xs font-medium text-center border-b-2 transition-colors ${
-              activeTab === 'model' 
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
+              activeTab === 'config' 
+                ? 'border-purple-500 text-purple-600 dark:text-purple-400' 
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
-            onClick={() => { setActiveTab('model'); }}
+            onClick={() => { setActiveTab('config'); }}
           >
             Configuration
           </button>
           <button
             className={`flex-1 py-2.5 text-xs font-medium text-center border-b-2 transition-colors ${
-              activeTab === 'params' 
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
+              activeTab === 'search_space' 
+                ? 'border-purple-500 text-purple-600 dark:text-purple-400' 
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
-            onClick={() => { setActiveTab('params'); }}
+            onClick={() => { setActiveTab('search_space'); }}
           >
-            Hyperparameters
+            Search Space
           </button>
         </div>
       )}
@@ -674,13 +729,13 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
       <div className="flex-1 overflow-y-auto px-1 pb-4 custom-scrollbar">
         {isWide ? (
             <div className="grid grid-cols-2 gap-6 h-full">
-                <div className="overflow-y-auto pr-2">{ModelConfigSection}</div>
-                <div className="overflow-y-auto pl-2 border-l border-gray-100 dark:border-gray-800"><HyperparametersSection /></div>
+                <div className="overflow-y-auto pr-2">{configSectionContent}</div>
+                <div className="overflow-y-auto pl-2 border-l border-gray-100 dark:border-gray-800">{searchSpaceSectionContent}</div>
             </div>
         ) : (
             <>
-                {activeTab === 'model' && ModelConfigSection}
-                {activeTab === 'params' && <HyperparametersSection />}
+                {activeTab === 'config' && configSectionContent}
+                {activeTab === 'search_space' && searchSpaceSectionContent}
             </>
         )}
       </div>
@@ -688,39 +743,28 @@ const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (
       {/* Footer */}
       <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
         <button
-          onClick={handleTrain}
+          onClick={handleTune}
           className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 text-white rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
           style={{ background: 'var(--main-gradient)' }}
         >
           <Play className="w-4 h-4 fill-current" />
-          <span className="text-sm font-semibold">Start Training</span>
+          <span className="text-sm font-semibold">Start Train-Optimization</span>
+        </button>
+
+        <button 
+            onClick={() => { setShowParamsModal(true); }}
+            className="text-xs text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 flex items-center gap-1.5 transition-colors px-3 py-1 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800"
+        >
+            <Activity className="w-3.5 h-3.5" />
+            View Best Parameters History
         </button>
       </div>
+
+      <BestParamsModal 
+        isOpen={showParamsModal}
+        onClose={() => { setShowParamsModal(false); }}
+        modelType={config.model_type}
+      />
     </div>
   );
-};
-
-export const ModelTrainingNode: NodeDefinition = {
-  type: 'model_training',
-  label: 'Standard Training',
-  category: 'Modeling',
-  description: 'Train a model with fixed or default parameters.',
-  icon: BrainCircuit,
-  inputs: [{ id: 'in', label: 'Training Data', type: 'dataset' }],
-  outputs: [{ id: 'model', label: 'Trained Model', type: 'model' }],
-  settings: ModelTrainingSettings,
-  validate: (config) => {
-    if (!config.target_column) return { isValid: false, message: 'Target column is required.' };
-    return { isValid: true };
-  },
-  getDefaultConfig: () => ({
-    target_column: '',
-    model_type: 'random_forest_classifier',
-    hyperparameters: {},
-    cv_enabled: true,
-    cv_folds: 5,
-    cv_type: 'k_fold',
-    cv_shuffle: true,
-    cv_random_state: 42
-  })
 };
