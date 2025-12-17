@@ -2,7 +2,44 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import BaseModel
+
+
+class JobStatus(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class JobInfo(BaseModel):
+    job_id: str
+    pipeline_id: str
+    node_id: str
+    dataset_id: Optional[str] = None
+    dataset_name: Optional[str] = None
+    job_type: Literal["training", "tuning", "preview"]
+    status: JobStatus
+    start_time: Optional[datetime]
+    end_time: Optional[datetime] = None
+    error: Optional[str] = None
+    result: Optional[Dict[str, Any]] = None
+    logs: Optional[List[str]] = None
+
+    # Extended fields for Experiments Page
+    model_type: Optional[str] = None
+    hyperparameters: Optional[Dict[str, Any]] = None
+    created_at: Optional[datetime] = None
+    metrics: Optional[Dict[str, Any]] = None
+    search_strategy: Optional[str] = None
+    target_column: Optional[str] = None
+    dropped_columns: Optional[List[str]] = None
+    version: Optional[int] = None
 
 
 @dataclass
