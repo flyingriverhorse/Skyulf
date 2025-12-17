@@ -24,7 +24,6 @@ from skyulf.modeling.regression import (
     RidgeRegressionApplier,
     RidgeRegressionCalculator,
 )
-from skyulf.modeling.tuning.schemas import TuningConfig
 from skyulf.modeling.tuning.tuner import TunerApplier, TunerCalculator
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
@@ -83,6 +82,7 @@ class PipelineEngine:
             []
         )  # Track fitted transformers for inference pipeline
         self._results: Dict[str, NodeExecutionResult] = {}
+        self._node_configs: Dict[str, NodeConfig] = {}
 
     def log(self, message: str):
         logger.info(message)
@@ -98,6 +98,7 @@ class PipelineEngine:
         self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
         start_time = datetime.now()
         self.executed_transformers = []  # Reset for new run
+        self._node_configs = {n.node_id: n for n in config.nodes}
 
         pipeline_result = PipelineExecutionResult(
             pipeline_id=config.pipeline_id,
@@ -203,39 +204,119 @@ class PipelineEngine:
         # We assume the previous node saved an artifact with its node_id.
         return self.artifact_store.load(input_node_id)
 
+    def _resolve_feature_engineer_artifact_key(self, node: NodeConfig) -> str | None:
+        if not node.inputs:
+            return None
+
+        for input_node_id in node.inputs:
+            candidate = f"{input_node_id}_pipeline"
+            if self.artifact_store.exists(candidate):
+                return candidate
+
+            candidate = f"exec_{input_node_id}_pipeline"
+            if self.artifact_store.exists(candidate):
+                return candidate
+
+        return None
+
+    def _collect_feature_engineer_artifact_keys(
+        self, node_id: str, visited: set[str]
+    ) -> list[str]:
+        if node_id in visited:
+            return []
+        visited.add(node_id)
+
+        keys: list[str] = []
+        node_cfg = self._node_configs.get(node_id)
+        if node_cfg and node_cfg.inputs:
+            for upstream_id in node_cfg.inputs:
+                keys.extend(self._collect_feature_engineer_artifact_keys(upstream_id, visited))
+
+        # Prefer the execution-time pipeline artifact if present.
+        for candidate in (f"exec_{node_id}_pipeline", f"{node_id}_pipeline"):
+            if self.artifact_store.exists(candidate):
+                keys.append(candidate)
+                break
+
+        return keys
+
+    def _build_composite_feature_engineer(self, node: NodeConfig) -> FeatureEngineer | None:
+        """Build a single, ordered FeatureEngineer from all upstream pipeline artifacts.
+
+        Some pipelines are represented as multiple transformer nodes (e.g., encoding -> scaling).
+        Each node saves its own FeatureEngineer artifact with only its fitted step(s).
+        For inference and label decoding we need a single FeatureEngineer that contains the
+        full chain in the correct order.
+        """
+
+        if not node.inputs:
+            return None
+
+        visited: set[str] = set()
+        artifact_keys: list[str] = []
+        for input_node_id in node.inputs:
+            artifact_keys.extend(self._collect_feature_engineer_artifact_keys(input_node_id, visited))
+
+        if not artifact_keys:
+            return None
+
+        merged_steps: list[dict[str, Any]] = []
+        for key in artifact_keys:
+            try:
+                fe = self.artifact_store.load(key)
+            except Exception as e:
+                logger.debug(f"Failed to load pipeline artifact {key}: {e}")
+                continue
+
+            fitted_steps = getattr(fe, "fitted_steps", None)
+            if isinstance(fitted_steps, list) and fitted_steps:
+                merged_steps.extend(fitted_steps)
+
+        if not merged_steps:
+            return None
+
+        composite = FeatureEngineer([])
+        composite.fitted_steps = merged_steps
+        return composite
+
     def _bundle_transformers_with_model(
-        self, model_artifact_key: str, job_id: str = "unknown"
+        self,
+        model_artifact_key: str,
+        job_id: str = "unknown",
+        feature_engineer_artifact_key: str | None = None,
+        feature_engineer_override: Any | None = None,
     ):
         """Bundles fitted transformers with the model artifact for inference."""
         try:
             model_artifact = self.artifact_store.load(model_artifact_key)
+
+            # Handle tuple artifacts from tuning: (model, metadata/tuning_result)
+            if isinstance(model_artifact, tuple) and len(model_artifact) >= 1:
+                model_artifact = model_artifact[0]
 
             # Collect fitted transformer objects
             # In the new SDK, the FeatureEngineer object contains all steps.
             # We should look for the FeatureEngineer artifact.
 
             feature_engineer = None
-            # Try to find the feature engineer artifact from previous nodes
-            # We iterate backwards through executed transformers to find the FeatureEngineer
-            # But executed_transformers tracks individual steps if we ran them individually.
-            # If we ran _run_feature_engineering, we saved the whole engineer.
 
-            # Heuristic: Look for an artifact ending in "_pipeline" which we saved in _run_feature_engineering
-            # Or check self.executed_transformers if we want to support the old way.
+            if feature_engineer_override is not None and hasattr(
+                feature_engineer_override, "transform"
+            ):
+                feature_engineer = feature_engineer_override
 
-            # New Way: We expect a FeatureEngineer object to be available.
-            # Let's try to find it.
-            for key in self.artifact_store.list_artifacts():
-                if key.endswith("_pipeline"):
-                    try:
-                        obj = self.artifact_store.load(key)
-                        if hasattr(
-                            obj, "transform"
-                        ):  # It's a FeatureEngineer or similar
-                            feature_engineer = obj
-                            break
-                    except BaseException:
-                        pass
+            # Prefer an explicit FeatureEngineer artifact key (derived from the pipeline graph)
+            # rather than scanning the whole artifacts directory. Scanning can pick a pipeline
+            # from a different run and cause incorrect transforms and label decoding.
+            if feature_engineer_artifact_key:
+                try:
+                    obj = self.artifact_store.load(feature_engineer_artifact_key)
+                    if hasattr(obj, "transform"):
+                        feature_engineer = obj
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to load feature engineer artifact {feature_engineer_artifact_key}: {e}"
+                    )
 
             if feature_engineer:
                 # Create the new bundle format
@@ -337,11 +418,11 @@ class PipelineEngine:
 
         if isinstance(processed_df, tuple):
             # SplitDataset
-            self.log(
-                f"Split details - Train: {
-                    processed_df[0].shape}, Test: {
-                    processed_df[1].shape if processed_df[1] is not None else 'None'}"
-            )
+            train_part = processed_df[0]
+            test_part = processed_df[1] if len(processed_df) > 1 else None
+            train_shape = getattr(train_part, "shape", None)
+            test_shape = getattr(test_part, "shape", None) if test_part is not None else None
+            self.log(f"Split details - Train: {train_shape}, Test: {test_shape or 'None'}")
 
         self.artifact_store.save(node.node_id, processed_df)
 
@@ -453,7 +534,17 @@ class PipelineEngine:
         self.log("Model training finished.")
 
         # Bundle transformers with the model for inference
-        self._bundle_transformers_with_model(node.node_id, job_id=job_id)
+        composite_feature_engineer = self._build_composite_feature_engineer(node)
+        feature_engineer_key = None
+        if composite_feature_engineer is None:
+            feature_engineer_key = self._resolve_feature_engineer_artifact_key(node)
+
+        self._bundle_transformers_with_model(
+            node.node_id,
+            job_id=job_id,
+            feature_engineer_artifact_key=feature_engineer_key,
+            feature_engineer_override=composite_feature_engineer,
+        )
 
         # Optional: Evaluate immediately
         metrics = {}
@@ -583,7 +674,17 @@ class PipelineEngine:
         self.log("Tuning and final model retraining finished.")
 
         # Bundle transformers with the model for inference
-        self._bundle_transformers_with_model(node.node_id, job_id=job_id)
+        composite_feature_engineer = self._build_composite_feature_engineer(node)
+        feature_engineer_key = None
+        if composite_feature_engineer is None:
+            feature_engineer_key = self._resolve_feature_engineer_artifact_key(node)
+
+        self._bundle_transformers_with_model(
+            node.node_id,
+            job_id=job_id,
+            feature_engineer_artifact_key=feature_engineer_key,
+            feature_engineer_override=composite_feature_engineer,
+        )
 
         # Extract metrics from tuning result
         _, tuning_result = estimator.model
@@ -713,7 +814,7 @@ class PipelineEngine:
 
             # Train
             if isinstance(data.train, tuple):
-                X, y = data.train
+                X, _ = data.train
                 preview_info["data_summary"]["train"] = get_df_info(X, "Train (X)")
             else:
                 preview_info["data_summary"]["train"] = get_df_info(data.train, "Train")

@@ -1,132 +1,28 @@
-# Skyulf 🐺
+# Skyulf
 
-**Machine Learning Operations (MLOps) shouldn't be this hard.**
+Skyulf is a self-hosted MLOps platform with a FastAPI backend and a Python SDK (skyulf-core).
 
-Skyulf is a self-hosted, privacy-first **MLOps Hub**. It is designed to be the "glue" that holds your data science workflow together—without the glue code. Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
+## Quick start
 
-Built with a modern stack: **FastAPI** (Backend), **React** (Frontend), **Celery** (Async Jobs), and **Redis**.
-
-## Key Features
-
-*   **🎨 Visual Feature Canvas**: A node-based editor to clean, transform, and engineer features without writing spaghetti code.
-*   **🚀 Modern Backend**: Built on FastAPI for high performance and easy API extension.
-*   **⚡ Async by Default**: Heavy training jobs run in the background via Celery & Redis (or background threads)—your UI never freezes.
-*   **💾 Flexible Data**: Ingest CSV, Excel, JSON, Parquet, or SQL. Start with SQLite (zero-config) and scale to PostgreSQL.
-*   **🧠 Model Training**: Built-in support for Scikit-Learn models with hyperparameter search (Grid/Random/Halving) and optional Optuna integration.
-*   **📦 Model Registry & Deployment**: Version control your models, track metrics, and deploy them to a live inference API with a single click.
-
-## Quick Start
-
-### Installation
-
-Prerequisites: **Python 3.10+**
+1. Install backend dependencies:
 
 ```bash
 pip install -r requirements-fastapi.txt
 ```
 
-### Running the Server
+2. Start the API server:
 
 ```bash
 python run_skyulf.py
 ```
 
-The server will start at `http://127.0.0.1:8000`.
+3. Open:
 
-### Running Without Celery (Direct Mode)
+- http://127.0.0.1:8000
 
-By default, Skyulf runs **without Celery** for simplicity. Background tasks execute directly in the FastAPI process using background threads. This is perfect for development and small-scale deployments.
+## Documentation
 
-To enable Celery for production workloads:
-
-1. Set the environment variable:
-   ```bash
-   # Windows
-   set USE_CELERY=true
-   
-   # Linux/Mac
-   export USE_CELERY=true
-   ```
-
-2. Start Redis (required for Celery):
-   ```bash
-   docker run -d -p 6379:6379 redis:alpine
-   ```
-
-3. Start the Celery worker:
-   ```bash
-   celery -A celery_worker worker --loglevel=info
-   ```
-
-4. Start the FastAPI server:
-   ```bash
-   python run_skyulf.py
-   ```
-
-> **Tip:** For local development, keep `USE_CELERY=false` (default) to avoid needing Redis.
-
-## Documentation Structure
-
-*   **User Guide**:
-   *   **[Getting Started](guides/getting_started.md)**: Installation and basic usage.
-   *   **[Common Recipes](guides/recipes.md)**: How-to guides for common tasks.
-   *   **[Python API Usage](python_api.md)**: Programmatic usage of backend modules.
-   *   **[Architecture](architecture.md)**: System design and responsibilities.
-   *   **[Experiments](guides/experiments.md)**: Tracking and managing experiments.
-   *   **[Model Registry](guides/model_registry.md)**: Managing model versions.
-   *   **[Inference](guides/inference.md)**: Deploying models for inference.
-*   **Modeling**:
-   *   **[Overview](modeling/index.md)**: Training and applying models.
-   *   **[Classification](modeling/classification.md)**: Classification algorithms.
-   *   **[Regression](modeling/regression.md)**: Regression algorithms.
-   *   **[Training](modeling/training.md)**: Model training process.
-   *   **[Tuning](modeling/tuning.md)**: Hyperparameter tuning.
-*   **Preprocessing**:
-   *   **[Cleaning](preprocessing/cleaning.md)**: Data cleaning operations.
-   *   **[Feature Engineering](preprocessing/feature_generation.md)**: Creating new features.
-   *   **[Transformations](preprocessing/transformations.md)**: Data transformations.
-
----
-
-## Building & Deploying Documentation
-
-This documentation is built with [MkDocs](https://www.mkdocs.org/) and the [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/) theme, with auto-generated API docs via [mkdocstrings](https://mkdocstrings.github.io/).
-
-### Local Development
-
-1. **Install dependencies:**
-   ```bash
-   pip install mkdocs-material mkdocstrings[python]
-   ```
-
-2. **Serve locally with hot-reload:**
-   ```bash
-   mkdocs serve
-   ```
-   Open `http://127.0.0.1:8000` in your browser.
-
-3. **Build static files:**
-   ```bash
-   mkdocs build
-   ```
-   This generates the `site/` directory with static HTML files.
-
-### Deploying to GitHub Pages
-
-The documentation is automatically deployed to GitHub Pages on every push to `main`, `master`, or `creatingnewversion` branches via GitHub Actions.
-
-**Manual deployment:**
-```bash
-mkdocs gh-deploy --force
-```
-
-This pushes the built docs to the `gh-pages` branch and makes them available at:
-`https://flyingriverhorse.github.io/Skyulf/site/`
-
-### Accessing via index.html
-
-Once deployed, the site is accessible through:
-- **Landing Page**: `https://flyingriverhorse.github.io/Skyulf/` → Root `index.html`
-- **Documentation**: `https://flyingriverhorse.github.io/Skyulf/site/` → MkDocs site
-
-The `index.html` file is automatically generated by MkDocs and serves as the entry point. All navigation, search, and page routing work through this single-page application style setup.
+- Getting Started: guides/getting_started.md
+- Recipes: guides/recipes.md
+- Architecture: architecture.md
+- Writing Docs: contributing/writing_docs.md

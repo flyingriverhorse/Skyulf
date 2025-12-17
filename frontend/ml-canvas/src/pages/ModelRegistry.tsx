@@ -10,8 +10,8 @@ interface ModelVersion {
   version: number | string;
   source: string;
   status: string;
-  metrics: any;
-  hyperparameters: any;
+  metrics: Record<string, unknown>;
+  hyperparameters: Record<string, unknown>;
   created_at: string;
   artifact_uri: string;
   is_deployed: boolean;
@@ -98,8 +98,8 @@ export const ModelRegistry: React.FC = () => {
 
       setModels(prev => reset ? modelsData : [...prev, ...modelsData]);
       return modelsData;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError((err as Error).message);
       return null;
     } finally {
       setLoading(false);
@@ -131,8 +131,8 @@ export const ModelRegistry: React.FC = () => {
       return () => { mainElement.removeEventListener('scroll', handleScroll); };
     } else {
       // Fallback to window if main not found (though it should be there)
-      window.addEventListener('scroll', handleScroll as any);
-      return () => { window.removeEventListener('scroll', handleScroll as any); };
+      window.addEventListener('scroll', handleScroll as unknown as EventListener);
+      return () => { window.removeEventListener('scroll', handleScroll as unknown as EventListener); };
     }
   }, [loading, hasMore]);
 
@@ -170,8 +170,8 @@ export const ModelRegistry: React.FC = () => {
       if (confirm('Model deployed successfully! Do you want to go to the inference page?')) {
         navigate('/deployments');
       }
-    } catch (err: any) {
-      alert(`Error deploying model: ${err.message}`);
+    } catch (err: unknown) {
+      alert(`Error deploying model: ${(err as Error).message}`);
     } finally {
       setDeployingId(null);
     }
@@ -186,13 +186,13 @@ export const ModelRegistry: React.FC = () => {
     }
   };
 
-  const formatMetrics = (metrics: any) => {
+  const formatMetrics = (metrics: Record<string, unknown>) => {
     if (!metrics) return '-';
     // Try to find common metrics
     const score = metrics.score || metrics.accuracy || metrics.f1_score || metrics.rmse || metrics.mse;
     if (score !== undefined) {
       // Format to 4 decimal places if number
-      return typeof score === 'number' ? score.toFixed(4) : score;
+      return typeof score === 'number' ? score.toFixed(4) : String(score);
     }
     // Fallback: first key
     const keys = Object.keys(metrics);

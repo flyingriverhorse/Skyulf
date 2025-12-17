@@ -17,6 +17,58 @@ sklearn.set_config(transform_output="pandas")
 logger = logging.getLogger(__name__)
 
 
+def _extract_target_label_encoder(feature_engineer: Any):
+    fitted_steps = getattr(feature_engineer, "fitted_steps", None)
+    if not isinstance(fitted_steps, list):
+        return None
+
+    # Walk backwards so the most recent LabelEncoder wins
+    for step in reversed(fitted_steps):
+        if not isinstance(step, dict):
+            continue
+        if step.get("type") != "LabelEncoder":
+            continue
+        artifact = step.get("artifact")
+        if not isinstance(artifact, dict):
+            continue
+        encoders = artifact.get("encoders")
+        if not isinstance(encoders, dict):
+            continue
+        target_encoder = encoders.get("__target__")
+        if target_encoder is not None and hasattr(target_encoder, "inverse_transform"):
+            return target_encoder
+
+    return None
+
+
+def _maybe_decode_predictions(predictions: Any, feature_engineer: Any) -> Any:
+    """Decode numeric class predictions to original labels if possible.
+
+    This uses the saved target LabelEncoder fitted during training (stored under
+    the LabelEncoder step artifact as encoders['__target__']). If no encoder is
+    present, or decoding fails, it returns predictions unchanged.
+    """
+
+    target_encoder = _extract_target_label_encoder(feature_engineer)
+    if target_encoder is None:
+        return predictions
+
+    try:
+        import numpy as np
+
+        preds = np.asarray(predictions)
+        # Best-effort: many sklearn classifiers output ints; decode expects int-like.
+        if preds.dtype.kind in {"i", "u", "b"}:
+            return target_encoder.inverse_transform(preds.astype(int))
+
+        # If dtype isn't integer but values might still be numeric strings/floats,
+        # try converting.
+        return target_encoder.inverse_transform(preds.astype(int))
+    except Exception as e:
+        logger.debug(f"Could not decode predictions via LabelEncoder: {e}")
+        return predictions
+
+
 class DeploymentService:
 
     @staticmethod
@@ -224,6 +276,7 @@ class DeploymentService:
             # Predict
             try:
                 predictions = estimator.predict(X_transformed)
+                predictions = _maybe_decode_predictions(predictions, feature_engineer)
                 if hasattr(predictions, "tolist"):
                     return cast(List[Any], predictions.tolist())
                 return list(predictions)

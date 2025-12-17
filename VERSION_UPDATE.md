@@ -14,10 +14,18 @@ This release focuses on hardening the codebase against runtime errors and improv
 
 ### 🛡️ Backend Stability
 - **Robust Artifact Handling:** Fixed a critical runtime error where Hyperparameter Tuning jobs saved artifacts as tuples `(model, metadata)`, causing prediction failures. The system now correctly unwraps these artifacts.
+- **Human-Readable Classification Outputs:** Deployment inference now automatically decodes label-encoded classification predictions back to their original text labels when a target `LabelEncoder` is present in the bundled artifacts.
+- **Evaluation Label Decoding:** Job evaluation responses now return decoded `y_true` / `y_pred` (when available) and include `y_proba.labels` alongside `y_proba.classes` to enable readable class names in the UI.
+- **Deterministic Artifact Bundling:** Fixed a subtle bundling bug where the wrong feature-engineering pipeline artifact could be attached by directory scanning.
+- **Composite Pipeline Bundling (Multi-Step Preprocessing):** Fixed an issue where adding an additional preprocessing node (e.g., scaling after encoding) could cause the final bundled `feature_engineer` to include only the *last* step (dropping the `LabelEncoder`). Bundling now composes a single ordered pipeline from all upstream `exec_*_pipeline` artifacts so deployments and Experiments always retain the full preprocessing chain and target label decoding.
 - **Database Safety:**
     - Fixed a variable shadowing issue in `crud.py` where the built-in `filter` was being overridden.
     - Corrected SQL statement execution logic for MySQL/Snowflake paths.
     - Cleaned up unused imports and variables across the backend.
+
+### 🧠 Engine Reliability
+- **Reduced Duplication:** Consolidated repeated logic for resolving feature-engineering artifact keys into a single helper.
+- **Safer Logging:** Fixed a feature-engineering logging bug that could cause runtime failures (malformed f-string) and improved shape-safe logging.
 
 ### 🧹 Frontend Code Quality (Codacy)
 - **Type Safety:**
@@ -27,6 +35,12 @@ This release focuses on hardening the codebase against runtime errors and improv
     - Enforced explicit `void` return types for Promise-returning functions to prevent "floating promises".
     - Standardized arrow function syntax in event handlers for better readability and safety.
     - Replaced the `delete` operator with `Reflect.deleteProperty` for safer object manipulation.
+
+### 📈 Experiments & Evaluation UX
+- **ROC Curve Availability:** Fixed ROC rendering when class IDs were numeric but `<select>` values were strings (type normalization in ROC computation).
+- **Readable ROC Class Selector:** The ROC “Target Class” selector now displays class names when provided by the backend (falls back to encoded IDs when names are unavailable).
+- **Cleaner Controls Layout:** The ROC mapping display is placed on its own full-width row to avoid packing controls into a single line.
+- **Confusion Matrix Clarity:** Confusion matrix axis labels remain encoded (IDs) to avoid layout issues with many/long class names, while still maintaining correct alignment.
 
 ---
 

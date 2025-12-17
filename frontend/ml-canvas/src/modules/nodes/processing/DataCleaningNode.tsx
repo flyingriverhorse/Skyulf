@@ -42,7 +42,7 @@ const DataCleaningSettings: React.FC<{ config: DataCleaningConfig; onChange: (c:
         <select
           className="w-full p-2 border rounded bg-background"
           value={config.fillStrategy}
-          onChange={(e) => onChange({ ...config, fillStrategy: e.target.value as any })}
+          onChange={(e) => onChange({ ...config, fillStrategy: e.target.value as DataCleaningConfig['fillStrategy'] })}
         >
           <option value="mean">Mean</option>
           <option value="median">Median</option>

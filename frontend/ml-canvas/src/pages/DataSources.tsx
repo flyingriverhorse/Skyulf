@@ -53,7 +53,7 @@ export const DataSources: React.FC = () => {
         d.source_metadata?.ingestion_status?.status === 'processing'
       );
       if (hasPending) {
-        fetchDatasets();
+        void fetchDatasets();
       }
     }, 5000);
     return () => { clearInterval(interval); };

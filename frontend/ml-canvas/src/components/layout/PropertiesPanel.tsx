@@ -3,6 +3,7 @@ import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { registry } from '../../core/registry/NodeRegistry';
 import { X, Maximize2, Minimize2, Settings2 } from 'lucide-react';
+import { Node } from '@xyflow/react';
 
 export const PropertiesPanel: React.FC = () => {
   const nodes = useGraphStore((state) => state.nodes);
@@ -38,7 +39,7 @@ export const PropertiesPanel: React.FC = () => {
 };
 
 const PropertiesContent: React.FC<{ 
-  selectedNode: any; 
+  selectedNode: Node; 
   isExpanded: boolean; 
   toggleExpand: () => void; 
 }> = ({ selectedNode, isExpanded, toggleExpand }) => {
@@ -73,7 +74,7 @@ const PropertiesContent: React.FC<{
             <Settings2 className="w-4 h-4 text-primary" />
           </div>
           <div>
-            <h2 className="font-semibold text-sm">{selectedNode.data.label || definition.label}</h2>
+            <h2 className="font-semibold text-sm">{String(selectedNode.data.label || definition.label)}</h2>
             <div className="text-xs text-muted-foreground font-mono">ID: {selectedNode.id}</div>
           </div>
         </div>
@@ -97,7 +98,7 @@ const PropertiesContent: React.FC<{
         <div className="space-y-6">
           <SettingsComponent
             config={selectedNode.data}
-            onChange={(data: any) => updateNodeData(selectedNode.id, data)}
+            onChange={(data: unknown) => updateNodeData(selectedNode.id, data)}
             nodeId={selectedNode.id}
           />
         </div>

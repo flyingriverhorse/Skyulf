@@ -1582,22 +1582,35 @@ encoded_df, metrics = engineer.fit_transform(df)
 </code></pre>
 <h2 id="available-transformers">Available Transformers</h2>
 <h3 id="onehotencoder">OneHotEncoder</h3>
-<p>Creates binary columns for each category.</p>
+<p>Creates binary columns for each category. Applies only to feature columns (X).</p>
 <p><strong>Parameters:</strong>
 - <code>handle_unknown</code> (str): 'error' or 'ignore'. Default 'ignore'.
 - <code>drop</code> (str): 'first' or None.
-- <code>columns</code> (List[str]): Columns to encode.</p>
+- <code>columns</code> (List[str]): Feature columns to encode.</p>
 <h3 id="ordinalencoder">OrdinalEncoder</h3>
 <p>Encodes categories as integers.</p>
 <p><strong>Parameters:</strong>
 - <code>columns</code> (List[str]): Columns to encode.</p>
 <h3 id="labelencoder">LabelEncoder</h3>
-<p>Encodes target labels as integers (0 to n_classes-1).</p>
-<p><strong>Python Config:</strong></p>
+<p>Encodes labels as integers (0 to n_classes-1). Primarily used for the target variable in classification tasks, but can also be applied to feature columns.</p>
+<p><strong>Parameters:</strong>
+- <code>columns</code> (List[str], optional): List of columns to encode.
+    - If provided, it encodes the specified columns (checking both features and the target variable).
+    - If empty or omitted, it defaults to encoding the target variable (<code>y</code>).</p>
+<p><strong>Python Config (Explicit Columns):</strong></p>
 <pre><code class="language-python">{
     &quot;name&quot;: &quot;label_encode&quot;,
     &quot;transformer&quot;: &quot;LabelEncoder&quot;,
-    &quot;params&quot;: {}
+    &quot;params&quot;: {
+        &quot;columns&quot;: [&quot;species&quot;, &quot;category_col&quot;]  # Can be target or feature columns
+    }
+}
+</code></pre>
+<p><strong>Python Config (Default Behavior):</strong></p>
+<pre><code class="language-python">{
+    &quot;name&quot;: &quot;label_encode_auto&quot;,
+    &quot;transformer&quot;: &quot;LabelEncoder&quot;,
+    &quot;params&quot;: {} # Automatically finds and encodes the target variable
 }
 </code></pre>
 <h3 id="targetencoder">TargetEncoder</h3>

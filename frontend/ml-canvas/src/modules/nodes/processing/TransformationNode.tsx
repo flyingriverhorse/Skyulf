@@ -180,7 +180,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
 
   const handleTypeChange = (index: number, newType: 'power' | 'simple') => {
     const defaultMethod = TRANSFORMATION_TYPES[newType].methods[0].value;
-    updateRule(index, { method: defaultMethod as any });
+    updateRule(index, { method: defaultMethod as TransformationRule['method'] });
   };
 
   const backendRecommendations = useRecommendations(nodeId || '', {
@@ -253,7 +253,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                       <select
                         className="w-full p-1.5 border rounded text-xs bg-background"
                         value={rule.method}
-                        onChange={(e) => { updateRule(idx, { method: e.target.value as any }); }}
+                        onChange={(e) => { updateRule(idx, { method: e.target.value as TransformationRule['method'] }); }}
                         onClick={(e) => e.stopPropagation()}
                       >
                         {TRANSFORMATION_TYPES[currentType].methods.map(m => (
@@ -313,7 +313,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
         recommendations={backendRecommendations || []}
         onApply={(rec) => {
           // Apply recommendation logic
-          const r = rec as any;
+          const r = rec as Record<string, any>;
           const method = r.suggested_params?.method || r.params?.method || 'log';
           const columns = r.target_columns || [];
           
@@ -323,7 +323,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
              onChange({
                transformations: [
                  ...transformations,
-                 { columns, method: method as any, params: {} }
+                 { columns, method: method as TransformationRule['method'], params: {} }
                ]
              });
           }
