@@ -1,6 +1,7 @@
 """Hyperparameter Tuner implementation."""
 
 import logging
+import warnings
 from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
@@ -470,7 +471,12 @@ class TunerCalculator(BaseModelCalculator):
         )
 
         try:
-            searcher.fit(X_arr, y_arr)
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="Failed to report cross validation scores for TerminatorCallback",
+                )
+                searcher.fit(X_arr, y_arr)
         except Exception as e:
             logger.error(f"Hyperparameter tuning failed: {str(e)}")
             error_msg = str(e)

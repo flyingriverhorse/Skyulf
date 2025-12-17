@@ -119,3 +119,4 @@ testingdb/
 !.codacy/cli-config.yaml
 !.codacy/cli-config.yml
 !.codacy/cli.sh
+.github/instructions

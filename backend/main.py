@@ -261,6 +261,11 @@ def _include_routers(app: FastAPI) -> None:
 
     # And at /ml-workflow/api/pipelines for frontend compatibility
     app.include_router(ml_pipeline_router, prefix="/ml-workflow/api/pipelines")
+    
+    # Mount at /api/ml for frontend compatibility (fixes 404s)
+    app.include_router(ml_pipeline_router, prefix="/api/ml")
+    app.include_router(model_registry_router, prefix="/api/ml", tags=["Model Registry"])
+
     app.include_router(deployment_router, prefix="/api", tags=["Deployment"])
     app.include_router(model_registry_router, prefix="/api", tags=["Model Registry"])
 
