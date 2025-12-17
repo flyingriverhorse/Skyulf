@@ -23,7 +23,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       if (!node) continue;
 
       let stepType = 'unknown';
-      let params: any = {};
+      let params: unknown = {};
       const incomingEdges = edges.filter(e => e.target === nodeId);
       const inputs = incomingEdges.map(e => e.source);
 
@@ -90,8 +90,8 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
             flag_suffix: node.data.flag_suffix
           };
       } else if (node.data.definitionType === 'scale_numeric_features') {
-          const config = node.data as any || {};
-          const method = config.method || 'standard';
+          const config = node.data as unknown || {};
+          const method = (config as Record<string, unknown>).method || 'standard';
           if (method === 'minmax') stepType = 'MinMaxScaler';
           else if (method === 'maxabs') stepType = 'MaxAbsScaler';
           else if (method === 'robust') stepType = 'RobustScaler';
@@ -137,16 +137,17 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           stepType = 'GeneralTransformation';
           
           // Flatten transformations: { columns: ['a', 'b'], method: 'log' } -> [{ column: 'a', method: 'log' }, { column: 'b', method: 'log' }]
-          const rawTransformations = (node.data.transformations || []) as any[];
+          const rawTransformations = (node.data.transformations || []) as unknown[];
           const flattenedTransformations = [];
           
-          for (const rule of rawTransformations) {
+          for (const r of rawTransformations) {
+              const rule = r as Record<string, unknown>;
               if (rule.columns && Array.isArray(rule.columns)) {
-                  for (const col of rule.columns) {
+                  for (const col of (rule.columns as string[])) {
                       flattenedTransformations.push({
                           column: col,
                           method: rule.method,
-                          ...rule.params
+                          ...(rule.params as Record<string, unknown>)
                       });
                   }
               }

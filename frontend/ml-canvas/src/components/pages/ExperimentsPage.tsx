@@ -333,9 +333,9 @@ export const ExperimentsPage: React.FC = () => {
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                   {job.model_type} • {job.dataset_name || 'Unknown Dataset'}
-                  {job.job_type === 'tuning' && (job.search_strategy || (job.config as Record<string, any>)?.tuning?.strategy) && (
+                  {job.job_type === 'tuning' && (job.search_strategy || (job.config as { tuning?: { strategy?: string } })?.tuning?.strategy) && (
                       <span className="ml-1 text-gray-400">
-                          ({job.search_strategy || (job.config as Record<string, any>)?.tuning?.strategy})
+                          ({job.search_strategy || (job.config as { tuning?: { strategy?: string } })?.tuning?.strategy})
                       </span>
                   )}
                 </div>
@@ -538,7 +538,7 @@ export const ExperimentsPage: React.FC = () => {
                         <tr key={metricKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                           <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{metricKey}</td>
                           {selectedJobs.map(job => {
-                             const m = (job.metrics || job.result?.metrics || {}) as Record<string, any>;
+                             const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
                              const val = m[metricKey];
                              return (
                                 <td key={job.job_id} className="px-4 py-1.5 font-mono text-gray-600 dark:text-gray-300">
@@ -689,7 +689,7 @@ export const ExperimentsPage: React.FC = () => {
                                     return true;
                                 })
                                 .map(([splitName, splitData]: [string, EvaluationSplit]) => {
-                                const data = splitData.y_true.map((y: any, i: number) => ({
+                                const data = splitData.y_true.map((y: unknown, i: number) => ({
                                     x: y,
                                     y: splitData.y_pred[i]
                                 }));
@@ -794,7 +794,10 @@ export const ExperimentsPage: React.FC = () => {
                                                             <ReferenceLine y={0} stroke="#ccc" strokeDasharray="3 3" />
                                                             <Scatter 
                                                                 name="Residuals" 
-                                                                data={data.map((d: any) => ({ ...d, residual: d.x - d.y }))} 
+                                                                data={data.map((d: unknown) => {
+                                                                    const val = d as { x: number; y: number };
+                                                                    return { ...val, residual: val.x - val.y };
+                                                                })} 
                                                                 fill="#82ca9d" 
                                                                 fillOpacity={0.6} 
                                                             />

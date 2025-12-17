@@ -342,8 +342,8 @@ export const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: Tuni
         if (node.data?.dataset_id) return node.data.dataset_id as string;
         // Check config/params
         const anyData = node.data as unknown;
-        if ((anyData as Record<string, any>)?.config?.datasetId) return (anyData as Record<string, any>).config.datasetId;
-        if ((anyData as Record<string, any>)?.config?.dataset_id) return (anyData as Record<string, any>).config.dataset_id;
+        if (((anyData as Record<string, unknown>)?.config as Record<string, unknown>)?.datasetId) return ((anyData as Record<string, unknown>).config as Record<string, unknown>).datasetId as string;
+        if (((anyData as Record<string, unknown>)?.config as Record<string, unknown>)?.dataset_id) return ((anyData as Record<string, unknown>).config as Record<string, unknown>).dataset_id as string;
       }
       const incomers = getIncomers(node, nodes, edges);
       for (const incomer of incomers) queue.push(incomer.id);

@@ -221,14 +221,17 @@ const TextCleaningSettings: React.FC<{ config: TextCleaningConfig; onChange: (c:
   const [showInfo, setShowInfo] = useState(true);
 
   const upstreamData = useUpstreamData(nodeId || '');
-  const datasetId = upstreamData.find((d: Record<string, any>) => d.datasetId)?.datasetId as string | undefined;
+  const datasetId = upstreamData.find((d: Record<string, unknown>) => d.datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
   
   // Filter for text columns only
   const textColumns = schema 
     ? Object.values(schema.columns)
-        .filter((c: Record<string, any>) => c.dtype === 'object' || c.dtype === 'string' || c.dtype === 'category')
-        .map((c: Record<string, any>) => c.name)
+        .filter((c: unknown) => {
+            const dtype = (c as Record<string, unknown>).dtype;
+            return dtype === 'object' || dtype === 'string' || dtype === 'category';
+        })
+        .map((c: Record<string, unknown>) => c.name)
     : [];
 
   useEffect(() => {

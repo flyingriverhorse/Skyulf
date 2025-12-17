@@ -86,7 +86,11 @@ export const ModelRegistry: React.FC = () => {
     try {
       setLoading(true);
       const skip = pageNum * LIMIT;
-      const modelsRes = await fetch(`/api/registry/models?skip=${skip}&limit=${LIMIT}`);
+      const params = new URLSearchParams({
+        skip: skip.toString(),
+        limit: LIMIT.toString()
+      });
+      const modelsRes = await fetch(`/api/registry/models?${params.toString()}`);
       if (!modelsRes.ok) throw new Error('Failed to fetch models');
       const modelsData = await modelsRes.json();
       

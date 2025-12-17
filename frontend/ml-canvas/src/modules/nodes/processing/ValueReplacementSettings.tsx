@@ -77,7 +77,7 @@ const ColumnSelector: React.FC<{
 const TypedInput: React.FC<{
   value: unknown;
   type: string;
-  onChange: (val: unknown, type: any) => void;
+  onChange: (val: unknown, type: unknown) => void;
   placeholder?: string;
 }> = ({ value, type, onChange, placeholder }) => {
   

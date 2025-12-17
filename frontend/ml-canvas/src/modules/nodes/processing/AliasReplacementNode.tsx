@@ -157,14 +157,17 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
   const [showInfo, setShowInfo] = useState(true);
 
   const upstreamData = useUpstreamData(nodeId || '');
-  const datasetId = upstreamData.find((d: Record<string, any>) => d.datasetId)?.datasetId as string | undefined;
+  const datasetId = upstreamData.find((d: Record<string, unknown>) => d.datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
   
   // Filter for text columns only
   const textColumns = schema 
     ? Object.values(schema.columns)
-        .filter((c: Record<string, any>) => c.dtype === 'object' || c.dtype === 'string' || c.dtype === 'category')
-        .map((c: Record<string, any>) => c.name)
+        .filter((c: unknown) => {
+            const col = c as Record<string, unknown>;
+            return col.dtype === 'object' || col.dtype === 'string' || col.dtype === 'category';
+        })
+        .map((c: unknown) => (c as Record<string, unknown>).name as string)
     : [];
 
   useEffect(() => {

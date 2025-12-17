@@ -55,11 +55,11 @@ export const jobsApi = {
   },
 
   getJobs: async (limit: number = 10, skip: number = 0, type?: 'training' | 'tuning'): Promise<JobInfo[]> => {
-    const params: unknown = { limit, skip };
+    const params: Record<string, unknown> = { limit, skip };
     if (type) {
-      (params as any).job_type = type;
+      params.job_type = type;
     }
-    const response = await apiClient.get<JobInfo[]>('/pipeline/jobs', { params: params as any });
+    const response = await apiClient.get<JobInfo[]>('/pipeline/jobs', { params });
     return response.data;
   },
 

@@ -25,8 +25,8 @@ interface GraphState {
   onConnect: OnConnect;
   
   // Custom Actions
-  addNode: (type: string, position: { x: number, y: number }, initialData?: any) => string;
-  updateNodeData: (id: string, data: any) => void;
+  addNode: (type: string, position: { x: number, y: number }, initialData?: unknown) => string;
+  updateNodeData: (id: string, data: unknown) => void;
   validateGraph: () => Promise<boolean>;
   setGraph: (nodes: Node[], edges: Edge[]) => void;
 
@@ -61,7 +61,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     });
   },
 
-  addNode: (type: string, position: { x: number, y: number }, initialData: any = {}) => {
+  addNode: (type: string, position: { x: number, y: number }, initialData: unknown = {}) => {
     const definition = registry.get(type);
     if (!definition) {
       console.error(`Node type ${type} not found in registry`);
@@ -79,7 +79,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         catalogType: type, // For backend execution compatibility
         // Initialize with default values if any
         ...definition.getDefaultConfig(),
-        ...initialData
+        ...(initialData as object)
       },
     };
 
@@ -87,11 +87,11 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     return id;
   },
 
-  updateNodeData: (id: string, data: any) => {
+  updateNodeData: (id: string, data: unknown) => {
     set({
       nodes: get().nodes.map((node) => {
         if (node.id === id) {
-          return { ...node, data: { ...node.data, ...data } };
+          return { ...node, data: { ...node.data, ...(data as object) } };
         }
         return node;
       }),

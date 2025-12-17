@@ -18,7 +18,7 @@ export const DeploymentsPage: React.FC = () => {
       ]);
       setActiveDeployment(active);
       setHistory(hist);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to load deployments", err);
       setError("Failed to load deployment data.");
     } finally {

@@ -10,7 +10,7 @@ export interface DeploymentInfo {
 }
 
 export interface PredictionResponse {
-  predictions: any[];
+  predictions: unknown[];
   model_version: string;
 }
 
@@ -24,8 +24,9 @@ export const deploymentApi = {
     try {
       const response = await apiClient.get<DeploymentInfo>('/deployment/active');
       return response.data;
-    } catch (error: any) {
-      if (error.response && error.response.status === 404) {
+    } catch (error: unknown) {
+      const err = error as { response?: { status: number } };
+      if (err.response && err.response.status === 404) {
         return null;
       }
       throw error;
@@ -41,7 +42,7 @@ export const deploymentApi = {
     await apiClient.post('/deployment/deactivate');
   },
 
-  predict: async (data: any[]): Promise<PredictionResponse> => {
+  predict: async (data: unknown[]): Promise<PredictionResponse> => {
     const response = await apiClient.post<PredictionResponse>('/deployment/predict', { data });
     return response.data;
   }

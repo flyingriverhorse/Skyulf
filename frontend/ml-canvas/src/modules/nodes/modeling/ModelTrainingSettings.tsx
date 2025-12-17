@@ -358,7 +358,7 @@ export const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
 
             // If we switched models while customization was active, apply new defaults immediately
             if (keepCustomizationOpen.current) {
-                const defaults: Record<string, any> = {};
+                const defaults: Record<string, unknown> = {};
                 definitions.forEach(p => {
                     defaults[p.name] = p.default;
                 });

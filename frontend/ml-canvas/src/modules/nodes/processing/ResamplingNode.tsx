@@ -98,12 +98,13 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
   const [showRecommendations, setShowRecommendations] = useState(true);
 
   // Upstream Data for Target Column Suggestion
-  const upstreamData = useUpstreamData(nodeId || '') as Record<string, any>[];
-  const datasetId = upstreamData.find((d: Record<string, any>) => d.datasetId)?.datasetId as string | undefined;
+  const upstreamData = useUpstreamData(nodeId || '') as Record<string, unknown>[];
+  const datasetId = upstreamData.find((d: Record<string, unknown>) => d.datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
   
   // Try to find a target column from upstream nodes configuration
-  const upstreamTarget = upstreamData.find((d: Record<string, any>) => d.config?.target_column)?.config.target_column;
+  const upstreamTarget = upstreamData.find((d: Record<string, unknown>) => (d.config as Record<string, unknown>)?.target_column);
+  const targetColumn = upstreamTarget ? ((upstreamTarget.config as Record<string, unknown>).target_column as string) : undefined;
 
   // Auto-fill target column if empty and available in schema or upstream
   useEffect(() => {
