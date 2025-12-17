@@ -114,7 +114,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
             <select
               className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
               value={config.strategy}
-              onChange={(e) => onChange({ ...config, strategy: e.target.value as any })}
+              onChange={(e) => onChange({ ...config, strategy: e.target.value as BinningConfig['strategy'] })}
             >
               <option value="equal_width">Equal Width (Uniform)</option>
               <option value="equal_frequency">Equal Frequency (Quantile)</option>
@@ -172,7 +172,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
             <select
               className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
               value={config.label_format}
-              onChange={(e) => onChange({ ...config, label_format: e.target.value as any })}
+              onChange={(e) => onChange({ ...config, label_format: e.target.value as BinningConfig['label_format'] })}
             >
               <option value="ordinal">Ordinal (0, 1, 2...)</option>
               <option value="range">Range Intervals ([0-10], [10-20]...)</option>

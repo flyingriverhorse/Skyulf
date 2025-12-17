@@ -148,7 +148,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
             <select
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.method}
-              onChange={(e) => onChange({ ...config, method: e.target.value as any })}
+              onChange={(e) => onChange({ ...config, method: e.target.value as ScalingConfig['method'] })}
             >
               <option value="standard">Standard Scaler (Z-Score)</option>
               <option value="minmax">MinMax Scaler (0-1)</option>

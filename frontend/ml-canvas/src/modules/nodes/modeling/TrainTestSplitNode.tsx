@@ -56,7 +56,7 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
   const upstreamDatasetId = findUpstreamDatasetId(nodeId || '');
   
   // Check if an upstream node (like FeatureTargetSplitter) has already defined a target column
-  const upstreamTargetColumn = upstreamData.find((d: any) => d.target_column)?.target_column as string | undefined;
+  const upstreamTargetColumn = upstreamData.find((d: Record<string, any>) => d.target_column)?.target_column as string | undefined;
 
   React.useEffect(() => {
     const updates: Partial<TrainTestSplitConfig> = {};

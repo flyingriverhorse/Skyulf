@@ -27,7 +27,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
     setError(null);
 
     try {
-      const config: any = {};
+      const config: Record<string, string> = {};
       if (type === 'database') {
         config.connection_string = connectionString;
         config.query = query;

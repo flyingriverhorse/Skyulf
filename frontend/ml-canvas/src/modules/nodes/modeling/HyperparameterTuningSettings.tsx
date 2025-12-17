@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { NodeDefinition } from '../../../core/types/nodes';
 import { 
-    Sliders, Play, Loader2, Database, Activity, 
+    Play, Loader2, Database, Activity, 
     Settings2, BarChart3, X, RefreshCw, ChevronRight, ChevronDown,
     HelpCircle, AlertCircle, AlertTriangle, Check
 } from 'lucide-react';
 import { jobsApi, JobInfo } from '../../../core/api/jobs';
+import { RegistryItem, registryApi } from '../../../core/api/registry';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useElementSize } from '../../../core/hooks/useElementSize';
@@ -14,12 +14,10 @@ import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { getIncomers } from '@xyflow/react';
 
-// --- Types ---
-
-interface TuningConfig {
+export interface TuningConfig {
   target_column: string;
   model_type: string;
-  search_space: Record<string, any>;
+  search_space: Record<string, unknown>;
   n_trials: number;
   metric: string;
   search_strategy: string;
@@ -35,14 +33,12 @@ interface HyperparameterDef {
     name: string;
     label: string;
     type: 'number' | 'select' | 'boolean';
-    default: any;
+    default: unknown;
     description?: string;
-    options?: { label: string; value: any }[];
+    options?: { label: string; value: unknown }[];
     min?: number;
     max?: number;
 }
-
-// --- Components ---
 
 const Tooltip: React.FC<{ text: string }> = ({ text }) => (
     <div className="group relative flex items-center">
@@ -56,8 +52,8 @@ const Tooltip: React.FC<{ text: string }> = ({ text }) => (
 
 const SearchSpaceInput: React.FC<{
     def: HyperparameterDef;
-    value: any[];
-    onChange: (values: any[]) => void;
+    value: unknown[];
+    onChange: (values: unknown[]) => void;
 }> = ({ def, value, onChange }) => {
     const [localValue, setLocalValue] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -71,7 +67,7 @@ const SearchSpaceInput: React.FC<{
         if (!input.trim()) return [];
         
         const parts = input.split(',').map(s => s.trim()).filter(s => s !== '');
-        const parsed: any[] = [];
+        const parsed: unknown[] = [];
         
         for (const part of parts) {
             if (part.toLowerCase() === 'none') {
@@ -105,8 +101,8 @@ const SearchSpaceInput: React.FC<{
             if (JSON.stringify(parsed) !== JSON.stringify(value)) {
                 onChange(parsed);
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError((err as Error).message);
         }
     };
 
@@ -140,7 +136,7 @@ const SearchSpaceInput: React.FC<{
                     <div className="mt-1 flex flex-wrap gap-1">
                         {def.options.map(opt => (
                             <button
-                                key={opt.value}
+                                key={String(opt.value)}
                                 onClick={() => {
                                     // Toggle option
                                     const current = validateAndParse(localValue);
@@ -311,9 +307,7 @@ const BestParamsModal: React.FC<{
     );
 };
 
-// --- Main Node Component ---
-
-const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfig) => void; nodeId?: string }> = ({
+export const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
   nodeId,
@@ -347,9 +341,9 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
         if (node.data?.datasetId) return node.data.datasetId as string;
         if (node.data?.dataset_id) return node.data.dataset_id as string;
         // Check config/params
-        const anyData = node.data as any;
-        if (anyData?.config?.datasetId) return anyData.config.datasetId;
-        if (anyData?.config?.dataset_id) return anyData.config.dataset_id;
+        const anyData = node.data as unknown;
+        if ((anyData as Record<string, any>)?.config?.datasetId) return (anyData as Record<string, any>).config.datasetId;
+        if ((anyData as Record<string, any>)?.config?.dataset_id) return (anyData as Record<string, any>).config.dataset_id;
       }
       const incomers = getIncomers(node, nodes, edges);
       for (const incomer of incomers) queue.push(incomer.id);
@@ -360,6 +354,32 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
   const datasetId = findUpstreamDatasetId(nodeId || '');
   const { data: schema } = useDatasetSchema(datasetId);
   const availableColumns = schema ? Object.values(schema.columns) : [];
+  const [availableModels, setAvailableModels] = useState<RegistryItem[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+
+  // Fetch available models from registry
+  useEffect(() => {
+      const fetchModels = async () => {
+          setIsLoadingModels(true);
+          try {
+              const nodes = await registryApi.getAllNodes();
+              const models = nodes.filter(n => n.category === 'Model');
+              setAvailableModels(models);
+          } catch (error) {
+              console.error("Failed to fetch models:", error);
+              // Fallback
+              setAvailableModels([
+                  { id: 'random_forest_classifier', name: 'Random Forest Classifier', category: 'Model', description: '', params: {} },
+                  { id: 'logistic_regression', name: 'Logistic Regression', category: 'Model', description: '', params: {} },
+                  { id: 'ridge_regression', name: 'Ridge Regression', category: 'Model', description: '', params: {} },
+                  { id: 'random_forest_regressor', name: 'Random Forest Regressor', category: 'Model', description: '', params: {} },
+              ]);
+          } finally {
+              setIsLoadingModels(false);
+          }
+      };
+      fetchModels();
+  }, []);
 
   // Auto-select target
   useEffect(() => {
@@ -390,10 +410,10 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
           try {
               // 1. Fetch Definitions
               const defs = await jobsApi.getHyperparameters(modelType);
-              setSearchSpaceDefs(defs);
+              setSearchSpaceDefs(defs as HyperparameterDef[]);
 
-              // 2. Fetch Defaults ONLY if it's a new model selection or search space is empty
-              if (isNewModel || Object.keys(config.search_space || {}).length === 0) {
+              // 2. Fetch Defaults ONLY if it's a new model selection
+              if (isNewModel) {
                   const defaults = await jobsApi.getDefaultSearchSpace(modelType);
                   
                   // Update config with new defaults
@@ -450,16 +470,16 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
                             <select
                                 value={config.model_type}
                                 onChange={(e) => {
-                                    // Reset loaded ref to force reload of defaults
-                                    loadedModelTypeRef.current = null; 
+                                    // We don't reset loadedModelTypeRef here anymore, 
+                                    // the useEffect will handle the change detection.
                                     onChange({ ...config, model_type: e.target.value, search_space: {} });
                                 }}
                                 className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                                disabled={isLoadingModels}
                             >
-                                <option value="random_forest_classifier">Random Forest Classifier</option>
-                                <option value="logistic_regression">Logistic Regression</option>
-                                <option value="ridge_regression">Ridge Regression</option>
-                                <option value="random_forest_regressor">Random Forest Regressor</option>
+                                {availableModels.map(model => (
+                                    <option key={model.id} value={model.id}>{model.name}</option>
+                                ))}
                             </select>
                             <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
                         </div>
@@ -640,7 +660,7 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
                     <div key={`${config.model_type}-${def.name}`} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                         <SearchSpaceInput
                             def={def}
-                            value={config.search_space?.[def.name] || []}
+                            value={(config.search_space?.[def.name] || []) as unknown[]}
                             onChange={(newValues) => {
                                 onChange({
                                     ...config,
@@ -747,33 +767,4 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
       />
     </div>
   );
-};
-
-export const HyperparameterTuningNode: NodeDefinition = {
-  type: 'hyperparameter_tuning',
-  label: 'Train Model and Optimize',
-  category: 'Modeling',
-  description: 'Automatically optimize model performance.',
-  icon: Sliders,
-  inputs: [{ id: 'in', label: 'Training Data', type: 'dataset' }],
-  outputs: [{ id: 'model', label: 'Best Model', type: 'model' }],
-  settings: TuningSettings,
-  validate: (config) => {
-    if (!config.target_column) return { isValid: false, message: 'Target column is required.' };
-    return { isValid: true };
-  },
-  getDefaultConfig: () => ({
-    target_column: '',
-    model_type: 'random_forest_classifier',
-    n_trials: 10,
-    metric: 'accuracy',
-    search_strategy: 'random',
-    cv_enabled: true,
-    cv_folds: 5,
-    cv_type: 'k_fold',
-    cv_shuffle: true,
-    cv_random_state: 42,
-    random_state: 42,
-    search_space: {}
-  })
 };

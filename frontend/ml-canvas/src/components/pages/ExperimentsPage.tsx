@@ -8,6 +8,22 @@ import { Filter, Rocket, ChevronDown, ChevronRight, Activity, RefreshCw } from '
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
 
+interface EvaluationSplit {
+  y_true: (string | number)[];
+  y_pred: (string | number)[];
+  y_proba?: {
+    classes: (string | number)[];
+        labels?: (string | number)[];
+    values: number[][];
+  };
+  metrics?: Record<string, number>;
+}
+
+interface EvaluationData {
+  problem_type: 'classification' | 'regression';
+  splits: Record<string, EvaluationSplit>;
+}
+
 export const ExperimentsPage: React.FC = () => {
   const { jobs, fetchJobs, hasMore, loadMoreJobs, isLoading } = useJobStore();
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
@@ -28,7 +44,7 @@ export const ExperimentsPage: React.FC = () => {
 
   // View state
   const [activeView, setActiveView] = useState<'charts' | 'table' | 'evaluation'>('charts');
-  const [evaluationData, setEvaluationData] = useState<any>(null);
+  const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
   const [isEvalLoading, setIsEvalLoading] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
   const [evalJobId, setEvalJobId] = useState<string | null>(null);
@@ -40,8 +56,10 @@ export const ExperimentsPage: React.FC = () => {
   }, [fetchJobs]);
 
   useEffect(() => {
-    if (evaluationData?.splits?.train?.y_proba?.classes?.length > 0) {
-        setSelectedRocClass(evaluationData.splits.train.y_proba.classes[0]);
+    if (evaluationData?.splits?.train?.y_proba?.classes && evaluationData.splits.train.y_proba.classes.length > 0) {
+                const proba = evaluationData.splits.train.y_proba;
+                const first = proba.labels?.[0] ?? proba.classes[0];
+                setSelectedRocClass(String(first));
     }
   }, [evaluationData]);
 
@@ -74,39 +92,50 @@ export const ExperimentsPage: React.FC = () => {
       try {
           const res = await apiClient.get(`/pipeline/jobs/${jobId}/evaluation`);
           setEvaluationData(res.data);
-      } catch (err: any) {
+      } catch (err: unknown) {
           console.error("Failed to fetch evaluation data", err);
-          setEvalError(err.response?.data?.detail || "Failed to fetch evaluation data");
+          setEvalError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Failed to fetch evaluation data");
       } finally {
           setIsEvalLoading(false);
       }
   };
 
-  const calculateConfusionMatrix = (y_true: any[], y_pred: any[]) => {
-      const classes = Array.from(new Set([...y_true, ...y_pred])).sort();
+  const calculateConfusionMatrix = (
+      y_true: (string | number)[],
+      y_pred: (string | number)[],
+      classOrder?: (string | number)[],
+  ) => {
+      const classes = (classOrder && classOrder.length > 0)
+          ? [...classOrder]
+          : Array.from(new Set([...y_true, ...y_pred])).sort((a, b) => String(a).localeCompare(String(b)));
       const matrix = classes.map(trueClass => {
           return classes.map(predClass => {
-              return y_true.reduce((count, t, i) => {
+              return y_true.reduce((count: number, t, i) => {
                   const p = y_pred[i];
-                  return (t === trueClass && p === predClass) ? count + 1 : count;
+                  return (String(t) === String(trueClass) && String(p) === String(predClass)) ? count + 1 : count;
               }, 0);
           });
       });
       return { classes, matrix };
   };
 
-  const calculateROC = (y_true: any[], y_proba: { classes: any[], values: number[][] }, targetClass: any) => {
+    const calculateROC = (y_true: (string | number)[], y_proba: { classes: (string | number)[], labels?: (string | number)[], values: number[][] }, targetClass: string | number) => {
       if (!y_proba.values) return null;
+
+      const targetClassStr = String(targetClass);
       
-      // Find index of target class
-      const classIndex = y_proba.classes.indexOf(targetClass);
+      // Find index of target class (normalize types because <select> values are strings)
+            const labelList = y_proba.labels && y_proba.labels.length === y_proba.classes.length
+                ? y_proba.labels
+                : undefined;
+            const classIndex = (labelList ?? y_proba.classes).findIndex(c => String(c) === targetClassStr);
       if (classIndex === -1) return null;
       
       const scores = y_proba.values.map(v => v[classIndex]);
       
       const data = scores.map((score, i) => ({
           score,
-          actual: y_true[i] === targetClass ? 1 : 0
+          actual: String(y_true[i]) === targetClassStr ? 1 : 0
       }));
       
       // Sort by score descending
@@ -144,7 +173,7 @@ export const ExperimentsPage: React.FC = () => {
               void fetchEvaluationData(selectedJobIds[0]);
           } else if (evalJobId && !selectedJobIds.includes(evalJobId) && selectedJobIds.length > 0) {
               // If current eval job is deselected, switch to another
-              fetchEvaluationData(selectedJobIds[0]);
+              void fetchEvaluationData(selectedJobIds[0]);
           } else if (selectedJobIds.length === 0) {
               setEvaluationData(null);
               setEvalJobId(null);
@@ -182,7 +211,7 @@ export const ExperimentsPage: React.FC = () => {
   // Get all unique metric keys from selected jobs
   const metricKeys = Array.from(new Set(
     selectedJobs.flatMap(job => {
-        const m = job.metrics || job.result?.metrics || {};
+        const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
         // Only include keys that have numeric values to prevent Recharts crashes
         return Object.keys(m).filter(k => {
             const val = m[k];
@@ -255,7 +284,7 @@ export const ExperimentsPage: React.FC = () => {
            <select 
              className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
              value={filterType}
-             onChange={(e) => { setFilterType(e.target.value as any); }}
+             onChange={(e) => { setFilterType(e.target.value as 'all' | 'training' | 'tuning'); }}
            >
              <option value="all">All Experiments</option>
              <option value="tuning">Model Optimization</option>
@@ -304,9 +333,9 @@ export const ExperimentsPage: React.FC = () => {
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                   {job.model_type} • {job.dataset_name || 'Unknown Dataset'}
-                  {job.job_type === 'tuning' && (job.search_strategy || job.config?.tuning?.strategy) && (
+                  {job.job_type === 'tuning' && (job.search_strategy || (job.config as Record<string, any>)?.tuning?.strategy) && (
                       <span className="ml-1 text-gray-400">
-                          ({job.search_strategy || job.config?.tuning?.strategy})
+                          ({job.search_strategy || (job.config as Record<string, any>)?.tuning?.strategy})
                       </span>
                   )}
                 </div>
@@ -509,7 +538,7 @@ export const ExperimentsPage: React.FC = () => {
                         <tr key={metricKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                           <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{metricKey}</td>
                           {selectedJobs.map(job => {
-                             const m = job.metrics || job.result?.metrics || {};
+                             const m = (job.metrics || job.result?.metrics || {}) as Record<string, any>;
                              const val = m[metricKey];
                              return (
                                 <td key={job.job_id} className="px-4 py-1.5 font-mono text-gray-600 dark:text-gray-300">
@@ -586,51 +615,68 @@ export const ExperimentsPage: React.FC = () => {
                     ) : (
                         <div className="space-y-6">
                             {/* Controls for Evaluation View */}
-                            <div className="flex justify-between items-center bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                                <div className="flex gap-4 text-sm">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={showTrainMetrics} 
-                                            onChange={e => setShowTrainMetrics(e.target.checked)}
-                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                        />
-                                        <span className="text-gray-700 dark:text-gray-300">Train</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={showTestMetrics} 
-                                            onChange={e => setShowTestMetrics(e.target.checked)}
-                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                        />
-                                        <span className="text-gray-700 dark:text-gray-300">Test</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={showValMetrics} 
-                                            onChange={e => setShowValMetrics(e.target.checked)}
-                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                        />
-                                        <span className="text-gray-700 dark:text-gray-300">Validation</span>
-                                    </label>
-                                </div>
-                                
-                                {evaluationData.problem_type === 'classification' && evaluationData.splits?.train?.y_proba && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm text-gray-500 dark:text-gray-400">Target Class (ROC):</span>
-                                        <select 
-                                            className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5"
-                                            value={selectedRocClass || ''}
-                                            onChange={(e) => { setSelectedRocClass(e.target.value); }}
-                                        >
-                                            {evaluationData.splits.train.y_proba.classes.map((c: any) => (
-                                                <option key={c} value={c}>{c}</option>
-                                            ))}
-                                        </select>
+                            <div className="flex flex-col gap-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                                <div className="flex justify-between items-center">
+                                    <div className="flex gap-4 text-sm">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={showTrainMetrics}
+                                                onChange={e => setShowTrainMetrics(e.target.checked)}
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <span className="text-gray-700 dark:text-gray-300">Train</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={showTestMetrics}
+                                                onChange={e => setShowTestMetrics(e.target.checked)}
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <span className="text-gray-700 dark:text-gray-300">Test</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={showValMetrics}
+                                                onChange={e => setShowValMetrics(e.target.checked)}
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <span className="text-gray-700 dark:text-gray-300">Validation</span>
+                                        </label>
                                     </div>
-                                )}
+
+                                    {evaluationData.problem_type === 'classification' && evaluationData.splits?.train?.y_proba && (() => {
+                                        const proba = evaluationData.splits.train.y_proba!;
+                                        return (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm text-gray-500 dark:text-gray-400">Target Class (ROC):</span>
+                                                <select
+                                                    className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5"
+                                                    value={selectedRocClass || ''}
+                                                    onChange={(e) => { setSelectedRocClass(e.target.value); }}
+                                                >
+                                                    {proba.classes.map((c: string | number, idx: number) => {
+                                                        const label = proba.labels?.[idx] ?? c;
+                                                        return (
+                                                            <option key={String(c)} value={String(label)}>{String(label)}</option>
+                                                        );
+                                                    })}
+                                                </select>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+
+                                {evaluationData.problem_type === 'classification' && evaluationData.splits?.train?.y_proba?.labels && (() => {
+                                    const proba = evaluationData.splits.train.y_proba!;
+                                    return (
+                                        <div className="w-full text-xs text-gray-500 dark:text-gray-400">
+                                            Mapping: {proba.classes.map((c, idx) => `${String(c)}→${String(proba.labels?.[idx] ?? c)}`).join(', ')}
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             <div className="flex flex-col gap-6">
@@ -642,7 +688,7 @@ export const ExperimentsPage: React.FC = () => {
                                     if (splitName === 'validation' && !showValMetrics) return false;
                                     return true;
                                 })
-                                .map(([splitName, splitData]: [string, any]) => {
+                                .map(([splitName, splitData]: [string, EvaluationSplit]) => {
                                 const data = splitData.y_true.map((y: any, i: number) => ({
                                     x: y,
                                     y: splitData.y_pred[i]
@@ -761,15 +807,29 @@ export const ExperimentsPage: React.FC = () => {
                                                 {/* Confusion Matrix */}
                                                 <div className="h-[300px] flex flex-col items-center justify-center">
                                                     {(() => {
-                                                        const { classes, matrix } = calculateConfusionMatrix(splitData.y_true, splitData.y_pred);
+                                                        const proba = splitData.y_proba;
+                                                        const classOrder = proba?.classes;
+
+                                                        let yTrueForCm: (string | number)[] = splitData.y_true;
+                                                        let yPredForCm: (string | number)[] = splitData.y_pred;
+                                                        if (proba?.labels && proba.labels.length === proba.classes.length) {
+                                                            const labelToClass = new Map<string, string | number>();
+                                                            proba.labels.forEach((label, idx) => {
+                                                                labelToClass.set(String(label), proba.classes[idx]);
+                                                            });
+                                                            yTrueForCm = splitData.y_true.map(y => labelToClass.get(String(y)) ?? y);
+                                                            yPredForCm = splitData.y_pred.map(y => labelToClass.get(String(y)) ?? y);
+                                                        }
+
+                                                        const { classes, matrix } = calculateConfusionMatrix(yTrueForCm, yPredForCm, classOrder);
                                                         return (
                                                             <div className="flex flex-col items-center">
                                                                 <div className="flex">
                                                                     <div className="w-8"></div> {/* Y-axis label spacer */}
                                                                     <div className="flex ml-2"> {/* Added margin-left to align with matrix */}
                                                                         {classes.map(c => (
-                                                                            <div key={c} className="w-16 text-center text-xs font-medium text-gray-500 dark:text-gray-400 pb-2">
-                                                                                Pred {c}
+                                                                            <div key={String(c)} className="w-16 text-center text-xs font-medium text-gray-500 dark:text-gray-400 pb-2">
+                                                                                Pred {String(c)}
                                                                             </div>
                                                                         ))}
                                                                     </div>
@@ -777,8 +837,8 @@ export const ExperimentsPage: React.FC = () => {
                                                                 <div className="flex">
                                                                     <div className="flex flex-col justify-center mr-2">
                                                                         {classes.map(c => (
-                                                                            <div key={c} className="h-16 flex items-center justify-end text-xs font-medium text-gray-500 dark:text-gray-400 pr-2">
-                                                                                True {c}
+                                                                            <div key={String(c)} className="h-16 flex items-center justify-end text-xs font-medium text-gray-500 dark:text-gray-400 pr-2">
+                                                                                True {String(c)}
                                                                             </div>
                                                                         ))}
                                                                     </div>
@@ -820,7 +880,8 @@ export const ExperimentsPage: React.FC = () => {
                                                     <div className="h-[300px] w-full">
                                                         <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">ROC Curve</h5>
                                                         {(() => {
-                                                            const rocData = calculateROC(splitData.y_true, splitData.y_proba, selectedRocClass);
+                                                            if (!selectedRocClass) return <div className="text-center text-xs text-gray-400">Select a class</div>;
+                                                            const rocData = calculateROC(splitData.y_true, splitData.y_proba!, selectedRocClass);
                                                             if (!rocData) return <div className="text-center text-xs text-gray-400">ROC not available (multiclass or missing proba)</div>;
                                                             
                                                             return (

@@ -157,14 +157,14 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
   const [showInfo, setShowInfo] = useState(true);
 
   const upstreamData = useUpstreamData(nodeId || '');
-  const datasetId = upstreamData.find((d: any) => d.datasetId)?.datasetId as string | undefined;
+  const datasetId = upstreamData.find((d: Record<string, any>) => d.datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
   
   // Filter for text columns only
   const textColumns = schema 
     ? Object.values(schema.columns)
-        .filter((c: any) => c.dtype === 'object' || c.dtype === 'string' || c.dtype === 'category')
-        .map((c: any) => c.name)
+        .filter((c: Record<string, any>) => c.dtype === 'object' || c.dtype === 'string' || c.dtype === 'category')
+        .map((c: Record<string, any>) => c.name)
     : [];
 
   useEffect(() => {
@@ -229,7 +229,7 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
             <select
               className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2"
               value={config.mode}
-              onChange={(e) => onChange({ ...config, mode: e.target.value as any })}
+              onChange={(e) => onChange({ ...config, mode: e.target.value as AliasReplacementConfig['mode'] })}
             >
               <option value="custom">Custom Mapping</option>
               <option value="canonicalize_country_codes">Canonicalize Country Codes</option>
