@@ -93,7 +93,7 @@ export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, 
                   </div>
                   {(job.status === 'processing' || job.status === 'pending') && (
                     <button
-                      onClick={() => handleCancel(job.id)}
+                      onClick={() => { void handleCancel(job.id); }}
                       disabled={cancellingId === job.id}
                       className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-colors disabled:opacity-50"
                       title="Cancel Ingestion"

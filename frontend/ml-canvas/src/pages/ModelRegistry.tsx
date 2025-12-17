@@ -453,7 +453,7 @@ export const ModelRegistry: React.FC = () => {
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                         {version.status === 'completed' && !version.is_deployed && (
                           <button 
-                            onClick={() => handleDeploy(version.job_id)}
+                            onClick={() => { void handleDeploy(version.job_id); }}
                             disabled={deployingId === version.job_id}
                             className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 disabled:opacity-50 flex items-center gap-1 ml-auto"
                           >

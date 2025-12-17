@@ -149,7 +149,7 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
         void fetchDetails(); // Initial fetch
 
         if (job.status === 'running' || job.status === 'queued') {
-            interval = setInterval(fetchDetails, 2000);
+            interval = setInterval(() => { void fetchDetails(); }, 2000);
         }
 
         return () => {
@@ -196,7 +196,7 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                 <div className="flex items-center gap-2">
                     {(job.status === 'running' || job.status === 'queued') && (
                         <button 
-                            onClick={handleCancel}
+                            onClick={() => { void handleCancel(); }}
                             disabled={isCancelling}
                             className="flex items-center gap-1 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded text-xs font-medium transition-colors border border-red-200 dark:border-red-800"
                         >
