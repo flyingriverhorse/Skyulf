@@ -39,7 +39,7 @@ const LastRunResults: React.FC<{ nodeId: string }> = ({ nodeId }) => {
   if (!nodeResult) return null;
 
   // Helper to format metrics
-  const renderMetrics = (metrics: any) => {
+  const renderMetrics = (metrics: Record<string, unknown>) => {
     if (!metrics) return null;
     return (
       <div className="space-y-1">
@@ -49,7 +49,7 @@ const LastRunResults: React.FC<{ nodeId: string }> = ({ nodeId }) => {
                <div key={key} className="mt-1">
                  <span className="font-medium text-gray-700 dark:text-gray-300">{key.replace(/_/g, ' ')}:</span>
                  <div className="pl-2 border-l-2 border-gray-200 dark:border-gray-700 ml-1">
-                    {renderMetrics(value)}
+                    {renderMetrics(value as Record<string, unknown>)}
                  </div>
                </div>
              );
@@ -98,12 +98,12 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
   const [showRecommendations, setShowRecommendations] = useState(true);
 
   // Upstream Data for Target Column Suggestion
-  const upstreamData = useUpstreamData(nodeId || '') as any[];
-  const datasetId = upstreamData.find((d: any) => d.datasetId)?.datasetId as string | undefined;
+  const upstreamData = useUpstreamData(nodeId || '') as Record<string, any>[];
+  const datasetId = upstreamData.find((d: Record<string, any>) => d.datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
   
   // Try to find a target column from upstream nodes configuration
-  const upstreamTarget = upstreamData.find((d: any) => d.config?.target_column)?.config.target_column;
+  const upstreamTarget = upstreamData.find((d: Record<string, any>) => d.config?.target_column)?.config.target_column;
 
   // Auto-fill target column if empty and available in schema or upstream
   useEffect(() => {
@@ -147,7 +147,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
     }
   };
 
-  const handleChange = (key: keyof ResamplingConfig, value: any) => {
+  const handleChange = (key: keyof ResamplingConfig, value: unknown) => {
     const newConfig = { ...config, [key]: value };
     
     // Reset method defaults when type changes
@@ -175,7 +175,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                 <select 
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.type}
-                    onChange={(e) => { handleChange('type', e.target.value); }}
+                    onChange={(e) => { handleChange('type', e.target.value as ResamplingConfig['type']); }}
                 >
                     <option value="oversampling">Oversampling (Minority)</option>
                     <option value="undersampling">Undersampling (Majority)</option>
@@ -436,7 +436,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
 
 // --- Node Definition ---
 
-const validate = (data: any): ValidationResult => {
+const validate = (data: ResamplingConfig): ValidationResult => {
   if (!data.target_column) {
     return { isValid: false, message: 'Target column is required for resampling.' };
   }

@@ -13,15 +13,15 @@ export interface JobInfo {
   start_time: string | null;
   end_time: string | null;
   error: string | null;
-  result: Record<string, any> | null;
+  result: Record<string, unknown> | null;
   logs?: string[];
   
   // Extended fields
   model_type?: string;
-  hyperparameters?: Record<string, any>;
+  hyperparameters?: Record<string, unknown>;
   created_at: string;
   metrics?: Record<string, number>;
-  config?: any;
+  config?: unknown;
   search_strategy?: string;
   target_column?: string;
   dropped_columns?: string[];
@@ -30,7 +30,7 @@ export interface JobInfo {
 
 export interface RunPipelineRequest extends PipelineConfigModel {
   target_node_id?: string;
-  job_type?: 'training' | 'tuning';
+  job_type?: 'training' | 'tuning' | 'preview';
 }
 
 export interface RunPipelineResponse {
@@ -55,21 +55,21 @@ export const jobsApi = {
   },
 
   getJobs: async (limit: number = 10, skip: number = 0, type?: 'training' | 'tuning'): Promise<JobInfo[]> => {
-    const params: any = { limit, skip };
+    const params: unknown = { limit, skip };
     if (type) {
-      params.job_type = type;
+      (params as any).job_type = type;
     }
-    const response = await apiClient.get<JobInfo[]>('/pipeline/jobs', { params });
+    const response = await apiClient.get<JobInfo[]>('/pipeline/jobs', { params: params as any });
     return response.data;
   },
 
-  getHyperparameters: async (modelType: string): Promise<any[]> => {
-    const response = await apiClient.get<any[]>(`/pipeline/hyperparameters/${modelType}`);
+  getHyperparameters: async (modelType: string): Promise<unknown[]> => {
+    const response = await apiClient.get<unknown[]>(`/pipeline/hyperparameters/${modelType}`);
     return response.data;
   },
 
-  getDefaultSearchSpace: async (modelType: string): Promise<Record<string, any>> => {
-    const response = await apiClient.get<Record<string, any>>(`/pipeline/hyperparameters/${modelType}/defaults`);
+  getDefaultSearchSpace: async (modelType: string): Promise<Record<string, unknown>> => {
+    const response = await apiClient.get<Record<string, unknown>>(`/pipeline/hyperparameters/${modelType}/defaults`);
     return response.data;
   },
 

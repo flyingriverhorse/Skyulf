@@ -325,7 +325,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
             <select
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.method}
-              onChange={(e) => onChange({ ...config, method: e.target.value as any })}
+              onChange={(e) => onChange({ ...config, method: e.target.value as OutlierConfig['method'] })}
             >
               <option value="iqr">IQR (Interquartile Range)</option>
               <option value="zscore">Z-Score (Standard Deviation)</option>

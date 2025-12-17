@@ -35,7 +35,7 @@ interface DatasetProfile {
 }
 
 export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ dataset, isOpen, onClose }) => {
-  const [sampleData, setSampleData] = useState<any[]>([]);
+  const [sampleData, setSampleData] = useState<unknown[]>([]);
   const [profile, setProfile] = useState<DatasetProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +81,7 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
 
   if (!isOpen || !dataset) return null;
 
-  const columns = sampleData.length > 0 ? Object.keys(sampleData[0]) : [];
+  const columns = sampleData.length > 0 ? Object.keys(sampleData[0] as object) : [];
   const rowCount = profile?.metrics.row_count ?? dataset.rows ?? 0;
   const colCount = profile?.metrics.column_count ?? dataset.columns ?? 0;
   const sizeBytes = dataset.size_bytes ?? 0;
@@ -192,7 +192,7 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
                           <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                             {columns.map((col) => (
                               <td key={`${i}-${col}`} className="px-4 py-2 whitespace-nowrap text-slate-700 dark:text-slate-300">
-                                {String(row[col] ?? '')}
+                                {String((row as Record<string, unknown>)[col] ?? '')}
                               </td>
                             ))}
                           </tr>

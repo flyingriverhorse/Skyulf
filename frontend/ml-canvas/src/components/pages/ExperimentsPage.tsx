@@ -8,6 +8,21 @@ import { Filter, Rocket, ChevronDown, ChevronRight, Activity, RefreshCw } from '
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
 
+interface EvaluationSplit {
+  y_true: (string | number)[];
+  y_pred: (string | number)[];
+  y_proba?: {
+    classes: (string | number)[];
+    values: number[][];
+  };
+  metrics?: Record<string, number>;
+}
+
+interface EvaluationData {
+  problem_type: 'classification' | 'regression';
+  splits: Record<string, EvaluationSplit>;
+}
+
 export const ExperimentsPage: React.FC = () => {
   const { jobs, fetchJobs, hasMore, loadMoreJobs, isLoading } = useJobStore();
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
@@ -28,7 +43,7 @@ export const ExperimentsPage: React.FC = () => {
 
   // View state
   const [activeView, setActiveView] = useState<'charts' | 'table' | 'evaluation'>('charts');
-  const [evaluationData, setEvaluationData] = useState<any>(null);
+  const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
   const [isEvalLoading, setIsEvalLoading] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
   const [evalJobId, setEvalJobId] = useState<string | null>(null);
@@ -40,8 +55,8 @@ export const ExperimentsPage: React.FC = () => {
   }, [fetchJobs]);
 
   useEffect(() => {
-    if (evaluationData?.splits?.train?.y_proba?.classes?.length > 0) {
-        setSelectedRocClass(evaluationData.splits.train.y_proba.classes[0]);
+    if (evaluationData?.splits?.train?.y_proba?.classes && evaluationData.splits.train.y_proba.classes.length > 0) {
+        setSelectedRocClass(String(evaluationData.splits.train.y_proba.classes[0]));
     }
   }, [evaluationData]);
 
@@ -74,19 +89,19 @@ export const ExperimentsPage: React.FC = () => {
       try {
           const res = await apiClient.get(`/pipeline/jobs/${jobId}/evaluation`);
           setEvaluationData(res.data);
-      } catch (err: any) {
+      } catch (err: unknown) {
           console.error("Failed to fetch evaluation data", err);
-          setEvalError(err.response?.data?.detail || "Failed to fetch evaluation data");
+          setEvalError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Failed to fetch evaluation data");
       } finally {
           setIsEvalLoading(false);
       }
   };
 
-  const calculateConfusionMatrix = (y_true: any[], y_pred: any[]) => {
+  const calculateConfusionMatrix = (y_true: (string | number)[], y_pred: (string | number)[]) => {
       const classes = Array.from(new Set([...y_true, ...y_pred])).sort();
       const matrix = classes.map(trueClass => {
           return classes.map(predClass => {
-              return y_true.reduce((count, t, i) => {
+              return y_true.reduce((count: number, t, i) => {
                   const p = y_pred[i];
                   return (t === trueClass && p === predClass) ? count + 1 : count;
               }, 0);
@@ -95,7 +110,7 @@ export const ExperimentsPage: React.FC = () => {
       return { classes, matrix };
   };
 
-  const calculateROC = (y_true: any[], y_proba: { classes: any[], values: number[][] }, targetClass: any) => {
+  const calculateROC = (y_true: (string | number)[], y_proba: { classes: (string | number)[], values: number[][] }, targetClass: string | number) => {
       if (!y_proba.values) return null;
       
       // Find index of target class
@@ -144,7 +159,7 @@ export const ExperimentsPage: React.FC = () => {
               void fetchEvaluationData(selectedJobIds[0]);
           } else if (evalJobId && !selectedJobIds.includes(evalJobId) && selectedJobIds.length > 0) {
               // If current eval job is deselected, switch to another
-              fetchEvaluationData(selectedJobIds[0]);
+              void fetchEvaluationData(selectedJobIds[0]);
           } else if (selectedJobIds.length === 0) {
               setEvaluationData(null);
               setEvalJobId(null);
@@ -182,7 +197,7 @@ export const ExperimentsPage: React.FC = () => {
   // Get all unique metric keys from selected jobs
   const metricKeys = Array.from(new Set(
     selectedJobs.flatMap(job => {
-        const m = job.metrics || job.result?.metrics || {};
+        const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
         // Only include keys that have numeric values to prevent Recharts crashes
         return Object.keys(m).filter(k => {
             const val = m[k];
@@ -255,7 +270,7 @@ export const ExperimentsPage: React.FC = () => {
            <select 
              className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
              value={filterType}
-             onChange={(e) => { setFilterType(e.target.value as any); }}
+             onChange={(e) => { setFilterType(e.target.value as 'all' | 'training' | 'tuning'); }}
            >
              <option value="all">All Experiments</option>
              <option value="tuning">Model Optimization</option>
@@ -304,9 +319,9 @@ export const ExperimentsPage: React.FC = () => {
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                   {job.model_type} • {job.dataset_name || 'Unknown Dataset'}
-                  {job.job_type === 'tuning' && (job.search_strategy || job.config?.tuning?.strategy) && (
+                  {job.job_type === 'tuning' && (job.search_strategy || (job.config as Record<string, any>)?.tuning?.strategy) && (
                       <span className="ml-1 text-gray-400">
-                          ({job.search_strategy || job.config?.tuning?.strategy})
+                          ({job.search_strategy || (job.config as Record<string, any>)?.tuning?.strategy})
                       </span>
                   )}
                 </div>
@@ -509,7 +524,7 @@ export const ExperimentsPage: React.FC = () => {
                         <tr key={metricKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                           <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{metricKey}</td>
                           {selectedJobs.map(job => {
-                             const m = job.metrics || job.result?.metrics || {};
+                             const m = (job.metrics || job.result?.metrics || {}) as Record<string, any>;
                              const val = m[metricKey];
                              return (
                                 <td key={job.job_id} className="px-4 py-1.5 font-mono text-gray-600 dark:text-gray-300">
@@ -625,7 +640,7 @@ export const ExperimentsPage: React.FC = () => {
                                             value={selectedRocClass || ''}
                                             onChange={(e) => { setSelectedRocClass(e.target.value); }}
                                         >
-                                            {evaluationData.splits.train.y_proba.classes.map((c: any) => (
+                                            {evaluationData.splits.train.y_proba.classes.map((c: string | number) => (
                                                 <option key={c} value={c}>{c}</option>
                                             ))}
                                         </select>
@@ -642,7 +657,7 @@ export const ExperimentsPage: React.FC = () => {
                                     if (splitName === 'validation' && !showValMetrics) return false;
                                     return true;
                                 })
-                                .map(([splitName, splitData]: [string, any]) => {
+                                .map(([splitName, splitData]: [string, EvaluationSplit]) => {
                                 const data = splitData.y_true.map((y: any, i: number) => ({
                                     x: y,
                                     y: splitData.y_pred[i]
@@ -820,7 +835,8 @@ export const ExperimentsPage: React.FC = () => {
                                                     <div className="h-[300px] w-full">
                                                         <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">ROC Curve</h5>
                                                         {(() => {
-                                                            const rocData = calculateROC(splitData.y_true, splitData.y_proba, selectedRocClass);
+                                                            if (!selectedRocClass) return <div className="text-center text-xs text-gray-400">Select a class</div>;
+                                                            const rocData = calculateROC(splitData.y_true, splitData.y_proba!, selectedRocClass);
                                                             if (!rocData) return <div className="text-center text-xs text-gray-400">ROC not available (multiclass or missing proba)</div>;
                                                             
                                                             return (

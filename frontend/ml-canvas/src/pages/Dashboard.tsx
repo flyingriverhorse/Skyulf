@@ -38,7 +38,7 @@ export const Dashboard: React.FC = () => {
             status: job.status,
             model_type: job.model_type || 'Unknown',
             created_at: job.start_time || job.created_at || new Date().toISOString(),
-            metrics: job.metrics || job.result?.metrics
+            metrics: job.metrics || (job.result as Record<string, any>)?.metrics
           }))
         );
       } catch (error) {

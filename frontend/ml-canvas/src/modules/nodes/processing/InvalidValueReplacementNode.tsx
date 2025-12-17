@@ -84,14 +84,14 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
   const [showInfo, setShowInfo] = useState(true);
 
   const upstreamData = useUpstreamData(nodeId || '');
-  const datasetId = upstreamData.find((d: any) => d.datasetId)?.datasetId as string | undefined;
+  const datasetId = upstreamData.find((d: unknown) => (d as Record<string, any>).datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
   
   // Filter for numeric columns only
   const numericColumns = schema 
     ? Object.values(schema.columns)
-        .filter((c: any) => ['int', 'float', 'number'].some(t => c.dtype?.toLowerCase().includes(t)))
-        .map((c: any) => c.name)
+        .filter((c: unknown) => ['int', 'float', 'number'].some(t => (c as Record<string, any>).dtype?.toLowerCase().includes(t)))
+        .map((c: unknown) => (c as Record<string, any>).name)
     : [];
 
   useEffect(() => {
@@ -156,7 +156,7 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
             <select
               className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2"
               value={config.mode}
-              onChange={(e) => onChange({ ...config, mode: e.target.value as any })}
+              onChange={(e) => onChange({ ...config, mode: e.target.value as InvalidValueReplacementConfig['mode'] })}
             >
               <option value="negative_to_nan">Negative to NaN</option>
               <option value="zero_to_nan">Zero to NaN</option>

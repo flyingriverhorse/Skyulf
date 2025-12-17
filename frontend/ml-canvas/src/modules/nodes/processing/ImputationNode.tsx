@@ -168,7 +168,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
             <select
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.method || 'simple'}
-              onChange={(e) => onChange({ ...config, method: e.target.value as any })}
+              onChange={(e) => onChange({ ...config, method: e.target.value as ImputationConfig['method'] })}
             >
               <option value="simple">Simple Imputer (Univariate)</option>
               <option value="knn">KNN Imputer (Multivariate)</option>
@@ -184,7 +184,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
                 <select
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.strategy}
-                  onChange={(e) => onChange({ ...config, strategy: e.target.value as any })}
+                  onChange={(e) => onChange({ ...config, strategy: e.target.value as ImputationConfig['strategy'] })}
                 >
                   <option value="mean">Mean (Average)</option>
                   <option value="median">Median (Middle Value)</option>
@@ -232,7 +232,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
                 <select
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.weights || 'uniform'}
-                  onChange={(e) => onChange({ ...config, weights: e.target.value as any })}
+                  onChange={(e) => onChange({ ...config, weights: e.target.value as ImputationConfig['weights'] })}
                 >
                   <option value="uniform">Uniform</option>
                   <option value="distance">Distance</option>
@@ -263,7 +263,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
                 <select
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.estimator || 'bayesian_ridge'}
-                  onChange={(e) => onChange({ ...config, estimator: e.target.value as any })}
+                  onChange={(e) => onChange({ ...config, estimator: e.target.value as ImputationConfig['estimator'] })}
                 >
                   <option value="bayesian_ridge">Bayesian Ridge</option>
                   <option value="decision_tree">Decision Tree</option>

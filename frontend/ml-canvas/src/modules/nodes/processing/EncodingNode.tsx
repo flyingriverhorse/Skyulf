@@ -96,7 +96,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
           <select
             className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
             value={config.method}
-            onChange={(e) => onChange({ ...config, method: e.target.value as any })}
+            onChange={(e) => onChange({ ...config, method: e.target.value as EncodingConfig['method'] })}
           >
             <option value="onehot">One-Hot Encoding</option>
             <option value="dummy">Dummy Encoding</option>
@@ -149,7 +149,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
                 <select
                   className="w-full p-1 text-sm border rounded"
                   value={config.handle_unknown || 'ignore'}
-                  onChange={(e) => onChange({ ...config, handle_unknown: e.target.value as any })}
+                  onChange={(e) => onChange({ ...config, handle_unknown: e.target.value as EncodingConfig['handle_unknown'] })}
                   title="How to handle categories seen in test data but not in training data."
                 >
                   <option value="ignore">Ignore (Zeros)</option>

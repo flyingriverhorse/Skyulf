@@ -19,7 +19,7 @@ import { getIncomers } from '@xyflow/react';
 interface TuningConfig {
   target_column: string;
   model_type: string;
-  search_space: Record<string, any>;
+  search_space: Record<string, unknown>;
   n_trials: number;
   metric: string;
   search_strategy: string;
@@ -35,9 +35,9 @@ interface HyperparameterDef {
     name: string;
     label: string;
     type: 'number' | 'select' | 'boolean';
-    default: any;
+    default: unknown;
     description?: string;
-    options?: { label: string; value: any }[];
+    options?: { label: string; value: unknown }[];
     min?: number;
     max?: number;
 }
@@ -56,8 +56,8 @@ const Tooltip: React.FC<{ text: string }> = ({ text }) => (
 
 const SearchSpaceInput: React.FC<{
     def: HyperparameterDef;
-    value: any[];
-    onChange: (values: any[]) => void;
+    value: unknown[];
+    onChange: (values: unknown[]) => void;
 }> = ({ def, value, onChange }) => {
     const [localValue, setLocalValue] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -71,7 +71,7 @@ const SearchSpaceInput: React.FC<{
         if (!input.trim()) return [];
         
         const parts = input.split(',').map(s => s.trim()).filter(s => s !== '');
-        const parsed: any[] = [];
+        const parsed: unknown[] = [];
         
         for (const part of parts) {
             if (part.toLowerCase() === 'none') {
@@ -105,8 +105,8 @@ const SearchSpaceInput: React.FC<{
             if (JSON.stringify(parsed) !== JSON.stringify(value)) {
                 onChange(parsed);
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError((err as Error).message);
         }
     };
 
@@ -140,7 +140,7 @@ const SearchSpaceInput: React.FC<{
                     <div className="mt-1 flex flex-wrap gap-1">
                         {def.options.map(opt => (
                             <button
-                                key={opt.value}
+                                key={String(opt.value)}
                                 onClick={() => {
                                     // Toggle option
                                     const current = validateAndParse(localValue);
@@ -347,9 +347,9 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
         if (node.data?.datasetId) return node.data.datasetId as string;
         if (node.data?.dataset_id) return node.data.dataset_id as string;
         // Check config/params
-        const anyData = node.data as any;
-        if (anyData?.config?.datasetId) return anyData.config.datasetId;
-        if (anyData?.config?.dataset_id) return anyData.config.dataset_id;
+        const anyData = node.data as unknown;
+        if ((anyData as Record<string, any>)?.config?.datasetId) return (anyData as Record<string, any>).config.datasetId;
+        if ((anyData as Record<string, any>)?.config?.dataset_id) return (anyData as Record<string, any>).config.dataset_id;
       }
       const incomers = getIncomers(node, nodes, edges);
       for (const incomer of incomers) queue.push(incomer.id);
@@ -390,7 +390,7 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
           try {
               // 1. Fetch Definitions
               const defs = await jobsApi.getHyperparameters(modelType);
-              setSearchSpaceDefs(defs);
+              setSearchSpaceDefs(defs as HyperparameterDef[]);
 
               // 2. Fetch Defaults ONLY if it's a new model selection or search space is empty
               if (isNewModel || Object.keys(config.search_space || {}).length === 0) {
@@ -640,7 +640,7 @@ const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfi
                     <div key={`${config.model_type}-${def.name}`} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                         <SearchSpaceInput
                             def={def}
-                            value={config.search_space?.[def.name] || []}
+                            value={(config.search_space?.[def.name] || []) as unknown[]}
                             onChange={(newValues) => {
                                 onChange({
                                     ...config,

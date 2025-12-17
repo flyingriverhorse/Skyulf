@@ -39,34 +39,9 @@ plugins:
 
 nav:
   - Home: index.md
-  - User Guide:
+  - Guides:
     - Getting Started: guides/getting_started.md
-    - Common Recipes: guides/recipes.md
-    - Python API Usage: python_api.md
+    - Recipes: guides/recipes.md
     - Architecture: architecture.md
-    - Experiments: guides/experiments.md
-    - Model Registry: guides/model_registry.md
-    - Inference: guides/inference.md
-  - Modeling:
-    - Overview: modeling/index.md
-    - Classification: modeling/classification.md
-    - Regression: modeling/regression.md
-    - Training: modeling/training.md
-    - Tuning: modeling/tuning.md
-  - Preprocessing:
-    - Cleaning: preprocessing/cleaning.md
-    - Drop & Missing: preprocessing/drop_and_missing.md
-    - Imputation: preprocessing/imputation.md
-    - Outliers: preprocessing/outliers.md
-    - Encoding: preprocessing/encoding.md
-    - Scaling: preprocessing/scaling.md
-    - Transformations: preprocessing/transformations.md
-    - Bucketing: preprocessing/bucketing.md
-    - Feature Selection: preprocessing/feature_selection.md
-    - Feature Generation: preprocessing/feature_generation.md
-    - Splitting: preprocessing/split.md
-    - Resampling: preprocessing/resampling.md
-    - Inspection: preprocessing/inspection.md
-    - Casting: preprocessing/casting.md
   - Contributing:
     - Writing Docs: contributing/writing_docs.md

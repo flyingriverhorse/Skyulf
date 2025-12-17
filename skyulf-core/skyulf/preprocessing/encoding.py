@@ -256,8 +256,16 @@ class LabelEncoderCalculator(BaseCalculator):
                 le.fit(X[col].astype(str))
                 encoders[col] = le
                 classes_count[col] = len(le.classes_)
+            
+            # Also check if target is in cols (if y has a name)
+            if y is not None and hasattr(y, 'name') and y.name in cols:
+                le = LabelEncoder()
+                le.fit(y.astype(str))
+                encoders["__target__"] = le
+                classes_count["__target__"] = len(le.classes_)
+
         else:
-            # Encode target y
+            # Encode target y (default if no columns specified)
             if y is not None:
                 le = LabelEncoder()
                 le.fit(y.astype(str))
@@ -300,12 +308,12 @@ class LabelEncoderApplier(BaseApplier):
                     # We can use map.
                     mapping = dict(zip(le.classes_, le.transform(le.classes_)))
                     X_out[col] = X_out[col].astype(str).map(mapping).fillna(-1)
-        else:
-            # Transform target
-            if y_out is not None and "__target__" in encoders:
-                le = encoders["__target__"]
-                mapping = dict(zip(le.classes_, le.transform(le.classes_)))
-                y_out = y_out.astype(str).map(mapping).fillna(-1)
+        
+        # Transform target (always check if encoder exists)
+        if y_out is not None and "__target__" in encoders:
+            le = encoders["__target__"]
+            mapping = dict(zip(le.classes_, le.transform(le.classes_)))
+            y_out = y_out.astype(str).map(mapping).fillna(-1)
 
         return pack_pipeline_output(X_out, y_out, is_tuple)
 

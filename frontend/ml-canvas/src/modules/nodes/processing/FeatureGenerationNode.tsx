@@ -206,7 +206,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
         {OPERATION_TYPES.map(t => (
           <button
             key={t.value}
-            onClick={() => { addOperation(t.value as any); }}
+            onClick={() => { addOperation(t.value as MathOperation['operation_type']); }}
             className="flex flex-col items-center justify-center gap-1 p-1.5 rounded-md border bg-card hover:bg-accent hover:border-primary/50 transition-all group w-16 h-14 shadow-sm"
             title={t.label}
           >

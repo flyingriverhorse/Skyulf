@@ -58,7 +58,7 @@ const DeduplicationSettings: React.FC<{ config: DeduplicationConfig; onChange: (
         <select
           className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
           value={config.keep}
-          onChange={(e) => onChange({ ...config, keep: e.target.value as any })}
+          onChange={(e) => onChange({ ...config, keep: e.target.value as DeduplicationConfig['keep'] })}
         >
           <option value="first">Keep First Occurrence</option>
           <option value="last">Keep Last Occurrence</option>
