@@ -109,7 +109,7 @@ testingdb/
 .testingdb
 
 #Ignore vscode AI rules
-.github\instructions\codacy.instructions.md
+.github/instructions/
 
 # === Codacy (local CLI) ===
 .codacy/
@@ -119,4 +119,3 @@ testingdb/
 !.codacy/cli-config.yaml
 !.codacy/cli-config.yml
 !.codacy/cli.sh
-.github/instructions
