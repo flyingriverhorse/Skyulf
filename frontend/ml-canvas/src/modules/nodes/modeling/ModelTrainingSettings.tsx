@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { 
     Play, Download, Loader2, Settings2, Database, Activity, 
     BarChart3, X, Check, ChevronRight, ChevronDown, HelpCircle, AlertCircle, RefreshCw, AlertTriangle
 } from 'lucide-react';
 import { jobsApi, JobInfo } from '../../../core/api/jobs';
+import { RegistryItem, registryApi } from '../../../core/api/registry';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useElementSize } from '../../../core/hooks/useElementSize';
@@ -262,7 +263,7 @@ export const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
   const [isLoadingDefs, setIsLoadingDefs] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_model_training'));
   
-  const { toggleDrawer, setTab } = useJobStore();
+  const { toggleDrawer: toggleJobDrawer, setTab } = useJobStore();
   const upstreamData = useUpstreamData(nodeId || '');
   
   // Recursive search for datasetId
@@ -316,13 +317,55 @@ export const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
   const isWide = width > 450; 
   const [activeTab, setActiveTab] = useState<'model' | 'params'>('model');
   const [showCV, setShowCV] = useState(false);
+  const [availableModels, setAvailableModels] = useState<RegistryItem[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+
+  // Fetch available models from registry
+  useEffect(() => {
+      const fetchModels = async () => {
+          setIsLoadingModels(true);
+          try {
+              const nodes = await registryApi.getAllNodes();
+              const models = nodes.filter(n => n.category === 'Model');
+              setAvailableModels(models);
+          } catch (error) {
+              console.error("Failed to fetch models:", error);
+              // Fallback to static list if API fails
+              setAvailableModels([
+                  { id: 'random_forest_classifier', name: 'Random Forest Classifier', category: 'Model', description: '', params: {} },
+                  { id: 'logistic_regression', name: 'Logistic Regression', category: 'Model', description: '', params: {} },
+                  { id: 'ridge_regression', name: 'Ridge Regression', category: 'Model', description: '', params: {} },
+                  { id: 'random_forest_regressor', name: 'Random Forest Regressor', category: 'Model', description: '', params: {} },
+              ]);
+          } finally {
+              setIsLoadingModels(false);
+          }
+      };
+      fetchModels();
+  }, []);
+
+  // We use a ref to track if customization was active before model switch
+  const keepCustomizationOpen = useRef(false);
 
   // Fetch hyperparameter definitions when model type changes
   useEffect(() => {
     if (config.model_type) {
       setIsLoadingDefs(true);
       jobsApi.getHyperparameters(config.model_type)
-        .then((defs) => setHyperparameters(defs as HyperparameterDef[]))
+        .then((defs) => {
+            const definitions = defs as HyperparameterDef[];
+            setHyperparameters(definitions);
+
+            // If we switched models while customization was active, apply new defaults immediately
+            if (keepCustomizationOpen.current) {
+                const defaults: Record<string, any> = {};
+                definitions.forEach(p => {
+                    defaults[p.name] = p.default;
+                });
+                onChange({ ...config, hyperparameters: defaults });
+                keepCustomizationOpen.current = false;
+            }
+        })
         .catch(console.error)
         .finally(() => { setIsLoadingDefs(false); });
     }
@@ -331,10 +374,16 @@ export const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
   // Auto-select target column from upstream
   useEffect(() => {
     const upstreamTarget = upstreamData.find(d => d.target_column)?.target_column as string | undefined;
+    // Only update if we have a new upstream target AND it's different from current
+    // AND we haven't manually set one (optional heuristic, but for now just check difference)
     if (upstreamTarget && config.target_column !== upstreamTarget) {
-        onChange({ ...config, target_column: upstreamTarget });
+        // Check if the current target is valid (in available columns)
+        // If current target is empty, auto-select.
+        if (!config.target_column) {
+             onChange({ ...config, target_column: upstreamTarget });
+        }
     }
-  }, [upstreamData, config.target_column]);
+  }, [upstreamData, config.target_column, onChange]);
 
   const handleTrain = async () => {
     if (!nodeId) return;
@@ -347,7 +396,7 @@ export const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
         });
         alert("Training job submitted successfully!");
         setTab('training');
-        toggleDrawer(true);
+        toggleJobDrawer(true);
     } catch (error) {
         console.error("Failed to submit training job:", error);
         alert("Failed to submit training job. Check console for details.");
@@ -366,13 +415,19 @@ export const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
                         <div className="relative">
                             <select
                                 value={config.model_type}
-                                onChange={(e) => onChange({ ...config, model_type: e.target.value, hyperparameters: {} })}
-                                className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                onChange={(e) => {
+                                    // Check if customization is active before switching
+                                    if (Object.keys(config.hyperparameters).length > 0) {
+                                        keepCustomizationOpen.current = true;
+                                    }
+                                    onChange({ ...config, model_type: e.target.value, hyperparameters: {} });
+                                }}
+                                className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                                disabled={isLoadingModels}
                             >
-                                <option value="random_forest_classifier">Random Forest Classifier</option>
-                                <option value="logistic_regression">Logistic Regression</option>
-                                <option value="ridge_regression">Ridge Regression</option>
-                                <option value="random_forest_regressor">Random Forest Regressor</option>
+                                {availableModels.map(model => (
+                                    <option key={model.id} value={model.id}>{model.name}</option>
+                                ))}
                             </select>
                             <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
                         </div>
@@ -497,7 +552,10 @@ export const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
             hyperparameters.forEach(p => {
                 defaults[p.name] = p.default;
             });
-            onChange({ ...config, hyperparameters: defaults });
+            // Only update if we don't have params already
+            if (Object.keys(config.hyperparameters).length === 0) {
+                onChange({ ...config, hyperparameters: defaults });
+            }
         } else {
             onChange({ ...config, hyperparameters: {} });
         }
@@ -511,12 +569,13 @@ export const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
              Hyperparameters
            </h4>
            <div className="flex items-center gap-2">
-               <label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2 cursor-pointer select-none">
+               <label className={`text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2 cursor-pointer select-none ${isLoadingDefs ? 'opacity-50 cursor-not-allowed' : ''}`}>
                    <input 
                         type="checkbox" 
                         checked={useCustomParams}
                         onChange={(e) => { toggleCustomParams(e.target.checked); }}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        disabled={isLoadingDefs}
                    />
                    Customize
                </label>

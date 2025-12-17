@@ -40,6 +40,46 @@ from .registry import NodeRegistry, RegistryItem
 
 logger = logging.getLogger(__name__)
 
+
+def _extract_target_label_encoder(feature_engineer: object):
+    fitted_steps = getattr(feature_engineer, "fitted_steps", None)
+    if not isinstance(fitted_steps, list):
+        return None
+
+    for step in reversed(fitted_steps):
+        if not isinstance(step, dict):
+            continue
+        if step.get("type") != "LabelEncoder":
+            continue
+        artifact = step.get("artifact")
+        if not isinstance(artifact, dict):
+            continue
+        encoders = artifact.get("encoders")
+        if not isinstance(encoders, dict):
+            continue
+
+        target_encoder = encoders.get("__target__")
+        if target_encoder is not None and hasattr(target_encoder, "inverse_transform"):
+            return target_encoder
+
+    return None
+
+
+def _decode_int_like(values: list, label_encoder) -> list:
+    """Best-effort decode for lists of encoded class indices.
+
+    If values are not int-like (or decoding fails), returns the original list.
+    """
+
+    try:
+        import numpy as np
+
+        arr = np.asarray(values)
+        decoded = label_encoder.inverse_transform(arr.astype(int))
+        return decoded.tolist() if hasattr(decoded, "tolist") else list(decoded)
+    except Exception:
+        return values
+
 # Stubs for deleted modules
 
 
@@ -818,6 +858,43 @@ async def get_job_evaluation(
             logger.warning(
                 f"Evaluation data job_id mismatch. Requested: {job_id}, Found: {data.get('job_id')}"
             )
+
+        # Optional: decode target labels for nicer UI (ROC selector, confusion matrix)
+        # We can do this at request-time by inspecting the bundled job artifact.
+        try:
+            if artifact_store.exists(job_id):
+                bundle = artifact_store.load(job_id)
+                if isinstance(bundle, dict) and "feature_engineer" in bundle:
+                    feature_engineer = bundle.get("feature_engineer")
+                    label_encoder = _extract_target_label_encoder(feature_engineer)
+
+                    if label_encoder is not None and isinstance(data, dict):
+                        splits = data.get("splits")
+                        if isinstance(splits, dict):
+                            for split_data in splits.values():
+                                if not isinstance(split_data, dict):
+                                    continue
+
+                                if isinstance(split_data.get("y_true"), list):
+                                    split_data["y_true"] = _decode_int_like(
+                                        split_data["y_true"], label_encoder
+                                    )
+                                if isinstance(split_data.get("y_pred"), list):
+                                    split_data["y_pred"] = _decode_int_like(
+                                        split_data["y_pred"], label_encoder
+                                    )
+
+                                y_proba = split_data.get("y_proba")
+                                if (
+                                    isinstance(y_proba, dict)
+                                    and isinstance(y_proba.get("classes"), list)
+                                ):
+                                    # Preserve original classes (often numeric) but also attach decoded labels.
+                                    y_proba["labels"] = _decode_int_like(
+                                        y_proba["classes"], label_encoder
+                                    )
+        except Exception as e:
+            logger.debug(f"Evaluation decode skipped/failed: {e}")
 
         return data
     except Exception as e:

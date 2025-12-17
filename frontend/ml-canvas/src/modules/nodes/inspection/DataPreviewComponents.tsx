@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useGraphStore } from '../../../core/store/useGraphStore';
-import { NodeDefinition } from '../../../core/types/nodes';
-import { Table, Activity, CheckCircle, AlertCircle, Play } from 'lucide-react';
+import { Activity, CheckCircle, AlertCircle, Play } from 'lucide-react';
 import { jobsApi, JobInfo } from '../../../core/api/jobs';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 
-interface DataPreviewConfig {
+export interface DataPreviewConfig {
   lastRunJobId?: string;
 }
 
@@ -41,7 +40,7 @@ const renderTable = (summary: unknown) => {
   );
 };
 
-const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange: (c: DataPreviewConfig) => void; nodeId?: string }> = ({
+export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange: (c: DataPreviewConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
   nodeId
@@ -184,7 +183,7 @@ const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange: (c: D
   );
 };
 
-const DataPreviewComponent: React.FC<{ data: DataPreviewConfig }> = ({ data }) => {
+export const DataPreviewComponent: React.FC<{ data: DataPreviewConfig }> = ({ data }) => {
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
@@ -222,18 +221,4 @@ const DataPreviewComponent: React.FC<{ data: DataPreviewConfig }> = ({ data }) =
        )}
     </div>
   );
-};
-
-export const DataPreviewNode: NodeDefinition<DataPreviewConfig> = {
-  type: 'data_preview',
-  label: 'Data Preview',
-  category: 'Evaluation', // Or Utility
-  description: 'Inspect data state and transformations at this point.',
-  icon: Table,
-  inputs: [{ id: 'in', label: 'Input Data', type: 'any' }],
-  outputs: [], // Sink node
-  component: DataPreviewComponent,
-  settings: DataPreviewSettings,
-  validate: () => ({ isValid: true }),
-  getDefaultConfig: () => ({}),
 };

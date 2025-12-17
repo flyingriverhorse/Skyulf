@@ -1,24 +1,19 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { NodeDefinition } from '../../../core/types/nodes';
-import { Replace, Plus, Trash2, Search, ArrowRight, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Trash2, Search, ArrowRight } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 
-// --- Types ---
-
-interface ReplacementItem {
+export interface ReplacementItem {
   old: unknown;
   new: unknown;
   oldType: 'string' | 'number' | 'boolean' | 'null' | 'nan';
   newType: 'string' | 'number' | 'boolean' | 'null' | 'nan';
 }
 
-interface ValueReplacementConfig {
+export interface ValueReplacementConfig {
   columns: string[];
   replacements: ReplacementItem[];
 }
-
-// --- Components ---
 
 const ColumnSelector: React.FC<{
   columns: string[];
@@ -92,11 +87,7 @@ const TypedInput: React.FC<{
     if (newType === 'boolean') newValue = Boolean(value);
     if (newType === 'string') newValue = String(value);
     if (newType === 'null') newValue = null;
-    if (newType === 'nan') newValue = 'NaN'; // We'll handle NaN as a special string or null in backend? 
-    // Actually JSON doesn't support NaN. We might need to send null or a special string.
-    // For now let's assume backend handles None as NaN for numeric columns?
-    // Or we can use a special string token if needed.
-    // But standard JSON serialization of NaN is null.
+    if (newType === 'nan') newValue = 'NaN'; 
     
     onChange(newValue, newType);
   };
@@ -195,153 +186,77 @@ const ReplacementEditor: React.FC<{
   );
 };
 
-const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig; onChange: (c: ValueReplacementConfig) => void; nodeId?: string }> = ({
+export const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig; onChange: (c: ValueReplacementConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
-  nodeId,
+  nodeId
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = useState(false);
-  const [showInfo, setShowInfo] = useState(true);
-
   const upstreamData = useUpstreamData(nodeId || '');
-  const datasetId = upstreamData.find((d: Record<string, any>) => d.datasetId)?.datasetId as string | undefined;
-  const { data: schema } = useDatasetSchema(datasetId);
-  
-  const columns = schema 
-    ? Object.values(schema.columns).map((c: Record<string, any>) => c.name)
-    : [];
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 400);
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => { observer.disconnect(); };
-  }, []);
+  const { data: schema } = useDatasetSchema(upstreamData[0]?.dataset_id as string | undefined);
+  const availableColumns = schema ? Object.keys(schema.columns) : [];
 
   const addReplacement = () => {
     onChange({
       ...config,
-      replacements: [...config.replacements, { old: '', new: '', oldType: 'string', newType: 'string' }]
+      replacements: [
+        ...config.replacements,
+        { old: '', new: '', oldType: 'string', newType: 'string' }
+      ]
     });
   };
 
   const updateReplacement = (index: number, item: ReplacementItem) => {
-    const newItems = [...config.replacements];
-    newItems[index] = item;
-    onChange({ ...config, replacements: newItems });
+    const newReplacements = [...config.replacements];
+    newReplacements[index] = item;
+    onChange({ ...config, replacements: newReplacements });
   };
 
   const removeReplacement = (index: number) => {
-    const newItems = config.replacements.filter((_, i) => i !== index);
-    onChange({ ...config, replacements: newItems });
+    const newReplacements = config.replacements.filter((_, i) => i !== index);
+    onChange({ ...config, replacements: newReplacements });
   };
 
   return (
-    <div ref={containerRef} className={`flex flex-col h-full w-full bg-white dark:bg-gray-900 ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-      <div className={`flex-1 min-h-0 p-4 gap-4 ${isWide ? 'grid grid-cols-2' : 'flex flex-col'}`}>
+    <div className="space-y-4 p-1">
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Target Columns</label>
+        <ColumnSelector
+          columns={availableColumns}
+          selected={config.columns}
+          onChange={(cols) => onChange({ ...config, columns: cols })}
+        />
+        <p className="text-[10px] text-gray-500">
+          Select columns to apply replacements to. If empty, applies to all compatible columns.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Replacements</label>
+          <button
+            onClick={addReplacement}
+            className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400"
+          >
+            <Plus size={12} /> Add
+          </button>
+        </div>
         
-        {/* Left Column: Column Selection */}
-        <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-              Target Columns ({config.columns.length})
-            </label>
-            <ColumnSelector 
-              columns={columns} 
-              selected={config.columns} 
-              onChange={(cols) => onChange({ ...config, columns: cols })} 
+        <div className="space-y-3">
+          {config.replacements.map((item, i) => (
+            <ReplacementEditor
+              key={i}
+              item={item}
+              onChange={(newItem) => updateReplacement(i, newItem)}
+              onDelete={() => removeReplacement(i)}
             />
-          </div>
+          ))}
+          {config.replacements.length === 0 && (
+            <div className="text-center py-4 text-xs text-gray-500 border border-dashed rounded">
+              No replacements defined.
+            </div>
+          )}
         </div>
-
-        {/* Right Column: Replacements */}
-        <div className={`space-y-4 ${isWide ? 'overflow-y-auto pl-2 border-l border-gray-100 dark:border-gray-700' : 'shrink-0 pt-4 border-t border-gray-100 dark:border-gray-700'}`}>
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-800 overflow-hidden">
-            <button 
-              onClick={() => { setShowInfo(!showInfo); }}
-              className="w-full flex items-center gap-2 p-3 text-left hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors"
-            >
-              <Info className="text-blue-600 dark:text-blue-400 shrink-0" size={16} />
-              <span className="text-xs font-semibold text-blue-800 dark:text-blue-200 flex-1">
-                About Value Replacement
-              </span>
-              {showInfo ? (
-                <ChevronUp size={14} className="text-blue-600 dark:text-blue-400" />
-              ) : (
-                <ChevronDown size={14} className="text-blue-600 dark:text-blue-400" />
-              )}
-            </button>
-            
-            {showInfo && (
-              <div className="px-3 pb-3 text-xs text-blue-800 dark:text-blue-200 pl-9">
-                <p>Replace specific values with new ones. Useful for fixing typos, recoding categories (e.g., "Yes" to 1), or handling specific placeholders.</p>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Value Mappings
-            </label>
-            <button
-              onClick={addReplacement}
-              className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-            >
-              <Plus size={14} />
-              Add Mapping
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {config.replacements.length === 0 ? (
-              <div className="text-center p-6 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
-                <p className="text-xs text-gray-500">No replacements defined.</p>
-                <button
-                  onClick={addReplacement}
-                  className="mt-2 text-xs text-blue-600 hover:underline"
-                >
-                  Add your first replacement
-                </button>
-              </div>
-            ) : (
-              config.replacements.map((item, idx) => (
-                <ReplacementEditor
-                  key={idx}
-                  item={item}
-                  onChange={(newItem) => { updateReplacement(idx, newItem); }}
-                  onDelete={() => { removeReplacement(idx); }}
-                />
-              ))
-            )}
-          </div>
-        </div>
-
       </div>
     </div>
   );
-};
-
-export const ValueReplacementNode: NodeDefinition<ValueReplacementConfig> = {
-  type: 'ValueReplacement',
-  label: 'Value Replacement',
-  category: 'Preprocessing',
-  description: 'Replace specific values in columns.',
-  icon: Replace,
-  inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
-  outputs: [{ id: 'out', label: 'Processed Data', type: 'dataset' }],
-  settings: ValueReplacementSettings,
-  validate: (config) => {
-    if (config.columns.length === 0) return { isValid: false, message: 'Select at least one column.' };
-    if (config.replacements.length === 0) return { isValid: false, message: 'Add at least one replacement.' };
-    return { isValid: true };
-  },
-  getDefaultConfig: () => ({
-    columns: [],
-    replacements: [{ old: '', new: '', oldType: 'string', newType: 'string' }],
-  }),
 };
