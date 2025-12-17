@@ -11,6 +11,14 @@ engines:
     enabled: false
 
 exclude_paths:
+  - ".venv/**"
+  - "venv/**"
+  - "node_modules/**"
+  - "build/**"
+  - "dist/**"
+  - "__pycache__/**"
+  - ".git/**"
+  - ".github/**"
   - "tests/**"
   - "skyulf-core/tests/**"
   - "testingdb/**"

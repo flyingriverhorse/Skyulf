@@ -68,7 +68,7 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
     };
 
     void fetchJob();
-    const interval = setInterval(fetchJob, 2000);
+    const interval = setInterval(() => { void fetchJob(); }, 2000);
     return () => { clearInterval(interval); };
   }, [config.lastRunJobId]);
 
@@ -104,7 +104,7 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
       </div>
       
       <button
-        onClick={handleRunPreview}
+        onClick={() => { void handleRunPreview(); }}
         disabled={isRunning}
         className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#38bdf8] via-[#6366f1] to-[#a855f7] text-white px-3 py-1.5 rounded-md hover:opacity-90 disabled:opacity-50 transition-all text-xs font-medium shadow-md"
       >

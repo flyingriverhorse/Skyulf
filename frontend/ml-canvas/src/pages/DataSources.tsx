@@ -302,7 +302,7 @@ export const DataSources: React.FC = () => {
                         )}
                         {(d.source_metadata?.ingestion_status?.status === 'pending' || d.source_metadata?.ingestion_status?.status === 'processing') && (
                           <button
-                            onClick={() => handleCancel(d.id)}
+                            onClick={() => { void handleCancel(d.id); }}
                             disabled={cancellingId === d.id}
                             className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-colors disabled:opacity-50"
                             title="Cancel Ingestion"
@@ -315,7 +315,7 @@ export const DataSources: React.FC = () => {
                           </button>
                         )}
                         <button
-                          onClick={() => handleDelete(d.id)}
+                          onClick={() => { void handleDelete(d.id); }}
                           disabled={deletingId === d.id}
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50"
                           title="Delete Dataset"

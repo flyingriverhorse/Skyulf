@@ -119,7 +119,7 @@ export const useJobStore = create<JobState>((set, get) => {
     startPolling: () => {
       if (pollingInterval) return;
       
-      pollingInterval = setInterval(async () => {
+      pollingInterval = setInterval(() => { void (async () => {
         // Silent fetch (no loading spinner)
         try {
           const latestJobs = await jobsApi.getJobs(PAGE_SIZE, 0);
@@ -141,7 +141,7 @@ export const useJobStore = create<JobState>((set, get) => {
         } catch (error) {
           console.error('Polling error:', error);
         }
-      }, POLLING_INTERVAL);
+      })(); }, POLLING_INTERVAL);
     },
 
     stopPolling: () => {

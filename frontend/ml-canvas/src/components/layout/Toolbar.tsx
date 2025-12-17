@@ -132,7 +132,7 @@ export const Toolbar: React.FC = () => {
         <span className="text-sm font-medium">Jobs</span>
       </button>
       <button 
-        onClick={handleLoad}
+        onClick={() => { void handleLoad(); }}
         disabled={isLoading || isRunning}
         className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
       >
@@ -140,7 +140,7 @@ export const Toolbar: React.FC = () => {
         <span className="text-sm font-medium">{isLoading ? 'Loading...' : 'Load'}</span>
       </button>
       <button 
-        onClick={handleSave}
+        onClick={() => { void handleSave(); }}
         disabled={isSaving || isRunning}
         className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
       >
@@ -148,7 +148,7 @@ export const Toolbar: React.FC = () => {
         <span className="text-sm font-medium">{isSaving ? 'Saving...' : 'Save'}</span>
       </button>
       <button 
-        onClick={handleRun}
+        onClick={() => { void handleRun(); }}
         disabled={isRunning}
         className="flex items-center gap-2 px-4 py-2 text-white rounded-md shadow-sm transition-all disabled:opacity-50"
         style={{ background: 'var(--main-gradient)' }}

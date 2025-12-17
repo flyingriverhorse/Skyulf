@@ -315,7 +315,7 @@ export const ExperimentsPage: React.FC = () => {
                   <div className="flex items-center gap-2">
                     {job.status === 'completed' && (job.job_type === 'training' || job.job_type === 'tuning') && (
                         <button 
-                            onClick={(e) => handleDeploy(e, job.job_id)}
+                            onClick={(e) => { void handleDeploy(e, job.job_id); }}
                             className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900 rounded text-blue-600 dark:text-blue-400"
                             title="Deploy to Test"
                         >
@@ -584,7 +584,7 @@ export const ExperimentsPage: React.FC = () => {
                             {selectedJobIds.map(id => (
                                 <button
                                     key={id}
-                                    onClick={() => fetchEvaluationData(id)}
+                                    onClick={() => { void fetchEvaluationData(id); }}
                                     className={`px-3 py-1 text-xs font-mono rounded border whitespace-nowrap ${
                                         evalJobId === id 
                                             ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300'

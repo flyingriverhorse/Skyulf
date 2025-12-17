@@ -743,7 +743,7 @@ export const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: Tuni
       {/* Footer */}
       <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
         <button
-          onClick={handleTune}
+          onClick={() => { void handleTune(); }}
           className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 text-white rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
           style={{ background: 'var(--main-gradient)' }}
         >

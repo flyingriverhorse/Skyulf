@@ -158,7 +158,7 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
             <div className="flex flex-col items-center justify-center h-64 text-red-500 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-900/20">
               <p>{error}</p>
               <button 
-                onClick={() => fetchData(sampleSize)}
+                onClick={() => { void fetchData(sampleSize); }}
                 className="mt-4 px-4 py-2 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-800 rounded-md text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
               >
                 Retry
