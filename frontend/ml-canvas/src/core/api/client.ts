@@ -14,14 +14,14 @@ export const apiClient = axios.create({
 export interface NodeConfigModel {
   node_id: string;
   step_type: string;
-  params: Record<string, any>;
+  params: Record<string, unknown>;
   inputs: string[];
 }
 
 export interface PipelineConfigModel {
   pipeline_id: string;
   nodes: NodeConfigModel[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   target_node_id?: string;
   job_type?: string;
 }
@@ -52,7 +52,7 @@ export interface Recommendation {
   target_columns: string[];
   description: string;
   suggested_node_type: string;
-  suggested_params: Record<string, any>;
+  suggested_params: Record<string, unknown>;
   confidence: number;
   reasoning: string;
 }
@@ -60,8 +60,8 @@ export interface Recommendation {
 export interface PreviewResponse {
   pipeline_id: string;
   status: string;
-  node_results: Record<string, any>;
-  preview_data: any;
+  node_results: Record<string, unknown>;
+  preview_data: unknown;
   recommendations: Recommendation[];
 }
 
@@ -82,14 +82,14 @@ export const fetchDatasetProfile = async (datasetId: string): Promise<AnalysisPr
 export interface SavedPipeline {
   id?: string; // Optional because backend might not return it on load
   graph: {
-    nodes: any[];
-    edges: any[];
+    nodes: unknown[];
+    edges: unknown[];
   };
   name?: string;
   description?: string;
 }
 
-export const savePipeline = async (datasetId: string, payload: any): Promise<{ id: string }> => {
+export const savePipeline = async (datasetId: string, payload: unknown): Promise<{ id: string }> => {
   const response = await apiClient.post<{ id: string }>(`/pipeline/save/${datasetId}`, payload);
   return response.data;
 };

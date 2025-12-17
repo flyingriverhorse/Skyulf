@@ -8,7 +8,7 @@ export interface Dataset {
   columns?: number;
   size_bytes?: number;
   format?: string;
-  source_metadata?: any;
+  source_metadata?: unknown;
 }
 
 export interface IngestionJobResponse {
@@ -22,13 +22,13 @@ export interface IngestionStatus {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number;
   error?: string;
-  details?: any;
+  details?: unknown;
   updated_at: string;
 }
 
 export interface DataSourceCreate {
   name: string;
   type: string;
-  config: Record<string, any>;
+  config: Record<string, unknown>;
   description?: string;
 }

@@ -84,14 +84,14 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
   const [showInfo, setShowInfo] = useState(true);
 
   const upstreamData = useUpstreamData(nodeId || '');
-  const datasetId = upstreamData.find((d: unknown) => (d as Record<string, any>).datasetId)?.datasetId as string | undefined;
+  const datasetId = upstreamData.find((d: unknown) => (d as Record<string, unknown>).datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
   
   // Filter for numeric columns only
   const numericColumns = schema 
     ? Object.values(schema.columns)
-        .filter((c: unknown) => ['int', 'float', 'number'].some(t => (c as Record<string, any>).dtype?.toLowerCase().includes(t)))
-        .map((c: unknown) => (c as Record<string, any>).name)
+        .filter((c: unknown) => ['int', 'float', 'number'].some(t => ((c as Record<string, unknown>).dtype as string)?.toLowerCase().includes(t)))
+        .map((c: unknown) => (c as Record<string, unknown>).name)
     : [];
 
   useEffect(() => {

@@ -1,11 +1,31 @@
 # Version Updates
 
+*   **v0.1.4 :** "The API Routing & Log Visibility Update" — Fixed API routing structure, restored live logs, and silenced misleading tuning warnings.
 *   **v0.1.3 :** "The Code Quality & Stability Update" — Extensive static analysis fixes, safer type handling, and backend runtime stability improvements.
 *   **v0.1.2 :** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
 
 ------------------------------------------------------------
+
+## v0.1.4
+**"The API Routing & Log Visibility Update"**
+
+This release addresses critical connectivity issues between the frontend and backend, ensuring that logs are visible and API endpoints are correctly routed.
+
+### 🔌 API & Routing
+- **Router Restructuring:** Refactored `jobs.py` and correctly mounted `ml_pipeline_router` and `model_registry_router` under the `/api/ml` prefix.
+- **404 Resolution:** Fixed issues where the Model Registry and Job endpoints were unreachable due to incorrect router prefixes.
+
+### 📜 Observability
+- **Live Logs Restored:** Fixed a mapping issue in `TrainingManager` and `TuningManager` where the `logs` field was not being propagated from the database to the API response, restoring live log visibility in the frontend.
+- **Cleaner Tuning Logs:** Suppressed harmless but noisy `UserWarning: Failed to report cross validation scores for TerminatorCallback` from Optuna, ensuring cleaner output during hyperparameter tuning.
+
+### 🛠 Stability
+- **Dependency Fix:** Added `aiofiles` to `requirements-fastapi.txt` to resolve `ImportError` failures during testing.
+- **Test Verification:** Verified system stability with passing tests for execution and core pipeline logic.
+
+---
 
 ## v0.1.3
 **"The Code Quality & Stability Update"**

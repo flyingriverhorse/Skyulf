@@ -293,9 +293,9 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                     )}
                                 </div>
                                 
-                                {job.job_type === 'training' && (job.result as Record<string, any>).metrics && (
+                                {job.job_type === 'training' && (job.result as Record<string, unknown>).metrics && (
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                        {Object.entries((job.result as Record<string, any>).metrics).map(([k, v]) => (
+                                        {Object.entries((job.result as Record<string, unknown>).metrics as Record<string, unknown>).map(([k, v]) => (
                                             <div key={k} className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
                                                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">{k.replace(/_/g, ' ')}</div>
                                                 <div className="font-mono font-medium text-blue-600 dark:text-blue-400">
@@ -309,21 +309,21 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                 {job.job_type === 'tuning' && (
                                     <div className="space-y-4">
                                         {/* Best Score */}
-                                        {(job.result as Record<string, any>).best_score !== undefined && (
+                                        {(job.result as Record<string, unknown>).best_score !== undefined && (
                                             <div className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg w-fit">
                                                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Best Score</div>
                                                 <div className="font-mono font-bold text-lg text-purple-600 dark:text-purple-400">
-                                                    {Number((job.result as Record<string, any>).best_score).toFixed(4)}
+                                                    {Number((job.result as Record<string, unknown>).best_score).toFixed(4)}
                                                 </div>
                                             </div>
                                         )}
 
                                         {/* Full Metrics (Train/Test/Val) */}
-                                        {(job.result as Record<string, any>)?.metrics && (
+                                        {(job.result as Record<string, unknown>)?.metrics && (
                                             <div className="space-y-2">
                                                 <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Evaluation Metrics</h4>
                                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                                    {Object.entries((job.result as Record<string, any>).metrics)
+                                                    {Object.entries((job.result as Record<string, unknown>).metrics as Record<string, unknown>)
                                                         .filter(([k]) => !['best_score', 'best_params', 'trials'].includes(k))
                                                         .map(([k, v]) => (
                                                         <div key={k} className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
@@ -338,10 +338,10 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                         )}
                                         
                                         {/* Best Params */}
-                                        {(job.result as Record<string, any>)?.best_params && (
+                                        {(job.result as Record<string, unknown>)?.best_params && (
                                             <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
                                                 <div className="text-gray-500 mb-2"># Best Hyperparameters</div>
-                                                <pre>{JSON.stringify((job.result as Record<string, any>).best_params, null, 2)}</pre>
+                                                <pre>{JSON.stringify((job.result as Record<string, unknown>).best_params, null, 2)}</pre>
                                             </div>
                                         )}
                                     </div>
@@ -426,8 +426,8 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
         </div>
         <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500">
             <span className="font-medium truncate">{job.model_type || 'Unknown Model'}</span>
-            {job.job_type === 'tuning' && (job.config as Record<string, any>)?.tuning?.strategy && (
-                <span className="text-gray-400 truncate">({(job.config as Record<string, any>).tuning.strategy})</span>
+            {job.job_type === 'tuning' && (job.config as Record<string, unknown>)?.tuning && (
+                <span className="text-gray-400 truncate">({((job.config as Record<string, unknown>).tuning as Record<string, unknown>).strategy as string})</span>
             )}
         </div>
       </div>
@@ -478,7 +478,7 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
                            Score: {Number(job.result.best_score).toFixed(4)}
                        </span>
                    )}
-                   {!(job.result as Record<string, any>).best_score && (job.result as Record<string, any>).best_params && (
+                   {!(job.result as Record<string, unknown>).best_score && (job.result as Record<string, unknown>).best_params && (
                        <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate">Params found</span>
                    )}
                </div>

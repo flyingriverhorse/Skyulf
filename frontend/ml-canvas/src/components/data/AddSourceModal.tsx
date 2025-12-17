@@ -46,8 +46,8 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
       const response = await DatasetService.createSource(payload);
       onSuccess(response.job_id);
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create source');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Failed to create source');
     } finally {
       setLoading(false);
     }

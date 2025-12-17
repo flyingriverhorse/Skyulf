@@ -7,7 +7,7 @@ import { Play, AlertCircle, CheckCircle, Box, Power } from 'lucide-react';
 export const InferencePage: React.FC = () => {
   const [activeDeployment, setActiveDeployment] = useState<DeploymentInfo | null>(null);
   const [inputData, setInputData] = useState<string>('[\n  {\n    "feature1": 0.5,\n    "feature2": 1.2\n  }\n]');
-  const [predictions, setPredictions] = useState<any[] | null>(null);
+  const [predictions, setPredictions] = useState<unknown[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,8 +95,8 @@ export const InferencePage: React.FC = () => {
       }
       const response = await deploymentApi.predict(data);
       setPredictions(response.predictions);
-    } catch (e: any) {
-      setError(e.message || "Prediction failed");
+    } catch (e: unknown) {
+      setError((e as Error).message || "Prediction failed");
     } finally {
       setIsLoading(false);
     }

@@ -77,7 +77,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
   };
 
   const upstreamDatasetId = findUpstreamDatasetId(nodeId || '');
-  const upstreamTargetColumn = upstreamData.find((d: Record<string, any>) => d.target_column)?.target_column as string | undefined;
+  const upstreamTargetColumn = upstreamData.find((d: Record<string, unknown>) => d.target_column)?.target_column as string | undefined;
 
   // Auto-detect target and dataset
   useEffect(() => {

@@ -57,7 +57,7 @@ export const DatasetService = {
   },
 
   getIngestionStatus: async (sourceId: string): Promise<IngestionStatus> => {
-    const response = await fetch(`${INGESTION_BASE}/${sourceId}/status`);
+    const response = await fetch(`${INGESTION_BASE}/${encodeURIComponent(sourceId)}/status`);
     
     if (!response.ok) {
       throw new Error('Failed to fetch ingestion status');
@@ -67,7 +67,7 @@ export const DatasetService = {
   },
 
   cancelIngestion: async (sourceId: string): Promise<void> => {
-    const response = await fetch(`${INGESTION_BASE}/${sourceId}/cancel`, {
+    const response = await fetch(`${INGESTION_BASE}/${encodeURIComponent(sourceId)}/cancel`, {
       method: 'POST',
     });
     if (!response.ok) {
@@ -77,7 +77,7 @@ export const DatasetService = {
   },
 
   getById: async (id: string): Promise<Dataset> => {
-    const response = await fetch(`${API_BASE}/sources/${id}`);
+    const response = await fetch(`${API_BASE}/sources/${encodeURIComponent(id)}`);
     if (!response.ok) {
       throw new Error('Failed to fetch dataset');
     }
@@ -85,8 +85,9 @@ export const DatasetService = {
     return data.source;
   },
 
-  getSample: async (id: string, limit: number = 1): Promise<any[]> => {
-    const response = await fetch(`${API_BASE}/sources/${id}/sample?limit=${limit}`);
+  getSample: async (id: string, limit: number = 1): Promise<unknown[]> => {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    const response = await fetch(`${API_BASE}/sources/${encodeURIComponent(id)}/sample?${params.toString()}`);
     if (!response.ok) {
       throw new Error('Failed to fetch dataset sample');
     }
@@ -95,7 +96,7 @@ export const DatasetService = {
   },
 
   delete: async (id: string): Promise<void> => {
-    const response = await fetch(`${API_BASE}/sources/${id}`, {
+    const response = await fetch(`${API_BASE}/sources/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -103,30 +104,33 @@ export const DatasetService = {
     }
   },
 
-  getProfile: async (id: string): Promise<any> => {
-    const response = await fetch(`/api/pipeline/datasets/${id}/schema`);
+  getProfile: async (id: string): Promise<unknown> => {
+    const response = await fetch(`/api/pipeline/datasets/${encodeURIComponent(id)}/schema`);
     if (!response.ok) {
       throw new Error('Failed to fetch dataset profile');
     }
     const data = await response.json();
     
     // Transform backend response to match frontend expectation
-    const columns = Object.values(data.columns).map((col: any) => ({
-      name: col.name,
-      dtype: col.dtype,
-      missing_count: col.missing_count,
-      missing_percentage: (col.missing_ratio || 0) * 100,
-      distinct_count: col.unique_count,
-      numeric_summary: col.column_type === 'numeric' ? {
-        mean: col.mean_value,
-        std: col.std_value,
-        minimum: col.min_value,
-        maximum: col.max_value
-      } : undefined
-    }));
+    const columns = Object.values(data.columns).map((col: unknown) => {
+      const c = col as Record<string, unknown>;
+      return {
+        name: c.name as string,
+        dtype: c.dtype as string,
+        missing_count: (c.missing_count as number) || 0,
+        missing_percentage: ((c.missing_ratio as number) || 0) * 100,
+        distinct_count: (c.unique_count as number) || 0,
+        numeric_summary: c.column_type === 'numeric' ? {
+          mean: c.mean_value as number,
+          std: c.std_value as number,
+          minimum: c.min_value as number,
+          maximum: c.max_value as number
+        } : undefined
+      };
+    });
 
-    const totalCells = data.row_count * data.column_count;
-    const missingCells = columns.reduce((acc, col) => acc + col.missing_count, 0);
+    const totalCells = (data.row_count as number) * (data.column_count as number);
+    const missingCells = columns.reduce((acc, col) => acc + (col.missing_count as number), 0);
 
     return {
       metrics: {

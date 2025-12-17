@@ -16,7 +16,7 @@ interface TrainingJobSummary {
   status: string;
   model_type: string;
   created_at: string;
-  metrics?: Record<string, any>;
+  metrics?: Record<string, unknown>;
 }
 
 export const Dashboard: React.FC = () => {
@@ -38,7 +38,7 @@ export const Dashboard: React.FC = () => {
             status: job.status,
             model_type: job.model_type || 'Unknown',
             created_at: job.start_time || job.created_at || new Date().toISOString(),
-            metrics: job.metrics || (job.result as Record<string, any>)?.metrics
+            metrics: job.metrics || (job.result as Record<string, unknown>)?.metrics
           }))
         );
       } catch (error) {
@@ -135,7 +135,7 @@ export const Dashboard: React.FC = () => {
   );
 };
 
-const StatCard = ({ title, value, loading, subtext, color = "text-slate-900 dark:text-slate-100" }: any) => (
+const StatCard = ({ title, value, loading, subtext, color = "text-slate-900 dark:text-slate-100" }: { title: string; value: string | number; loading: boolean; subtext?: string; color?: string }) => (
   <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
     <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{title}</h3>
     <div className={`mt-2 text-3xl font-bold ${color}`}>

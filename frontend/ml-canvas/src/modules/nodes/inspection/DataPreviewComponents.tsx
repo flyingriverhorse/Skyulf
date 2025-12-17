@@ -10,15 +10,15 @@ export interface DataPreviewConfig {
 
 // Helper to render a mini table
 const renderTable = (summary: unknown) => {
-  if (!summary || !(summary as Record<string, any>).sample) return <div className="text-xs text-muted-foreground italic">No data available</div>;
+  if (!summary || !(summary as Record<string, unknown>).sample) return <div className="text-xs text-muted-foreground italic">No data available</div>;
   
-  const cols = Object.keys((summary as Record<string, any>).sample[0] || {}).slice(0, 5); // Show max 5 cols
+  const cols = Object.keys((summary as Record<string, unknown>).sample[0] || {}).slice(0, 5); // Show max 5 cols
   
   return (
     <div className="overflow-x-auto rounded border border-border">
       <div className="text-xs font-semibold mb-1 flex justify-between p-2 bg-muted/50 border-b border-border">
-          <span>{(summary as Record<string, any>).name}</span>
-          <span className="text-muted-foreground">{(summary as Record<string, any>).shape[0]} rows x {(summary as Record<string, any>).shape[1]} cols</span>
+          <span>{(summary as Record<string, unknown>).name}</span>
+          <span className="text-muted-foreground">{(summary as Record<string, unknown>).shape[0]} rows x {(summary as Record<string, unknown>).shape[1]} cols</span>
       </div>
       <table className="w-full text-[10px] border-collapse">
         <thead>
@@ -27,7 +27,7 @@ const renderTable = (summary: unknown) => {
           </tr>
         </thead>
         <tbody>
-          {(summary as Record<string, any>).sample.slice(0, 5).map((row: unknown, i: number) => (
+          {(summary as Record<string, unknown>).sample.slice(0, 5).map((row: unknown, i: number) => (
             <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/20">
               {cols.map(c => (
                 <td key={c} className="p-2 border-r border-border truncate max-w-[80px] last:border-r-0">{String((row as Record<string, unknown>)[c])}</td>
@@ -94,8 +94,8 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
   };
 
   const result = job?.result?.metrics || job?.result;
-  const dataSummary = (result as Record<string, any>)?.data_summary;
-  const operationMode = (result as Record<string, any>)?.operation_mode;
+  const dataSummary = (result as Record<string, unknown>)?.data_summary;
+  const operationMode = (result as Record<string, unknown>)?.operation_mode;
 
   return (
     <div className="p-4 space-y-4 h-full overflow-y-auto">
@@ -161,11 +161,11 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
             )}
             
             {/* Transformations */}
-            {(result as Record<string, any>).applied_transformations && (result as Record<string, any>).applied_transformations.length > 0 && (
+            {(result as Record<string, unknown>).applied_transformations && (result as Record<string, unknown>).applied_transformations.length > 0 && (
                 <div className="pt-2 border-t border-border">
                     <div className="text-[10px] font-semibold mb-2 text-foreground">Applied Steps</div>
                     <div className="space-y-1.5">
-                        {(result as Record<string, any>).applied_transformations.map((t: unknown, i: number) => (
+                        {(result as Record<string, unknown>).applied_transformations.map((t: unknown, i: number) => (
                             <div key={i} className="text-[10px] flex items-center gap-2 text-muted-foreground p-1.5 bg-muted/30 rounded border border-border">
                                 <span className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-[8px] font-medium text-foreground">{i+1}</span>
                                 <div className="flex flex-col">

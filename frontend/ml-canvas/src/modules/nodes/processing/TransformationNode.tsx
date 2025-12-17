@@ -313,9 +313,9 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
         recommendations={backendRecommendations || []}
         onApply={(rec) => {
           // Apply recommendation logic
-          const r = rec as Record<string, any>;
-          const method = r.suggested_params?.method || r.params?.method || 'log';
-          const columns = r.target_columns || [];
+          const r = rec as Record<string, unknown>;
+          const method = (r.suggested_params as Record<string, unknown>)?.method || (r.params as Record<string, unknown>)?.method || 'log';
+          const columns = (r.target_columns as string[]) || [];
           
           if (columns.length > 0) {
              const newIndex = transformations.length;

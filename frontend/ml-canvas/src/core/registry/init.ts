@@ -49,6 +49,4 @@ export const initializeRegistry = () => {
   registry.register(MissingIndicatorNode);
   registry.register(ModelTrainingNode);
   registry.register(HyperparameterTuningNode);
-  
-  console.log('[Registry] Initialization complete. Total nodes:', registry.getAll().length);
 };

@@ -51,9 +51,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
       // Returns job_id (which is source_id) and status
       onUploadComplete(response.job_id, file.name);
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Upload failed:', err);
-      setError(err.message || 'Failed to upload file. Please try again.');
+      setError((err as Error).message || 'Failed to upload file. Please try again.');
     } finally {
       setUploading(false);
     }
