@@ -21,7 +21,10 @@ const DropRowsSettings: React.FC<{ config: DropRowsConfig; onChange: (c: DropRow
   
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics = nodeResult?.metrics;
+  const metrics: Record<string, unknown> | null =
+    nodeResult?.metrics && typeof nodeResult.metrics === 'object'
+      ? (nodeResult.metrics as Record<string, unknown>)
+      : null;
 
   return (
     <div className="p-4 space-y-4">
@@ -82,15 +85,15 @@ const DropRowsSettings: React.FC<{ config: DropRowsConfig; onChange: (c: DropRow
           <div className="space-y-1 text-xs">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Rows Removed:</span>
-              <span className="font-medium text-destructive">{metrics.DropMissingRows_rows_removed}</span>
+              <span className="font-medium text-destructive">{String(metrics.DropMissingRows_rows_removed)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Rows Remaining:</span>
-              <span className="font-medium">{metrics.DropMissingRows_rows_remaining}</span>
+              <span className="font-medium">{String(metrics.DropMissingRows_rows_remaining)}</span>
             </div>
             <div className="flex justify-between pt-1 border-t">
               <span className="text-muted-foreground">Total Rows:</span>
-              <span className="font-medium">{metrics.DropMissingRows_rows_total}</span>
+              <span className="font-medium">{String(metrics.DropMissingRows_rows_total)}</span>
             </div>
           </div>
         </div>

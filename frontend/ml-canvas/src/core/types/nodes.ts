@@ -18,7 +18,13 @@ export interface ValidationResult {
   message?: string;
 }
 
-export interface NodeDefinition<TConfig = unknown> {
+export interface NodeSettingsProps<TConfig> {
+  config: TConfig;
+  onChange: (newConfig: TConfig) => void;
+  nodeId?: string;
+}
+
+export interface NodeDefinition<TConfig = any> {
   // Metadata
   type: string;              // Unique ID, e.g., "imputation_simple"
   label: string;             // Display Name, e.g., "Simple Imputer"
@@ -26,7 +32,7 @@ export interface NodeDefinition<TConfig = unknown> {
   description: string;
   
   // Visual Configuration
-  icon?: React.FC<unknown>;      // Lucide Icon
+  icon?: React.ElementType;      // Lucide Icon / React component
   color?: string;            // Tailwind class or hex
   
   // Logic Configuration
@@ -34,12 +40,8 @@ export interface NodeDefinition<TConfig = unknown> {
   outputs: PortDefinition[];
   
   // Components
-  component?: React.FC<unknown>; // Custom Node View (optional)
-  settings: React.FC<{       // The Form in the Sidebar
-    config: TConfig;
-    onChange: (newConfig: TConfig) => void;
-    nodeId?: string;
-  }>;
+  component?: React.JSXElementConstructor<any>; // Custom Node View (optional)
+  settings: React.JSXElementConstructor<NodeSettingsProps<TConfig>>; // The Form in the Sidebar
   
   // Behavior
   validate: (config: TConfig) => ValidationResult;

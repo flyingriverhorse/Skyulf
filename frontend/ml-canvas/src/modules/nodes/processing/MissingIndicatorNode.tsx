@@ -22,7 +22,9 @@ const MissingIndicatorSettings: React.FC<{ config: MissingIndicatorConfig; onCha
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics = nodeResult?.metrics;
+  const metrics = (nodeResult?.metrics && typeof nodeResult.metrics === 'object')
+    ? (nodeResult.metrics as Record<string, unknown>)
+    : null;
 
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -126,7 +128,15 @@ const MissingIndicatorSettings: React.FC<{ config: MissingIndicatorConfig; onCha
       </div>
 
       {/* Feedback Section */}
-      {metrics && (metrics.missing_indicators_created !== undefined) && (
+      {(() => {
+        const indicatorsCreated = metrics?.missing_indicators_created;
+        const indicatorColumns = Array.isArray(metrics?.missing_indicators_columns)
+          ? (metrics?.missing_indicators_columns as unknown[])
+          : [];
+
+        if (indicatorsCreated === undefined) return null;
+
+        return (
         <div className="mt-4 p-3 bg-muted/30 rounded-md border border-border">
           <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
             <Activity size={14} />
@@ -135,23 +145,27 @@ const MissingIndicatorSettings: React.FC<{ config: MissingIndicatorConfig; onCha
           <div className="space-y-1 text-xs">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Indicators Created:</span>
-              <span className="font-medium text-primary">{metrics.missing_indicators_created}</span>
+              <span className="font-medium text-primary">{String(indicatorsCreated)}</span>
             </div>
-            {metrics.missing_indicators_columns && Array.isArray(metrics.missing_indicators_columns) && metrics.missing_indicators_columns.length > 0 && (
+            {indicatorColumns.length > 0 && (
               <div className="pt-1 border-t mt-1">
                 <span className="text-muted-foreground block mb-1">New Columns:</span>
                 <div className="flex flex-wrap gap-1">
-                  {metrics.missing_indicators_columns.map((col: string) => (
-                    <span key={col} className="px-1.5 py-0.5 bg-background border rounded text-[10px] font-mono">
-                      {col}
-                    </span>
-                  ))}
+                  {indicatorColumns.map((col: unknown) => {
+                    const colKey = String(col);
+                    return (
+                      <span key={colKey} className="px-1.5 py-0.5 bg-background border rounded text-[10px] font-mono">
+                        {colKey}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

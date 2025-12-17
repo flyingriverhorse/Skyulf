@@ -263,14 +263,16 @@ class FeatureGenerationApplier(BaseApplier):
                 if op_type == "arithmetic":
                     # Ensure inputs exist
                     valid_inputs = [c for c in input_cols if c in df_out.columns]
-                    if not valid_inputs and not constants:
+                    valid_secondary = [c for c in secondary_cols if c in df_out.columns]
+                    all_cols = valid_inputs + valid_secondary
+                    if not all_cols and not constants:
                         continue
 
                     series_list = [
                         pd.to_numeric(df_out[c], errors="coerce").fillna(
                             fillna if fillna is not None else 0
                         )
-                        for c in valid_inputs
+                        for c in all_cols
                     ]
 
                     if method == "add":

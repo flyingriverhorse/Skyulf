@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { Node, Edge } from '@xyflow/react';
 import { Play, Save, Loader2, FolderOpen, History } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
@@ -82,7 +83,9 @@ export const Toolbar: React.FC = () => {
     try {
       const pipeline = await fetchPipeline(datasetId);
       if (pipeline) {
-        setGraph(pipeline.graph.nodes, pipeline.graph.edges);
+        const graphNodes: Node[] = Array.isArray(pipeline.graph.nodes) ? (pipeline.graph.nodes as Node[]) : [];
+        const graphEdges: Edge[] = Array.isArray(pipeline.graph.edges) ? (pipeline.graph.edges as Edge[]) : [];
+        setGraph(graphNodes, graphEdges);
         alert('Pipeline loaded successfully!');
       } else {
         alert('No saved pipeline found for this dataset.');

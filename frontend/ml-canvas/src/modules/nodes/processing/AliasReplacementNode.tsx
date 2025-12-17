@@ -163,11 +163,11 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
   // Filter for text columns only
   const textColumns = schema 
     ? Object.values(schema.columns)
-        .filter((c: unknown) => {
-            const col = c as Record<string, unknown>;
-            return col.dtype === 'object' || col.dtype === 'string' || col.dtype === 'category';
-        })
-        .map((c: unknown) => (c as Record<string, unknown>).name as string)
+      .filter((c) => {
+        const dtype = String(c.dtype).toLowerCase();
+        return dtype.includes('object') || dtype.includes('string') || dtype.includes('category') || dtype.includes('text');
+      })
+      .map((c) => c.name)
     : [];
 
   useEffect(() => {

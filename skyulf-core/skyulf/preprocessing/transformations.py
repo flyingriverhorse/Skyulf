@@ -129,7 +129,9 @@ class PowerTransformerApplier(BaseApplier):
             # PowerTransformer checks hasattr(self, "lambdas_")
 
             X_trans = pt.transform(X_vals)
-            df_out[valid_cols] = X_trans
+            # sklearn can be configured with transform_output="pandas", which returns a DataFrame.
+            X_trans_arr = X_trans.to_numpy() if hasattr(X_trans, "to_numpy") else X_trans
+            df_out.loc[:, valid_cols] = np.asarray(X_trans_arr)
 
         except Exception as e:
             logger.error(f"PowerTransformer application failed: {e}")
@@ -318,7 +320,11 @@ class GeneralTransformationApplier(BaseApplier):
                     # Reshape for sklearn
                     vals = series.values.reshape(-1, 1)
                     trans_vals = pt.transform(vals)
-                    df_out[col] = trans_vals.flatten()
+                    # sklearn can be configured with transform_output="pandas", which returns a DataFrame.
+                    trans_vals_arr = (
+                        trans_vals.to_numpy() if hasattr(trans_vals, "to_numpy") else trans_vals
+                    )
+                    df_out[col] = np.asarray(trans_vals_arr).ravel()
                 except Exception as e:
                     logger.warning(f"Failed to apply {method} for column {col}: {e}")
 

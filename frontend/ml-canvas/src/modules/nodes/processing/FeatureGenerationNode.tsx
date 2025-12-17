@@ -124,7 +124,14 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
   
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics = nodeResult?.metrics;
+  const metrics: Record<string, unknown> | null =
+    nodeResult?.metrics && typeof nodeResult.metrics === 'object'
+      ? (nodeResult.metrics as Record<string, unknown>)
+      : null;
+  const generatedFeatures: string[] =
+    metrics && Array.isArray(metrics.generated_features)
+      ? (metrics.generated_features as unknown[]).map((v) => String(v))
+      : [];
 
   const [showRecommendations, setShowRecommendations] = useState(false);
 
@@ -336,7 +343,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     label="Numerator (Sum)"
                     columns={numericColumns}
                     selected={op.input_columns}
-                    onChange={(cols) => updateOperation(idx, { input_columns: cols })}
+                    onChange={(cols) => { updateOperation(idx, { input_columns: cols }); }}
                   />
                   
                   <div className="relative flex items-center justify-center">
@@ -348,7 +355,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     label="Denominator (Sum)"
                     columns={numericColumns}
                     selected={op.secondary_columns || []}
-                    onChange={(cols) => updateOperation(idx, { secondary_columns: cols })}
+                    onChange={(cols) => { updateOperation(idx, { secondary_columns: cols }); }}
                   />
                 </div>
               )}
@@ -525,19 +532,19 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
             </div>
             
             <div className="space-y-2 text-xs">
-              {metrics.generated_features && metrics.generated_features.length > 0 ? (
+              {generatedFeatures.length > 0 ? (
                 <>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">New Features Created:</span>
                     <span className="font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                      {metrics.generated_features.length}
+                      {generatedFeatures.length}
                     </span>
                   </div>
                   
                   <div className="pt-2">
                     <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1.5 block">Generated Columns</span>
                     <div className="flex flex-wrap gap-1.5">
-                      {metrics.generated_features.map((f: string) => (
+                      {generatedFeatures.map((f) => (
                         <span key={f} className="px-2 py-1 bg-background border rounded text-[10px] font-mono text-foreground shadow-sm">
                           {f}
                         </span>
@@ -569,7 +576,7 @@ export const FeatureGenerationNode: NodeDefinition = {
   inputs: [{ id: 'in', type: 'dataset', label: 'Dataset' }],
   outputs: [{ id: 'out', type: 'dataset', label: 'Enhanced' }],
   validate: (config: FeatureGenerationConfig) => {
-    if (!config.operations || config.operations.length === 0) {
+    if (!config.operations?.length) {
       return { isValid: false, message: 'Add at least one operation.' };
     }
     for (const op of config.operations) {

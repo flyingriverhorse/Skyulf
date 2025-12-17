@@ -108,7 +108,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
                if (typeof min === 'number') details = `Min=${min.toFixed(2)}, Max=${typeof max === 'number' ? max.toFixed(2) : '-'}`;
             } else if (config.method === 'robust') {
                const center = (m.center as number[])[idx];
-               const scale = (m.scale as number[])?.[idx];
+               const scale = (m.scale as number[])[idx];
                if (typeof center === 'number') details = `Med=${center.toFixed(2)}, IQR=${typeof scale === 'number' ? scale.toFixed(2) : '-'}`;
             } else if (config.method === 'maxabs') {
                const maxAbs = (m.max_abs as number[])[idx];

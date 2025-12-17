@@ -254,7 +254,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                         className="w-full p-1.5 border rounded text-xs bg-background"
                         value={rule.method}
                         onChange={(e) => { updateRule(idx, { method: e.target.value as TransformationRule['method'] }); }}
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); }}
                       >
                         {TRANSFORMATION_TYPES[currentType].methods.map(m => (
                           <option key={m.value} value={m.value}>{m.label}</option>
@@ -313,8 +313,8 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
         recommendations={backendRecommendations || []}
         onApply={(rec) => {
           // Apply recommendation logic
-          const r = rec as Record<string, unknown>;
-          const method = (r.suggested_params as Record<string, unknown>)?.method || (r.params as Record<string, unknown>)?.method || 'log';
+          const r = rec as unknown as Record<string, unknown>;
+          const method = (r.suggested_params as Record<string, unknown>).method || (r.params as Record<string, unknown>)?.method || 'log';
           const columns = (r.target_columns as string[]) || [];
           
           if (columns.length > 0) {
@@ -333,11 +333,11 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
   );
 };
 
-export const TransformationNode: NodeDefinition = {
+export const TransformationNode: NodeDefinition<TransformationConfig> = {
   type: 'TransformationNode',
   label: 'Transformation',
   description: 'Apply mathematical transformations to features.',
-  icon: FunctionSquare,
+  icon: FunctionSquare as unknown as React.FC<any>,
   category: 'Preprocessing',
   inputs: [{ id: 'in', type: 'dataset', label: 'Dataset' }],
   outputs: [{ id: 'out', type: 'dataset', label: 'Transformed' }],

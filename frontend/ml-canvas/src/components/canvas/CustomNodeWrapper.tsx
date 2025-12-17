@@ -3,6 +3,7 @@ import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
 import { registry } from '../../core/registry/NodeRegistry';
 import { AlertCircle, X, CheckCircle2, XCircle } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
+import type { NodeExecutionResult } from '../../core/api/client';
 
 export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
   const definitionType = data.definitionType as string;
@@ -10,7 +11,7 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
   const { deleteElements } = useReactFlow();
   
   const executionResult = useGraphStore((state) => state.executionResult);
-  const nodeResult = executionResult?.node_results[id];
+  const nodeResult: NodeExecutionResult | undefined = executionResult?.node_results?.[id];
 
   const onDelete = (evt: React.MouseEvent) => {
     evt.stopPropagation();

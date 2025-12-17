@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { ChevronUp, ChevronDown, Table, Layers } from 'lucide-react';
+import type { NodeExecutionResult, PreviewDataRows } from '../../core/api/client';
 
 export const ResultsPanel: React.FC = () => {
   const executionResult = useGraphStore((state) => state.executionResult);
@@ -10,15 +11,16 @@ export const ResultsPanel: React.FC = () => {
 
   // Determine available datasets (tabs)
   const datasets = useMemo(() => {
-    if (!executionResult?.preview_data) return {};
+    const previewData = executionResult?.preview_data;
+    if (!previewData) return {};
     
-    if (Array.isArray(executionResult.preview_data)) {
-      return { 'Result': executionResult.preview_data };
+    if (Array.isArray(previewData)) {
+      return { Result: previewData as PreviewDataRows };
     }
     
-    if (typeof executionResult.preview_data === 'object') {
+    if (typeof previewData === 'object') {
       // It's a dictionary of datasets (e.g. { train: [...], test: [...] } or { X: [...], y: [...] })
-      return executionResult.preview_data;
+      return previewData as Record<string, PreviewDataRows>;
     }
     
     return {};
@@ -38,15 +40,17 @@ export const ResultsPanel: React.FC = () => {
 
   if (!executionResult) return null;
 
-  const currentRows = activeTab && datasets[activeTab] ? datasets[activeTab] : [];
-  const columns = currentRows.length > 0 ? Object.keys(currentRows[0]) : [];
+  const currentRows = (activeTab && datasets[activeTab]) ? datasets[activeTab] : [];
+  const columns = currentRows.length > 0 ? Object.keys(currentRows[0] ?? {}) : [];
   const applied_steps = executionResult.node_results ? Object.keys(executionResult.node_results) : [];
 
   // Check for errors
-  const errorNodeId = Object.keys(executionResult.node_results || {}).find(
-    nodeId => executionResult.node_results[nodeId].status === 'failed'
-  );
-  const error = errorNodeId ? executionResult.node_results[errorNodeId].error : null;
+  const nodeResults = executionResult.node_results || {};
+  const errorNodeId = Object.keys(nodeResults).find((nodeId) => {
+    const result: NodeExecutionResult | undefined = nodeResults[nodeId];
+    return result?.status === 'failed';
+  });
+  const error = errorNodeId ? nodeResults[errorNodeId]?.error : null;
 
   return (
     <div 

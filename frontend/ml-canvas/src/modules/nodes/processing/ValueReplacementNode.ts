@@ -12,7 +12,7 @@ export const ValueReplacementNode: NodeDefinition<ValueReplacementConfig> = {
   outputs: [{ id: 'out', label: 'Cleaned Dataset', type: 'dataset' }],
   settings: ValueReplacementSettings,
   validate: (config) => {
-    if (!config.replacements || config.replacements.length === 0) return { isValid: true, message: 'No replacements defined (pass-through).' };
+    if (!config.replacements?.length) return { isValid: true, message: 'No replacements defined (pass-through).' };
     return { isValid: true };
   },
   getDefaultConfig: () => ({

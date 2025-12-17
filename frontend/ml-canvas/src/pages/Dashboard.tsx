@@ -19,6 +19,10 @@ interface TrainingJobSummary {
   metrics?: Record<string, unknown>;
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
 export const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [jobs, setJobs] = useState<TrainingJobSummary[]>([]);
@@ -38,7 +42,10 @@ export const Dashboard: React.FC = () => {
             status: job.status,
             model_type: job.model_type || 'Unknown',
             created_at: job.start_time || job.created_at || new Date().toISOString(),
-            metrics: job.metrics || (job.result as Record<string, unknown>)?.metrics
+            metrics: (() => {
+              const metricsCandidate = job.metrics ?? (isRecord(job.result) ? (job.result as Record<string, unknown>).metrics : undefined);
+              return isRecord(metricsCandidate) ? metricsCandidate : undefined;
+            })()
           }))
         );
       } catch (error) {
