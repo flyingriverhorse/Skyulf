@@ -7,11 +7,16 @@ long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="skyulf-core",
-    version="0.1.3",
+    version="0.1.4",
     description="The core machine learning library for Skyulf.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Murat H. Unsal",
+    project_urls={
+        "Documentation": "https://flyingriverhorse.github.io/Skyulf",
+        "Source": "https://github.com/flyingriverhorse/Skyulf",
+        "Changelog": "https://github.com/flyingriverhorse/Skyulf/releases",
+    },
     include_package_data=True,
     packages=find_packages(),
     install_requires=[
@@ -26,4 +31,13 @@ setup(
     ],
     extras_require={"dev": ["pytest", "twine", "build"]},
     python_requires=">=3.9",
+    classifiers=[
+        "License :: OSI Approved :: Apache Software License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Operating System :: OS Independent",
+    ],
 )
