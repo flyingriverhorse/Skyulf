@@ -180,6 +180,16 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           params = {
               operations: node.data.operations
           };
+      } else if (node.data.definitionType === 'PolynomialFeaturesNode') {
+          stepType = 'PolynomialFeatures';
+          params = {
+              columns: node.data.columns,
+              degree: node.data.degree,
+              interaction_only: node.data.interaction_only,
+              include_bias: node.data.include_bias,
+              output_prefix: node.data.output_prefix,
+              include_input_features: node.data.include_input_features
+          };
       } else if (node.data.definitionType === 'TextCleaning') {
           stepType = 'TextCleaning';
           params = node.data;

@@ -167,7 +167,28 @@ class PolynomialFeaturesApplier(BaseApplier):
         poly.fit(X[valid_cols])  # Cheap fit
 
         transformed = poly.transform(X[valid_cols])
+        
+        # Handle case where sklearn is configured to output pandas DataFrames
+        if hasattr(transformed, "iloc"):
+            transformed = transformed.values
+            
         feature_names = poly.get_feature_names_out(valid_cols)
+
+        # Filter out original features (degree 1) if not requested
+        # We use powers_ to determine the degree of each output feature
+        indices_to_keep = []
+        for i, p in enumerate(poly.powers_):
+            deg = sum(p)
+            # If degree is 1 (linear term) and we don't want to include input features, skip it
+            if deg == 1 and not include_input_features:
+                continue
+            indices_to_keep.append(i)
+
+        if not indices_to_keep:
+            return pack_pipeline_output(X, y, is_tuple)
+
+        transformed = transformed[:, indices_to_keep]
+        feature_names = feature_names[indices_to_keep]
 
         # Rename features to be more readable and avoid collisions
         # We convert sklearn's "col1 col2" format to "prefix_col1_col2"
@@ -181,11 +202,8 @@ class PolynomialFeaturesApplier(BaseApplier):
         df_poly = pd.DataFrame(transformed, columns=new_names, index=X.index)
 
         df_out = X.copy()
-        if not include_input_features:
-            # If input features are not requested, we rely on the user to drop them later if needed,
-            # or we could drop them here. Currently we keep the original dataframe structure.
-            pass
-
+        # We no longer need to check include_input_features here as we filtered them above
+        
         # Concatenate
         df_out = pd.concat([df_out, df_poly], axis=1)
 
