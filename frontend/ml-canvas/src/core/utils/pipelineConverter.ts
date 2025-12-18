@@ -1,5 +1,6 @@
 import { Node, Edge } from '@xyflow/react';
 import { PipelineConfigModel, NodeConfigModel } from '../api/client';
+import { v4 as uuidv4 } from 'uuid';
 
 export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): PipelineConfigModel => {
     const sortedNodes: NodeConfigModel[] = [];
@@ -254,7 +255,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
     }
 
     return {
-      pipeline_id: `preview_${Date.now()}`,
+      pipeline_id: `preview_${uuidv4()}`,
       nodes: sortedNodes,
       metadata: { dataset_source_id: datasetId }
     };

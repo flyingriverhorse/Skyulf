@@ -1,6 +1,6 @@
 # Version Updates
 
-*   **v0.1.4 :** "The API Routing & Log Visibility Update" — Fixed API routing structure, restored live logs, and silenced misleading tuning warnings.
+*   **v0.1.4 :** "The Polynomial, Security & API Update" — Major release combining frontend refactoring, security hardening, backend logic fixes, and critical API routing improvements.
 *   **v0.1.3 :** "The Code Quality & Stability Update" — Extensive static analysis fixes, safer type handling, and backend runtime stability improvements.
 *   **v0.1.2 :** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
@@ -9,9 +9,19 @@
 ------------------------------------------------------------
 
 ## v0.1.4
-**"The API Routing & Log Visibility Update"**
+**"The Polynomial, Security & API Update"**
 
-This release addresses critical connectivity issues between the frontend and backend, ensuring that logs are visible and API endpoints are correctly routed.
+This comprehensive release addresses critical connectivity issues, refines the feature engineering experience, and hardens the application's security and stability.
+
+### 🎨 Frontend Refactoring & Security
+- **Standalone Polynomial Node:** Extracted `PolynomialFeatures` from the generic "Feature Generation" node into its own dedicated node. This improves discoverability and simplifies the configuration UX.
+- **Secure ID Generation:** Replaced insecure `Math.random()` calls with cryptographically secure `uuid` (v4) for generating Node and Pipeline IDs, satisfying strict security compliance rules.
+- **Code Hygiene:** Cleaned up console logs and improved TypeScript type safety across the frontend codebase.
+
+### 🧠 Backend Logic & Stability
+- **Polynomial Logic Fix:** Resolved a critical bug where `PolynomialFeatures` would duplicate input columns even when `include_input_features` was disabled.
+- **Pandas Output Compatibility:** Fixed a crash that occurred when Scikit-Learn was configured to output Pandas DataFrames (`transform_output="pandas"`), ensuring the backend handles both Numpy and Pandas formats seamlessly.
+- **Null Value Verification:** Verified and hardened the handling of null values in polynomial generation, confirming that nulls are only propagated from existing NaNs in the input data.
 
 ### 🔌 API & Routing
 - **Router Restructuring:** Refactored `jobs.py` and correctly mounted `ml_pipeline_router` and `model_registry_router` under the `/api/ml` prefix.

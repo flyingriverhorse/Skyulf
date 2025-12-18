@@ -1,0 +1,8 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skyulf-core"
+dynamic = ["version", "description", "readme", "authors", "dependencies", "optional-dependencies"]
+requires-python = ">=3.9"
