@@ -1,165 +1,27 @@
 # Pipeline Quickstart
 
-This guide shows a production-style workflow: split → fit → evaluate → predict.
+This guide shows a production-style workflow: split → fit → evaluate → predict → save/load.
 
-## 1) Define a config
+## What data shape should I pass?
 
-Preprocessing steps are executed by `FeatureEngineer`.
+`SkyulfPipeline.fit(...)` supports two common inputs:
 
-Each step has:
+1. A single `pd.DataFrame` that **includes the target column**.
+    - You pass `target_column="..."` and Skyulf splits features/target internally.
+    - This is what the quickstart uses, because it’s the simplest onboarding path.
 
-- `name`: human-readable identifier
-- `transformer`: the node type (string)
-- `params`: node configuration passed to the Calculator
+2. A `SplitDataset` (recommended when you already have train/test splits).
+    - Each split can be either a DataFrame (with the target column) **or** a tuple `(X, y)`.
 
-```python
-config = {
-    "preprocessing": [
-        {
-            "name": "split",
-            "transformer": "TrainTestSplitter",
-            "params": {
-                "test_size": 0.2,
-                "validation_size": 0.0,
-                "random_state": 42,
-                "shuffle": True,
-                "stratify": True,
-                "target_column": "target",
-            },
-        },
-        {
-            "name": "impute",
-            "transformer": "SimpleImputer",
-            "params": {"strategy": "mean", "columns": ["age"]},
-        },
-        {
-            "name": "encode",
-            "transformer": "OneHotEncoder",
-            "params": {"columns": ["city"], "drop_original": True},
-        },
-    ],
-    "modeling": {
-        "type": "random_forest_classifier",
-        "params": {"n_estimators": 200, "random_state": 42},
-    },
-}
-```
+You do not need to manually build `X` and `y` for the pipeline unless you want to.
 
-## 2) Fit
+If you prefer a scikit-learn-style workflow (`X`/`y` + `train_test_split`), see:
 
-```python
-from __future__ import annotations
+- [Validation vs scikit-learn (Proof)](validation_vs_sklearn.md)
 
-import pandas as pd
+## Complete runnable example
 
-from skyulf.pipeline import SkyulfPipeline
-
-config = {
-    "preprocessing": [
-        {
-            "name": "split",
-            "transformer": "TrainTestSplitter",
-            "params": {
-                "test_size": 0.2,
-                "validation_size": 0.0,
-                "random_state": 42,
-                "shuffle": True,
-                "stratify": True,
-                "target_column": "target",
-            },
-        },
-        {
-            "name": "impute",
-            "transformer": "SimpleImputer",
-            "params": {"strategy": "mean", "columns": ["age"]},
-        },
-        {
-            "name": "encode",
-            "transformer": "OneHotEncoder",
-            "params": {"columns": ["city"], "drop_original": True},
-        },
-    ],
-    "modeling": {
-        "type": "random_forest_classifier",
-        "params": {"n_estimators": 200, "random_state": 42},
-    },
-}
-
-df = pd.DataFrame(
-    {
-        "age": [10, 20, None, 40, 50, 60, None, 80],
-        "city": ["A", "B", "A", "C", "B", "A", "C", "B"],
-        "target": [0, 1, 0, 1, 1, 0, 1, 0],
-    }
-)
-
-pipeline = SkyulfPipeline(config)
-metrics = pipeline.fit(df, target_column="target")
-print(metrics)
-```
-
-## 3) Predict
-
-`predict()` expects a feature-only dataframe.
-
-```python
-from __future__ import annotations
-
-import pandas as pd
-
-from skyulf.pipeline import SkyulfPipeline
-
-config = {
-    "preprocessing": [
-        {
-            "name": "split",
-            "transformer": "TrainTestSplitter",
-            "params": {
-                "test_size": 0.2,
-                "validation_size": 0.0,
-                "random_state": 42,
-                "shuffle": True,
-                "stratify": True,
-                "target_column": "target",
-            },
-        },
-        {
-            "name": "impute",
-            "transformer": "SimpleImputer",
-            "params": {"strategy": "mean", "columns": ["age"]},
-        },
-        {
-            "name": "encode",
-            "transformer": "OneHotEncoder",
-            "params": {"columns": ["city"], "drop_original": True},
-        },
-    ],
-    "modeling": {
-        "type": "random_forest_classifier",
-        "params": {"n_estimators": 200, "random_state": 42},
-    },
-}
-
-train_df = pd.DataFrame(
-    {
-        "age": [10, 20, None, 40, 50, 60, None, 80],
-        "city": ["A", "B", "A", "C", "B", "A", "C", "B"],
-        "target": [0, 1, 0, 1, 1, 0, 1, 0],
-    }
-)
-
-pipeline = SkyulfPipeline(config)
-_ = pipeline.fit(train_df, target_column="target")
-
-incoming = pd.DataFrame({"age": [25, None], "city": ["A", "C"]})
-preds = pipeline.predict(incoming)
-
-print(preds)
-```
-
-## 4) Save / load
-
-SkyulfPipeline supports pickling.
+This single snippet is intentionally end-to-end (no duplicated setup across steps).
 
 ```python
 from __future__ import annotations
@@ -171,13 +33,16 @@ import pandas as pd
 
 from skyulf.pipeline import SkyulfPipeline
 
+# 1) Define a pipeline config
+# Each preprocessing step is:
+#   {"name": "...", "transformer": "TransformerType", "params": {...}}
 config = {
     "preprocessing": [
         {
             "name": "split",
             "transformer": "TrainTestSplitter",
             "params": {
-                "test_size": 0.2,
+                "test_size": 0.25,
                 "validation_size": 0.0,
                 "random_state": 42,
                 "shuffle": True,
@@ -193,15 +58,16 @@ config = {
         {
             "name": "encode",
             "transformer": "OneHotEncoder",
-            "params": {"columns": ["city"], "drop_original": True},
+            "params": {"columns": ["city"], "drop_original": True, "handle_unknown": "ignore"},
         },
     ],
     "modeling": {
         "type": "random_forest_classifier",
-        "params": {"n_estimators": 200, "random_state": 42},
+        "params": {"n_estimators": 50, "random_state": 42},
     },
 }
 
+# 2) Training data (includes the target column)
 df = pd.DataFrame(
     {
         "age": [10, 20, None, 40, 50, 60, None, 80],
@@ -210,15 +76,24 @@ df = pd.DataFrame(
     }
 )
 
-with tempfile.TemporaryDirectory() as tmp:
-    path = Path(tmp) / "model.pkl"
+# 3) Fit (learn params on train split, apply to test split)
+pipeline = SkyulfPipeline(config)
+metrics = pipeline.fit(df, target_column="target")
+print("Metrics keys:", list(metrics.keys()))
 
-    pipeline = SkyulfPipeline(config)
-    _ = pipeline.fit(df, target_column="target")
-    pipeline.save(path)
-
-    loaded = SkyulfPipeline.load(path)
-    preds = loaded.predict(pd.DataFrame({"age": [15, 65], "city": ["A", "B"]}))
-
+# 4) Predict (feature-only dataframe)
+incoming = pd.DataFrame({"age": [25, None], "city": ["A", "C"]})
+preds = pipeline.predict(incoming)
+print("Preds:")
 print(preds)
+
+# 5) Save / load
+with tempfile.TemporaryDirectory() as tmp:
+    model_path = Path(tmp) / "model.pkl"
+    pipeline.save(model_path)
+    loaded = SkyulfPipeline.load(model_path)
+    preds2 = loaded.predict(incoming)
+
+print("Preds after reload:")
+print(preds2)
 ```

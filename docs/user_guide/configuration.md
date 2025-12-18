@@ -27,56 +27,33 @@ Each step is:
 }
 ```
 
-The supported `TransformerType` strings are defined in the `FeatureEngineer` dispatcher:
+`TransformerType` is a string key that `FeatureEngineer` dispatches to a Calculator/Applier pair.
+For the full list and per-node parameters, see:
 
-- `TrainTestSplitter`
-- `feature_target_split`
-- `TextCleaning`
-- `ValueReplacement`
-- `Deduplicate`
-- `DropMissingColumns`
-- `DropMissingRows`
-- `MissingIndicator`
-- `AliasReplacement`
-- `InvalidValueReplacement`
-- `SimpleImputer`
-- `KNNImputer`
-- `IterativeImputer`
-- `OneHotEncoder`
-- `DummyEncoder`
-- `OrdinalEncoder`
-- `LabelEncoder`
-- `TargetEncoder`
-- `HashEncoder`
-- `StandardScaler`
-- `MinMaxScaler`
-- `RobustScaler`
-- `MaxAbsScaler`
-- `IQR`
-- `ZScore`
-- `Winsorize`
-- `ManualBounds`
-- `EllipticEnvelope`
-- `PowerTransformer`
-- `SimpleTransformation`
-- `GeneralTransformation`
-- `GeneralBinning`
-- `CustomBinning`
-- `KBinsDiscretizer`
-- `VarianceThreshold`
-- `CorrelationThreshold`
-- `UnivariateSelection`
-- `ModelBasedSelection`
-- `feature_selection`
-- `Casting`
-- `PolynomialFeatures`
-- `FeatureMath` / `FeatureGenerationNode`
-- `Oversampling`
-- `Undersampling`
-- `DatasetProfile`
-- `DataSnapshot`
+- Reference → Preprocessing Nodes
+- Reference → API → Preprocessing → pipeline
 
-See “Preprocessing Nodes” in Reference for per-node parameters.
+#### Minimal examples
+
+```python
+# Split to avoid leakage
+{"name": "split", "transformer": "TrainTestSplitter", "params": {"test_size": 0.2, "random_state": 42, "target_column": "target"}}
+```
+
+```python
+# Impute missing numeric values
+{"name": "impute", "transformer": "SimpleImputer", "params": {"strategy": "mean", "columns": ["age"]}}
+```
+
+```python
+# Encode categoricals
+{"name": "encode", "transformer": "OneHotEncoder", "params": {"columns": ["city"], "drop_original": True, "handle_unknown": "ignore"}}
+```
+
+```python
+# Scale numeric columns
+{"name": "scale", "transformer": "StandardScaler", "params": {"auto_detect": True}}
+```
 
 ### Modeling config
 

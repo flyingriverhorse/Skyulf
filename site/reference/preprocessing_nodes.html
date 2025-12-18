@@ -710,6 +710,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/configuration.html" class="md-nav__link">
         
   
@@ -2872,6 +2900,9 @@
 </code></pre>
 <p>Where <code>params</code> is passed into the node’s Calculator <code>fit()</code>.</p>
 <h2 id="splitters">Splitters</h2>
+<p>Example step:</p>
+<pre><code class="language-python">{&quot;name&quot;: &quot;split&quot;, &quot;transformer&quot;: &quot;TrainTestSplitter&quot;, &quot;params&quot;: {&quot;test_size&quot;: 0.2, &quot;random_state&quot;: 42, &quot;target_column&quot;: &quot;target&quot;}}
+</code></pre>
 <h3 id="traintestsplitter">TrainTestSplitter</h3>
 <p>Splits a DataFrame (or <code>(X, y)</code> tuple) into <code>SplitDataset(train, test, validation)</code>.</p>
 <p>Config (<code>params</code>):</p>
@@ -2892,6 +2923,20 @@
 </ul>
 <p>Learned params: none.</p>
 <h2 id="cleaning">Cleaning</h2>
+<p>Example step:</p>
+<pre><code class="language-python">{
+  &quot;name&quot;: &quot;clean_text&quot;,
+  &quot;transformer&quot;: &quot;TextCleaning&quot;,
+  &quot;params&quot;: {
+    &quot;columns&quot;: [&quot;free_text&quot;],
+    &quot;operations&quot;: [
+      {&quot;op&quot;: &quot;trim&quot;, &quot;mode&quot;: &quot;both&quot;},
+      {&quot;op&quot;: &quot;case&quot;, &quot;mode&quot;: &quot;lower&quot;},
+      {&quot;op&quot;: &quot;regex&quot;, &quot;mode&quot;: &quot;collapse_whitespace&quot;}
+    ]
+  }
+}
+</code></pre>
 <h3 id="textcleaning">TextCleaning</h3>
 <p>Applies a list of string operations.</p>
 <p>Config:</p>
@@ -2990,6 +3035,9 @@
 <li><code>columns</code></li>
 </ul>
 <h2 id="imputation">Imputation</h2>
+<p>Example step:</p>
+<pre><code class="language-python">{&quot;name&quot;: &quot;impute&quot;, &quot;transformer&quot;: &quot;SimpleImputer&quot;, &quot;params&quot;: {&quot;strategy&quot;: &quot;median&quot;, &quot;columns&quot;: [&quot;age&quot;]}}
+</code></pre>
 <h3 id="simpleimputer">SimpleImputer</h3>
 <p>Config:</p>
 <ul>
@@ -3032,6 +3080,9 @@
 <li><code>estimator</code></li>
 </ul>
 <h2 id="encoding">Encoding</h2>
+<p>Example step:</p>
+<pre><code class="language-python">{&quot;name&quot;: &quot;encode&quot;, &quot;transformer&quot;: &quot;OneHotEncoder&quot;, &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;], &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;}}
+</code></pre>
 <h3 id="onehotencoder">OneHotEncoder</h3>
 <p>Config:</p>
 <ul>

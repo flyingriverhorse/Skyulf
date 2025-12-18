@@ -711,6 +711,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#how-fit-transform-works-in-skyulf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How fit / transform works in Skyulf
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-splitting-matters-leakage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why splitting matters (leakage)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#where-things-live" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -801,6 +823,34 @@
     
   
     Step-by-Step (No Config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
   
 
     
@@ -2171,13 +2221,53 @@
 <li>A <strong>Calculator</strong> learns from data and returns a <code>params</code> dictionary.</li>
 <li>An <strong>Applier</strong> takes <code>params</code> and transforms data.</li>
 </ul>
-<p>This differs from scikit-learn’s stateful estimators where learned values are stored inside the object instance.
-In Skyulf-core, learned values are explicit and can be inspected or persisted.</p>
+<p>This differs from scikit-learn’s default pattern:</p>
+<ul>
+<li>In scikit-learn, <code>fit()</code> <strong>mutates</strong> the estimator/transformer object (e.g. <code>self.mean_</code>, <code>self.categories_</code>), and <code>transform()</code> uses those hidden internal attributes.</li>
+<li>In Skyulf-core, <code>fit()</code> returns the learned state explicitly as a plain <code>params</code> dictionary (ideally JSON-serializable; sometimes pickled for complex sklearn objects), and <code>apply()</code> uses only that dictionary.</li>
+</ul>
+<p>Practically, this makes learned state easier to inspect, persist, and apply consistently across train/test/inference.</p>
 <h2 id="two-ways-to-use-the-library">Two ways to use the library</h2>
 <h3 id="1-pipeline-way-recommended">1) Pipeline way (recommended)</h3>
 <p>Use <code>SkyulfPipeline</code> to run preprocessing + modeling end-to-end.</p>
 <h3 id="2-component-way-low-level">2) Component way (low-level)</h3>
 <p>Call calculators/appliers directly for debugging, testing, or custom scripts.</p>
+<p>This is also where you’ll see <code>StatefulEstimator</code> used: it’s a small convenience wrapper that
+keeps a fitted model artifact in memory and can run <code>fit_predict()</code> on a <code>SplitDataset</code>.
+<code>SkyulfPipeline</code> uses the same underlying idea internally.</p>
+<h2 id="how-fit-transform-works-in-skyulf">How <code>fit</code> / <code>transform</code> works in Skyulf</h2>
+<p>At a high level:</p>
+<ul>
+<li>
+<p><code>SkyulfPipeline.fit(data, target_column=...)</code></p>
+<ul>
+<li>Runs preprocessing in order.</li>
+<li>For each preprocessing step: Calculator learns params (typically from train only), then Applier applies those params to train/test/validation.</li>
+<li>Trains the model and reports metrics.</li>
+</ul>
+</li>
+<li>
+<p><code>SkyulfPipeline.predict(df)</code></p>
+<ul>
+<li>Applies the already-learned preprocessing params (no re-fitting).</li>
+<li>Skips steps that only make sense during training (e.g., splitters / resampling).</li>
+<li>Runs the trained model to produce predictions.</li>
+</ul>
+</li>
+</ul>
+<p>If you want reproducible “proof-style” checks (sklearn-style <code>X/y</code> split + leakage demonstration), see:</p>
+<ul>
+<li>Validation vs scikit-learn</li>
+</ul>
+<h2 id="why-splitting-matters-leakage">Why splitting matters (leakage)</h2>
+<p>Many preprocessing nodes <em>learn</em> from data (means, categories, bin edges, vocabularies…).
+If you learn those from the full dataset and then evaluate on a test set, you leak information.</p>
+<p>The safe pattern is:</p>
+<ul>
+<li>Split first (or provide a <code>SplitDataset</code>).</li>
+<li>Fit preprocessing on <code>train</code> only.</li>
+<li>Reuse the learned <code>params</code> to transform <code>test</code> / new inference data.</li>
+</ul>
 <h2 id="where-things-live">Where things live</h2>
 <ul>
 <li><code>skyulf.preprocessing</code>: feature engineering nodes (imputation, encoding, scaling, …)</li>
