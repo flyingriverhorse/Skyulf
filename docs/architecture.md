@@ -1,33 +1,58 @@
 # Architecture
 
-Skyulf is split into a FastAPI backend (the running application) and a standalone Python SDK (skyulf-core).
+Skyulf is split into three pieces with strict boundaries:
 
-## Components
+1. **skyulf-core** (this docs set focuses on this)
+   - A standalone Python ML library.
+   - Implements a strict **Calculator → Applier** pattern for every node.
+   - Depends on Pandas/Numpy/Scikit-Learn (and a few optional ML utilities).
+2. **backend**
+   - FastAPI + Celery orchestration layer.
+   - Handles ingestion, jobs, persistence, and exposes REST APIs.
+3. **frontend**
+   - React + TypeScript UI (ML canvas).
+   - Builds pipeline configs and talks to the backend.
 
-1. Frontend: a React UI for interacting with the platform (feature canvas, dataset views).
-2. Backend API: a FastAPI service that manages ingestion, jobs, artifacts, and deployments.
-3. Worker (optional): Celery + Redis for long-running tasks (training, tuning). The backend can also run without Celery for simple development setups.
-4. Storage: SQLite/PostgreSQL for metadata and an artifact store (local filesystem by default).
+## The Calculator → Applier Pattern
 
-## Data flow (high level)
+Skyulf-core separates learning from transformation:
 
-1. Data is ingested and profiled.
-2. A job executes a preprocessing + modeling pipeline.
-3. Fitted transformers and trained models are stored as artifacts.
-4. Deployments load those artifacts to serve predictions.
+- **Calculator**: `fit(data, config) -> params`
+  - Learns statistics / encoders / models.
+  - Returns a serializable `params` dictionary.
+- **Applier**: `apply(data, params) -> transformed_data`
+  - Stateless transformer.
+  - Applies learned parameters.
 
-## Repository layout
+This makes pipelines easier to persist and safer to run in production:
 
-```text
-backend/        # FastAPI app (routes, ingestion, pipeline execution, registry, deployment)
-frontend/       # React UI
-skyulf-core/    # Python SDK (imported as skyulf)
-tests/          # Backend + SDK tests
+- Learning happens on train.
+- The learned state is explicit.
+- Applying is pure and repeatable.
+
+## Pipeline Data Flow
+
+At runtime, `SkyulfPipeline` orchestrates:
+
+1. **Preprocessing**: `FeatureEngineer`
+   - Executes a list of steps (each step is a transformer).
+   - Some steps change the data structure (e.g., splitters) and are handled specially.
+2. **Modeling**: `StatefulEstimator`
+   - Trains a model on the train split.
+   - Optionally evaluates on test/validation.
+
+High-level flow:
+
+```
+Raw DataFrame
+  └─ FeatureEngineer.fit_transform(...)  -> DataFrame or SplitDataset
+        └─ (optionally) SplitDataset.train / test / validation
+              └─ StatefulEstimator.fit_predict(...) -> predictions
 ```
 
-## Key code areas
+## Avoiding Data Leakage
 
-- backend/data_ingestion: connectors and profiling (Polars-based ingestion)
-- backend/ml_pipeline: pipeline execution, artifacts, model registry, deployments
-- skyulf-core/skyulf/preprocessing: calculators/appliers (fit/transform pattern)
-- skyulf-core/skyulf/modeling: estimators and model wrappers
+If you split first (or provide a `SplitDataset`), calculators should learn only on the train split.
+This prevents leakage of statistics from test/validation.
+
+See the User Guide section “SplitDataset & Leakage” for recommended patterns.

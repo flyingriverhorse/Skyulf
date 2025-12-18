@@ -3,6 +3,10 @@ site_url: https://flyingriverhorse.github.io/Skyulf/
 repo_url: https://github.com/flyingriverhorse/Skyulf
 repo_name: flyingriverhorse/Skyulf
 
+# Make the generated site usable when opening HTML files directly
+# (e.g., double-clicking site/index.html on Windows).
+use_directory_urls: false
+
 theme:
   name: material
   palette:
@@ -43,5 +47,48 @@ nav:
     - Getting Started: guides/getting_started.md
     - Recipes: guides/recipes.md
     - Architecture: architecture.md
+  - User Guide:
+    - Overview: user_guide/overview.md
+    - Installation: user_guide/installation.md
+    - Pipeline Quickstart: user_guide/pipeline_quickstart.md
+    - Step-by-Step (No Config): user_guide/step_by_step_no_config.md
+    - Configuration: user_guide/configuration.md
+    - SplitDataset & Leakage: user_guide/splitdataset_and_leakage.md
+    - Serialization: user_guide/serialization.md
+    - Extending Skyulf-Core: user_guide/extending_custom_nodes.md
+    - Troubleshooting: user_guide/troubleshooting.md
+  - Reference:
+    - Preprocessing Nodes: reference/preprocessing_nodes.md
+    - Modeling Nodes: reference/modeling_nodes.md
+    - API:
+      - Pipeline: reference/api/pipeline.md
+      - Data:
+        - SplitDataset: reference/api/data/dataset.md
+      - Preprocessing:
+        - Overview: reference/api/preprocessing/index.md
+        - base: reference/api/preprocessing/base.md
+        - pipeline: reference/api/preprocessing/pipeline.md
+        - split: reference/api/preprocessing/split.md
+        - cleaning: reference/api/preprocessing/cleaning.md
+        - drop_and_missing: reference/api/preprocessing/drop_and_missing.md
+        - imputation: reference/api/preprocessing/imputation.md
+        - encoding: reference/api/preprocessing/encoding.md
+        - scaling: reference/api/preprocessing/scaling.md
+        - outliers: reference/api/preprocessing/outliers.md
+        - transformations: reference/api/preprocessing/transformations.md
+        - bucketing: reference/api/preprocessing/bucketing.md
+        - casting: reference/api/preprocessing/casting.md
+        - feature_generation: reference/api/preprocessing/feature_generation.md
+        - feature_selection: reference/api/preprocessing/feature_selection.md
+        - resampling: reference/api/preprocessing/resampling.md
+        - inspection: reference/api/preprocessing/inspection.md
+      - Modeling:
+        - Overview: reference/api/modeling/index.md
+        - base: reference/api/modeling/base.md
+        - sklearn_wrapper: reference/api/modeling/sklearn_wrapper.md
+        - classification: reference/api/modeling/classification.md
+        - regression: reference/api/modeling/regression.md
+        - cross_validation: reference/api/modeling/cross_validation.md
+        - tuning/tuner: reference/api/modeling/tuning_tuner.md
   - Contributing:
     - Writing Docs: contributing/writing_docs.md
