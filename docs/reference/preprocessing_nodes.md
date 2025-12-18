@@ -18,6 +18,12 @@ Where `params` is passed into the node’s Calculator `fit()`.
 
 ## Splitters
 
+Example step:
+
+```python
+{"name": "split", "transformer": "TrainTestSplitter", "params": {"test_size": 0.2, "random_state": 42, "target_column": "target"}}
+```
+
 ### TrainTestSplitter
 
 Splits a DataFrame (or `(X, y)` tuple) into `SplitDataset(train, test, validation)`.
@@ -44,6 +50,23 @@ Config:
 Learned params: none.
 
 ## Cleaning
+
+Example step:
+
+```python
+{
+  "name": "clean_text",
+  "transformer": "TextCleaning",
+  "params": {
+    "columns": ["free_text"],
+    "operations": [
+      {"op": "trim", "mode": "both"},
+      {"op": "case", "mode": "lower"},
+      {"op": "regex", "mode": "collapse_whitespace"}
+    ]
+  }
+}
+```
 
 ### TextCleaning
 
@@ -158,6 +181,12 @@ Learned params:
 
 ## Imputation
 
+Example step:
+
+```python
+{"name": "impute", "transformer": "SimpleImputer", "params": {"strategy": "median", "columns": ["age"]}}
+```
+
 ### SimpleImputer
 
 Config:
@@ -203,6 +232,12 @@ Learned params:
 - `estimator`
 
 ## Encoding
+
+Example step:
+
+```python
+{"name": "encode", "transformer": "OneHotEncoder", "params": {"columns": ["city"], "drop_original": True, "handle_unknown": "ignore"}}
+```
 
 ### OneHotEncoder
 

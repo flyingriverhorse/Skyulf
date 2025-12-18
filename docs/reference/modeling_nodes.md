@@ -19,6 +19,15 @@ The sklearn wrapper supports both:
 - Nested params (preferred): `{ "params": {"C": 1.0} }`
 - Flat params (legacy): `{ "C": 1.0, "type": "..." }`
 
+Example (RandomForestClassifier):
+
+```python
+{
+  "type": "random_forest_classifier",
+  "params": {"n_estimators": 50, "random_state": 42}
+}
+```
+
 ## Classification
 
 ### logistic_regression
@@ -92,3 +101,6 @@ Learned params:
 ## Cross-validation
 
 `StatefulEstimator.cross_validate()` can perform CV on the train split and returns aggregated fold metrics.
+
+Note: `SkyulfPipeline` performs modeling through the same building blocks (a calculator + applier); `StatefulEstimator`
+is the lightweight wrapper exposed for low-level usage.

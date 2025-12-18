@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/configuration.html">
       
       
-        <link rel="prev" href="step_by_step_no_config.html">
+        <link rel="prev" href="validation_vs_sklearn.html">
       
       
         <link rel="next" href="splitdataset_and_leakage.html">
@@ -710,6 +710,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -792,6 +820,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Preprocessing config">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minimal-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimal examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -2159,56 +2204,25 @@
   &quot;params&quot;: { ... }
 }
 </code></pre>
-<p>The supported <code>TransformerType</code> strings are defined in the <code>FeatureEngineer</code> dispatcher:</p>
+<p><code>TransformerType</code> is a string key that <code>FeatureEngineer</code> dispatches to a Calculator/Applier pair.
+For the full list and per-node parameters, see:</p>
 <ul>
-<li><code>TrainTestSplitter</code></li>
-<li><code>feature_target_split</code></li>
-<li><code>TextCleaning</code></li>
-<li><code>ValueReplacement</code></li>
-<li><code>Deduplicate</code></li>
-<li><code>DropMissingColumns</code></li>
-<li><code>DropMissingRows</code></li>
-<li><code>MissingIndicator</code></li>
-<li><code>AliasReplacement</code></li>
-<li><code>InvalidValueReplacement</code></li>
-<li><code>SimpleImputer</code></li>
-<li><code>KNNImputer</code></li>
-<li><code>IterativeImputer</code></li>
-<li><code>OneHotEncoder</code></li>
-<li><code>DummyEncoder</code></li>
-<li><code>OrdinalEncoder</code></li>
-<li><code>LabelEncoder</code></li>
-<li><code>TargetEncoder</code></li>
-<li><code>HashEncoder</code></li>
-<li><code>StandardScaler</code></li>
-<li><code>MinMaxScaler</code></li>
-<li><code>RobustScaler</code></li>
-<li><code>MaxAbsScaler</code></li>
-<li><code>IQR</code></li>
-<li><code>ZScore</code></li>
-<li><code>Winsorize</code></li>
-<li><code>ManualBounds</code></li>
-<li><code>EllipticEnvelope</code></li>
-<li><code>PowerTransformer</code></li>
-<li><code>SimpleTransformation</code></li>
-<li><code>GeneralTransformation</code></li>
-<li><code>GeneralBinning</code></li>
-<li><code>CustomBinning</code></li>
-<li><code>KBinsDiscretizer</code></li>
-<li><code>VarianceThreshold</code></li>
-<li><code>CorrelationThreshold</code></li>
-<li><code>UnivariateSelection</code></li>
-<li><code>ModelBasedSelection</code></li>
-<li><code>feature_selection</code></li>
-<li><code>Casting</code></li>
-<li><code>PolynomialFeatures</code></li>
-<li><code>FeatureMath</code> / <code>FeatureGenerationNode</code></li>
-<li><code>Oversampling</code></li>
-<li><code>Undersampling</code></li>
-<li><code>DatasetProfile</code></li>
-<li><code>DataSnapshot</code></li>
+<li>Reference → Preprocessing Nodes</li>
+<li>Reference → API → Preprocessing → pipeline</li>
 </ul>
-<p>See “Preprocessing Nodes” in Reference for per-node parameters.</p>
+<h4 id="minimal-examples">Minimal examples</h4>
+<pre><code class="language-python"># Split to avoid leakage
+{&quot;name&quot;: &quot;split&quot;, &quot;transformer&quot;: &quot;TrainTestSplitter&quot;, &quot;params&quot;: {&quot;test_size&quot;: 0.2, &quot;random_state&quot;: 42, &quot;target_column&quot;: &quot;target&quot;}}
+</code></pre>
+<pre><code class="language-python"># Impute missing numeric values
+{&quot;name&quot;: &quot;impute&quot;, &quot;transformer&quot;: &quot;SimpleImputer&quot;, &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]}}
+</code></pre>
+<pre><code class="language-python"># Encode categoricals
+{&quot;name&quot;: &quot;encode&quot;, &quot;transformer&quot;: &quot;OneHotEncoder&quot;, &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;], &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;}}
+</code></pre>
+<pre><code class="language-python"># Scale numeric columns
+{&quot;name&quot;: &quot;scale&quot;, &quot;transformer&quot;: &quot;StandardScaler&quot;, &quot;params&quot;: {&quot;auto_detect&quot;: True}}
+</code></pre>
 <h3 id="modeling-config">Modeling config</h3>
 <p><code>SkyulfPipeline</code> currently supports these model types:</p>
 <ul>

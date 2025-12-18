@@ -710,6 +710,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/configuration.html" class="md-nav__link">
         
   
@@ -2248,6 +2276,12 @@
 <li>Nested params (preferred): <code>{ "params": {"C": 1.0} }</code></li>
 <li>Flat params (legacy): <code>{ "C": 1.0, "type": "..." }</code></li>
 </ul>
+<p>Example (RandomForestClassifier):</p>
+<pre><code class="language-python">{
+  &quot;type&quot;: &quot;random_forest_classifier&quot;,
+  &quot;params&quot;: {&quot;n_estimators&quot;: 50, &quot;random_state&quot;: 42}
+}
+</code></pre>
 <h2 id="classification">Classification</h2>
 <h3 id="logistic_regression">logistic_regression</h3>
 <p>Backed by <code>sklearn.linear_model.LogisticRegression</code>.</p>
@@ -2307,6 +2341,8 @@
 </ul>
 <h2 id="cross-validation">Cross-validation</h2>
 <p><code>StatefulEstimator.cross_validate()</code> can perform CV on the train split and returns aggregated fold metrics.</p>
+<p>Note: <code>SkyulfPipeline</code> performs modeling through the same building blocks (a calculator + applier); <code>StatefulEstimator</code>
+is the lightweight wrapper exposed for low-level usage.</p>
 
 
 
