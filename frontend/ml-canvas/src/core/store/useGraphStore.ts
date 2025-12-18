@@ -14,6 +14,7 @@ import {
 } from '@xyflow/react';
 import { registry } from '../registry/NodeRegistry';
 import { PreviewResponse } from '../api/client';
+import { v4 as uuidv4 } from 'uuid';
 
 interface GraphState {
   nodes: Node[];
@@ -68,7 +69,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       return '';
     }
 
-    const id = `${type}-${Date.now()}`;
+    const id = `${type}-${uuidv4()}`;
     const newNode: Node = {
       id,
       type: 'custom', // We'll use a generic wrapper component

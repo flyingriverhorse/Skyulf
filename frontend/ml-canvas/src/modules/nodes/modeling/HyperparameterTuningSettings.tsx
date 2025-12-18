@@ -192,7 +192,6 @@ const BestParamsModal: React.FC<{
         // Use getTuningHistory instead of getTuningJobsForModel
         jobsApi.getTuningHistory(currentModelType)
             .then(data => {
-                console.log("Fetched jobs for", currentModelType, data);
                 setJobs(data);
             })
             .catch(err => {

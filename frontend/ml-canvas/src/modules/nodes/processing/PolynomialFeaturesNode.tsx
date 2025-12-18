@@ -101,13 +101,13 @@ export const PolynomialFeaturesNode: NodeDefinition = {
 
   settings: ({ config, onChange, nodeId }) => {
     const upstreamData = useUpstreamData(nodeId || '');
-    const datasetId = upstreamData.find((d: any) => d.datasetId)?.datasetId as string | undefined;
+    const datasetId = upstreamData.find((d) => d.datasetId)?.datasetId as string | undefined;
     const { data: schema } = useDatasetSchema(datasetId);
     
     // Filter for numeric columns as polynomial features usually apply to numbers
     const numericColumns = schema ? Object.values(schema.columns)
-      .filter((col: any) => ['int', 'float', 'number', 'double', 'long'].some(t => col.dtype.toLowerCase().includes(t)))
-      .map((col: any) => col.name) : [];
+      .filter((col) => ['int', 'float', 'number', 'double', 'long'].some(t => col.dtype.toLowerCase().includes(t)))
+      .map((col) => col.name) : [];
 
     const updateConfig = (updates: Partial<PolynomialFeaturesConfig>) => {
       onChange({ ...config, ...updates });
