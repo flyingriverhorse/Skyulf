@@ -2440,6 +2440,9 @@ print(&quot;sklearn preds head:&quot;)
 print(sk_preds.head())
 print(&quot;skyulf preds head:&quot;)
 print(sky_preds.head())
+
+assert (sk_pred.values == sky_pred.values).all()
+print(&quot;Predictions match exactly.&quot;)
 </code></pre>
 <h3 id="example-output-from-the-notebook">Example output (from the notebook)</h3>
 <p>This is the exact output from one notebook run (same dataset, same random seed/split):</p>
