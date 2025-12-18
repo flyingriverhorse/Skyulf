@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
-import { Calculator, Trash2, Calendar, Percent, GitCompare, Search, Check, ChevronDown, ChevronRight, Zap, FunctionSquare, Info, Lightbulb, Activity } from 'lucide-react';
+import { Calculator, Trash2, Calendar, Percent, GitCompare, Search, Check, ChevronDown, ChevronRight, FunctionSquare, Info, Lightbulb, Activity } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useRecommendations } from '../../../core/hooks/useRecommendations';
@@ -9,18 +9,13 @@ import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 
 interface MathOperation {
-  operation_type: 'arithmetic' | 'datetime_extract' | 'ratio' | 'similarity' | 'polynomial' | 'group_agg';
+  operation_type: 'arithmetic' | 'datetime_extract' | 'ratio' | 'similarity' | 'group_agg';
   method: string;
   input_columns: string[];
   secondary_columns?: string[]; // For arithmetic (second operand)
   constants?: number[];
   output_column?: string;
   datetime_features?: string[]; // For datetime_extract
-  
-  // Polynomial specific
-  degree?: number;
-  interaction_only?: boolean;
-  include_bias?: boolean;
 
   isExpanded?: boolean; // UI state
 }
@@ -34,7 +29,6 @@ const OPERATION_TYPES = [
   { value: 'datetime_extract', label: 'Date Extraction', icon: Calendar },
   { value: 'ratio', label: 'Ratio', icon: Percent },
   { value: 'similarity', label: 'Similarity', icon: GitCompare },
-  { value: 'polynomial', label: 'Polynomial', icon: Zap },
   { value: 'group_agg', label: 'Group Agg', icon: FunctionSquare },
 ];
 
@@ -170,13 +164,10 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
       operation_type: type,
       method: type === 'arithmetic' ? 'add' : 
               type === 'similarity' ? 'ratio' : 
-              type === 'group_agg' ? 'mean' :
-              type === 'polynomial' ? 'poly' : 'year',
+              type === 'group_agg' ? 'mean' : 'year',
       input_columns: [],
       output_column: '',
       datetime_features: type === 'datetime_extract' ? ['year'] : undefined,
-      degree: type === 'polynomial' ? 2 : undefined,
-      interaction_only: type === 'polynomial' ? false : undefined,
       isExpanded: true
     };
     onChange({ operations: [...(config.operations || []), newOp] });
@@ -395,45 +386,6 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                 </div>
               )}
 
-              {/* POLYNOMIAL */}
-              {op.operation_type === 'polynomial' && (
-                <div className="space-y-3">
-                  <div className="text-[10px] text-muted-foreground bg-muted/20 p-1.5 rounded border border-muted/20">
-                    Generates polynomial and interaction features (e.g., A², A×B).
-                  </div>
-                  <ColumnSelector
-                    label="Input Columns"
-                    columns={numericColumns}
-                    selected={op.input_columns}
-                    onChange={(cols) => updateOperation(idx, { input_columns: cols })}
-                  />
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Degree</label>
-                      <input
-                        type="number"
-                        min="2"
-                        max="5"
-                        className="w-full text-xs border rounded p-1.5"
-                        value={op.degree || 2}
-                        onChange={(e) => { updateOperation(idx, { degree: parseInt(e.target.value) }); }}
-                      />
-                    </div>
-                    <div className="space-y-1 pt-5">
-                      <label className="flex items-center gap-2 text-xs cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={op.interaction_only || false}
-                          onChange={(e) => { updateOperation(idx, { interaction_only: e.target.checked }); }}
-                        />
-                        Interaction Only
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* GROUP AGG */}
               {op.operation_type === 'group_agg' && (
                 <div className="space-y-3">
@@ -586,9 +538,6 @@ export const FeatureGenerationNode: NodeDefinition = {
       }
       if (op.operation_type === 'datetime_extract' && op.input_columns.length === 0) {
         return { isValid: false, message: 'Select a date column.' };
-      }
-      if (op.operation_type === 'polynomial' && op.input_columns.length === 0) {
-        return { isValid: false, message: 'Select input columns for polynomial features.' };
       }
       if (op.operation_type === 'group_agg' && (op.input_columns.length === 0 || !op.secondary_columns?.length)) {
         return { isValid: false, message: 'Select both Group By and Target columns.' };

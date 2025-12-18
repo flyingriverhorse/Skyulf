@@ -19,6 +19,7 @@ import { TransformationNode } from '../../modules/nodes/processing/Transformatio
 import { BinningNode } from '../../modules/nodes/processing/BinningNode';
 import { ResamplingNode } from '../../modules/nodes/processing/ResamplingNode';
 import { FeatureGenerationNode } from '../../modules/nodes/processing/FeatureGenerationNode';
+import { PolynomialFeaturesNode } from '../../modules/nodes/processing/PolynomialFeaturesNode';
 import { TextCleaningNode } from '../../modules/nodes/processing/TextCleaningNode';
 import { ValueReplacementNode } from '../../modules/nodes/processing/ValueReplacementNode';
 import { AliasReplacementNode } from '../../modules/nodes/processing/AliasReplacementNode';
@@ -35,6 +36,7 @@ export const initializeRegistry = () => {
   registry.register(BinningNode);
   registry.register(ResamplingNode);
   registry.register(FeatureGenerationNode);
+  registry.register(PolynomialFeaturesNode);
   registry.register(TextCleaningNode);
   registry.register(ValueReplacementNode);
   registry.register(AliasReplacementNode);
