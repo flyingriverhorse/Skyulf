@@ -1,28 +1,27 @@
 # Skyulf
 
-Skyulf is a self-hosted MLOps platform with a FastAPI backend and a Python SDK (skyulf-core).
+Skyulf is a self-hosted MLOps platform with:
 
-## Quick start
+- a FastAPI backend
+- a React frontend
+- a standalone Python ML library: **skyulf-core**
 
-1. Install backend dependencies:
+## If you are here for skyulf-core
+
+Start with:
+
+- **User Guide → Overview**
+- **User Guide → Pipeline Quickstart**
+- **Reference → Preprocessing Nodes / Modeling Nodes**
+
+## Backend quick start
 
 ```bash
 pip install -r requirements-fastapi.txt
-```
-
-2. Start the API server:
-
-```bash
 python run_skyulf.py
 ```
 
-3. Open:
+Open:
 
 - http://127.0.0.1:8000
 
-## Documentation
-
-- Getting Started: guides/getting_started.md
-- Recipes: guides/recipes.md
-- Architecture: architecture.md
-- Writing Docs: contributing/writing_docs.md
