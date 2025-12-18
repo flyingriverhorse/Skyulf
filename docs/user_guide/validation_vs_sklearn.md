@@ -254,6 +254,9 @@ print("sklearn preds head:")
 print(sk_preds.head())
 print("skyulf preds head:")
 print(sky_preds.head())
+
+assert (sk_pred.values == sky_pred.values).all()
+print("Predictions match exactly.")
 ```
 
 ### Example output (from the notebook)
