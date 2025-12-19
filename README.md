@@ -1,9 +1,17 @@
-# Skyulf 🐺
+<p align="center">
+  <img src="static/img/logo.png" alt="Skyulf Logo" width="200">
+</p>
+
+# Skyulf
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Commercial](https://img.shields.io/badge/enterprise-support-blueviolet)](COMMERCIAL-LICENSE.md)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](#quick-start)
+[![CI](https://github.com/flyingriverhorse/Skyulf/actions/workflows/ci.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/ci.yml)
+[![Docs](https://github.com/flyingriverhorse/Skyulf/actions/workflows/docs.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/docs.yml)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](.pre-commit-config.yaml)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Checked with mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Skyulf](https://img.shields.io/badge/Skyulf-Privacy--First_MLOps_Hub-blueviolet)](#key-features)
 [![codecov](https://codecov.io/gh/flyingriverhorse/Skyulf/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/flyingriverhorse/Skyulf)
@@ -12,7 +20,6 @@
 [![issues](https://img.shields.io/github/issues/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/issues) 
 [![contributors](https://img.shields.io/github/contributors/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/graphs/contributors)
 
-
 > ⚠️ **Status:** Active Development. Expect bugs, but also expect rapid progress.
 
 **Machine Learning Operations (MLOps) shouldn't be this hard.**
@@ -20,6 +27,10 @@
 Skyulf is a self-hosted, privacy-first **MLOps Hub**. It is designed to be the "glue" that holds your data science workflow together—without the glue code. Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
 
 Built with a modern stack: **FastAPI** (Backend), **React** (Frontend), **Celery** (Async Jobs), and **Redis**.
+
+## What is the meaning of Skyulf?
+
+I named it Skyulf after two ideas. Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means “wolf,” with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and community-driven.
 
 ## Table of Contents
 
