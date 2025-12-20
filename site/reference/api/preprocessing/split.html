@@ -2454,8 +2454,8 @@
             <span class="n">class_counts</span> <span class="o">=</span> <span class="n">stratify</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span>
             <span class="k">if</span> <span class="n">class_counts</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Stratified split requested but the least populated class has only </span><span class="si">{</span>
-<span class="w">                        </span><span class="n">class_counts</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">}</span><span class="s2"> member(s). Stratification will be disabled.&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Stratified split requested but the least populated class has only </span><span class="si">{</span><span class="n">class_counts</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">}</span><span class="s2"> &quot;</span>
+                    <span class="s2">&quot;member(s). Stratification will be disabled.&quot;</span>
                 <span class="p">)</span>
                 <span class="n">stratify</span> <span class="o">=</span> <span class="kc">None</span>
 
@@ -2585,8 +2585,8 @@
         <span class="n">class_counts</span> <span class="o">=</span> <span class="n">stratify</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">class_counts</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Stratified split requested but the least populated class has only </span><span class="si">{</span>
-<span class="w">                    </span><span class="n">class_counts</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">}</span><span class="s2"> member(s). Stratification will be disabled.&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Stratified split requested but the least populated class has only </span><span class="si">{</span><span class="n">class_counts</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">}</span><span class="s2"> &quot;</span>
+                <span class="s2">&quot;member(s). Stratification will be disabled.&quot;</span>
             <span class="p">)</span>
             <span class="n">stratify</span> <span class="o">=</span> <span class="kc">None</span>
 
