@@ -103,8 +103,8 @@ class DataSplitter:
                 class_counts_val = y_train_val.value_counts()
                 if class_counts_val.min() < 2:
                     logger.warning(
-                        f"Stratified validation split requested but the least populated class has only {class_counts_val.min()} "
-                        "member(s). Stratification will be disabled for validation split."
+                        "Stratified validation split requested but the least populated class has only "
+                        f"{class_counts_val.min()} member(s). Stratification will be disabled for validation split."
                     )
                     stratify_val = None
 
