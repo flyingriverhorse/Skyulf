@@ -9,7 +9,6 @@ It replaces the Flask run.py with modern async server capabilities.
 
 import logging
 import os
-import signal
 import subprocess
 import sys
 

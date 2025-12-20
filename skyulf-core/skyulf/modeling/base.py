@@ -224,7 +224,7 @@ class StatefulEstimator:
         # 2. Train Model
         self.model = self.calculator.fit(X_combined, y_combined, config)
 
-    def evaluate(
+    def evaluate(  # noqa: C901
         self, dataset: SplitDataset, target_column: str, job_id: str = "unknown"
     ) -> Any:
         """

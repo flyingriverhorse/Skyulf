@@ -33,7 +33,7 @@ def get_db_session():
 
 
 @shared_task(name="core.ml_pipeline.tasks.run_pipeline_task")
-def run_pipeline_task(job_id: str, pipeline_config_dict: dict):
+def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
     """
     Background task to execute a full ML pipeline.
     """

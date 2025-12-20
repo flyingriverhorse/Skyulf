@@ -53,7 +53,7 @@ async def select_data_sources(
                 conditions = []
                 for k, v in filter_dict.items():
                     conditions.append(column(k) == v)
-                
+
                 stmt = select(literal_column("*")).select_from(tbl).where(*conditions)
                 result = await session.execute(stmt)
             else:
@@ -80,9 +80,9 @@ async def update_data_source(
         try:
             # Use SQLAlchemy Core for UPDATE
             tbl = table(TABLE, *[column(c) for c in update_data.keys()] + [column(c) for c in filter_dict.keys()])
-            
+
             stmt = update(tbl).values(**update_data)
-            
+
             for k, v in filter_dict.items():
                 stmt = stmt.where(column(k) == v)
 

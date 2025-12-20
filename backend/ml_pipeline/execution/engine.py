@@ -444,7 +444,7 @@ class PipelineEngine:
 
         return node.node_id, metrics
 
-    def _run_model_training(
+    def _run_model_training(  # noqa: C901
         self, node: NodeConfig, job_id: str = "unknown"
     ) -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset (from Feature Engineering) or DataFrame
@@ -607,7 +607,7 @@ class PipelineEngine:
 
         return node.node_id, metrics
 
-    def _run_model_tuning(
+    def _run_model_tuning(  # noqa: C901
         self, node: NodeConfig, job_id: str = "unknown"
     ) -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset
@@ -629,7 +629,8 @@ class PipelineEngine:
         estimator = StatefulEstimator(tuner_calc, tuner_applier, node.node_id)
 
         self.log(
-            f"Starting hyperparameter tuning (Strategy: {tuning_params.get('strategy', 'random')}, Trials: {tuning_params.get('n_trials', 10)})"
+            f"Starting hyperparameter tuning (Strategy: {tuning_params.get('strategy', 'random')}, "
+            f"Trials: {tuning_params.get('n_trials', 10)})"
         )
 
         # Ensure data is SplitDataset

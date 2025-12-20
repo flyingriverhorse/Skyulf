@@ -188,7 +188,7 @@ class DeploymentService:
         await session.commit()
 
     @staticmethod
-    async def predict(session: AsyncSession, data: list[dict]) -> list:
+    async def predict(session: AsyncSession, data: list[dict]) -> list:  # noqa: C901
         # 1. Get active deployment
         deployment = await DeploymentService.get_active_deployment(session)
         if not deployment:

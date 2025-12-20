@@ -1,10 +1,9 @@
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Literal, Optional, Sequence
+from typing import Any, Dict, List, Optional
 from typing import cast as t_cast
 
 from sqlalchemy import String, cast, or_, select
-from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
@@ -82,7 +81,7 @@ class TrainingManager:
 
         # Fallback for hyperparameters if not found in graph (though extract_job_details should find it)
         if not hyperparameters:
-             hyperparameters = job.hyperparameters
+            hyperparameters = job.hyperparameters
 
         return JobInfo(
             job_id=t_cast(str, job.id),

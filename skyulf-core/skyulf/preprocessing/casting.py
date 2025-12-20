@@ -112,7 +112,7 @@ class CastingApplier(BaseApplier):
             return df
         return self._apply_dataframe(df, params)
 
-    def _apply_dataframe(
+    def _apply_dataframe(  # noqa: C901
         self, df: pd.DataFrame, params: Dict[str, Any]
     ) -> pd.DataFrame:
         type_map = params.get("type_map", {})

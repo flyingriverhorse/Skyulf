@@ -27,7 +27,7 @@ def get_primary_database(settings: Settings) -> str:
     return getattr(settings, "DB_PRIMARY", "sqlite").lower()
 
 
-async def create(settings: Settings, row: Dict[str, Any]) -> Any:
+async def create(settings: Settings, row: Dict[str, Any]) -> Any:  # noqa: C901
     """Create a new data source record with configurable primary database.
 
     Strategy: DB_PRIMARY-first approach

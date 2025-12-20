@@ -115,7 +115,7 @@ def build_connection_config(settings: Settings) -> Dict[str, Any]:
 
 
 @asynccontextmanager
-async def async_session_or_connection(
+async def async_session_or_connection(  # noqa: C901
     settings: Settings, config: Optional[Dict[str, Any]] = None
 ):
     """

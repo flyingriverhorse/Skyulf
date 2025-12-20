@@ -167,11 +167,11 @@ class PolynomialFeaturesApplier(BaseApplier):
         poly.fit(X[valid_cols])  # Cheap fit
 
         transformed = poly.transform(X[valid_cols])
-        
+
         # Handle case where sklearn is configured to output pandas DataFrames
         if hasattr(transformed, "iloc"):
             transformed = transformed.values
-            
+
         feature_names = poly.get_feature_names_out(valid_cols)
 
         # Filter out original features (degree 1) if not requested
@@ -203,7 +203,7 @@ class PolynomialFeaturesApplier(BaseApplier):
 
         df_out = X.copy()
         # We no longer need to check include_input_features here as we filtered them above
-        
+
         # Concatenate
         df_out = pd.concat([df_out, df_poly], axis=1)
 
@@ -233,7 +233,7 @@ class FeatureGenerationCalculator(BaseCalculator):
 
 
 class FeatureGenerationApplier(BaseApplier):
-    def apply(
+    def apply(  # noqa: C901
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         params: Dict[str, Any],

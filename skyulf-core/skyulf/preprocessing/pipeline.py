@@ -164,7 +164,7 @@ class FeatureEngineer:
 
         return current_data
 
-    def fit_transform(self, data: Union[pd.DataFrame, Any], node_id_prefix="") -> Any:
+    def fit_transform(self, data: Union[pd.DataFrame, Any], node_id_prefix="") -> Any:  # noqa: C901
         """
         Runs the pipeline on data.
         Returns: (transformed_data, metrics_dict)
@@ -540,7 +540,7 @@ class FeatureEngineer:
 
         return current_data, metrics
 
-    def _get_transformer_components(self, type_name: str):
+    def _get_transformer_components(self, type_name: str):  # noqa: C901
         if type_name == "TrainTestSplitter":
             return SplitCalculator(), SplitApplier()
         elif type_name == "feature_target_split":
