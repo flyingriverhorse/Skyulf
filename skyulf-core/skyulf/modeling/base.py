@@ -141,6 +141,10 @@ class StatefulEstimator:
                 dataset = SplitDataset(train=train_df, test=test_df, validation=None)  # type: ignore
             else:
                 # Fallback: Treat input as training data (e.g. X, y tuple) and initialize empty test set.
+                logger.warning(
+                    "No test set provided in dataset. Using entire input as training data. "
+                    "Ensure data was split BEFORE preprocessing to avoid data leakage."
+                )
                 dataset = SplitDataset(
                     train=dataset, test=pd.DataFrame(), validation=None
                 )
