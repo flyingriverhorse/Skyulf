@@ -1,15 +1,15 @@
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 
 def _get_strategy_from_params(params: Dict[str, Any]) -> Optional[str]:
     if "tuning_config" in params and "strategy" in params["tuning_config"]:
-        return params["tuning_config"]["strategy"]
+        return cast(str, params["tuning_config"]["strategy"])
     if "tuning" in params and "strategy" in params["tuning"]:
-        return params["tuning"]["strategy"]
+        return cast(str, params["tuning"]["strategy"])
     if "search_strategy" in params:
-        return params["search_strategy"]
+        return cast(str, params["search_strategy"])
     if "strategy" in params:
-        return params["strategy"]
+        return cast(str, params["strategy"])
     return None
 
 
@@ -26,11 +26,11 @@ def extract_tuning_strategy(node_data: Dict[str, Any]) -> Optional[str]:
     config = data.get("config", {})
 
     if "tuning" in config and "strategy" in config["tuning"]:
-        return config["tuning"]["strategy"]
+        return cast(str, config["tuning"]["strategy"])
     if "strategy" in config:
-        return config["strategy"]
+        return cast(str, config["strategy"])
     if "search_strategy" in data:
-        return data["search_strategy"]
+        return cast(str, data["search_strategy"])
     return None
 
 
@@ -88,18 +88,20 @@ def _parse_node_info(node: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any]]:
 
 
 def _extract_columns(ntype: str, params: Dict[str, Any]) -> List[str]:
-    dropped = []
+    dropped: List[str] = []
     if ntype in [
         "drop_missing_columns",
         "DropMissingColumns",
         "drop_column_recommendations",
         "drop_columns",
-    ] and isinstance(params.get("columns"), list):
-        dropped.extend(params.get("columns"))
-    if ntype == "feature_selection" and isinstance(
-        params.get("dropped_features"), list
-    ):
-        dropped.extend(params.get("dropped_features"))
+    ]:
+        cols = params.get("columns")
+        if isinstance(cols, list):
+            dropped.extend(cols)
+    if ntype == "feature_selection":
+        dropped_feats = params.get("dropped_features")
+        if isinstance(dropped_feats, list):
+            dropped.extend(dropped_feats)
     return dropped
 
 
@@ -109,7 +111,7 @@ def extract_job_details(
     """Extracts hyperparameters, target_column, and dropped_columns from graph."""
     hyperparameters = None
     target_column = None
-    dropped_columns = []
+    dropped_columns: List[str] = []
 
     if not graph or "nodes" not in graph:
         return hyperparameters, target_column, dropped_columns

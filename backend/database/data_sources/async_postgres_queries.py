@@ -23,7 +23,7 @@ async def insert_data_source(settings: Settings, row: Dict[str, Any]) -> Dict[st
     async with async_session_or_connection(settings) as session:
         try:
             tbl = table(TABLE, *[column(c) for c in row.keys()])
-            stmt = tbl.insert().values(**row).returning(literal_column("*"))
+            stmt: Any = tbl.insert().values(**row).returning(literal_column("*"))
             result = await session.execute(stmt)
             await session.commit()
 
@@ -54,7 +54,7 @@ async def select_data_sources(
                 for k, v in filter_dict.items():
                     conditions.append(column(k) == v)
 
-                stmt = select(literal_column("*")).select_from(tbl).where(*conditions)
+                stmt: Any = select(literal_column("*")).select_from(tbl).where(*conditions)
                 result = await session.execute(stmt)
             else:
                 stmt = select(literal_column("*")).select_from(tbl)

@@ -32,7 +32,7 @@ async def insert_data_source(settings: Settings, row: Dict[str, Any]) -> Dict[st
             if "id" in row:
                 # Use SQLAlchemy Core for SELECT
                 tbl_select = table(TABLE, column("id"))
-                stmt_select = select(literal_column("*")).select_from(tbl_select).where(column("id") == row["id"])
+                stmt_select: Any = select(literal_column("*")).select_from(tbl_select).where(column("id") == row["id"])
                 result = await session.execute(stmt_select)
                 fetched = result.fetchone()
                 if fetched:
@@ -75,7 +75,7 @@ async def select_data_sources(
                 for k, v in filter_dict.items():
                     conditions.append(column(k) == v)
 
-                stmt = select(literal_column("*")).select_from(tbl).where(*conditions)
+                stmt: Any = select(literal_column("*")).select_from(tbl).where(*conditions)
                 result = await session.execute(stmt)
             else:
                 stmt = select(literal_column("*")).select_from(tbl)
@@ -172,7 +172,7 @@ async def select_data_source_by_file_hash(
         try:
             # Use SQLAlchemy Core with json_extract
             tbl = table(TABLE)
-            stmt = select(literal_column("*")).select_from(tbl).where(
+            stmt: Any = select(literal_column("*")).select_from(tbl).where(
                 func.json_extract(column("config"), "$.file_hash") == file_hash
             ).limit(1)
 
