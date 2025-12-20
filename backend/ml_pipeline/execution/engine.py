@@ -691,13 +691,21 @@ class PipelineEngine:
         )
 
         # Extract metrics from tuning result
-        _, tuning_result = estimator.model
+        # estimator.model is expected to be a tuple (model, tuning_result) for Tuner
+        model_artifact = estimator.model
+        if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
+             _, tuning_result = model_artifact
+        else:
+             tuning_result = None
 
-        metrics = {
-            "best_score": tuning_result.best_score,
-            "best_params": tuning_result.best_params,
-            "trials": tuning_result.trials,
-        }
+        if tuning_result:
+            metrics = {
+                "best_score": tuning_result.best_score,
+                "best_params": tuning_result.best_params,
+                "trials": tuning_result.trials,
+            }
+        else:
+            metrics = {}
 
         # Evaluate the tuned model
         try:

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from typing import cast as t_cast
+from typing import cast as type_cast
 
 from sqlalchemy import String, cast, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,7 +64,7 @@ class TuningJobManager:
             _,
             target_column,
             dropped_columns,
-        ) = extract_job_details(job.graph, job.node_id)
+        ) = extract_job_details(type_cast(Dict[str, Any], job.graph), type_cast(str, job.node_id))
 
         # Extract hyperparameters (search space)
         # For display in Experiments table, users prefer to see the BEST params found
@@ -82,31 +82,31 @@ class TuningJobManager:
         )
 
         return JobInfo(
-            job_id=t_cast(str, job.id),
-            pipeline_id=t_cast(str, job.pipeline_id),
-            node_id=t_cast(str, job.node_id),
-            dataset_id=t_cast(Optional[str], job.dataset_source_id),
+            job_id=type_cast(str, job.id),
+            pipeline_id=type_cast(str, job.pipeline_id),
+            node_id=type_cast(str, job.node_id),
+            dataset_id=type_cast(Optional[str], job.dataset_source_id),
             dataset_name=dataset_name,
             job_type="tuning",
             status=JobStatus(job.status),
-            start_time=t_cast(Optional[datetime], job.started_at),
-            end_time=t_cast(Optional[datetime], job.finished_at),
-            error=t_cast(Optional[str], job.error_message),
+            start_time=type_cast(Optional[datetime], job.started_at),
+            end_time=type_cast(Optional[datetime], job.finished_at),
+            error=type_cast(Optional[str], job.error_message),
             result={
                 "best_params": job.best_params,
                 "best_score": job.best_score,
                 "metrics": metrics,
             },
             # Ensure metrics are in result too
-            model_type=t_cast(str, job.model_type),
-            hyperparameters=t_cast(Dict[str, Any], hyperparameters),
-            created_at=t_cast(datetime, job.created_at),
-            metrics=t_cast(Optional[Dict[str, Any]], metrics),
-            search_strategy=t_cast(Optional[str], job.search_strategy),
-            version=t_cast(Optional[int], job.run_number),
+            model_type=type_cast(str, job.model_type),
+            hyperparameters=type_cast(Dict[str, Any], hyperparameters),
+            created_at=type_cast(datetime, job.created_at),
+            metrics=type_cast(Optional[Dict[str, Any]], metrics),
+            search_strategy=type_cast(Optional[str], job.search_strategy),
+            version=type_cast(Optional[int], job.run_number),
             target_column=target_column,
             dropped_columns=dropped_columns,
-            logs=t_cast(Optional[List[str]], job.logs),
+            logs=type_cast(Optional[List[str]], job.logs),
         )
 
     @staticmethod
@@ -119,9 +119,9 @@ class TuningJobManager:
         job = result.scalar_one_or_none()
 
         if job and job.status in [JobStatus.QUEUED.value, JobStatus.RUNNING.value]:
-            job.status = JobStatus.CANCELLED.value
-            job.error_message = "Job cancelled by user."
-            job.finished_at = datetime.now()
+            job.status = JobStatus.CANCELLED.value  # type: ignore
+            job.error_message = "Job cancelled by user."  # type: ignore
+            job.finished_at = datetime.now()  # type: ignore
             await session.commit()
             return True
         return False
@@ -135,7 +135,7 @@ class TuningJobManager:
         if "artifact_uri" in result:
             job.artifact_uri = result["artifact_uri"]
 
-        job.metrics = result
+        job.metrics = result  # type: ignore
 
     @staticmethod
     def update_status_sync(
@@ -156,13 +156,13 @@ class TuningJobManager:
             return False
 
         if status:
-            job.status = status.value
+            job.status = status.value  # type: ignore
         if error:
-            job.error_message = error
+            job.error_message = error  # type: ignore
 
         if logs:
-            current_logs = job.logs or []
-            job.logs = current_logs + logs
+            current_logs: List[str] = job.logs or []  # type: ignore
+            job.logs = current_logs + logs  # type: ignore
 
         if result:
             TuningJobManager._update_tuning_result(job, result)
@@ -172,7 +172,7 @@ class TuningJobManager:
             JobStatus.FAILED,
             JobStatus.SUCCEEDED,
         ]:
-            job.finished_at = datetime.now()
+            job.finished_at = datetime.now()  # type: ignore
 
         session.commit()
         return True

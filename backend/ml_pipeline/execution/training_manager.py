@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from typing import cast as t_cast
+from typing import Any, Dict, List, Optional, cast as t_cast, cast as type_cast
 
 from sqlalchemy import String, cast, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,7 +63,7 @@ class TrainingManager:
             hyperparameters,
             target_column,
             dropped_columns,
-        ) = extract_job_details(job.graph, job.node_id)
+        ) = extract_job_details(type_cast(Dict[str, Any], job.graph), type_cast(str, job.node_id))
 
         # Also check job metrics for runtime dropped columns (e.g. from Feature Selection)
         if (
@@ -81,7 +80,7 @@ class TrainingManager:
 
         # Fallback for hyperparameters if not found in graph (though extract_job_details should find it)
         if not hyperparameters:
-            hyperparameters = job.hyperparameters
+            hyperparameters = type_cast(Optional[Dict[str, Any]], job.hyperparameters)
 
         return JobInfo(
             job_id=t_cast(str, job.id),
@@ -113,9 +112,9 @@ class TrainingManager:
         job = result.scalar_one_or_none()
 
         if job and job.status in [JobStatus.QUEUED.value, JobStatus.RUNNING.value]:
-            job.status = JobStatus.CANCELLED.value
-            job.error_message = "Job cancelled by user."
-            job.finished_at = datetime.now()
+            job.status = JobStatus.CANCELLED.value  # type: ignore
+            job.error_message = "Job cancelled by user."  # type: ignore
+            job.finished_at = datetime.now()  # type: ignore
             await session.commit()
             return True
         return False
@@ -144,13 +143,13 @@ class TrainingManager:
             return False
 
         if status:
-            job.status = status.value
+            job.status = status.value  # type: ignore
         if error:
-            job.error_message = error
+            job.error_message = error  # type: ignore
 
         if logs:
-            current_logs = job.logs or []
-            job.logs = current_logs + logs
+            current_logs: List[str] = job.logs or []  # type: ignore
+            job.logs = current_logs + logs  # type: ignore
 
         if result:
             TrainingManager._update_training_result(job, result)
@@ -160,7 +159,7 @@ class TrainingManager:
             JobStatus.FAILED,
             JobStatus.SUCCEEDED,
         ]:
-            job.finished_at = datetime.now()
+            job.finished_at = datetime.now()  # type: ignore
 
         session.commit()
         return True

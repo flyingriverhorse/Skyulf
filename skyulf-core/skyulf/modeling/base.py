@@ -138,9 +138,9 @@ class StatefulEstimator:
             if isinstance(elem0, pd.DataFrame) and target_column in elem0.columns:
                 # It's (train_df, test_df)
                 train_df, test_df = dataset
-                dataset = SplitDataset(train=train_df, test=test_df, validation=None)
+                dataset = SplitDataset(train=train_df, test=test_df, validation=None)  # type: ignore
             else:
-                # It's (X, y) or something else, treat as train set
+                # Fallback: Treat input as training data (e.g. X, y tuple) and initialize empty test set.
                 dataset = SplitDataset(
                     train=dataset, test=pd.DataFrame(), validation=None
                 )

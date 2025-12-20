@@ -129,7 +129,13 @@ class TunerCalculator(BaseModelCalculator):
         if log_callback:
             log_callback(f"Refitting best model with params: {final_params}")
 
-        model = self.model_calculator.model_class(**final_params)
+        # Mypy doesn't know that model_calculator has model_class because it's typed as BaseModelCalculator
+        # We can cast it or ignore it.
+        model_cls = getattr(self.model_calculator, "model_class", None)
+        if not model_cls:
+             raise ValueError("Model calculator does not have a model_class attribute")
+        
+        model = model_cls(**final_params)
         model.fit(X, y)
 
         return (model, tuning_result)
@@ -377,6 +383,10 @@ class TunerCalculator(BaseModelCalculator):
                 if mean_score > best_score:
                     best_score = mean_score
                     best_params = params
+
+            if log_callback:
+                log_callback(f"Tuning Completed. Best Score: {best_score:.4f}")
+                log_callback(f"Best Params: {best_params}")
 
             return TuningResult(
                 best_params=best_params if best_params is not None else {},
