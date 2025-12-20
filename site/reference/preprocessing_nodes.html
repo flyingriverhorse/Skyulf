@@ -1,0 +1,3531 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/reference/preprocessing_nodes.html">
+      
+      
+        <link rel="prev" href="../user_guide/troubleshooting.html">
+      
+      
+        <link rel="next" href="modeling_nodes.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Preprocessing Nodes - Skyulf</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#preprocessing-nodes" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Skyulf
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Preprocessing Nodes
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.html" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/getting_started.html" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../user_guide/overview.html" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="preprocessing_nodes.html" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
+          
+  
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Skyulf
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/getting_started.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/recipes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/step_by_step_no_config.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step-by-Step (No Config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/serialization.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/extending_custom_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending Skyulf-Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Nodes
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="preprocessing_nodes.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#step-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#splitters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Splitters
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Splitters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#traintestsplitter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TrainTestSplitter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature_target_split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        feature_target_split
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cleaning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cleaning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cleaning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#textcleaning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TextCleaning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#valuereplacement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ValueReplacement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aliasreplacement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AliasReplacement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invalidvaluereplacement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InvalidValueReplacement
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#drop-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drop &amp; Missing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Drop &amp; Missing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deduplicate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deduplicate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dropmissingcolumns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DropMissingColumns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dropmissingrows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DropMissingRows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missingindicator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MissingIndicator
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#imputation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Imputation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Imputation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#simpleimputer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SimpleImputer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#knnimputer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KNNImputer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iterativeimputer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IterativeImputer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#encoding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encoding
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Encoding">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#onehotencoder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OneHotEncoder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dummyencoder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DummyEncoder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ordinalencoder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OrdinalEncoder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#labelencoder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LabelEncoder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#targetencoder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TargetEncoder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hashencoder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HashEncoder
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scaling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scaling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scaling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#standardscaler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StandardScaler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minmaxscaler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MinMaxScaler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#robustscaler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RobustScaler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#maxabsscaler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MaxAbsScaler
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outliers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outliers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Outliers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#iqr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IQR
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zscore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZScore
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#winsorize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Winsorize
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manualbounds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ManualBounds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ellipticenvelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EllipticEnvelope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transformations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transformations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Transformations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#powertransformer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PowerTransformer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simpletransformation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SimpleTransformation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generaltransformation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GeneralTransformation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bucketing-binning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bucketing (Binning)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bucketing (Binning)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generalbinning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GeneralBinning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custombinning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CustomBinning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kbinsdiscretizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KBinsDiscretizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#casting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Casting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Casting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#casting_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Casting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feature-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature Generation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Feature Generation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#polynomialfeatures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PolynomialFeatures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#featuremath-featuregenerationnode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FeatureMath / FeatureGenerationNode
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feature-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature Selection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Feature Selection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#variancethreshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VarianceThreshold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#correlationthreshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CorrelationThreshold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#univariateselection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UnivariateSelection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modelbasedselection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModelBasedSelection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature_selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        feature_selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resampling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Resampling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#oversampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Oversampling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#undersampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Undersampling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inspection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Inspection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#datasetprofile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetProfile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#datasnapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DataSnapshot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modeling_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3_2" id="__nav_4_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/data/dataset.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3_3" id="__nav_4_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Preprocessing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/split.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/cleaning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cleaning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/drop_and_missing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    drop_and_missing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/imputation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    imputation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/encoding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/scaling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/outliers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    outliers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/transformations.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/bucketing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bucketing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/casting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    casting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/feature_generation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/feature_selection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/resampling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/preprocessing/inspection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    inspection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3_4" id="__nav_4_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modeling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/modeling/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/modeling/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/modeling/sklearn_wrapper.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sklearn_wrapper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/modeling/classification.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    classification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/modeling/regression.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    regression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/modeling/cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cross_validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/modeling/tuning_tuner.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tuning/tuner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="preprocessing-nodes">Preprocessing Nodes</h1>
+<p>This page documents the preprocessing node types supported by <code>FeatureEngineer</code>.</p>
+<h2 id="step-schema">Step schema</h2>
+<p>Every preprocessing step in the pipeline config uses:</p>
+<pre><code class="language-python">{
+  &quot;name&quot;: &quot;...&quot;,
+  &quot;transformer&quot;: &quot;TransformerType&quot;,
+  &quot;params&quot;: { ... }
+}
+</code></pre>
+<p>Where <code>params</code> is passed into the node’s Calculator <code>fit()</code>.</p>
+<h2 id="splitters">Splitters</h2>
+<p>Example step:</p>
+<pre><code class="language-python">{&quot;name&quot;: &quot;split&quot;, &quot;transformer&quot;: &quot;TrainTestSplitter&quot;, &quot;params&quot;: {&quot;test_size&quot;: 0.2, &quot;random_state&quot;: 42, &quot;target_column&quot;: &quot;target&quot;}}
+</code></pre>
+<h3 id="traintestsplitter">TrainTestSplitter</h3>
+<p>Splits a DataFrame (or <code>(X, y)</code> tuple) into <code>SplitDataset(train, test, validation)</code>.</p>
+<p>Config (<code>params</code>):</p>
+<ul>
+<li><code>test_size</code>: float (default 0.2)</li>
+<li><code>validation_size</code>: float (default 0.0)</li>
+<li><code>random_state</code>: int (default 42)</li>
+<li><code>shuffle</code>: bool (default True)</li>
+<li><code>stratify</code>: bool (default False)</li>
+<li><code>target_column</code>: str (required only when splitting a DataFrame and using stratify)</li>
+</ul>
+<p>Learned params: none (passes through config).</p>
+<h3 id="feature_target_split">feature_target_split</h3>
+<p>Splits a DataFrame into <code>(X, y)</code> (or applies the split to each <code>SplitDataset</code> split).</p>
+<p>Config:</p>
+<ul>
+<li><code>target_column</code>: str (required)</li>
+</ul>
+<p>Learned params: none.</p>
+<h2 id="cleaning">Cleaning</h2>
+<p>Example step:</p>
+<pre><code class="language-python">{
+  &quot;name&quot;: &quot;clean_text&quot;,
+  &quot;transformer&quot;: &quot;TextCleaning&quot;,
+  &quot;params&quot;: {
+    &quot;columns&quot;: [&quot;free_text&quot;],
+    &quot;operations&quot;: [
+      {&quot;op&quot;: &quot;trim&quot;, &quot;mode&quot;: &quot;both&quot;},
+      {&quot;op&quot;: &quot;case&quot;, &quot;mode&quot;: &quot;lower&quot;},
+      {&quot;op&quot;: &quot;regex&quot;, &quot;mode&quot;: &quot;collapse_whitespace&quot;}
+    ]
+  }
+}
+</code></pre>
+<h3 id="textcleaning">TextCleaning</h3>
+<p>Applies a list of string operations.</p>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str] (optional; auto-detects text-like columns)</li>
+<li><code>operations</code>: list[dict]</li>
+<li><code>{ "op": "trim", "mode": "both"|"leading"|"trailing" }</code></li>
+<li><code>{ "op": "case", "mode": "lower"|"upper"|"title"|"sentence" }</code></li>
+<li><code>{ "op": "remove_special", "mode": "keep_alphanumeric"|"keep_alphanumeric_space"|"letters_only"|"digits_only", "replacement": "" }</code></li>
+<li><code>{ "op": "regex", "mode": "collapse_whitespace"|"extract_digits"|"custom", "pattern": "...", "repl": "..." }</code></li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code></li>
+<li><code>operations</code></li>
+</ul>
+<h3 id="valuereplacement">ValueReplacement</h3>
+<p>Replaces values in selected columns.</p>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li>Either:</li>
+<li><code>mapping</code>: dict (global mapping) <strong>or</strong> dict[col -&gt; mapping]</li>
+<li><code>to_replace</code> + <code>value</code></li>
+<li><code>replacements</code>: list of <code>{old, new}</code> (converted into a mapping)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code>, <code>mapping</code>, <code>to_replace</code>, <code>value</code></li>
+</ul>
+<h3 id="aliasreplacement">AliasReplacement</h3>
+<p>Normalizes common textual aliases (boolean/country/custom).</p>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str] (optional; auto-detects text-like columns)</li>
+<li><code>alias_type</code>: <code>boolean</code> | <code>country</code> | <code>custom</code> (also supports legacy <code>mode</code>)</li>
+<li><code>custom_map</code>: dict[str, str] (also supports legacy <code>custom_pairs</code>)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code>, <code>alias_type</code>, <code>custom_map</code></li>
+</ul>
+<h3 id="invalidvaluereplacement">InvalidValueReplacement</h3>
+<p>Replaces invalid numeric values.</p>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>rule</code>: <code>negative</code> | <code>zero</code> | <code>negative_to_nan</code> | <code>custom_range</code> (also supports legacy <code>mode</code>)</li>
+<li><code>replacement</code>: any (default NaN)</li>
+<li><code>min_value</code> / <code>max_value</code>: used by <code>custom_range</code></li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code>, <code>rule</code>, <code>replacement</code>, <code>min_value</code>, <code>max_value</code></li>
+</ul>
+<h2 id="drop-missing">Drop &amp; Missing</h2>
+<h3 id="deduplicate">Deduplicate</h3>
+<p>Config:</p>
+<ul>
+<li><code>subset</code>: list[str] | None</li>
+<li><code>keep</code>: <code>first</code> | <code>last</code> | <code>none</code> (mapped to <code>False</code>)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>subset</code>, <code>keep</code></li>
+</ul>
+<h3 id="dropmissingcolumns">DropMissingColumns</h3>
+<p>Config:</p>
+<ul>
+<li><code>missing_threshold</code>: float (percentage; if &gt; 0, drops columns with missing% &gt;= threshold)</li>
+<li><code>columns</code>: list[str] (explicit columns to drop)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns_to_drop</code>, <code>threshold</code></li>
+</ul>
+<h3 id="dropmissingrows">DropMissingRows</h3>
+<p>Config:</p>
+<ul>
+<li><code>subset</code>: list[str] | None</li>
+<li><code>how</code>: <code>any</code> | <code>all</code> (ignored if <code>threshold</code> provided)</li>
+<li><code>threshold</code>: int | None (min non-null values)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>subset</code>, <code>how</code>, <code>threshold</code></li>
+</ul>
+<h3 id="missingindicator">MissingIndicator</h3>
+<p>Adds <code>{col}_missing</code> indicator columns.</p>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str] (optional; defaults to all columns with any missing values)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code></li>
+</ul>
+<h2 id="imputation">Imputation</h2>
+<p>Example step:</p>
+<pre><code class="language-python">{&quot;name&quot;: &quot;impute&quot;, &quot;transformer&quot;: &quot;SimpleImputer&quot;, &quot;params&quot;: {&quot;strategy&quot;: &quot;median&quot;, &quot;columns&quot;: [&quot;age&quot;]}}
+</code></pre>
+<h3 id="simpleimputer">SimpleImputer</h3>
+<p>Config:</p>
+<ul>
+<li><code>strategy</code>: <code>mean</code> | <code>median</code> | <code>most_frequent</code> | <code>constant</code> (also accepts <code>mode</code>)</li>
+<li><code>columns</code>: list[str] (optional; numeric auto-detection for mean/median)</li>
+<li><code>fill_value</code>: any (used for <code>constant</code>)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code></li>
+<li><code>strategy</code></li>
+<li><code>fill_values</code>: dict[col -&gt; value]</li>
+<li><code>missing_counts</code>: dict[col -&gt; count]</li>
+<li><code>total_missing</code>: int</li>
+</ul>
+<h3 id="knnimputer">KNNImputer</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str] (numeric)</li>
+<li><code>n_neighbors</code>: int (default 5)</li>
+<li><code>weights</code>: <code>uniform</code> | <code>distance</code></li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code></li>
+<li><code>imputer_object</code> (sklearn object; pickled in pipeline)</li>
+<li><code>n_neighbors</code>, <code>weights</code></li>
+</ul>
+<h3 id="iterativeimputer">IterativeImputer</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str] (numeric)</li>
+<li><code>max_iter</code>: int (default 10)</li>
+<li><code>estimator</code>: <code>BayesianRidge</code> | <code>DecisionTree</code> | <code>ExtraTrees</code> | <code>KNeighbors</code></li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code></li>
+<li><code>imputer_object</code> (sklearn object; pickled in pipeline)</li>
+<li><code>estimator</code></li>
+</ul>
+<h2 id="encoding">Encoding</h2>
+<p>Example step:</p>
+<pre><code class="language-python">{&quot;name&quot;: &quot;encode&quot;, &quot;transformer&quot;: &quot;OneHotEncoder&quot;, &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;], &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;}}
+</code></pre>
+<h3 id="onehotencoder">OneHotEncoder</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str] (optional; auto-detects categorical columns)</li>
+<li><code>drop_first</code>: bool (default False)</li>
+<li><code>max_categories</code>: int (default 20)</li>
+<li><code>handle_unknown</code>: <code>ignore</code> | <code>error</code> (default ignore)</li>
+<li><code>drop_original</code>: bool (default True)</li>
+<li><code>include_missing</code>: bool (default False)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code></li>
+<li><code>encoder_object</code> (sklearn OneHotEncoder)</li>
+<li><code>feature_names</code>: list[str]</li>
+<li><code>drop_original</code>, <code>include_missing</code></li>
+</ul>
+<h3 id="dummyencoder">DummyEncoder</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>drop_first</code>: bool</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code></li>
+<li><code>categories</code>: dict[col -&gt; list[str]]</li>
+<li><code>drop_first</code></li>
+</ul>
+<h3 id="ordinalencoder">OrdinalEncoder</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>handle_unknown</code>: str (default <code>use_encoded_value</code>)</li>
+<li><code>unknown_value</code>: int/float (default -1)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code></li>
+<li><code>encoder_object</code> (sklearn OrdinalEncoder)</li>
+<li><code>categories_count</code></li>
+</ul>
+<h3 id="labelencoder">LabelEncoder</h3>
+<p>Encodes either target or selected feature columns.</p>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: optional list[str]</li>
+<li>if omitted, encodes the provided target <code>y</code></li>
+<li>if provided, encodes those feature columns (and also target if included)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>encoders</code>: dict[col or "<strong>target</strong>" -&gt; sklearn LabelEncoder]</li>
+<li><code>classes_count</code></li>
+</ul>
+<h3 id="targetencoder">TargetEncoder</h3>
+<p>Requires a target series (<code>y</code>).</p>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>smooth</code>: <code>auto</code> or numeric</li>
+<li><code>target_type</code>: <code>auto</code> or explicit type</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code></li>
+<li><code>encoder_object</code> (sklearn TargetEncoder)</li>
+</ul>
+<h3 id="hashencoder">HashEncoder</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>n_features</code>: int (default 10)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code>, <code>n_features</code></li>
+</ul>
+<h2 id="scaling">Scaling</h2>
+<p>All scaling nodes accept <code>columns</code> (optional; numeric auto-detect) and return learned numeric arrays.</p>
+<h3 id="standardscaler">StandardScaler</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>with_mean</code>: bool (default True)</li>
+<li><code>with_std</code>: bool (default True)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code>, <code>mean</code>, <code>scale</code>, <code>var</code>, <code>with_mean</code>, <code>with_std</code></li>
+</ul>
+<h3 id="minmaxscaler">MinMaxScaler</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>feature_range</code>: tuple (default (0, 1))</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code>, <code>min</code>, <code>scale</code>, <code>data_min</code>, <code>data_max</code>, <code>feature_range</code></li>
+</ul>
+<h3 id="robustscaler">RobustScaler</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>quantile_range</code>: tuple (default (25.0, 75.0))</li>
+<li><code>with_centering</code>: bool (default True)</li>
+<li><code>with_scaling</code>: bool (default True)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code>, <code>center</code>, <code>scale</code>, <code>quantile_range</code>, <code>with_centering</code>, <code>with_scaling</code></li>
+</ul>
+<h3 id="maxabsscaler">MaxAbsScaler</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code>, <code>scale</code>, <code>max_abs</code></li>
+</ul>
+<h2 id="outliers">Outliers</h2>
+<h3 id="iqr">IQR</h3>
+<p>Filters rows outside per-column IQR bounds.</p>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>multiplier</code>: float (default 1.5)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>bounds</code>: dict[col -&gt; {lower, upper}]</li>
+<li><code>warnings</code></li>
+</ul>
+<h3 id="zscore">ZScore</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>threshold</code>: float (default 3.0)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>stats</code>: dict[col -&gt; {mean, std}]</li>
+<li><code>threshold</code>, <code>warnings</code></li>
+</ul>
+<h3 id="winsorize">Winsorize</h3>
+<p>Clips values into per-column percentile bounds.</p>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>lower_percentile</code>: float (default 5.0)</li>
+<li><code>upper_percentile</code>: float (default 95.0)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>bounds</code>: dict[col -&gt; {lower, upper}]</li>
+</ul>
+<h3 id="manualbounds">ManualBounds</h3>
+<p>Filters rows outside user-provided bounds.</p>
+<p>Config:</p>
+<ul>
+<li><code>bounds</code>: dict[col -&gt; {lower, upper}]</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>bounds</code></li>
+</ul>
+<h3 id="ellipticenvelope">EllipticEnvelope</h3>
+<p>Learns a per-column EllipticEnvelope model and filters outliers.</p>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>contamination</code>: float (default 0.01)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>models</code>: dict[col -&gt; sklearn model]</li>
+<li><code>contamination</code>, <code>warnings</code></li>
+</ul>
+<h2 id="transformations">Transformations</h2>
+<h3 id="powertransformer">PowerTransformer</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>method</code>: <code>yeo-johnson</code> | <code>box-cox</code></li>
+<li><code>standardize</code>: bool</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code>, <code>lambdas</code>, <code>method</code>, <code>standardize</code>, <code>scaler_params</code></li>
+</ul>
+<h3 id="simpletransformation">SimpleTransformation</h3>
+<p>Config:</p>
+<ul>
+<li><code>transformations</code>: list of <code>{column, method, clip_threshold?}</code></li>
+<li>methods include <code>log</code>, <code>square_root</code>, <code>cube_root</code>, <code>reciprocal</code>, <code>square</code>, <code>exponential</code></li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>transformations</code> (passes through)</li>
+</ul>
+<h3 id="generaltransformation">GeneralTransformation</h3>
+<p>Config:</p>
+<ul>
+<li><code>transformations</code>: list of <code>{column, method, clip_threshold?}</code></li>
+<li>methods include power transforms (<code>box-cox</code>, <code>yeo-johnson</code>) and the simple methods</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>transformations</code> with fitted <code>lambdas</code>/<code>scaler_params</code> where applicable</li>
+</ul>
+<h2 id="bucketing-binning">Bucketing (Binning)</h2>
+<h3 id="generalbinning">GeneralBinning</h3>
+<p>Creates binned features with configurable strategies.</p>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str] (numeric)</li>
+<li><code>strategy</code>: <code>equal_width</code> | <code>equal_frequency</code> | <code>kmeans</code> | <code>custom</code> | <code>kbins</code></li>
+<li><code>n_bins</code> and strategy-specific keys:</li>
+<li><code>equal_width_bins</code>, <code>equal_frequency_bins</code>, <code>duplicates</code></li>
+<li><code>kbins_n_bins</code>, <code>kbins_strategy</code></li>
+<li><code>custom_bins</code>: dict[col -&gt; edges]</li>
+<li><code>custom_labels</code>: dict[col -&gt; labels]</li>
+<li>output formatting:</li>
+<li><code>output_suffix</code>, <code>drop_original</code>, <code>label_format</code>, <code>missing_strategy</code>, <code>missing_label</code>, <code>include_lowest</code>, <code>precision</code></li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>bin_edges</code> (dict[col -&gt; edges])</li>
+<li>output formatting settings</li>
+</ul>
+<h3 id="custombinning">CustomBinning</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>bins</code>: list[float] (shared edges)</li>
+<li>plus output formatting keys (same as GeneralBinning)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>bin_edges</code></li>
+</ul>
+<h3 id="kbinsdiscretizer">KBinsDiscretizer</h3>
+<p>Wrapper around <code>GeneralBinning</code> with a KBins-style interface.</p>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>n_bins</code>: int</li>
+<li><code>strategy</code>: <code>uniform</code> | <code>quantile</code> | <code>kmeans</code></li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>bin_edges</code></li>
+</ul>
+<h2 id="casting">Casting</h2>
+<h3 id="casting_1">Casting</h3>
+<p>Config:</p>
+<ul>
+<li>Either:</li>
+<li><code>column_types</code>: dict[col -&gt; dtype]</li>
+<li>or <code>columns</code> + <code>target_type</code></li>
+<li><code>coerce_on_error</code>: bool (default True)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>type_map</code>, <code>coerce_on_error</code></li>
+</ul>
+<h2 id="feature-generation">Feature Generation</h2>
+<h3 id="polynomialfeatures">PolynomialFeatures</h3>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>auto_detect</code>: bool</li>
+<li><code>degree</code>: int</li>
+<li><code>interaction_only</code>: bool</li>
+<li><code>include_bias</code>: bool</li>
+<li><code>include_input_features</code>: bool</li>
+<li><code>output_prefix</code>: str</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code>, <code>degree</code>, <code>interaction_only</code>, <code>include_bias</code>, <code>include_input_features</code>, <code>output_prefix</code>, <code>feature_names</code></li>
+</ul>
+<h3 id="featuremath-featuregenerationnode">FeatureMath / FeatureGenerationNode</h3>
+<p>Config:</p>
+<ul>
+<li><code>operations</code>: list[dict]</li>
+<li><code>epsilon</code>: float (default 1e-9)</li>
+<li><code>allow_overwrite</code>: bool</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>operations</code>, <code>epsilon</code>, <code>allow_overwrite</code></li>
+</ul>
+<h2 id="feature-selection">Feature Selection</h2>
+<h3 id="variancethreshold">VarianceThreshold</h3>
+<p>Config:</p>
+<ul>
+<li><code>threshold</code>: float (default 0.0)</li>
+<li><code>columns</code>: list[str] (optional; numeric)</li>
+<li><code>drop_columns</code>: bool (default True)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>candidate_columns</code>, <code>selected_columns</code>, <code>variances</code>, <code>threshold</code>, <code>drop_columns</code></li>
+</ul>
+<h3 id="correlationthreshold">CorrelationThreshold</h3>
+<p>Config:</p>
+<ul>
+<li><code>threshold</code>: float (default 0.95)</li>
+<li><code>correlation_method</code>: <code>pearson</code> | <code>spearman</code> | <code>kendall</code> (default pearson)</li>
+<li><code>columns</code>: list[str] (numeric)</li>
+<li><code>drop_columns</code>: bool</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns_to_drop</code>, <code>threshold</code>, <code>method</code>, <code>drop_columns</code></li>
+</ul>
+<h3 id="univariateselection">UnivariateSelection</h3>
+<p>Config:</p>
+<ul>
+<li><code>target_column</code>: str (if <code>y</code> not passed as tuple)</li>
+<li><code>problem_type</code>: <code>auto</code> | <code>classification</code> | <code>regression</code></li>
+<li><code>method</code>: <code>select_k_best</code> | <code>select_percentile</code> | <code>select_fpr</code> | <code>select_fdr</code> | <code>select_fwe</code> | <code>generic_univariate_select</code></li>
+<li>selector parameters (depending on method): <code>k</code>, <code>percentile</code>, <code>alpha</code>, <code>mode</code>, <code>param</code></li>
+<li>scoring: <code>score_func</code> (e.g., <code>f_classif</code>, <code>mutual_info_classif</code>, …)</li>
+<li><code>drop_columns</code>: bool</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>selected_columns</code>, <code>candidate_columns</code>, <code>scores</code>, <code>pvalues</code> (when available), plus selector config</li>
+</ul>
+<h3 id="modelbasedselection">ModelBasedSelection</h3>
+<p>Config:</p>
+<ul>
+<li><code>target_column</code>: str</li>
+<li><code>problem_type</code>: <code>auto</code> | <code>classification</code> | <code>regression</code></li>
+<li><code>method</code>: <code>select_from_model</code> | <code>rfe</code></li>
+<li><code>estimator</code>: <code>auto</code> | <code>logistic_regression</code> | <code>random_forest</code> | <code>linear_regression</code></li>
+<li>For select_from_model: <code>threshold</code>, <code>max_features</code></li>
+<li>For RFE: <code>n_features_to_select</code>, <code>step</code></li>
+<li><code>drop_columns</code>: bool</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>selected_columns</code>, <code>candidate_columns</code>, and method-specific metadata</li>
+</ul>
+<h3 id="feature_selection">feature_selection</h3>
+<p>A higher-level facade node that dispatches to the selection implementations.</p>
+<h2 id="resampling">Resampling</h2>
+<h3 id="oversampling">Oversampling</h3>
+<p>Config:</p>
+<ul>
+<li><code>method</code>: <code>smote</code> | <code>adasyn</code> | <code>borderline_smote</code> | <code>svm_smote</code> | <code>kmeans_smote</code> | <code>smote_tomek</code></li>
+<li><code>target_column</code>: required if <code>y</code> is not provided as tuple</li>
+<li><code>sampling_strategy</code>: <code>auto</code> or dict</li>
+<li><code>random_state</code>: int</li>
+<li>method-specific keys: <code>k_neighbors</code>, <code>m_neighbors</code>, <code>kind</code>, <code>out_step</code>, <code>cluster_balance_threshold</code>, <code>density_exponent</code>, <code>n_jobs</code></li>
+</ul>
+<p>Learned params: none (passes through config).</p>
+<h3 id="undersampling">Undersampling</h3>
+<p>Config:</p>
+<ul>
+<li><code>method</code>: <code>random_under_sampling</code> | <code>nearmiss</code> | <code>tomek_links</code> | <code>edited_nearest_neighbours</code></li>
+<li><code>target_column</code>: required if <code>y</code> not provided as tuple</li>
+<li><code>sampling_strategy</code>, <code>random_state</code>, <code>replacement</code>, <code>version</code>, <code>n_neighbors</code>, <code>kind_sel</code>, <code>n_jobs</code></li>
+</ul>
+<p>Learned params: none.</p>
+<h2 id="inspection">Inspection</h2>
+<h3 id="datasetprofile">DatasetProfile</h3>
+<p>Captures basic dataset stats without modifying data.</p>
+<p>Config: none.</p>
+<p>Learned params:</p>
+<ul>
+<li><code>profile</code>: rows/columns/dtypes/missing/numeric_stats</li>
+</ul>
+<h3 id="datasnapshot">DataSnapshot</h3>
+<p>Captures the first N rows without modifying data.</p>
+<p>Config:</p>
+<ul>
+<li><code>n_rows</code>: int (default 5)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>snapshot</code>: list[dict]</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

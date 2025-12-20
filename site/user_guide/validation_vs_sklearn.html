@@ -8,25 +8,31 @@
       
       
       
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/validation_vs_sklearn.html">
       
+      
+        <link rel="prev" href="step_by_step_no_config.html">
+      
+      
+        <link rel="next" href="configuration.html">
       
       
         
       
       
-      <link rel="icon" href="/Skyulf/assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
-        <title>Skyulf</title>
+        <title>Validation vs scikit-learn - Skyulf</title>
       
     
     
-      <link rel="stylesheet" href="/Skyulf/assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="/Skyulf/assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,9 +51,9 @@
       
     
     
-      <link rel="stylesheet" href="/Skyulf/assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("/Skyulf/",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -71,6 +77,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#validation-vs-scikit-learn-proof" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -81,7 +92,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/Skyulf/index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -101,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              Validation vs scikit-learn
             
           </span>
         </div>
@@ -212,7 +223,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="/Skyulf/index.html" class="md-tabs__link">
+      <a href="../index.html" class="md-tabs__link">
         
   
   
@@ -233,7 +244,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/Skyulf/guides/getting_started.html" class="md-tabs__link">
+        <a href="../guides/getting_started.html" class="md-tabs__link">
           
   
   
@@ -249,11 +260,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="/Skyulf/user_guide/overview.html" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="overview.html" class="md-tabs__link">
           
   
   
@@ -273,7 +286,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/Skyulf/reference/preprocessing_nodes.html" class="md-tabs__link">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
           
   
   
@@ -293,7 +306,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/Skyulf/contributing/writing_docs.html" class="md-tabs__link">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
           
   
   
@@ -329,7 +342,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/Skyulf/index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -359,7 +372,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/index.html" class="md-nav__link">
+      <a href="../index.html" class="md-nav__link">
         
   
   
@@ -440,7 +453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/guides/getting_started.html" class="md-nav__link">
+      <a href="../guides/getting_started.html" class="md-nav__link">
         
   
   
@@ -468,7 +481,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/guides/recipes.html" class="md-nav__link">
+      <a href="../guides/recipes.html" class="md-nav__link">
         
   
   
@@ -496,7 +509,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/architecture.html" class="md-nav__link">
+      <a href="../architecture.html" class="md-nav__link">
         
   
   
@@ -528,28 +541,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
   
@@ -567,7 +583,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -585,7 +601,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/user_guide/overview.html" class="md-nav__link">
+      <a href="overview.html" class="md-nav__link">
         
   
   
@@ -613,7 +629,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/user_guide/installation.html" class="md-nav__link">
+      <a href="installation.html" class="md-nav__link">
         
   
   
@@ -641,7 +657,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/user_guide/pipeline_quickstart.html" class="md-nav__link">
+      <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
   
@@ -669,7 +685,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/user_guide/step_by_step_no_config.html" class="md-nav__link">
+      <a href="step_by_step_no_config.html" class="md-nav__link">
         
   
   
@@ -694,10 +710,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="/Skyulf/user_guide/validation_vs_sklearn.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="validation_vs_sklearn.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -713,6 +756,87 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-scikit-learn-style-workflow-xy-train_test_split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1) scikit-learn-style workflow (X/y + train_test_split)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1b-side-by-side-run-sklearn-pipeline-vs-skyulfpipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1b) Side-by-side run: sklearn Pipeline vs SkyulfPipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1b) Side-by-side run: sklearn Pipeline vs SkyulfPipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-output-from-the-notebook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example output (from the notebook)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-proof-of-leakage-prevention-train-only-learned-params" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2) Proof of leakage prevention (train-only learned params)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-what-this-proves-and-what-it-doesnt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3) What this proves (and what it doesn’t)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -725,7 +849,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/user_guide/configuration.html" class="md-nav__link">
+      <a href="configuration.html" class="md-nav__link">
         
   
   
@@ -753,7 +877,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/user_guide/splitdataset_and_leakage.html" class="md-nav__link">
+      <a href="splitdataset_and_leakage.html" class="md-nav__link">
         
   
   
@@ -781,7 +905,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/user_guide/serialization.html" class="md-nav__link">
+      <a href="serialization.html" class="md-nav__link">
         
   
   
@@ -809,7 +933,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/user_guide/extending_custom_nodes.html" class="md-nav__link">
+      <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
   
@@ -837,7 +961,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/user_guide/troubleshooting.html" class="md-nav__link">
+      <a href="troubleshooting.html" class="md-nav__link">
         
   
   
@@ -926,7 +1050,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/preprocessing_nodes.html" class="md-nav__link">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
         
   
   
@@ -954,7 +1078,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/modeling_nodes.html" class="md-nav__link">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
         
   
   
@@ -1036,7 +1160,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/pipeline.html" class="md-nav__link">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
         
   
   
@@ -1118,7 +1242,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/data/dataset.html" class="md-nav__link">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
         
   
   
@@ -1208,7 +1332,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/index.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
         
   
   
@@ -1236,7 +1360,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/base.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
         
   
   
@@ -1264,7 +1388,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/pipeline.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
         
   
   
@@ -1292,7 +1416,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/split.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
         
   
   
@@ -1320,7 +1444,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/cleaning.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
         
   
   
@@ -1348,7 +1472,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
         
   
   
@@ -1376,7 +1500,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/imputation.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
         
   
   
@@ -1404,7 +1528,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/encoding.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
         
   
   
@@ -1432,7 +1556,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/scaling.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
         
   
   
@@ -1460,7 +1584,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/outliers.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
         
   
   
@@ -1488,7 +1612,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/transformations.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
         
   
   
@@ -1516,7 +1640,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/bucketing.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
         
   
   
@@ -1544,7 +1668,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/casting.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
         
   
   
@@ -1572,7 +1696,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/feature_generation.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
         
   
   
@@ -1600,7 +1724,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/feature_selection.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
         
   
   
@@ -1628,7 +1752,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/resampling.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
         
   
   
@@ -1656,7 +1780,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/preprocessing/inspection.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
         
   
   
@@ -1746,7 +1870,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/modeling/index.html" class="md-nav__link">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
         
   
   
@@ -1774,7 +1898,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/modeling/base.html" class="md-nav__link">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
         
   
   
@@ -1802,7 +1926,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
         
   
   
@@ -1830,7 +1954,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/modeling/classification.html" class="md-nav__link">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
         
   
   
@@ -1858,7 +1982,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/modeling/regression.html" class="md-nav__link">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
         
   
   
@@ -1886,7 +2010,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/modeling/cross_validation.html" class="md-nav__link">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
         
   
   
@@ -1914,7 +2038,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/api/modeling/tuning_tuner.html" class="md-nav__link">
+      <a href="../reference/api/modeling/tuning_tuner.html" class="md-nav__link">
         
   
   
@@ -2019,7 +2143,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/contributing/writing_docs.html" class="md-nav__link">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
         
   
   
@@ -2060,8 +2184,448 @@
               
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+  
+  
+
+
+<h1 id="validation-vs-scikit-learn-proof">Validation vs scikit-learn (Proof)</h1>
+<p>This page gives <strong>reproducible, runnable checks</strong> that:</p>
+<ul>
+<li>Skyulf supports the familiar scikit-learn workflow (build <code>X</code>/<code>y</code>, run <code>train_test_split</code>, fit on train, transform/predict on test).</li>
+<li>Skyulf avoids common forms of data leakage by learning preprocessing parameters from <strong>train only</strong>.</li>
+</ul>
+<blockquote>
+<p>Goal: show <em>verifiable behavior</em>, not claim bit-for-bit identical models.</p>
+</blockquote>
+<h2 id="1-scikit-learn-style-workflow-xy-train_test_split">1) scikit-learn-style workflow (X/y + train_test_split)</h2>
+<p>This mirrors the sklearn pattern:</p>
+<ul>
+<li>sklearn: <code>fit(X_train, y_train)</code> then <code>predict(X_test)</code></li>
+<li>Skyulf: pass <code>SplitDataset(train=(X_train, y_train), test=(X_test, y_test))</code></li>
+</ul>
+<pre><code class="language-python">from __future__ import annotations
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+from skyulf.data.dataset import SplitDataset
+from skyulf.pipeline import SkyulfPipeline
+
+# Synthetic classification data
+raw = pd.DataFrame(
+    {
+        &quot;age&quot;: [10, 20, None, 40, 50, 60, None, 80],
+        &quot;city&quot;: [&quot;A&quot;, &quot;B&quot;, &quot;A&quot;, &quot;C&quot;, &quot;B&quot;, &quot;A&quot;, &quot;C&quot;, &quot;B&quot;],
+        &quot;target&quot;: [0, 1, 0, 1, 1, 0, 1, 0],
+    }
+)
+
+X = raw.drop(columns=[&quot;target&quot;])
+y = raw[&quot;target&quot;]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, random_state=42, stratify=y
+)
+
+dataset = SplitDataset(train=(X_train, y_train), test=(X_test, y_test), validation=None)
+
+# IMPORTANT: because we already split, we do not add TrainTestSplitter here.
+config = {
+    &quot;preprocessing&quot;: [
+        {
+            &quot;name&quot;: &quot;impute&quot;,
+            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
+            &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]},
+        },
+        {
+            &quot;name&quot;: &quot;encode&quot;,
+            &quot;transformer&quot;: &quot;OneHotEncoder&quot;,
+            &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;], &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;},
+        },
+    ],
+    &quot;modeling&quot;: {&quot;type&quot;: &quot;random_forest_classifier&quot;, &quot;params&quot;: {&quot;n_estimators&quot;: 50, &quot;random_state&quot;: 42}},
+}
+
+pipeline = SkyulfPipeline(config)
+metrics = pipeline.fit(dataset, target_column=&quot;target&quot;)  # target_column ignored for (X, y) tuples
+
+preds = pipeline.predict(X_test)
+
+# Proof-like checks
+assert len(preds) == len(X_test)
+assert preds.index.equals(X_test.index)
+print(&quot;OK: Skyulf fit/predict with sklearn-style train/test split&quot;)
+print(&quot;Metrics keys:&quot;, list(metrics.keys()))
+</code></pre>
+<h2 id="1b-side-by-side-run-sklearn-pipeline-vs-skyulfpipeline">1b) Side-by-side run: sklearn Pipeline vs SkyulfPipeline</h2>
+<p>This comparison proves both stacks can run the same <em>shape</em> of workflow on the same split.
+We do <strong>not</strong> assert equality of predictions (different defaults / encodings can legitimately differ).</p>
+<p>For a stronger numeric sanity check, we also compute and print test accuracy for both pipelines and the absolute difference.</p>
+<pre><code class="language-python">from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+from sklearn.compose import ColumnTransformer
+from sklearn.datasets import load_breast_cancer
+from sklearn.impute import SimpleImputer as SkSimpleImputer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline as SkPipeline
+from sklearn.preprocessing import OneHotEncoder as SkOneHotEncoder
+from sklearn.preprocessing import StandardScaler
+
+from skyulf import SkyulfPipeline
+from skyulf.data.dataset import SplitDataset
+
+np.random.seed(42)
+
+# Real dataset + extra categorical feature + missingness
+raw = load_breast_cancer(as_frame=True)
+df = raw.frame.copy().rename(columns={&quot;target&quot;: &quot;label&quot;})
+
+df[&quot;radius_band&quot;] = pd.cut(
+    df[&quot;mean radius&quot;],
+    bins=[0, 12, 15, 100],
+    labels=[&quot;small&quot;, &quot;medium&quot;, &quot;large&quot;],
+    include_lowest=True,
+)
+
+missing_idx = np.random.choice(df.index, size=25, replace=False)
+df.loc[missing_idx, &quot;mean texture&quot;] = np.nan
+
+target_col = &quot;label&quot;
+cat_cols = [&quot;radius_band&quot;]
+num_cols = [c for c in df.columns if c not in [target_col, *cat_cols]]
+
+X = df[num_cols + cat_cols]
+y = df[target_col]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, random_state=42, stratify=y
+)
+
+# --- scikit-learn pipeline ---
+numeric_features = num_cols
+categorical_features = cat_cols
+
+numeric_pipe = SkPipeline(
+    steps=[
+        (&quot;imputer&quot;, SkSimpleImputer(strategy=&quot;mean&quot;)),
+        (&quot;scaler&quot;, StandardScaler()),
+    ]
+)
+
+categorical_pipe = SkPipeline(
+    steps=[
+        (&quot;imputer&quot;, SkSimpleImputer(strategy=&quot;most_frequent&quot;)),
+        (&quot;onehot&quot;, SkOneHotEncoder(handle_unknown=&quot;ignore&quot;, sparse_output=False)),
+    ]
+)
+
+preprocess = ColumnTransformer(
+    transformers=[
+        (&quot;num&quot;, numeric_pipe, numeric_features),
+        (&quot;cat&quot;, categorical_pipe, categorical_features),
+    ],
+    remainder=&quot;drop&quot;,
+)
+
+sk_model = LogisticRegression(max_iter=1000, random_state=42)
+sk = SkPipeline(steps=[(&quot;preprocess&quot;, preprocess), (&quot;model&quot;, sk_model)])
+sk.fit(X_train, y_train)
+sk_preds = pd.Series(sk.predict(X_test), index=X_test.index)
+sk_acc = accuracy_score(y_test, sk_preds)
+
+# --- Skyulf pipeline ---
+train_df = X_train.copy()
+train_df[target_col] = y_train
+test_df = X_test.copy()
+test_df[target_col] = y_test
+
+dataset = SplitDataset(train=train_df, test=test_df, validation=None)
+skyulf_config = {
+    &quot;preprocessing&quot;: [
+        {
+            &quot;name&quot;: &quot;impute&quot;,
+            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
+            &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: num_cols},
+        },
+        {
+            &quot;name&quot;: &quot;impute_cat&quot;,
+            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
+            &quot;params&quot;: {&quot;strategy&quot;: &quot;most_frequent&quot;, &quot;columns&quot;: cat_cols},
+        },
+        {
+            &quot;name&quot;: &quot;encode&quot;,
+            &quot;transformer&quot;: &quot;OneHotEncoder&quot;,
+            &quot;params&quot;: {&quot;columns&quot;: cat_cols, &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;},
+        },
+        {
+            &quot;name&quot;: &quot;scale&quot;,
+            &quot;transformer&quot;: &quot;StandardScaler&quot;,
+            &quot;params&quot;: {&quot;columns&quot;: num_cols},
+        },
+    ],
+    &quot;modeling&quot;: {&quot;type&quot;: &quot;logistic_regression&quot;, &quot;params&quot;: {&quot;max_iter&quot;: 1000, &quot;random_state&quot;: 42}},
+}
+
+sky = SkyulfPipeline(skyulf_config)
+_ = sky.fit(dataset, target_column=target_col)
+sky_preds = sky.predict(X_test)
+sky_acc = accuracy_score(y_test, sky_preds)
+delta = abs(sk_acc - sky_acc)
+
+assert sk_preds.index.equals(X_test.index)
+assert sky_preds.index.equals(X_test.index)
+
+# Proof-like checks
+assert len(sk_preds) == len(X_test)
+assert sk_preds.index.equals(X_test.index)
+assert len(sky_preds) == len(X_test)
+assert sky_preds.index.equals(X_test.index)
+
+print(&quot;OK: sklearn Pipeline and SkyulfPipeline both run&quot;)
+print(f&quot;sklearn test accuracy: {sk_acc:.4f}&quot;)
+print(f&quot;skyulf  test accuracy: {sky_acc:.4f}&quot;)
+print(f&quot;delta accuracy: {delta:.4f}&quot;)
+
+# --- Classification metrics (side-by-side) ---
+sk_report = classification_report(y_test, sk_preds, output_dict=True, zero_division=0)
+sky_report = classification_report(y_test, sky_preds, output_dict=True, zero_division=0)
+
+sk_df = pd.DataFrame(sk_report).T
+sky_df = pd.DataFrame(sky_report).T
+
+# Keep a consistent row order: class labels first, then summary rows (if present)
+label_rows = [str(v) for v in sorted(pd.unique(y_test))]
+summary_rows = [r for r in [&quot;accuracy&quot;, &quot;macro avg&quot;, &quot;weighted avg&quot;] if r in sk_df.index]
+row_order = [r for r in label_rows if r in sk_df.index] + summary_rows
+
+sk_df = sk_df.loc[row_order]
+sky_df = sky_df.loc[row_order]
+
+side_by_side = pd.concat(
+    {
+        &quot;sklearn&quot;: sk_df[[&quot;precision&quot;, &quot;recall&quot;, &quot;f1-score&quot;, &quot;support&quot;]],
+        &quot;skyulf&quot;: sky_df[[&quot;precision&quot;, &quot;recall&quot;, &quot;f1-score&quot;, &quot;support&quot;]],
+    },
+    axis=1,
+)
+
+print(&quot;\nClassification report (side-by-side):&quot;)
+print(side_by_side.to_string())
+
+labels = sorted(pd.unique(y_test))
+cm_sk = confusion_matrix(y_test, sk_preds, labels=labels)
+cm_sky = confusion_matrix(y_test, sky_preds, labels=labels)
+
+cm_index = [f&quot;true_{l}&quot; for l in labels]
+cm_cols = [f&quot;pred_{l}&quot; for l in labels]
+
+cm_sk_df = pd.DataFrame(cm_sk, index=cm_index, columns=cm_cols)
+cm_sky_df = pd.DataFrame(cm_sky, index=cm_index, columns=cm_cols)
+
+print(&quot;\nConfusion matrix (sklearn):&quot;)
+print(cm_sk_df.to_string())
+print(&quot;\nConfusion matrix (skyulf):&quot;)
+print(cm_sky_df.to_string())
+
+print(&quot;sklearn preds head:&quot;)
+print(sk_preds.head())
+print(&quot;skyulf preds head:&quot;)
+print(sky_preds.head())
+
+assert (sk_pred.values == sky_pred.values).all()
+print(&quot;Predictions match exactly.&quot;)
+</code></pre>
+<h3 id="example-output-from-the-notebook">Example output (from the notebook)</h3>
+<p>This is the exact output from one notebook run (same dataset, same random seed/split):</p>
+<p>Classification report (side-by-side):</p>
+<table>
+<thead>
+<tr>
+<th>class/avg</th>
+<th style="text-align: right;">sklearn precision</th>
+<th style="text-align: right;">sklearn recall</th>
+<th style="text-align: right;">sklearn f1-score</th>
+<th style="text-align: right;">sklearn support</th>
+<th style="text-align: right;">skyulf precision</th>
+<th style="text-align: right;">skyulf recall</th>
+<th style="text-align: right;">skyulf f1-score</th>
+<th style="text-align: right;">skyulf support</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td style="text-align: right;">0.962963</td>
+<td style="text-align: right;">0.981132</td>
+<td style="text-align: right;">0.971963</td>
+<td style="text-align: right;">53.000000</td>
+<td style="text-align: right;">0.962963</td>
+<td style="text-align: right;">0.981132</td>
+<td style="text-align: right;">0.971963</td>
+<td style="text-align: right;">53.000000</td>
+</tr>
+<tr>
+<td>1</td>
+<td style="text-align: right;">0.988764</td>
+<td style="text-align: right;">0.977778</td>
+<td style="text-align: right;">0.983240</td>
+<td style="text-align: right;">90.000000</td>
+<td style="text-align: right;">0.988764</td>
+<td style="text-align: right;">0.977778</td>
+<td style="text-align: right;">0.983240</td>
+<td style="text-align: right;">90.000000</td>
+</tr>
+<tr>
+<td>accuracy</td>
+<td style="text-align: right;">0.979021</td>
+<td style="text-align: right;">0.979021</td>
+<td style="text-align: right;">0.979021</td>
+<td style="text-align: right;">0.979021</td>
+<td style="text-align: right;">0.979021</td>
+<td style="text-align: right;">0.979021</td>
+<td style="text-align: right;">0.979021</td>
+<td style="text-align: right;">0.979021</td>
+</tr>
+<tr>
+<td>macro avg</td>
+<td style="text-align: right;">0.975864</td>
+<td style="text-align: right;">0.979455</td>
+<td style="text-align: right;">0.977601</td>
+<td style="text-align: right;">143.000000</td>
+<td style="text-align: right;">0.975864</td>
+<td style="text-align: right;">0.979455</td>
+<td style="text-align: right;">0.977601</td>
+<td style="text-align: right;">143.000000</td>
+</tr>
+<tr>
+<td>weighted avg</td>
+<td style="text-align: right;">0.979201</td>
+<td style="text-align: right;">0.979021</td>
+<td style="text-align: right;">0.979060</td>
+<td style="text-align: right;">143.000000</td>
+<td style="text-align: right;">0.979201</td>
+<td style="text-align: right;">0.979021</td>
+<td style="text-align: right;">0.979060</td>
+<td style="text-align: right;">143.000000</td>
+</tr>
+</tbody>
+</table>
+<p>Confusion matrix (sklearn):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">pred_0</th>
+<th style="text-align: right;">pred_1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>true_0</td>
+<td style="text-align: right;">52</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td>true_1</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">88</td>
+</tr>
+</tbody>
+</table>
+<p>Confusion matrix (skyulf):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">pred_0</th>
+<th style="text-align: right;">pred_1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>true_0</td>
+<td style="text-align: right;">52</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td>true_1</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">88</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-proof-of-leakage-prevention-train-only-learned-params">2) Proof of leakage prevention (train-only learned params)</h2>
+<p>A common leakage bug is fitting preprocessing on the full dataset.</p>
+<p>Here we construct a dataset where <strong>train and test have very different distributions</strong>.
+If an imputer learns the mean from the full dataset, it will be pulled toward the test distribution.</p>
+<p>Skyulf’s pattern learns from train only (Calculator) and applies to test (Applier).</p>
+<pre><code class="language-python">from __future__ import annotations
+
+import pandas as pd
+
+from skyulf.preprocessing.imputation import SimpleImputerCalculator
+
+# Train has small ages; test has huge ages.
+X_train = pd.DataFrame({&quot;age&quot;: [1.0, 2.0, None, 2.0]})
+y_train = pd.Series([0, 1, 0, 1])
+
+X_test = pd.DataFrame({&quot;age&quot;: [1000.0, None, 1200.0]})
+y_test = pd.Series([0, 1, 1])
+
+cfg = {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]}
+
+# What train-only mean should be (ignoring NaNs)
+expected_train_mean = float(pd.Series([1.0, 2.0, 2.0]).mean())
+
+params = SimpleImputerCalculator().fit((X_train, y_train), cfg)
+learned_mean = float(params[&quot;fill_values&quot;][&quot;age&quot;])
+
+# Proof: learned mean equals train mean (not influenced by test)
+assert abs(learned_mean - expected_train_mean) &lt; 1e-12
+
+# For comparison only: full-data mean would be very different
+full_mean = float(pd.concat([X_train[&quot;age&quot;], X_test[&quot;age&quot;]]).mean())
+assert abs(full_mean - expected_train_mean) &gt; 1.0
+
+print(&quot;OK: SimpleImputer learns from train only&quot;)
+print(&quot;train_mean:&quot;, expected_train_mean)
+print(&quot;full_mean:&quot;, full_mean)
+print(&quot;learned_mean:&quot;, learned_mean)
+</code></pre>
+<h2 id="3-what-this-proves-and-what-it-doesnt">3) What this proves (and what it doesn’t)</h2>
+<ul>
+<li>Proves the API supports sklearn-style <code>X/y</code> workflows and produces aligned predictions.</li>
+<li>Proves at least one common leakage-sensitive node (<code>SimpleImputer</code>) learns its statistics from the provided training data.</li>
+</ul>
+<p>It does <strong>not</strong> claim Skyulf will produce identical predictions to an arbitrary sklearn pipeline, because:</p>
+<ul>
+<li>different defaults/hyperparameters,</li>
+<li>different encoding conventions,</li>
+<li>and different ordering of operations</li>
+</ul>
+<p>can all change results while still being correct.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -2100,10 +2664,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "/Skyulf/", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "/Skyulf/assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="/Skyulf/assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
