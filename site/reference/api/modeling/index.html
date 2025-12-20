@@ -4528,7 +4528,7 @@ Returns DataFrame where columns are classes.</p>
         <span class="c1"># 2. Train Model</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calculator</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_combined</span><span class="p">,</span> <span class="n">y_combined</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -4876,7 +4876,7 @@ Returns DataFrame where columns are classes.</p>
 <span class="normal">338</span>
 <span class="normal">339</span>
 <span class="normal">340</span>
-<span class="normal">341</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span>
+<span class="normal">341</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>

@@ -3220,7 +3220,7 @@ Applies specific bin edges to selected columns.</p>
 
         <span class="k">return</span> <span class="n">current_data</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">node_id_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">node_id_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># noqa: C901</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Runs the pipeline on data.</span>
 <span class="sd">        Returns: (transformed_data, metrics_dict)</span>
@@ -3596,7 +3596,7 @@ Applies specific bin edges to selected columns.</p>
 
         <span class="k">return</span> <span class="n">current_data</span><span class="p">,</span> <span class="n">metrics</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_get_transformer_components</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">type_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_transformer_components</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">type_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>  <span class="c1"># noqa: C901</span>
         <span class="k">if</span> <span class="n">type_name</span> <span class="o">==</span> <span class="s2">&quot;TrainTestSplitter&quot;</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">SplitCalculator</span><span class="p">(),</span> <span class="n">SplitApplier</span><span class="p">()</span>
         <span class="k">elif</span> <span class="n">type_name</span> <span class="o">==</span> <span class="s2">&quot;feature_target_split&quot;</span><span class="p">:</span>
@@ -4100,7 +4100,7 @@ Returns: (transformed_data, metrics_dict)</p>
 <span class="normal">538</span>
 <span class="normal">539</span>
 <span class="normal">540</span>
-<span class="normal">541</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">node_id_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="normal">541</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">node_id_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># noqa: C901</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Runs the pipeline on data.</span>
 <span class="sd">    Returns: (transformed_data, metrics_dict)</span>
@@ -4708,7 +4708,7 @@ Returns: (transformed_data, metrics_dict)</p>
 <span class="sd">    Master calculator that handles mixed strategies and overrides.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">],</span> <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="n">X</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">unpack_pipeline_input</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
