@@ -123,3 +123,6 @@ testingdb/
 !.semgrepignore
 .codacy.yml
 !.codacy.yml
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md
