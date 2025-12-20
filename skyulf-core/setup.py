@@ -24,7 +24,7 @@ setup(
         "numpy>=1.24.0",
         "scikit-learn>=1.3.0",
         "polars>=0.19.0",
-        "imbalanced-learn>=0.12.0",
+        "imbalanced-learn>=0.13.0",
         "pydantic>=2.0.0",
         "optuna>=3.0.0",
         "optuna-integration>=3.0.0",
