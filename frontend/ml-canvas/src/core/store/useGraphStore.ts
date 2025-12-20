@@ -57,6 +57,50 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
 
   onConnect: (connection: Connection) => {
+    // Validation: Check for X/Y Split usage without prior Train/Test Split
+    const nodes = get().nodes;
+    const edges = get().edges;
+    const sourceNode = nodes.find((n) => n.id === connection.source);
+    const targetNode = nodes.find((n) => n.id === connection.target);
+
+    if (sourceNode && targetNode) {
+      const sourceType = sourceNode.data.definitionType;
+      
+      // If connecting FROM an X/Y Split
+      if (sourceType === 'feature_target_split') {
+        // Check if there is a Train/Test Split upstream
+        let hasTrainTestSplit = false;
+        const queue = [sourceNode.id];
+        const visited = new Set<string>();
+
+        while (queue.length > 0) {
+          const currentId = queue.shift()!;
+          if (visited.has(currentId)) continue;
+          visited.add(currentId);
+
+          const currentNode = nodes.find((n) => n.id === currentId);
+          if (currentNode?.data.definitionType === 'train_test_split') {
+            hasTrainTestSplit = true;
+            break;
+          }
+
+          // Find parents
+          const parentEdges = edges.filter((e) => e.target === currentId);
+          for (const edge of parentEdges) {
+            queue.push(edge.source);
+          }
+        }
+
+        if (!hasTrainTestSplit) {
+          alert(
+            'Warning: You are using an X/Y Split without a prior Train-Test Split.\n\n' +
+            'Any processing or modeling done on this data will use 100% of the dataset (Data Leakage).\n\n' +
+            'Recommended: Add a "Train-Test Split" node BEFORE the "Feature-Target Split" node.'
+          );
+        }
+      }
+    }
+
     set({
       edges: addEdge(connection, get().edges),
     });
