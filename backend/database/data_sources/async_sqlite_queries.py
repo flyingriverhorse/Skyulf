@@ -74,7 +74,7 @@ async def select_data_sources(
                 conditions = []
                 for k, v in filter_dict.items():
                     conditions.append(column(k) == v)
-                
+
                 stmt = select(literal_column("*")).select_from(tbl).where(*conditions)
                 result = await session.execute(stmt)
             else:
@@ -101,9 +101,9 @@ async def update_data_source(
         try:
             # Use SQLAlchemy Core for UPDATE
             tbl = table(TABLE, *[column(c) for c in update_data.keys()] + [column(c) for c in filter_dict.keys()])
-            
+
             stmt = update(tbl).values(**update_data)
-            
+
             for k, v in filter_dict.items():
                 stmt = stmt.where(column(k) == v)
 
@@ -125,7 +125,7 @@ async def delete_data_source(settings: Settings, filter_dict: Dict[str, Any]):
             # Use SQLAlchemy Core for DELETE
             tbl = table(TABLE, *[column(c) for c in filter_dict.keys()])
             stmt = delete(tbl)
-            
+
             for k, v in filter_dict.items():
                 stmt = stmt.where(column(k) == v)
 
@@ -148,7 +148,7 @@ async def count_data_sources(
         try:
             tbl = table(TABLE)
             stmt = select(func.count()).select_from(tbl)
-            
+
             if filter_dict:
                 for k, v in filter_dict.items():
                     stmt = stmt.where(column(k) == v)
@@ -175,7 +175,7 @@ async def select_data_source_by_file_hash(
             stmt = select(literal_column("*")).select_from(tbl).where(
                 func.json_extract(column("config"), "$.file_hash") == file_hash
             ).limit(1)
-            
+
             result = await session.execute(stmt)
             row = result.fetchone()
             return dict(row._mapping) if row else None

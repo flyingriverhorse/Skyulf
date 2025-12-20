@@ -313,7 +313,7 @@ class RunPipelineResponse(BaseModel):
 
 
 @router.post("/run", response_model=RunPipelineResponse)
-async def run_pipeline(
+async def run_pipeline(  # noqa: C901
     config: PipelineConfigModel,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_async_session),
@@ -529,7 +529,7 @@ async def load_pipeline(
 
 
 @router.post("/preview", response_model=PreviewResponse)
-async def preview_pipeline(
+async def preview_pipeline(  # noqa: C901
     config: PipelineConfigModel, session: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -794,7 +794,7 @@ async def cancel_job(job_id: str, session: AsyncSession = Depends(get_async_sess
 
 
 @router.get("/jobs/{job_id}/evaluation")
-async def get_job_evaluation(
+async def get_job_evaluation(  # noqa: C901
     job_id: str, session: AsyncSession = Depends(get_async_session)
 ):
     """Retrieves the raw evaluation data (y_true, y_pred) for a job."""

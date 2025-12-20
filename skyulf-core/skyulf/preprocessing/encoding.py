@@ -256,7 +256,7 @@ class LabelEncoderCalculator(BaseCalculator):
                 le.fit(X[col].astype(str))
                 encoders[col] = le
                 classes_count[col] = len(le.classes_)
-            
+
             # Also check if target is in cols (if y has a name)
             if y is not None and hasattr(y, 'name') and y.name in cols:
                 le = LabelEncoder()
@@ -308,7 +308,7 @@ class LabelEncoderApplier(BaseApplier):
                     # We can use map.
                     mapping = dict(zip(le.classes_, le.transform(le.classes_)))
                     X_out[col] = X_out[col].astype(str).map(mapping).fillna(-1)
-        
+
         # Transform target (always check if encoder exists)
         if y_out is not None and "__target__" in encoders:
             le = encoders["__target__"]

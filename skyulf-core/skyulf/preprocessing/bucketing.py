@@ -21,7 +21,7 @@ class BaseBinningApplier(BaseApplier):
     Expects 'bin_edges' in params: Dict[str, List[float]] mapping column names to bin edges.
     """
 
-    def apply(
+    def apply(  # noqa: C901
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         params: Dict[str, Any],
@@ -156,7 +156,7 @@ class GeneralBinningCalculator(BaseCalculator):
     Master calculator that handles mixed strategies and overrides.
     """
 
-    def fit(
+    def fit(  # noqa: C901
         self, df: Union[pd.DataFrame, tuple], config: Dict[str, Any]
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)

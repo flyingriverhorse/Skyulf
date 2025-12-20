@@ -208,7 +208,7 @@ class CorrelationThresholdApplier(BaseApplier):
 
 
 class UnivariateSelectionCalculator(BaseCalculator):
-    def fit(
+    def fit(  # noqa: C901
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         config: Dict[str, Any],
@@ -380,7 +380,7 @@ class UnivariateSelectionApplier(BaseApplier):
 
 
 class ModelBasedSelectionCalculator(BaseCalculator):
-    def fit(
+    def fit(  # noqa: C901
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         config: Dict[str, Any],

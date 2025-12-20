@@ -134,7 +134,7 @@ class TunerCalculator(BaseModelCalculator):
 
         return (model, tuning_result)
 
-    def tune(
+    def tune(  # noqa: C901
         self,
         X: pd.DataFrame,
         y: pd.Series,
@@ -291,7 +291,8 @@ class TunerCalculator(BaseModelCalculator):
                     )
 
                 # Use custom cross-validation loop to enable per-fold logging and progress tracking.
-                # We instantiate the model with the current candidate parameters and evaluate it using the configured CV strategy.
+                # We instantiate the model with the current candidate parameters and evaluate it
+                # using the configured CV strategy.
 
                 fold_scores = []
 

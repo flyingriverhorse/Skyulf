@@ -93,7 +93,7 @@ class TextCleaningCalculator(BaseCalculator):
 
 
 class TextCleaningApplier(BaseApplier):
-    def apply(
+    def apply(  # noqa: C901
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         params: Dict[str, Any],
