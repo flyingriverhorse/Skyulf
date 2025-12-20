@@ -694,9 +694,9 @@ class PipelineEngine:
         # estimator.model is expected to be a tuple (model, tuning_result) for Tuner
         model_artifact = estimator.model
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
-             _, tuning_result = model_artifact
+            _, tuning_result = model_artifact
         else:
-             tuning_result = None
+            tuning_result = None
 
         if tuning_result:
             metrics = {

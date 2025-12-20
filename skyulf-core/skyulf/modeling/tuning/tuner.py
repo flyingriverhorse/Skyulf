@@ -133,8 +133,8 @@ class TunerCalculator(BaseModelCalculator):
         # We can cast it or ignore it.
         model_cls = getattr(self.model_calculator, "model_class", None)
         if not model_cls:
-             raise ValueError("Model calculator does not have a model_class attribute")
-        
+            raise ValueError("Model calculator does not have a model_class attribute")
+
         model = model_cls(**final_params)
         model.fit(X, y)
 
