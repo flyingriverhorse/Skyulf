@@ -2926,7 +2926,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
         <span class="c1"># We can cast it or ignore it.</span>
         <span class="n">model_cls</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="p">,</span> <span class="s2">&quot;model_class&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">model_cls</span><span class="p">:</span>
-             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Model calculator does not have a model_class attribute&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Model calculator does not have a model_class attribute&quot;</span><span class="p">)</span>
 
         <span class="n">model</span> <span class="o">=</span> <span class="n">model_cls</span><span class="p">(</span><span class="o">**</span><span class="n">final_params</span><span class="p">)</span>
         <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
@@ -3477,7 +3477,7 @@ Adapts the generic fit interface to the specific tune method.</p>
     <span class="c1"># We can cast it or ignore it.</span>
     <span class="n">model_cls</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="p">,</span> <span class="s2">&quot;model_class&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">model_cls</span><span class="p">:</span>
-         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Model calculator does not have a model_class attribute&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Model calculator does not have a model_class attribute&quot;</span><span class="p">)</span>
 
     <span class="n">model</span> <span class="o">=</span> <span class="n">model_cls</span><span class="p">(</span><span class="o">**</span><span class="n">final_params</span><span class="p">)</span>
     <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
