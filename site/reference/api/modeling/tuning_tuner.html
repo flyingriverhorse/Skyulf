@@ -2265,8 +2265,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/tuning/tuner.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">540</span>
-<span class="normal">541</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">541</span>
 <span class="normal">542</span>
 <span class="normal">543</span>
 <span class="normal">544</span>
@@ -2288,7 +2287,8 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">560</span>
 <span class="normal">561</span>
 <span class="normal">562</span>
-<span class="normal">563</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TunerApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
+<span class="normal">563</span>
+<span class="normal">564</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TunerApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Applier for TunerCalculator.</span>
 <span class="sd">    Wraps the base model applier to provide predictions using the refitted best model.</span>
@@ -2840,7 +2840,8 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">534</span>
 <span class="normal">535</span>
 <span class="normal">536</span>
-<span class="normal">537</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TunerCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
+<span class="normal">537</span>
+<span class="normal">538</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TunerCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculator for hyperparameter tuning.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_calculator</span><span class="p">:</span> <span class="n">BaseModelCalculator</span><span class="p">):</span>
@@ -2916,7 +2917,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
         <span class="k">return</span> <span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">tuning_result</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span>
         <span class="n">y</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span>
@@ -3073,7 +3074,8 @@ Wraps the base model applier to provide predictions using the refitted best mode
                     <span class="p">)</span>
 
                 <span class="c1"># Use custom cross-validation loop to enable per-fold logging and progress tracking.</span>
-                <span class="c1"># We instantiate the model with the current candidate parameters and evaluate it using the configured CV strategy.</span>
+                <span class="c1"># We instantiate the model with the current candidate parameters and evaluate it</span>
+                <span class="c1"># using the configured CV strategy.</span>
 
                 <span class="n">fold_scores</span> <span class="o">=</span> <span class="p">[]</span>
 
@@ -3871,7 +3873,8 @@ Adapts the generic fit interface to the specific tune method.</p>
 <span class="normal">534</span>
 <span class="normal">535</span>
 <span class="normal">536</span>
-<span class="normal">537</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
+<span class="normal">537</span>
+<span class="normal">538</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span>
@@ -4028,7 +4031,8 @@ Adapts the generic fit interface to the specific tune method.</p>
                 <span class="p">)</span>
 
             <span class="c1"># Use custom cross-validation loop to enable per-fold logging and progress tracking.</span>
-            <span class="c1"># We instantiate the model with the current candidate parameters and evaluate it using the configured CV strategy.</span>
+            <span class="c1"># We instantiate the model with the current candidate parameters and evaluate it</span>
+            <span class="c1"># using the configured CV strategy.</span>
 
             <span class="n">fold_scores</span> <span class="o">=</span> <span class="p">[]</span>
 
