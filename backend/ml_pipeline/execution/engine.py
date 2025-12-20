@@ -422,7 +422,10 @@ class PipelineEngine:
             test_part = processed_df[1] if len(processed_df) > 1 else None
             train_shape = getattr(train_part, "shape", None)
             test_shape = getattr(test_part, "shape", None) if test_part is not None else None
-            self.log(f"Split details - Train: {train_shape}, Test: {test_shape or 'None'}")
+            self.log(
+                f"Split details - Train: {train_shape}, "
+                f"Test: {test_shape or 'None'}"
+            )
 
         self.artifact_store.save(node.node_id, processed_df)
 
