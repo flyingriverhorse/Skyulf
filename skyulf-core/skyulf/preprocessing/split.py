@@ -133,8 +133,8 @@ class DataSplitter:
             class_counts = stratify.value_counts()
             if class_counts.min() < 2:
                 logger.warning(
-                    f"Stratified split requested but the least populated class has only {
-                        class_counts.min()} member(s). Stratification will be disabled."
+                    f"Stratified split requested but the least populated class has only {class_counts.min()} "
+                    "member(s). Stratification will be disabled."
                 )
                 stratify = None
 
