@@ -22,7 +22,7 @@ setup(
     install_requires=[
         "pandas>=2.0.0",
         "numpy>=1.24.0",
-        "scikit-learn>=1.3.0",
+        "scikit-learn>=1.3.0,<1.6.0",
         "polars>=0.19.0",
         "imbalanced-learn>=0.13.0",
         "pydantic>=2.0.0",

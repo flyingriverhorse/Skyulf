@@ -17,6 +17,16 @@ This comprehensive release addresses critical connectivity issues, refines the f
 - **Standalone Polynomial Node:** Extracted `PolynomialFeatures` from the generic "Feature Generation" node into its own dedicated node. This improves discoverability and simplifies the configuration UX.
 - **Secure ID Generation:** Replaced insecure `Math.random()` calls with cryptographically secure `uuid` (v4) for generating Node and Pipeline IDs, satisfying strict security compliance rules.
 - **Code Hygiene:** Cleaned up console logs and improved TypeScript type safety across the frontend codebase.
+- **Data Leakage Prevention:** Added intelligent warnings in the Frontend Graph Store to alert users when connecting "X/Y Split" nodes directly to models without a prior "Train/Test Split".
+
+### 🔧 Backend & Core
+- **Dependency Management:** Pinned `scikit-learn` to `<1.6.0` to resolve critical incompatibility with `imbalanced-learn` (missing `_is_pandas_df`).
+- **Type Safety:** Resolved 82 `mypy` errors across `backend` and `skyulf-core` by adding `pandas-stubs` and fixing SQLAlchemy/Pydantic type mismatches.
+- **Linting:** Achieved zero `flake8` errors by fixing indentation and whitespace issues in `engine.py` and `tuner.py`.
+- **Logging:** Added `log_callback` support to `Tuner` and `BaseModelCalculator` to ensure warnings and tuning results are visible in the frontend.
+
+### 📚 Documentation
+- **Quality Protocols:** Added `.github/instructions/quality_checks.instructions.md` defining mandatory Linting, Type Checking, and Versioning protocols.
 
 ### 🧠 Backend Logic & Stability
 - **Polynomial Logic Fix:** Resolved a critical bug where `PolynomialFeatures` would duplicate input columns even when `include_input_features` was disabled.
