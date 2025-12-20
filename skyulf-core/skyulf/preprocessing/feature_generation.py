@@ -11,11 +11,11 @@ from .base import BaseApplier, BaseCalculator
 
 # --- Optional Dependencies ---
 try:
-    from rapidfuzz import fuzz
+    from rapidfuzz import fuzz  # type: ignore
 
     _HAS_RAPIDFUZZ = True
 except ImportError:
-    fuzz = None  # type: ignore
+    fuzz = None
     _HAS_RAPIDFUZZ = False
 
 # --- Constants ---
