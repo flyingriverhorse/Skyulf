@@ -7,6 +7,9 @@ from pathlib import Path
 
 # Force Celery to use in-memory broker/backend for tests to avoid Redis connection issues
 # and the lingering _connection_worker_thread.
+# NOTE: We prefer using a real Redis service in CI, but for local tests or if CI service fails,
+# this fallback prevents hangs. However, if a real Redis is available (like in CI with services),
+# we might want to use it. For now, we force memory to be safe and avoid the hang.
 os.environ["CELERY_BROKER_URL"] = "memory://"
 os.environ["CELERY_RESULT_BACKEND"] = "rpc://"
 os.environ["USE_CELERY"] = "False"
@@ -49,11 +52,14 @@ def cleanup_celery_connections():
             print(f"\n[pytest] Closing Celery current_app: {current_app}")
             current_app.close()
 
-        # 2. Close the explicit app if it was loaded
-        if "backend.celery_app" in sys.modules:
+        # 2. Force import and close the backend celery app to ensure its pool is drained
+        try:
             from backend.celery_app import celery_app
             print("\n[pytest] Closing backend.celery_app...")
             celery_app.close()
+        except ImportError:
+            pass
+            
     except Exception as e:
         print(f"\n[pytest] Error closing Celery app: {e}")
 
