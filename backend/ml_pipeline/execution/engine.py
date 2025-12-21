@@ -375,14 +375,16 @@ class PipelineEngine:
     def _run_data_loader(self, node: NodeConfig) -> str:
         # params: {"source": "csv", "path": "...", "sample": True/False, "limit": 1000}
         loader = DataLoader()
-        
-        # Handle both "path" and "dataset_id" (which might be a path in tests)
+
+        # Some callers use `dataset_id` as a path.
         path = node.params.get("path")
         if not path and "dataset_id" in node.params:
-             path = node.params["dataset_id"]
-             
+            path = node.params["dataset_id"]
+
         if not path:
-            raise KeyError(f"Node {node.node_id} missing 'path' or 'dataset_id' in params: {node.params}")
+            raise KeyError(
+                f"Node {node.node_id} missing 'path' or 'dataset_id' in params: {node.params}"
+            )
 
         if node.params.get("sample", False):
             limit = node.params.get("limit", 1000)
