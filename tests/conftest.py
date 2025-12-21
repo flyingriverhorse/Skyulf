@@ -39,27 +39,45 @@ if str(REPO_ROOT) not in sys.path:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def cleanup_celery_connections():
+def cleanup_resources():
     """
-    Explicitly close Celery connections at the end of the test session.
-    This prevents the '_connection_worker_thread' (from redis-py) from hanging the process.
+    Explicitly close connections (Celery, DB) at the end of the test session.
+    This prevents hanging threads from keeping the process alive.
     """
     yield
+
+    import threading
+    import asyncio
+
+    # --- Celery Cleanup ---
     try:
-        # 1. Close the current default app (which might be implicitly created)
         from celery import current_app
         if current_app:
-            print(f"\n[pytest] Closing Celery current_app: {current_app}")
+            print(f"\n[pytest] Closing Celery current_app: {current_app}", file=sys.stderr)
             current_app.close()
 
-        # 2. Force import and close the backend celery app to ensure its pool is drained
         try:
             from backend.celery_app import celery_app
-            print("\n[pytest] Closing backend.celery_app...")
+            print("[pytest] Closing backend.celery_app...", file=sys.stderr)
             celery_app.close()
         except ImportError:
             pass
-            
     except Exception as e:
-        print(f"\n[pytest] Error closing Celery app: {e}")
+        print(f"[pytest] Error closing Celery app: {e}", file=sys.stderr)
 
+    # --- Database Cleanup ---
+    try:
+        from backend.database.engine import async_engine
+        if async_engine:
+            print("[pytest] Disposing async_engine...", file=sys.stderr)
+            try:
+                # Create a new loop to run the dispose coroutine
+                asyncio.run(async_engine.dispose())
+            except Exception as e:
+                print(f"[pytest] Could not dispose async_engine: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"[pytest] Error accessing async_engine: {e}", file=sys.stderr)
+
+    # --- Thread Debugging ---
+    active_threads = threading.enumerate()
+    print(f"[pytest] Active threads at exit: {[t.name for t in active_threads]}", file=sys.stderr)
