@@ -1,6 +1,7 @@
 """Pytest configuration helpers for Skyulf test suite."""
 
 import sys
+import pytest
 from pathlib import Path
 
 # During tests we want the FastAPI TestClient which uses the host
@@ -53,3 +54,27 @@ def pytest_sessionfinish(session, exitstatus):
             print("[pytest debug] could not enumerate asyncio tasks")
     except Exception as e:
         print(f"[pytest debug] sessionfinish hook error: {e}")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_celery_connections():
+    """
+    Explicitly close Celery connections at the end of the test session.
+    This prevents the '_connection_worker_thread' (from redis-py) from hanging the process.
+    """
+    yield
+    try:
+        # 1. Close the current default app (which might be implicitly created)
+        from celery import current_app
+        if current_app:
+            print(f"\n[pytest] Closing Celery current_app: {current_app}")
+            current_app.close()
+
+        # 2. Close the explicit app if it was loaded
+        if "backend.celery_app" in sys.modules:
+            from backend.celery_app import celery_app
+            print("\n[pytest] Closing backend.celery_app...")
+            celery_app.close()
+    except Exception as e:
+        print(f"\n[pytest] Error closing Celery app: {e}")
+
