@@ -25,3 +25,31 @@ except Exception:
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Debug hook: print active threads and asyncio tasks at session end.
+
+    Add this temporarily to help identify lingering background work
+    that prevents the process from exiting. Remove once root cause
+    is found.
+    """
+    try:
+        import threading
+        import asyncio
+
+        threads = threading.enumerate()
+        print("\n[pytest debug] active threads:")
+        for t in threads:
+            print(f" - {t.name} (daemon={t.daemon})")
+
+        try:
+            loop = asyncio.get_event_loop()
+            tasks = asyncio.all_tasks(loop)
+            print("[pytest debug] asyncio tasks:")
+            for task in tasks:
+                print(f" - {task!r}")
+        except Exception as _:
+            print("[pytest debug] could not enumerate asyncio tasks")
+    except Exception as e:
+        print(f"[pytest debug] sessionfinish hook error: {e}")
