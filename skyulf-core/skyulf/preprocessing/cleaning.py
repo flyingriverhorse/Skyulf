@@ -256,15 +256,10 @@ class ValueReplacementApplier(BaseApplier):
             # Global replacement
             if to_replace is not None:
                 for col in valid_cols:
-                    # Pandas 2.0+ deprecation fix: replace(to_replace, value) where to_replace is dict-like
-                    # and value is not None is invalid.
                     if isinstance(to_replace, dict) and value is not None:
-                         # If to_replace is a dict, value should be ignored or it's a misuse.
-                         # Assuming user meant to map keys in to_replace to 'value', 
-                         # but standard replace(dict) uses the dict values.
-                         # If value is provided, it usually implies to_replace is a scalar/list.
-                         # We'll fallback to standard replace(to_replace) if it's a dict.
-                         df_out[col] = df_out[col].replace(to_replace)
+                        # Pandas doesn't allow dict-like `to_replace` with a non-None `value`.
+                        # If `to_replace` is a dict, we ignore `value` and apply the mapping.
+                        df_out[col] = df_out[col].replace(to_replace)
                     else:
                         df_out[col] = df_out[col].replace(to_replace, value)
 

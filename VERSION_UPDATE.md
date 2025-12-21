@@ -24,6 +24,9 @@ This comprehensive release addresses critical connectivity issues, refines the f
 - **Type Safety:** Resolved 82 `mypy` errors across `backend` and `skyulf-core` by adding `pandas-stubs` and fixing SQLAlchemy/Pydantic type mismatches.
 - **Linting:** Achieved zero `flake8` errors by fixing indentation and whitespace issues in `engine.py` and `tuner.py`.
 - **Logging:** Added `log_callback` support to `Tuner` and `BaseModelCalculator` to ensure warnings and tuning results are visible in the frontend.
+- **CI Stability:** Added Redis service in CI and hardened teardown to avoid pytest hangs from lingering Redis/Celery background threads.
+- **Pipeline Robustness:** Made `data_loader` accept `dataset_id` as a fallback for `path` in configs used by tests.
+- **Pandas Compatibility:** Fixed `ValueReplacement` to handle dict-like replacements correctly on Pandas 2.x.
 
 ### 📚 Documentation
 - **Quality Protocols:** Added `.github/instructions/quality_checks.instructions.md` defining mandatory Linting, Type Checking, and Versioning protocols.
