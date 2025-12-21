@@ -60,7 +60,13 @@ jobs:
       - name: Type check (mypy)
         run: |
           python -m mypy -p backend
+          python -m mypy -p skyulf-core
           python -m mypy run_fastapi.py run_skyulf.py celery_worker.py
 
       - name: Run tests
-        run: pytest -q -s --maxfail=1 --disable-warnings --cov --cov-report=term-missing --cov-report=xml
+        run: pytest -q -s --maxfail=1 --disable-warnings --cov --cov-branch --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
