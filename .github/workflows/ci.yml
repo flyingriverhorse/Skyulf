@@ -60,7 +60,8 @@ jobs:
       - name: Type check (mypy)
         run: |
           python -m mypy -p backend
-          python -m mypy -p skyulf-core
+          python -m mypy -p skyulf
+          python -m mypy skyulf-core/tests
           python -m mypy run_fastapi.py run_skyulf.py celery_worker.py
 
       - name: Run tests
