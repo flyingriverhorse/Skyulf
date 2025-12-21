@@ -256,9 +256,9 @@ class ValueReplacementApplier(BaseApplier):
             # Global replacement
             if to_replace is not None:
                 for col in valid_cols:
-                    if isinstance(to_replace, dict) and value is not None:
-                        # Pandas doesn't allow dict-like `to_replace` with a non-None `value`.
-                        # If `to_replace` is a dict, we ignore `value` and apply the mapping.
+                    # Check for dict-like objects (dict, pd.Series, etc.)
+                    # If to_replace is a mapping, we ignore `value` and apply the mapping.
+                    if isinstance(to_replace, (dict, pd.Series)) or hasattr(to_replace, "items"):
                         df_out[col] = df_out[col].replace(to_replace)
                     else:
                         df_out[col] = df_out[col].replace(to_replace, value)
