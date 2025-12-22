@@ -21,7 +21,7 @@ jobs:
           # tool: flake8 
 
       - name: Upload Analysis Results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: codacy-results
           path: codacy_results.json
