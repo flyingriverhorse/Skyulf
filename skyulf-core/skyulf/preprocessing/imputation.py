@@ -18,12 +18,46 @@ from ..utils import (
     unpack_pipeline_input,
 )
 from .base import BaseApplier, BaseCalculator
+from ..registry import NodeRegistry
 
 logger = logging.getLogger(__name__)
 
 # --- Simple Imputer (Mean, Median, Mode) ---
 
 
+class SimpleImputerApplier(BaseApplier):
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+
+        cols = params.get("columns", [])
+        fill_values = params.get("fill_values", {})
+
+        if not cols:
+            return pack_pipeline_output(X, y, is_tuple)
+
+        X_out = X.copy()
+
+        # Iterate over ALL expected columns, not just valid ones
+        for col in cols:
+            val = fill_values.get(col)
+            if val is None:
+                continue
+
+            if col not in X_out.columns:
+                # Restore missing column with fill value
+                X_out[col] = val
+            else:
+                # Fill existing NaNs
+                X_out[col] = X_out[col].fillna(val)
+
+        return pack_pipeline_output(X_out, y, is_tuple)
+
+
+@NodeRegistry.register("SimpleImputer", SimpleImputerApplier)
 class SimpleImputerCalculator(BaseCalculator):
     def fit(
         self,
@@ -86,72 +120,7 @@ class SimpleImputerCalculator(BaseCalculator):
         }
 
 
-class SimpleImputerApplier(BaseApplier):
-    def apply(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
-        X, y, is_tuple = unpack_pipeline_input(df)
-
-        cols = params.get("columns", [])
-        fill_values = params.get("fill_values", {})
-
-        if not cols:
-            return pack_pipeline_output(X, y, is_tuple)
-
-        X_out = X.copy()
-
-        # Iterate over ALL expected columns, not just valid ones
-        for col in cols:
-            val = fill_values.get(col)
-            if val is None:
-                continue
-
-            if col not in X_out.columns:
-                # Restore missing column with fill value
-                X_out[col] = val
-            else:
-                # Fill existing NaNs
-                X_out[col] = X_out[col].fillna(val)
-
-        return pack_pipeline_output(X_out, y, is_tuple)
-
-
 # --- KNN Imputer ---
-
-
-class KNNImputerCalculator(BaseCalculator):
-    def fit(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
-
-        # Config: {'n_neighbors': 5, 'weights': 'uniform'|'distance', 'columns': [...]}
-        n_neighbors = config.get("n_neighbors", 5)
-        weights = config.get("weights", "uniform")
-
-        cols = resolve_columns(X, config, detect_numeric_columns)
-
-        if not cols:
-            return {}
-
-        # KNN Imputer is heavy, we need to store the whole training set (or a sample)
-        # For now, we store the fitted imputer object directly.
-        # WARNING: This is not JSON serializable. We need pickle for this.
-
-        imputer = KNNImputer(n_neighbors=n_neighbors, weights=weights)
-        imputer.fit(X[cols])
-
-        return {
-            "type": "knn_imputer",
-            "imputer_object": imputer,  # Not JSON serializable
-            "columns": cols,
-            "n_neighbors": n_neighbors,
-            "weights": weights,
-        }
 
 
 class KNNImputerApplier(BaseApplier):
@@ -194,9 +163,72 @@ class KNNImputerApplier(BaseApplier):
         return pack_pipeline_output(X_out, y, is_tuple)
 
 
+@NodeRegistry.register("KNNImputer", KNNImputerApplier)
+class KNNImputerCalculator(BaseCalculator):
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
+        # Config: {'n_neighbors': 5, 'weights': 'uniform'|'distance', 'columns': [...]}
+        n_neighbors = config.get("n_neighbors", 5)
+        weights = config.get("weights", "uniform")
+
+        cols = resolve_columns(X, config, detect_numeric_columns)
+
+        if not cols:
+            return {}
+
+        # KNN Imputer is heavy, we need to store the whole training set (or a sample)
+        # For now, we store the fitted imputer object directly.
+        # WARNING: This is not JSON serializable. We need pickle for this.
+
+        imputer = KNNImputer(n_neighbors=n_neighbors, weights=weights)
+        imputer.fit(X[cols])
+
+        return {
+            "type": "knn_imputer",
+            "imputer_object": imputer,  # Not JSON serializable
+            "columns": cols,
+            "n_neighbors": n_neighbors,
+            "weights": weights,
+        }
+
+
 # --- Iterative Imputer (MICE) ---
 
 
+class IterativeImputerApplier(BaseApplier):
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+
+        cols = params.get("columns", [])
+        imputer = params.get("imputer_object")
+
+        valid_cols = [c for c in cols if c in X.columns]
+        if not valid_cols or not imputer:
+            return pack_pipeline_output(X, y, is_tuple)
+
+        X_out = X.copy()
+
+        try:
+            X_subset = X_out[cols].copy()
+            X_transformed = imputer.transform(X_subset)
+            X_out[cols] = X_transformed
+        except Exception as e:
+            logger.error(f"Iterative Imputation failed: {e}")
+            pass
+
+        return pack_pipeline_output(X_out, y, is_tuple)
+
+
+@NodeRegistry.register("IterativeImputer", IterativeImputerApplier)
 class IterativeImputerCalculator(BaseCalculator):
     def fit(
         self,
@@ -236,31 +268,3 @@ class IterativeImputerCalculator(BaseCalculator):
             "columns": cols,
             "estimator": estimator_name,
         }
-
-
-class IterativeImputerApplier(BaseApplier):
-    def apply(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
-        X, y, is_tuple = unpack_pipeline_input(df)
-
-        cols = params.get("columns", [])
-        imputer = params.get("imputer_object")
-
-        valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols or not imputer:
-            return pack_pipeline_output(X, y, is_tuple)
-
-        X_out = X.copy()
-
-        try:
-            X_subset = X_out[cols].copy()
-            X_transformed = imputer.transform(X_subset)
-            X_out[cols] = X_transformed
-        except Exception as e:
-            logger.error(f"Iterative Imputation failed: {e}")
-            pass
-
-        return pack_pipeline_output(X_out, y, is_tuple)

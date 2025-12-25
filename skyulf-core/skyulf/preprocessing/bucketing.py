@@ -11,6 +11,7 @@ from ..utils import (
     unpack_pipeline_input,
 )
 from .base import BaseApplier, BaseCalculator
+from ..registry import NodeRegistry
 
 # --- Base Binning Applier ---
 
@@ -151,6 +152,11 @@ class BaseBinningApplier(BaseApplier):
 # --- General Binning Calculator ---
 
 
+class GeneralBinningApplier(BaseBinningApplier):
+    pass
+
+
+@NodeRegistry.register("GeneralBinning", GeneralBinningApplier)
 class GeneralBinningCalculator(BaseCalculator):
     """
     Master calculator that handles mixed strategies and overrides.
@@ -269,10 +275,11 @@ class GeneralBinningCalculator(BaseCalculator):
         }
 
 
-class GeneralBinningApplier(BaseBinningApplier):
+class CustomBinningApplier(GeneralBinningApplier):
     pass
 
 
+@NodeRegistry.register("CustomBinning", CustomBinningApplier)
 class CustomBinningCalculator(BaseCalculator):
     """
     Calculator for CustomBinning node.
@@ -308,10 +315,11 @@ class CustomBinningCalculator(BaseCalculator):
         }
 
 
-class CustomBinningApplier(GeneralBinningApplier):
+class KBinsDiscretizerApplier(GeneralBinningApplier):
     pass
 
 
+@NodeRegistry.register("KBinsDiscretizer", KBinsDiscretizerApplier)
 class KBinsDiscretizerCalculator(GeneralBinningCalculator):
     """
     Calculator for KBinsDiscretizer node.
@@ -336,7 +344,3 @@ class KBinsDiscretizerCalculator(GeneralBinningCalculator):
             new_config["kbins_strategy"] = config["strategy"]
 
         return super().fit(df, new_config)
-
-
-class KBinsDiscretizerApplier(GeneralBinningApplier):
-    pass

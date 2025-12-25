@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from .base import BaseApplier, BaseCalculator
+from ..registry import NodeRegistry
 
 # Map common aliases to pandas types
 TYPE_ALIASES = {
@@ -55,49 +56,6 @@ def _coerce_boolean_value(value: Any) -> Optional[bool]:
         return False
 
     return None
-
-
-class CastingCalculator(BaseCalculator):
-    def fit(
-        self, df: Union[pd.DataFrame, Tuple[Any, ...]], config: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        # Config: {'columns': ['col1'], 'target_type': 'float'}
-        # OR {'column_types': {'col1': 'float', 'col2': 'int'}}
-
-        if isinstance(df, tuple):
-            if len(df) > 0 and isinstance(df[0], pd.DataFrame):
-                df = df[0]
-            else:
-                return {
-                    "type": "casting",
-                    "type_map": {},
-                    "coerce_on_error": config.get("coerce_on_error", True),
-                }
-
-        target_type = config.get("target_type")
-        columns = config.get("columns", [])
-        column_types = config.get("column_types", {})
-
-        # Normalize to column_types map
-        final_map = {}
-
-        # 1. Process explicit map
-        for col, dtype in column_types.items():
-            if col in df.columns:
-                final_map[col] = TYPE_ALIASES.get(str(dtype).lower(), dtype)
-
-        # 2. Process list + single type
-        if target_type and columns:
-            resolved_type = TYPE_ALIASES.get(str(target_type).lower(), target_type)
-            for col in columns:
-                if col in df.columns:
-                    final_map[col] = resolved_type
-
-        return {
-            "type": "casting",
-            "type_map": final_map,
-            "coerce_on_error": config.get("coerce_on_error", True),
-        }
 
 
 class CastingApplier(BaseApplier):
@@ -213,3 +171,47 @@ class CastingApplier(BaseApplier):
                 pass
 
         return df_out
+
+
+@NodeRegistry.register("Casting", CastingApplier)
+class CastingCalculator(BaseCalculator):
+    def fit(
+        self, df: Union[pd.DataFrame, Tuple[Any, ...]], config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        # Config: {'columns': ['col1'], 'target_type': 'float'}
+        # OR {'column_types': {'col1': 'float', 'col2': 'int'}}
+
+        if isinstance(df, tuple):
+            if len(df) > 0 and isinstance(df[0], pd.DataFrame):
+                df = df[0]
+            else:
+                return {
+                    "type": "casting",
+                    "type_map": {},
+                    "coerce_on_error": config.get("coerce_on_error", True),
+                }
+
+        target_type = config.get("target_type")
+        columns = config.get("columns", [])
+        column_types = config.get("column_types", {})
+
+        # Normalize to column_types map
+        final_map = {}
+
+        # 1. Process explicit map
+        for col, dtype in column_types.items():
+            if col in df.columns:
+                final_map[col] = TYPE_ALIASES.get(str(dtype).lower(), dtype)
+
+        # 2. Process list + single type
+        if target_type and columns:
+            resolved_type = TYPE_ALIASES.get(str(target_type).lower(), target_type)
+            for col in columns:
+                if col in df.columns:
+                    final_map[col] = resolved_type
+
+        return {
+            "type": "casting",
+            "type_map": final_map,
+            "coerce_on_error": config.get("coerce_on_error", True),
+        }

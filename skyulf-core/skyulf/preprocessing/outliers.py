@@ -11,12 +11,52 @@ from ..utils import (
     unpack_pipeline_input,
 )
 from .base import BaseApplier, BaseCalculator
+from ..registry import NodeRegistry
 
 logger = logging.getLogger(__name__)
 
 # --- IQR Filter ---
 
 
+class IQRApplier(BaseApplier):
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+
+        bounds = params.get("bounds", {})
+        if not bounds:
+            return pack_pipeline_output(X, y, is_tuple)
+
+        mask = pd.Series(True, index=X.index)
+
+        for col, bound in bounds.items():
+            if col not in X.columns:
+                continue
+
+            lower = bound["lower"]
+            upper = bound["upper"]
+
+            series = pd.to_numeric(X[col], errors="coerce")
+
+            # Keep values within bounds or NaN
+            col_mask = (series >= lower) & (series <= upper)
+            col_mask = col_mask | series.isna()
+
+            mask = mask & col_mask
+
+        X_filtered = X[mask]
+
+        if y is not None:
+            y_filtered = y[mask]
+            return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
+
+        return pack_pipeline_output(X_filtered, y, is_tuple)
+
+
+@NodeRegistry.register("IQR", IQRApplier)
 class IQRCalculator(BaseCalculator):
     def fit(
         self,
@@ -58,86 +98,7 @@ class IQRCalculator(BaseCalculator):
         }
 
 
-class IQRApplier(BaseApplier):
-    def apply(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
-        X, y, is_tuple = unpack_pipeline_input(df)
-
-        bounds = params.get("bounds", {})
-        if not bounds:
-            return pack_pipeline_output(X, y, is_tuple)
-
-        mask = pd.Series(True, index=X.index)
-
-        for col, bound in bounds.items():
-            if col not in X.columns:
-                continue
-
-            lower = bound["lower"]
-            upper = bound["upper"]
-
-            series = pd.to_numeric(X[col], errors="coerce")
-
-            # Keep values within bounds or NaN
-            col_mask = (series >= lower) & (series <= upper)
-            col_mask = col_mask | series.isna()
-
-            mask = mask & col_mask
-
-        X_filtered = X[mask]
-
-        if y is not None:
-            y_filtered = y[mask]
-            return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
-
-        return pack_pipeline_output(X_filtered, y, is_tuple)
-
-
 # --- Z-Score Filter ---
-
-
-class ZScoreCalculator(BaseCalculator):
-    def fit(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
-
-        # Config: {'threshold': 3.0, 'columns': [...]}
-        threshold = config.get("threshold", 3.0)
-
-        cols = resolve_columns(X, config, detect_numeric_columns)
-
-        if not cols:
-            return {}
-
-        stats = {}
-        warnings = []
-        for col in cols:
-            series = pd.to_numeric(X[col], errors="coerce").dropna()
-            if series.empty:
-                warnings.append(f"Column '{col}': Empty or non-numeric")
-                continue
-
-            mean = series.mean()
-            std = series.std(ddof=0)
-
-            if std == 0:
-                warnings.append(f"Column '{col}': Zero variance (std=0)")
-                continue
-
-            stats[col] = {"mean": mean, "std": std}
-
-        return {
-            "type": "zscore",
-            "stats": stats,
-            "threshold": threshold,
-            "warnings": warnings,
-        }
 
 
 class ZScoreApplier(BaseApplier):
@@ -184,9 +145,80 @@ class ZScoreApplier(BaseApplier):
         return pack_pipeline_output(X_filtered, y, is_tuple)
 
 
+@NodeRegistry.register("ZScore", ZScoreApplier)
+class ZScoreCalculator(BaseCalculator):
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
+        # Config: {'threshold': 3.0, 'columns': [...]}
+        threshold = config.get("threshold", 3.0)
+
+        cols = resolve_columns(X, config, detect_numeric_columns)
+
+        if not cols:
+            return {}
+
+        stats = {}
+        warnings = []
+        for col in cols:
+            series = pd.to_numeric(X[col], errors="coerce").dropna()
+            if series.empty:
+                warnings.append(f"Column '{col}': Empty or non-numeric")
+                continue
+
+            mean = series.mean()
+            std = series.std(ddof=0)
+
+            if std == 0:
+                warnings.append(f"Column '{col}': Zero variance (std=0)")
+                continue
+
+            stats[col] = {"mean": mean, "std": std}
+
+        return {
+            "type": "zscore",
+            "stats": stats,
+            "threshold": threshold,
+            "warnings": warnings,
+        }
+
+
 # --- Winsorize ---
 
 
+class WinsorizeApplier(BaseApplier):
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+
+        bounds = params.get("bounds", {})
+        if not bounds:
+            return pack_pipeline_output(X, y, is_tuple)
+
+        df_out = X.copy()
+
+        for col, bound in bounds.items():
+            if col not in df_out.columns:
+                continue
+
+            lower = bound["lower"]
+            upper = bound["upper"]
+
+            # Clip values
+            if pd.api.types.is_numeric_dtype(df_out[col]):
+                df_out[col] = df_out[col].clip(lower=lower, upper=upper)
+
+        return pack_pipeline_output(df_out, y, is_tuple)
+
+
+@NodeRegistry.register("Winsorize", WinsorizeApplier)
 class WinsorizeCalculator(BaseCalculator):
     def fit(
         self,
@@ -226,47 +258,7 @@ class WinsorizeCalculator(BaseCalculator):
         }
 
 
-class WinsorizeApplier(BaseApplier):
-    def apply(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
-        X, y, is_tuple = unpack_pipeline_input(df)
-
-        bounds = params.get("bounds", {})
-        if not bounds:
-            return pack_pipeline_output(X, y, is_tuple)
-
-        df_out = X.copy()
-
-        for col, bound in bounds.items():
-            if col not in df_out.columns:
-                continue
-
-            lower = bound["lower"]
-            upper = bound["upper"]
-
-            # Clip values
-            if pd.api.types.is_numeric_dtype(df_out[col]):
-                df_out[col] = df_out[col].clip(lower=lower, upper=upper)
-
-        return pack_pipeline_output(df_out, y, is_tuple)
-
-
 # --- Manual Bounds ---
-
-
-class ManualBoundsCalculator(BaseCalculator):
-    def fit(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        # Config: {'bounds': {'col1': {'lower': 0, 'upper': 100}, ...}}
-        bounds = config.get("bounds", {})
-
-        return {"type": "manual_bounds", "bounds": bounds}
 
 
 class ManualBoundsApplier(BaseApplier):
@@ -310,48 +302,20 @@ class ManualBoundsApplier(BaseApplier):
         return pack_pipeline_output(X_filtered, y, is_tuple)
 
 
-# --- Elliptic Envelope ---
-
-
-class EllipticEnvelopeCalculator(BaseCalculator):
+@NodeRegistry.register("ManualBounds", ManualBoundsApplier)
+class ManualBoundsCalculator(BaseCalculator):
     def fit(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+        # Config: {'bounds': {'col1': {'lower': 0, 'upper': 100}, ...}}
+        bounds = config.get("bounds", {})
 
-        # Config: {'contamination': 0.01, 'columns': [...]}
-        contamination = config.get("contamination", 0.01)
+        return {"type": "manual_bounds", "bounds": bounds}
 
-        cols = resolve_columns(X, config, detect_numeric_columns)
 
-        if not cols:
-            return {}
-
-        models = {}
-        warnings = []
-        for col in cols:
-            series = pd.to_numeric(X[col], errors="coerce").dropna()
-            if series.shape[0] < 5:
-                warnings.append(f"Column '{col}': Too few samples ({series.shape[0]})")
-                continue
-
-            try:
-                model = EllipticEnvelope(contamination=contamination)
-                model.fit(series.to_numpy().reshape(-1, 1))
-                models[col] = model
-            except Exception as e:
-                logger.warning(f"EllipticEnvelope fit failed for column {col}: {e}")
-                warnings.append(f"Column '{col}': {str(e)}")
-                pass
-
-        return {
-            "type": "elliptic_envelope",
-            "models": models,
-            "contamination": contamination,
-            "warnings": warnings,
-        }
+# --- Elliptic Envelope ---
 
 
 class EllipticEnvelopeApplier(BaseApplier):
@@ -409,3 +373,45 @@ class EllipticEnvelopeApplier(BaseApplier):
             return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
 
         return pack_pipeline_output(X_filtered, y, is_tuple)
+
+
+@NodeRegistry.register("EllipticEnvelope", EllipticEnvelopeApplier)
+class EllipticEnvelopeCalculator(BaseCalculator):
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
+        # Config: {'contamination': 0.01, 'columns': [...]}
+        contamination = config.get("contamination", 0.01)
+
+        cols = resolve_columns(X, config, detect_numeric_columns)
+
+        if not cols:
+            return {}
+
+        models = {}
+        warnings = []
+        for col in cols:
+            series = pd.to_numeric(X[col], errors="coerce").dropna()
+            if series.shape[0] < 5:
+                warnings.append(f"Column '{col}': Too few samples ({series.shape[0]})")
+                continue
+
+            try:
+                model = EllipticEnvelope(contamination=contamination)
+                model.fit(series.to_numpy().reshape(-1, 1))
+                models[col] = model
+            except Exception as e:
+                logger.warning(f"EllipticEnvelope fit failed for column {col}: {e}")
+                warnings.append(f"Column '{col}': {str(e)}")
+                pass
+
+        return {
+            "type": "elliptic_envelope",
+            "models": models,
+            "contamination": contamination,
+            "warnings": warnings,
+        }

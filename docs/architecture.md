@@ -30,6 +30,14 @@ This makes pipelines easier to persist and safer to run in production:
 - The learned state is explicit.
 - Applying is pure and repeatable.
 
+## Node Registry
+
+Skyulf uses a **Registry Pattern** to decouple the pipeline orchestrator from specific node implementations.
+
+- **Registration**: Nodes self-register using the `@NodeRegistry.register("NodeName", ApplierClass)` decorator on the Calculator class.
+- **Discovery**: The pipeline dynamically looks up the Calculator and Applier classes by name at runtime.
+- **Extensibility**: New nodes can be added simply by creating a new file and decorating the class; no changes to `pipeline.py` are required.
+
 ## Pipeline Data Flow
 
 At runtime, `SkyulfPipeline` orchestrates:

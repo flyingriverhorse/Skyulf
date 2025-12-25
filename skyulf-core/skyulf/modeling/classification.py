@@ -3,10 +3,18 @@
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 
+from ..registry import NodeRegistry
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 
 
 # --- Logistic Regression ---
+class LogisticRegressionApplier(SklearnApplier):
+    """Logistic Regression Applier."""
+
+    pass
+
+
+@NodeRegistry.register("logistic_regression", LogisticRegressionApplier)
 class LogisticRegressionCalculator(SklearnCalculator):
     """Logistic Regression Calculator."""
 
@@ -22,13 +30,14 @@ class LogisticRegressionCalculator(SklearnCalculator):
         )
 
 
-class LogisticRegressionApplier(SklearnApplier):
-    """Logistic Regression Applier."""
+# --- Random Forest Classifier ---
+class RandomForestClassifierApplier(SklearnApplier):
+    """Random Forest Classifier Applier."""
 
     pass
 
 
-# --- Random Forest Classifier ---
+@NodeRegistry.register("random_forest_classifier", RandomForestClassifierApplier)
 class RandomForestClassifierCalculator(SklearnCalculator):
     """Random Forest Classifier Calculator."""
 
@@ -45,9 +54,3 @@ class RandomForestClassifierCalculator(SklearnCalculator):
             },
             problem_type="classification",
         )
-
-
-class RandomForestClassifierApplier(SklearnApplier):
-    """Random Forest Classifier Applier."""
-
-    pass

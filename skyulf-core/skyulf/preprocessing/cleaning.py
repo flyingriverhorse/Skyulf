@@ -6,6 +6,7 @@ import pandas as pd
 
 from ..utils import pack_pipeline_output, resolve_columns, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
+from ..registry import NodeRegistry
 
 # --- Constants ---
 ALIAS_PUNCTUATION_TABLE = str.maketrans("", "", string.punctuation)
@@ -62,34 +63,6 @@ def _auto_detect_datetime_columns(df: pd.DataFrame) -> List[str]:
 
 
 # --- Text Cleaning ---
-
-
-class TextCleaningCalculator(BaseCalculator):
-    def fit(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        # Config:
-        # columns: List[str]
-        # operations: List[Dict]
-        #   {'op': 'trim', 'mode': 'both'|'leading'|'trailing'}
-        #   {'op': 'case', 'mode': 'lower'|'upper'|'title'|'sentence'}
-        #   {'op': 'remove_special', 'mode': 'keep_alphanumeric'|'keep_alphanumeric_space'|'letters_only'|'digits_only',
-        #    'replacement': ''}
-        #   {'op': 'regex', 'mode': 'custom'|'collapse_whitespace'|'extract_digits'|'normalize_slash_dates',
-        #    'pattern': '...', 'repl': '...'}
-
-        X, _, _ = unpack_pipeline_input(df)
-
-        cols = resolve_columns(X, config, _auto_detect_text_columns)
-
-        if not cols:
-            return {}
-
-        operations = config.get("operations", [])
-
-        return {"type": "text_cleaning", "columns": cols, "operations": operations}
 
 
 class TextCleaningApplier(BaseApplier):
@@ -185,38 +158,36 @@ class TextCleaningApplier(BaseApplier):
         return pack_pipeline_output(df_out, y, is_tuple)
 
 
-# --- Value Replacement ---
-
-
-class ValueReplacementCalculator(BaseCalculator):
+@NodeRegistry.register("TextCleaning", TextCleaningApplier)
+class TextCleaningCalculator(BaseCalculator):
     def fit(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
+        # Config:
+        # columns: List[str]
+        # operations: List[Dict]
+        #   {'op': 'trim', 'mode': 'both'|'leading'|'trailing'}
+        #   {'op': 'case', 'mode': 'lower'|'upper'|'title'|'sentence'}
+        #   {'op': 'remove_special', 'mode': 'keep_alphanumeric'|'keep_alphanumeric_space'|'letters_only'|'digits_only',
+        #    'replacement': ''}
+        #   {'op': 'regex', 'mode': 'custom'|'collapse_whitespace'|'extract_digits'|'normalize_slash_dates',
+        #    'pattern': '...', 'repl': '...'}
+
         X, _, _ = unpack_pipeline_input(df)
 
-        # Config: {'columns': [...], 'mapping': {col: {old: new}}}
-        # OR {'columns': [...], 'to_replace': '?', 'value': np.nan}
-        # OR {'columns': [...], 'replacements': [{'old': 1, 'new': 100}, ...]}
+        cols = resolve_columns(X, config, _auto_detect_text_columns)
 
-        cols = resolve_columns(X, config)
-        mapping = config.get("mapping")
-        to_replace = config.get("to_replace")
-        value = config.get("value")
-        replacements = config.get("replacements")
+        if not cols:
+            return {}
 
-        if replacements:
-            # Convert list of dicts to mapping dict
-            mapping = {item["old"]: item["new"] for item in replacements}
+        operations = config.get("operations", [])
 
-        return {
-            "type": "value_replacement",
-            "columns": cols,
-            "mapping": mapping,
-            "to_replace": to_replace,
-            "value": value,
-        }
+        return {"type": "text_cleaning", "columns": cols, "operations": operations}
+
+
+# --- Value Replacement ---
 
 
 class ValueReplacementApplier(BaseApplier):
@@ -266,49 +237,39 @@ class ValueReplacementApplier(BaseApplier):
         return pack_pipeline_output(df_out, y, is_tuple)
 
 
-# --- Alias Replacement ---
-
-
-class AliasReplacementCalculator(BaseCalculator):
+@NodeRegistry.register("ValueReplacement", ValueReplacementApplier)
+class ValueReplacementCalculator(BaseCalculator):
     def fit(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
-        cols = resolve_columns(X, config, _auto_detect_text_columns)
 
-        # Support both 'alias_type' and 'mode'
-        alias_type = config.get("alias_type") or config.get("mode", "boolean")
+        # Config: {'columns': [...], 'mapping': {col: {old: new}}}
+        # OR {'columns': [...], 'to_replace': '?', 'value': np.nan}
+        # OR {'columns': [...], 'replacements': [{'old': 1, 'new': 100}, ...]}
 
-        # Map legacy modes
-        if alias_type == "normalize_boolean":
-            alias_type = "boolean"
-        elif alias_type == "canonicalize_country_codes":
-            alias_type = "country"
+        cols = resolve_columns(X, config)
+        mapping = config.get("mapping")
+        to_replace = config.get("to_replace")
+        value = config.get("value")
+        replacements = config.get("replacements")
 
-        # Support both 'custom_map' and 'custom_pairs'
-        custom_map = config.get("custom_map") or config.get("custom_pairs", {})
-
-        # Normalize custom_map keys to match the cleaning logic in Applier
-        if custom_map:
-            normalized_map = {}
-            for k, v in custom_map.items():
-                if isinstance(k, str):
-                    clean_k = (
-                        k.lower().translate(ALIAS_PUNCTUATION_TABLE).replace(" ", "")
-                    )
-                    normalized_map[clean_k] = v
-                else:
-                    normalized_map[k] = v
-            custom_map = normalized_map
+        if replacements:
+            # Convert list of dicts to mapping dict
+            mapping = {item["old"]: item["new"] for item in replacements}
 
         return {
-            "type": "alias_replacement",
+            "type": "value_replacement",
             "columns": cols,
-            "alias_type": alias_type,
-            "custom_map": custom_map,
+            "mapping": mapping,
+            "to_replace": to_replace,
+            "value": value,
         }
+
+
+# --- Alias Replacement ---
 
 
 class AliasReplacementApplier(BaseApplier):
@@ -369,35 +330,50 @@ class AliasReplacementApplier(BaseApplier):
         return pack_pipeline_output(df_out, y, is_tuple)
 
 
-# --- Invalid Value Replacement ---
-
-
-class InvalidValueReplacementCalculator(BaseCalculator):
+@NodeRegistry.register("AliasReplacement", AliasReplacementApplier)
+class AliasReplacementCalculator(BaseCalculator):
     def fit(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
-        cols = resolve_columns(X, config)
+        cols = resolve_columns(X, config, _auto_detect_text_columns)
 
-        # Config: {'rule': 'negative', 'replacement': np.nan}
-        # Support 'mode' as alias for 'rule'
-        rule = config.get("rule") or config.get("mode", "negative")
-        replacement = config.get("replacement", np.nan)
+        # Support both 'alias_type' and 'mode'
+        alias_type = config.get("alias_type") or config.get("mode", "boolean")
 
-        # Support min_value and max_value for custom_range
-        min_value = config.get("min_value")
-        max_value = config.get("max_value")
+        # Map legacy modes
+        if alias_type == "normalize_boolean":
+            alias_type = "boolean"
+        elif alias_type == "canonicalize_country_codes":
+            alias_type = "country"
+
+        # Support both 'custom_map' and 'custom_pairs'
+        custom_map = config.get("custom_map") or config.get("custom_pairs", {})
+
+        # Normalize custom_map keys to match the cleaning logic in Applier
+        if custom_map:
+            normalized_map = {}
+            for k, v in custom_map.items():
+                if isinstance(k, str):
+                    clean_k = (
+                        k.lower().translate(ALIAS_PUNCTUATION_TABLE).replace(" ", "")
+                    )
+                    normalized_map[clean_k] = v
+                else:
+                    normalized_map[k] = v
+            custom_map = normalized_map
 
         return {
-            "type": "invalid_value_replacement",
+            "type": "alias_replacement",
             "columns": cols,
-            "rule": rule,
-            "replacement": replacement,
-            "min_value": min_value,
-            "max_value": max_value,
+            "alias_type": alias_type,
+            "custom_map": custom_map,
         }
+
+
+# --- Invalid Value Replacement ---
 
 
 class InvalidValueReplacementApplier(BaseApplier):
@@ -440,5 +416,36 @@ class InvalidValueReplacementApplier(BaseApplier):
 
             if mask is not None:
                 df_out.loc[mask, col] = replacement
+
+        return pack_pipeline_output(df_out, y, is_tuple)
+
+
+@NodeRegistry.register("InvalidValueReplacement", InvalidValueReplacementApplier)
+class InvalidValueReplacementCalculator(BaseCalculator):
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+        cols = resolve_columns(X, config)
+
+        # Config: {'rule': 'negative', 'replacement': np.nan}
+        # Support 'mode' as alias for 'rule'
+        rule = config.get("rule") or config.get("mode", "negative")
+        replacement = config.get("replacement", np.nan)
+
+        # Support min_value and max_value for custom_range
+        min_value = config.get("min_value")
+        max_value = config.get("max_value")
+
+        return {
+            "type": "invalid_value_replacement",
+            "columns": cols,
+            "rule": rule,
+            "replacement": replacement,
+            "min_value": min_value,
+            "max_value": max_value,
+        }
 
         return pack_pipeline_output(df_out, y, is_tuple)
