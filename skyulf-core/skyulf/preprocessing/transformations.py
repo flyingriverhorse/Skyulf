@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import PowerTransformer, StandardScaler
 
+from ..registry import NodeRegistry
 from ..utils import (
     detect_numeric_columns,
     pack_pipeline_output,
@@ -16,61 +17,6 @@ from .base import BaseApplier, BaseCalculator
 logger = logging.getLogger(__name__)
 
 # --- Power Transformer (Box-Cox, Yeo-Johnson) ---
-
-
-class PowerTransformerCalculator(BaseCalculator):
-    def fit(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
-
-        # Config: {'method': 'yeo-johnson' | 'box-cox', 'standardize': True, 'columns': [...]}
-        method = config.get("method", "yeo-johnson")
-        standardize = config.get("standardize", True)
-
-        cols = resolve_columns(X, config, detect_numeric_columns)
-
-        if not cols:
-            return {}
-
-        valid_cols = []
-        if method == "box-cox":
-            for col in cols:
-                # Box-Cox requires strictly positive data
-                if (X[col] <= 0).any():
-                    continue
-                valid_cols.append(col)
-        else:
-            valid_cols = cols
-
-        if not valid_cols:
-            return {}
-
-        transformer = PowerTransformer(method=method, standardize=standardize)
-        transformer.fit(X[valid_cols])
-
-        # Capture internal scaler parameters if standardization is enabled
-        scaler_params = {}
-        if standardize and hasattr(transformer, "_scaler"):
-            scaler = transformer._scaler
-            if scaler:
-                scaler_params = {
-                    "mean": scaler.mean_.tolist() if scaler.mean_ is not None else None,
-                    "scale": (
-                        scaler.scale_.tolist() if scaler.scale_ is not None else None
-                    ),
-                }
-
-        return {
-            "type": "power_transformer",
-            "lambdas": transformer.lambdas_.tolist(),
-            "method": method,
-            "standardize": standardize,
-            "columns": valid_cols,
-            "scaler_params": scaler_params,
-        }
 
 
 class PowerTransformerApplier(BaseApplier):
@@ -141,20 +87,63 @@ class PowerTransformerApplier(BaseApplier):
         return pack_pipeline_output(df_out, y, is_tuple)
 
 
-# --- Simple Transformations (Log, Sqrt, etc.) ---
-
-
-class SimpleTransformationCalculator(BaseCalculator):
+@NodeRegistry.register("PowerTransformer", PowerTransformerApplier)
+class PowerTransformerCalculator(BaseCalculator):
     def fit(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        # Config: {'transformations': [{'column': 'col1', 'method': 'log'}, ...]}
+        X, _, _ = unpack_pipeline_input(df)
+
+        # Config: {'method': 'yeo-johnson' | 'box-cox', 'standardize': True, 'columns': [...]}
+        method = config.get("method", "yeo-johnson")
+        standardize = config.get("standardize", True)
+
+        cols = resolve_columns(X, config, detect_numeric_columns)
+
+        if not cols:
+            return {}
+
+        valid_cols = []
+        if method == "box-cox":
+            for col in cols:
+                # Box-Cox requires strictly positive data
+                if (X[col] <= 0).any():
+                    continue
+                valid_cols.append(col)
+        else:
+            valid_cols = cols
+
+        if not valid_cols:
+            return {}
+
+        transformer = PowerTransformer(method=method, standardize=standardize)
+        transformer.fit(X[valid_cols])
+
+        # Capture internal scaler parameters if standardization is enabled
+        scaler_params = {}
+        if standardize and hasattr(transformer, "_scaler"):
+            scaler = transformer._scaler
+            if scaler:
+                scaler_params = {
+                    "mean": scaler.mean_.tolist() if scaler.mean_ is not None else None,
+                    "scale": (
+                        scaler.scale_.tolist() if scaler.scale_ is not None else None
+                    ),
+                }
+
         return {
-            "type": "simple_transformation",
-            "transformations": config.get("transformations", []),
+            "type": "power_transformer",
+            "lambdas": transformer.lambdas_.tolist(),
+            "method": method,
+            "standardize": standardize,
+            "columns": valid_cols,
+            "scaler_params": scaler_params,
         }
+
+
+# --- Simple Transformations (Log, Sqrt, etc.) ---
 
 
 class SimpleTransformationApplier(BaseApplier):
@@ -210,70 +199,21 @@ class SimpleTransformationApplier(BaseApplier):
         return pack_pipeline_output(df_out, y, is_tuple)
 
 
-# --- General Transformation (Combined) ---
-
-
-class GeneralTransformationCalculator(BaseCalculator):
+@NodeRegistry.register("SimpleTransformation", SimpleTransformationApplier)
+class SimpleTransformationCalculator(BaseCalculator):
     def fit(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        # Config: {'transformations': [{'column': 'col1', 'method': 'log'},
-        #                              {'column': 'col2', 'method': 'yeo-johnson'}]}
-        X, _, _ = unpack_pipeline_input(df)
-
-        transformations_config = config.get("transformations", [])
-        fitted_transformations = []
-
-        for item in transformations_config:
-            col = item.get("column")
-            method = item.get("method")
-
-            if col not in X.columns:
-                continue
-
-            fitted_item = {"column": col, "method": method}
-
-            if method in ["box-cox", "yeo-johnson"]:
-                # Fit PowerTransformer
-                try:
-                    # Box-Cox requires strictly positive
-                    if method == "box-cox" and (X[col] <= 0).any():
-                        logger.warning(
-                            f"Skipping Box-Cox for column {col} because it contains non-positive values."
-                        )
-                        continue
-
-                    # Default to standardize=True for power transforms
-                    pt = PowerTransformer(method=method, standardize=True)
-                    pt.fit(X[[col]])
-
-                    fitted_item["lambdas"] = pt.lambdas_.tolist()
-
-                    if hasattr(pt, "_scaler") and pt._scaler:
-                        fitted_item["scaler_params"] = {
-                            "mean": (
-                                pt._scaler.mean_.tolist()
-                                if pt._scaler.mean_ is not None
-                                else None
-                            ),
-                            "scale": (
-                                pt._scaler.scale_.tolist()
-                                if pt._scaler.scale_ is not None
-                                else None
-                            ),
-                        }
-                except Exception as e:
-                    logger.warning(f"Failed to fit {method} for column {col}: {e}")
-                    continue
-
-            fitted_transformations.append(fitted_item)
-
+        # Config: {'transformations': [{'column': 'col1', 'method': 'log'}, ...]}
         return {
-            "type": "general_transformation",
-            "transformations": fitted_transformations,
+            "type": "simple_transformation",
+            "transformations": config.get("transformations", []),
         }
+
+
+# --- General Transformation (Combined) ---
 
 
 class GeneralTransformationApplier(BaseApplier):
@@ -348,3 +288,67 @@ class GeneralTransformationApplier(BaseApplier):
                 df_out[col] = np.exp(series_clipped)
 
         return pack_pipeline_output(df_out, y, is_tuple)
+
+
+@NodeRegistry.register("GeneralTransformation", GeneralTransformationApplier)
+class GeneralTransformationCalculator(BaseCalculator):
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        # Config: {'transformations': [{'column': 'col1', 'method': 'log'},
+        #                              {'column': 'col2', 'method': 'yeo-johnson'}]}
+        X, _, _ = unpack_pipeline_input(df)
+
+        transformations_config = config.get("transformations", [])
+        fitted_transformations = []
+
+        for item in transformations_config:
+            col = item.get("column")
+            method = item.get("method")
+
+            if col not in X.columns:
+                continue
+
+            fitted_item = {"column": col, "method": method}
+
+            if method in ["box-cox", "yeo-johnson"]:
+                # Fit PowerTransformer
+                try:
+                    # Box-Cox requires strictly positive
+                    if method == "box-cox" and (X[col] <= 0).any():
+                        logger.warning(
+                            f"Skipping Box-Cox for column {col} because it contains non-positive values."
+                        )
+                        continue
+
+                    # Default to standardize=True for power transforms
+                    pt = PowerTransformer(method=method, standardize=True)
+                    pt.fit(X[[col]])
+
+                    fitted_item["lambdas"] = pt.lambdas_.tolist()
+
+                    if hasattr(pt, "_scaler") and pt._scaler:
+                        fitted_item["scaler_params"] = {
+                            "mean": (
+                                pt._scaler.mean_.tolist()
+                                if pt._scaler.mean_ is not None
+                                else None
+                            ),
+                            "scale": (
+                                pt._scaler.scale_.tolist()
+                                if pt._scaler.scale_ is not None
+                                else None
+                            ),
+                        }
+                except Exception as e:
+                    logger.warning(f"Failed to fit {method} for column {col}: {e}")
+                    continue
+
+            fitted_transformations.append(fitted_item)
+
+        return {
+            "type": "general_transformation",
+            "transformations": fitted_transformations,
+        }

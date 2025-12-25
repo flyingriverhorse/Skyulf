@@ -22,6 +22,7 @@ from .modeling.regression import (
 )
 from .modeling.tuning.tuner import TunerApplier, TunerCalculator
 from .preprocessing.pipeline import FeatureEngineer
+from .registry import NodeRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -62,48 +63,65 @@ class SkyulfPipeline:
         calculator: Optional[BaseModelCalculator] = None
         applier: Optional[BaseModelApplier] = None
 
-        # Map model types to classes
-        # This mapping should ideally be dynamic or registered
-        if model_type == "logistic_regression":
-            calculator = LogisticRegressionCalculator()
-            applier = LogisticRegressionApplier()
-        elif model_type == "random_forest_classifier":
-            calculator = RandomForestClassifierCalculator()
-            applier = RandomForestClassifierApplier()
-        elif model_type == "ridge_regression":
-            calculator = RidgeRegressionCalculator()
-            applier = RidgeRegressionApplier()
-        elif model_type == "random_forest_regressor":
-            calculator = RandomForestRegressorCalculator()
-            applier = RandomForestRegressorApplier()
-        elif model_type == "hyperparameter_tuner":
-            # Tuner wraps another model
-            base_model_config = self.modeling_config.get("base_model", {})
-            base_model_type = base_model_config.get("type")
+        # Try Registry first
+        try:
+            calculator = NodeRegistry.get_calculator(model_type)()
+            applier = NodeRegistry.get_applier(model_type)()
+        except ValueError:
+            pass
 
-            base_calc: Optional[BaseModelCalculator] = None
-            base_applier: Optional[BaseModelApplier] = None
-            if base_model_type == "logistic_regression":
-                base_calc = LogisticRegressionCalculator()
-                base_applier = LogisticRegressionApplier()
-            elif base_model_type == "random_forest_classifier":
-                base_calc = RandomForestClassifierCalculator()
-                base_applier = RandomForestClassifierApplier()
-            elif base_model_type == "ridge_regression":
-                base_calc = RidgeRegressionCalculator()
-                base_applier = RidgeRegressionApplier()
-            elif base_model_type == "random_forest_regressor":
-                base_calc = RandomForestRegressorCalculator()
-                base_applier = RandomForestRegressorApplier()
+        if calculator is None:
+            # Map model types to classes
+            if model_type == "logistic_regression":
+                calculator = LogisticRegressionCalculator()
+                applier = LogisticRegressionApplier()
+            elif model_type == "random_forest_classifier":
+                calculator = RandomForestClassifierCalculator()
+                applier = RandomForestClassifierApplier()
+            elif model_type == "ridge_regression":
+                calculator = RidgeRegressionCalculator()
+                applier = RidgeRegressionApplier()
+            elif model_type == "random_forest_regressor":
+                calculator = RandomForestRegressorCalculator()
+                applier = RandomForestRegressorApplier()
+            elif model_type == "hyperparameter_tuner":
+                # Tuner wraps another model
+                base_model_config = self.modeling_config.get("base_model", {})
+                base_model_type = base_model_config.get("type")
 
-            if base_calc and base_applier:
-                calculator = TunerCalculator(base_calc)
-                applier = TunerApplier(base_applier)
-            else:
-                raise ValueError(
-                    f"Unknown base model type for tuner: {base_model_type}"
-                )
-        else:
+                base_calc: Optional[BaseModelCalculator] = None
+                base_applier: Optional[BaseModelApplier] = None
+
+                # Try Registry for base model
+                try:
+                    base_calc = NodeRegistry.get_calculator(base_model_type)()
+                    base_applier = NodeRegistry.get_applier(base_model_type)()
+                except ValueError:
+                    pass
+
+                if base_calc is None:
+                    if base_model_type == "logistic_regression":
+                        base_calc = LogisticRegressionCalculator()
+                        base_applier = LogisticRegressionApplier()
+                    elif base_model_type == "random_forest_classifier":
+                        base_calc = RandomForestClassifierCalculator()
+                        base_applier = RandomForestClassifierApplier()
+                    elif base_model_type == "ridge_regression":
+                        base_calc = RidgeRegressionCalculator()
+                        base_applier = RidgeRegressionApplier()
+                    elif base_model_type == "random_forest_regressor":
+                        base_calc = RandomForestRegressorCalculator()
+                        base_applier = RandomForestRegressorApplier()
+
+                if base_calc and base_applier:
+                    calculator = TunerCalculator(base_calc)
+                    applier = TunerApplier(base_applier)
+                else:
+                    raise ValueError(
+                        f"Unknown base model type for tuner: {base_model_type}"
+                    )
+
+        if calculator is None:
             raise ValueError(f"Unknown model type: {model_type}")
 
         self.model_estimator = StatefulEstimator(

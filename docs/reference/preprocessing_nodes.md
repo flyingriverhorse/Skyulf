@@ -547,6 +547,8 @@ Learned params:
 
 ### PolynomialFeatures
 
+(Alias: `PolynomialFeaturesNode`)
+
 Config:
 
 - `columns`: list[str]
@@ -561,7 +563,9 @@ Learned params:
 
 - `columns`, `degree`, `interaction_only`, `include_bias`, `include_input_features`, `output_prefix`, `feature_names`
 
-### FeatureMath / FeatureGenerationNode
+### FeatureGeneration
+
+(Aliases: `FeatureMath`, `FeatureGenerationNode`)
 
 Config:
 

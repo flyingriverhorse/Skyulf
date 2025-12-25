@@ -8,6 +8,21 @@
 
 ------------------------------------------------------------
 
+## v0.1.5
+**"The Registry Architecture Update"**
+
+This release finalizes the migration to a fully decoupled, registry-based architecture for the ML pipeline.
+
+### 🔧 Backend Architecture
+- **Node Registry Completion:** All preprocessing nodes now self-register using the `@NodeRegistry` decorator.
+- **Pipeline Decoupling:** Removed the monolithic factory logic from `pipeline.py`. The pipeline now dynamically instantiates nodes via the registry.
+- **Alias Support:** Added support for legacy node names (e.g., `FeatureMath` -> `FeatureGeneration`) to ensure backward compatibility with existing pipeline configurations.
+- **Test Coverage:** Verified full system stability with 100% pass rate on the test suite (121 tests).
+- **Circular Dependency Fix:** Resolved a circular dependency in `skyulf/modeling/regression.py` where Appliers were referenced before definition.
+- **Logic Fix:** Corrected a logic inversion in `SkyulfPipeline._init_model_estimator` that caused valid models to be rejected.
+
+------------------------------------------------------------
+
 ## v0.1.4
 **"The Polynomial, Security & API Update"**
 

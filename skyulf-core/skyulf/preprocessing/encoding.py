@@ -12,6 +12,7 @@ from sklearn.preprocessing import (
 
 from ..utils import pack_pipeline_output, resolve_columns, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
+from ..registry import NodeRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,63 @@ def detect_categorical_columns(df: pd.DataFrame) -> List[str]:
 # --- OneHot Encoder ---
 
 
+class OneHotEncoderApplier(BaseApplier):
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+
+        if not params or not params.get("columns"):
+            return pack_pipeline_output(X, y, is_tuple)
+
+        cols = params["columns"]
+        encoder = params.get("encoder_object")
+        feature_names = params.get("feature_names")
+        drop_original = params.get("drop_original", True)
+        include_missing = params.get("include_missing", False)
+
+        valid_cols = [c for c in cols if c in X.columns]
+        if not valid_cols or not encoder:
+            return pack_pipeline_output(X, y, is_tuple)
+
+        X_out = X.copy()
+
+        # Ensure all expected columns are present for the encoder
+        # If some columns are missing in input, we fill them with NaN
+        # This allows encoder.transform to receive the correct number of features
+
+        X_subset = X_out[valid_cols].copy()
+
+        if include_missing:
+            X_subset = X_subset.fillna("__mlops_missing__")
+
+        # Transform
+        try:
+            encoded_array = encoder.transform(X_subset)
+
+            # Create DataFrame from encoded array
+            encoded_df = pd.DataFrame(
+                encoded_array, columns=feature_names, index=X_out.index
+            )
+
+            # Concatenate
+            X_out = pd.concat([X_out, encoded_df], axis=1)
+
+            # Drop original columns
+            if drop_original:
+                X_out = X_out.drop(columns=valid_cols)
+
+        except Exception as e:
+            logger.error(f"OneHot Encoding failed: {e}")
+            # If encoding fails (e.g. new categories with handle_unknown='error'), we might just return original
+            pass
+
+        return pack_pipeline_output(X_out, y, is_tuple)
+
+
+@NodeRegistry.register("OneHotEncoder", OneHotEncoderApplier)
 class OneHotEncoderCalculator(BaseCalculator):
     def fit(
         self,
@@ -97,7 +155,10 @@ class OneHotEncoderCalculator(BaseCalculator):
         }
 
 
-class OneHotEncoderApplier(BaseApplier):
+# --- Ordinal Encoder ---
+
+
+class OrdinalEncoderApplier(BaseApplier):
     def apply(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
@@ -105,14 +166,8 @@ class OneHotEncoderApplier(BaseApplier):
     ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
-        if not params or not params.get("columns"):
-            return pack_pipeline_output(X, y, is_tuple)
-
-        cols = params["columns"]
+        cols = params.get("columns", [])
         encoder = params.get("encoder_object")
-        feature_names = params.get("feature_names")
-        drop_original = params.get("drop_original", True)
-        include_missing = params.get("include_missing", False)
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or not encoder:
@@ -120,42 +175,21 @@ class OneHotEncoderApplier(BaseApplier):
 
         X_out = X.copy()
 
-        # Ensure all expected columns are present for the encoder
-        # If some columns are missing in input, we fill them with NaN
-        # This allows encoder.transform to receive the correct number of features
-
-        X_subset = X_out[valid_cols].copy()
-
-        if include_missing:
-            X_subset = X_subset.fillna("__mlops_missing__")
-
-        # Transform
         try:
+            X_subset = X_out[valid_cols].astype(str)
             encoded_array = encoder.transform(X_subset)
 
-            # Create DataFrame from encoded array
-            encoded_df = pd.DataFrame(
-                encoded_array, columns=feature_names, index=X_out.index
-            )
-
-            # Concatenate
-            X_out = pd.concat([X_out, encoded_df], axis=1)
-
-            # Drop original columns
-            if drop_original:
-                X_out = X_out.drop(columns=valid_cols)
+            # Replace columns in place
+            X_out[valid_cols] = encoded_array
 
         except Exception as e:
-            logger.error(f"OneHot Encoding failed: {e}")
-            # If encoding fails (e.g. new categories with handle_unknown='error'), we might just return original
+            logger.error(f"Ordinal Encoding failed: {e}")
             pass
 
         return pack_pipeline_output(X_out, y, is_tuple)
 
 
-# --- Ordinal Encoder ---
-
-
+@NodeRegistry.register("OrdinalEncoder", OrdinalEncoderApplier)
 class OrdinalEncoderCalculator(BaseCalculator):
     def fit(
         self,
@@ -197,7 +231,10 @@ class OrdinalEncoderCalculator(BaseCalculator):
         }
 
 
-class OrdinalEncoderApplier(BaseApplier):
+# --- Label Encoder (Target) ---
+
+
+class LabelEncoderApplier(BaseApplier):
     def apply(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
@@ -205,32 +242,37 @@ class OrdinalEncoderApplier(BaseApplier):
     ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
-        cols = params.get("columns", [])
-        encoder = params.get("encoder_object")
-
-        valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols or not encoder:
-            return pack_pipeline_output(X, y, is_tuple)
+        encoders = params.get("encoders", {})
+        cols = params.get("columns")
 
         X_out = X.copy()
+        y_out = y.copy() if y is not None else None
 
-        try:
-            X_subset = X_out[valid_cols].astype(str)
-            encoded_array = encoder.transform(X_subset)
+        if cols:
+            # Transform features
+            for col in cols:
+                if col in X_out.columns and col in encoders:
+                    le = encoders[col]
+                    # Handle unseen labels? LabelEncoder crashes on unseen.
+                    # We need a safe transform helper.
 
-            # Replace columns in place
-            X_out[valid_cols] = encoded_array
+                    # Fast safe transform:
+                    # Map known classes to integers, unknown to -1 or NaN
+                    # But LabelEncoder doesn't support unknown.
+                    # We can use map.
+                    mapping = dict(zip(le.classes_, le.transform(le.classes_)))
+                    X_out[col] = X_out[col].astype(str).map(mapping).fillna(-1)
 
-        except Exception as e:
-            logger.error(f"Ordinal Encoding failed: {e}")
-            pass
+        # Transform target (always check if encoder exists)
+        if y_out is not None and "__target__" in encoders:
+            le = encoders["__target__"]
+            mapping = dict(zip(le.classes_, le.transform(le.classes_)))
+            y_out = y_out.astype(str).map(mapping).fillna(-1)
 
-        return pack_pipeline_output(X_out, y, is_tuple)
+        return pack_pipeline_output(X_out, y_out, is_tuple)
 
 
-# --- Label Encoder (Target) ---
-
-
+@NodeRegistry.register("LabelEncoder", LabelEncoderApplier)
 class LabelEncoderCalculator(BaseCalculator):
     def fit(
         self,
@@ -280,71 +322,7 @@ class LabelEncoderCalculator(BaseCalculator):
         }
 
 
-class LabelEncoderApplier(BaseApplier):
-    def apply(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
-        X, y, is_tuple = unpack_pipeline_input(df)
-
-        encoders = params.get("encoders", {})
-        cols = params.get("columns")
-
-        X_out = X.copy()
-        y_out = y.copy() if y is not None else None
-
-        if cols:
-            # Transform features
-            for col in cols:
-                if col in X_out.columns and col in encoders:
-                    le = encoders[col]
-                    # Handle unseen labels? LabelEncoder crashes on unseen.
-                    # We need a safe transform helper.
-
-                    # Fast safe transform:
-                    # Map known classes to integers, unknown to -1 or NaN
-                    # But LabelEncoder doesn't support unknown.
-                    # We can use map.
-                    mapping = dict(zip(le.classes_, le.transform(le.classes_)))
-                    X_out[col] = X_out[col].astype(str).map(mapping).fillna(-1)
-
-        # Transform target (always check if encoder exists)
-        if y_out is not None and "__target__" in encoders:
-            le = encoders["__target__"]
-            mapping = dict(zip(le.classes_, le.transform(le.classes_)))
-            y_out = y_out.astype(str).map(mapping).fillna(-1)
-
-        return pack_pipeline_output(X_out, y_out, is_tuple)
-
-
 # --- Target Encoder (Mean Encoding) ---
-
-
-class TargetEncoderCalculator(BaseCalculator):
-    def fit(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, y, is_tuple = unpack_pipeline_input(df)
-
-        if y is None:
-            logger.warning("TargetEncoder requires a target variable (y). Skipping.")
-            return {}
-
-        cols = resolve_columns(X, config, detect_categorical_columns)
-        if not cols:
-            return {}
-
-        # Config: {'smooth': 'auto', 'target_type': 'auto'}
-        smooth = config.get("smooth", "auto")
-        target_type = config.get("target_type", "auto")
-
-        encoder = TargetEncoder(smooth=smooth, target_type=target_type)
-        encoder.fit(X[cols], y)
-
-        return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}
 
 
 class TargetEncoderApplier(BaseApplier):
@@ -375,26 +353,34 @@ class TargetEncoderApplier(BaseApplier):
         return pack_pipeline_output(X_out, y, is_tuple)
 
 
-# --- Hash Encoder ---
-
-
-class HashEncoderCalculator(BaseCalculator):
+@NodeRegistry.register("TargetEncoder", TargetEncoderApplier)
+class TargetEncoderCalculator(BaseCalculator):
     def fit(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+        X, y, is_tuple = unpack_pipeline_input(df)
+
+        if y is None:
+            logger.warning("TargetEncoder requires a target variable (y). Skipping.")
+            return {}
 
         cols = resolve_columns(X, config, detect_categorical_columns)
         if not cols:
             return {}
 
-        # Config: {'n_features': 10}
-        n_features = config.get("n_features", 10)
+        # Config: {'smooth': 'auto', 'target_type': 'auto'}
+        smooth = config.get("smooth", "auto")
+        target_type = config.get("target_type", "auto")
 
-        # FeatureHasher is stateless, no fit needed really, but we store config
-        return {"type": "hash_encoder", "columns": cols, "n_features": n_features}
+        encoder = TargetEncoder(smooth=smooth, target_type=target_type)
+        encoder.fit(X[cols], y)
+
+        return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}
+
+
+# --- Hash Encoder ---
 
 
 class HashEncoderApplier(BaseApplier):
@@ -426,29 +412,27 @@ class HashEncoderApplier(BaseApplier):
         return pack_pipeline_output(X_out, y, is_tuple)
 
 
-# --- Dummy Encoder (Pandas get_dummies) ---
-
-
-class DummyEncoderCalculator(BaseCalculator):
+@NodeRegistry.register("HashEncoder", HashEncoderApplier)
+class HashEncoderCalculator(BaseCalculator):
     def fit(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+
         cols = resolve_columns(X, config, detect_categorical_columns)
+        if not cols:
+            return {}
 
-        # We need to know all possible categories to align columns during transform
-        categories = {}
-        for col in cols:
-            categories[col] = sorted(X[col].dropna().unique().astype(str).tolist())
+        # Config: {'n_features': 10}
+        n_features = config.get("n_features", 10)
 
-        return {
-            "type": "dummy_encoder",
-            "columns": cols,
-            "categories": categories,
-            "drop_first": config.get("drop_first", False),
-        }
+        # FeatureHasher is stateless, no fit needed really, but we store config
+        return {"type": "hash_encoder", "columns": cols, "n_features": n_features}
+
+
+# --- Dummy Encoder (Pandas get_dummies) ---
 
 
 class DummyEncoderApplier(BaseApplier):
@@ -479,8 +463,33 @@ class DummyEncoderApplier(BaseApplier):
 
         # Drop original
         X_out = X_out.drop(columns=valid_cols)
-
-        # Concat
+        
+        # Concatenate dummies
         X_out = pd.concat([X_out, dummies], axis=1)
 
         return pack_pipeline_output(X_out, y, is_tuple)
+
+
+@NodeRegistry.register("DummyEncoder", DummyEncoderApplier)
+class DummyEncoderCalculator(BaseCalculator):
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+        cols = resolve_columns(X, config, detect_categorical_columns)
+
+        # We need to know all possible categories to align columns during transform
+        categories = {}
+        for col in cols:
+            categories[col] = sorted(X[col].dropna().unique().astype(str).tolist())
+
+        return {
+            "type": "dummy_encoder",
+            "columns": cols,
+            "categories": categories,
+            "drop_first": config.get("drop_first", False),
+        }
+
+

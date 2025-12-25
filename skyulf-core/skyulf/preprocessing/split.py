@@ -4,18 +4,11 @@ from typing import Any, Dict, Optional, Tuple, Union
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+from ..registry import NodeRegistry
 from ..data.dataset import SplitDataset
 from .base import BaseApplier, BaseCalculator
 
 logger = logging.getLogger(__name__)
-
-
-class SplitCalculator(BaseCalculator):
-    def fit(
-        self, df: Union[pd.DataFrame, Tuple[Any, ...]], config: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        # No learning from data, just pass through config
-        return config
 
 
 class SplitApplier(BaseApplier):
@@ -48,6 +41,16 @@ class SplitApplier(BaseApplier):
             return splitter.split_xy(X, y)
 
         return splitter.split(df)
+
+
+@NodeRegistry.register("Split", SplitApplier)
+@NodeRegistry.register("TrainTestSplitter", SplitApplier)
+class SplitCalculator(BaseCalculator):
+    def fit(
+        self, df: Union[pd.DataFrame, Tuple[Any, ...]], config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        # No learning from data, just pass through config
+        return config
 
 
 class DataSplitter:
@@ -176,15 +179,6 @@ class DataSplitter:
         return SplitDataset(train=train, test=test, validation=validation)
 
 
-class FeatureTargetSplitCalculator(BaseCalculator):
-    def fit(
-        self,
-        df: Union[pd.DataFrame, SplitDataset, Tuple[Any, ...]],
-        config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        return config
-
-
 class FeatureTargetSplitApplier(BaseApplier):
     def apply(
         self,
@@ -222,5 +216,17 @@ class FeatureTargetSplitApplier(BaseApplier):
 
         if isinstance(df, pd.DataFrame):
             return split_one(df)
+
+        return df  # Fallback if already tuple or unknown
+
+
+@NodeRegistry.register("feature_target_split", FeatureTargetSplitApplier)
+class FeatureTargetSplitCalculator(BaseCalculator):
+    def fit(
+        self,
+        df: Union[pd.DataFrame, SplitDataset, Tuple[Any, ...]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return config
 
         return df

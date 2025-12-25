@@ -30,6 +30,7 @@ from ..utils import (
     unpack_pipeline_input,
 )
 from .base import BaseApplier, BaseCalculator
+from ..registry import NodeRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,30 @@ def _resolve_estimator(key: Optional[str], problem_type: str) -> Any:
 # --- Variance Threshold ---
 
 
+class VarianceThresholdApplier(BaseApplier):
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+
+        selected_cols = params.get("selected_columns")
+        candidate_columns = params.get("candidate_columns", [])
+        drop_columns = params.get("drop_columns", True)
+
+        if selected_cols is None:
+            return pack_pipeline_output(X, y, is_tuple)
+
+        cols_to_drop_set = set(candidate_columns) - set(selected_cols)
+        cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
+
+        if cols_to_drop_list and drop_columns:
+            X = X.drop(columns=cols_to_drop_list)
+        return pack_pipeline_output(X, y, is_tuple)
+
+
+@NodeRegistry.register("VarianceThreshold", VarianceThresholdApplier)
 class VarianceThresholdCalculator(BaseCalculator):
     def fit(
         self,
@@ -124,7 +149,10 @@ class VarianceThresholdCalculator(BaseCalculator):
         }
 
 
-class VarianceThresholdApplier(BaseApplier):
+# --- Correlation Threshold ---
+
+
+class CorrelationThresholdApplier(BaseApplier):
     def apply(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
@@ -132,24 +160,19 @@ class VarianceThresholdApplier(BaseApplier):
     ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
-        selected_cols = params.get("selected_columns")
-        candidate_columns = params.get("candidate_columns", [])
+        cols_to_drop = params.get("columns_to_drop", [])
         drop_columns = params.get("drop_columns", True)
 
-        if selected_cols is None:
+        cols_to_drop = [c for c in cols_to_drop if c in X.columns]
+        if not cols_to_drop:
             return pack_pipeline_output(X, y, is_tuple)
 
-        cols_to_drop_set = set(candidate_columns) - set(selected_cols)
-        cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
-
-        if cols_to_drop_list and drop_columns:
-            X = X.drop(columns=cols_to_drop_list)
+        if drop_columns:
+            X = X.drop(columns=cols_to_drop)
         return pack_pipeline_output(X, y, is_tuple)
 
 
-# --- Correlation Threshold ---
-
-
+@NodeRegistry.register("CorrelationThreshold", CorrelationThresholdApplier)
 class CorrelationThresholdCalculator(BaseCalculator):
     def fit(
         self,
@@ -184,7 +207,10 @@ class CorrelationThresholdCalculator(BaseCalculator):
         }
 
 
-class CorrelationThresholdApplier(BaseApplier):
+# --- Univariate Selection ---
+
+
+class UnivariateSelectionApplier(BaseApplier):
     def apply(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
@@ -192,21 +218,21 @@ class CorrelationThresholdApplier(BaseApplier):
     ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
-        cols_to_drop = params.get("columns_to_drop", [])
+        selected_cols = params.get("selected_columns")
+        candidate_columns = params.get("candidate_columns", [])
         drop_columns = params.get("drop_columns", True)
 
-        cols_to_drop = [c for c in cols_to_drop if c in X.columns]
-        if not cols_to_drop:
+        if selected_cols is None:
             return pack_pipeline_output(X, y, is_tuple)
 
-        if drop_columns:
-            X = X.drop(columns=cols_to_drop)
+        cols_to_drop_set = set(candidate_columns) - set(selected_cols)
+        cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
+        if cols_to_drop_list and drop_columns:
+            X = X.drop(columns=cols_to_drop_list)
         return pack_pipeline_output(X, y, is_tuple)
 
 
-# --- Univariate Selection ---
-
-
+@NodeRegistry.register("UnivariateSelection", UnivariateSelectionApplier)
 class UnivariateSelectionCalculator(BaseCalculator):
     def fit(  # noqa: C901
         self,
@@ -354,7 +380,10 @@ class UnivariateSelectionCalculator(BaseCalculator):
         }
 
 
-class UnivariateSelectionApplier(BaseApplier):
+# --- Model Based Selection ---
+
+
+class ModelBasedSelectionApplier(BaseApplier):
     def apply(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
@@ -376,9 +405,7 @@ class UnivariateSelectionApplier(BaseApplier):
         return pack_pipeline_output(X, y, is_tuple)
 
 
-# --- Model Based Selection ---
-
-
+@NodeRegistry.register("ModelBasedSelection", ModelBasedSelectionApplier)
 class ModelBasedSelectionCalculator(BaseCalculator):
     def fit(  # noqa: C901
         self,
@@ -494,29 +521,33 @@ class ModelBasedSelectionCalculator(BaseCalculator):
         }
 
 
-class ModelBasedSelectionApplier(BaseApplier):
+# --- Unified Feature Selection (Facade) ---
+class FeatureSelectionApplier(BaseApplier):
     def apply(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         params: Dict[str, Any],
     ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
-        X, y, is_tuple = unpack_pipeline_input(df)
+        # The params returned by the specific calculator will have a "type" field
+        # corresponding to the specific calculator's return value.
+        type_name = params.get("type")
 
-        selected_cols = params.get("selected_columns")
-        candidate_columns = params.get("candidate_columns", [])
-        drop_columns = params.get("drop_columns", True)
+        applier: Optional[BaseApplier] = None
+        if type_name == "variance_threshold":
+            applier = VarianceThresholdApplier()
+        elif type_name == "correlation_threshold":
+            applier = CorrelationThresholdApplier()
+        elif type_name == "univariate_selection":
+            applier = UnivariateSelectionApplier()
+        elif type_name == "model_based_selection":
+            applier = ModelBasedSelectionApplier()
 
-        if selected_cols is None:
-            return pack_pipeline_output(X, y, is_tuple)
-
-        cols_to_drop_set = set(candidate_columns) - set(selected_cols)
-        cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
-        if cols_to_drop_list and drop_columns:
-            X = X.drop(columns=cols_to_drop_list)
-        return pack_pipeline_output(X, y, is_tuple)
+        if applier:
+            return applier.apply(df, params)  # type: ignore
+        return pack_pipeline_output(*unpack_pipeline_input(df))
 
 
-# --- Unified Feature Selection (Facade) ---
+@NodeRegistry.register("feature_selection", FeatureSelectionApplier)
 class FeatureSelectionCalculator(BaseCalculator):
     def fit(
         self,
@@ -547,29 +578,5 @@ class FeatureSelectionCalculator(BaseCalculator):
 
         logger.warning(f"Unknown feature selection method: {method}")
         return {}
-
-
-class FeatureSelectionApplier(BaseApplier):
-    def apply(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
-        # The params returned by the specific calculator will have a "type" field
-        # corresponding to the specific calculator's return value.
-        type_name = params.get("type")
-
-        applier: Optional[BaseApplier] = None
-        if type_name == "variance_threshold":
-            applier = VarianceThresholdApplier()
-        elif type_name == "correlation_threshold":
-            applier = CorrelationThresholdApplier()
-        elif type_name == "univariate_selection":
-            applier = UnivariateSelectionApplier()
-        elif type_name == "model_based_selection":
-            applier = ModelBasedSelectionApplier()
-
-        if applier:
-            return applier.apply(df, params)  # type: ignore
 
         return df

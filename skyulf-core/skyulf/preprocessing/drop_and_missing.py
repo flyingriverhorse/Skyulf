@@ -2,28 +2,11 @@ from typing import Any, Dict, Tuple, Union
 
 import pandas as pd
 
+from ..registry import NodeRegistry
 from ..utils import pack_pipeline_output, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
 
 # --- Deduplicate ---
-
-
-class DeduplicateCalculator(BaseCalculator):
-    def fit(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
-
-        # Config: {'subset': [...], 'keep': 'first'|'last'|False}
-        # Deduplication is an operation that doesn't learn parameters from data,
-        # it just applies logic. So fit just passes through the config.
-
-        subset = config.get("subset")
-        keep = config.get("keep", "first")
-
-        return {"type": "deduplicate", "subset": subset, "keep": keep}
 
 
 class DeduplicateApplier(BaseApplier):
@@ -56,9 +39,46 @@ class DeduplicateApplier(BaseApplier):
         return pack_pipeline_output(X_dedup, y, is_tuple)
 
 
+@NodeRegistry.register("Deduplicate", DeduplicateApplier)
+class DeduplicateCalculator(BaseCalculator):
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
+        # Config: {'subset': [...], 'keep': 'first'|'last'|False}
+        # Deduplication is an operation that doesn't learn parameters from data,
+        # it just applies logic. So fit just passes through the config.
+
+        subset = config.get("subset")
+        keep = config.get("keep", "first")
+
+        return {"type": "deduplicate", "subset": subset, "keep": keep}
+
+
 # --- Drop Missing Columns ---
 
 
+class DropMissingColumnsApplier(BaseApplier):
+    def apply(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+
+        cols_to_drop = params.get("columns_to_drop", [])
+        cols_to_drop_X = [c for c in cols_to_drop if c in X.columns]
+
+        if cols_to_drop_X:
+            X = X.drop(columns=cols_to_drop_X)
+
+        return pack_pipeline_output(X, y, is_tuple)
+
+
+@NodeRegistry.register("DropMissingColumns", DropMissingColumnsApplier)
 class DropMissingColumnsCalculator(BaseCalculator):
     def fit(
         self,
@@ -102,43 +122,7 @@ class DropMissingColumnsCalculator(BaseCalculator):
         }
 
 
-class DropMissingColumnsApplier(BaseApplier):
-    def apply(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
-        X, y, is_tuple = unpack_pipeline_input(df)
-
-        cols_to_drop = params.get("columns_to_drop", [])
-        cols_to_drop_X = [c for c in cols_to_drop if c in X.columns]
-
-        if cols_to_drop_X:
-            X = X.drop(columns=cols_to_drop_X)
-
-        return pack_pipeline_output(X, y, is_tuple)
-
-
 # --- Drop Missing Rows ---
-
-
-class DropMissingRowsCalculator(BaseCalculator):
-    def fit(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        # Config: {'subset': [...], 'how': 'any'|'all', 'threshold': int}
-        subset = config.get("subset")
-        how = config.get("how", "any")
-        threshold = config.get("threshold")
-
-        return {
-            "type": "drop_missing_rows",
-            "subset": subset,
-            "how": how,
-            "threshold": threshold,
-        }
 
 
 class DropMissingRowsApplier(BaseApplier):
@@ -173,28 +157,27 @@ class DropMissingRowsApplier(BaseApplier):
         return pack_pipeline_output(X_clean, y, is_tuple)
 
 
-# --- Missing Indicator ---
-
-
-class MissingIndicatorCalculator(BaseCalculator):
+@NodeRegistry.register("DropMissingRows", DropMissingRowsApplier)
+class DropMissingRowsCalculator(BaseCalculator):
     def fit(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+        # Config: {'subset': [...], 'how': 'any'|'all', 'threshold': int}
+        subset = config.get("subset")
+        how = config.get("how", "any")
+        threshold = config.get("threshold")
 
-        # Config: {'columns': [...]}
-        # If columns not provided, maybe detect columns with missing values?
+        return {
+            "type": "drop_missing_rows",
+            "subset": subset,
+            "how": how,
+            "threshold": threshold,
+        }
 
-        cols = config.get("columns")
-        if not cols:
-            # Auto-detect columns with missing values
-            cols = X.columns[X.isna().any()].tolist()
-        else:
-            cols = [c for c in cols if c in X.columns]
 
-        return {"type": "missing_indicator", "columns": cols}
+# --- Missing Indicator ---
 
 
 class MissingIndicatorApplier(BaseApplier):
@@ -219,3 +202,25 @@ class MissingIndicatorApplier(BaseApplier):
             df_out[new_col_name] = df_out[col].isna().astype(int)
 
         return pack_pipeline_output(df_out, y, is_tuple)
+
+
+@NodeRegistry.register("MissingIndicator", MissingIndicatorApplier)
+class MissingIndicatorCalculator(BaseCalculator):
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+
+        # Config: {'columns': [...]}
+        # If columns not provided, maybe detect columns with missing values?
+
+        cols = config.get("columns")
+        if not cols:
+            # Auto-detect columns with missing values
+            cols = X.columns[X.isna().any()].tolist()
+        else:
+            cols = [c for c in cols if c in X.columns]
+
+        return {"type": "missing_indicator", "columns": cols}

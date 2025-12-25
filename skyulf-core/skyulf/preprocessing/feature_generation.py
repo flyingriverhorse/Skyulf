@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
 from sklearn.preprocessing import PolynomialFeatures
 
+from ..registry import NodeRegistry
 from ..utils import pack_pipeline_output, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
 
@@ -97,50 +98,6 @@ def _compute_similarity_score(a: Any, b: Any, method: str) -> float:
 # --- Polynomial Features ---
 
 
-class PolynomialFeaturesCalculator(BaseCalculator):
-    def fit(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        # Extract configuration parameters
-        # We support standard polynomial features settings like degree and interaction_only
-
-        X, _, _ = unpack_pipeline_input(df)
-
-        cols = config.get("columns", [])
-        auto_detect = config.get("auto_detect", False)
-
-        if not cols and auto_detect:
-            cols = _auto_detect_numeric_columns(X)
-
-        cols = [c for c in cols if c in X.columns]
-
-        if not cols:
-            return {}
-
-        degree = config.get("degree", 2)
-        interaction_only = config.get("interaction_only", False)
-        include_bias = config.get("include_bias", False)
-
-        # We use sklearn to get feature names
-        poly = PolynomialFeatures(
-            degree=degree, interaction_only=interaction_only, include_bias=include_bias
-        )
-        poly.fit(X[cols])
-
-        return {
-            "type": "polynomial_features",
-            "columns": cols,
-            "degree": degree,
-            "interaction_only": interaction_only,
-            "include_bias": include_bias,
-            "include_input_features": config.get("include_input_features", False),
-            "output_prefix": config.get("output_prefix", "poly"),
-            "feature_names": poly.get_feature_names_out(cols).tolist(),
-        }
-
-
 class PolynomialFeaturesApplier(BaseApplier):
     def apply(
         self,
@@ -210,26 +167,53 @@ class PolynomialFeaturesApplier(BaseApplier):
         return pack_pipeline_output(df_out, y, is_tuple)
 
 
-# --- Feature Generation ---
-
-
-class FeatureGenerationCalculator(BaseCalculator):
+@NodeRegistry.register("PolynomialFeatures", PolynomialFeaturesApplier)
+@NodeRegistry.register("PolynomialFeaturesNode", PolynomialFeaturesApplier)
+class PolynomialFeaturesCalculator(BaseCalculator):
     def fit(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        # Config:
-        # operations: List[Dict]
-        # epsilon: float
-        # allow_overwrite: bool
+        # Extract configuration parameters
+        # We support standard polynomial features settings like degree and interaction_only
+
+        X, _, _ = unpack_pipeline_input(df)
+
+        cols = config.get("columns", [])
+        auto_detect = config.get("auto_detect", False)
+
+        if not cols and auto_detect:
+            cols = _auto_detect_numeric_columns(X)
+
+        cols = [c for c in cols if c in X.columns]
+
+        if not cols:
+            return {}
+
+        degree = config.get("degree", 2)
+        interaction_only = config.get("interaction_only", False)
+        include_bias = config.get("include_bias", False)
+
+        # We use sklearn to get feature names
+        poly = PolynomialFeatures(
+            degree=degree, interaction_only=interaction_only, include_bias=include_bias
+        )
+        poly.fit(X[cols])
 
         return {
-            "type": "feature_generation",
-            "operations": config.get("operations", []),
-            "epsilon": config.get("epsilon", DEFAULT_EPSILON),
-            "allow_overwrite": config.get("allow_overwrite", False),
+            "type": "polynomial_features",
+            "columns": cols,
+            "degree": degree,
+            "interaction_only": interaction_only,
+            "include_bias": include_bias,
+            "include_input_features": config.get("include_input_features", False),
+            "output_prefix": config.get("output_prefix", "poly"),
+            "feature_names": poly.get_feature_names_out(cols).tolist(),
         }
+
+
+# --- Feature Generation ---
 
 
 class FeatureGenerationApplier(BaseApplier):
@@ -441,3 +425,25 @@ class FeatureGenerationApplier(BaseApplier):
                 pass
 
         return pack_pipeline_output(df_out, y, is_tuple)
+
+
+@NodeRegistry.register("FeatureGeneration", FeatureGenerationApplier)
+@NodeRegistry.register("FeatureMath", FeatureGenerationApplier)
+@NodeRegistry.register("FeatureGenerationNode", FeatureGenerationApplier)
+class FeatureGenerationCalculator(BaseCalculator):
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        # Config:
+        # operations: List[Dict]
+        # epsilon: float
+        # allow_overwrite: bool
+
+        return {
+            "type": "feature_generation",
+            "operations": config.get("operations", []),
+            "epsilon": config.get("epsilon", DEFAULT_EPSILON),
+            "allow_overwrite": config.get("allow_overwrite", False),
+        }

@@ -3,10 +3,18 @@
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
 
+from ..registry import NodeRegistry
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 
 
 # --- Ridge Regression ---
+class RidgeRegressionApplier(SklearnApplier):
+    """Ridge Regression Applier."""
+
+    pass
+
+
+@NodeRegistry.register("ridge_regression", RidgeRegressionApplier)
 class RidgeRegressionCalculator(SklearnCalculator):
     """Ridge Regression Calculator."""
 
@@ -22,13 +30,14 @@ class RidgeRegressionCalculator(SklearnCalculator):
         )
 
 
-class RidgeRegressionApplier(SklearnApplier):
-    """Ridge Regression Applier."""
+# --- Random Forest Regressor ---
+class RandomForestRegressorApplier(SklearnApplier):
+    """Random Forest Regressor Applier."""
 
     pass
 
 
-# --- Random Forest Regressor ---
+@NodeRegistry.register("random_forest_regressor", RandomForestRegressorApplier)
 class RandomForestRegressorCalculator(SklearnCalculator):
     """Random Forest Regressor Calculator."""
 
@@ -45,9 +54,3 @@ class RandomForestRegressorCalculator(SklearnCalculator):
             },
             problem_type="regression",
         )
-
-
-class RandomForestRegressorApplier(SklearnApplier):
-    """Random Forest Regressor Applier."""
-
-    pass

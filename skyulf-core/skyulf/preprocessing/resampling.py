@@ -12,37 +12,13 @@ from imblearn.under_sampling import (
     TomekLinks,
 )
 
+from ..registry import NodeRegistry
 from ..utils import pack_pipeline_output, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
 
 logger = logging.getLogger(__name__)
 
 # --- Oversampling (SMOTE variants) ---
-
-
-class OversamplingCalculator(BaseCalculator):
-    def fit(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        # Config: {'method': 'smote', 'target_column': 'target', 'sampling_strategy': 'auto', ...}
-        return {
-            "type": "oversampling",
-            "method": config.get("method", "smote"),
-            "target_column": config.get("target_column"),
-            "sampling_strategy": config.get("sampling_strategy", "auto"),
-            "random_state": config.get("random_state", 42),
-            "k_neighbors": config.get("k_neighbors", 5),
-            "m_neighbors": config.get("m_neighbors", 10),
-            "kind": config.get("kind", "borderline-1"),
-            "svm_estimator": config.get("svm_estimator", None),
-            "out_step": config.get("out_step", 0.5),
-            "kmeans_estimator": config.get("kmeans_estimator", None),
-            "cluster_balance_threshold": config.get("cluster_balance_threshold", 0.1),
-            "density_exponent": config.get("density_exponent", "auto"),
-            "n_jobs": config.get("n_jobs", -1),
-        }
 
 
 class OversamplingApplier(BaseApplier):
@@ -138,27 +114,33 @@ class OversamplingApplier(BaseApplier):
         return pack_pipeline_output(X_res, y_res, is_tuple)
 
 
-# --- Undersampling ---
-
-
-class UndersamplingCalculator(BaseCalculator):
+@NodeRegistry.register("Oversampling", OversamplingApplier)
+class OversamplingCalculator(BaseCalculator):
     def fit(
         self,
         df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
+        # Config: {'method': 'smote', 'target_column': 'target', 'sampling_strategy': 'auto', ...}
         return {
-            "type": "undersampling",
-            "method": config.get("method", "random_under_sampling"),
+            "type": "oversampling",
+            "method": config.get("method", "smote"),
             "target_column": config.get("target_column"),
             "sampling_strategy": config.get("sampling_strategy", "auto"),
             "random_state": config.get("random_state", 42),
-            "replacement": config.get("replacement", False),
-            "version": config.get("version", 1),  # For NearMiss
-            "n_neighbors": config.get("n_neighbors", 3),  # For EditedNearestNeighbours
-            "kind_sel": config.get("kind_sel", "all"),  # For EditedNearestNeighbours
+            "k_neighbors": config.get("k_neighbors", 5),
+            "m_neighbors": config.get("m_neighbors", 10),
+            "kind": config.get("kind", "borderline-1"),
+            "svm_estimator": config.get("svm_estimator", None),
+            "out_step": config.get("out_step", 0.5),
+            "kmeans_estimator": config.get("kmeans_estimator", None),
+            "cluster_balance_threshold": config.get("cluster_balance_threshold", 0.1),
+            "density_exponent": config.get("density_exponent", "auto"),
             "n_jobs": config.get("n_jobs", -1),
         }
+
+
+# --- Undersampling ---
 
 
 class UndersamplingApplier(BaseApplier):
@@ -224,3 +206,24 @@ class UndersamplingApplier(BaseApplier):
             y_res = pd.Series(y_res, name=y.name if y is not None else target_col)
 
         return pack_pipeline_output(X_res, y_res, is_tuple)
+
+
+@NodeRegistry.register("Undersampling", UndersamplingApplier)
+class UndersamplingCalculator(BaseCalculator):
+    def fit(
+        self,
+        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "type": "undersampling",
+            "method": config.get("method", "random_under_sampling"),
+            "target_column": config.get("target_column"),
+            "sampling_strategy": config.get("sampling_strategy", "auto"),
+            "random_state": config.get("random_state", 42),
+            "replacement": config.get("replacement", False),
+            "version": config.get("version", 1),  # For NearMiss
+            "n_neighbors": config.get("n_neighbors", 3),  # For EditedNearestNeighbours
+            "kind_sel": config.get("kind_sel", "all"),  # For EditedNearestNeighbours
+            "n_jobs": config.get("n_jobs", -1),
+        }

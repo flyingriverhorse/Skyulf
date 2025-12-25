@@ -7,123 +7,25 @@ import pandas as pd
 
 from ..data.dataset import SplitDataset
 from ..utils import get_data_stats
+from ..registry import NodeRegistry
 from .base import StatefulTransformer
-from .bucketing import (
-    CustomBinningApplier,
-    CustomBinningCalculator,
-    GeneralBinningApplier,
-    GeneralBinningCalculator,
-    KBinsDiscretizerApplier,
-    KBinsDiscretizerCalculator,
-)
-from .casting import CastingApplier, CastingCalculator
-from .cleaning import (
-    AliasReplacementApplier,
-    AliasReplacementCalculator,
-    InvalidValueReplacementApplier,
-    InvalidValueReplacementCalculator,
-    TextCleaningApplier,
-    TextCleaningCalculator,
-    ValueReplacementApplier,
-    ValueReplacementCalculator,
-)
-from .drop_and_missing import (
-    DeduplicateApplier,
-    DeduplicateCalculator,
-    DropMissingColumnsApplier,
-    DropMissingColumnsCalculator,
-    DropMissingRowsApplier,
-    DropMissingRowsCalculator,
-    MissingIndicatorApplier,
-    MissingIndicatorCalculator,
-)
-from .encoding import (
-    HashEncoderApplier,
-    HashEncoderCalculator,
-    LabelEncoderApplier,
-    LabelEncoderCalculator,
-    OneHotEncoderApplier,
-    OneHotEncoderCalculator,
-    OrdinalEncoderApplier,
-    OrdinalEncoderCalculator,
-    TargetEncoderApplier,
-    TargetEncoderCalculator,
-)
-from .feature_generation import (
-    FeatureGenerationApplier,
-    FeatureGenerationCalculator,
-    PolynomialFeaturesApplier,
-    PolynomialFeaturesCalculator,
-)
-from .feature_selection import (
-    CorrelationThresholdApplier,
-    CorrelationThresholdCalculator,
-    FeatureSelectionApplier,
-    FeatureSelectionCalculator,
-    ModelBasedSelectionApplier,
-    ModelBasedSelectionCalculator,
-    UnivariateSelectionApplier,
-    UnivariateSelectionCalculator,
-    VarianceThresholdApplier,
-    VarianceThresholdCalculator,
-)
-from .imputation import (
-    IterativeImputerApplier,
-    IterativeImputerCalculator,
-    KNNImputerApplier,
-    KNNImputerCalculator,
-    SimpleImputerApplier,
-    SimpleImputerCalculator,
-)
-from .inspection import (
-    DatasetProfileApplier,
-    DatasetProfileCalculator,
-    DataSnapshotApplier,
-    DataSnapshotCalculator,
-)
-from .outliers import (
-    EllipticEnvelopeApplier,
-    EllipticEnvelopeCalculator,
-    IQRApplier,
-    IQRCalculator,
-    ManualBoundsApplier,
-    ManualBoundsCalculator,
-    WinsorizeApplier,
-    WinsorizeCalculator,
-    ZScoreApplier,
-    ZScoreCalculator,
-)
-from .resampling import (
-    OversamplingApplier,
-    OversamplingCalculator,
-    UndersamplingApplier,
-    UndersamplingCalculator,
-)
-from .scaling import (
-    MaxAbsScalerApplier,
-    MaxAbsScalerCalculator,
-    MinMaxScalerApplier,
-    MinMaxScalerCalculator,
-    RobustScalerApplier,
-    RobustScalerCalculator,
-    StandardScalerApplier,
-    StandardScalerCalculator,
-)
 
-# Import all transformers
-from .split import (
-    FeatureTargetSplitApplier,
-    FeatureTargetSplitCalculator,
-    SplitApplier,
-    SplitCalculator,
-)
-from .transformations import (
-    GeneralTransformationApplier,
-    GeneralTransformationCalculator,
-    PowerTransformerApplier,
-    PowerTransformerCalculator,
-    SimpleTransformationApplier,
-    SimpleTransformationCalculator,
+# Import modules to ensure nodes are registered
+from . import (
+    bucketing,
+    casting,
+    cleaning,
+    drop_and_missing,
+    encoding,
+    feature_generation,
+    feature_selection,
+    imputation,
+    inspection,
+    outliers,
+    resampling,
+    scaling,
+    split,
+    transformations,
 )
 
 logger = logging.getLogger(__name__)
@@ -541,99 +443,11 @@ class FeatureEngineer:
         return current_data, metrics
 
     def _get_transformer_components(self, type_name: str):  # noqa: C901
-        if type_name == "TrainTestSplitter":
-            return SplitCalculator(), SplitApplier()
-        elif type_name == "feature_target_split":
-            return FeatureTargetSplitCalculator(), FeatureTargetSplitApplier()
-        elif type_name == "TextCleaning":
-            return TextCleaningCalculator(), TextCleaningApplier()
-        elif type_name == "ValueReplacement":
-            return ValueReplacementCalculator(), ValueReplacementApplier()
-        elif type_name == "Deduplicate":
-            return DeduplicateCalculator(), DeduplicateApplier()
-        elif type_name == "DropMissingColumns":
-            return DropMissingColumnsCalculator(), DropMissingColumnsApplier()
-        elif type_name == "DropMissingRows":
-            return DropMissingRowsCalculator(), DropMissingRowsApplier()
-        elif type_name == "MissingIndicator":
-            return MissingIndicatorCalculator(), MissingIndicatorApplier()
-        elif type_name == "AliasReplacement":
-            return AliasReplacementCalculator(), AliasReplacementApplier()
-        elif type_name == "InvalidValueReplacement":
-            return InvalidValueReplacementCalculator(), InvalidValueReplacementApplier()
-        elif type_name == "SimpleImputer":
-            return SimpleImputerCalculator(), SimpleImputerApplier()
-        elif type_name == "KNNImputer":
-            return KNNImputerCalculator(), KNNImputerApplier()
-        elif type_name == "IterativeImputer":
-            return IterativeImputerCalculator(), IterativeImputerApplier()
-        elif type_name == "OneHotEncoder":
-            return OneHotEncoderCalculator(), OneHotEncoderApplier()
-        elif type_name == "DummyEncoder":
-            from .encoding import DummyEncoderApplier, DummyEncoderCalculator
-
-            return DummyEncoderCalculator(), DummyEncoderApplier()
-        elif type_name == "OrdinalEncoder":
-            return OrdinalEncoderCalculator(), OrdinalEncoderApplier()
-        elif type_name == "LabelEncoder":
-            return LabelEncoderCalculator(), LabelEncoderApplier()
-        elif type_name == "TargetEncoder":
-            return TargetEncoderCalculator(), TargetEncoderApplier()
-        elif type_name == "HashEncoder":
-            return HashEncoderCalculator(), HashEncoderApplier()
-        elif type_name == "StandardScaler":
-            return StandardScalerCalculator(), StandardScalerApplier()
-        elif type_name == "MinMaxScaler":
-            return MinMaxScalerCalculator(), MinMaxScalerApplier()
-        elif type_name == "RobustScaler":
-            return RobustScalerCalculator(), RobustScalerApplier()
-        elif type_name == "MaxAbsScaler":
-            return MaxAbsScalerCalculator(), MaxAbsScalerApplier()
-        elif type_name == "IQR":
-            return IQRCalculator(), IQRApplier()
-        elif type_name == "ZScore":
-            return ZScoreCalculator(), ZScoreApplier()
-        elif type_name == "Winsorize":
-            return WinsorizeCalculator(), WinsorizeApplier()
-        elif type_name == "ManualBounds":
-            return ManualBoundsCalculator(), ManualBoundsApplier()
-        elif type_name == "EllipticEnvelope":
-            return EllipticEnvelopeCalculator(), EllipticEnvelopeApplier()
-        elif type_name == "PowerTransformer":
-            return PowerTransformerCalculator(), PowerTransformerApplier()
-        elif type_name == "SimpleTransformation":
-            return SimpleTransformationCalculator(), SimpleTransformationApplier()
-        elif type_name == "GeneralTransformation":
-            return GeneralTransformationCalculator(), GeneralTransformationApplier()
-        elif type_name == "GeneralBinning":
-            return GeneralBinningCalculator(), GeneralBinningApplier()
-        elif type_name == "CustomBinning":
-            return CustomBinningCalculator(), CustomBinningApplier()
-        elif type_name == "KBinsDiscretizer":
-            return KBinsDiscretizerCalculator(), KBinsDiscretizerApplier()
-        elif type_name == "VarianceThreshold":
-            return VarianceThresholdCalculator(), VarianceThresholdApplier()
-        elif type_name == "CorrelationThreshold":
-            return CorrelationThresholdCalculator(), CorrelationThresholdApplier()
-        elif type_name == "UnivariateSelection":
-            return UnivariateSelectionCalculator(), UnivariateSelectionApplier()
-        elif type_name == "ModelBasedSelection":
-            return ModelBasedSelectionCalculator(), ModelBasedSelectionApplier()
-        elif type_name == "feature_selection":
-            return FeatureSelectionCalculator(), FeatureSelectionApplier()
-        elif type_name == "Casting":
-            return CastingCalculator(), CastingApplier()
-        elif type_name == "PolynomialFeatures":
-            return PolynomialFeaturesCalculator(), PolynomialFeaturesApplier()
-        elif type_name == "FeatureMath" or type_name == "FeatureGenerationNode":
-            return FeatureGenerationCalculator(), FeatureGenerationApplier()
-        elif type_name == "Oversampling":
-            return OversamplingCalculator(), OversamplingApplier()
-        elif type_name == "Undersampling":
-            return UndersamplingCalculator(), UndersamplingApplier()
-        elif type_name == "DatasetProfile":
-            return DatasetProfileCalculator(), DatasetProfileApplier()
-        elif type_name == "DataSnapshot":
-            return DataSnapshotCalculator(), DataSnapshotApplier()
-        else:
+        # Try Registry first
+        try:
+            return (
+                NodeRegistry.get_calculator(type_name)(),
+                NodeRegistry.get_applier(type_name)(),
+            )
+        except ValueError:
             raise ValueError(f"Unknown transformer type: {type_name}")

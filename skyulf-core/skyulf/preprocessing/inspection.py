@@ -2,10 +2,20 @@ from typing import Any, Dict, Tuple, Union
 
 import pandas as pd
 
+from ..registry import NodeRegistry
 from ..utils import detect_numeric_columns
 from .base import BaseApplier, BaseCalculator
 
 
+class DatasetProfileApplier(BaseApplier):
+    def apply(
+        self, df: Union[pd.DataFrame, Tuple[Any, ...]], params: Dict[str, Any]
+    ) -> Union[pd.DataFrame, Tuple[Any, ...]]:
+        # Inspection nodes do not modify data
+        return df
+
+
+@NodeRegistry.register("DatasetProfile", DatasetProfileApplier)
 class DatasetProfileCalculator(BaseCalculator):
     def fit(
         self, df: Union[pd.DataFrame, Tuple[Any, ...]], config: Dict[str, Any]
@@ -47,14 +57,14 @@ class DatasetProfileCalculator(BaseCalculator):
         return {"type": "dataset_profile", "profile": profile}
 
 
-class DatasetProfileApplier(BaseApplier):
+class DataSnapshotApplier(BaseApplier):
     def apply(
         self, df: Union[pd.DataFrame, Tuple[Any, ...]], params: Dict[str, Any]
     ) -> Union[pd.DataFrame, Tuple[Any, ...]]:
-        # Inspection nodes do not modify data
         return df
 
 
+@NodeRegistry.register("DataSnapshot", DataSnapshotApplier)
 class DataSnapshotCalculator(BaseCalculator):
     def fit(
         self, df: Union[pd.DataFrame, Tuple[Any, ...]], config: Dict[str, Any]
@@ -70,10 +80,3 @@ class DataSnapshotCalculator(BaseCalculator):
         snapshot = df.head(n).to_dict(orient="records")
 
         return {"type": "data_snapshot", "snapshot": snapshot}
-
-
-class DataSnapshotApplier(BaseApplier):
-    def apply(
-        self, df: Union[pd.DataFrame, Tuple[Any, ...]], params: Dict[str, Any]
-    ) -> Union[pd.DataFrame, Tuple[Any, ...]]:
-        return df
