@@ -68,26 +68,29 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       
       // If connecting FROM an X/Y Split
       if (sourceType === 'feature_target_split') {
-        // Check if there is a Train/Test Split upstream
-        let hasTrainTestSplit = false;
-        const queue = [sourceNode.id];
-        const visited = new Set<string>();
+        // Check if there is a Train/Test Split upstream OR if we are connecting TO one
+        let hasTrainTestSplit = targetNode.data.definitionType === 'TrainTestSplitter';
+        
+        if (!hasTrainTestSplit) {
+          const queue = [sourceNode.id];
+          const visited = new Set<string>();
 
-        while (queue.length > 0) {
-          const currentId = queue.shift()!;
-          if (visited.has(currentId)) continue;
-          visited.add(currentId);
+          while (queue.length > 0) {
+            const currentId = queue.shift()!;
+            if (visited.has(currentId)) continue;
+            visited.add(currentId);
 
-          const currentNode = nodes.find((n) => n.id === currentId);
-          if (currentNode?.data.definitionType === 'train_test_split') {
-            hasTrainTestSplit = true;
-            break;
-          }
+            const currentNode = nodes.find((n) => n.id === currentId);
+            if (currentNode?.data.definitionType === 'TrainTestSplitter') {
+              hasTrainTestSplit = true;
+              break;
+            }
 
-          // Find parents
-          const parentEdges = edges.filter((e) => e.target === currentId);
-          for (const edge of parentEdges) {
-            queue.push(edge.source);
+            // Find parents
+            const parentEdges = edges.filter((e) => e.target === currentId);
+            for (const edge of parentEdges) {
+              queue.push(edge.source);
+            }
           }
         }
 
