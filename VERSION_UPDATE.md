@@ -31,6 +31,7 @@ This release finalizes the migration to a fully decoupled, registry-based archit
 - **S3 Integration:** Updated "Add Data Source" modal to support S3 paths with optional secure credential input.
 - **Responsive UI:** Improved modal responsiveness for smaller screens (laptops) and added collapsible sections for advanced options.
 - **Validation Logic:** Improved the "Data Leakage" warning logic. It now correctly suppresses the warning if an X/Y Split is connected *to* a Train/Test Split node.
+- **Dataset Node Fix:** Corrected a logic where dataset nodes could be duplicated on the canvas when added via URL query parameters.
 
 ------------------------------------------------------------
 
