@@ -17,6 +17,9 @@ class DeploymentInfo(BaseModel):
     deployed_by: Optional[int]
     created_at: datetime
     updated_at: datetime
+    input_schema: Optional[List[Dict[str, Any]]] = None  # List of column definitions
+    output_schema: Optional[Dict[str, Any]] = None
+    target_column: Optional[str] = None
 
 
 class PredictionRequest(BaseModel):

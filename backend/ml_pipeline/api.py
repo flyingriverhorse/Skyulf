@@ -352,38 +352,10 @@ async def run_pipeline(  # noqa: C901
             dataset_id = node.params.get("dataset_id", "unknown")
 
     # --- Path Resolution Logic ---
+    from backend.ml_pipeline.resolution import resolve_pipeline_nodes
+    
     ingestion_service = DataIngestionService(db)
-    for node in config.nodes:
-        if node.step_type == "data_loader" and "dataset_id" in node.params:
-            try:
-                ds_id = int(node.params["dataset_id"])
-                ds = await ingestion_service.get_source(ds_id)
-                if ds:
-                    # Use the UUID source_id for consistency with the database join
-                    if ds.source_id:
-                        dataset_id = cast(
-                            str, ds.source_id
-                        )  # Update dataset_id for job record
-
-                    ds_dict = {
-                        "connection_info": ds.config,
-                        "file_path": ds.config.get("file_path") if ds.config else None,
-                    }
-                    path = extract_file_path_from_source(ds_dict)
-                    if path:
-                        node.params["path"] = str(path)
-                    else:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"Could not resolve path for dataset {ds_id}",
-                        )
-                else:
-                    raise HTTPException(
-                        status_code=404, detail=f"Dataset {ds_id} not found"
-                    )
-            except ValueError:
-                # If it's not an int, assume it's already a UUID or string ID
-                pass
+    resolved_s3_options = await resolve_pipeline_nodes(config.nodes, ingestion_service)
     # -----------------------------
 
     # Create Job in DB
@@ -399,11 +371,17 @@ async def run_pipeline(  # noqa: C901
 
     # Trigger Task
     settings = get_settings()
+    
+    # Pass resolved options to the task so it can init S3Catalog if needed
+    job_payload = config.dict()
+    if resolved_s3_options:
+        job_payload["storage_options"] = resolved_s3_options
+
     if settings.USE_CELERY:
-        run_pipeline_task.delay(job_id, config.dict())
+        run_pipeline_task.delay(job_id, job_payload)
     else:
         # Run in background thread if Celery is disabled
-        background_tasks.add_task(run_pipeline_task, job_id, config.dict())
+        background_tasks.add_task(run_pipeline_task, job_id, job_payload)
 
     return RunPipelineResponse(
         message="Pipeline execution started", pipeline_id=pipeline_id, job_id=job_id
@@ -539,50 +517,15 @@ async def preview_pipeline(  # noqa: C901
     """
 
     # Resolve dataset paths
-    ingestion_service = DataIngestionService(session)
-    for node in config.nodes:
-        # Handle both explicit data_loader and implicit ones (feature_engineering with no inputs)
-        is_data_loader = node.step_type == "data_loader"
-        is_implicit_loader = (
-            node.step_type == "feature_engineering"
-            and not node.inputs
-            and "dataset_id" in node.params
-        )
-
-        if (is_data_loader or is_implicit_loader) and "dataset_id" in node.params:
-            try:
-                ds_id = int(node.params["dataset_id"])
-                ds = await ingestion_service.get_data_source_by_id(ds_id)
-                if ds:
-                    # Convert SQLAlchemy model to dict for utility
-                    # Note: DataSource model stores connection info in 'config' column
-                    ds_dict = {
-                        "connection_info": ds.config,
-                        "file_path": ds.config.get("file_path") if ds.config else None,
-                    }
-                    path = extract_file_path_from_source(ds_dict)
-                    if path:
-                        node.params["path"] = str(path)
-                        # Also update dataset_id to be the path so the engine uses it
-                        node.params["dataset_id"] = str(path)
-                    else:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"Could not resolve path for dataset {ds_id}",
-                        )
-                else:
-                    raise HTTPException(
-                        status_code=404, detail=f"Dataset {ds_id} not found"
-                    )
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid dataset ID: {node.params['dataset_id']}",
-                )
 
     # 1. Create Temporary Artifact Store
     temp_dir = tempfile.mkdtemp(prefix="skyulf_preview_")
     artifact_store = LocalArtifactStore(temp_dir)
+    
+    # Resolve paths and credentials for Preview (Async)
+    from backend.ml_pipeline.resolution import resolve_pipeline_nodes
+    ingestion_service = DataIngestionService(session)
+    resolved_s3_options = await resolve_pipeline_nodes(config.nodes, ingestion_service)
 
     try:
         logger.debug(f"Preview request received with {len(config.nodes)} nodes")
@@ -622,11 +565,27 @@ async def preview_pipeline(  # noqa: C901
         )
 
         # 3. Run Engine
-        from backend.data.catalog import FileSystemCatalog
-
-        catalog = FileSystemCatalog()
-        engine = PipelineEngine(artifact_store, catalog=catalog)
-        result = engine.run(pipeline_config)
+        from backend.data.catalog import create_catalog_from_options
+        
+        # IMPORTANT: Pass session to create_catalog_from_options so SmartCatalog can resolve IDs
+        # But session here is AsyncSession, SmartCatalog expects Sync Session (usually)
+        # However, SmartCatalog uses self.session.query() which is sync-style ORM usage.
+        # If we pass AsyncSession, query() won't work.
+        # We need a sync session for SmartCatalog.
+        
+        from backend.database.engine import sync_session_factory
+        
+        if sync_session_factory is None:
+            raise HTTPException(status_code=500, detail="Database not initialized")
+            
+        sync_session = sync_session_factory()
+        
+        try:
+            catalog = create_catalog_from_options(resolved_s3_options, config.nodes, session=sync_session)
+            engine = PipelineEngine(artifact_store, catalog=catalog)
+            result = engine.run(pipeline_config)
+        finally:
+            sync_session.close()
 
         # 4. Extract Preview Data & Generate Recommendations
         preview_data = {}
@@ -831,9 +790,32 @@ async def get_job_evaluation(  # noqa: C901
     # 2. Determine Artifact Path
     # Matches the path used in run_pipeline (tasks.py)
     settings = get_settings()
-    persistent_path = os.path.join(settings.TRAINING_ARTIFACT_DIR, job_id)
-
-    artifact_store = LocalArtifactStore(persistent_path)
+    
+    from typing import Union
+    from backend.ml_pipeline.artifacts.store import ArtifactStore
+    from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+    from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
+    
+    artifact_store: ArtifactStore
+    
+    if job.artifact_uri and str(job.artifact_uri).startswith("s3://"):
+        # Parse bucket and prefix: s3://bucket/prefix
+        parts = str(job.artifact_uri).replace("s3://", "").split("/", 1)
+        bucket = parts[0]
+        prefix = parts[1] if len(parts) > 1 else ""
+        
+        storage_options = {
+            "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+            "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+            "region_name": settings.AWS_DEFAULT_REGION,
+        }
+        # Filter None values
+        storage_options = {k: v for k, v in storage_options.items() if v is not None}
+        
+        artifact_store = S3ArtifactStore(bucket_name=bucket, prefix=prefix, storage_options=storage_options)
+    else:
+        persistent_path = os.path.join(settings.TRAINING_ARTIFACT_DIR, job_id)
+        artifact_store = LocalArtifactStore(persistent_path)
 
     # 3. Load Evaluation Artifact
     # Key format: {node_id}_evaluation_data

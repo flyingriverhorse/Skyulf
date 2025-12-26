@@ -11,6 +11,7 @@ from backend.config import get_settings
 from backend.data.catalog import FileSystemCatalog, SmartCatalog
 from backend.database.models import DataSource, HyperparameterTuningJob, TrainingJob
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 from backend.ml_pipeline.execution.engine import PipelineEngine
 from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
 from backend.utils.file_utils import extract_file_path_from_source
@@ -65,11 +66,74 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
         session.commit()
 
         # 2. Setup Artifact Store
-        # We use a persistent path for training jobs
         settings = get_settings()
-        base_artifact_path = os.path.join(settings.TRAINING_ARTIFACT_DIR, job_id)
-        os.makedirs(base_artifact_path, exist_ok=True)
-        artifact_store = LocalArtifactStore(base_artifact_path)
+        
+        from typing import Union
+        from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+        from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
+        
+        artifact_store: Union[S3ArtifactStore, LocalArtifactStore]
+
+        # Check if S3 Artifact Store is configured
+        s3_bucket = settings.S3_ARTIFACT_BUCKET
+        
+        # Determine Data Source Type to decide on Artifact Store
+        is_s3_source = False
+        nodes = pipeline_config_dict.get("nodes", [])
+        for node in nodes:
+            # Check dictionary access since it might be a dict or object depending on serialization
+            # Here it is passed as a dict
+            if isinstance(node, dict):
+                step_type = node.get("step_type")
+                params = node.get("params", {})
+            else:
+                # Fallback if it's an object
+                step_type = getattr(node, "step_type", "")
+                params = getattr(node, "params", {})
+
+            if step_type == "data_loader":
+                dataset_id = params.get("dataset_id") or params.get("path")
+                # print(f"DEBUG: Found data_loader. dataset_id={dataset_id}")
+                if dataset_id and str(dataset_id).startswith("s3://"):
+                    is_s3_source = True
+                break
+        
+        # print(f"DEBUG: is_s3_source={is_s3_source}, s3_bucket={s3_bucket}, UPLOAD_TO_S3={settings.UPLOAD_TO_S3_FOR_LOCAL_FILES}")
+        
+        use_s3_artifacts = False
+        if s3_bucket:
+            if is_s3_source:
+                # Default is S3, but user can force local storage via config
+                if not settings.SAVE_S3_ARTIFACTS_LOCALLY:
+                    use_s3_artifacts = True
+            elif settings.UPLOAD_TO_S3_FOR_LOCAL_FILES:
+                # Local source, but user wants to upload to S3
+                use_s3_artifacts = True
+
+        if use_s3_artifacts:
+            # Use S3 for artifacts
+            # We use job_id as prefix to keep things organized
+            
+            # Prepare storage options from settings
+            s3_options = {}
+            if settings.AWS_ACCESS_KEY_ID:
+                s3_options["key"] = settings.AWS_ACCESS_KEY_ID
+            if settings.AWS_SECRET_ACCESS_KEY:
+                s3_options["secret"] = settings.AWS_SECRET_ACCESS_KEY
+            if settings.AWS_ENDPOINT_URL:
+                s3_options["endpoint_url"] = settings.AWS_ENDPOINT_URL
+            if settings.AWS_DEFAULT_REGION:
+                s3_options["region"] = settings.AWS_DEFAULT_REGION
+                
+            artifact_store = S3ArtifactStore(bucket_name=s3_bucket, prefix=job_id, storage_options=s3_options)
+            # For S3, the URI is the s3 path
+            base_artifact_uri = f"s3://{s3_bucket}/{job_id}"
+        else:
+            # Fallback to Local
+            base_artifact_path = os.path.join(settings.TRAINING_ARTIFACT_DIR, job_id)
+            os.makedirs(base_artifact_path, exist_ok=True)
+            artifact_store = LocalArtifactStore(base_artifact_path)
+            base_artifact_uri = base_artifact_path
 
         # 3. Reconstruct Pipeline Config
         # Convert dict back to dataclasses
@@ -92,8 +156,13 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
         )
 
         # 4. Initialize Engine with Progress Callback
-        # SmartCatalog handles DB ID resolution and S3/Local dispatch
-        catalog = SmartCatalog(session=session)
+        # If storage_options are passed in config (from API resolution), use them to init S3Catalog
+        # Otherwise use SmartCatalog for dynamic resolution (Sync only)
+        
+        storage_options = pipeline_config_dict.get("storage_options")
+        from backend.data.catalog import create_catalog_from_options
+        
+        catalog = create_catalog_from_options(storage_options, nodes, session=session)
         
         job_logs = []
         last_log_update = datetime.now()
@@ -135,7 +204,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
             job.status = "completed"
             job.progress = 100
             job.finished_at = datetime.now()
-            job.artifact_uri = base_artifact_path
+            job.artifact_uri = base_artifact_uri
 
             # Extract metrics from the last node if available
             if result.node_results:

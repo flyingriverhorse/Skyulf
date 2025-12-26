@@ -136,7 +136,7 @@ class Settings(BaseSettings):
 
     # === CORE APPLICATION METADATA ===
     APP_NAME: str = "Skyulf"
-    APP_VERSION: str = "0.1.0"
+    APP_VERSION: str = "0.1.5"
     APP_SUMMARY: str = (
         "Skyulf MLops service surface for data, experimentation, and automation."
     )
@@ -151,6 +151,21 @@ class Settings(BaseSettings):
     HOST: str = "127.0.0.1"
     PORT: int = 8000
     WORKERS: int = 1
+
+    # === AWS CONFIGURATION ===
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_DEFAULT_REGION: Optional[str] = "us-east-1"
+    AWS_ENDPOINT_URL: Optional[str] = None
+    AWS_BUCKET_NAME: Optional[str] = None
+    S3_ARTIFACT_BUCKET: Optional[str] = None
+    # If True, local file uploads/training will also be saved to S3 if S3_ARTIFACT_BUCKET is set.
+    # If False, local files stay local, and S3 files go to S3.
+    UPLOAD_TO_S3_FOR_LOCAL_FILES: bool = True
+
+    # If True, training jobs using S3 data will save artifacts locally instead of to S3.
+    # This gives users the freedom to keep artifacts local even if data is in the cloud.
+    SAVE_S3_ARTIFACTS_LOCALLY: bool = True
 
     # === SECURITY ===
     SECRET_KEY: str = secrets.token_urlsafe(32)

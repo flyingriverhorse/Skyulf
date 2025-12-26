@@ -22,52 +22,65 @@ export const InferencePage: React.FC = () => {
       const deployment = await deploymentApi.getActive();
       setActiveDeployment(deployment);
 
-      // Auto-fill input data from dataset sample if available
-      if (deployment && deployment.job_id) {
-        try {
-          const job = await jobsApi.getJob(deployment.job_id);
-          if (job.dataset_id) {
-            // 1. Use Target and Dropped Columns from Job Info
-            const targetColumn = job.target_column;
-            const droppedColumns = job.dropped_columns || [];
+      if (deployment) {
+        let initialData: Record<string, unknown> = {};
+        let usedSchema = false;
 
-            // 2. Fetch Sample Data
-            const sample = await DatasetService.getSample(job.dataset_id, 1);
-            
-            if (sample.length > 0) {
-              // 3. Filter the sample data
-                const filteredSample = sample.map((row) => {
-                  const rowObj: Record<string, unknown> =
-                  (row && typeof row === 'object') ? (row as Record<string, unknown>) : {};
-                  const newRow: Record<string, unknown> = { ...rowObj };
-                  
-                  // Remove target column
-                  if (typeof targetColumn === 'string' && targetColumn in newRow) {
-                    Reflect.deleteProperty(newRow, targetColumn);
-                  }
-                  
-                  // Remove dropped columns
-                  droppedColumns.forEach((col) => {
-                    if (typeof col === 'string' && col in newRow) Reflect.deleteProperty(newRow, col);
-                  });
-                  
-                  return newRow;
-              });
+        // 1. Try to use Schema from Artifacts
+        if (deployment.input_schema && deployment.input_schema.length > 0) {
+           deployment.input_schema.forEach(col => {
+             initialData[col.name] = 0; // Default value
+           });
+           usedSchema = true;
+           setAutoFilterInfo(`Schema loaded from artifacts (${deployment.input_schema.length} features)`);
+        }
 
-              setInputData(JSON.stringify(filteredSample, null, 2));
-              
-              // Set info message
-              const droppedInfo = [];
-              if (targetColumn) droppedInfo.push(`Target: ${targetColumn}`);
-              if (droppedColumns.length > 0) droppedInfo.push(`Dropped: ${droppedColumns.length} cols`);
-              
-              if (droppedInfo.length > 0) {
-                  setAutoFilterInfo(`Auto-filtered: ${droppedInfo.join(', ')}`);
-              }
+        // 2. Try to fetch sample data to populate values (or fallback if no schema)
+        if (deployment.job_id) {
+          try {
+            const job = await jobsApi.getJob(deployment.job_id);
+            if (job.dataset_id) {
+               const sample = await DatasetService.getSample(job.dataset_id, 1);
+               if (sample.length > 0) {
+                 const sampleRow = sample[0] as Record<string, unknown>;
+                 
+                 if (usedSchema) {
+                   // Update schema-based object with real values where keys match
+                   Object.keys(initialData).forEach(key => {
+                     if (key in sampleRow) {
+                       initialData[key] = sampleRow[key];
+                     }
+                   });
+                 } else {
+                   // Fallback: Use filtered sample logic
+                   const targetColumn = job.target_column;
+                   const droppedColumns = job.dropped_columns || [];
+                   
+                   const newRow = { ...sampleRow };
+                   if (typeof targetColumn === 'string' && targetColumn in newRow) {
+                      Reflect.deleteProperty(newRow, targetColumn);
+                   }
+                   droppedColumns.forEach((col) => {
+                      if (typeof col === 'string' && col in newRow) Reflect.deleteProperty(newRow, col);
+                   });
+                   initialData = newRow;
+                   
+                   const droppedInfo = [];
+                   if (targetColumn) droppedInfo.push(`Target: ${targetColumn}`);
+                   if (droppedColumns.length > 0) droppedInfo.push(`Dropped: ${droppedColumns.length} cols`);
+                   if (droppedInfo.length > 0) {
+                      setAutoFilterInfo(`Auto-filtered from dataset: ${droppedInfo.join(', ')}`);
+                   }
+                 }
+               }
             }
+          } catch (err) {
+            console.warn("Failed to fetch dataset sample", err);
           }
-        } catch (err) {
-          console.warn("Failed to fetch dataset sample for inference auto-fill", err);
+        }
+        
+        if (Object.keys(initialData).length > 0) {
+            setInputData(JSON.stringify([initialData], null, 2));
         }
       }
     } catch (e) {

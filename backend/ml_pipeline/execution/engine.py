@@ -265,6 +265,8 @@ class PipelineEngine:
         job_id: str = "unknown",
         feature_engineer_artifact_key: str | None = None,
         feature_engineer_override: Any | None = None,
+        target_column: str | None = None,
+        dropped_columns: List[str] | None = None,
     ):
         """Bundles fitted transformers with the model artifact for inference."""
         try:
@@ -304,6 +306,8 @@ class PipelineEngine:
                     "model": model_artifact,
                     "feature_engineer": feature_engineer,
                     "job_id": job_id,
+                    "target_column": target_column,
+                    "dropped_columns": dropped_columns or [],
                 }
             else:
                 # Fallback to old logic if no FeatureEngineer found (e.g. manual steps)
@@ -340,6 +344,8 @@ class PipelineEngine:
                     "transformers": transformers,
                     "transformer_plan": transformer_plan,
                     "job_id": job_id,
+                    "target_column": target_column,
+                    "dropped_columns": dropped_columns or [],
                 }
 
             # Save to job_id key if available - this is the final artifact for the job
@@ -370,10 +376,16 @@ class PipelineEngine:
             limit = node.params.get("limit", 1000)
             self.log(f"Loading sample data from {dataset_id} (limit={limit})")
         else:
-            self.log(f"Loading full data from {dataset_id}")
+            dataset_name = self.catalog.get_dataset_name(dataset_id)
+            log_msg = f"Loading full data from {dataset_name}" if dataset_name else f"Loading full data from {dataset_id}"
+            self.log(log_msg)
 
         # Use the injected catalog
-        df = self.catalog.load(dataset_id, limit=limit)
+        try:
+            df = self.catalog.load(dataset_id, limit=limit)
+        except FileNotFoundError:
+            # Try to resolve name for better error message
+            raise FileNotFoundError(f"Dataset {dataset_id} not found. Please check if the file exists.")
 
         self.log(
             f"Data loaded successfully. Shape: {df.shape} ({len(df)} rows, {len(df.columns)} columns)"
@@ -537,6 +549,7 @@ class PipelineEngine:
             job_id=job_id,
             feature_engineer_artifact_key=feature_engineer_key,
             feature_engineer_override=composite_feature_engineer,
+            target_column=target_col,
         )
 
         # Optional: Evaluate immediately
@@ -678,6 +691,7 @@ class PipelineEngine:
             job_id=job_id,
             feature_engineer_artifact_key=feature_engineer_key,
             feature_engineer_override=composite_feature_engineer,
+            target_column=target_col,
         )
 
         # Extract metrics from tuning result

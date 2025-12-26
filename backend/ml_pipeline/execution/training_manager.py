@@ -12,6 +12,8 @@ from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
 
 
+from backend.ml_pipeline.execution.utils import resolve_dataset_name, get_dataset_map
+
 class TrainingManager:
     @staticmethod
     async def create_training_job(
@@ -102,6 +104,7 @@ class TrainingManager:
             target_column=target_column,
             dropped_columns=dropped_columns,
             logs=t_cast(Optional[List[str]], job.logs),
+            graph=type_cast(Dict[str, Any], job.graph),
         )
 
     @staticmethod
@@ -169,20 +172,18 @@ class TrainingManager:
         session: AsyncSession, job_id: str
     ) -> Optional[JobInfo]:
         """Retrieves a training job by ID."""
-        stmt = (
-            select(TrainingJob, DataSource.name)
-            .outerjoin(
-                DataSource, TrainingJob.dataset_source_id == DataSource.source_id
-            )
-            .where(TrainingJob.id == job_id)
-        )
+        # 1. Fetch Job
+        stmt = select(TrainingJob).where(TrainingJob.id == job_id)
         result = await session.execute(stmt)
-        row = result.first()
+        job = result.scalar_one_or_none()
 
-        if row:
-            job, dataset_name = row
-            return TrainingManager.map_training_job_to_info(job, dataset_name)
-        return None
+        if not job:
+            return None
+
+        # 2. Resolve Dataset Name
+        dataset_name = await resolve_dataset_name(session, job.dataset_source_id)
+
+        return TrainingManager.map_training_job_to_info(job, dataset_name)
 
     @staticmethod
     async def list_training_jobs(
@@ -191,23 +192,29 @@ class TrainingManager:
         skip: int = 0,
     ) -> List[JobInfo]:
         """Lists recent training jobs (Async)."""
+        # 1. Fetch all DataSources for robust name resolution
+        ds_map = await get_dataset_map(session)
+
+        # 2. Fetch Jobs
         result_train = await session.execute(
-            select(TrainingJob, DataSource.name)
-            .outerjoin(
-                DataSource,
-                or_(
-                    TrainingJob.dataset_source_id == DataSource.source_id,
-                    TrainingJob.dataset_source_id == cast(DataSource.id, String),
-                ),
-            )
+            select(TrainingJob)
             .where(TrainingJob.model_type != "preview")
             .order_by(TrainingJob.started_at.desc())
             .limit(limit)
             .offset(skip)
         )
-        train_rows = result_train.all()
+        train_rows = result_train.scalars().all()
 
-        return [
-            TrainingManager.map_training_job_to_info(j, d_name)
-            for j, d_name in train_rows
-        ]
+        # 3. Map to Info
+        jobs = []
+        for job in train_rows:
+            ds_id = str(job.dataset_source_id) if job.dataset_source_id else None
+            ds_name = ds_map.get(ds_id) if ds_id else None
+            
+            # Fallback: if name is missing but we have an ID, show "Dataset {id}"
+            if not ds_name and ds_id:
+                 ds_name = f"Dataset {ds_id}"
+
+            jobs.append(TrainingManager.map_training_job_to_info(job, ds_name))
+            
+        return jobs

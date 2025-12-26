@@ -40,6 +40,7 @@ class JobInfo(BaseModel):
     target_column: Optional[str] = None
     dropped_columns: Optional[List[str]] = None
     version: Optional[int] = None
+    graph: Optional[Dict[str, Any]] = None
 
 
 @dataclass

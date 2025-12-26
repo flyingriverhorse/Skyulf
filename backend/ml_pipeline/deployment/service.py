@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, List, Optional, Sequence, cast
+from typing import Any, Dict, List, Optional, Sequence, Union, cast
 
 import pandas as pd
 import sklearn
@@ -9,7 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models import Deployment, HyperparameterTuningJob, TrainingJob
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 from backend.ml_pipeline.execution.jobs import JobManager
+from backend.config import get_settings
 
 # Ensure sklearn outputs pandas DataFrames where possible to preserve feature names
 sklearn.set_config(transform_output="pandas")
@@ -127,8 +129,13 @@ class DeploymentService:
         # If artifact_uri is a directory (doesn't end with .joblib or similar), we need to point to the specific file.
         # The PipelineEngine saves the FULL bundled artifact (model + transformers) using the job_id as the key.
         if artifact_uri:
+            if artifact_uri.startswith("s3://"):
+                # Handle S3 URI
+                if not artifact_uri.endswith(".joblib") and not artifact_uri.endswith(".pkl"):
+                    # Assume it's a prefix, append job_id.joblib
+                    final_uri = f"{artifact_uri.rstrip('/')}/{job_id}.joblib"
             # Check if it's a directory on disk
-            if os.path.isdir(artifact_uri):
+            elif os.path.isdir(artifact_uri):
                 # The artifact is likely named {job_id}.joblib inside it.
                 # We construct the full path to the file so predict() can parse it correctly.
                 final_uri = os.path.join(artifact_uri, f"{job_id}.joblib")
@@ -196,46 +203,66 @@ class DeploymentService:
 
         # 2. Load Artifact
         try:
-            # Handle full path (absolute or relative with separators)
-            if os.path.isabs(deployment.artifact_uri):
-                base_path = os.path.dirname(deployment.artifact_uri)
-                node_id = os.path.basename(deployment.artifact_uri)
-            elif "/" in deployment.artifact_uri or "\\" in deployment.artifact_uri:
-                # Check if it's a "pipeline_id/node_id" pattern that maps to exports/models
-                # If the path doesn't exist locally, assume it's the internal format
-                if not os.path.exists(deployment.artifact_uri) and not os.path.exists(
-                    os.path.dirname(deployment.artifact_uri)
-                ):
-                    parts = deployment.artifact_uri.replace("\\", "/").split("/")
-                    if len(parts) == 2:
+            store: Union[S3ArtifactStore, LocalArtifactStore]
+            if deployment.artifact_uri.startswith("s3://"):
+                # Parse bucket and key: s3://bucket/key
+                parts = deployment.artifact_uri.replace("s3://", "").split("/")
+                bucket_name = parts[0]
+                key = "/".join(parts[1:])
+                
+                settings = get_settings()
+                storage_options = {
+                    "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+                    "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+                    "endpoint_url": settings.AWS_ENDPOINT_URL,
+                    "region_name": settings.AWS_DEFAULT_REGION,
+                }
+                # Filter None values
+                storage_options = {k: v for k, v in storage_options.items() if v is not None}
+                
+                store = S3ArtifactStore(bucket_name=bucket_name, storage_options=storage_options)
+                artifact = store.load(key)
+
+            else:
+                if os.path.isabs(deployment.artifact_uri):
+                    base_path = os.path.dirname(deployment.artifact_uri)
+                    node_id = os.path.basename(deployment.artifact_uri)
+                elif "/" in deployment.artifact_uri or "\\" in deployment.artifact_uri:
+                    # Check if it's a "pipeline_id/node_id" pattern that maps to exports/models
+                    # If the path doesn't exist locally, assume it's the internal format
+                    if not os.path.exists(deployment.artifact_uri) and not os.path.exists(
+                        os.path.dirname(deployment.artifact_uri)
+                    ):
+                        parts = deployment.artifact_uri.replace("\\", "/").split("/")
+                        if len(parts) == 2:
+                            pipeline_id = parts[0]
+                            node_id = parts[1]
+                            base_path = os.path.join(
+                                os.getcwd(), "exports", "models", pipeline_id
+                            )
+                        else:
+                            base_path = os.path.dirname(deployment.artifact_uri)
+                            node_id = os.path.basename(deployment.artifact_uri)
+                    else:
+                        base_path = os.path.dirname(deployment.artifact_uri)
+                        node_id = os.path.basename(deployment.artifact_uri)
+                else:
+                    # Legacy format: "pipeline_id/node_id" (handled by split above if separators exist)
+                    # OR just "node_id" (fallback)
+                    parts = deployment.artifact_uri.split("/")
+                    if len(parts) >= 2:
                         pipeline_id = parts[0]
                         node_id = parts[1]
                         base_path = os.path.join(
                             os.getcwd(), "exports", "models", pipeline_id
                         )
                     else:
-                        base_path = os.path.dirname(deployment.artifact_uri)
-                        node_id = os.path.basename(deployment.artifact_uri)
-                else:
-                    base_path = os.path.dirname(deployment.artifact_uri)
-                    node_id = os.path.basename(deployment.artifact_uri)
-            else:
-                # Legacy format: "pipeline_id/node_id" (handled by split above if separators exist)
-                # OR just "node_id" (fallback)
-                parts = deployment.artifact_uri.split("/")
-                if len(parts) >= 2:
-                    pipeline_id = parts[0]
-                    node_id = parts[1]
-                    base_path = os.path.join(
-                        os.getcwd(), "exports", "models", pipeline_id
-                    )
-                else:
-                    raise ValueError(
-                        f"Invalid artifact URI format: {deployment.artifact_uri}"
-                    )
+                        raise ValueError(
+                            f"Invalid artifact URI format: {deployment.artifact_uri}"
+                        )
 
-            store = LocalArtifactStore(base_path)
-            artifact = store.load(node_id)
+                store = LocalArtifactStore(base_path)
+                artifact = store.load(node_id)
 
         except Exception as e:
             logger.error(f"Failed to load artifact: {e}")
@@ -260,6 +287,24 @@ class DeploymentService:
         ):
             feature_engineer = artifact["feature_engineer"]
             estimator = artifact["model"]
+
+            # Clean Data
+            target_col = artifact.get("target_column")
+            dropped_cols = artifact.get("dropped_columns", [])
+            
+            if target_col and target_col in df.columns:
+                logger.info(f"Dropping target column '{target_col}' from inference data")
+                df = df.drop(columns=[target_col])
+                
+            if dropped_cols:
+                # Ensure dropped_cols is a list of strings
+                if isinstance(dropped_cols, str):
+                    dropped_cols = [dropped_cols]
+                
+                existing_dropped = [c for c in dropped_cols if c in df.columns]
+                if existing_dropped:
+                    logger.info(f"Dropping explicitly dropped columns {existing_dropped} from inference data")
+                    df = df.drop(columns=existing_dropped)
 
             # Handle tuple estimator inside dict (e.g. from TunerCalculator)
             if isinstance(estimator, tuple) and len(estimator) >= 1:
@@ -310,3 +355,140 @@ class DeploymentService:
             raise ValueError(
                 "Loaded artifact is not a valid predictor or recognized pipeline format"
             )
+
+    @staticmethod
+    async def get_deployment_details(session: AsyncSession, deployment: Deployment) -> Dict[str, Any]:
+        """
+        Returns deployment info enriched with input/output schema from the artifact.
+        """
+        info = deployment.to_dict()
+        info["input_schema"] = None
+        info["output_schema"] = None
+
+        try:
+            # Load Artifact (Reuse logic from predict - simplified)
+            artifact_uri = str(deployment.artifact_uri)
+            store: Union[S3ArtifactStore, LocalArtifactStore]
+
+            if artifact_uri.startswith("s3://"):
+                # Parse bucket and key: s3://bucket/key
+                parts = artifact_uri.replace("s3://", "").split("/")
+                bucket_name = parts[0]
+                key = "/".join(parts[1:])
+                
+                settings = get_settings()
+                storage_options = {
+                    "key": settings.AWS_ACCESS_KEY_ID,
+                    "secret": settings.AWS_SECRET_ACCESS_KEY,
+                    "endpoint_url": settings.AWS_ENDPOINT_URL,
+                    "region_name": settings.AWS_DEFAULT_REGION,
+                }
+                # Filter None values
+                storage_options = {k: v for k, v in storage_options.items() if v is not None}
+                
+                store = S3ArtifactStore(bucket_name=bucket_name, storage_options=storage_options)
+                artifact = store.load(key)
+
+            elif os.path.isabs(artifact_uri):
+                base_path = os.path.dirname(artifact_uri)
+                node_id = os.path.basename(artifact_uri)
+                store = LocalArtifactStore(base_path)
+                if store.exists(node_id):
+                    artifact = store.load(node_id)
+                else:
+                    artifact = None
+            elif "/" in artifact_uri or "\\" in artifact_uri:
+                if not os.path.exists(artifact_uri) and not os.path.exists(
+                    os.path.dirname(artifact_uri)
+                ):
+                    parts = artifact_uri.replace("\\", "/").split("/")
+                    if len(parts) == 2:
+                        pipeline_id = parts[0]
+                        node_id = parts[1]
+                        base_path = os.path.join(
+                            os.getcwd(), "exports", "models", pipeline_id
+                        )
+                    else:
+                        base_path = os.path.dirname(artifact_uri)
+                        node_id = os.path.basename(artifact_uri)
+                else:
+                    base_path = os.path.dirname(artifact_uri)
+                    node_id = os.path.basename(artifact_uri)
+                
+                store = LocalArtifactStore(base_path)
+                if store.exists(node_id):
+                    artifact = store.load(node_id)
+                else:
+                    artifact = None
+            else:
+                # Fallback
+                base_path = os.getcwd()
+                node_id = artifact_uri
+                store = LocalArtifactStore(base_path)
+                if store.exists(node_id):
+                    artifact = store.load(node_id)
+                else:
+                    artifact = None
+
+            if artifact:
+                # Handle tuple
+                if isinstance(artifact, tuple) and len(artifact) >= 1:
+                    artifact = artifact[0]
+
+                # Extract Schema
+                input_features = []
+                
+                # Check dict format
+                if isinstance(artifact, dict) and "feature_engineer" in artifact:
+                    fe = artifact["feature_engineer"]
+                    # Try to get features from FeatureEngineer
+                    if hasattr(fe, "feature_names_in_"):
+                        input_features = fe.feature_names_in_
+                    elif hasattr(fe, "steps") and fe.steps:
+                        # Try first step
+                        first_step = fe.steps[0]
+                        # If it's a tuple (name, transformer)
+                        if isinstance(first_step, tuple) and len(first_step) > 1:
+                            transformer = first_step[1]
+                            if hasattr(transformer, "feature_names_in_"):
+                                input_features = transformer.feature_names_in_
+                    
+                    # If still empty, try model
+                    if not input_features and "model" in artifact:
+                        model = artifact["model"]
+                        if isinstance(model, tuple): model = model[0]
+                        if hasattr(model, "feature_names_in_"):
+                            input_features = model.feature_names_in_
+
+                # Check direct model
+                elif hasattr(artifact, "feature_names_in_"):
+                    input_features = artifact.feature_names_in_
+                
+                if hasattr(input_features, "tolist"):
+                    input_features = input_features.tolist()
+                
+                if input_features:
+                    info["input_schema"] = [{"name": str(f), "type": "unknown"} for f in input_features]
+
+            # Extract Target Column from Job Graph
+            from backend.ml_pipeline.execution.jobs import JobManager
+            job = await JobManager.get_job(session, str(deployment.job_id))
+            if job and job.graph:
+                nodes = job.graph.get("nodes", [])
+                for node in nodes:
+                    # Handle both dict and object (though graph is usually dict from DB)
+                    if isinstance(node, dict):
+                        params = node.get("params", {})
+                        if "target_column" in params:
+                            info["target_column"] = params["target_column"]
+                            break
+                    elif hasattr(node, "params"):
+                        params = getattr(node, "params", {})
+                        if "target_column" in params:
+                            info["target_column"] = params["target_column"]
+                            break
+
+        except Exception as e:
+            logger.warning(f"Failed to extract schema for deployment {deployment.id}: {e}")
+
+        return cast(Dict[str, Any], info)

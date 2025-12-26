@@ -34,3 +34,7 @@ class DataCatalog(ABC):
     def exists(self, dataset_id: str) -> bool:
         """Check if a dataset exists."""
         pass
+
+    def get_dataset_name(self, dataset_id: str) -> Optional[str]:
+        """Returns the human-readable name of the dataset, if available."""
+        return None

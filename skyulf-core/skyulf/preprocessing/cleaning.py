@@ -447,5 +447,3 @@ class InvalidValueReplacementCalculator(BaseCalculator):
             "min_value": min_value,
             "max_value": max_value,
         }
-
-        return pack_pipeline_output(df_out, y, is_tuple)
