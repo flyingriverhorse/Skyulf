@@ -7,9 +7,9 @@ async def test_artifact_routing_logic():
     # We will mock everything around the logic we want to test
     
     with patch("backend.ml_pipeline.tasks.get_db_session") as mock_get_session, \
-         patch("backend.ml_pipeline.tasks.get_settings") as mock_get_settings, \
-         patch("backend.ml_pipeline.artifacts.s3.S3ArtifactStore") as MockS3Store, \
-         patch("backend.ml_pipeline.artifacts.local.LocalArtifactStore") as MockLocalStore, \
+         patch("backend.ml_pipeline.artifacts.factory.get_settings") as mock_get_settings, \
+         patch("backend.ml_pipeline.artifacts.factory.S3ArtifactStore") as MockS3Store, \
+         patch("backend.ml_pipeline.artifacts.factory.LocalArtifactStore") as MockLocalStore, \
          patch("backend.ml_pipeline.tasks.PipelineEngine") as MockEngine, \
          patch("os.makedirs"):
          

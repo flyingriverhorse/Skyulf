@@ -66,16 +66,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
         session.commit()
 
         # 2. Setup Artifact Store
-        settings = get_settings()
-        
-        from typing import Union
-        from backend.ml_pipeline.artifacts.local import LocalArtifactStore
-        from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
-        
-        artifact_store: Union[S3ArtifactStore, LocalArtifactStore]
-
-        # Check if S3 Artifact Store is configured
-        s3_bucket = settings.S3_ARTIFACT_BUCKET
+        from backend.ml_pipeline.artifacts.factory import ArtifactFactory
         
         # Determine Data Source Type to decide on Artifact Store
         is_s3_source = False
@@ -93,47 +84,17 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
 
             if step_type == "data_loader":
                 dataset_id = params.get("dataset_id") or params.get("path")
-                # print(f"DEBUG: Found data_loader. dataset_id={dataset_id}")
                 if dataset_id and str(dataset_id).startswith("s3://"):
                     is_s3_source = True
                 break
         
-        # print(f"DEBUG: is_s3_source={is_s3_source}, s3_bucket={s3_bucket}, UPLOAD_TO_S3={settings.UPLOAD_TO_S3_FOR_LOCAL_FILES}")
+        artifact_store, base_artifact_uri = ArtifactFactory.create_store_for_job(job_id, is_s3_source)
         
-        use_s3_artifacts = False
-        if s3_bucket:
-            if is_s3_source:
-                # Default is S3, but user can force local storage via config
-                if not settings.SAVE_S3_ARTIFACTS_LOCALLY:
-                    use_s3_artifacts = True
-            elif settings.UPLOAD_TO_S3_FOR_LOCAL_FILES:
-                # Local source, but user wants to upload to S3
-                use_s3_artifacts = True
+        # Save the URI to the job immediately so we know where to look later
+        job.artifact_uri = base_artifact_uri
+        session.commit()
 
-        if use_s3_artifacts:
-            # Use S3 for artifacts
-            # We use job_id as prefix to keep things organized
-            
-            # Prepare storage options from settings
-            s3_options = {}
-            if settings.AWS_ACCESS_KEY_ID:
-                s3_options["key"] = settings.AWS_ACCESS_KEY_ID
-            if settings.AWS_SECRET_ACCESS_KEY:
-                s3_options["secret"] = settings.AWS_SECRET_ACCESS_KEY
-            if settings.AWS_ENDPOINT_URL:
-                s3_options["endpoint_url"] = settings.AWS_ENDPOINT_URL
-            if settings.AWS_DEFAULT_REGION:
-                s3_options["region"] = settings.AWS_DEFAULT_REGION
-                
-            artifact_store = S3ArtifactStore(bucket_name=s3_bucket, prefix=job_id, storage_options=s3_options)
-            # For S3, the URI is the s3 path
-            base_artifact_uri = f"s3://{s3_bucket}/{job_id}"
-        else:
-            # Fallback to Local
-            base_artifact_path = os.path.join(settings.TRAINING_ARTIFACT_DIR, job_id)
-            os.makedirs(base_artifact_path, exist_ok=True)
-            artifact_store = LocalArtifactStore(base_artifact_path)
-            base_artifact_uri = base_artifact_path
+
 
         # 3. Reconstruct Pipeline Config
         # Convert dict back to dataclasses
