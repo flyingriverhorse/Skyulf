@@ -1,5 +1,6 @@
 # Version Updates
 
+*   **v0.1.5 :** "The Registry & Catalog Architecture Update" — Decoupled data loading with Smart Catalog, full S3 integration, and dynamic node registry architecture.
 *   **v0.1.4 :** "The Polynomial, Security & API Update" — Major release combining frontend refactoring, security hardening, backend logic fixes, and critical API routing improvements.
 *   **v0.1.3 :** "The Code Quality & Stability Update" — Extensive static analysis fixes, safer type handling, and backend runtime stability improvements.
 *   **v0.1.2 :** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
@@ -14,7 +15,8 @@
 This release finalizes the migration to a fully decoupled, registry-based architecture and introduces the Data Catalog pattern.
 
 ### 🔧 Backend Architecture
-- **Data Catalog Pattern:** Decoupled data loading from the execution engine. `skyulf-core` now defines a `DataCatalog` interface, and `backend` provides a `FileSystemCatalog` implementation. This allows for easier testing and future support for S3/SQL sources.
+- **Data Catalog Pattern:** Decoupled data loading from the execution engine. `skyulf-core` now defines a `DataCatalog` interface, and `backend` provides a `FileSystemCatalog` implementation.
+- **Smart Catalog & S3 Support:** Implemented `SmartCatalog` to handle ID resolution and dispatching. Added `S3Catalog` and `S3Connector` for full S3 bucket integration (ingestion and pipeline execution) with secure per-dataset credential handling.
 - **Node Registry Completion:** All preprocessing nodes now self-register using the `@NodeRegistry` decorator.
 - **Pipeline Decoupling:** Removed the monolithic factory logic from `pipeline.py`. The pipeline now dynamically instantiates nodes via the registry.
 - **Alias Support:** Added support for legacy node names (e.g., `FeatureMath` -> `FeatureGeneration`) to ensure backward compatibility with existing pipeline configurations.
@@ -26,6 +28,8 @@ This release finalizes the migration to a fully decoupled, registry-based archit
 - **Logic Fix:** Corrected a logic inversion in `SkyulfPipeline._init_model_estimator` that caused valid models to be rejected.
 
 ### 🎨 Frontend
+- **S3 Integration:** Updated "Add Data Source" modal to support S3 paths with optional secure credential input.
+- **Responsive UI:** Improved modal responsiveness for smaller screens (laptops) and added collapsible sections for advanced options.
 - **Validation Logic:** Improved the "Data Leakage" warning logic. It now correctly suppresses the warning if an X/Y Split is connected *to* a Train/Test Split node.
 
 ------------------------------------------------------------

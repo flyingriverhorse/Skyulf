@@ -11,6 +11,7 @@ from backend.data_ingestion.connectors.api import ApiConnector
 from backend.data_ingestion.connectors.base import BaseConnector
 from backend.data_ingestion.connectors.file import LocalFileConnector
 from backend.data_ingestion.connectors.sql import DatabaseConnector
+from backend.data_ingestion.connectors.s3 import S3Connector
 from backend.data_ingestion.engine.profiler import DataProfiler
 from backend.database.models import DataSource
 
@@ -97,7 +98,16 @@ def ingest_data_task(source_id: int):
             connector = ApiConnector(
                 url, method=method, headers=headers, params=params, data_key=data_key
             )
-
+        elif data_source.type == "s3":
+            path = config.get("path")
+            if not path:
+                raise ValueError("Missing path in config")
+            
+            # Optional: Pass credentials if stored in config (be careful with security)
+            # For now, assume env vars or IAM roles
+            storage_options = config.get("storage_options", {})
+            
+            connector = S3Connector(path, storage_options=storage_options)
         else:
             raise ValueError(f"Unsupported source type: {data_source.type}")
 
