@@ -38,6 +38,14 @@ Skyulf uses a **Registry Pattern** to decouple the pipeline orchestrator from sp
 - **Discovery**: The pipeline dynamically looks up the Calculator and Applier classes by name at runtime.
 - **Extensibility**: New nodes can be added simply by creating a new file and decorating the class; no changes to `pipeline.py` are required.
 
+## Data Catalog
+
+To decouple data loading from the execution engine, Skyulf uses a **Data Catalog** pattern.
+
+- **Interface**: `DataCatalog` (in `skyulf-core`) defines the contract for loading data by identifier.
+- **Implementation**: `FileSystemCatalog` (in `backend`) implements this interface to load files from the local filesystem.
+- **Usage**: The `PipelineEngine` is injected with a catalog instance. Nodes request data by ID (or path), and the catalog handles the retrieval.
+
 ## Pipeline Data Flow
 
 At runtime, `SkyulfPipeline` orchestrates:

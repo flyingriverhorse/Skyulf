@@ -8,10 +8,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.config import get_settings
-from backend.database.models import HyperparameterTuningJob, TrainingJob
+from backend.data.catalog import FileSystemCatalog
+from backend.database.models import DataSource, HyperparameterTuningJob, TrainingJob
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.execution.engine import PipelineEngine
 from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
+from backend.utils.file_utils import extract_file_path_from_source
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,38 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
         # Convert dict back to dataclasses
         nodes = []
         for n in pipeline_config_dict["nodes"]:
+            # Resolve Dataset ID to File Path if needed
+            # Handle both explicit data_loader and implicit ones (feature_engineering with no inputs)
+            is_data_loader = n["step_type"] == "data_loader"
+            is_implicit_loader = (
+                n["step_type"] == "feature_engineering"
+                and not n.get("inputs")
+                and "dataset_id" in n.get("params", {})
+            )
+
+            if is_data_loader or is_implicit_loader:
+                dataset_id = n["params"].get("dataset_id")
+                # Check if it's a numeric ID (Database ID)
+                if dataset_id and str(dataset_id).isdigit():
+                    ds = (
+                        session.query(DataSource)
+                        .filter(DataSource.id == int(dataset_id))
+                        .first()
+                    )
+                    if ds:
+                        path = extract_file_path_from_source(ds.to_dict())
+                        if path:
+                            logger.info(
+                                f"Resolved dataset ID {dataset_id} to path: {path}"
+                            )
+                            n["params"]["dataset_id"] = str(path)
+                        else:
+                            logger.warning(
+                                f"Could not resolve path for dataset ID {dataset_id}"
+                            )
+                    else:
+                        logger.warning(f"DataSource {dataset_id} not found in DB")
+
             nodes.append(
                 NodeConfig(
                     node_id=n["node_id"],
@@ -115,7 +149,12 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
                 except Exception as e:
                     logger.warning(f"Failed to update logs: {e}")
 
-        engine = PipelineEngine(artifact_store, log_callback=log_callback)
+        # Initialize Catalog
+        catalog = FileSystemCatalog()
+
+        engine = PipelineEngine(
+            artifact_store, catalog=catalog, log_callback=log_callback
+        )
 
         # 5. Run Pipeline
         result = engine.run(pipeline_config, job_id=job_id)

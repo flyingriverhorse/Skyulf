@@ -28,7 +28,7 @@ from backend.ml_pipeline.tasks import run_pipeline_task
 from backend.utils.file_utils import extract_file_path_from_source
 
 from .artifacts.local import LocalArtifactStore
-from .execution.engine import DataLoader, PipelineEngine
+from .execution.engine import PipelineEngine
 
 # from .data.profiler import DataProfiler
 # from .recommendations.schemas import Recommendation, AnalysisProfile
@@ -541,7 +541,15 @@ async def preview_pipeline(  # noqa: C901
     # Resolve dataset paths
     ingestion_service = DataIngestionService(session)
     for node in config.nodes:
-        if node.step_type == "data_loader" and "dataset_id" in node.params:
+        # Handle both explicit data_loader and implicit ones (feature_engineering with no inputs)
+        is_data_loader = node.step_type == "data_loader"
+        is_implicit_loader = (
+            node.step_type == "feature_engineering"
+            and not node.inputs
+            and "dataset_id" in node.params
+        )
+
+        if (is_data_loader or is_implicit_loader) and "dataset_id" in node.params:
             try:
                 ds_id = int(node.params["dataset_id"])
                 ds = await ingestion_service.get_data_source_by_id(ds_id)
@@ -555,6 +563,8 @@ async def preview_pipeline(  # noqa: C901
                     path = extract_file_path_from_source(ds_dict)
                     if path:
                         node.params["path"] = str(path)
+                        # Also update dataset_id to be the path so the engine uses it
+                        node.params["dataset_id"] = str(path)
                     else:
                         raise HTTPException(
                             status_code=400,
@@ -612,7 +622,10 @@ async def preview_pipeline(  # noqa: C901
         )
 
         # 3. Run Engine
-        engine = PipelineEngine(artifact_store)
+        from backend.data.catalog import FileSystemCatalog
+
+        catalog = FileSystemCatalog()
+        engine = PipelineEngine(artifact_store, catalog=catalog)
         result = engine.run(pipeline_config)
 
         # 4. Extract Preview Data & Generate Recommendations
@@ -1065,10 +1078,14 @@ async def get_dataset_schema(
             )
 
         # Load sample
-        loader = DataLoader()
-        df = loader.load_sample(str(path), n=1000)
+        from backend.data.catalog import FileSystemCatalog
+
+        catalog = FileSystemCatalog()
+        df = catalog.load(str(path), limit=1000)
 
         # Profile
+        from .data.profiler import DataProfiler
+
         profile = DataProfiler.generate_profile(df)
         return profile
 
