@@ -8,6 +8,7 @@ from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.execution.engine import PipelineEngine
 from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
 from backend.ml_pipeline.registry import NodeRegistry
+from backend.data.catalog import FileSystemCatalog
 
 # Get all node IDs to ensure we cover them
 ALL_NODES = {node.id: node for node in NodeRegistry.get_all_nodes()}
@@ -92,7 +93,8 @@ async def test_all_transformers(sample_data, tmp_path):
 
         # Execute
         artifact_store = LocalArtifactStore(base_path=str(tmp_path))
-        engine = PipelineEngine(artifact_store=artifact_store)
+        catalog = FileSystemCatalog()
+        engine = PipelineEngine(artifact_store=artifact_store, catalog=catalog)
 
         # Convert dict to Pydantic model
         nodes = [NodeConfig(**node) for node in pipeline_config["nodes"]]
@@ -167,7 +169,8 @@ async def test_models(sample_data, tmp_path):
         }
 
         artifact_store = LocalArtifactStore(base_path=str(tmp_path))
-        engine = PipelineEngine(artifact_store=artifact_store)
+        catalog = FileSystemCatalog()
+        engine = PipelineEngine(artifact_store=artifact_store, catalog=catalog)
         nodes = [NodeConfig(**node) for node in pipeline_config["nodes"]]
         config = PipelineConfig(
             pipeline_id=pipeline_config["pipeline_id"],
@@ -217,7 +220,8 @@ async def test_splitters(sample_data, tmp_path):
         }
 
         artifact_store = LocalArtifactStore(base_path=str(tmp_path))
-        engine = PipelineEngine(artifact_store=artifact_store)
+        catalog = FileSystemCatalog()
+        engine = PipelineEngine(artifact_store=artifact_store, catalog=catalog)
         nodes = [NodeConfig(**node) for node in pipeline_config["nodes"]]
         config = PipelineConfig(
             pipeline_id=pipeline_config["pipeline_id"],

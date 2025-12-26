@@ -6,6 +6,7 @@ import pytest
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.execution.engine import PipelineEngine
 from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
+from backend.data.catalog import FileSystemCatalog
 
 
 @pytest.fixture
@@ -65,7 +66,8 @@ def test_pipeline_execution_flow(pipeline_data_csv, tmp_path):
     )
 
     # 3. Run Engine
-    engine = PipelineEngine(artifact_store)
+    catalog = FileSystemCatalog()
+    engine = PipelineEngine(artifact_store, catalog=catalog)
     result = engine.run(config)
 
     # 4. Verify
@@ -130,7 +132,8 @@ def test_pipeline_tuning_flow(pipeline_data_csv, tmp_path):
         ],
     )
 
-    engine = PipelineEngine(artifact_store)
+    catalog = FileSystemCatalog()
+    engine = PipelineEngine(artifact_store, catalog=catalog)
     result = engine.run(config)
 
     assert result.status == "success"

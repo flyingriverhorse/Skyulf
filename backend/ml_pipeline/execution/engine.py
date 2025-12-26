@@ -11,6 +11,7 @@ import pandas as pd
 # Phase 1: Data Loading
 # from ..data.loader import DataLoader
 from skyulf.data.dataset import SplitDataset
+from skyulf.data.catalog import DataCatalog
 from skyulf.modeling.base import StatefulEstimator
 from skyulf.modeling.classification import (
     LogisticRegressionApplier,
@@ -36,33 +37,6 @@ from .schemas import (
 )
 
 
-class DataLoader:
-    """Simple Data Loader to replace the deleted module."""
-
-    def load_sample(self, path: str, n: int = 1000) -> pd.DataFrame:
-        if path.endswith(".csv"):
-            return pd.read_csv(path, nrows=n)
-        elif path.endswith(".parquet"):
-            # Parquet doesn't support nrows directly in read_parquet efficiently without pyarrow,
-            # but pandas handles it.
-            df = pd.read_parquet(path)
-            return df.head(n)
-        elif path.endswith(".json"):
-            return pd.read_json(path).head(n)
-        else:
-            raise ValueError(f"Unsupported file format: {path}")
-
-    def load_full(self, path: str) -> pd.DataFrame:
-        if path.endswith(".csv"):
-            return pd.read_csv(path)
-        elif path.endswith(".parquet"):
-            return pd.read_parquet(path)
-        elif path.endswith(".json"):
-            return pd.read_json(path)
-        else:
-            raise ValueError(f"Unsupported file format: {path}")
-
-
 # Phase 2: Feature Engineering
 
 # Phase 3: Modeling
@@ -75,8 +49,14 @@ class PipelineEngine:
     Orchestrates the execution of ML pipelines.
     """
 
-    def __init__(self, artifact_store: ArtifactStore, log_callback=None):
+    def __init__(
+        self,
+        artifact_store: ArtifactStore,
+        catalog: DataCatalog,
+        log_callback=None,
+    ):
         self.artifact_store = artifact_store
+        self.catalog = catalog
         self.log_callback = log_callback
         self.executed_transformers: List[Any] = (
             []
@@ -374,25 +354,26 @@ class PipelineEngine:
 
     def _run_data_loader(self, node: NodeConfig) -> str:
         # params: {"source": "csv", "path": "...", "sample": True/False, "limit": 1000}
-        loader = DataLoader()
 
         # Some callers use `dataset_id` as a path.
-        path = node.params.get("path")
-        if not path and "dataset_id" in node.params:
-            path = node.params["dataset_id"]
+        dataset_id = node.params.get("dataset_id")
+        if not dataset_id:
+            dataset_id = node.params.get("path")
 
-        if not path:
+        if not dataset_id:
             raise KeyError(
-                f"Node {node.node_id} missing 'path' or 'dataset_id' in params: {node.params}"
+                f"Node {node.node_id} missing 'dataset_id' or 'path' in params: {node.params}"
             )
 
+        limit = None
         if node.params.get("sample", False):
             limit = node.params.get("limit", 1000)
-            self.log(f"Loading sample data from {path} (limit={limit})")
-            df = loader.load_sample(path, n=limit)
+            self.log(f"Loading sample data from {dataset_id} (limit={limit})")
         else:
-            self.log(f"Loading full data from {path}")
-            df = loader.load_full(path)
+            self.log(f"Loading full data from {dataset_id}")
+
+        # Use the injected catalog
+        df = self.catalog.load(dataset_id, limit=limit)
 
         self.log(
             f"Data loaded successfully. Shape: {df.shape} ({len(df)} rows, {len(df.columns)} columns)"

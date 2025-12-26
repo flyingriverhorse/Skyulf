@@ -14,6 +14,7 @@ from skyulf.preprocessing.pipeline import FeatureEngineer
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.execution.engine import PipelineEngine
 from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
+from backend.data.catalog import FileSystemCatalog
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +29,8 @@ def test_full_inference_pipeline():
     os.makedirs(base_path)
 
     store = LocalArtifactStore(base_path)
-    engine = PipelineEngine(store)
+    catalog = FileSystemCatalog()
+    engine = PipelineEngine(store, catalog=catalog)
 
     # 2. Create Complex Dummy Data
     # - 'age': Numeric, has outliers (150), has missing (NaN)
