@@ -23,37 +23,8 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
 }) => {
   const upstreamData = useUpstreamData(nodeId || '');
   
-  // Recursive search for datasetId
-  const nodes = useGraphStore((state) => state.nodes);
-  const edges = useGraphStore((state) => state.edges);
-
-  const findUpstreamDatasetId = (currentNodeId: string): string | undefined => {
-    const visited = new Set<string>();
-    const queue = [currentNodeId];
-    
-    while (queue.length > 0) {
-      const id = queue.shift();
-      if (!id) continue;
-      if (visited.has(id)) continue;
-      visited.add(id);
-      
-      const node = nodes.find(n => n.id === id);
-      if (!node) continue;
-      
-      // If this is NOT the current node, check if it has datasetId
-      if (id !== currentNodeId && node.data?.datasetId) {
-        return node.data.datasetId as string;
-      }
-      
-      const incomers = getIncomers(node, nodes, edges);
-      for (const incomer of incomers) {
-        queue.push(incomer.id);
-      }
-    }
-    return undefined;
-  };
-
-  const upstreamDatasetId = findUpstreamDatasetId(nodeId || '');
+  // Find datasetId from upstream data (injected by useUpstreamData hook)
+  const upstreamDatasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   
   // Check if an upstream node (like FeatureTargetSplitter) has already defined a target column
   const upstreamTargetColumn = upstreamData.find((d: Record<string, unknown>) => d.target_column)?.target_column as string | undefined;
