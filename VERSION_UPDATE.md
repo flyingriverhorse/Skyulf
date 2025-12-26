@@ -15,23 +15,25 @@
 This release finalizes the migration to a fully decoupled, registry-based architecture and introduces the Data Catalog pattern.
 
 ### 🔧 Backend Architecture
-- **Data Catalog Pattern:** Decoupled data loading from the execution engine. `skyulf-core` now defines a `DataCatalog` interface, and `backend` provides a `FileSystemCatalog` implementation.
-- **Smart Catalog & S3 Support:** Implemented `SmartCatalog` to handle ID resolution and dispatching. Added `S3Catalog` and `S3Connector` for full S3 bucket integration (ingestion and pipeline execution) with secure per-dataset credential handling.
-- **Node Registry Completion:** All preprocessing nodes now self-register using the `@NodeRegistry` decorator.
-- **Pipeline Decoupling:** Removed the monolithic factory logic from `pipeline.py`. The pipeline now dynamically instantiates nodes via the registry.
-- **Alias Support:** Added support for legacy node names (e.g., `FeatureMath` -> `FeatureGeneration`) to ensure backward compatibility with existing pipeline configurations.
+- **Data Catalog & S3:** Decoupled data loading via `DataCatalog`. Added `S3Catalog` and `S3Connector` for full S3 integration (ingestion, pipeline execution, artifact storage) with secure credential handling and local caching.
+- **Hybrid Artifact Storage:** Implemented smart artifact routing. S3 data sources automatically save models to S3. Local data sources save locally by default.
+- **Storage Control:** Added `UPLOAD_TO_S3_FOR_LOCAL_FILES` to upload local training to S3, and `SAVE_S3_ARTIFACTS_LOCALLY` to force local storage even for S3 data sources.
+- **Node Registry:** All preprocessing nodes now self-register. Removed monolithic pipeline factory in favor of dynamic instantiation.
+- **Artifacts:** Implemented `S3ArtifactStore` for saving models to S3. Added API to browse job artifacts.
 
 ### 🐛 Bug Fixes
-- **Data Loading:** Fixed `FileNotFoundError` where the Data Catalog received raw Database IDs instead of file paths during pipeline execution and preview. Also improved robustness for implicit data loaders (misconfigured feature engineering nodes).
-- **Test Coverage:** Verified full system stability with 100% pass rate on the test suite (113 tests).
-- **Circular Dependency Fix:** Resolved a circular dependency in `skyulf/modeling/regression.py` where Appliers were referenced before definition.
-- **Logic Fix:** Corrected a logic inversion in `SkyulfPipeline._init_model_estimator` that caused valid models to be rejected.
+- **S3 Artifacts:** Fixed `500 Internal Server Error` in artifact listing by correcting `AWS_REGION` setting and `s3fs` region configuration.
+- **S3 Inference:** Fixed `400 Bad Request` in prediction endpoint by adding S3 URI support to `DeploymentService`.
+- **S3 Evaluation:** Fixed `404 Not Found` in evaluation endpoint by enabling S3 artifact loading.
+- **S3 Reliability:** Fixed multiple S3 issues including credential mapping for Polars/fsspec, path resolution, and file type detection.
+- **Inference:** Fixed schema detection for S3-trained models and added automatic target column dropping to prevent shape mismatches.
+- **Data Loading:** Resolved `FileNotFoundError` in pipeline execution and fixed "File out of specification" errors for Parquet/CSV.
+- **Stability:** Achieved 100% test pass rate (113 tests). Fixed circular dependencies and logic inversions in model initialization.
 
 ### 🎨 Frontend
-- **S3 Integration:** Updated "Add Data Source" modal to support S3 paths with optional secure credential input.
-- **Responsive UI:** Improved modal responsiveness for smaller screens (laptops) and added collapsible sections for advanced options.
-- **Validation Logic:** Improved the "Data Leakage" warning logic. It now correctly suppresses the warning if an X/Y Split is connected *to* a Train/Test Split node.
-- **Dataset Node Fix:** Corrected a logic where dataset nodes could be duplicated on the canvas when added via URL query parameters.
+- **S3 UI:** Updated "Add Data Source" to support S3 paths with secure credentials.
+- **Artifact Browser:** Added UI to view files associated with model versions, now displaying storage type (S3 vs Local) and full URI.
+- **UX Improvements:** Improved "Data Leakage" warnings, modal responsiveness, and fixed dataset node duplication bugs.
 
 ------------------------------------------------------------
 

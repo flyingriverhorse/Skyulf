@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Archive, Box, CheckCircle, ChevronRight, X, Play } from 'lucide-react';
+import { Archive, Box, CheckCircle, ChevronRight, X, Play, Folder, FileText, Cloud, HardDrive } from 'lucide-react';
+
+interface ArtifactResponse {
+  storage_type: string;
+  base_uri: string;
+  files: string[];
+}
 
 interface ModelVersion {
   job_id: string;
@@ -22,6 +28,7 @@ interface ModelRegistryEntry {
   model_type: string;
   dataset_id: string;
   dataset_name: string;
+  dataset_type?: string;
   latest_version: ModelVersion | null;
   versions: ModelVersion[];
   deployment_count: number;
@@ -41,6 +48,11 @@ export const ModelRegistry: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<ModelRegistryEntry | null>(null);
   const [deployingId, setDeployingId] = useState<string | null>(null);
+  
+  // Artifacts viewing
+  const [viewingArtifacts, setViewingArtifacts] = useState<string | null>(null);
+  const [artifacts, setArtifacts] = useState<ArtifactResponse | null>(null);
+  const [loadingArtifacts, setLoadingArtifacts] = useState(false);
   
   // Pagination
   const [page, setPage] = useState(0);
@@ -67,6 +79,35 @@ export const ModelRegistry: React.FC = () => {
       localStorage.setItem('skyulf_manual_deployments', JSON.stringify(next));
       return next;
     });
+  };
+
+  const handleViewArtifacts = async (jobId: string) => {
+    setViewingArtifacts(jobId);
+    setLoadingArtifacts(true);
+    setArtifacts(null);
+    try {
+      const res = await fetch(`/api/registry/artifacts/${jobId}`);
+      if (res.ok) {
+        const data: ArtifactResponse = await res.json();
+        setArtifacts(data);
+      } else {
+        const err = await res.json();
+        // Fallback for error display
+        setArtifacts({ 
+          storage_type: 'error', 
+          base_uri: '', 
+          files: [`Failed to load artifacts: ${err.detail || 'Unknown error'}`] 
+        });
+      }
+    } catch (e) {
+      setArtifacts({ 
+        storage_type: 'error', 
+        base_uri: '', 
+        files: ['Error loading artifacts'] 
+      });
+    } finally {
+      setLoadingArtifacts(false);
+    }
   };
 
   const fetchStats = async () => {
@@ -350,7 +391,14 @@ export const ModelRegistry: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                         <div className="flex flex-col">
-                          <span className="font-medium text-slate-700 dark:text-slate-300">{model.dataset_name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-700 dark:text-slate-300">{model.dataset_name}</span>
+                            {model.dataset_type && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 uppercase">
+                                {model.dataset_type}
+                              </span>
+                            )}
+                          </div>
                           <span className="text-xs text-slate-400 font-mono mt-0.5">{model.dataset_id}</span>
                         </div>
                       </td>
@@ -460,25 +508,35 @@ export const ModelRegistry: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                        {version.status === 'completed' && !version.is_deployed && (
-                          <button 
-                            onClick={() => { void handleDeploy(version.job_id); }}
-                            disabled={deployingId === version.job_id}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 disabled:opacity-50 flex items-center gap-1 ml-auto"
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => { void handleViewArtifacts(version.job_id); }}
+                            className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                            title="View Artifacts"
                           >
-                            {deployingId === version.job_id ? (
-                              <span className="animate-spin h-3 w-3 border-b-2 border-current rounded-full"></span>
-                            ) : (
-                              <Play size={14} />
-                            )}
-                            Deploy
+                            <Folder size={16} />
                           </button>
-                        )}
-                        {version.is_deployed && (
-                          <span className="text-green-600 dark:text-green-400 text-xs flex items-center justify-end gap-1">
-                            <CheckCircle size={14} /> Active
-                          </span>
-                        )}
+                          
+                          {version.status === 'completed' && !version.is_deployed && (
+                            <button 
+                              onClick={() => { void handleDeploy(version.job_id); }}
+                              disabled={deployingId === version.job_id}
+                              className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 disabled:opacity-50 flex items-center gap-1"
+                            >
+                              {deployingId === version.job_id ? (
+                                <span className="animate-spin h-3 w-3 border-b-2 border-current rounded-full"></span>
+                              ) : (
+                                <Play size={14} />
+                              )}
+                              Deploy
+                            </button>
+                          )}
+                          {version.is_deployed && (
+                            <span className="text-green-600 dark:text-green-400 text-xs flex items-center gap-1">
+                              <CheckCircle size={14} /> Active
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -489,6 +547,74 @@ export const ModelRegistry: React.FC = () => {
             <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end">
               <button 
                 onClick={() => { setSelectedModel(null); }}
+                className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Artifacts Modal */}
+      {viewingArtifacts && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => { setViewingArtifacts(null); }}>
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700" onClick={e => { e.stopPropagation(); }}>
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Folder size={20} className="text-blue-500" />
+                Artifacts
+              </h3>
+              <button onClick={() => { setViewingArtifacts(null); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingArtifacts ? (
+                <div className="flex justify-center py-8 text-slate-500 dark:text-slate-400">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
+                  Loading artifacts...
+                </div>
+              ) : !artifacts || artifacts.files.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                  No artifacts found.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                    {artifacts.storage_type === 's3' ? (
+                      <Cloud size={20} className="text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                    ) : (
+                      <HardDrive size={20} className="text-slate-600 dark:text-slate-400 flex-shrink-0" />
+                    )}
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+                        {artifacts.storage_type === 's3' ? 'S3 Bucket Storage' : 'Local Storage'}
+                      </span>
+                      <span className="text-xs font-mono text-slate-600 dark:text-slate-400 truncate" title={artifacts.base_uri}>
+                        {artifacts.base_uri}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <ul className="space-y-2">
+                    {artifacts.files.map((artifact, idx) => (
+                      <li key={idx} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/30 border border-slate-100 dark:border-slate-700">
+                        <FileText size={18} className="text-slate-400" />
+                        <span className="text-sm font-mono text-slate-700 dark:text-slate-300 break-all">
+                          {artifact}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end">
+              <button 
+                onClick={() => { setViewingArtifacts(null); }}
                 className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
                 Close

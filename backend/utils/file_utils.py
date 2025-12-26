@@ -167,6 +167,11 @@ def extract_file_path_from_source(source_data: dict) -> Optional[Path]:
 
     for candidate in path_candidates:
         if candidate and isinstance(candidate, (str, Path)):
+            # Special handling for S3 paths - return immediately without checking local existence
+            if str(candidate).startswith("s3://"):
+                logger.debug(f"Found S3 path: {candidate}")
+                return candidate
+                
             path = Path(candidate)
             if path.exists() and path.is_file():  # Only return if it's actually a file
                 logger.debug(f"Found file path: {path}")

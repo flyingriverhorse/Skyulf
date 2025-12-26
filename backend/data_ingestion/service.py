@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Union, cast
+from typing import Any, Dict, List, Optional, Sequence, Union, cast
 
 import aiofiles  # type: ignore
 from fastapi import BackgroundTasks, HTTPException, UploadFile
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
 from backend.data_ingestion.connectors.file import LocalFileConnector
+from backend.data_ingestion.connectors.s3 import S3Connector
 from backend.data_ingestion.schemas.ingestion import (
     DataSourceCreate,
     IngestionJobResponse,
@@ -128,14 +129,44 @@ class DataIngestionService:
         """
         Get a sample of data from the source.
         """
+        from backend.data_ingestion.connectors.file import LocalFileConnector
+        from backend.data_ingestion.connectors.s3 import S3Connector
+        
         source = await self.get_source(source_id)
         if not source:
             raise HTTPException(status_code=404, detail="Source not found")
 
         config: Dict[str, Any] = cast(Dict[str, Any], source.config) or {}
+        # Normalize path retrieval: check 'file_path' then 'path'
+        file_path = config.get("file_path") or config.get("path")
+        
+        connector: Union[S3Connector, LocalFileConnector]
 
-        if source.type == "file" or source.type == "csv" or source.type == "txt":
-            file_path = config.get("file_path")
+        # Check for S3 path first, regardless of source type
+        if file_path and str(file_path).startswith("s3://"):
+            storage_options = config.get("storage_options", {})
+            
+            # Ensure options are strings for Polars
+            # Polars expects 'aws_access_key_id', NOT 'key'
+            # So we don't need to remap here, but we need to ensure they are strings
+            str_options = {k: str(v) for k, v in storage_options.items() if v is not None}
+            
+            try:
+                logger.info(f"Fetching S3 sample from {file_path} with options keys: {list(str_options.keys())}")
+                connector = S3Connector(file_path, storage_options=str_options)
+                await connector.connect()
+                df = await connector.fetch_data(limit=limit)
+                return cast(List[Dict[str, Any]], df.to_dicts())
+            except Exception as e:
+                logger.error(f"Failed to get S3 sample: {e}", exc_info=True)
+                # If it's a 403/404 from S3, it might come as ValueError from connector
+                if "403" in str(e) or "404" in str(e):
+                     raise HTTPException(status_code=400, detail=f"S3 Access Error: {str(e)}")
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to read S3 data sample: {str(e)}"
+                )
+
+        if source.type in ["file", "csv", "txt"]:
             if not file_path:
                 raise HTTPException(status_code=400, detail="Missing file path")
 
@@ -153,11 +184,46 @@ class DataIngestionService:
 
                 # Convert to list of dicts, handling potential serialization issues
                 # Polars to_dicts handles basic types well
-                return df.to_dicts()
+                return cast(List[Dict[str, Any]], df.to_dicts())
             except Exception as e:
                 logger.error(f"Failed to get sample: {e}")
                 raise HTTPException(
                     status_code=500, detail=f"Failed to read data sample: {str(e)}"
+                )
+        
+        elif source.type in ["s3", "parquet"]:
+            # This block might be redundant now if file_path starts with s3://, 
+            # but kept for cases where type is explicit but path might not be standard s3:// (unlikely)
+            # or for parquet files that are local.
+            
+            storage_options = config.get("storage_options", {})
+            
+            if not file_path:
+                raise HTTPException(status_code=400, detail="Missing path")
+            
+            # If it's local parquet
+            if not str(file_path).startswith("s3://"):
+                 try:
+                    abs_path = Path(file_path).absolute()
+                    connector = LocalFileConnector(str(abs_path))
+                    await connector.connect()
+                    df = await connector.fetch_data(limit=limit)
+                    return cast(List[Dict[str, Any]], df.to_dicts())
+                 except Exception as e:
+                     raise HTTPException(status_code=500, detail=f"Failed to read local parquet: {e}")
+
+            try:
+                logger.info(f"Fetching S3 sample from {file_path} with options keys: {list(storage_options.keys())}")
+                # Ensure options are strings for Polars
+                str_options = {k: str(v) for k, v in storage_options.items() if v is not None}
+                connector = S3Connector(file_path, storage_options=str_options)
+                await connector.connect()
+                df = await connector.fetch_data(limit=limit)
+                return df.to_dicts()
+            except Exception as e:
+                logger.error(f"Failed to get S3 sample: {e}")
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to read S3 data sample: {str(e)}"
                 )
 
         # TODO: Handle other source types (SQL, etc.)

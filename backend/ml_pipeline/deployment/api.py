@@ -23,7 +23,8 @@ async def deploy_model(job_id: str, session: AsyncSession = Depends(get_async_se
     """
     try:
         deployment = await DeploymentService.deploy_model(session, job_id)
-        return deployment
+        # Enrich with schema
+        return await DeploymentService.get_deployment_details(session, deployment)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -38,7 +39,9 @@ async def get_active_deployment(session: AsyncSession = Depends(get_async_sessio
     deployment = await DeploymentService.get_active_deployment(session)
     if not deployment:
         raise HTTPException(status_code=404, detail="No active deployment found")
-    return deployment
+    
+    # Enrich with schema
+    return await DeploymentService.get_deployment_details(session, deployment)
 
 
 @router.get("/history", response_model=List[DeploymentInfo])

@@ -3,8 +3,6 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { Split } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
-import { useGraphStore } from '../../../core/store/useGraphStore';
-import { getIncomers } from '@xyflow/react';
 
 interface TrainTestSplitConfig {
   test_size: number;

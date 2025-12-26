@@ -44,9 +44,9 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
         
         if (accessKey && secretKey) {
           config.storage_options = {
-            key: accessKey,
-            secret: secretKey,
-            client_kwargs: region ? { region_name: region } : {}
+            aws_access_key_id: accessKey,
+            aws_secret_access_key: secretKey,
+            region: region || undefined
           };
         }
       } else {

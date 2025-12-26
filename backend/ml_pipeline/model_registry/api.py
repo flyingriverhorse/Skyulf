@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.engine import get_async_session
 
-from .schemas import ModelRegistryEntry, ModelVersion, RegistryStats
+from .schemas import ArtifactListResponse, ModelRegistryEntry, ModelVersion, RegistryStats
 from .service import ModelRegistryService
 
 router = APIRouter(prefix="/registry", tags=["Model Registry"])
@@ -37,3 +37,20 @@ async def get_model_versions(
     Get all versions for a specific model type.
     """
     return await ModelRegistryService.get_model_versions(session, model_type)
+
+
+@router.get("/artifacts/{job_id}", response_model=ArtifactListResponse)
+async def list_job_artifacts(
+    job_id: str, session: AsyncSession = Depends(get_async_session)
+):
+    """
+    List artifacts for a specific job.
+    """
+    try:
+        return await ModelRegistryService.get_job_artifacts(session, job_id)
+    except ValueError as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=str(e))

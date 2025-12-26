@@ -24,6 +24,7 @@ class ModelRegistryEntry(BaseModel):
     model_type: str
     dataset_id: str
     dataset_name: str
+    dataset_type: Optional[str] = "unknown"
     latest_version: Optional[ModelVersion] = None
     versions: List[ModelVersion] = []
     deployment_count: int = 0
@@ -33,3 +34,9 @@ class RegistryStats(BaseModel):
     total_models: int
     total_versions: int
     active_deployments: int
+
+
+class ArtifactListResponse(BaseModel):
+    storage_type: str
+    base_uri: str
+    files: List[str]

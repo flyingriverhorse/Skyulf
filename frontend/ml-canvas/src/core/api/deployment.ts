@@ -7,6 +7,8 @@ export interface DeploymentInfo {
   artifact_uri: string;
   is_active: boolean;
   created_at: string;
+  input_schema?: { name: string; type: string }[];
+  target_column?: string;
 }
 
 export interface PredictionResponse {

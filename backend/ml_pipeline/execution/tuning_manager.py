@@ -14,6 +14,7 @@ from backend.ml_pipeline.execution.graph_utils import (
 )
 from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
+from backend.ml_pipeline.execution.utils import resolve_dataset_name, get_dataset_map
 
 
 class TuningJobManager:
@@ -107,6 +108,7 @@ class TuningJobManager:
             target_column=target_column,
             dropped_columns=dropped_columns,
             logs=type_cast(Optional[List[str]], job.logs),
+            graph=type_cast(Dict[str, Any], job.graph),
         )
 
     @staticmethod
@@ -182,19 +184,14 @@ class TuningJobManager:
         session: AsyncSession, job_id: str
     ) -> Optional[JobInfo]:
         """Retrieves a tuning job by ID."""
-        stmt = (
-            select(HyperparameterTuningJob, DataSource.name)
-            .outerjoin(
-                DataSource,
-                HyperparameterTuningJob.dataset_source_id == DataSource.source_id,
-            )
-            .where(HyperparameterTuningJob.id == job_id)
+        stmt = select(HyperparameterTuningJob).where(
+            HyperparameterTuningJob.id == job_id
         )
         result = await session.execute(stmt)
-        row = result.first()
+        job = result.scalar_one_or_none()
 
-        if row:
-            job, dataset_name = row
+        if job:
+            dataset_name = await resolve_dataset_name(session, job.dataset_source_id)
             return TuningJobManager.map_tuning_job_to_info(job, dataset_name)
         return None
 
@@ -205,26 +202,31 @@ class TuningJobManager:
         skip: int = 0,
     ) -> List[JobInfo]:
         """Lists recent tuning jobs (Async)."""
+        # 1. Fetch all DataSources for robust name resolution
+        ds_map = await get_dataset_map(session)
+
+        # 2. Fetch Jobs
         result_tune = await session.execute(
-            select(HyperparameterTuningJob, DataSource.name)
-            .outerjoin(
-                DataSource,
-                or_(
-                    HyperparameterTuningJob.dataset_source_id == DataSource.source_id,
-                    HyperparameterTuningJob.dataset_source_id
-                    == cast(DataSource.id, String),
-                ),
-            )
+            select(HyperparameterTuningJob)
             .order_by(HyperparameterTuningJob.started_at.desc())
             .limit(limit)
             .offset(skip)
         )
-        tune_rows = result_tune.all()
+        tune_rows = result_tune.scalars().all()
 
-        return [
-            TuningJobManager.map_tuning_job_to_info(j, d_name)
-            for j, d_name in tune_rows
-        ]
+        # 3. Map to Info
+        jobs = []
+        for job in tune_rows:
+            ds_id = str(job.dataset_source_id) if job.dataset_source_id else None
+            ds_name = ds_map.get(ds_id) if ds_id else None
+            
+            # Fallback
+            if not ds_name and ds_id:
+                 ds_name = f"Dataset {ds_id}"
+
+            jobs.append(TuningJobManager.map_tuning_job_to_info(job, ds_name))
+            
+        return jobs
 
     @staticmethod
     async def get_latest_tuning_job_for_node(
