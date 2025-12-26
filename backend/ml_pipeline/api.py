@@ -789,33 +789,15 @@ async def get_job_evaluation(  # noqa: C901
 
     # 2. Determine Artifact Path
     # Matches the path used in run_pipeline (tasks.py)
-    settings = get_settings()
+    from backend.ml_pipeline.artifacts.factory import ArtifactFactory
     
-    from typing import Union
-    from backend.ml_pipeline.artifacts.store import ArtifactStore
-    from backend.ml_pipeline.artifacts.local import LocalArtifactStore
-    from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
-    
-    artifact_store: ArtifactStore
-    
-    if job.artifact_uri and str(job.artifact_uri).startswith("s3://"):
-        # Parse bucket and prefix: s3://bucket/prefix
-        parts = str(job.artifact_uri).replace("s3://", "").split("/", 1)
-        bucket = parts[0]
-        prefix = parts[1] if len(parts) > 1 else ""
+    artifact_uri = job.artifact_uri
+    if not artifact_uri:
+        # Fallback for old jobs or local jobs without explicit URI
+        settings = get_settings()
+        artifact_uri = os.path.join(settings.TRAINING_ARTIFACT_DIR, job_id)
         
-        storage_options = {
-            "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
-            "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
-            "region_name": settings.AWS_DEFAULT_REGION,
-        }
-        # Filter None values
-        storage_options = {k: v for k, v in storage_options.items() if v is not None}
-        
-        artifact_store = S3ArtifactStore(bucket_name=bucket, prefix=prefix, storage_options=storage_options)
-    else:
-        persistent_path = os.path.join(settings.TRAINING_ARTIFACT_DIR, job_id)
-        artifact_store = LocalArtifactStore(persistent_path)
+    artifact_store = ArtifactFactory.get_artifact_store(artifact_uri)
 
     # 3. Load Evaluation Artifact
     # Key format: {node_id}_evaluation_data

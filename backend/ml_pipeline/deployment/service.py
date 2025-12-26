@@ -203,66 +203,52 @@ class DeploymentService:
 
         # 2. Load Artifact
         try:
-            store: Union[S3ArtifactStore, LocalArtifactStore]
-            if deployment.artifact_uri.startswith("s3://"):
-                # Parse bucket and key: s3://bucket/key
-                parts = deployment.artifact_uri.replace("s3://", "").split("/")
-                bucket_name = parts[0]
-                key = "/".join(parts[1:])
-                
-                settings = get_settings()
-                storage_options = {
-                    "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
-                    "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
-                    "endpoint_url": settings.AWS_ENDPOINT_URL,
-                    "region_name": settings.AWS_DEFAULT_REGION,
-                }
-                # Filter None values
-                storage_options = {k: v for k, v in storage_options.items() if v is not None}
-                
-                store = S3ArtifactStore(bucket_name=bucket_name, storage_options=storage_options)
-                artifact = store.load(key)
-
+            from backend.ml_pipeline.artifacts.factory import ArtifactFactory
+            
+            uri = deployment.artifact_uri
+            store_uri = ""
+            artifact_key = ""
+            
+            if uri.startswith("s3://"):
+                if uri.endswith(".joblib"):
+                    store_uri = uri.rsplit("/", 1)[0]
+                    artifact_key = uri.rsplit("/", 1)[1].replace(".joblib", "")
+                else:
+                    parts = uri.replace("s3://", "").split("/")
+                    bucket = parts[0]
+                    artifact_key = "/".join(parts[1:])
+                    store_uri = f"s3://{bucket}"
             else:
-                if os.path.isabs(deployment.artifact_uri):
-                    base_path = os.path.dirname(deployment.artifact_uri)
-                    node_id = os.path.basename(deployment.artifact_uri)
-                elif "/" in deployment.artifact_uri or "\\" in deployment.artifact_uri:
-                    # Check if it's a "pipeline_id/node_id" pattern that maps to exports/models
-                    # If the path doesn't exist locally, assume it's the internal format
-                    if not os.path.exists(deployment.artifact_uri) and not os.path.exists(
-                        os.path.dirname(deployment.artifact_uri)
-                    ):
-                        parts = deployment.artifact_uri.replace("\\", "/").split("/")
+                # Local path handling
+                if os.path.isabs(uri):
+                    store_uri = os.path.dirname(uri)
+                    artifact_key = os.path.basename(uri)
+                elif "/" in uri or "\\" in uri:
+                    if not os.path.exists(uri) and not os.path.exists(os.path.dirname(uri)):
+                        parts = uri.replace("\\", "/").split("/")
                         if len(parts) == 2:
                             pipeline_id = parts[0]
                             node_id = parts[1]
-                            base_path = os.path.join(
-                                os.getcwd(), "exports", "models", pipeline_id
-                            )
+                            store_uri = os.path.join(os.getcwd(), "exports", "models", pipeline_id)
+                            artifact_key = node_id
                         else:
-                            base_path = os.path.dirname(deployment.artifact_uri)
-                            node_id = os.path.basename(deployment.artifact_uri)
+                            store_uri = os.path.dirname(uri)
+                            artifact_key = os.path.basename(uri)
                     else:
-                        base_path = os.path.dirname(deployment.artifact_uri)
-                        node_id = os.path.basename(deployment.artifact_uri)
+                        store_uri = os.path.dirname(uri)
+                        artifact_key = os.path.basename(uri)
                 else:
-                    # Legacy format: "pipeline_id/node_id" (handled by split above if separators exist)
-                    # OR just "node_id" (fallback)
-                    parts = deployment.artifact_uri.split("/")
+                    parts = uri.split("/")
                     if len(parts) >= 2:
                         pipeline_id = parts[0]
                         node_id = parts[1]
-                        base_path = os.path.join(
-                            os.getcwd(), "exports", "models", pipeline_id
-                        )
+                        store_uri = os.path.join(os.getcwd(), "exports", "models", pipeline_id)
+                        artifact_key = node_id
                     else:
-                        raise ValueError(
-                            f"Invalid artifact URI format: {deployment.artifact_uri}"
-                        )
+                        raise ValueError(f"Invalid artifact URI format: {uri}")
 
-                store = LocalArtifactStore(base_path)
-                artifact = store.load(node_id)
+            store = ArtifactFactory.get_artifact_store(store_uri)
+            artifact = store.load(artifact_key)
 
         except Exception as e:
             logger.error(f"Failed to load artifact: {e}")

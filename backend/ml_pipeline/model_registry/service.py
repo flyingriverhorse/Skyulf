@@ -329,43 +329,21 @@ class ModelRegistryService:
         store: Union[S3ArtifactStore, LocalArtifactStore]
 
         # 3. Instantiate the appropriate ArtifactStore
-        if artifact_uri.startswith("s3://"):
-            # Parse bucket and prefix: s3://bucket/prefix
-            parts = artifact_uri.replace("s3://", "").split("/", 1)
-            bucket = parts[0]
-            prefix = parts[1] if len(parts) > 1 else ""
+        from backend.ml_pipeline.artifacts.factory import ArtifactFactory
+        
+        try:
+            store = ArtifactFactory.get_artifact_store(artifact_uri)
             
-            # Inject AWS Credentials from Settings
-            from backend.config import get_settings
-            settings = get_settings()
+            storage_type = "s3" if artifact_uri.startswith("s3://") else "local"
             
-            storage_options = {
-                "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
-                "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
-                "region_name": settings.AWS_DEFAULT_REGION,
-            }
-            
-            # Filter None values
-            storage_options = {k: v for k, v in storage_options.items() if v is not None}
-            
-            try:
-                store = S3ArtifactStore(bucket_name=bucket, prefix=prefix, storage_options=storage_options)
-                return ArtifactListResponse(
-                    storage_type="s3",
-                    base_uri=artifact_uri,
-                    files=store.list_artifacts()
-                )
-            except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"Failed to list S3 artifacts: {e}")
-                raise e
-        else:
-            # Use Local storage
-            store = LocalArtifactStore(base_path=artifact_uri)
             return ArtifactListResponse(
-                storage_type="local",
+                storage_type=storage_type,
                 base_uri=artifact_uri,
                 files=store.list_artifacts()
             )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to list artifacts: {e}")
+            raise e
 

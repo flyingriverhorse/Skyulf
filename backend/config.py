@@ -161,11 +161,11 @@ class Settings(BaseSettings):
     S3_ARTIFACT_BUCKET: Optional[str] = None
     # If True, local file uploads/training will also be saved to S3 if S3_ARTIFACT_BUCKET is set.
     # If False, local files stay local, and S3 files go to S3.
-    UPLOAD_TO_S3_FOR_LOCAL_FILES: bool = True
+    UPLOAD_TO_S3_FOR_LOCAL_FILES: bool = False
 
     # If True, training jobs using S3 data will save artifacts locally instead of to S3.
     # This gives users the freedom to keep artifacts local even if data is in the cloud.
-    SAVE_S3_ARTIFACTS_LOCALLY: bool = True
+    SAVE_S3_ARTIFACTS_LOCALLY: bool = False
 
     # === SECURITY ===
     SECRET_KEY: str = secrets.token_urlsafe(32)
