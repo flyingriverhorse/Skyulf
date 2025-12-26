@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.database.models import HyperparameterTuningJob, TrainingJob
+from backend.database.models import HyperparameterTuningJob, TrainingJob, DataSource
 from backend.ml_pipeline.execution.schemas import (
     NodeExecutionResult,
     PipelineExecutionResult,
@@ -141,3 +141,88 @@ def test_run_pipeline_task_failure(mock_get_db_session, mock_engine_class):
     assert job.status == "failed"
     assert "Pipeline crashed" in job.error_message
     assert job.finished_at is not None
+
+
+def test_run_pipeline_task_resolves_dataset_id(mock_get_db_session, mock_engine_class):
+    """
+    Test that run_pipeline_task correctly resolves a numeric dataset_id (28)
+    to a file path using the DataSource table.
+    """
+    # Setup Mock Session
+    session = MagicMock()
+    mock_get_db_session.return_value = session
+
+    # Setup Job
+    job = TrainingJob(id=MOCK_JOB_ID, status="queued")
+
+    # Setup DataSource Mock
+    mock_ds = MagicMock()
+    mock_ds.to_dict.return_value = {
+        "config": {"file_path": "uploads/data/resolved_path.csv"}
+    }
+
+    def query_side_effect(model):
+        query_mock = MagicMock()
+        # Check by name to avoid import mismatch issues
+        model_name = getattr(model, "__name__", str(model))
+        print(f"DEBUG: query called with {model} (name={model_name})")
+
+        if model_name == "TrainingJob":
+            query_mock.filter.return_value.first.return_value = job
+        elif model_name == "DataSource":
+            print("DEBUG: Returning mock_ds for DataSource")
+            query_mock.filter.return_value.first.return_value = mock_ds
+        return query_mock
+
+    session.query.side_effect = query_side_effect
+
+    # Config with numeric ID
+    config_with_numeric_id = {
+        "pipeline_id": "test_pipeline",
+        "nodes": [
+            {
+                "node_id": "node_1",
+                "step_type": "data_loader",
+                "params": {"dataset_id": "28"},  # Numeric ID as string
+                "inputs": [],
+            }
+        ],
+        "metadata": {},
+    }
+
+    # Setup Mock Engine
+    engine_instance = mock_engine_class.return_value
+    engine_instance.run.return_value = PipelineExecutionResult(
+        pipeline_id="test_pipeline",
+        status="success",
+        node_results={},
+    )
+
+    # Patch extract_file_path_from_source to avoid file existence check
+    # Note: With SmartCatalog, this patch might be needed inside the catalog's method if we were testing catalog execution,
+    # but here we are just testing tasks.py flow.
+    # However, SmartCatalog imports it locally, so we might need to patch it where it's used.
+    # But wait, tasks.py doesn't call it anymore! SmartCatalog calls it.
+    # And we are mocking PipelineEngine, so engine.run() is a mock.
+    # So SmartCatalog.load() is NEVER CALLED in this test!
+    # So we don't need to patch extract_file_path_from_source for this test anymore.
+    
+    # Run Task
+    run_pipeline_task(MOCK_JOB_ID, config_with_numeric_id)
+
+    # Verify Engine was initialized with the SmartCatalog
+    # and the config still has the original ID (because SmartCatalog handles resolution)
+    run_call_args = engine_instance.run.call_args
+    passed_config = run_call_args[0][0]
+
+    # The node in the passed config should have the ORIGINAL ID "28"
+    assert passed_config.nodes[0].params["dataset_id"] == "28"
+    
+    # Verify SmartCatalog was used
+    # We can check the catalog passed to PipelineEngine constructor
+    init_call_args = mock_engine_class.call_args
+    passed_catalog = init_call_args[1]["catalog"]
+    
+    # It should be a SmartCatalog instance
+    from backend.data.catalog import SmartCatalog
+    assert isinstance(passed_catalog, SmartCatalog)
