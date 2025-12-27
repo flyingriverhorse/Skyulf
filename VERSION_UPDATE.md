@@ -21,6 +21,13 @@ This release finalizes the migration to a fully decoupled, registry-based archit
 - **Node Registry:** All preprocessing nodes now self-register. Removed monolithic pipeline factory in favor of dynamic instantiation.
 - **Artifacts:** Implemented `S3ArtifactStore` for saving models to S3. Added API to browse job artifacts.
 
+### 🧹 Refactoring
+- **Artifact Factory:** Centralized artifact storage logic into `ArtifactFactory`, eliminating code duplication across API, Tasks, and Deployment services.
+- **Job Service:** Created `JobService` to unify job retrieval logic, removing the repetitive "Try TrainingJob then TuningJob" pattern.
+- **Evaluation Service:** Extracted evaluation logic from `api.py` into `EvaluationService`, improving separation of concerns.
+- **Logging:** Moved logging configuration to `backend/utils/logging_utils.py` to clean up `config.py`.
+- **Naming:** Renamed `registry.py` to `node_definitions.py` to avoid confusion with `model_registry`.
+
 ### 🐛 Bug Fixes
 - **S3 Artifacts:** Fixed `500 Internal Server Error` in artifact listing by correcting `AWS_REGION` setting and `s3fs` region configuration.
 - **S3 Inference:** Fixed `400 Bad Request` in prediction endpoint by adding S3 URI support to `DeploymentService`.

@@ -14,6 +14,7 @@ from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 from backend.ml_pipeline.execution.engine import PipelineEngine
 from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
+from backend.ml_pipeline.services.job_service import JobService
 from backend.utils.file_utils import extract_file_path_from_source
 
 logger = logging.getLogger(__name__)
@@ -45,13 +46,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
 
     try:
         # 1. Get Job (Try TrainingJob first, then HyperparameterTuningJob)
-        job = session.query(TrainingJob).filter(TrainingJob.id == job_id).first()
-        if not job:
-            job = (
-                session.query(HyperparameterTuningJob)
-                .filter(HyperparameterTuningJob.id == job_id)
-                .first()
-            )
+        job = JobService.get_job_by_id_sync(session, job_id)
 
         if not job:
             logger.error(

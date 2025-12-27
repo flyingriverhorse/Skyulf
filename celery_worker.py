@@ -11,7 +11,8 @@ import asyncio
 from celery.signals import setup_logging, worker_process_init
 
 from backend.celery_app import celery_app
-from backend.config import setup_universal_logging
+from backend.config import get_settings
+from backend.utils.logging_utils import setup_universal_logging
 
 # Ensure tasks register with the shared Celery app
 from backend.data_ingestion import tasks as _ingestion_tasks  # noqa: F401

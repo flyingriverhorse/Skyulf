@@ -10,6 +10,7 @@ from backend.database.models import (
     HyperparameterTuningJob,
     TrainingJob,
 )
+from backend.ml_pipeline.services.job_service import JobService
 
 from .schemas import ArtifactListResponse, ModelRegistryEntry, ModelVersion, RegistryStats
 
@@ -308,16 +309,8 @@ class ModelRegistryService:
         from backend.ml_pipeline.artifacts.local import LocalArtifactStore
         from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 
-        # 1. Try finding a TrainingJob first
-        stmt = select(TrainingJob).where(TrainingJob.id == job_id)
-        result = await session.execute(stmt)
-        job = result.scalar_one_or_none()
-
-        if not job:
-            # 2. If not found, try HyperparameterTuningJob
-            stmt = select(HyperparameterTuningJob).where(HyperparameterTuningJob.id == job_id)
-            result = await session.execute(stmt)
-            job = result.scalar_one_or_none()
+        # 1. Get Job Entity
+        job = await JobService.get_job_by_id(session, job_id)
         
         if not job:
             raise ValueError(f"Job {job_id} not found")

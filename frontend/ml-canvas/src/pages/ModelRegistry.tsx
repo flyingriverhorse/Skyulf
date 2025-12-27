@@ -399,7 +399,6 @@ export const ModelRegistry: React.FC = () => {
                               </span>
                             )}
                           </div>
-                          <span className="text-xs text-slate-400 font-mono mt-0.5">{model.dataset_id}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
