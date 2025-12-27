@@ -10,7 +10,8 @@ It replaces the Flask run.py with modern async server capabilities.
 import logging
 import sys
 
-from backend.config import get_settings, setup_universal_logging
+from backend.config import get_settings
+from backend.utils.logging_utils import setup_universal_logging
 from backend.main import app
 
 

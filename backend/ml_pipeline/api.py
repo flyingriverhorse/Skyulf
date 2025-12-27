@@ -26,6 +26,7 @@ from backend.database.models import (
 )
 from backend.ml_pipeline.tasks import run_pipeline_task
 from backend.utils.file_utils import extract_file_path_from_source
+from backend.ml_pipeline.services.evaluation_service import EvaluationService
 
 from .artifacts.local import LocalArtifactStore
 from .execution.engine import PipelineEngine
@@ -36,49 +37,10 @@ from .execution.jobs import JobInfo, JobManager
 from .execution.schemas import NodeConfig, PipelineConfig
 
 # from .data.loader import DataLoader
-from .registry import NodeRegistry, RegistryItem
+from .node_definitions import NodeRegistry, RegistryItem
 
 logger = logging.getLogger(__name__)
 
-
-def _extract_target_label_encoder(feature_engineer: object):
-    fitted_steps = getattr(feature_engineer, "fitted_steps", None)
-    if not isinstance(fitted_steps, list):
-        return None
-
-    for step in reversed(fitted_steps):
-        if not isinstance(step, dict):
-            continue
-        if step.get("type") != "LabelEncoder":
-            continue
-        artifact = step.get("artifact")
-        if not isinstance(artifact, dict):
-            continue
-        encoders = artifact.get("encoders")
-        if not isinstance(encoders, dict):
-            continue
-
-        target_encoder = encoders.get("__target__")
-        if target_encoder is not None and hasattr(target_encoder, "inverse_transform"):
-            return target_encoder
-
-    return None
-
-
-def _decode_int_like(values: list, label_encoder) -> list:
-    """Best-effort decode for lists of encoded class indices.
-
-    If values are not int-like (or decoding fails), returns the original list.
-    """
-
-    try:
-        import numpy as np
-
-        arr = np.asarray(values)
-        decoded = label_encoder.inverse_transform(arr.astype(int))
-        return decoded.tolist() if hasattr(decoded, "tolist") else list(decoded)
-    except Exception:
-        return values
 
 # Stubs for deleted modules
 
@@ -770,114 +732,17 @@ async def get_job_evaluation(  # noqa: C901
     job_id: str, session: AsyncSession = Depends(get_async_session)
 ):
     """Retrieves the raw evaluation data (y_true, y_pred) for a job."""
-
-    # 1. Get Job Info
-    stmt = select(TrainingJob).where(TrainingJob.id == job_id)
-    result = await session.execute(stmt)
-    job = result.scalar_one_or_none()
-
-    if not job:
-        # Try Tuning Job
-        stmt = select(HyperparameterTuningJob).where(
-            HyperparameterTuningJob.id == job_id
-        )
-        result = await session.execute(stmt)
-        job = result.scalar_one_or_none()
-
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    # 2. Determine Artifact Path
-    # Matches the path used in run_pipeline (tasks.py)
-    from backend.ml_pipeline.artifacts.factory import ArtifactFactory
-    
-    artifact_uri = job.artifact_uri
-    if not artifact_uri:
-        # Fallback for old jobs or local jobs without explicit URI
-        settings = get_settings()
-        artifact_uri = os.path.join(settings.TRAINING_ARTIFACT_DIR, job_id)
-        
-    artifact_store = ArtifactFactory.get_artifact_store(artifact_uri)
-
-    # 3. Load Evaluation Artifact
-    # Key format: {node_id}_evaluation_data
-    # Or {job_id}_evaluation_data if saved with job_id (which we do now)
-
-    # Try job_id key first (preferred)
-    key = f"{job_id}_evaluation_data"
-    if not artifact_store.exists(key):
-        # Fallback to node_id key
-        key = f"{job.node_id}_evaluation_data"
-
-    if not artifact_store.exists(key):
-        # Fallback: Check if the job failed or is still running
-        if job.status != "completed" and job.status != "succeeded":
-            raise HTTPException(
-                status_code=400,
-                detail=f"Job is {job.status}, evaluation data not available yet.",
-            )
-
-        # Debug info
-        path = artifact_store._get_path(key)
-        raise HTTPException(
-            status_code=404,
-            detail=f"Evaluation data artifact not found. Key: {key}, Path: {path}",
-        )
-
     try:
-        data = artifact_store.load(key)
-        # Verify it belongs to this job (since we share the folder)
-        if data.get("job_id") != job_id:
-            # This confirms the overwrite issue mentioned earlier.
-            # If the ID doesn't match, it means a newer job overwrote it.
-            # We return it anyway with a warning in the logs, or we accept it as "latest for this pipeline".
-            # For now, let's return it but log a warning.
-            logger.warning(
-                f"Evaluation data job_id mismatch. Requested: {job_id}, Found: {data.get('job_id')}"
-            )
-
-        # Optional: decode target labels for nicer UI (ROC selector, confusion matrix)
-        # We can do this at request-time by inspecting the bundled job artifact.
-        try:
-            if artifact_store.exists(job_id):
-                bundle = artifact_store.load(job_id)
-                if isinstance(bundle, dict) and "feature_engineer" in bundle:
-                    feature_engineer = bundle.get("feature_engineer")
-                    label_encoder = _extract_target_label_encoder(feature_engineer)
-
-                    if label_encoder is not None and isinstance(data, dict):
-                        splits = data.get("splits")
-                        if isinstance(splits, dict):
-                            for split_data in splits.values():
-                                if not isinstance(split_data, dict):
-                                    continue
-
-                                if isinstance(split_data.get("y_true"), list):
-                                    split_data["y_true"] = _decode_int_like(
-                                        split_data["y_true"], label_encoder
-                                    )
-                                if isinstance(split_data.get("y_pred"), list):
-                                    split_data["y_pred"] = _decode_int_like(
-                                        split_data["y_pred"], label_encoder
-                                    )
-
-                                y_proba = split_data.get("y_proba")
-                                if (
-                                    isinstance(y_proba, dict)
-                                    and isinstance(y_proba.get("classes"), list)
-                                ):
-                                    # Preserve original classes (often numeric) but also attach decoded labels.
-                                    y_proba["labels"] = _decode_int_like(
-                                        y_proba["classes"], label_encoder
-                                    )
-        except Exception as e:
-            logger.debug(f"Evaluation decode skipped/failed: {e}")
-
-        return data
+        return await EvaluationService.get_job_evaluation(session, job_id)
+    except ValueError as e:
+        # Map ValueError to 404 or 400 depending on message, or just 404/400 generic
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to load evaluation data: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/jobs", response_model=List[JobInfo])

@@ -7,7 +7,7 @@ import pytest
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.execution.engine import PipelineEngine
 from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
-from backend.ml_pipeline.registry import NodeRegistry
+from backend.ml_pipeline.node_definitions import NodeRegistry
 from backend.data.catalog import FileSystemCatalog
 
 # Get all node IDs to ensure we cover them

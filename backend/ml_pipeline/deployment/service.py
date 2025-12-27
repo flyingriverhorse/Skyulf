@@ -11,36 +11,14 @@ from backend.database.models import Deployment, HyperparameterTuningJob, Trainin
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 from backend.ml_pipeline.execution.jobs import JobManager
+from backend.ml_pipeline.services.job_service import JobService
+from backend.ml_pipeline.services.prediction_utils import extract_target_label_encoder
 from backend.config import get_settings
 
 # Ensure sklearn outputs pandas DataFrames where possible to preserve feature names
 sklearn.set_config(transform_output="pandas")
 
 logger = logging.getLogger(__name__)
-
-
-def _extract_target_label_encoder(feature_engineer: Any):
-    fitted_steps = getattr(feature_engineer, "fitted_steps", None)
-    if not isinstance(fitted_steps, list):
-        return None
-
-    # Walk backwards so the most recent LabelEncoder wins
-    for step in reversed(fitted_steps):
-        if not isinstance(step, dict):
-            continue
-        if step.get("type") != "LabelEncoder":
-            continue
-        artifact = step.get("artifact")
-        if not isinstance(artifact, dict):
-            continue
-        encoders = artifact.get("encoders")
-        if not isinstance(encoders, dict):
-            continue
-        target_encoder = encoders.get("__target__")
-        if target_encoder is not None and hasattr(target_encoder, "inverse_transform"):
-            return target_encoder
-
-    return None
 
 
 def _maybe_decode_predictions(predictions: Any, feature_engineer: Any) -> Any:
@@ -51,7 +29,7 @@ def _maybe_decode_predictions(predictions: Any, feature_engineer: Any) -> Any:
     present, or decoding fails, it returns predictions unchanged.
     """
 
-    target_encoder = _extract_target_label_encoder(feature_engineer)
+    target_encoder = extract_target_label_encoder(feature_engineer)
     if target_encoder is None:
         return predictions
 
@@ -77,36 +55,21 @@ class DeploymentService:
     async def deploy_model(
         session: AsyncSession, job_id: str, user_id: Optional[int] = None
     ) -> Deployment:
-        # 1. Get Job Info
-        job = await JobManager.get_job(session, job_id)
-        if not job:
+        # 1. Get Job Entity
+        db_job = await JobService.get_job_by_id(session, job_id)
+        if not db_job:
             raise ValueError(f"Job {job_id} not found")
 
-        if job.status.value not in ["completed", "succeeded"]:
+        if db_job.status not in ["completed", "succeeded"]:
             raise ValueError(f"Job {job_id} is not completed successfully")
 
         # 2. Get Artifact URI
-        artifact_uri = None
-        pipeline_id = job.pipeline_id
-
-        if job.job_type == "training":
-            stmt = select(TrainingJob).where(TrainingJob.id == job_id)
-            result = await session.execute(stmt)
-            db_job = result.scalar_one_or_none()
-            if db_job:
-                artifact_uri = cast(str, db_job.artifact_uri)
-        else:
-            stmt = select(HyperparameterTuningJob).where(
-                HyperparameterTuningJob.id == job_id
-            )
-            result = await session.execute(stmt)
-            db_job = result.scalar_one_or_none()
-            if db_job:
-                artifact_uri = cast(str, db_job.artifact_uri)
+        artifact_uri = db_job.artifact_uri
+        pipeline_id = db_job.pipeline_id
 
         if not artifact_uri:
             # Fallback: use node_id if artifact_uri is missing (legacy jobs)
-            artifact_uri = cast(str, job.node_id)
+            artifact_uri = str(db_job.node_id)
             logger.warning(
                 f"No artifact URI found for job {job_id}, falling back to node_id: {artifact_uri}"
             )
@@ -151,7 +114,7 @@ class DeploymentService:
 
         deployment = Deployment(
             job_id=job_id,
-            model_type=job.model_type or "unknown",
+            model_type=db_job.model_type or "unknown",
             artifact_uri=final_uri,
             is_active=True,
             deployed_by=user_id,
@@ -204,6 +167,7 @@ class DeploymentService:
         # 2. Load Artifact
         try:
             from backend.ml_pipeline.artifacts.factory import ArtifactFactory
+            from backend.ml_pipeline.services.job_service import JobService
             
             uri = deployment.artifact_uri
             store_uri = ""
