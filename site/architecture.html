@@ -583,6 +583,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#node-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node Registry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Catalog
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pipeline-data-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2192,6 +2214,20 @@
 <li>Learning happens on train.</li>
 <li>The learned state is explicit.</li>
 <li>Applying is pure and repeatable.</li>
+</ul>
+<h2 id="node-registry">Node Registry</h2>
+<p>Skyulf uses a <strong>Registry Pattern</strong> to decouple the pipeline orchestrator from specific node implementations.</p>
+<ul>
+<li><strong>Registration</strong>: Nodes self-register using the <code>@NodeRegistry.register("NodeName", ApplierClass)</code> decorator on the Calculator class.</li>
+<li><strong>Discovery</strong>: The pipeline dynamically looks up the Calculator and Applier classes by name at runtime.</li>
+<li><strong>Extensibility</strong>: New nodes can be added simply by creating a new file and decorating the class; no changes to <code>pipeline.py</code> are required.</li>
+</ul>
+<h2 id="data-catalog">Data Catalog</h2>
+<p>To decouple data loading from the execution engine, Skyulf uses a <strong>Data Catalog</strong> pattern.</p>
+<ul>
+<li><strong>Interface</strong>: <code>DataCatalog</code> (in <code>skyulf-core</code>) defines the contract for loading data by identifier.</li>
+<li><strong>Implementation</strong>: <code>FileSystemCatalog</code> (in <code>backend</code>) implements this interface to load files from the local filesystem.</li>
+<li><strong>Usage</strong>: The <code>PipelineEngine</code> is injected with a catalog instance. Nodes request data by ID (or path), and the catalog handles the retrieval.</li>
 </ul>
 <h2 id="pipeline-data-flow">Pipeline Data Flow</h2>
 <p>At runtime, <code>SkyulfPipeline</code> orchestrates:</p>
