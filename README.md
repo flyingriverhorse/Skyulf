@@ -77,6 +77,19 @@ USE_CELERY=false
 ```
 When disabled, background tasks (training, ingestion) will run in background threads within the main application process instead of a separate worker.
 
+### S3 Configuration (Optional)
+To enable S3 integration for data and artifacts, add these to your `.env`:
+```ini
+AWS_ACCESS_KEY_ID=your_key
+AWS_SECRET_ACCESS_KEY=your_secret
+AWS_REGION=us-east-1
+S3_BUCKET_NAME=your-bucket
+# Optional: Upload local training artifacts to S3
+UPLOAD_TO_S3_FOR_LOCAL_FILES=true
+# Optional: Force local storage even for S3 data
+SAVE_S3_ARTIFACTS_LOCALLY=false
+```
+
 ### With Docker Compose (Recommended)
 
 ```powershell
@@ -108,6 +121,7 @@ uv add skyulf-core
 *   **🚀 Modern Backend:** Built on FastAPI for high performance and easy API extension.
 *   **⚡ Async by Default:** Heavy training jobs run in the background via Celery & Redis (or background threads)—your UI never freezes.
 *   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or SQL. Start with SQLite (zero-config) and scale to PostgreSQL.
+*   **☁️ S3 Integration:** Full support for S3-compatible storage (AWS, MinIO) for data ingestion, artifact storage, and model registry.
 *   **🧠 Model Training:** Built-in support for Scikit-Learn models with hyperparameter search (Grid/Random/Halving) and optional Optuna integration.
 *   **📦 Model Registry & Deployment:** Version control your models, track metrics, and deploy them to a live inference API with a single click.
 *   **📊 Experiment Tracking:** Compare multiple runs side-by-side with interactive charts, confusion matrices, and ROC curves.
