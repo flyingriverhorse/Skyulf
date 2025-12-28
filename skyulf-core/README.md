@@ -20,8 +20,6 @@ Visit the full documentation and project site for guides, API reference, and exa
 - Repository: https://github.com/flyingriverhorse/Skyulf
 - PyPI package: https://pypi.org/project/skyulf-core
 
-If you would like the `README.md` to send users immediately to the docs or website, add a prominent link at the top like the badges above. Automatic redirects from GitHub's repository README are not supported in the repository view — for automatic redirect behavior use your website landing page (GitHub Pages) or a custom HTML landing page.
-
 ## Installation
 
 ```bash
