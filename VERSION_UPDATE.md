@@ -8,6 +8,14 @@
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
 
 ------------------------------------------------------------
+## v0.1.6
+**"The Backend Abstraction & Modern Frameworks Update"**
+This release lays the groundwork for backend abstraction, enabling future support for multiple data processing frameworks like Polars and Rust-based extensions.
+
+### 🔧 Backend Architecture
+- **Artifact Naming:** Updated artifact folder naming convention to `dataset_name_timestamp_job_id` for better organization and traceability.
+- **Logging:** Improved artifact saving logs to display the full URI/path instead of just the internal key.
+- **Timezone:** Switched artifact timestamp generation to use local server time instead of UTC database time.
 
 ## v0.1.5
 **"The Registry & Catalog Architecture Update"**

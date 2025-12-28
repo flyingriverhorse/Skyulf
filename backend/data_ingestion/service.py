@@ -1,5 +1,4 @@
 import logging
-import os
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -175,7 +174,7 @@ class DataIngestionService:
                 abs_path = Path(file_path).absolute()
                 if not abs_path.exists():
                     # Try relative to workspace if absolute fails
-                    abs_path = Path(os.getcwd()) / file_path
+                    abs_path = Path.cwd() / file_path
 
                 connector = LocalFileConnector(str(abs_path))
                 await connector.connect()
@@ -240,7 +239,7 @@ class DataIngestionService:
         """
         # 1. Generate unique filename
         filename = file.filename or "unknown"
-        file_ext = os.path.splitext(filename)[1]
+        file_ext = Path(filename).suffix
         file_id = str(uuid.uuid4())
         safe_filename = f"{file_id}{file_ext}"
         file_path = self.upload_dir / safe_filename
@@ -271,7 +270,7 @@ class DataIngestionService:
                         "updated_at": datetime.utcnow().isoformat(),
                     },
                     "original_filename": file.filename,
-                    "file_size": os.path.getsize(file_path),
+                    "file_size": file_path.stat().st_size,
                 },
             )
             self.session.add(new_source)
