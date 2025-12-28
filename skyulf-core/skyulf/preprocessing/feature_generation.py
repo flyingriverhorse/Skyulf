@@ -7,7 +7,7 @@ import pandas as pd
 from sklearn.preprocessing import PolynomialFeatures
 
 from ..registry import NodeRegistry
-from ..utils import pack_pipeline_output, unpack_pipeline_input
+from ..utils import detect_numeric_columns, pack_pipeline_output, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
 
 # --- Optional Dependencies ---
@@ -47,10 +47,6 @@ ALLOWED_DATETIME_FEATURES = {
 }
 
 # --- Helpers ---
-
-
-def _auto_detect_numeric_columns(df: pd.DataFrame) -> List[str]:
-    return list(df.select_dtypes(include=["number"]).columns)
 
 
 def _coerce_float(value: Any) -> Optional[float]:
@@ -184,7 +180,7 @@ class PolynomialFeaturesCalculator(BaseCalculator):
         auto_detect = config.get("auto_detect", False)
 
         if not cols and auto_detect:
-            cols = _auto_detect_numeric_columns(X)
+            cols = detect_numeric_columns(X)
 
         cols = [c for c in cols if c in X.columns]
 

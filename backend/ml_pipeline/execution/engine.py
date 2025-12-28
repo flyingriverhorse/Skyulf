@@ -8,8 +8,6 @@ from typing import Any, Dict, List
 import numpy as np
 import pandas as pd
 
-# Phase 1: Data Loading
-# from ..data.loader import DataLoader
 from skyulf.data.dataset import SplitDataset
 from skyulf.data.catalog import DataCatalog
 from skyulf.modeling.base import StatefulEstimator
@@ -36,10 +34,6 @@ from .schemas import (
     PipelineExecutionResult,
 )
 
-
-# Phase 2: Feature Engineering
-
-# Phase 3: Modeling
 
 logger = logging.getLogger(__name__)
 
@@ -350,7 +344,8 @@ class PipelineEngine:
 
             # Save to job_id key if available - this is the final artifact for the job
             if job_id and job_id != "unknown":
-                self.log(f"Saving bundled artifact to {job_id}")
+                uri = self.artifact_store.get_artifact_uri(job_id)
+                self.log(f"Saving bundled artifact to {uri}")
                 self.artifact_store.save(job_id, full_artifact)
 
         except Exception as e:
@@ -583,7 +578,8 @@ class PipelineEngine:
             # Save evaluation data artifact for API
             if "raw_data" in report:
                 eval_key = f"{job_id}_evaluation_data"
-                self.log(f"Saving evaluation data to {eval_key}")
+                uri = self.artifact_store.get_artifact_uri(eval_key)
+                self.log(f"Saving evaluation data to {uri}")
                 self.artifact_store.save(eval_key, report["raw_data"])
 
             # Flatten metrics for summary with prefixes
@@ -718,7 +714,8 @@ class PipelineEngine:
             # Save evaluation data artifact for API
             if "raw_data" in report:
                 eval_key = f"{job_id}_evaluation_data"
-                self.log(f"Saving evaluation data to {eval_key}")
+                uri = self.artifact_store.get_artifact_uri(eval_key)
+                self.log(f"Saving evaluation data to {uri}")
                 self.artifact_store.save(eval_key, report["raw_data"])
 
             splits = report["splits"]

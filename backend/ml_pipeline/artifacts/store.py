@@ -22,3 +22,8 @@ class ArtifactStore(ABC):
     def list_artifacts(self) -> list[str]:
         """List all artifacts in the store."""
         pass
+
+    @abstractmethod
+    def get_artifact_uri(self, key: str) -> str:
+        """Get the full URI/Path for a given artifact key."""
+        pass

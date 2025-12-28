@@ -46,3 +46,7 @@ class LocalArtifactStore(ArtifactStore):
             else:
                 keys.append(f)
         return keys
+
+    def get_artifact_uri(self, key: str) -> str:
+        """Get the full URI/Path for a given artifact key."""
+        return self._get_path(key)

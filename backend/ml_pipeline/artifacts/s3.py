@@ -108,3 +108,7 @@ class S3ArtifactStore(ArtifactStore):
         except Exception as e:
             logger.error(f"Failed to list artifacts in {base_path}: {e}")
             return []
+
+    def get_artifact_uri(self, key: str) -> str:
+        """Get the full URI/Path for a given artifact key."""
+        return self._get_s3_path(key)

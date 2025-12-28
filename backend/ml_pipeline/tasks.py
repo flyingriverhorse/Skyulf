@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import traceback
 from datetime import datetime
 
@@ -83,7 +84,33 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
                     is_s3_source = True
                 break
         
-        artifact_store, base_artifact_uri = ArtifactFactory.create_store_for_job(job_id, is_s3_source)
+        # Construct folder name: dataset_name + time_created + job_id
+        dataset_name = "unknown_dataset"
+        if job.dataset_source_id:
+             # Try to find by source_id
+             ds = session.query(DataSource).filter(DataSource.source_id == job.dataset_source_id).first()
+             if not ds:
+                 # Try to find by id (if it was stored as string)
+                 try:
+                     ds_id = int(job.dataset_source_id)
+                     ds = session.query(DataSource).filter(DataSource.id == ds_id).first()
+                 except ValueError:
+                     pass
+             
+             if ds:
+                 dataset_name = ds.name
+
+        # Sanitize dataset name
+        dataset_name = re.sub(r'[^a-zA-Z0-9_-]', '_', dataset_name)
+        
+        # Format time
+        # Use datetime.now() to ensure we get the local server time (user's time if running locally)
+        # instead of potentially UTC time from the database
+        time_created = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        folder_name = f"{dataset_name}_{time_created}_{job_id}"
+
+        artifact_store, base_artifact_uri = ArtifactFactory.create_store_for_job(job_id, is_s3_source, artifact_path_name=folder_name)
         
         # Save the URI to the job immediately so we know where to look later
         job.artifact_uri = base_artifact_uri
