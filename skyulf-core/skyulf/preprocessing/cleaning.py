@@ -7,6 +7,7 @@ import pandas as pd
 from ..utils import pack_pipeline_output, resolve_columns, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
+from ..engines import SkyulfDataFrame, get_engine
 
 # --- Constants ---
 ALIAS_PUNCTUATION_TABLE = str.maketrans("", "", string.punctuation)
@@ -68,10 +69,11 @@ def _auto_detect_datetime_columns(df: pd.DataFrame) -> List[str]:
 class TextCleaningApplier(BaseApplier):
     def apply(  # noqa: C901
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         if not params or not params.get("columns"):
             return pack_pipeline_output(X, y, is_tuple)
@@ -83,6 +85,80 @@ class TextCleaningApplier(BaseApplier):
         if not valid_cols or not operations:
             return pack_pipeline_output(X, y, is_tuple)
 
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+            
+            exprs = []
+            for col in valid_cols:
+                expr = pl.col(col).cast(pl.String)
+                
+                for op in operations:
+                    op_type = op.get("op")
+                    
+                    if op_type == "trim":
+                        mode = op.get("mode", "both")
+                        if mode == "leading":
+                            expr = expr.str.strip_chars_start()
+                        elif mode == "trailing":
+                            expr = expr.str.strip_chars_end()
+                        else:
+                            expr = expr.str.strip_chars()
+                            
+                    elif op_type == "case":
+                        mode = op.get("mode", "lower")
+                        if mode == "upper":
+                            expr = expr.str.to_uppercase()
+                        elif mode == "title":
+                            expr = expr.str.to_titlecase()
+                        elif mode == "sentence":
+                            # Capitalize first char, lower the rest
+                            expr = (
+                                expr.str.slice(0, 1).str.to_uppercase() + 
+                                expr.str.slice(1).str.to_lowercase()
+                            )
+                        else:
+                            expr = expr.str.to_lowercase()
+                            
+                    elif op_type == "remove_special":
+                        mode = op.get("mode", "keep_alphanumeric")
+                        replacement = op.get("replacement", "")
+                        
+                        pattern = ""
+                        if mode == "keep_alphanumeric":
+                            pattern = r"[^a-zA-Z0-9]"
+                        elif mode == "keep_alphanumeric_space":
+                            pattern = r"[^a-zA-Z0-9\s]"
+                        elif mode == "letters_only":
+                            pattern = r"[^a-zA-Z]"
+                        elif mode == "digits_only":
+                            pattern = r"[^0-9]"
+                            
+                        if pattern:
+                            expr = expr.str.replace_all(pattern, replacement)
+                            
+                    elif op_type == "regex":
+                        mode = op.get("mode", "custom")
+                        
+                        if mode == "collapse_whitespace":
+                            expr = expr.str.replace_all(r"\s+", " ").str.strip_chars()
+                        elif mode == "extract_digits":
+                            # extract first group
+                            expr = expr.str.extract(r"(\d+)", 1)
+                        elif mode == "normalize_slash_dates":
+                            pass
+                        elif mode == "custom":
+                            pattern = op.get("pattern")
+                            repl = op.get("repl", "")
+                            if pattern:
+                                expr = expr.str.replace_all(pattern, repl)
+                                
+                exprs.append(expr.alias(col))
+            
+            X_out = X.with_columns(exprs)
+            return pack_pipeline_output(X_out, y, is_tuple)
+
+        # Pandas Path
         df_out = X.copy()
 
         for col in valid_cols:
@@ -187,16 +263,141 @@ class TextCleaningCalculator(BaseCalculator):
         return {"type": "text_cleaning", "columns": cols, "operations": operations}
 
 
-# --- Value Replacement ---
+# --- Invalid Value Replacement ---
+
+
+class InvalidValueReplacementApplier(BaseApplier):
+    def apply(
+        self,
+        df: SkyulfDataFrame,
+        params: Dict[str, Any],
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
+
+        cols = params.get("columns", [])
+        
+        # Params
+        replace_inf = params.get("replace_inf", False)
+        replace_neg_inf = params.get("replace_neg_inf", False)
+        rule = params.get("rule")
+        
+        # Unify replacement value
+        replacement = params.get("replacement", np.nan)
+        value = params.get("value")
+        final_replacement = value if value is not None else replacement
+        
+        min_value = params.get("min_value")
+        max_value = params.get("max_value")
+
+        valid_cols = [c for c in cols if c in X.columns]
+        if not valid_cols:
+            return pack_pipeline_output(X, y, is_tuple)
+
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+            
+            exprs = []
+            for col in valid_cols:
+                expr = pl.col(col)
+                
+                # 1. Handle Inf
+                if replace_inf:
+                    expr = pl.when(expr == float('inf')).then(final_replacement).otherwise(expr)
+                if replace_neg_inf:
+                    expr = pl.when(expr == float('-inf')).then(final_replacement).otherwise(expr)
+                    
+                # 2. Handle Rules
+                if rule == "negative":
+                    expr = pl.when(expr < 0).then(final_replacement).otherwise(expr)
+                elif rule == "zero":
+                    expr = pl.when(expr == 0).then(final_replacement).otherwise(expr)
+                elif rule == "custom_range":
+                    if min_value is not None and max_value is not None:
+                        expr = pl.when((expr < min_value) | (expr > max_value)).then(final_replacement).otherwise(expr)
+                    elif min_value is not None:
+                        expr = pl.when(expr < min_value).then(final_replacement).otherwise(expr)
+                    elif max_value is not None:
+                        expr = pl.when(expr > max_value).then(final_replacement).otherwise(expr)
+                        
+                exprs.append(expr.alias(col))
+            
+            X_out = X.with_columns(exprs)
+            return pack_pipeline_output(X_out, y, is_tuple)
+
+        # Pandas Path
+        df_out = X.copy()
+        
+        for col in valid_cols:
+            # Ensure numeric
+            df_out[col] = pd.to_numeric(df_out[col], errors="coerce")
+            
+            # 1. Handle Inf
+            to_replace = []
+            if replace_inf:
+                to_replace.append(np.inf)
+            if replace_neg_inf:
+                to_replace.append(-np.inf)
+            
+            if to_replace:
+                df_out[col] = df_out[col].replace(to_replace, final_replacement)
+                
+            # 2. Handle Rules
+            series = df_out[col]
+            mask = None
+            
+            if rule == "negative":
+                mask = series < 0
+            elif rule == "zero":
+                mask = series == 0
+            elif rule == "negative_to_nan":
+                mask = series < 0
+            elif rule == "custom_range":
+                if min_value is not None and max_value is not None:
+                    mask = (series < min_value) | (series > max_value)
+                elif min_value is not None:
+                    mask = series < min_value
+                elif max_value is not None:
+                    mask = series > max_value
+            
+            if mask is not None:
+                df_out.loc[mask, col] = final_replacement
+
+        return pack_pipeline_output(df_out, y, is_tuple)
+
+
+@NodeRegistry.register("InvalidValueReplacement", InvalidValueReplacementApplier)
+class InvalidValueReplacementCalculator(BaseCalculator):
+    def fit(
+        self,
+        df: SkyulfDataFrame,
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        X, _, _ = unpack_pipeline_input(df)
+        cols = resolve_columns(X, config, _auto_detect_numeric_columns)
+        
+        return {
+            "type": "invalid_value_replacement",
+            "columns": cols,
+            "replace_inf": config.get("replace_inf", False),
+            "replace_neg_inf": config.get("replace_neg_inf", False),
+            "rule": config.get("rule") or config.get("mode"),
+            "replacement": config.get("replacement", np.nan),
+            "value": config.get("value"),
+            "min_value": config.get("min_value"),
+            "max_value": config.get("max_value"),
+        }
 
 
 class ValueReplacementApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         cols = params.get("columns", [])
         mapping = params.get("mapping")
@@ -207,6 +408,47 @@ class ValueReplacementApplier(BaseApplier):
         if not valid_cols:
             return pack_pipeline_output(X, y, is_tuple)
 
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+            
+            exprs = []
+            
+            if mapping:
+                is_nested = any(isinstance(v, dict) for v in mapping.values())
+                
+                if is_nested:
+                    # Column-specific mapping
+                    for col in valid_cols:
+                        if col in mapping:
+                            map_dict = mapping[col]
+                            # Polars replace: mapping dict
+                            # We need to ensure types match or use strict=False
+                            # map_dict keys/values should be compatible with col type
+                            exprs.append(pl.col(col).replace(map_dict, default=pl.col(col)).alias(col))
+                else:
+                    # Global mapping
+                    for col in valid_cols:
+                        exprs.append(pl.col(col).replace(mapping, default=pl.col(col)).alias(col))
+            
+            else:
+                # Global replacement
+                if to_replace is not None:
+                    for col in valid_cols:
+                        if isinstance(to_replace, (dict, pd.Series)) or hasattr(to_replace, "items"):
+                             exprs.append(pl.col(col).replace(to_replace, default=pl.col(col)).alias(col))
+                        else:
+                            # Replace single value
+                            # pl.when(col == to_replace).then(value).otherwise(col)
+                            # But replace is easier
+                            exprs.append(pl.col(col).replace({to_replace: value}, default=pl.col(col)).alias(col))
+            
+            if exprs:
+                X_out = X.with_columns(exprs)
+                return pack_pipeline_output(X_out, y, is_tuple)
+            return pack_pipeline_output(X, y, is_tuple)
+
+        # Pandas Path
         df_out = X.copy()
 
         if mapping:
@@ -241,7 +483,7 @@ class ValueReplacementApplier(BaseApplier):
 class ValueReplacementCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -275,10 +517,11 @@ class ValueReplacementCalculator(BaseCalculator):
 class AliasReplacementApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         cols = params.get("columns", [])
         alias_type = params.get("alias_type", "boolean")
@@ -288,8 +531,6 @@ class AliasReplacementApplier(BaseApplier):
         if not valid_cols:
             return pack_pipeline_output(X, y, is_tuple)
 
-        df_out = X.copy()
-
         # Prepare the mapping
         mapping = {}
         if alias_type == "boolean":
@@ -298,6 +539,60 @@ class AliasReplacementApplier(BaseApplier):
             mapping = COUNTRY_ALIAS_MAP
         elif alias_type == "custom":
             mapping = custom_map
+
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+            import re
+            
+            # Construct regex for punctuation removal
+            # We want to remove punctuation and spaces, then lower case
+            # Python: val.lower().translate(ALIAS_PUNCTUATION_TABLE).replace(" ", "")
+            
+            escaped_punct = re.escape(string.punctuation)
+            
+            exprs = []
+            for col in valid_cols:
+                # 1. Clean: lower -> remove punct -> remove space
+                clean_expr = (
+                    pl.col(col)
+                    .cast(pl.String)
+                    .str.to_lowercase()
+                    .str.replace_all(f"[{escaped_punct}]", "")
+                    .str.replace_all(" ", "")
+                )
+                
+                # 2. Map
+                # replace(mapping, default=None) -> if not found, returns null? 
+                # No, replace returns default if not found.
+                # We want: if found in mapping, use mapped value. If not found, use ORIGINAL value.
+                # So:
+                # mapped = clean.replace(mapping, default=None)
+                # result = coalesce(mapped, original)
+                
+                # Note: replace in Polars with a dict maps keys to values.
+                # If a value is not in keys, it keeps it AS IS (if default is not set) or uses default.
+                # But here 'clean_expr' is the CLEANED value (e.g. "usa").
+                # If "usa" is in mapping, it becomes "USA".
+                # If "foobar" is NOT in mapping, it stays "foobar".
+                # But we want to revert to ORIGINAL "Foo Bar" if not found?
+                # The pandas code says: mapped_series.fillna(df_out[col])
+                # Pandas map returns NaN if not found.
+                # Polars replace returns original value if not found (by default).
+                # So we need `replace(mapping, default=None)` to get nulls for non-matches.
+                
+                mapped_expr = clean_expr.replace(mapping, default=None)
+                
+                # 3. Coalesce with original
+                final_expr = pl.coalesce([mapped_expr, pl.col(col)])
+                
+                exprs.append(final_expr.alias(col))
+            
+            X_out = X.with_columns(exprs)
+            return pack_pipeline_output(X_out, y, is_tuple)
+
+        # Pandas Path
+        df_out = X.copy()
 
         # Normalize function
         def normalize(val):
@@ -334,7 +629,7 @@ class AliasReplacementApplier(BaseApplier):
 class AliasReplacementCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -373,77 +668,4 @@ class AliasReplacementCalculator(BaseCalculator):
         }
 
 
-# --- Invalid Value Replacement ---
 
-
-class InvalidValueReplacementApplier(BaseApplier):
-    def apply(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
-        X, y, is_tuple = unpack_pipeline_input(df)
-
-        cols = params.get("columns", [])
-        rule = params.get("rule")
-        replacement = params.get("replacement", np.nan)
-        min_value = params.get("min_value")
-        max_value = params.get("max_value")
-
-        valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols:
-            return pack_pipeline_output(X, y, is_tuple)
-
-        df_out = X.copy()
-
-        for col in valid_cols:
-            series = pd.to_numeric(df_out[col], errors="coerce")  # Ensure numeric
-
-            mask = None
-            if rule == "negative":
-                mask = series < 0
-            elif rule == "zero":
-                mask = series == 0
-            elif rule == "negative_to_nan":  # Alias for negative with nan replacement
-                mask = series < 0
-            elif rule == "custom_range":
-                if min_value is not None and max_value is not None:
-                    mask = (series < min_value) | (series > max_value)
-                elif min_value is not None:
-                    mask = series < min_value
-                elif max_value is not None:
-                    mask = series > max_value
-
-            if mask is not None:
-                df_out.loc[mask, col] = replacement
-
-        return pack_pipeline_output(df_out, y, is_tuple)
-
-
-@NodeRegistry.register("InvalidValueReplacement", InvalidValueReplacementApplier)
-class InvalidValueReplacementCalculator(BaseCalculator):
-    def fit(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
-        cols = resolve_columns(X, config)
-
-        # Config: {'rule': 'negative', 'replacement': np.nan}
-        # Support 'mode' as alias for 'rule'
-        rule = config.get("rule") or config.get("mode", "negative")
-        replacement = config.get("replacement", np.nan)
-
-        # Support min_value and max_value for custom_range
-        min_value = config.get("min_value")
-        max_value = config.get("max_value")
-
-        return {
-            "type": "invalid_value_replacement",
-            "columns": cols,
-            "rule": rule,
-            "replacement": replacement,
-            "min_value": min_value,
-            "max_value": max_value,
-        }

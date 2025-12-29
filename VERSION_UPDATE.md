@@ -19,6 +19,8 @@ This release lays the groundwork for backend abstraction, enabling future suppor
 - **Sklearn Bridge:** Implemented `SklearnBridge` to seamlessly convert Polars/Arrow data to Numpy for Scikit-Learn compatibility without unnecessary copies.
 - **Node Migration:** Migrated `StandardScaler`, `MinMaxScaler`, `RobustScaler`, `MaxAbsScaler`, and `SimpleImputer` to use native Polars expressions for significant performance gains.
 - **Node Migration (Bucketing & Outliers):** Migrated `KBinsDiscretizer`, `IQR`, `ZScore`, `Winsorize`, `ManualBounds`, and `EllipticEnvelope` to support Polars (native expressions where possible, bridge for sklearn models).
+- **Node Migration (Cleaning & Drop/Missing):** Migrated `TextCleaning`, `ValueReplacement`, `AliasReplacement`, `InvalidValueReplacement`, `Deduplicate`, `DropMissingColumns`, `DropMissingRows`, and `MissingIndicator` to support Polars.
+- **Refactoring:** Moved `MissingIndicator` to `drop_and_missing.py` and merged `InvalidValueReplacement` logic to support both infinite values and rule-based replacement.
 - **Compatibility:** Updated `OneHotEncoder`, `OrdinalEncoder`, `TargetEncoder`, `HashEncoder`, `DummyEncoder`, `KNNImputer`, and `IterativeImputer` to work with Polars inputs via the bridge.
 - **Validation:** Added `compliance_suite.py` to verify parity between Pandas and Polars implementations.
 
