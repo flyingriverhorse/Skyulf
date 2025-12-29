@@ -5,6 +5,8 @@ import pandas as pd
 
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
+from ..engines import SkyulfDataFrame, get_engine
+from ..utils import pack_pipeline_output, unpack_pipeline_input
 
 # Map common aliases to pandas types
 TYPE_ALIASES = {
@@ -60,24 +62,70 @@ def _coerce_boolean_value(value: Any) -> Optional[bool]:
 
 class CastingApplier(BaseApplier):
     def apply(
-        self, df: Union[pd.DataFrame, Tuple[Any, ...]], params: Dict[str, Any]
-    ) -> Union[pd.DataFrame, Tuple[Any, ...]]:
-        if isinstance(df, tuple):
-            if len(df) > 0 and isinstance(df[0], pd.DataFrame):
-                X = df[0]
-                X_new = self._apply_dataframe(X, params)
-                return (X_new,) + df[1:]
-            return df
-        return self._apply_dataframe(df, params)
-
-    def _apply_dataframe(  # noqa: C901
-        self, df: pd.DataFrame, params: Dict[str, Any]
-    ) -> pd.DataFrame:
+        self, df: SkyulfDataFrame, params: Dict[str, Any]
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
+        
         type_map = params.get("type_map", {})
         coerce_on_error = params.get("coerce_on_error", True)
 
         if not type_map:
-            return df
+            return pack_pipeline_output(X, y, is_tuple)
+
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+            
+            exprs = []
+            for col, target_dtype in type_map.items():
+                if col not in X.columns:
+                    continue
+                
+                dtype_str = str(target_dtype).lower()
+                pl_dtype = None
+                
+                # Map to Polars types
+                if dtype_str in ["float", "float64", "double", "numeric"]:
+                    pl_dtype = pl.Float64
+                elif dtype_str == "float32":
+                    pl_dtype = pl.Float32
+                elif dtype_str in ["int", "int64", "integer"]:
+                    pl_dtype = pl.Int64
+                elif dtype_str == "int32":
+                    pl_dtype = pl.Int32
+                elif dtype_str in ["string", "str", "text"]:
+                    pl_dtype = pl.String
+                elif dtype_str in ["bool", "boolean"]:
+                    pl_dtype = pl.Boolean
+                elif dtype_str in ["category", "categorical"]:
+                    pl_dtype = pl.Categorical
+                elif dtype_str.startswith("datetime") or dtype_str == "date":
+                    pl_dtype = pl.Datetime
+                
+                if pl_dtype:
+                    # Handle coercion if needed (strict=False returns null on error)
+                    if coerce_on_error:
+                        exprs.append(pl.col(col).cast(pl_dtype, strict=False).alias(col))
+                    else:
+                        exprs.append(pl.col(col).cast(pl_dtype, strict=True).alias(col))
+                else:
+                    # Fallback or unknown type
+                    pass
+            
+            if exprs:
+                X = X.with_columns(exprs)
+            
+            return pack_pipeline_output(X, y, is_tuple)
+
+        # Pandas Path
+        return self._apply_dataframe(X, params, y, is_tuple)
+
+    def _apply_dataframe(  # noqa: C901
+        self, df: pd.DataFrame, params: Dict[str, Any], y=None, is_tuple=False
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, Any]]:
+        type_map = params.get("type_map", {})
+        coerce_on_error = params.get("coerce_on_error", True)
 
         df_out = df.copy()
 
@@ -97,6 +145,7 @@ class CastingApplier(BaseApplier):
                         series, errors="coerce" if coerce_on_error else "raise"
                     )
                     df_out[col] = numeric.astype(target_dtype)
+
 
                 elif dtype_str.startswith("int"):
                     # Int Family
@@ -170,27 +219,22 @@ class CastingApplier(BaseApplier):
                 # If coercion is on, we might leave it as is or try best effort?
                 pass
 
-        return df_out
+        return pack_pipeline_output(df_out, y, is_tuple)
 
 
 @NodeRegistry.register("Casting", CastingApplier)
 class CastingCalculator(BaseCalculator):
     def fit(
-        self, df: Union[pd.DataFrame, Tuple[Any, ...]], config: Dict[str, Any]
+        self, df: SkyulfDataFrame, config: Dict[str, Any]
     ) -> Dict[str, Any]:
         # Config: {'columns': ['col1'], 'target_type': 'float'}
         # OR {'column_types': {'col1': 'float', 'col2': 'int'}}
-
-        if isinstance(df, tuple):
-            if len(df) > 0 and isinstance(df[0], pd.DataFrame):
-                df = df[0]
-            else:
-                return {
-                    "type": "casting",
-                    "type_map": {},
-                    "coerce_on_error": config.get("coerce_on_error", True),
-                }
-
+        
+        X, _, _ = unpack_pipeline_input(df)
+        # We don't need to convert to pandas just to check columns, 
+        # but let's keep it consistent if we need complex logic.
+        # Here we just check columns existence.
+        
         target_type = config.get("target_type")
         columns = config.get("columns", [])
         column_types = config.get("column_types", {})
@@ -200,14 +244,14 @@ class CastingCalculator(BaseCalculator):
 
         # 1. Process explicit map
         for col, dtype in column_types.items():
-            if col in df.columns:
+            if col in X.columns:
                 final_map[col] = TYPE_ALIASES.get(str(dtype).lower(), dtype)
 
         # 2. Process list + single type
         if target_type and columns:
             resolved_type = TYPE_ALIASES.get(str(target_type).lower(), target_type)
             for col in columns:
-                if col in df.columns:
+                if col in X.columns:
                     final_map[col] = resolved_type
 
         return {

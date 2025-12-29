@@ -37,6 +37,26 @@ from skyulf.preprocessing.outliers import (
     ManualBoundsCalculator, ManualBoundsApplier,
     EllipticEnvelopeCalculator, EllipticEnvelopeApplier
 )
+from skyulf.preprocessing.casting import (
+    CastingCalculator, CastingApplier
+)
+from skyulf.preprocessing.cleaning import (
+    TextCleaningApplier,
+    ValueReplacementApplier,
+    AliasReplacementApplier,
+    InvalidValueReplacementApplier
+)
+from skyulf.preprocessing.imputation import (
+    SimpleImputerCalculator, SimpleImputerApplier,
+    KNNImputerCalculator, KNNImputerApplier,
+    IterativeImputerCalculator, IterativeImputerApplier
+)
+from skyulf.preprocessing.drop_and_missing import (
+    DeduplicateCalculator, DeduplicateApplier,
+    DropMissingColumnsCalculator, DropMissingColumnsApplier,
+    DropMissingRowsApplier,
+    MissingIndicatorCalculator, MissingIndicatorApplier
+)
 from skyulf.engines import get_engine
 
 @pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
@@ -593,6 +613,276 @@ def test_elliptic_envelope_parity():
     pd.testing.assert_frame_equal(res_pd.reset_index(drop=True), res_pl.to_pandas().reset_index(drop=True), check_dtype=False)
     print("EllipticEnvelope Parity Test Passed!")
 
+@pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
+def test_casting_parity():
+    print("Starting Casting Parity Test...")
+    data = {"a": ["1", "2", "3"], "b": [1, 2, 3], "c": ["x", "y", "z"]}
+    df_pd = pd.DataFrame(data)
+    df_pl = pl.DataFrame(data)
+    
+    config = {"columns": ["a", "b", "c"], "target_type": "float"} # This config is for Calculator fit, but CastingCalculator fit just returns config
+    
+    # CastingCalculator fit
+    calc = CastingCalculator()
+    params_pd = calc.fit(df_pd, config)
+    params_pl = calc.fit(df_pl, config)
+    
+    assert params_pd == params_pl
+    
+    # CastingApplier apply
+    # Let's test specific casting
+    # a -> float, b -> string, c -> category
+    params = {
+        "columns": ["a", "b", "c"],
+        "target_type": "float", 
+    }
+    
+    # Let's construct params manually for Applier to test multiple types
+    params_mixed = {
+        "type_map": {
+            "a": "float",
+            "b": "string",
+            "c": "category"
+        }
+    }
+    
+    applier = CastingApplier()
+    res_pd = applier.apply(df_pd, params_mixed)
+    res_pl = applier.apply(df_pl, params_mixed)
+    
+    # Check types
+    assert pd.api.types.is_float_dtype(res_pd["a"])
+    assert pd.api.types.is_string_dtype(res_pd["b"]) or pd.api.types.is_object_dtype(res_pd["b"])
+    assert isinstance(res_pd["c"].dtype, pd.CategoricalDtype)
+    
+    assert res_pl["a"].dtype == pl.Float64
+    assert res_pl["b"].dtype == pl.String
+    assert res_pl["c"].dtype == pl.Categorical
+    
+    # Check values
+    pd.testing.assert_frame_equal(res_pd, res_pl.to_pandas(), check_dtype=False)
+    print("Casting Parity Test Passed!")
+
+@pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
+def test_text_cleaning_parity():
+    print("Starting Text Cleaning Parity Test...")
+    data = {
+        "text": ["  Hello World  ", "Foo Bar", "123 Go!"],
+        "mixed": ["UPPER", "lower", "MiXeD"]
+    }
+    df_pd = pd.DataFrame(data)
+    df_pl = pl.DataFrame(data)
+    
+    params = {
+        "columns": ["text", "mixed"],
+        "operations": [
+            {"op": "trim", "mode": "both"},
+            {"op": "case", "mode": "lower"},
+            {"op": "remove_special", "mode": "keep_alphanumeric_space"}
+        ]
+    }
+    
+    applier = TextCleaningApplier()
+    res_pd = applier.apply(df_pd, params)
+    res_pl = applier.apply(df_pl, params)
+    
+    # Expected:
+    # "  Hello World  " -> "hello world"
+    # "Foo Bar" -> "foo bar"
+    # "123 Go!" -> "123 go" (exclamation removed)
+    
+    pd.testing.assert_frame_equal(res_pd, res_pl.to_pandas(), check_dtype=False)
+    print("Text Cleaning Parity Test Passed!")
+
+@pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
+def test_value_replacement_parity():
+    print("Starting ValueReplacement Parity Test...")
+    data = {"a": [1, 2, 3, 4], "b": ["x", "y", "z", "x"]}
+    df_pd = pd.DataFrame(data)
+    df_pl = pl.DataFrame(data)
+    
+    # Test 1: Global mapping
+    params_map = {"columns": ["a"], "mapping": {1: 10, 2: 20}}
+    applier = ValueReplacementApplier()
+    res_pd = applier.apply(df_pd, params_map)
+    res_pl = applier.apply(df_pl, params_map)
+    pd.testing.assert_frame_equal(res_pd, res_pl.to_pandas(), check_dtype=False)
+    
+    # Test 2: Column specific mapping
+    params_nested = {"columns": ["a", "b"], "mapping": {"a": {3: 30}, "b": {"x": "X"}}}
+    res_pd_n = applier.apply(df_pd, params_nested)
+    res_pl_n = applier.apply(df_pl, params_nested)
+    pd.testing.assert_frame_equal(res_pd_n, res_pl_n.to_pandas(), check_dtype=False)
+    
+    # Test 3: to_replace / value
+    params_val = {"columns": ["a"], "to_replace": 4, "value": 40}
+    res_pd_v = applier.apply(df_pd, params_val)
+    res_pl_v = applier.apply(df_pl, params_val)
+    pd.testing.assert_frame_equal(res_pd_v, res_pl_v.to_pandas(), check_dtype=False)
+    
+    print("ValueReplacement Parity Test Passed!")
+
+@pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
+def test_alias_replacement_parity():
+    print("Starting AliasReplacement Parity Test...")
+    data = {"country": ["U.S.A.", "united states", "UK", "Great Britain", "Other"]}
+    df_pd = pd.DataFrame(data)
+    df_pl = pl.DataFrame(data)
+    
+    params = {"columns": ["country"], "alias_type": "country"}
+    
+    applier = AliasReplacementApplier()
+    res_pd = applier.apply(df_pd, params)
+    res_pl = applier.apply(df_pl, params)
+    
+    # Expected: "USA", "USA", "United Kingdom", "United Kingdom", "Other"
+    
+    pd.testing.assert_frame_equal(res_pd, res_pl.to_pandas(), check_dtype=False)
+    print("AliasReplacement Parity Test Passed!")
+
+@pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
+def test_invalid_value_replacement_parity():
+    print("Starting InvalidValueReplacement Parity Test...")
+    data = {"a": [1.0, np.inf, -np.inf, 4.0]}
+    df_pd = pd.DataFrame(data)
+    df_pl = pl.DataFrame(data)
+    
+    # Test 1: Replace both infs with NaN (default)
+    params = {"columns": ["a"], "replace_inf": True, "replace_neg_inf": True, "value": None}
+    applier = InvalidValueReplacementApplier()
+    res_pd = applier.apply(df_pd, params)
+    res_pl = applier.apply(df_pl, params)
+    
+    # Should be [1.0, NaN, NaN, 4.0]
+    assert np.isnan(res_pd["a"][1])
+    assert np.isnan(res_pd["a"][2])
+    
+    pd.testing.assert_frame_equal(res_pd, res_pl.to_pandas(), check_dtype=False)
+    
+    # Test 2: Replace only +inf with 999
+    params_pos = {"columns": ["a"], "replace_inf": True, "replace_neg_inf": False, "value": 999.0}
+    res_pd_p = applier.apply(df_pd, params_pos)
+    res_pl_p = applier.apply(df_pl, params_pos)
+    
+    # Should be [1.0, 999.0, -inf, 4.0]
+    assert res_pd_p["a"][1] == 999.0
+    assert res_pd_p["a"][2] == -np.inf
+    
+    pd.testing.assert_frame_equal(res_pd_p, res_pl_p.to_pandas(), check_dtype=False)
+    print("InvalidValueReplacement Parity Test Passed!")
+
+@pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
+def test_missing_indicator_parity():
+    print("Starting MissingIndicator Parity Test...")
+    data = {"a": [1, None, 3], "b": [None, 2, 3]}
+    df_pd = pd.DataFrame(data)
+    df_pl = pl.DataFrame(data)
+    
+    config = {} # Auto detect
+    calc = MissingIndicatorCalculator()
+    params_pd = calc.fit(df_pd, config)
+    params_pl = calc.fit(df_pl, config)
+    
+    assert set(params_pd["columns"]) == {"a", "b"}
+    assert set(params_pl["columns"]) == {"a", "b"}
+    
+    applier = MissingIndicatorApplier()
+    res_pd = applier.apply(df_pd, params_pd)
+    res_pl = applier.apply(df_pl, params_pl)
+    
+    # Should have a_missing, b_missing
+    assert "a_missing" in res_pd.columns
+    assert "b_missing" in res_pd.columns
+    
+    pd.testing.assert_frame_equal(res_pd, res_pl.to_pandas(), check_dtype=False)
+    print("MissingIndicator Parity Test Passed!")
+
+@pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
+def test_deduplicate_parity():
+    print("Starting Deduplicate Parity Test...")
+    data = {"id": [1, 1, 2, 3, 3], "val": ["a", "b", "c", "d", "e"]}
+    df_pd = pd.DataFrame(data)
+    df_pl = pl.DataFrame(data)
+    
+    params = {"subset": ["id"], "keep": "first"}
+    
+    applier = DeduplicateApplier()
+    res_pd = applier.apply(df_pd, params)
+    res_pl = applier.apply(df_pl, params)
+    
+    # Should keep 1-a, 2-c, 3-d
+    assert len(res_pd) == 3
+    assert len(res_pl) == 3
+    
+    pd.testing.assert_frame_equal(res_pd.reset_index(drop=True), res_pl.to_pandas().reset_index(drop=True), check_dtype=False)
+    print("Deduplicate Parity Test Passed!")
+
+@pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
+def test_drop_missing_columns_parity():
+    print("Starting DropMissingColumns Parity Test...")
+    data = {
+        "a": [1, 2, 3, 4],
+        "b": [1, None, None, 4], # 50% missing
+        "c": [None, None, None, None] # 100% missing
+    }
+    df_pd = pd.DataFrame(data)
+    df_pl = pl.DataFrame(data)
+    
+    config = {"missing_threshold": 40.0} # Drop if >= 40% missing
+    
+    calc = DropMissingColumnsCalculator()
+    params_pd = calc.fit(df_pd, config)
+    params_pl = calc.fit(df_pl, config)
+    
+    # Should drop b and c
+    assert "b" in params_pd["columns_to_drop"]
+    assert "c" in params_pd["columns_to_drop"]
+    assert set(params_pd["columns_to_drop"]) == set(params_pl["columns_to_drop"])
+    
+    applier = DropMissingColumnsApplier()
+    res_pd = applier.apply(df_pd, params_pd)
+    res_pl = applier.apply(df_pl, params_pl)
+    
+    assert "b" not in res_pd.columns
+    assert "c" not in res_pd.columns
+    assert "a" in res_pd.columns
+    
+    pd.testing.assert_frame_equal(res_pd, res_pl.to_pandas(), check_dtype=False)
+    print("DropMissingColumns Parity Test Passed!")
+
+@pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
+def test_drop_missing_rows_parity():
+    print("Starting DropMissingRows Parity Test...")
+    data = {
+        "a": [1, 2, None, 4],
+        "b": [1, None, None, 4]
+    }
+    df_pd = pd.DataFrame(data)
+    df_pl = pl.DataFrame(data)
+    
+    # Test 'any'
+    params_any = {"subset": ["a", "b"], "how": "any"}
+    applier = DropMissingRowsApplier()
+    res_pd = applier.apply(df_pd, params_any)
+    res_pl = applier.apply(df_pl, params_any)
+    
+    # Should drop row 1 (b is None) and row 2 (a and b are None)
+    # Keep row 0 and 3
+    assert len(res_pd) == 2
+    pd.testing.assert_frame_equal(res_pd.reset_index(drop=True), res_pl.to_pandas().reset_index(drop=True), check_dtype=False)
+    
+    # Test 'threshold'
+    params_thresh = {"subset": ["a", "b"], "threshold": 1} # Keep if at least 1 non-null
+    res_pd_t = applier.apply(df_pd, params_thresh)
+    res_pl_t = applier.apply(df_pl, params_thresh)
+    
+    # Should keep row 0 (2 non-null), row 1 (1 non-null), row 3 (2 non-null)
+    # Drop row 2 (0 non-null)
+    assert len(res_pd_t) == 3
+    pd.testing.assert_frame_equal(res_pd_t.reset_index(drop=True), res_pl_t.to_pandas().reset_index(drop=True), check_dtype=False)
+    
+    print("DropMissingRows Parity Test Passed!")
+
 if __name__ == "__main__":
     print(f"Has Polars: {HAS_POLARS}")
     if HAS_POLARS:
@@ -608,13 +898,21 @@ if __name__ == "__main__":
         test_dummy_encoder_parity()
         test_knn_imputer_parity()
         test_iterative_imputer_parity()
-        test_bucketing_parity()
+        test_general_binning_parity()
+        test_custom_binning_parity()
         test_iqr_parity()
         test_zscore_parity()
         test_winsorize_parity()
         test_manual_bounds_parity()
-        test_general_binning_parity()
-        test_custom_binning_parity()
         test_elliptic_envelope_parity()
+        test_casting_parity()
+        test_text_cleaning_parity()
+        test_value_replacement_parity()
+        test_alias_replacement_parity()
+        test_invalid_value_replacement_parity()
+        test_missing_indicator_parity()
+        test_deduplicate_parity()
+        test_drop_missing_columns_parity()
+        test_drop_missing_rows_parity()
     else:
         print("Skipping test because Polars is not installed.")
