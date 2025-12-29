@@ -18,6 +18,8 @@ from ..utils import (
 )
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
+from ..engines import SkyulfDataFrame, get_engine
+from ..engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
 
@@ -27,19 +29,52 @@ logger = logging.getLogger(__name__)
 class StandardScalerApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
         cols = params.get("columns", [])
         mean = params.get("mean")
         scale = params.get("scale")
 
+        # Check valid cols (works for both Pandas and Polars/Wrapper)
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or mean is None or scale is None:
             return pack_pipeline_output(X, y, is_tuple)
 
+        # Check Engine
+        engine = get_engine(X)
+        
+        if engine.__name__ == "PolarsEngine":
+            import polars as pl
+            # Polars Native Implementation
+            mean_arr = np.array(mean)
+            scale_arr = np.array(scale)
+            col_indices = [cols.index(c) for c in valid_cols]
+            
+            exprs = []
+            for idx, col_name in zip(col_indices, valid_cols):
+                e = pl.col(col_name)
+                if params.get("with_mean", True):
+                    e = e - mean_arr[idx]
+                if params.get("with_std", True):
+                    s = scale_arr[idx]
+                    s = s if s != 0 else 1.0
+                    e = e / s
+                exprs.append(e)
+            
+            # Apply transformations
+            # X is Polars DataFrame or Wrapper
+            if hasattr(X, "with_columns"):
+                X_out = X.with_columns(exprs)
+            else:
+                # Should be wrapper or raw polars
+                X_out = X.with_columns(exprs)
+                
+            return pack_pipeline_output(X_out, y, is_tuple)
+
+        # Pandas/Numpy Implementation (Legacy)
         X_out = X.copy()
         mean_arr = np.array(mean)
         scale_arr = np.array(scale)
@@ -61,7 +96,7 @@ class StandardScalerApplier(BaseApplier):
 class StandardScalerCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -76,7 +111,12 @@ class StandardScalerCalculator(BaseCalculator):
             return {}
 
         scaler = StandardScaler(with_mean=with_mean, with_std=with_std)
-        scaler.fit(X[cols])
+        
+        # Use Bridge for fitting
+        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
+        X_np, _ = SklearnBridge.to_sklearn(X_subset)
+        
+        scaler.fit(X_np)
 
         return {
             "type": "standard_scaler",

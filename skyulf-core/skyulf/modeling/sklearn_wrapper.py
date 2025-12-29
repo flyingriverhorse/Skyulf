@@ -1,11 +1,13 @@
 """Wrapper for Scikit-Learn models."""
 
 import logging
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Optional, Type, Union
 
 import pandas as pd
 from sklearn.base import BaseEstimator
 
+from ..engines import SkyulfDataFrame
+from ..engines.sklearn_bridge import SklearnBridge
 from .base import BaseModelApplier, BaseModelCalculator
 
 logger = logging.getLogger(__name__)
@@ -34,8 +36,8 @@ class SklearnCalculator(BaseModelCalculator):
 
     def fit(
         self,
-        X: pd.DataFrame,
-        y: pd.Series,
+        X: Union[pd.DataFrame, SkyulfDataFrame],
+        y: Union[pd.Series, Any],
         config: Dict[str, Any],
         progress_callback=None,
         log_callback=None,
@@ -80,24 +82,58 @@ class SklearnCalculator(BaseModelCalculator):
             log_callback(msg)
 
         # 2. Instantiate Model
-        # Filter params to only those accepted by the model class
-        # This prevents errors if extra config is passed
-        # (Though sklearn usually ignores extra kwargs in __init__ if **kwargs is present,
-        # strict models might not)
-        # For now, we assume the user/config provides valid params.
-
-        # Handle special cases like 'random_state' if needed, but usually passed directly.
-
         model = self.model_class(**params)
 
         # 3. Fit
-        model.fit(X, y)
+        # Convert to Numpy using Bridge (handles Polars/Pandas/Wrappers)
+        X_np, y_np = SklearnBridge.to_sklearn((X, y))
+        
+        model.fit(X_np, y_np)
 
         return model
 
 
 class SklearnApplier(BaseModelApplier):
     """Base applier for Scikit-Learn models."""
+    
+    def predict(self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any) -> pd.Series:
+        # Convert to Numpy
+        X_np, _ = SklearnBridge.to_sklearn(df)
+        
+        preds = model_artifact.predict(X_np)
+        
+        # Return as Pandas Series for consistency
+        # If input was Pandas, try to preserve index
+        index = None
+        if hasattr(df, "index"):
+            index = df.index
+        elif hasattr(df, "to_pandas"):
+             # If it's a wrapper or Polars, we might lose index unless we convert
+             # For now, default index is acceptable for predictions
+             pass
+             
+        return pd.Series(preds, index=index)
+
+    def predict_proba(
+        self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any
+    ) -> Optional[pd.DataFrame]:
+        if not hasattr(model_artifact, "predict_proba"):
+            return None
+            
+        X_np, _ = SklearnBridge.to_sklearn(df)
+        probs = model_artifact.predict_proba(X_np)
+        
+        # Return as DataFrame
+        index = None
+        if hasattr(df, "index"):
+            index = df.index
+            
+        # Column names usually 0, 1, etc. or classes_
+        columns = None
+        if hasattr(model_artifact, "classes_"):
+            columns = model_artifact.classes_
+            
+        return pd.DataFrame(probs, index=index, columns=columns)
 
     def predict(self, df: pd.DataFrame, model_artifact: Any) -> pd.Series:
         """Generate predictions."""
