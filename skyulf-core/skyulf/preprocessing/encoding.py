@@ -97,12 +97,28 @@ class OneHotEncoderApplier(BaseApplier):
 
         # Transform
         try:
-            encoded_array = encoder.transform(X_subset)
+            # Fix for "X has feature names, but ... was fitted without feature names"
+            # We must pass the same format as fit. Fit used X_np (numpy).
+            # So we convert X_subset (DataFrame) to numpy/values.
+            if hasattr(X_subset, "values"):
+                X_input = X_subset.values
+            else:
+                X_input = X_subset
+
+            encoded_array = encoder.transform(X_input)
+
+            if hasattr(encoded_array, "toarray"):
+                encoded_array = encoded_array.toarray()
+            elif hasattr(encoded_array, "values"):
+                # If sklearn is configured to output pandas, we get a DataFrame.
+                # We need the underlying numpy array to create a new DataFrame with our custom feature names.
+                encoded_array = encoded_array.values
 
             # Create DataFrame from encoded array
             encoded_df = pd.DataFrame(
                 encoded_array, columns=feature_names, index=X_out.index
             )
+
 
             # Concatenate
             X_out = pd.concat([X_out, encoded_df], axis=1)
@@ -165,7 +181,15 @@ class OneHotEncoderCalculator(BaseCalculator):
             sparse_output=False,
             dtype=np.int8,  # Save memory
         )
-
+        
+        # Fix for "X has feature names, but OneHotEncoder was fitted without feature names"
+        # Since we convert to numpy for fit, we lose feature names.
+        # We can explicitly set feature names if available, but it's easier to just fit on numpy
+        # and ensure transform also receives numpy (which we do via SklearnBridge).
+        # However, SklearnBridge might return a DataFrame if configured? No, it returns (data, feature_names).
+        # The issue is likely that SklearnBridge returns a Numpy array, so fit sees no names.
+        # But in apply (Pandas path), we pass X_subset (DataFrame) directly to transform.
+        
         encoder.fit(X_np)
 
         # Check for columns that produced no features
@@ -249,7 +273,14 @@ class OrdinalEncoderApplier(BaseApplier):
 
         try:
             X_subset = X_out[valid_cols].astype(str)
-            encoded_array = encoder.transform(X_subset)
+            
+            # Fix for "X has feature names..." warning
+            if hasattr(X_subset, "values"):
+                X_input = X_subset.values
+            else:
+                X_input = X_subset
+                
+            encoded_array = encoder.transform(X_input)
 
             # Replace columns in place
             X_out[valid_cols] = encoded_array
@@ -318,37 +349,61 @@ class OrdinalEncoderCalculator(BaseCalculator):
 class LabelEncoderApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         encoders = params.get("encoders", {})
         cols = params.get("columns")
 
-        X_out = X.copy()
-        y_out = y.copy() if y is not None else None
+        if engine.name == "polars":
+            import polars as pl
+            X_out = X.clone()
+            y_out = y.clone() if y is not None else None
 
-        if cols:
-            # Transform features
-            for col in cols:
-                if col in X_out.columns and col in encoders:
-                    le = encoders[col]
-                    # Handle unseen labels? LabelEncoder crashes on unseen.
-                    # We need a safe transform helper.
+            if cols:
+                exprs = []
+                for col in cols:
+                    if col in X_out.columns and col in encoders:
+                        le = encoders[col]
+                        mapping = {str(k): int(v) for k, v in zip(le.classes_, le.transform(le.classes_))}
+                        exprs.append(
+                            pl.col(col).cast(pl.Utf8).replace(mapping, default=-1).cast(pl.Int64).alias(col)
+                        )
+                if exprs:
+                    X_out = X_out.with_columns(exprs)
 
-                    # Fast safe transform:
-                    # Map known classes to integers, unknown to -1 or NaN
-                    # But LabelEncoder doesn't support unknown.
-                    # We can use map.
-                    mapping = dict(zip(le.classes_, le.transform(le.classes_)))
-                    X_out[col] = X_out[col].astype(str).map(mapping).fillna(-1)
+            if y_out is not None and "__target__" in encoders:
+                le = encoders["__target__"]
+                mapping = {str(k): int(v) for k, v in zip(le.classes_, le.transform(le.classes_))}
+                y_out = y_out.cast(pl.Utf8).replace(mapping, default=-1).cast(pl.Int64)
 
-        # Transform target (always check if encoder exists)
-        if y_out is not None and "__target__" in encoders:
-            le = encoders["__target__"]
-            mapping = dict(zip(le.classes_, le.transform(le.classes_)))
-            y_out = y_out.astype(str).map(mapping).fillna(-1)
+        else:
+            X_out = X.copy()
+            y_out = y.copy() if y is not None else None
+
+            if cols:
+                # Transform features
+                for col in cols:
+                    if col in X_out.columns and col in encoders:
+                        le = encoders[col]
+                        # Handle unseen labels? LabelEncoder crashes on unseen.
+                        # We need a safe transform helper.
+
+                        # Fast safe transform:
+                        # Map known classes to integers, unknown to -1 or NaN
+                        # But LabelEncoder doesn't support unknown.
+                        # We can use map.
+                        mapping = dict(zip(le.classes_, le.transform(le.classes_)))
+                        X_out[col] = X_out[col].astype(str).map(mapping).fillna(-1)
+
+            # Transform target (always check if encoder exists)
+            if y_out is not None and "__target__" in encoders:
+                le = encoders["__target__"]
+                mapping = dict(zip(le.classes_, le.transform(le.classes_)))
+                y_out = y_out.astype(str).map(mapping).fillna(-1)
 
         return pack_pipeline_output(X_out, y_out, is_tuple)
 
@@ -357,10 +412,28 @@ class LabelEncoderApplier(BaseApplier):
 class LabelEncoderCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, y, is_tuple = unpack_pipeline_input(df)
+
+        # Attempt to extract y from X if not provided
+        target_col = config.get("target_column")
+        if y is None and target_col:
+            # Check if target_col is in X
+            cols = X.columns if hasattr(X, "columns") else []
+            if target_col in cols:
+                # Extract y for fitting
+                try:
+                    if hasattr(X, "to_pandas"):
+                        y = X.to_pandas()[target_col]
+                    else:
+                        # Fallback for raw dataframes or other engines
+                        y = X[target_col]
+                except Exception:
+                    pass
+
+        engine = get_engine(X)
 
         # LabelEncoder is usually for the target variable y.
         # But sometimes used for features too.
@@ -374,24 +447,51 @@ class LabelEncoderCalculator(BaseCalculator):
         if cols:
             # Encode features
             valid_cols = [c for c in cols if c in X.columns]
-            for col in valid_cols:
-                le = LabelEncoder()
-                le.fit(X[col].astype(str))
-                encoders[col] = le
-                classes_count[col] = len(le.classes_)
+            
+            # Polars Path for features
+            if engine.name == "polars":
+                import polars as pl
+                for col in valid_cols:
+                    le = LabelEncoder()
+                    # Convert to numpy array of strings
+                    col_data = X.select(pl.col(col).cast(pl.Utf8)).to_series().to_numpy()
+                    le.fit(col_data)
+                    encoders[col] = le
+                    classes_count[col] = len(le.classes_)
+            else:
+                # Pandas Path
+                for col in valid_cols:
+                    le = LabelEncoder()
+                    le.fit(X[col].astype(str))
+                    encoders[col] = le
+                    classes_count[col] = len(le.classes_)
 
             # Also check if target is in cols (if y has a name)
-            if y is not None and hasattr(y, 'name') and y.name in cols:
-                le = LabelEncoder()
-                le.fit(y.astype(str))
-                encoders["__target__"] = le
-                classes_count["__target__"] = len(le.classes_)
+            if y is not None:
+                y_name = getattr(y, 'name', None)
+                if y_name and y_name in cols:
+                    le = LabelEncoder()
+                    # Handle y conversion
+                    if hasattr(y, "to_numpy"): # Polars Series or Pandas Series
+                         y_data = y.to_numpy().astype(str)
+                    else:
+                         y_data = np.array(y).astype(str)
+                         
+                    le.fit(y_data)
+                    encoders["__target__"] = le
+                    classes_count["__target__"] = len(le.classes_)
 
         else:
             # Encode target y (default if no columns specified)
             if y is not None:
                 le = LabelEncoder()
-                le.fit(y.astype(str))
+                # Handle y conversion
+                if hasattr(y, "to_numpy"):
+                     y_data = y.to_numpy().astype(str)
+                else:
+                     y_data = np.array(y).astype(str)
+                     
+                le.fit(y_data)
                 encoders["__target__"] = le
                 classes_count["__target__"] = len(le.classes_)
 
@@ -446,7 +546,14 @@ class TargetEncoderApplier(BaseApplier):
 
         try:
             X_subset = X_out[valid_cols]
-            encoded_array = encoder.transform(X_subset)
+            
+            # Fix for "X has feature names..." warning
+            if hasattr(X_subset, "values"):
+                X_input = X_subset.values
+            else:
+                X_input = X_subset
+                
+            encoded_array = encoder.transform(X_input)
             X_out[valid_cols] = encoded_array
         except Exception as e:
             logger.error(f"Target Encoding failed: {e}")
@@ -463,6 +570,22 @@ class TargetEncoderCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, y, is_tuple = unpack_pipeline_input(df)
+
+        # Attempt to extract y from X if not provided
+        target_col = config.get("target_column")
+        if y is None and target_col:
+            # Check if target_col is in X
+            cols = X.columns if hasattr(X, "columns") else []
+            if target_col in cols:
+                # Extract y for fitting
+                try:
+                    if hasattr(X, "to_pandas"):
+                        y = X.to_pandas()[target_col]
+                    else:
+                        # Fallback for raw dataframes or other engines
+                        y = X[target_col]
+                except Exception:
+                    pass
 
         if y is None:
             logger.warning("TargetEncoder requires a target variable (y). Skipping.")

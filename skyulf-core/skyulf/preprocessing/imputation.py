@@ -248,7 +248,13 @@ class KNNImputerApplier(BaseApplier):
             X_subset = X_out[cols].copy()
 
             # Transform
-            X_transformed = imputer.transform(X_subset)
+            # Fix for "X has feature names..." warning
+            if hasattr(X_subset, "values"):
+                X_input = X_subset.values
+            else:
+                X_input = X_subset
+                
+            X_transformed = imputer.transform(X_input)
 
             # Update DataFrame
             X_out[cols] = X_transformed
@@ -342,7 +348,14 @@ class IterativeImputerApplier(BaseApplier):
 
         try:
             X_subset = X_out[cols].copy()
-            X_transformed = imputer.transform(X_subset)
+            
+            # Fix for "X has feature names..." warning
+            if hasattr(X_subset, "values"):
+                X_input = X_subset.values
+            else:
+                X_input = X_subset
+                
+            X_transformed = imputer.transform(X_input)
             X_out[cols] = X_transformed
         except Exception as e:
             logger.error(f"Iterative Imputation failed: {e}")

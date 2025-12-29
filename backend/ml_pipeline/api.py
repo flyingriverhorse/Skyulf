@@ -328,14 +328,14 @@ async def run_pipeline(  # noqa: C901
         job_type=cast(Literal["training", "tuning", "preview"], config.job_type),
         dataset_id=dataset_id,
         model_type=model_type,
-        graph=config.dict(),
+        graph=config.model_dump(),
     )
 
     # Trigger Task
     settings = get_settings()
     
     # Pass resolved options to the task so it can init S3Catalog if needed
-    job_payload = config.dict()
+    job_payload = config.model_dump()
     if resolved_s3_options:
         job_payload["storage_options"] = resolved_s3_options
 
@@ -580,20 +580,59 @@ async def preview_pipeline(  # noqa: C901
 
                 df_for_analysis = None
 
+                # Helper to convert DataFrame/Series (Pandas or Polars) to records list
+                def to_records(df):
+                    if isinstance(df, pd.DataFrame):
+                        return json.loads(df.head(50).to_json(orient="records"))
+                    if isinstance(df, pd.Series):
+                        return json.loads(df.to_frame().head(50).to_json(orient="records"))
+                    
+                    try:
+                        import polars as pl
+                        if isinstance(df, pl.DataFrame):
+                            return json.loads(df.head(50).to_pandas().to_json(orient="records"))
+                        if isinstance(df, pl.Series):
+                            return json.loads(df.head(50).to_pandas().to_frame().to_json(orient="records"))
+                    except ImportError:
+                        pass
+                    return []
+
                 # Helper to process (X, y) tuple
                 def process_xy(xy_tuple, prefix):
                     X, y = xy_tuple
-                    if isinstance(X, pd.Series):
-                        X = X.to_frame()
-                    if isinstance(y, pd.Series):
-                        y = y.to_frame()
                     return {
-                        f"{prefix}_X": json.loads(X.head(50).to_json(orient="records")),
-                        f"{prefix}_y": json.loads(y.head(50).to_json(orient="records")),
+                        f"{prefix}_X": to_records(X),
+                        f"{prefix}_y": to_records(y),
                     }
+                
+                # Helper to ensure df_for_analysis is Pandas
+                def to_pandas_safe(df):
+                    if isinstance(df, pd.DataFrame):
+                        return df
+                    try:
+                        import polars as pl
+                        if isinstance(df, pl.DataFrame):
+                            return df.to_pandas()
+                    except ImportError:
+                        pass
+                    return None
 
                 # Handle different artifact types
-                if isinstance(artifact, pd.DataFrame):
+                # Check for Polars DataFrame
+                is_polars = False
+                try:
+                    import polars as pl
+                    if isinstance(artifact, pl.DataFrame):
+                        is_polars = True
+                except ImportError:
+                    pass
+
+                if is_polars:
+                    logger.debug("Handling Polars DataFrame artifact")
+                    preview_data = to_records(artifact)
+                    df_for_analysis = to_pandas_safe(artifact)
+
+                elif isinstance(artifact, pd.DataFrame):
                     logger.debug("Handling DataFrame artifact")
                     preview_data = json.loads(
                         artifact.head(50).to_json(orient="records")
@@ -607,21 +646,17 @@ async def preview_pipeline(  # noqa: C901
                     if isinstance(artifact.train, tuple):
                         logger.debug("Train is tuple")
                         preview_data.update(process_xy(artifact.train, "train"))
-                        df_for_analysis = artifact.train[0]
+                        df_for_analysis = to_pandas_safe(artifact.train[0])
                     else:
                         logger.debug("Train is DataFrame")
-                        preview_data["train"] = json.loads(
-                            artifact.train.head(50).to_json(orient="records")
-                        )
-                        df_for_analysis = artifact.train
+                        preview_data["train"] = to_records(artifact.train)
+                        df_for_analysis = to_pandas_safe(artifact.train)
 
                     # Handle Test
                     if isinstance(artifact.test, tuple):
                         preview_data.update(process_xy(artifact.test, "test"))
                     else:
-                        preview_data["test"] = json.loads(
-                            artifact.test.head(50).to_json(orient="records")
-                        )
+                        preview_data["test"] = to_records(artifact.test)
 
                     # Handle Validation
                     if artifact.validation is not None:
@@ -630,9 +665,7 @@ async def preview_pipeline(  # noqa: C901
                                 process_xy(artifact.validation, "validation")
                             )
                         else:
-                            preview_data["validation"] = json.loads(
-                                artifact.validation.head(50).to_json(orient="records")
-                            )
+                            preview_data["validation"] = to_records(artifact.validation)
 
                 elif isinstance(artifact, tuple) and len(artifact) == 2:
                     logger.debug("Handling Tuple artifact")
@@ -640,21 +673,10 @@ async def preview_pipeline(  # noqa: C901
                     X, y = artifact
                     preview_data = {}
 
-                    if isinstance(X, (pd.DataFrame, pd.Series)):
-                        if isinstance(X, pd.Series):
-                            X = X.to_frame()
-                        preview_data["X"] = json.loads(
-                            X.head(50).to_json(orient="records")
-                        )
+                    preview_data["X"] = to_records(X)
+                    preview_data["y"] = to_records(y)
 
-                    if isinstance(y, (pd.DataFrame, pd.Series)):
-                        if isinstance(y, pd.Series):
-                            y = y.to_frame()
-                        preview_data["y"] = json.loads(
-                            y.head(50).to_json(orient="records")
-                        )
-
-                    df_for_analysis = X if isinstance(X, pd.DataFrame) else None
+                    df_for_analysis = to_pandas_safe(X)
                 elif (
                     isinstance(artifact, dict)
                     and "train" in artifact
@@ -666,7 +688,7 @@ async def preview_pipeline(  # noqa: C901
 
                     if "train" in artifact:
                         preview_data.update(process_xy(artifact["train"], "train"))
-                        df_for_analysis = artifact["train"][0]  # X_train
+                        df_for_analysis = to_pandas_safe(artifact["train"][0])  # X_train
 
                     if "test" in artifact:
                         preview_data.update(process_xy(artifact["test"], "test"))

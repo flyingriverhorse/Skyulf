@@ -3,14 +3,15 @@ from typing import Any, Dict, Tuple, Union
 import pandas as pd
 
 from ..registry import NodeRegistry
-from ..utils import detect_numeric_columns
+from ..utils import detect_numeric_columns, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
+from ..engines import SkyulfDataFrame, get_engine
 
 
 class DatasetProfileApplier(BaseApplier):
     def apply(
-        self, df: Union[pd.DataFrame, Tuple[Any, ...]], params: Dict[str, Any]
-    ) -> Union[pd.DataFrame, Tuple[Any, ...]]:
+        self, df: SkyulfDataFrame, params: Dict[str, Any]
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         # Inspection nodes do not modify data
         return df
 
@@ -18,65 +19,87 @@ class DatasetProfileApplier(BaseApplier):
 @NodeRegistry.register("DatasetProfile", DatasetProfileApplier)
 class DatasetProfileCalculator(BaseCalculator):
     def fit(
-        self, df: Union[pd.DataFrame, Tuple[Any, ...]], config: Dict[str, Any]
+        self, df: SkyulfDataFrame, config: Dict[str, Any]
     ) -> Dict[str, Any]:
         # Generate a lightweight dataset profile
-        # We capture shape, types, and basic numeric stats for pipeline metadata
-
-        if isinstance(df, tuple):
-            # Handle tuple if needed, or just ignore/raise.
-            # Since this is inspection, maybe we inspect the first element?
-            # Or just return empty profile?
-            # For now, let's assume it's a DataFrame for the logic below,
-            # but we must accept tuple to satisfy the interface.
-            # If we get a tuple, we can try to unpack it or just fail gracefully.
-            # Given the existing code assumes df is DataFrame, let's just cast or check.
-            if len(df) > 0 and isinstance(df[0], pd.DataFrame):
-                df = df[0]
-            else:
-                return {"type": "dataset_profile", "profile": {}}
+        X, _, _ = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         profile: Dict[str, Any] = {}
 
-        # Shape
-        profile["rows"] = len(df)
-        profile["columns"] = len(df.columns)
+        if engine.name == "polars":
+            import polars as pl
 
-        # Column types
-        profile["dtypes"] = df.dtypes.astype(str).to_dict()
+            profile["rows"] = len(X)
+            profile["columns"] = len(X.columns)
+            profile["dtypes"] = {
+                col: str(dtype) for col, dtype in zip(X.columns, X.dtypes)
+            }
+            profile["missing"] = {col: X[col].null_count() for col in X.columns}
 
-        # Missing values
-        profile["missing"] = df.isna().sum().to_dict()
+            # Numeric stats
+            numeric_cols = [
+                col
+                for col, dtype in zip(X.columns, X.dtypes)
+                if dtype in [pl.Float64, pl.Float32, pl.Int64, pl.Int32]
+            ]
+            if numeric_cols:
+                # Polars describe returns a DataFrame
+                desc_df = X.select(numeric_cols).describe()
+                # Convert to list of dicts
+                desc_dicts = desc_df.to_dicts()
+                
+                stats = {}
+                # Initialize stats dicts
+                for col in numeric_cols:
+                    stats[col] = {}
+                
+                for row in desc_dicts:
+                    # Polars < 0.19 uses "describe", newer uses "statistic"
+                    metric = row.get("describe") or row.get("statistic")
+                    if not metric:
+                        continue
+                        
+                    for col in numeric_cols:
+                        if col in row:
+                            stats[col][metric] = row[col]
+                            
+                profile["numeric_stats"] = stats
+        else:
+            # Pandas logic
+            profile["rows"] = len(X)
+            profile["columns"] = len(X.columns)
+            profile["dtypes"] = X.dtypes.astype(str).to_dict()
+            profile["missing"] = X.isna().sum().to_dict()
 
-        # Numeric stats
-        numeric_cols = detect_numeric_columns(df)
-        if numeric_cols:
-            desc = df[numeric_cols].describe().to_dict()
-            profile["numeric_stats"] = desc
+            numeric_cols = detect_numeric_columns(X)
+            if numeric_cols:
+                desc = X[numeric_cols].describe().to_dict()
+                profile["numeric_stats"] = desc
 
         return {"type": "dataset_profile", "profile": profile}
 
 
 class DataSnapshotApplier(BaseApplier):
     def apply(
-        self, df: Union[pd.DataFrame, Tuple[Any, ...]], params: Dict[str, Any]
-    ) -> Union[pd.DataFrame, Tuple[Any, ...]]:
+        self, df: SkyulfDataFrame, params: Dict[str, Any]
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         return df
 
 
 @NodeRegistry.register("DataSnapshot", DataSnapshotApplier)
 class DataSnapshotCalculator(BaseCalculator):
     def fit(
-        self, df: Union[pd.DataFrame, Tuple[Any, ...]], config: Dict[str, Any]
+        self, df: SkyulfDataFrame, config: Dict[str, Any]
     ) -> Dict[str, Any]:
-        # Take a snapshot of the first N rows
-        if isinstance(df, tuple):
-            if len(df) > 0 and isinstance(df[0], pd.DataFrame):
-                df = df[0]
-            else:
-                return {"type": "data_snapshot", "snapshot": []}
+        X, _, _ = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         n = config.get("n_rows", 5)
-        snapshot = df.head(n).to_dict(orient="records")
+        
+        if engine.name == "polars":
+            snapshot = X.head(n).to_dicts()
+        else:
+            snapshot = X.head(n).to_dict(orient="records")
 
         return {"type": "data_snapshot", "snapshot": snapshot}

@@ -26,7 +26,7 @@
 
 Skyulf is a self-hosted, privacy-first **MLOps Hub**. It is designed to be the "glue" that holds your data science workflow together—without the glue code. Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
 
-Built with a modern stack: **FastAPI** (Backend), **React** (Frontend), **Celery** (Async Jobs), and **Redis**.
+Built with a modern stack: **FastAPI** (Backend), **React** (Frontend), **Polars** (High-Performance Engine), **Celery** (Async Jobs), and **Redis**.
 
 ## What is the meaning of Skyulf?
 
@@ -118,7 +118,7 @@ uv add skyulf-core
 ## Key Features
 
 *   **🎨 Visual Feature Canvas:** A node-based editor to clean, transform, and engineer features without writing spaghetti code. (25+ built-in nodes).
-*   **🚀 Modern Backend:** Built on FastAPI for high performance and easy API extension.
+*   **🚀 High-Performance Engine:** Built on **FastAPI** and **Polars** for lightning-fast data processing and easy API extension.
 *   **⚡ Async by Default:** Heavy training jobs run in the background via Celery & Redis (or background threads)—your UI never freezes.
 *   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or SQL. Start with SQLite (zero-config) and scale to PostgreSQL.
 *   **☁️ S3 Integration:** Full support for S3-compatible storage (AWS, MinIO) for data ingestion, artifact storage, and model registry.

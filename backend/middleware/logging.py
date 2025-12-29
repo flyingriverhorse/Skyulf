@@ -44,8 +44,8 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         user_agent = request.headers.get("user-agent", "unknown")
         request_id = getattr(request.state, "request_id", "unknown")
 
-        # Log incoming request
-        logger.info(
+        # Log incoming request (DEBUG only to reduce noise)
+        logger.debug(
             f"Request started: {method} {url}",
             extra={
                 "request_id": request_id,
@@ -64,9 +64,16 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             # Calculate processing time
             process_time = time.time() - start_time
 
-            # Log response
-            logger.info(
-                f"Request completed: {method} {url} - {response.status_code} in {process_time:.3f}s",
+            # Log response with color-coded status if using rich (handled by level)
+            log_level = logging.INFO
+            if response.status_code >= 400:
+                log_level = logging.WARNING
+            if response.status_code >= 500:
+                log_level = logging.ERROR
+
+            logger.log(
+                log_level,
+                f"{method} {url} - {response.status_code} ({process_time:.3f}s)",
                 extra={
                     "request_id": request_id,
                     "method": method,

@@ -1,0 +1,48 @@
+name: 🩹 Small Fix / Typo
+description: Report a typo, broken link, or trivial code fix
+title: "[Fix]: "
+labels: ["good first issue", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for very small, obvious fixes (typos, broken links, one-line code changes).
+        For larger bugs, please use the **Bug Report** template.
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: What needs to be fixed?
+      placeholder: e.g. "Typo in function name 'caluculate_metrics'"
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: File / Location
+      description: Where is the issue? (File path or URL)
+      placeholder: backend/utils.py
+    validations:
+      required: true
+
+  - type: textarea
+    id: fix
+    attributes:
+      label: Suggested Fix
+      description: What should it be changed to?
+      placeholder: |
+        Change:
+        def caluculate_metrics():
+        To:
+        def calculate_metrics():
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to submit a PR for this myself!

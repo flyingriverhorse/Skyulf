@@ -1,0 +1,48 @@
+name: 📚 Documentation Issue
+description: Report missing, incorrect, or confusing documentation
+title: "[Docs]: "
+labels: ["documentation", "good first issue"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve our documentation!
+
+  - type: dropdown
+    id: doc_type
+    attributes:
+      label: Documentation Type
+      options:
+        - User Guide
+        - API Reference
+        - Installation / Setup
+        - Developer Guide / Contributing
+        - README / Landing Page
+    validations:
+      required: true
+
+  - type: input
+    id: link
+    attributes:
+      label: Link to the page
+      description: URL of the page with the issue
+      placeholder: https://flyingriverhorse.github.io/Skyulf/...
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description of the issue
+      description: What is missing, wrong, or confusing?
+      placeholder: "The example code for Custom Nodes is outdated and references a deprecated class..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Fix
+      description: If you know how to fix it, please describe it here or provide the correct text.
+    validations:
+      required: false

@@ -46,7 +46,7 @@ async def health_check(settings: Settings = Depends(get_config)):
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now(timezone.utc),
-        version="2.0.0",
+        version="0.1.6",
         environment="development" if settings.DEBUG else "production",
         uptime_seconds=time.time() - START_TIME,
     )
@@ -67,7 +67,14 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
         database_status = "error"
 
     # Check cache connectivity
-    cache_status = "healthy"  # TODO: Implement cache health check if using Redis
+    cache_status = "healthy"
+    if settings.USE_CELERY:
+        try:
+            import redis
+            r = redis.from_url(settings.CELERY_BROKER_URL, socket_connect_timeout=1)
+            r.ping()
+        except Exception:
+            cache_status = "unhealthy"
 
     # Check external services
     external_services = {
@@ -77,7 +84,7 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
     return DetailedHealthResponse(
         status="healthy" if database_status == "healthy" else "degraded",
         timestamp=datetime.now(timezone.utc),
-        version="2.0.0",
+        version="0.1.6",
         environment="development" if settings.DEBUG else "production",
         uptime_seconds=time.time() - START_TIME,
         database_status=database_status,

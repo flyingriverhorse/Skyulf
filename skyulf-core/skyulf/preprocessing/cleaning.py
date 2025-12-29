@@ -51,15 +51,42 @@ TWO_DIGIT_YEAR_PIVOT = 50
 # --- Helpers ---
 
 
-def _auto_detect_text_columns(df: pd.DataFrame) -> List[str]:
+def _auto_detect_text_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
+    engine = get_engine(df)
+    if engine.name == "polars":
+        import polars as pl
+
+        return [
+            c
+            for c, t in zip(df.columns, df.dtypes)
+            if t in [pl.Utf8, pl.Categorical, pl.Object]
+        ]
     return list(df.select_dtypes(include=["object", "string", "category"]).columns)
 
 
-def _auto_detect_numeric_columns(df: pd.DataFrame) -> List[str]:
+def _auto_detect_numeric_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
+    engine = get_engine(df)
+    if engine.name == "polars":
+        import polars as pl
+
+        return [
+            c
+            for c, t in zip(df.columns, df.dtypes)
+            if t in [pl.Float32, pl.Float64, pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64]
+        ]
     return list(df.select_dtypes(include=["number"]).columns)
 
 
-def _auto_detect_datetime_columns(df: pd.DataFrame) -> List[str]:
+def _auto_detect_datetime_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
+    engine = get_engine(df)
+    if engine.name == "polars":
+        import polars as pl
+
+        return [
+            c
+            for c, t in zip(df.columns, df.dtypes)
+            if t in [pl.Date, pl.Datetime] or isinstance(t, pl.Datetime)
+        ]
     return list(df.select_dtypes(include=["datetime", "datetimetz"]).columns)
 
 
@@ -238,7 +265,7 @@ class TextCleaningApplier(BaseApplier):
 class TextCleaningCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config:

@@ -97,7 +97,7 @@ class DeduplicateApplier(BaseApplier):
 class DeduplicateCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -274,7 +274,7 @@ class DropMissingRowsApplier(BaseApplier):
 class DropMissingRowsCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: {'subset': [...], 'how': 'any'|'all', 'threshold': int}

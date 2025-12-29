@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import numpy as np
 import pandas as pd
 
+from ...engines import SkyulfDataFrame
+from ...modeling.sklearn_wrapper import SklearnBridge
 from .common import sanitize_metrics
 from .metrics import calculate_regression_metrics
 from .schemas import ModelEvaluationReport, RegressionEvaluation, ResidualsData
@@ -14,22 +16,25 @@ from .schemas import ModelEvaluationReport, RegressionEvaluation, ResidualsData
 
 def evaluate_regression_model(
     model: Any,
-    X_test: pd.DataFrame,
-    y_test: pd.Series,
-    X_train: Optional[pd.DataFrame] = None,
-    y_train: Optional[pd.Series] = None,
+    X_test: Union[pd.DataFrame, SkyulfDataFrame],
+    y_test: Union[pd.Series, Any],
+    X_train: Optional[Union[pd.DataFrame, SkyulfDataFrame]] = None,
+    y_train: Optional[Union[pd.Series, Any]] = None,
     dataset_name: str = "test",
 ) -> ModelEvaluationReport:
     """Evaluate a regression model and return a structured report."""
+
+    # Convert to Numpy for compatibility
+    X_test_np, y_test_np = SklearnBridge.to_sklearn((X_test, y_test))
 
     # Calculate scalar metrics
     metrics = calculate_regression_metrics(model, X_test, y_test)
 
     # Generate predictions
-    y_pred = model.predict(X_test)
+    y_pred = model.predict(X_test_np)
 
     # Ensure numpy arrays
-    y_true_arr = y_test.to_numpy() if hasattr(y_test, "to_numpy") else np.array(y_test)
+    y_true_arr = y_test_np
     y_pred_arr = np.array(y_pred)
 
     # Calculate residuals

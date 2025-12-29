@@ -47,6 +47,11 @@ nav:
     - Getting Started: guides/getting_started.md
     - Recipes: guides/recipes.md
     - Architecture: architecture.md
+    - Performance: performance.md
+    - Adding New Engine: guides/adding_new_engine.md
+  - Examples:
+    - Quickstart: examples/quickstart.md
+    - Leakage Proof: examples/leakage_proof.md
   - User Guide:
     - Overview: user_guide/overview.md
     - Installation: user_guide/installation.md

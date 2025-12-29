@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -12,6 +12,9 @@ from sklearn.model_selection import (
     StratifiedKFold,
     TimeSeriesSplit,
 )
+
+from ..engines import SkyulfDataFrame
+from ..engines.sklearn_bridge import SklearnBridge
 
 if TYPE_CHECKING:
     from .base import BaseModelApplier, BaseModelCalculator
@@ -52,8 +55,8 @@ def _aggregate_metrics(
 def perform_cross_validation(
     calculator: BaseModelCalculator,
     applier: BaseModelApplier,
-    X: pd.DataFrame,
-    y: pd.Series,
+    X: Union[pd.DataFrame, SkyulfDataFrame],
+    y: Union[pd.Series, Any],
     config: Dict[str, Any],
     n_folds: int = 5,
     cv_type: str = "k_fold",  # k_fold, stratified_k_fold, time_series_split, shuffle_split
@@ -110,9 +113,8 @@ def perform_cross_validation(
 
     fold_results = []
 
-    # Ensure numpy for splitting
-    X_arr = X.to_numpy() if hasattr(X, "to_numpy") else X
-    y_arr = y.to_numpy() if hasattr(y, "to_numpy") else y
+    # Ensure numpy for splitting using the Bridge
+    X_arr, y_arr = SklearnBridge.to_sklearn((X, y))
 
     # 2. Iterate Folds
     for fold_idx, (train_idx, val_idx) in enumerate(splitter.split(X_arr, y_arr)):
@@ -123,10 +125,25 @@ def perform_cross_validation(
             log_callback(f"Processing Fold {fold_idx + 1}/{n_folds}...")
 
         # Split Data
-        X_train_fold = X.iloc[train_idx] if hasattr(X, "iloc") else X[train_idx]
-        y_train_fold = y.iloc[train_idx] if hasattr(y, "iloc") else y[train_idx]
-        X_val_fold = X.iloc[val_idx] if hasattr(X, "iloc") else X[val_idx]
-        y_val_fold = y.iloc[val_idx] if hasattr(y, "iloc") else y[val_idx]
+        # We slice the original X/y to preserve their type (Pandas/Polars) for the calculator
+        # Polars supports slicing with numpy arrays via __getitem__
+        # Pandas supports slicing via iloc
+        
+        if hasattr(X, "iloc"):
+            X_train_fold = X.iloc[train_idx]
+            X_val_fold = X.iloc[val_idx]
+        else:
+            # Polars or other
+            X_train_fold = X[train_idx]
+            X_val_fold = X[val_idx]
+            
+        if hasattr(y, "iloc"):
+            y_train_fold = y.iloc[train_idx]
+            y_val_fold = y.iloc[val_idx]
+        else:
+            # Polars Series or numpy array
+            y_train_fold = y[train_idx]
+            y_val_fold = y[val_idx]
 
         # Fit
         model_artifact = calculator.fit(X_train_fold, y_train_fold, config)

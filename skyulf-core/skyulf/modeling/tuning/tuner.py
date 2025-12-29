@@ -2,7 +2,7 @@
 
 import logging
 import warnings
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -21,6 +21,8 @@ from sklearn.model_selection import (
 )
 
 from ..base import BaseModelApplier, BaseModelCalculator
+from ...engines import SkyulfDataFrame, get_engine
+from ...engines.sklearn_bridge import SklearnBridge
 from .schemas import TuningConfig, TuningResult
 
 logger = logging.getLogger(__name__)
@@ -85,14 +87,14 @@ class TunerCalculator(BaseModelCalculator):
 
     def fit(
         self,
-        X: pd.DataFrame,
-        y: pd.Series,
+        X: Union[pd.DataFrame, SkyulfDataFrame],
+        y: Union[pd.Series, Any],
         config: Dict[str, Any],
         progress_callback: Optional[
             Callable[[int, int, Optional[float], Optional[Dict]], None]
         ] = None,
         log_callback: Optional[Callable[[str], None]] = None,
-        validation_data: Optional[tuple[pd.DataFrame, pd.Series]] = None,
+        validation_data: Optional[tuple[Union[pd.DataFrame, SkyulfDataFrame], Union[pd.Series, Any]]] = None,
     ) -> Any:
         """
         Fits the tuner (runs tuning).
@@ -107,13 +109,22 @@ class TunerCalculator(BaseModelCalculator):
             filtered_config = {k: v for k, v in config.items() if k in valid_keys}
             tuning_config = TuningConfig(**filtered_config)  # type: ignore
 
+        # Convert data to Numpy for tuning
+        X_np, y_np = SklearnBridge.to_sklearn((X, y))
+
+        validation_data_np = None
+        if validation_data:
+            X_val, y_val = validation_data
+            X_val_np, y_val_np = SklearnBridge.to_sklearn((X_val, y_val))
+            validation_data_np = (X_val_np, y_val_np)
+
         tuning_result = self.tune(
-            X,
-            y,
+            X_np,
+            y_np,
             tuning_config,
             progress_callback=progress_callback,
             log_callback=log_callback,
-            validation_data=validation_data,
+            validation_data=validation_data_np,
         )
 
         # Refit the best model on the full dataset
@@ -136,20 +147,20 @@ class TunerCalculator(BaseModelCalculator):
             raise ValueError("Model calculator does not have a model_class attribute")
 
         model = model_cls(**final_params)
-        model.fit(X, y)
+        model.fit(X_np, y_np)
 
         return (model, tuning_result)
 
     def tune(  # noqa: C901
         self,
-        X: pd.DataFrame,
-        y: pd.Series,
+        X: Any,
+        y: Any,
         config: TuningConfig,
         progress_callback: Optional[
             Callable[[int, int, Optional[float], Optional[Dict]], None]
         ] = None,
         log_callback: Optional[Callable[[str], None]] = None,
-        validation_data: Optional[tuple[pd.DataFrame, pd.Series]] = None,
+        validation_data: Optional[tuple[Any, Any]] = None,
     ) -> TuningResult:
         """
         Runs hyperparameter tuning.
@@ -177,9 +188,9 @@ class TunerCalculator(BaseModelCalculator):
 
             X_val, y_val = validation_data
 
-            # Concatenate Train and Val
-            X_for_search = pd.concat([X, X_val], axis=0)
-            y_for_search = pd.concat([y, y_val], axis=0)
+            # Concatenate Train and Val (Numpy arrays)
+            X_for_search = np.concatenate([X, X_val], axis=0)
+            y_for_search = np.concatenate([y, y_val], axis=0)
 
             # Create test_fold array: -1 for train, 0 for val
             # -1 means "never in test set" (so always in training set)

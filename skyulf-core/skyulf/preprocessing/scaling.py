@@ -29,9 +29,9 @@ logger = logging.getLogger(__name__)
 class StandardScalerApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
         cols = params.get("columns", [])
@@ -96,7 +96,7 @@ class StandardScalerApplier(BaseApplier):
 class StandardScalerCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)

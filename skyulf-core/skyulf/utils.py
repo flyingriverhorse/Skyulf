@@ -75,21 +75,37 @@ def pack_pipeline_output(
         # Re-attach y to X
         engine = get_engine(X)
         
-        if engine.__name__ == "PolarsEngine":
+        if getattr(engine, "name", "") == "polars":
             # Polars specific concat
             import polars as pl
+            
+            y_series = y
             if not isinstance(y, (pl.Series, pl.DataFrame)):
                 # Try to convert y to Series
                 try:
-                    y = pl.Series(y)
+                    y_series = pl.Series(y)
                 except:
                     pass # Let it fail or handle otherwise
             
-            if isinstance(X, pl.DataFrame):
-                return X.hstack([y] if isinstance(y, pl.Series) else y)
-            # Handle Wrapper
+            # Helper to get raw df
+            raw_df = X
+            is_wrapped = False
             if hasattr(X, "_df"):
-                 return X._df.hstack([y] if isinstance(y, pl.Series) else y)
+                raw_df = X._df
+                is_wrapped = True
+            
+            # Hstack
+            if isinstance(y_series, pl.Series):
+                # Ensure y has a name if it doesn't
+                if y_series.name == "":
+                    y_series = y_series.alias("target")
+                result = raw_df.hstack([y_series])
+            else:
+                result = raw_df.hstack(y_series)
+                
+            if is_wrapped:
+                return engine.wrap(result)
+            return result
 
         # Default to Pandas behavior (convert if needed or assume Pandas)
         if hasattr(X, "to_pandas"):
@@ -108,8 +124,19 @@ def pack_pipeline_output(
     return X
 
 
-def _is_binary_numeric(series: pd.Series) -> bool:
+def _is_binary_numeric(series: Union[pd.Series, Any]) -> bool:
     """Check if a numeric series contains only 0s and 1s (or close to them)."""
+    # Handle Polars Series
+    if hasattr(series, "n_unique"):
+        unique_vals = series.drop_nulls().unique()
+        if len(unique_vals) > 2:
+            return False
+        for val in unique_vals:
+            if not (np.isclose(val, 0) or np.isclose(val, 1)):
+                return False
+        return True
+
+    # Pandas Series
     unique_vals = series.dropna().unique()
     if len(unique_vals) > 2:
         return False
@@ -121,23 +148,63 @@ def _is_binary_numeric(series: pd.Series) -> bool:
     return True
 
 
-def detect_numeric_columns(frame: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
+def detect_numeric_columns(
+    frame: Union[pd.DataFrame, SkyulfDataFrame],
+    exclude_binary: bool = True,
+    exclude_constant: bool = True,
+) -> List[str]:
     """
-    Find numeric-like columns that have more than one non-binary value.
+    Find numeric-like columns.
 
-    Logic ported from V1 (core/shared/utils.py):
-    1. Excludes boolean columns.
-    2. Tries to convert strings to numbers (e.g. "1.5").
-    3. Excludes binary (0/1) columns.
-    4. Excludes constant columns (0 or 1 unique value).
+    Args:
+        frame: DataFrame to analyze
+        exclude_binary: If True, excludes columns with only 0/1 values.
+        exclude_constant: If True, excludes columns with 0 or 1 unique value.
     """
+    engine = get_engine(frame)
+    
+    # Polars Path
+    if engine.name == "polars":
+        import polars as pl
+        
+        detected: List[str] = []
+        
+        # Select numeric columns first
+        numeric_cols = [
+            c for c, t in zip(frame.columns, frame.dtypes)
+            if t in [pl.Float32, pl.Float64, pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64]
+        ]
+        
+        for col in numeric_cols:
+            series = frame[col]
+            
+            # 1. Exclude explicit booleans (already filtered by type check above mostly, but good to be safe)
+            if series.dtype == pl.Boolean:
+                continue
+                
+            # 2. Check for validity (non-nulls)
+            valid = series.drop_nulls()
+            if valid.is_empty():
+                continue
+                
+            # 3. Exclude 0/1 columns (Binary)
+            if exclude_binary and _is_binary_numeric(valid):
+                continue
+                
+            # 4. Exclude constant columns
+            if exclude_constant and valid.n_unique() < 2:
+                continue
+                
+            detected.append(col)
+            
+        return detected
+
+    # Pandas Path
     # Convert to Pandas for analysis if not already
-    # TODO: Implement native Polars logic for performance
     if not isinstance(frame, pd.DataFrame):
         if hasattr(frame, "to_pandas"):
             frame = frame.to_pandas()
             
-    # ... existing logic ...
     detected: List[str] = []
     seen: Set[str] = set()
 
@@ -160,11 +227,11 @@ def detect_numeric_columns(frame: Union[pd.DataFrame, SkyulfDataFrame]) -> List[
             continue
 
         # 3. Exclude 0/1 columns (Binary)
-        if _is_binary_numeric(valid):
+        if exclude_binary and _is_binary_numeric(valid):
             continue
 
         # 4. Exclude constant columns
-        if valid.nunique() < 2:
+        if exclude_constant and valid.nunique() < 2:
             continue
 
         detected.append(column)

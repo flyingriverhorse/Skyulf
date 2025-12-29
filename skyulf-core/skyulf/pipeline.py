@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional, Union
 import pandas as pd
 
 from .data.dataset import SplitDataset
+from .engines import SkyulfDataFrame, get_engine
 from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator
 from .modeling.classification import (
     LogisticRegressionApplier,
@@ -129,7 +130,7 @@ class SkyulfPipeline:
         )
 
     def fit(
-        self, data: Union[pd.DataFrame, SplitDataset], target_column: str
+        self, data: Union[pd.DataFrame, SkyulfDataFrame, SplitDataset], target_column: str
     ) -> Dict[str, Any]:
         """
         Fit the pipeline.
@@ -153,16 +154,18 @@ class SkyulfPipeline:
             logger.info("Starting Model Training...")
 
             # Ensure transformed_data is SplitDataset for modeling
-            if isinstance(transformed_data, pd.DataFrame):
+            if isinstance(transformed_data, SplitDataset):
+                dataset = transformed_data
+            else:
                 # If we only have a DataFrame, we can't really evaluate properly without a split
                 # But we can fit on it.
                 # Ideally, the user should provide a SplitDataset or use a Splitter node in preprocessing.
                 # If preprocessing didn't split, we wrap it.
+                engine = get_engine(transformed_data)
+                empty_df = engine.create_dataframe({})
                 dataset = SplitDataset(
-                    train=transformed_data, test=pd.DataFrame(), validation=None
+                    train=transformed_data, test=empty_df, validation=None
                 )
-            else:
-                dataset = transformed_data
 
             # Fit the model
             # Note: fit_predict updates self.model_estimator.model in-memory
@@ -185,7 +188,7 @@ class SkyulfPipeline:
 
         return metrics
 
-    def predict(self, data: pd.DataFrame) -> pd.Series:
+    def predict(self, data: Union[pd.DataFrame, SkyulfDataFrame]) -> Any:
         """
         Generate predictions.
 

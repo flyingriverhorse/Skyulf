@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class DataSourceCreate(BaseModel):
@@ -50,8 +50,7 @@ class DataSourceRead(BaseModel):
             self.size_bytes = self.source_metadata.get("file_size")
         return self
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DataSourceListResponse(BaseModel):

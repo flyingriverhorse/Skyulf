@@ -1,5 +1,6 @@
 # Version Updates
 
+*   **v0.1.6 :** "The Backend Abstraction & Modern Frameworks Update" — Polars migration, leakage proof, and performance optimization.
 *   **v0.1.5 :** "The Registry & Catalog Architecture Update" — Decoupled data loading with Smart Catalog, full S3 integration, and dynamic node registry architecture.
 *   **v0.1.4 :** "The Polynomial, Security & API Update" — Major release combining frontend refactoring, security hardening, backend logic fixes, and critical API routing improvements.
 *   **v0.1.3 :** "The Code Quality & Stability Update" — Extensive static analysis fixes, safer type handling, and backend runtime stability improvements.
@@ -12,22 +13,21 @@
 **"The Backend Abstraction & Modern Frameworks Update"**
 This release lays the groundwork for backend abstraction, enabling future support for multiple data processing frameworks like Polars and Rust-based extensions.
 
-### � Core Engine (Polars Migration)
-- **Engine Architecture:** Introduced `SkyulfDataFrame` Protocol and `EngineRegistry` to support multiple compute backends (Pandas, Polars).
-- **Polars Support:** Implemented `PolarsEngine` for high-performance data processing.
-- **Service Layer:** Created `DataService` to centralize I/O operations, defaulting to Polars for faster CSV/Parquet reading.
+### 🚀 Core Engine & Performance (Polars Migration)
+- **Hybrid Engine:** Introduced `SkyulfDataFrame` Protocol and `EngineRegistry` to support both Pandas and Polars backends.
+- **High Performance:** Migrated key preprocessing nodes (Scalers, Imputers, Encoders, Feature Selection, etc.) to use native Polars expressions, achieving up to **4x speedup** on large datasets.
 - **Sklearn Bridge:** Implemented `SklearnBridge` to seamlessly convert Polars/Arrow data to Numpy for Scikit-Learn compatibility without unnecessary copies.
-- **Node Migration:** Migrated `StandardScaler`, `MinMaxScaler`, `RobustScaler`, `MaxAbsScaler`, and `SimpleImputer` to use native Polars expressions for significant performance gains.
-- **Node Migration (Bucketing & Outliers):** Migrated `KBinsDiscretizer`, `IQR`, `ZScore`, `Winsorize`, `ManualBounds`, and `EllipticEnvelope` to support Polars (native expressions where possible, bridge for sklearn models).
-- **Node Migration (Cleaning & Drop/Missing):** Migrated `TextCleaning`, `ValueReplacement`, `AliasReplacement`, `InvalidValueReplacement`, `Deduplicate`, `DropMissingColumns`, `DropMissingRows`, and `MissingIndicator` to support Polars.
-- **Refactoring:** Moved `MissingIndicator` to `drop_and_missing.py` and merged `InvalidValueReplacement` logic to support both infinite values and rule-based replacement.
-- **Compatibility:** Updated `OneHotEncoder`, `OrdinalEncoder`, `TargetEncoder`, `HashEncoder`, `DummyEncoder`, `KNNImputer`, and `IterativeImputer` to work with Polars inputs via the bridge.
-- **Validation:** Added `compliance_suite.py` to verify parity between Pandas and Polars implementations.
 
-### �🔧 Backend Architecture
-- **Artifact Naming:** Updated artifact folder naming convention to `dataset_name_timestamp_job_id` for better organization and traceability.
-- **Logging:** Improved artifact saving logs to display the full URI/path instead of just the internal key.
-- **Timezone:** Switched artifact timestamp generation to use local server time instead of UTC database time.
+### 🐛 Bug Fixes & Stability
+- **Target Encoding:** Fixed a critical bug where `TargetEncoder` would skip fitting if `y` was not explicitly passed.
+- **Robustness:** Fixed `LabelEncoder` and `PolynomialFeatures` to robustly handle Polars inputs and missing target columns.
+- **Type Safety:** Standardized all preprocessing nodes with strict type hints and added a `compliance_suite` to verify Pandas/Polars parity.
+
+### 📚 Documentation
+- **Leakage Proof:** Added `examples/05_leakage_proof_titanic.ipynb` proving that Skyulf's architecture prevents data leakage.
+- **Performance:** Added benchmarks demonstrating the speed advantages of the new Polars engine.
+
+------------------------------------------------------------
 
 ## v0.1.5
 **"The Registry & Catalog Architecture Update"**

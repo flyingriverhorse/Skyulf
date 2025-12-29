@@ -275,7 +275,7 @@ class GeneralBinningCalculator(BaseCalculator):
                 elif strategy == "kmeans":
                     n_bins = override.get("n_bins", default_n_bins)
                     est = KBinsDiscretizer(
-                        n_bins=n_bins, strategy="kmeans", encode="ordinal"
+                        n_bins=n_bins, strategy="kmeans", encode="ordinal", quantile_method="averaged_inverted_cdf"
                     )
                     est.fit(series.values.reshape(-1, 1))  # type: ignore
                     edges = est.bin_edges_[0]
@@ -312,7 +312,7 @@ class GeneralBinningCalculator(BaseCalculator):
                         sklearn_strategy = "quantile"
 
                     est = KBinsDiscretizer(
-                        n_bins=n_bins, strategy=sklearn_strategy, encode="ordinal"
+                        n_bins=n_bins, strategy=sklearn_strategy, encode="ordinal", quantile_method="averaged_inverted_cdf"
                     )
                     est.fit(series.values.reshape(-1, 1))  # type: ignore
                     edges = est.bin_edges_[0]

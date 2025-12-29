@@ -1,57 +1,134 @@
-# © 2025 Murat Unsal — Skyulf Project
-
-name: Bug report
-description: File a bug/issue
-labels: [bug]
+name: 🐛 Bug Report
+description: Create a report to help us improve Skyulf
+title: "[Bug]: "
+labels: ["bug", "triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to report a bug! Please fill in the details below.
+        Thanks for taking the time to fill out this bug report!
+        
+        **Before you submit:**
+        1. Please search [existing issues](https://github.com/flyingriverhorse/Skyulf/issues) to see if this has already been reported.
+        2. Ensure you are running the latest version of Skyulf.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      description: Please ensure you have done the following before submitting.
+      options:
+        - label: I have searched for existing issues and found no duplicates.
+          required: true
+        - label: I have checked the [Troubleshooting Guide](https://flyingriverhorse.github.io/Skyulf/user_guide/troubleshooting/).
+          required: false
+
   - type: input
     id: summary
     attributes:
       label: Summary
-      description: A clear and concise description of the bug
+      description: A clear and concise description of the bug.
       placeholder: e.g. "EDA preview fails on CSV with Unicode column names"
     validations:
       required: true
+
   - type: textarea
     id: steps
     attributes:
-      label: Steps to reproduce
-      description: Provide minimal steps to reproduce the issue
-      render: bash
+      label: Steps to Reproduce
+      description: |
+        Please provide a minimal set of steps to reproduce the issue.
+        1. Go to '...'
+        2. Click on '...'
+        3. Upload file '...'
+        4. See error
+      placeholder: |
+        1. 
+        2. 
+        3. 
     validations:
       required: true
+
   - type: textarea
     id: expected
     attributes:
-      label: Expected behavior
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+      placeholder: "I expected the column to be recognized as categorical..."
     validations:
       required: true
+
   - type: textarea
     id: actual
     attributes:
-      label: Actual behavior and logs
-      description: Paste relevant logs/tracebacks (redact sensitive info)
-      render: text
+      label: Actual Behavior & Logs
+      description: |
+        Paste relevant logs, tracebacks, or error messages here.
+        **Tip:** Check the terminal output where you ran `run_skyulf.py` or the browser console (F12).
+      render: shell
+      placeholder: |
+        Traceback (most recent call last):
+          File "backend/main.py", line 42, in ...
+        ValueError: ...
+
   - type: dropdown
-    id: env
+    id: os
     attributes:
-      label: Environment
+      label: Operating System
       options:
         - Windows
         - Linux
         - macOS
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation Method
+      options:
+        - Local (Python/venv)
         - Docker Compose
+        - Other
+    validations:
+      required: true
+
   - type: input
-    id: versions
+    id: version
     attributes:
-      label: Version info
-      description: Python version, commit SHA or release tag, browser version if UI-related
+      label: Skyulf Version
+      description: Which version are you running? (e.g., v0.1.6, main branch commit SHA)
+      placeholder: v0.1.6
+    validations:
+      required: true
+
   - type: textarea
-    id: extra
+    id: environment
     attributes:
-      label: Additional context
-      description: Anything else we should know
+      label: Environment Details
+      description: |
+        - Python Version (e.g., 3.11.4)
+        - Browser & Version (if UI related)
+        - Polars/Pandas version (if known)
+      value: |
+        - Python: 
+        - Browser: 
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If applicable, add screenshots to help explain your problem. You can drag and drop images here.
+    validations:
+      required: false
+
+  - type: textarea
+    id: reproduction_script
+    attributes:
+      label: Reproduction Script (Optional)
+      description: |
+        If this is a backend/core issue, providing a standalone script is the **fastest** way to get it fixed.
+        See `tests/reproduce_issue_template.py` for inspiration.
+      render: python

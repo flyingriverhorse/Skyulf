@@ -1,8 +1,13 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Ask a question
-  url: https://github.com/flyingriverhorse/skyulf/discussions
-    about: Use GitHub Discussions for general questions and ideas
-  - name: Security reports
-  url: https://github.com/flyingriverhorse/skyulf/security/policy
-    about: Please follow the instructions in SECURITY.md for sensitive issues
+  - name: 💬 Ask a Question
+    url: https://github.com/flyingriverhorse/Skyulf/discussions
+    about: Please use GitHub Discussions for general questions, ideas, and community support.
+  
+  - name: 📚 Documentation
+    url: https://flyingriverhorse.github.io/Skyulf/
+    about: Check the official documentation before opening an issue.
+
+  - name: 🔒 Security Vulnerability
+    url: https://github.com/flyingriverhorse/Skyulf/security/policy
+    about: Please strictly follow the instructions in SECURITY.md for sensitive security reports.

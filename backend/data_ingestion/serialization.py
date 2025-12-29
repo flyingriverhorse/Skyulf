@@ -137,8 +137,11 @@ class AsyncJSONSafeSerializer:
 
     @staticmethod
     async def _handle_float(obj: Any) -> Any:
-        if isinstance(obj, float) and (pd.isna(obj) or np.isinf(obj)):
-            return None
+        # Use math.isnan/isinf or numpy instead of pandas if possible to reduce dependency
+        # But pd.isna is robust.
+        if isinstance(obj, float):
+            if np.isnan(obj) or np.isinf(obj):
+                return None
         return AsyncJSONSafeSerializer._NOT_HANDLED
 
     @staticmethod
@@ -172,10 +175,10 @@ class AsyncJSONSafeSerializer:
 
     @staticmethod
     async def safe_dict_from_dataframe(
-        df: pd.DataFrame, records_format: bool = True, max_rows: Optional[int] = None
+        df: Union[pd.DataFrame, Any], records_format: bool = True, max_rows: Optional[int] = None
     ) -> Union[List[Dict], Dict]:
         """
-        Convert DataFrame to JSON-safe dictionary format.
+        Convert DataFrame (Pandas or Polars) to JSON-safe dictionary format.
 
         Args:
             df: DataFrame to convert
@@ -185,6 +188,21 @@ class AsyncJSONSafeSerializer:
         Returns:
             JSON-safe dictionary representation
         """
+        # Handle Polars
+        try:
+            import polars as pl
+            if isinstance(df, pl.DataFrame):
+                if max_rows and df.height > max_rows:
+                    df = df.head(max_rows)
+                # Convert to Pandas for now as the rest of the logic assumes Pandas
+                # Or use write_json/to_dicts directly
+                if records_format:
+                    return df.to_dicts()
+                else:
+                    return df.to_dict(as_series=False)
+        except ImportError:
+            pass
+
         if df.empty:
             return [] if records_format else {}
 
