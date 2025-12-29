@@ -13,11 +13,22 @@ from sklearn.preprocessing import (
 from ..utils import pack_pipeline_output, resolve_columns, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
+from ..engines import SkyulfDataFrame, get_engine
+from ..engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
 
 
-def detect_categorical_columns(df: pd.DataFrame) -> List[str]:
+def detect_categorical_columns(df: SkyulfDataFrame) -> List[str]:
+    engine = get_engine(df)
+    if engine.name == "polars":
+        import polars as pl
+        # Polars dtypes
+        return [
+            c for c, t in zip(df.columns, df.dtypes) 
+            if t in [pl.Utf8, pl.Categorical, pl.Object]
+        ]
+    # Pandas
     return df.select_dtypes(include=["object", "category"]).columns.tolist()
 
 
@@ -27,10 +38,11 @@ def detect_categorical_columns(df: pd.DataFrame) -> List[str]:
 class OneHotEncoderApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         if not params or not params.get("columns"):
             return pack_pipeline_output(X, y, is_tuple)
@@ -45,6 +57,33 @@ class OneHotEncoderApplier(BaseApplier):
         if not valid_cols or not encoder:
             return pack_pipeline_output(X, y, is_tuple)
 
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+
+            try:
+                X_subset = X.select(valid_cols)
+                if include_missing:
+                    X_subset = X_subset.fill_null("__mlops_missing__")
+
+                X_np, _ = SklearnBridge.to_sklearn(X_subset)
+                encoded_array = encoder.transform(X_np)
+
+                if hasattr(encoded_array, "toarray"):
+                    encoded_array = encoded_array.toarray()
+
+                encoded_df = pl.DataFrame(encoded_array, schema=feature_names)
+                X_out = pl.concat([X, encoded_df], how="horizontal")
+
+                if drop_original:
+                    X_out = X_out.drop(valid_cols)
+
+                return pack_pipeline_output(X_out, y, is_tuple)
+            except Exception as e:
+                logger.error(f"OneHot Encoding failed: {e}")
+                return pack_pipeline_output(X, y, is_tuple)
+
+        # Pandas Path
         X_out = X.copy()
 
         # Ensure all expected columns are present for the encoder
@@ -84,7 +123,7 @@ class OneHotEncoderApplier(BaseApplier):
 class OneHotEncoderCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -107,9 +146,15 @@ class OneHotEncoderCalculator(BaseCalculator):
         include_missing = config.get("include_missing", False)
 
         # Handle missing values for fit if requested
-        df_fit = X[cols].copy()
+        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
+
         if include_missing:
-            df_fit = df_fit.fillna("__mlops_missing__")
+            if hasattr(X_subset, "fill_null"):  # Polars
+                X_subset = X_subset.fill_null("__mlops_missing__")
+            else:  # Pandas
+                X_subset = X_subset.fillna("__mlops_missing__")
+
+        X_np, _ = SklearnBridge.to_sklearn(X_subset)
 
         # We use sklearn's OneHotEncoder
         # Note: sparse_output=False to return dense arrays for pandas
@@ -121,7 +166,7 @@ class OneHotEncoderCalculator(BaseCalculator):
             dtype=np.int8,  # Save memory
         )
 
-        encoder.fit(df_fit)
+        encoder.fit(X_np)
 
         # Check for columns that produced no features
         if hasattr(encoder, "categories_"):
@@ -161,10 +206,11 @@ class OneHotEncoderCalculator(BaseCalculator):
 class OrdinalEncoderApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         cols = params.get("columns", [])
         encoder = params.get("encoder_object")
@@ -173,6 +219,32 @@ class OrdinalEncoderApplier(BaseApplier):
         if not valid_cols or not encoder:
             return pack_pipeline_output(X, y, is_tuple)
 
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+
+            try:
+                X_subset = X.select(valid_cols)
+                # Cast to string to match fit behavior
+                X_subset = X_subset.select(
+                    [pl.col(c).cast(pl.Utf8) for c in valid_cols]
+                )
+
+                X_np, _ = SklearnBridge.to_sklearn(X_subset)
+                encoded_array = encoder.transform(X_np)
+
+                # Replace columns
+                new_cols = [
+                    pl.Series(col, encoded_array[:, i])
+                    for i, col in enumerate(valid_cols)
+                ]
+                X_out = X.with_columns(new_cols)
+                return pack_pipeline_output(X_out, y, is_tuple)
+            except Exception as e:
+                logger.error(f"Ordinal Encoding failed: {e}")
+                return pack_pipeline_output(X, y, is_tuple)
+
+        # Pandas Path
         X_out = X.copy()
 
         try:
@@ -193,7 +265,7 @@ class OrdinalEncoderApplier(BaseApplier):
 class OrdinalEncoderCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -219,9 +291,18 @@ class OrdinalEncoderCalculator(BaseCalculator):
         # Let's assume standard behavior: NaN is a category or error.
         # We'll convert to string to treat NaN as "nan" category if needed, or let it fail.
         # Safer: Convert to string.
-        X_fit = X[cols].astype(str)
+        
+        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
+        
+        if hasattr(X_subset, "select"): # Polars
+             import polars as pl
+             X_subset = X_subset.select([pl.col(c).cast(pl.Utf8) for c in cols])
+        else: # Pandas
+             X_subset = X_subset.astype(str)
 
-        encoder.fit(X_fit)
+        X_np, _ = SklearnBridge.to_sklearn(X_subset)
+
+        encoder.fit(X_np)
 
         return {
             "type": "ordinal",
@@ -328,10 +409,11 @@ class LabelEncoderCalculator(BaseCalculator):
 class TargetEncoderApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         cols = params.get("columns", [])
         encoder = params.get("encoder_object")
@@ -340,6 +422,26 @@ class TargetEncoderApplier(BaseApplier):
         if not valid_cols or not encoder:
             return pack_pipeline_output(X, y, is_tuple)
 
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+
+            try:
+                X_subset = X.select(valid_cols)
+                X_np, _ = SklearnBridge.to_sklearn(X_subset)
+                encoded_array = encoder.transform(X_np)
+
+                new_cols = [
+                    pl.Series(col, encoded_array[:, i])
+                    for i, col in enumerate(valid_cols)
+                ]
+                X_out = X.with_columns(new_cols)
+                return pack_pipeline_output(X_out, y, is_tuple)
+            except Exception as e:
+                logger.error(f"Target Encoding failed: {e}")
+                return pack_pipeline_output(X, y, is_tuple)
+
+        # Pandas Path
         X_out = X.copy()
 
         try:
@@ -357,7 +459,7 @@ class TargetEncoderApplier(BaseApplier):
 class TargetEncoderCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, y, is_tuple = unpack_pipeline_input(df)
@@ -375,7 +477,19 @@ class TargetEncoderCalculator(BaseCalculator):
         target_type = config.get("target_type", "auto")
 
         encoder = TargetEncoder(smooth=smooth, target_type=target_type)
-        encoder.fit(X[cols], y)
+        
+        # Use Bridge for fitting
+        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
+        X_np, _ = SklearnBridge.to_sklearn(X_subset)
+        
+        # Handle y
+        y_np = y
+        if hasattr(y, "to_numpy"):
+            y_np = y.to_numpy()
+        elif hasattr(y, "to_pandas"): # Polars Series
+            y_np = y.to_pandas().to_numpy()
+        
+        encoder.fit(X_np, y_np)
 
         return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}
 
@@ -386,10 +500,11 @@ class TargetEncoderCalculator(BaseCalculator):
 class HashEncoderApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         cols = params.get("columns", [])
         n_features = params.get("n_features", 10)
@@ -398,6 +513,24 @@ class HashEncoderApplier(BaseApplier):
         if not valid_cols:
             return pack_pipeline_output(X, y, is_tuple)
 
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+
+            exprs = []
+            for col in valid_cols:
+                # Polars hash() returns u64. We take modulo n_features.
+                # Note: Polars hash might differ from Python hash.
+                # For consistency across engines, we might need a custom hash or accept divergence.
+                # Here we use Polars native hash for speed.
+                exprs.append(
+                    (pl.col(col).cast(pl.Utf8).hash() % n_features).alias(col)
+                )
+            
+            X_out = X.with_columns(exprs)
+            return pack_pipeline_output(X_out, y, is_tuple)
+
+        # Pandas Path
         X_out = X.copy()
 
         # hasher = FeatureHasher(n_features=n_features, input_type='string')
@@ -416,7 +549,7 @@ class HashEncoderApplier(BaseApplier):
 class HashEncoderCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -438,10 +571,11 @@ class HashEncoderCalculator(BaseCalculator):
 class DummyEncoderApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         cols = params.get("columns", [])
         categories = params.get("categories", {})
@@ -451,6 +585,38 @@ class DummyEncoderApplier(BaseApplier):
         if not valid_cols:
             return pack_pipeline_output(X, y, is_tuple)
 
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+            
+            X_out = X
+            
+            for col in valid_cols:
+                known_cats = categories.get(col, [])
+                
+                # Create dummies manually for Polars
+                # For each category, create a boolean column (cast to int)
+                
+                cats_to_encode = known_cats
+                if drop_first and len(cats_to_encode) > 1:
+                    cats_to_encode = cats_to_encode[1:]
+                
+                dummy_exprs = []
+                for cat in cats_to_encode:
+                    # Column name: col_cat
+                    dummy_name = f"{col}_{cat}"
+                    dummy_exprs.append(
+                        (pl.col(col).cast(pl.Utf8) == str(cat)).cast(pl.Int8).alias(dummy_name)
+                    )
+                
+                X_out = X_out.with_columns(dummy_exprs)
+            
+            # Drop original columns
+            X_out = X_out.drop(valid_cols)
+            
+            return pack_pipeline_output(X_out, y, is_tuple)
+
+        # Pandas Path
         X_out = X.copy()
 
         for col in valid_cols:
@@ -474,16 +640,34 @@ class DummyEncoderApplier(BaseApplier):
 class DummyEncoderCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+        engine = get_engine(X)
+        
         cols = resolve_columns(X, config, detect_categorical_columns)
 
         # We need to know all possible categories to align columns during transform
         categories = {}
-        for col in cols:
-            categories[col] = sorted(X[col].dropna().unique().astype(str).tolist())
+        
+        if engine.name == "polars":
+            import polars as pl
+            for col in cols:
+                # Get unique values, sort them, convert to list
+                cats = X.select(pl.col(col).cast(pl.Utf8).unique().sort()).to_series().to_list()
+                categories[col] = [str(c) for c in cats if c is not None]
+        else:
+            # Pandas
+            for col in cols:
+                categories[col] = sorted(X[col].dropna().unique().astype(str).tolist())
+                
+        return {
+            "type": "dummy_encoder",
+            "columns": cols,
+            "categories": categories,
+            "drop_first": config.get("drop_first", False),
+        }
 
         return {
             "type": "dummy_encoder",

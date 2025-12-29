@@ -45,6 +45,8 @@ class SkyulfPandasWrapper:
         return getattr(self._df, name)
 
 class PandasEngine(BaseEngine):
+    name = "pandas"
+
     @classmethod
     def is_compatible(cls, data: Any) -> bool:
         return isinstance(data, pd.DataFrame)

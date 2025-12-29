@@ -135,10 +135,11 @@ class StandardScalerCalculator(BaseCalculator):
 class MinMaxScalerApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         cols = params.get("columns", [])
         min_val = params.get("min")
@@ -148,6 +149,22 @@ class MinMaxScalerApplier(BaseApplier):
         if not valid_cols or min_val is None or scale is None:
             return pack_pipeline_output(X, y, is_tuple)
 
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+
+            exprs = []
+            for i, col_name in enumerate(cols):
+                if col_name in valid_cols:
+                    # X * scale + min
+                    exprs.append(
+                        (pl.col(col_name) * scale[i] + min_val[i]).alias(col_name)
+                    )
+
+            X_out = X.with_columns(exprs)
+            return pack_pipeline_output(X_out, y, is_tuple)
+
+        # Pandas Path
         X_out = X.copy()
         min_arr = np.array(min_val)
         scale_arr = np.array(scale)
@@ -163,7 +180,7 @@ class MinMaxScalerApplier(BaseApplier):
 class MinMaxScalerCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -177,7 +194,12 @@ class MinMaxScalerCalculator(BaseCalculator):
             return {}
 
         scaler = MinMaxScaler(feature_range=feature_range)
-        scaler.fit(X[cols])
+        
+        # Use Bridge for fitting
+        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
+        X_np, _ = SklearnBridge.to_sklearn(X_subset)
+        
+        scaler.fit(X_np)
 
         return {
             "type": "minmax_scaler",
@@ -196,10 +218,11 @@ class MinMaxScalerCalculator(BaseCalculator):
 class RobustScalerApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         cols = params.get("columns", [])
         center = params.get("center")
@@ -209,6 +232,30 @@ class RobustScalerApplier(BaseApplier):
         if not valid_cols:
             return pack_pipeline_output(X, y, is_tuple)
 
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+
+            exprs = []
+            for i, col_name in enumerate(cols):
+                if col_name in valid_cols:
+                    expr = pl.col(col_name)
+
+                    if params.get("with_centering", True) and center is not None:
+                        expr = expr - center[i]
+
+                    if params.get("with_scaling", True) and scale is not None:
+                        s = scale[i]
+                        if s == 0:
+                            s = 1.0
+                        expr = expr / s
+
+                    exprs.append(expr.alias(col_name))
+
+            X_out = X.with_columns(exprs)
+            return pack_pipeline_output(X_out, y, is_tuple)
+
+        # Pandas Path
         X_out = X.copy()
         col_indices = [cols.index(c) for c in valid_cols]
         vals = X_out[valid_cols].values
@@ -232,7 +279,7 @@ class RobustScalerApplier(BaseApplier):
 class RobustScalerCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -252,7 +299,12 @@ class RobustScalerCalculator(BaseCalculator):
             with_centering=with_centering,
             with_scaling=with_scaling,
         )
-        scaler.fit(X[cols])
+        
+        # Use Bridge for fitting
+        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
+        X_np, _ = SklearnBridge.to_sklearn(X_subset)
+        
+        scaler.fit(X_np)
 
         return {
             "type": "robust_scaler",
@@ -271,10 +323,11 @@ class RobustScalerCalculator(BaseCalculator):
 class MaxAbsScalerApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         cols = params.get("columns", [])
         scale = params.get("scale")
@@ -283,6 +336,22 @@ class MaxAbsScalerApplier(BaseApplier):
         if not valid_cols or scale is None:
             return pack_pipeline_output(X, y, is_tuple)
 
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+
+            exprs = []
+            for i, col_name in enumerate(cols):
+                if col_name in valid_cols:
+                    s = scale[i]
+                    if s == 0:
+                        s = 1.0
+                    exprs.append((pl.col(col_name) / s).alias(col_name))
+
+            X_out = X.with_columns(exprs)
+            return pack_pipeline_output(X_out, y, is_tuple)
+
+        # Pandas Path
         X_out = X.copy()
         scale_arr = np.array(scale)
         col_indices = [cols.index(c) for c in valid_cols]
@@ -301,7 +370,7 @@ class MaxAbsScalerApplier(BaseApplier):
 class MaxAbsScalerCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -312,7 +381,12 @@ class MaxAbsScalerCalculator(BaseCalculator):
             return {}
 
         scaler = MaxAbsScaler()
-        scaler.fit(X[cols])
+        
+        # Use Bridge for fitting
+        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
+        X_np, _ = SklearnBridge.to_sklearn(X_subset)
+        
+        scaler.fit(X_np)
 
         return {
             "type": "maxabs_scaler",

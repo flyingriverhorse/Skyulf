@@ -12,7 +12,17 @@
 **"The Backend Abstraction & Modern Frameworks Update"**
 This release lays the groundwork for backend abstraction, enabling future support for multiple data processing frameworks like Polars and Rust-based extensions.
 
-### 🔧 Backend Architecture
+### � Core Engine (Polars Migration)
+- **Engine Architecture:** Introduced `SkyulfDataFrame` Protocol and `EngineRegistry` to support multiple compute backends (Pandas, Polars).
+- **Polars Support:** Implemented `PolarsEngine` for high-performance data processing.
+- **Service Layer:** Created `DataService` to centralize I/O operations, defaulting to Polars for faster CSV/Parquet reading.
+- **Sklearn Bridge:** Implemented `SklearnBridge` to seamlessly convert Polars/Arrow data to Numpy for Scikit-Learn compatibility without unnecessary copies.
+- **Node Migration:** Migrated `StandardScaler`, `MinMaxScaler`, `RobustScaler`, `MaxAbsScaler`, and `SimpleImputer` to use native Polars expressions for significant performance gains.
+- **Node Migration (Bucketing & Outliers):** Migrated `KBinsDiscretizer`, `IQR`, `ZScore`, `Winsorize`, `ManualBounds`, and `EllipticEnvelope` to support Polars (native expressions where possible, bridge for sklearn models).
+- **Compatibility:** Updated `OneHotEncoder`, `OrdinalEncoder`, `TargetEncoder`, `HashEncoder`, `DummyEncoder`, `KNNImputer`, and `IterativeImputer` to work with Polars inputs via the bridge.
+- **Validation:** Added `compliance_suite.py` to verify parity between Pandas and Polars implementations.
+
+### �🔧 Backend Architecture
 - **Artifact Naming:** Updated artifact folder naming convention to `dataset_name_timestamp_job_id` for better organization and traceability.
 - **Logging:** Improved artifact saving logs to display the full URI/path instead of just the internal key.
 - **Timezone:** Switched artifact timestamp generation to use local server time instead of UTC database time.
