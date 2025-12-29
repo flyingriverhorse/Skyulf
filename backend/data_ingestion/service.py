@@ -18,6 +18,7 @@ from backend.data_ingestion.schemas.ingestion import (
 )
 from backend.data_ingestion.tasks import ingest_data_task
 from backend.database.models import DataSource
+from backend.services.data_service import DataService
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class DataIngestionService:
         self.session = session
         self.upload_dir = Path(upload_dir)
         self.upload_dir.mkdir(parents=True, exist_ok=True)
+        self.data_service = DataService()
 
     async def list_sources(self, user_id: Optional[int] = None) -> Sequence[DataSource]:
         """
@@ -176,14 +178,7 @@ class DataIngestionService:
                     # Try relative to workspace if absolute fails
                     abs_path = Path.cwd() / file_path
 
-                connector = LocalFileConnector(str(abs_path))
-                await connector.connect()
-                # Pass limit to fetch_data to avoid loading full file if possible
-                df = await connector.fetch_data(limit=limit)
-
-                # Convert to list of dicts, handling potential serialization issues
-                # Polars to_dicts handles basic types well
-                return cast(List[Dict[str, Any]], df.to_dicts())
+                return await self.data_service.get_sample(abs_path, limit=limit)
             except Exception as e:
                 logger.error(f"Failed to get sample: {e}")
                 raise HTTPException(

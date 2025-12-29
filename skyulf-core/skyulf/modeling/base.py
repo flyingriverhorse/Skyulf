@@ -6,6 +6,7 @@ import pandas as pd
 
 # Use relative imports assuming the structure is preserved
 from ..data.dataset import SplitDataset
+from ..engines import SkyulfDataFrame
 
 # Evaluation imports - we will migrate these next
 # from .evaluation.schemas import ModelEvaluationReport, ModelEvaluationSplitPayload
@@ -30,12 +31,12 @@ class BaseModelCalculator(ABC):
     @abstractmethod
     def fit(
         self,
-        X: pd.DataFrame,
-        y: pd.Series,
+        X: Union[pd.DataFrame, SkyulfDataFrame],
+        y: Union[pd.Series, Any],
         config: Dict[str, Any],
         progress_callback: Optional[Callable[..., None]] = None,
         log_callback: Optional[Callable[[str], None]] = None,
-        validation_data: Optional[tuple[pd.DataFrame, pd.Series]] = None,
+        validation_data: Optional[tuple[Union[pd.DataFrame, SkyulfDataFrame], Union[pd.Series, Any]]] = None,
     ) -> Any:
         """
         Trains the model. Returns the model object (serializable).
@@ -45,15 +46,15 @@ class BaseModelCalculator(ABC):
 
 class BaseModelApplier(ABC):
     @abstractmethod
-    def predict(self, df: pd.DataFrame, model_artifact: Any) -> pd.Series:
+    def predict(self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any) -> Union[pd.Series, Any]:
         """
         Generates predictions.
         """
         pass
 
     def predict_proba(
-        self, df: pd.DataFrame, model_artifact: Any
-    ) -> Optional[pd.DataFrame]:
+        self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any
+    ) -> Optional[Union[pd.DataFrame, SkyulfDataFrame]]:
         """
         Generates prediction probabilities if supported.
         Returns DataFrame where columns are classes.
@@ -72,16 +73,27 @@ class StatefulEstimator:
 
     def _extract_xy(
         self, data: Any, target_column: str
-    ) -> tuple[pd.DataFrame, pd.Series]:
+    ) -> tuple[Any, Any]:
         """Helper to extract X and y from DataFrame or Tuple."""
         if isinstance(data, tuple) and len(data) == 2:
             return data[0], data[1]
-        elif isinstance(data, pd.DataFrame):
+        
+        # Check for DataFrame-like
+        if hasattr(data, "columns"):
             if target_column not in data.columns:
                 raise ValueError(f"Target column '{target_column}' not found in data")
-            return data.drop(columns=[target_column]), data[target_column]
-        else:
-            raise ValueError(f"Unexpected data type: {type(data)}")
+            
+            # Use protocol methods if available
+            if hasattr(data, "drop") and hasattr(data, "select"):
+                X = data.drop([target_column])
+                y = data.select([target_column]) # Returns DataFrame
+                return X, y
+            
+            # Fallback for pure Pandas
+            if isinstance(data, pd.DataFrame):
+                return data.drop(columns=[target_column]), data[target_column]
+        
+        raise ValueError(f"Unexpected data type: {type(data)}")
 
     def cross_validate(
         self,

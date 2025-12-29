@@ -4,10 +4,11 @@ import numpy as np
 import pandas as pd
 
 from .data.dataset import SplitDataset
+from .engines import SkyulfDataFrame, get_engine
 
 
 def get_data_stats(
-    data: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series], SplitDataset],
+    data: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any], SplitDataset],
 ) -> Tuple[int, Set[str]]:
     """
     Calculates row count and column set for various data structures.
@@ -16,14 +17,15 @@ def get_data_stats(
     rows = 0
     cols = set()
 
-    if isinstance(data, pd.DataFrame):
-        rows = len(data)
+    # Check for DataFrame-like object (Pandas, Polars, Wrapper)
+    if hasattr(data, "shape") and hasattr(data, "columns") and not isinstance(data, tuple):
+        rows = data.shape[0]
         cols = set(data.columns)
     elif isinstance(data, tuple) and len(data) == 2:
         # Handle (X, y) tuple
         # Check if first element is DataFrame/Series
         if hasattr(data[0], "shape"):
-            rows = len(data[0])
+            rows = data[0].shape[0]
             if hasattr(data[0], "columns"):
                 cols = set(data[0].columns)
     elif isinstance(data, SplitDataset):
@@ -46,8 +48,8 @@ def get_data_stats(
 
 
 def unpack_pipeline_input(
-    data: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-) -> Tuple[pd.DataFrame, Optional[pd.Series], bool]:
+    data: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
+) -> Tuple[Union[pd.DataFrame, SkyulfDataFrame], Optional[Any], bool]:
     """
     Unpacks input which might be a DataFrame or a (X, y) tuple.
     Returns: (X, y, is_tuple)
@@ -58,8 +60,10 @@ def unpack_pipeline_input(
 
 
 def pack_pipeline_output(
-    X: pd.DataFrame, y: Optional[pd.Series], was_tuple: bool
-) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    X: Union[pd.DataFrame, SkyulfDataFrame], 
+    y: Optional[Any], 
+    was_tuple: bool
+) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]]:
     """
     Packs output back into a tuple if the input was a tuple and y is present.
     Otherwise, if y is present, concatenates it back to X.
@@ -69,8 +73,37 @@ def pack_pipeline_output(
 
     if y is not None:
         # Re-attach y to X
+        engine = get_engine(X)
+        
+        if engine.__name__ == "PolarsEngine":
+            # Polars specific concat
+            import polars as pl
+            if not isinstance(y, (pl.Series, pl.DataFrame)):
+                # Try to convert y to Series
+                try:
+                    y = pl.Series(y)
+                except:
+                    pass # Let it fail or handle otherwise
+            
+            if isinstance(X, pl.DataFrame):
+                return X.hstack([y] if isinstance(y, pl.Series) else y)
+            # Handle Wrapper
+            if hasattr(X, "_df"):
+                 return X._df.hstack([y] if isinstance(y, pl.Series) else y)
+
+        # Default to Pandas behavior (convert if needed or assume Pandas)
+        if hasattr(X, "to_pandas"):
+             X_pd = X.to_pandas()
+        else:
+             X_pd = X
+             
+        if hasattr(y, "to_pandas"):
+             y_pd = y.to_pandas()
+        else:
+             y_pd = y
+             
         # Ensure indices align (they should if coming from same operation)
-        return pd.concat([X, y], axis=1)
+        return pd.concat([X_pd, y_pd], axis=1)
 
     return X
 
@@ -88,7 +121,7 @@ def _is_binary_numeric(series: pd.Series) -> bool:
     return True
 
 
-def detect_numeric_columns(frame: pd.DataFrame) -> List[str]:
+def detect_numeric_columns(frame: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
     """
     Find numeric-like columns that have more than one non-binary value.
 
@@ -98,6 +131,13 @@ def detect_numeric_columns(frame: pd.DataFrame) -> List[str]:
     3. Excludes binary (0/1) columns.
     4. Excludes constant columns (0 or 1 unique value).
     """
+    # Convert to Pandas for analysis if not already
+    # TODO: Implement native Polars logic for performance
+    if not isinstance(frame, pd.DataFrame):
+        if hasattr(frame, "to_pandas"):
+            frame = frame.to_pandas()
+            
+    # ... existing logic ...
     detected: List[str] = []
     seen: Set[str] = set()
 
@@ -134,9 +174,9 @@ def detect_numeric_columns(frame: pd.DataFrame) -> List[str]:
 
 
 def resolve_columns(
-    df: pd.DataFrame,
+    df: Union[pd.DataFrame, SkyulfDataFrame],
     config: Dict[str, Any],
-    default_selection_func: Optional[Callable[[pd.DataFrame], List[str]]] = None,
+    default_selection_func: Optional[Callable[[Union[pd.DataFrame, SkyulfDataFrame]], List[str]]] = None,
     target_column_key: str = "target_column",
 ) -> List[str]:
     """

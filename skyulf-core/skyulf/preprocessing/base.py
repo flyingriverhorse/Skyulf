@@ -4,6 +4,7 @@ from typing import Any, Dict, Union
 import pandas as pd
 
 from ..data.dataset import SplitDataset
+from ..engines import SkyulfDataFrame
 
 # from ..artifacts.store import ArtifactStore # Removed dependency on ArtifactStore for now
 
@@ -11,7 +12,7 @@ from ..data.dataset import SplitDataset
 class BaseCalculator(ABC):
     @abstractmethod
     def fit(
-        self, df: Union[pd.DataFrame, tuple], config: Dict[str, Any]
+        self, df: Union[pd.DataFrame, SkyulfDataFrame, tuple], config: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Calculates parameters from the training data.
@@ -23,8 +24,8 @@ class BaseCalculator(ABC):
 class BaseApplier(ABC):
     @abstractmethod
     def apply(
-        self, df: Union[pd.DataFrame, tuple], params: Dict[str, Any]
-    ) -> Union[pd.DataFrame, tuple, SplitDataset]:
+        self, df: Union[pd.DataFrame, SkyulfDataFrame, tuple], params: Dict[str, Any]
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, tuple, SplitDataset]:
         """
         Applies the transformation using fitted parameters.
         """
@@ -50,9 +51,10 @@ class StatefulTransformer:
         )  # Store params in memory instead of ArtifactStore
 
     def fit_transform(
-        self, dataset: Union[SplitDataset, pd.DataFrame, tuple], config: Dict[str, Any]
-    ) -> Union[SplitDataset, pd.DataFrame, tuple]:
-        if isinstance(dataset, pd.DataFrame):
+        self, dataset: Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple], config: Dict[str, Any]
+    ) -> Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple]:
+        # Check for DataFrame-like (Pandas, Polars, Wrapper)
+        if hasattr(dataset, "shape") and hasattr(dataset, "columns") and not isinstance(dataset, tuple):
             # Fit on the whole dataframe (be careful about leakage!)
             self.params = self.calculator.fit(dataset, config)
             return self.applier.apply(dataset, self.params)
@@ -94,8 +96,8 @@ class StatefulTransformer:
         return SplitDataset(train=new_train, test=new_test, validation=new_val)
 
     def transform(
-        self, dataset: Union[SplitDataset, pd.DataFrame, tuple]
-    ) -> Union[SplitDataset, pd.DataFrame, tuple]:
+        self, dataset: Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple]
+    ) -> Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple]:
         # Use stored params
         params = self.params
 
