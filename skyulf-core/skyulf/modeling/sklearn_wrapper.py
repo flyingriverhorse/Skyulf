@@ -134,27 +134,3 @@ class SklearnApplier(BaseModelApplier):
             columns = model_artifact.classes_
             
         return pd.DataFrame(probs, index=index, columns=columns)
-
-    def predict(self, df: pd.DataFrame, model_artifact: Any) -> pd.Series:
-        """Generate predictions."""
-        # model_artifact is the fitted sklearn estimator
-        return pd.Series(model_artifact.predict(df), index=df.index)
-
-    def predict_proba(
-        self, df: pd.DataFrame, model_artifact: Any
-    ) -> Optional[pd.DataFrame]:
-        """Generate prediction probabilities."""
-        if hasattr(model_artifact, "predict_proba"):
-            try:
-                probas = model_artifact.predict_proba(df)
-                # Handle binary vs multiclass
-                # If binary, classes_ usually has 2 entries.
-                classes = getattr(model_artifact, "classes_", None)
-                if classes is None:
-                    # Fallback if classes_ is missing (unlikely for sklearn classifiers)
-                    return pd.DataFrame(probas, index=df.index)
-
-                return pd.DataFrame(probas, columns=classes, index=df.index)
-            except Exception:
-                return None
-        return None

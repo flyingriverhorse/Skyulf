@@ -69,5 +69,9 @@ class PandasEngine(BaseEngine):
             return data
         return SkyulfPandasWrapper(data)
 
+    @classmethod
+    def create_dataframe(cls, data: Any) -> Any:
+        return pd.DataFrame(data)
+
 # Register automatically
 EngineRegistry.register("pandas", PandasEngine)

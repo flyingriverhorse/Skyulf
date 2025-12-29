@@ -109,11 +109,31 @@ def setup_universal_logging(
         print(f"Warning: Could not setup file logging to {log_file}: {e}")
 
     # Console handler with cleaner output for development
-    console_handler = logging.StreamHandler()
+    try:
+        from rich.logging import RichHandler
+
+        console_handler = RichHandler(
+            rich_tracebacks=True,
+            markup=True,
+            show_time=True,
+            show_path=False,
+        )
+        # Rich handler has its own formatter, no need to set one
+    except ImportError:
+        console_handler = logging.StreamHandler()
+        console_formatter = logging.Formatter("%(levelname)s: %(message)s")
+        console_handler.setFormatter(console_formatter)
+
     console_handler.setLevel(
         getattr(logging, console_log_level.upper(), logging.WARNING)
-    )  # Only show warnings and errors in console
-    console_formatter = logging.Formatter("%(levelname)s: %(message)s")
-    console_handler.setFormatter(console_formatter)
+    )
     root_logger.addHandler(console_handler)
+
+    # === NOISE REDUCTION ===
+    # Set noisy libraries to WARNING or ERROR
+    logging.getLogger("multipart").setLevel(logging.WARNING)
+    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("watchfiles").setLevel(logging.WARNING)
+
 

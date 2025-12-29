@@ -13,6 +13,7 @@ from ..utils import (
     unpack_pipeline_input,
 )
 from .base import BaseApplier, BaseCalculator
+from ..engines import SkyulfDataFrame, get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +23,9 @@ logger = logging.getLogger(__name__)
 class PowerTransformerApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
         cols = params.get("columns", [])
@@ -91,7 +92,7 @@ class PowerTransformerApplier(BaseApplier):
 class PowerTransformerCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -149,9 +150,9 @@ class PowerTransformerCalculator(BaseCalculator):
 class SimpleTransformationApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
         transformations = params.get("transformations", [])
@@ -203,7 +204,7 @@ class SimpleTransformationApplier(BaseApplier):
 class SimpleTransformationCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'}, ...]}
@@ -219,9 +220,9 @@ class SimpleTransformationCalculator(BaseCalculator):
 class GeneralTransformationApplier(BaseApplier):
     def apply(  # noqa: C901
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
         transformations = params.get("transformations", [])
@@ -294,7 +295,7 @@ class GeneralTransformationApplier(BaseApplier):
 class GeneralTransformationCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'},

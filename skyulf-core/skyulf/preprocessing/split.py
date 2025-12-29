@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from ..registry import NodeRegistry
 from ..data.dataset import SplitDataset
 from .base import BaseApplier, BaseCalculator
+from ..engines import SkyulfDataFrame, get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 class SplitApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
     ) -> SplitDataset:
         stratify = params.get("stratify", False)
@@ -47,7 +48,7 @@ class SplitApplier(BaseApplier):
 @NodeRegistry.register("TrainTestSplitter", SplitApplier)
 class SplitCalculator(BaseCalculator):
     def fit(
-        self, df: Union[pd.DataFrame, Tuple[Any, ...]], config: Dict[str, Any]
+        self, df: SkyulfDataFrame, config: Dict[str, Any]
     ) -> Dict[str, Any]:
         # No learning from data, just pass through config
         return config
@@ -72,25 +73,39 @@ class DataSplitter:
         self.shuffle = shuffle
         self.stratify_col = stratify_col
 
-    def split_xy(self, X: pd.DataFrame, y: pd.Series) -> SplitDataset:
+    def split_xy(self, X: Union[pd.DataFrame, SkyulfDataFrame], y: Union[pd.Series, Any]) -> SplitDataset:
         """
         Splits X and y arrays.
         """
-        stratify = y if self.stratify_col else None  # If stratify is requested, use y
+        engine = get_engine(X)
+        is_polars = engine.name == "polars"
+
+        if is_polars:
+            # Convert to Pandas to preserve schema/metadata during split
+            X_pd = X.to_pandas()
+            y_pd = y.to_pandas() if y is not None else None
+        else:
+            X_pd = X
+            y_pd = y
+
+        stratify = y_pd if self.stratify_col else None  # If stratify is requested, use y
 
         if stratify is not None:
-            class_counts = y.value_counts()
-            if class_counts.min() < 2:
+            # Check value counts
+            class_counts = y_pd.value_counts()
+            min_count = class_counts.min()
+                
+            if min_count < 2:
                 logger.warning(
-                    f"Stratified split requested but the least populated class has only {class_counts.min()} "
+                    f"Stratified split requested but the least populated class has only {min_count} "
                     "member(s). Stratification will be disabled."
                 )
                 stratify = None
 
         # First split: Train+Val vs Test
         X_train_val, X_test, y_train_val, y_test = train_test_split(
-            X,
-            y,
+            X_pd,
+            y_pd,
             test_size=self.test_size,
             random_state=self.random_state,
             shuffle=self.shuffle,
@@ -104,10 +119,12 @@ class DataSplitter:
 
             if stratify_val is not None:
                 class_counts_val = y_train_val.value_counts()
-                if class_counts_val.min() < 2:
+                min_count_val = class_counts_val.min()
+                    
+                if min_count_val < 2:
                     logger.warning(
                         "Stratified validation split requested but the least populated class has only "
-                        f"{class_counts_val.min()} member(s). Stratification will be disabled for validation split."
+                        f"{min_count_val} member(s). Stratification will be disabled for validation split."
                     )
                     stratify_val = None
 
@@ -123,17 +140,44 @@ class DataSplitter:
         else:
             X_train, y_train = X_train_val, y_train_val
 
+        # Convert back to Polars if needed
+        if is_polars:
+            import polars as pl
+            
+            def to_pl(df_or_series):
+                if df_or_series is None: return None
+                if isinstance(df_or_series, pd.DataFrame): return pl.from_pandas(df_or_series)
+                if isinstance(df_or_series, pd.Series): return pl.from_pandas(df_or_series)
+                return df_or_series
+
+            X_train = to_pl(X_train)
+            y_train = to_pl(y_train)
+            X_test = to_pl(X_test)
+            y_test = to_pl(y_test)
+            
+            if validation:
+                validation = (to_pl(validation[0]), to_pl(validation[1]))
+
         return SplitDataset(
             train=(X_train, y_train), test=(X_test, y_test), validation=validation
         )
 
-    def split(self, df: pd.DataFrame) -> SplitDataset:
+    def split(self, df: Union[pd.DataFrame, SkyulfDataFrame]) -> SplitDataset:
         """
         Splits a DataFrame.
         """
+        engine = get_engine(df)
+        is_polars = engine.name == "polars"
+
+        if is_polars:
+            # Convert to Pandas to preserve schema/metadata during split
+            df_pd = df.to_pandas()
+        else:
+            df_pd = df
+        
         stratify = None
-        if self.stratify_col and self.stratify_col in df.columns:
-            stratify = df[self.stratify_col]
+        if self.stratify_col and self.stratify_col in df_pd.columns:
+            stratify = df_pd[self.stratify_col]
             class_counts = stratify.value_counts()
             if class_counts.min() < 2:
                 logger.warning(
@@ -143,7 +187,7 @@ class DataSplitter:
                 stratify = None
 
         train_val, test = train_test_split(
-            df,
+            df_pd,
             test_size=self.test_size,
             random_state=self.random_state,
             shuffle=self.shuffle,
@@ -176,13 +220,21 @@ class DataSplitter:
         else:
             train = train_val
 
+        # Convert back to Polars if needed
+        if is_polars:
+            import polars as pl
+            train = pl.from_pandas(train)
+            test = pl.from_pandas(test)
+            if validation is not None:
+                validation = pl.from_pandas(validation)
+
         return SplitDataset(train=train, test=test, validation=validation)
 
 
 class FeatureTargetSplitApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, SplitDataset, Tuple[Any, ...]],
+        df: Union[pd.DataFrame, SkyulfDataFrame, SplitDataset, Tuple[Any, ...]],
         params: Dict[str, Any],
     ) -> Union[Tuple[pd.DataFrame, pd.Series], SplitDataset]:
         target_col = params.get("target_column")
@@ -191,7 +243,16 @@ class FeatureTargetSplitApplier(BaseApplier):
                 "Target column must be specified for FeatureTargetSplitter"
             )
 
-        def split_one(data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
+        def split_one(data: Union[pd.DataFrame, SkyulfDataFrame]) -> Tuple[Any, Any]:
+            engine = get_engine(data)
+            if engine.name == "polars":
+                if target_col not in data.columns:
+                    raise ValueError(f"Target column '{target_col}' not found in dataset")
+                y = data.select(target_col).to_series()
+                X = data.drop([target_col])
+                return X, y
+            
+            # Pandas
             if target_col not in data.columns:
                 raise ValueError(f"Target column '{target_col}' not found in dataset")
             y = data[target_col]
@@ -200,33 +261,33 @@ class FeatureTargetSplitApplier(BaseApplier):
 
         if isinstance(df, SplitDataset):
             # Apply to all splits
+            # We check if it's NOT a tuple (meaning it's a DataFrame-like object)
             train = (
-                split_one(df.train) if isinstance(df.train, pd.DataFrame) else df.train
+                split_one(df.train) if not isinstance(df.train, tuple) else df.train
             )
-            test = split_one(df.test) if isinstance(df.test, pd.DataFrame) else df.test
+            test = split_one(df.test) if not isinstance(df.test, tuple) else df.test
             validation = None
             if df.validation is not None:
                 validation = (
                     split_one(df.validation)
-                    if isinstance(df.validation, pd.DataFrame)
+                    if not isinstance(df.validation, tuple)
                     else df.validation
                 )
 
             return SplitDataset(train=train, test=test, validation=validation)
 
-        if isinstance(df, pd.DataFrame):
-            return split_one(df)
+        if isinstance(df, tuple):
+            return df
 
-        return df  # Fallback if already tuple or unknown
+        # Assume DataFrame-like
+        return split_one(df)
 
 
 @NodeRegistry.register("feature_target_split", FeatureTargetSplitApplier)
 class FeatureTargetSplitCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, SplitDataset, Tuple[Any, ...]],
+        df: Union[pd.DataFrame, SkyulfDataFrame, SplitDataset, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         return config
-
-        return df

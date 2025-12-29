@@ -17,3 +17,4 @@ pandas-stubs
 # Optional helpful REPL / notebook tools for development
 ipython>=8.18.1
 jupyter>=1.1.1
+rich>=13.0.0

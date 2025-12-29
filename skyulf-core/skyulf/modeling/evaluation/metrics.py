@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib
 import math
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 import numpy as np
 import pandas as pd
@@ -22,6 +22,9 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import label_binarize
 
+from ...engines import SkyulfDataFrame
+from ...modeling.sklearn_wrapper import SklearnBridge
+
 _imblearn_metrics = None
 try:
     _imblearn_metrics = importlib.import_module("imblearn.metrics")
@@ -34,17 +37,20 @@ if _imblearn_metrics is not None:
 
 
 def calculate_classification_metrics(
-    model: Any, X: pd.DataFrame, y: pd.Series
+    model: Any, X: Union[pd.DataFrame, SkyulfDataFrame], y: Union[pd.Series, Any]
 ) -> Dict[str, float]:
     """Compute classification metrics for predictions."""
+
+    # Convert to Numpy for compatibility
+    X_np, y_np = SklearnBridge.to_sklearn((X, y))
 
     # Use DataFrame directly if possible to preserve feature names
     # Only convert to numpy if model doesn't support pandas or if X is not pandas
 
-    predictions = model.predict(X)
+    predictions = model.predict(X_np)
 
     # For metrics calculation, we might need numpy arrays for y
-    y_arr = y.to_numpy() if hasattr(y, "to_numpy") else y
+    y_arr = y_np
 
     metrics: Dict[str, float] = {
         "accuracy": float(accuracy_score(y_arr, predictions)),
@@ -85,7 +91,7 @@ def calculate_classification_metrics(
 
     try:
         if hasattr(model, "predict_proba"):
-            proba = model.predict_proba(X)
+            proba = model.predict_proba(X_np)
             if proba.ndim == 2 and proba.shape[1] >= 2:
                 class_count = proba.shape[1]
                 try:
@@ -118,14 +124,17 @@ def calculate_classification_metrics(
 
 
 def calculate_regression_metrics(
-    model: Any, X: pd.DataFrame, y: pd.Series
+    model: Any, X: Union[pd.DataFrame, SkyulfDataFrame], y: Union[pd.Series, Any]
 ) -> Dict[str, float]:
     """Compute regression metrics for predictions."""
 
-    # Use DataFrame directly if possible to preserve feature names
-    predictions = model.predict(X)
+    # Convert to Numpy for compatibility
+    X_np, y_np = SklearnBridge.to_sklearn((X, y))
 
-    y_arr = y.to_numpy() if hasattr(y, "to_numpy") else y
+    # Use DataFrame directly if possible to preserve feature names
+    predictions = model.predict(X_np)
+
+    y_arr = y_np
 
     mse_value = mean_squared_error(y_arr, predictions)
     metrics: Dict[str, float] = {

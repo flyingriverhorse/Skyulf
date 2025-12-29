@@ -1,44 +1,67 @@
-# © 2025 Murat Unsal — Skyulf Project
-
-name: Feature request
+name: 💡 Feature Request
 description: Suggest an idea for this project
-labels: [enhancement]
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! 
+        Please check the [Roadmap](https://github.com/flyingriverhorse/Skyulf/blob/master/ROADMAP.md) first to see if it's already planned.
+
   - type: input
     id: summary
     attributes:
       label: Summary
-      description: One sentence describing the feature
-      placeholder: e.g. "Export trained models to ONNX"
+      description: A clear and concise description of the feature.
+      placeholder: e.g. "Add support for exporting trained models to ONNX format"
     validations:
       required: true
+
   - type: textarea
     id: problem
     attributes:
-      label: Problem to solve
-      description: What user problem does this solve?
+      label: Is your feature request related to a problem?
+      description: A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+      placeholder: "I need to deploy models to edge devices, but currently I can only use the Python API..."
+    validations:
+      required: true
+
   - type: textarea
-    id: proposal
+    id: solution
     attributes:
-      label: Proposed solution
-      description: Describe how it could work (UI/API)
+      label: Proposed Solution
+      description: Describe the solution you'd like. How should it work? What should the UI look like?
+      placeholder: "Add an 'Export' button in the Model Registry that generates an .onnx file..."
+    validations:
+      required: true
+
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives considered
+      label: Alternatives Considered
+      description: Describe alternatives you've considered or workarounds you are currently using.
+    validations:
+      required: false
+
   - type: dropdown
     id: area
     attributes:
-      label: Area
+      label: Functional Area
+      description: Which part of Skyulf does this impact?
       options:
-        - Data ingestion
-        - EDA/Feature Canvas
-        - Model training
-        - LLM helpers
-        - Admin/UX
-        - Docs
-        - Infrastructure
+        - 📥 Data Ingestion (Connectors, SQL, S3)
+        - 🎨 Feature Canvas (Nodes, UI, UX)
+        - 🧠 Model Training (Algorithms, Tuning)
+        - 📦 Deployment & Registry
+        - ⚙️ Backend & Infrastructure
+        - 📚 Documentation
+        - Other
+    validations:
+      required: true
+
   - type: textarea
-    id: extra
+    id: context
     attributes:
-      label: Additional context
+      label: Additional Context
+      description: Add any other context or screenshots about the feature request here.

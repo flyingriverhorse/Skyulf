@@ -20,13 +20,15 @@ async def test_get_job_artifacts_s3_creds():
     session.execute.return_value = mock_result
     
     # Mock Settings
-    with patch("backend.config.get_settings") as mock_settings:
+    # Patch get_settings where it is used in ArtifactFactory
+    with patch("backend.ml_pipeline.artifacts.factory.get_settings") as mock_settings:
         mock_settings.return_value.AWS_ACCESS_KEY_ID = "test-key"
         mock_settings.return_value.AWS_SECRET_ACCESS_KEY = "test-secret"
         mock_settings.return_value.AWS_REGION = "us-east-1"
         
         # Mock S3ArtifactStore
-        with patch("backend.ml_pipeline.artifacts.s3.S3ArtifactStore") as MockS3Store:
+        # We must patch where it is imported/used, which is inside ArtifactFactory
+        with patch("backend.ml_pipeline.artifacts.factory.S3ArtifactStore") as MockS3Store:
             mock_store_instance = MockS3Store.return_value
             mock_store_instance.list_artifacts.return_value = ["model.joblib"]
             

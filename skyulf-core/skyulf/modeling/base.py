@@ -6,7 +6,7 @@ import pandas as pd
 
 # Use relative imports assuming the structure is preserved
 from ..data.dataset import SplitDataset
-from ..engines import SkyulfDataFrame
+from ..engines import SkyulfDataFrame, get_engine
 
 # Evaluation imports - we will migrate these next
 # from .evaluation.schemas import ModelEvaluationReport, ModelEvaluationSplitPayload
@@ -77,22 +77,26 @@ class StatefulEstimator:
         """Helper to extract X and y from DataFrame or Tuple."""
         if isinstance(data, tuple) and len(data) == 2:
             return data[0], data[1]
-        
+
+        engine = get_engine(data)
+
+        if engine.name == "polars":
+            if target_column not in data.columns:
+                raise ValueError(f"Target column '{target_column}' not found in data")
+            X = data.drop([target_column])
+            y = data.select(target_column).to_series()
+            return X, y
+
+        # Pandas / Default
         # Check for DataFrame-like
         if hasattr(data, "columns"):
             if target_column not in data.columns:
                 raise ValueError(f"Target column '{target_column}' not found in data")
-            
-            # Use protocol methods if available
-            if hasattr(data, "drop") and hasattr(data, "select"):
-                X = data.drop([target_column])
-                y = data.select([target_column]) # Returns DataFrame
-                return X, y
-            
+
             # Fallback for pure Pandas
             if isinstance(data, pd.DataFrame):
                 return data.drop(columns=[target_column]), data[target_column]
-        
+
         raise ValueError(f"Unexpected data type: {type(data)}")
 
     def cross_validate(
@@ -191,17 +195,28 @@ class StatefulEstimator:
 
         # Test Predictions
         is_test_empty = False
+        test_df = None
         if isinstance(dataset.test, tuple):
-            is_test_empty = dataset.test[0].empty
+            test_df = dataset.test[0]
         else:
-            is_test_empty = dataset.test.empty
+            test_df = dataset.test
+
+        if hasattr(test_df, "empty"):
+            is_test_empty = test_df.empty
+        else:
+            # Polars
+            is_test_empty = test_df.is_empty()
 
         if not is_test_empty:
             if isinstance(dataset.test, tuple):
                 X_test, _ = dataset.test
             else:
                 if target_column in dataset.test.columns:
-                    X_test = dataset.test.drop(columns=[target_column])
+                    try:
+                        X_test = dataset.test.drop(columns=[target_column])
+                    except TypeError:
+                        # Polars
+                        X_test = dataset.test.drop([target_column])
                 else:
                     X_test = dataset.test
             predictions["test"] = self.applier.predict(X_test, self.model)

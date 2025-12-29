@@ -30,6 +30,15 @@ This makes pipelines easier to persist and safer to run in production:
 - The learned state is explicit.
 - Applying is pure and repeatable.
 
+## Hybrid Engine (Polars & Pandas)
+
+Skyulf employs a **Hybrid Engine** architecture to maximize performance:
+
+-   **Polars**: Used for high-performance data ingestion (ETL) and stateless transformations (Scaling, Imputation, Encoding) where possible.
+-   **Pandas/Numpy**: Used for stateful learning (Calculators) and compatibility with Scikit-Learn models.
+
+The system automatically detects the input data type (`pd.DataFrame` or `pl.DataFrame`) and dispatches to the appropriate optimized path.
+
 ## Node Registry
 
 Skyulf uses a **Registry Pattern** to decouple the pipeline orchestrator from specific node implementations.

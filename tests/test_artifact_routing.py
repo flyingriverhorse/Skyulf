@@ -17,6 +17,8 @@ async def test_artifact_routing_logic():
         session = MagicMock()
         mock_get_session.return_value = session
         job = MagicMock()
+        # Ensure dataset_source_id is None to avoid query logic that returns a mock
+        job.dataset_source_id = None
         session.query.return_value.filter.return_value.first.return_value = job
         
         # Setup Settings

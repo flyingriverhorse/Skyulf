@@ -31,6 +31,8 @@ from ..utils import (
 )
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
+from ..engines import SkyulfDataFrame, get_engine
+from ..engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +91,9 @@ def _resolve_estimator(key: Optional[str], problem_type: str) -> Any:
 class VarianceThresholdApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
         selected_cols = params.get("selected_columns")
@@ -105,7 +107,10 @@ class VarianceThresholdApplier(BaseApplier):
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
 
         if cols_to_drop_list and drop_columns:
-            X = X.drop(columns=cols_to_drop_list)
+            if hasattr(X, "select"):
+                X = X.drop(cols_to_drop_list)
+            else:
+                X = X.drop(columns=cols_to_drop_list)
         return pack_pipeline_output(X, y, is_tuple)
 
 
@@ -113,7 +118,7 @@ class VarianceThresholdApplier(BaseApplier):
 class VarianceThresholdCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -123,14 +128,21 @@ class VarianceThresholdCalculator(BaseCalculator):
         drop_columns = config.get("drop_columns", True)
 
         cols = resolve_columns(
-            X, config, lambda d: d.select_dtypes(include=["number"]).columns.tolist()
+            X,
+            config,
+            lambda d: detect_numeric_columns(d, exclude_binary=False, exclude_constant=False),
         )
 
         if not cols:
             return {}
 
         selector = VarianceThreshold(threshold=threshold)
-        selector.fit(X[cols])
+        
+        # Use Bridge for fitting
+        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
+        X_np, _ = SklearnBridge.to_sklearn(X_subset)
+        
+        selector.fit(X_np)
 
         support = selector.get_support()
         selected_cols = [c for c, s in zip(cols, support) if s]
@@ -155,9 +167,9 @@ class VarianceThresholdCalculator(BaseCalculator):
 class CorrelationThresholdApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
         cols_to_drop = params.get("columns_to_drop", [])
@@ -168,7 +180,10 @@ class CorrelationThresholdApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         if drop_columns:
-            X = X.drop(columns=cols_to_drop)
+            if hasattr(X, "select"):
+                X = X.drop(cols_to_drop)
+            else:
+                X = X.drop(columns=cols_to_drop)
         return pack_pipeline_output(X, y, is_tuple)
 
 
@@ -176,7 +191,7 @@ class CorrelationThresholdApplier(BaseApplier):
 class CorrelationThresholdCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -213,9 +228,9 @@ class CorrelationThresholdCalculator(BaseCalculator):
 class UnivariateSelectionApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
         selected_cols = params.get("selected_columns")
@@ -228,7 +243,10 @@ class UnivariateSelectionApplier(BaseApplier):
         cols_to_drop_set = set(candidate_columns) - set(selected_cols)
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
         if cols_to_drop_list and drop_columns:
-            X = X.drop(columns=cols_to_drop_list)
+            if hasattr(X, "select"):
+                X = X.drop(cols_to_drop_list)
+            else:
+                X = X.drop(columns=cols_to_drop_list)
         return pack_pipeline_output(X, y, is_tuple)
 
 
@@ -236,7 +254,7 @@ class UnivariateSelectionApplier(BaseApplier):
 class UnivariateSelectionCalculator(BaseCalculator):
     def fit(  # noqa: C901
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: method, k, percentile, alpha, score_func, target_column
@@ -250,9 +268,17 @@ class UnivariateSelectionCalculator(BaseCalculator):
                     f"UnivariateSelection requires target column '{target_col}' to be present in training data."
                 )
                 return {}
-            y = X[target_col]
+            # Handle y extraction safely for Polars
+            engine = get_engine(X)
+            if engine.name == "polars":
+                import polars as pl
+                y = X.select(target_col).to_series()
+            else:
+                y = X[target_col]
 
-        cols = resolve_columns(X, config, detect_numeric_columns)
+        cols = resolve_columns(
+            X, config, lambda d: detect_numeric_columns(d, exclude_binary=False)
+        )
 
         # Ensure target is not in candidate columns
         if target_col in cols:
@@ -311,34 +337,50 @@ class UnivariateSelectionCalculator(BaseCalculator):
         if not selector:
             return {}
 
-        X_fit = X[cols].fillna(0)
+        # Use Bridge for fitting
+        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
+        
+        # Fill NA for selection (simple 0 fill)
+        if hasattr(X_subset, "fill_null"): # Polars
+             X_subset = X_subset.fill_null(0)
+        else:
+             X_subset = X_subset.fillna(0)
+             
+        X_np, _ = SklearnBridge.to_sklearn(X_subset)
 
         # Handle Chi2 negative values
-        if score_func_name == "chi2" and (X_fit < 0).any().any():
+        if score_func_name == "chi2" and (X_np < 0).any():
             logger.warning(
                 "Chi-squared statistic requires non-negative feature values. "
                 "Applying MinMaxScaler to features for selection."
             )
             from sklearn.preprocessing import MinMaxScaler
-
-            X_fit = pd.DataFrame(
-                MinMaxScaler().fit_transform(X_fit),
-                columns=X_fit.columns,
-                index=X_fit.index,
-            )
+            X_np = MinMaxScaler().fit_transform(X_np)
 
         # Handle classification target encoding if needed
-        y_fit: Union[pd.Series, np.ndarray, None] = y
+        y_fit = y
+        
+        # Convert y to numpy/pandas for inspection
+        if hasattr(y, "to_numpy"):
+             y_np = y.to_numpy()
+        elif hasattr(y, "to_pandas"):
+             y_np = y.to_pandas().to_numpy()
+        else:
+             y_np = np.array(y)
+             
         if (
             problem_type == "classification"
             and y is not None
-            and not pd.api.types.is_numeric_dtype(y)
+            # Check if numeric
+            and not np.issubdtype(y_np.dtype, np.number)
         ):
-            y_factorized, _ = pd.factorize(y)
+            y_factorized, _ = pd.factorize(y_np)
             y_fit = y_factorized
+        else:
+            y_fit = y_np
 
         if y is not None:
-            selector.fit(X_fit, y_fit)
+            selector.fit(X_np, y_fit)
             support = selector.get_support()
             selected_cols = [c for c, s in zip(cols, support) if s]
         else:
@@ -386,9 +428,9 @@ class UnivariateSelectionCalculator(BaseCalculator):
 class ModelBasedSelectionApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
         selected_cols = params.get("selected_columns")
@@ -401,7 +443,10 @@ class ModelBasedSelectionApplier(BaseApplier):
         cols_to_drop_set = set(candidate_columns) - set(selected_cols)
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
         if cols_to_drop_list and drop_columns:
-            X = X.drop(columns=cols_to_drop_list)
+            if hasattr(X, "select"):
+                X = X.drop(cols_to_drop_list)
+            else:
+                X = X.drop(columns=cols_to_drop_list)
         return pack_pipeline_output(X, y, is_tuple)
 
 
@@ -409,7 +454,7 @@ class ModelBasedSelectionApplier(BaseApplier):
 class ModelBasedSelectionCalculator(BaseCalculator):
     def fit(  # noqa: C901
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: method (select_from_model, rfe), estimator, target_column
@@ -423,9 +468,17 @@ class ModelBasedSelectionCalculator(BaseCalculator):
                     f"ModelBasedSelection requires target column '{target_col}' to be present in training data."
                 )
                 return {}
-            y = X[target_col]
+            # Handle y extraction safely for Polars
+            engine = get_engine(X)
+            if engine.name == "polars":
+                import polars as pl
+                y = X.select(target_col).to_series()
+            else:
+                y = X[target_col]
 
-        cols = resolve_columns(X, config, detect_numeric_columns)
+        cols = resolve_columns(
+            X, config, lambda d: detect_numeric_columns(d, exclude_binary=False)
+        )
 
         # Ensure target is not in candidate columns
         if target_col in cols:
@@ -451,21 +504,18 @@ class ModelBasedSelectionCalculator(BaseCalculator):
             )
             return {}
 
-        X_fit = X[cols].fillna(0)
 
-        # Handle classification target encoding if needed
-        y_fit: Union[pd.Series, np.ndarray, None] = y
-        if (
-            problem_type == "classification"
-            and y is not None
-            and not pd.api.types.is_numeric_dtype(y)
-        ):
-            y_factorized, _ = pd.factorize(y)
-            y_fit = y_factorized
 
         selector = None
         if method == "select_from_model":
             threshold = config.get("threshold", "mean")
+            # Try to convert string number to float
+            if isinstance(threshold, str):
+                try:
+                    threshold = float(threshold)
+                except ValueError:
+                    pass  # Keep as string (e.g. "mean", "1.25*mean")
+
             max_features = config.get("max_features", None)
             selector = SelectFromModel(
                 estimator=estimator, threshold=threshold, max_features=max_features
@@ -482,8 +532,41 @@ class ModelBasedSelectionCalculator(BaseCalculator):
         if not selector:
             return {}
 
+        # Use Bridge for fitting
+        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
+        
+        # Fill NA for selection (simple 0 fill)
+        if hasattr(X_subset, "fill_null"): # Polars
+             X_subset = X_subset.fill_null(0)
+        else:
+             X_subset = X_subset.fillna(0)
+             
+        X_np, _ = SklearnBridge.to_sklearn(X_subset)
+
+        # Handle classification target encoding if needed
+        y_fit = y
+        
+        # Convert y to numpy/pandas for inspection
+        if hasattr(y, "to_numpy"):
+             y_np = y.to_numpy()
+        elif hasattr(y, "to_pandas"):
+             y_np = y.to_pandas().to_numpy()
+        else:
+             y_np = np.array(y)
+             
+        if (
+            problem_type == "classification"
+            and y is not None
+            # Check if numeric
+            and not np.issubdtype(y_np.dtype, np.number)
+        ):
+            y_factorized, _ = pd.factorize(y_np)
+            y_fit = y_factorized
+        else:
+            y_fit = y_np
+
         if y is not None:
-            selector.fit(X_fit, y_fit)
+            selector.fit(X_np, y_fit)
             support = selector.get_support()
             selected_cols = [c for c, s in zip(cols, support) if s]
         else:
@@ -525,9 +608,9 @@ class ModelBasedSelectionCalculator(BaseCalculator):
 class FeatureSelectionApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]]:
         # The params returned by the specific calculator will have a "type" field
         # corresponding to the specific calculator's return value.
         type_name = params.get("type")
@@ -551,7 +634,7 @@ class FeatureSelectionApplier(BaseApplier):
 class FeatureSelectionCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         method = config.get("method", "select_k_best")

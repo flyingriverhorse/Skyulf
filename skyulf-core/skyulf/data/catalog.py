@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 import pandas as pd
+from ..engines import SkyulfDataFrame
 
 class DataCatalog(ABC):
     """
@@ -9,7 +10,7 @@ class DataCatalog(ABC):
     """
 
     @abstractmethod
-    def load(self, dataset_id: str, **kwargs) -> pd.DataFrame:
+    def load(self, dataset_id: str, **kwargs) -> Union[pd.DataFrame, SkyulfDataFrame]:
         """
         Load a dataset by its identifier.
         
@@ -20,13 +21,13 @@ class DataCatalog(ABC):
         pass
 
     @abstractmethod
-    def save(self, dataset_id: str, data: pd.DataFrame, **kwargs) -> None:
+    def save(self, dataset_id: str, data: Union[pd.DataFrame, SkyulfDataFrame], **kwargs) -> None:
         """
         Save a dataset.
         
         Args:
             dataset_id: Unique identifier for the destination.
-            data: The pandas DataFrame to save.
+            data: The pandas/polars DataFrame to save.
         """
         pass
 

@@ -23,7 +23,8 @@ from skyulf.preprocessing.encoding import (
     OrdinalEncoderCalculator, OrdinalEncoderApplier,
     TargetEncoderCalculator, TargetEncoderApplier,
     HashEncoderCalculator, HashEncoderApplier,
-    DummyEncoderCalculator, DummyEncoderApplier
+    DummyEncoderCalculator, DummyEncoderApplier,
+    LabelEncoderCalculator, LabelEncoderApplier
 )
 from skyulf.preprocessing.bucketing import (
     GeneralBinningCalculator, GeneralBinningApplier,
@@ -45,6 +46,10 @@ from skyulf.preprocessing.cleaning import (
     ValueReplacementApplier,
     AliasReplacementApplier,
     InvalidValueReplacementApplier
+)
+from skyulf.preprocessing.feature_generation import (
+    PolynomialFeaturesCalculator, PolynomialFeaturesApplier,
+    FeatureGenerationCalculator, FeatureGenerationApplier
 )
 from skyulf.preprocessing.imputation import (
     SimpleImputerCalculator, SimpleImputerApplier,
@@ -883,6 +888,116 @@ def test_drop_missing_rows_parity():
     
     print("DropMissingRows Parity Test Passed!")
 
+@pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
+def test_polynomial_features_parity():
+    print("Starting PolynomialFeatures Parity Test...")
+    data = {"a": [1, 2, 3, 4], "b": [2, 3, 4, 5]}
+    df_pd = pd.DataFrame(data)
+    df_pl = pl.DataFrame(data)
+    
+    calc = PolynomialFeaturesCalculator()
+    config = {"columns": ["a", "b"], "degree": 2, "interaction_only": False, "include_bias": False}
+    params = calc.fit(df_pd, config)
+    
+    applier = PolynomialFeaturesApplier()
+    res_pd = applier.apply(df_pd, params)
+    res_pl = applier.apply(df_pl, params)
+    
+    # Check columns
+    assert "poly_a_pow_2" in res_pd.columns
+    assert "poly_a_b" in res_pd.columns
+    
+    pd.testing.assert_frame_equal(res_pd, res_pl.to_pandas(), check_dtype=False)
+    print("PolynomialFeatures Parity Test Passed!")
+
+@pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
+def test_feature_generation_parity():
+    print("Starting FeatureGeneration Parity Test...")
+    data = {"a": [10, 20, 30], "b": [2, 4, 5], "s1": ["hello", "world", "foo"], "s2": ["hello", "word", "bar"]}
+    df_pd = pd.DataFrame(data)
+    df_pl = pl.DataFrame(data)
+    
+    calc = FeatureGenerationCalculator()
+    
+    # Arithmetic
+    op_arith = {
+        "operation_type": "arithmetic",
+        "method": "add",
+        "input_columns": ["a", "b"],
+        "constants": [1],
+        "output_column": "sum_ab_1"
+    }
+    
+    # Ratio
+    op_ratio = {
+        "operation_type": "ratio",
+        "input_columns": ["a"],
+        "secondary_columns": ["b"],
+        "output_column": "ratio_a_b"
+    }
+    
+    # Similarity
+    op_sim = {
+        "operation_type": "similarity",
+        "method": "ratio",
+        "input_columns": ["s1"],
+        "secondary_columns": ["s2"],
+        "output_column": "sim_s1_s2"
+    }
+    
+    config = {"operations": [op_arith, op_ratio, op_sim]}
+    params = calc.fit(df_pd, config)
+    
+    applier = FeatureGenerationApplier()
+    res_pd = applier.apply(df_pd, params)
+    res_pl = applier.apply(df_pl, params)
+    
+    pd.testing.assert_frame_equal(res_pd, res_pl.to_pandas(), check_dtype=False)
+    print("FeatureGeneration Parity Test Passed!")
+
+@pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
+def test_label_encoder_parity():
+    print("Starting LabelEncoder Parity Test...")
+    data = {"a": ["cat", "dog", "cat"], "b": ["low", "high", "medium"]}
+    y = pd.Series(["yes", "no", "yes"], name="target")
+    y_pl = pl.Series("target", ["yes", "no", "yes"])
+    
+    df_pd = pd.DataFrame(data)
+    df_pl = pl.DataFrame(data)
+    
+    calc = LabelEncoderCalculator()
+    
+    # Test 1: Encode features
+    config_feat = {"columns": ["a", "b"]}
+    params_feat = calc.fit(df_pd, config_feat)
+    
+    applier = LabelEncoderApplier()
+    res_pd = applier.apply(df_pd, params_feat)
+    res_pl = applier.apply(df_pl, params_feat)
+    
+    pd.testing.assert_frame_equal(res_pd, res_pl.to_pandas(), check_dtype=False)
+    
+    # Test 2: Encode target
+    config_target = {} # Default target
+    params_target = calc.fit((df_pd, y), config_target)
+    
+    res_pd_X, res_pd_y = applier.apply((df_pd, y), params_target)
+    res_pl_X, res_pl_y = applier.apply((df_pl, y_pl), params_target)
+    
+    # Check y
+    assert res_pd_y.dtype == int or res_pd_y.dtype == np.int32 or res_pd_y.dtype == np.int64
+    # Polars y might be Series or DataFrame depending on how it was packed/unpacked
+    # But here we expect Series
+    
+    # Convert Polars y to pandas for comparison
+    if isinstance(res_pl_y, pl.Series):
+        res_pl_y_pd = res_pl_y.to_pandas()
+    else:
+        res_pl_y_pd = res_pl_y
+        
+    pd.testing.assert_series_equal(res_pd_y, res_pl_y_pd, check_names=False, check_dtype=False)
+    print("LabelEncoder Parity Test Passed!")
+
 if __name__ == "__main__":
     print(f"Has Polars: {HAS_POLARS}")
     if HAS_POLARS:
@@ -914,5 +1029,8 @@ if __name__ == "__main__":
         test_deduplicate_parity()
         test_drop_missing_columns_parity()
         test_drop_missing_rows_parity()
+        test_polynomial_features_parity()
+        test_feature_generation_parity()
+        test_label_encoder_parity()
     else:
         print("Skipping test because Polars is not installed.")

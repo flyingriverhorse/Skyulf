@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
 from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
 from sklearn.preprocessing import label_binarize
 
+from ...engines import SkyulfDataFrame
+from ...modeling.sklearn_wrapper import SklearnBridge
 from .common import downsample_curve, sanitize_metrics
 from .metrics import calculate_classification_metrics
 from .schemas import (
@@ -21,35 +23,38 @@ from .schemas import (
 
 def evaluate_classification_model(
     model: Any,
-    X_test: pd.DataFrame,
-    y_test: pd.Series,
-    X_train: Optional[pd.DataFrame] = None,
-    y_train: Optional[pd.Series] = None,
+    X_test: Union[pd.DataFrame, SkyulfDataFrame],
+    y_test: Union[pd.Series, Any],
+    X_train: Optional[Union[pd.DataFrame, SkyulfDataFrame]] = None,
+    y_train: Optional[Union[pd.Series, Any]] = None,
     dataset_name: str = "test",
 ) -> ModelEvaluationReport:
     """Evaluate a classification model and return a structured report."""
+
+    # Convert to Numpy for compatibility
+    X_test_np, y_test_np = SklearnBridge.to_sklearn((X_test, y_test))
 
     # Calculate scalar metrics
     metrics = calculate_classification_metrics(model, X_test, y_test)
 
     # Generate predictions and probabilities
-    y_pred = model.predict(X_test)
+    y_pred = model.predict(X_test_np)
     y_prob = None
     if hasattr(model, "predict_proba"):
         try:
-            y_prob = model.predict_proba(X_test)
+            y_prob = model.predict_proba(X_test_np)
         except Exception:
             pass
 
     # Determine classes
     classes = getattr(model, "classes_", None)
     if classes is None:
-        classes = np.unique(y_test)
+        classes = np.unique(y_test_np)
     class_names = [str(c) for c in classes]
     n_classes = len(classes)
 
     # Confusion Matrix
-    cm_data = _compute_confusion_matrix(y_test, y_pred, class_names)
+    cm_data = _compute_confusion_matrix(y_test_np, y_pred, class_names)
 
     # ROC and PR Curves
     roc_curves = []
@@ -63,7 +68,7 @@ def evaluate_classification_model(
             pos_probs = y_prob[:, 1]
 
             # ROC
-            fpr, tpr, _ = roc_curve(y_test, pos_probs, pos_label=pos_label)
+            fpr, tpr, _ = roc_curve(y_test_np, pos_probs, pos_label=pos_label)
             roc_curves.append(
                 CurveData(
                     name=f"ROC (Class {class_names[1]})",
@@ -74,7 +79,7 @@ def evaluate_classification_model(
 
             # PR
             precision, recall, _ = precision_recall_curve(
-                y_test, pos_probs, pos_label=pos_label
+                y_test_np, pos_probs, pos_label=pos_label
             )
             pr_curves.append(
                 CurveData(
@@ -85,7 +90,7 @@ def evaluate_classification_model(
             )
         else:
             # Multiclass classification
-            y_test_bin = label_binarize(y_test, classes=classes)
+            y_test_bin = label_binarize(y_test_np, classes=classes)
 
             for i, class_name in enumerate(class_names):
                 # ROC

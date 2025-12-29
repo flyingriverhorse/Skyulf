@@ -17,6 +17,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import ORJSONResponse
 from fastapi.staticfiles import StaticFiles
 
 # Use absolute imports to fix import issues
@@ -33,6 +34,7 @@ from backend.exceptions.handlers import (
 from backend.health.routes import router as health_router
 from backend.middleware.error_handler import ErrorHandlerMiddleware
 from backend.middleware.logging import LoggingMiddleware
+from backend.utils.logging_utils import setup_universal_logging
 
 # from core.feature_engineering.routes import router as feature_engineering_router
 from backend.ml_pipeline.api import router as ml_pipeline_router
@@ -40,9 +42,7 @@ from backend.ml_pipeline.deployment.api import router as deployment_router
 from backend.ml_pipeline.model_registry.api import router as model_registry_router
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+setup_universal_logging()
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
@@ -182,6 +182,7 @@ def create_app() -> FastAPI:
         redoc_url=settings.API_REDOC_URL if docs_enabled else None,
         openapi_url=settings.API_OPENAPI_URL if docs_enabled else None,
         lifespan=lifespan,
+        default_response_class=ORJSONResponse,
         swagger_ui_parameters=_build_swagger_ui_parameters(),
     )
 
