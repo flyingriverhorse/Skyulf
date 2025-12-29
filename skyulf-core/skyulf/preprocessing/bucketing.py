@@ -12,6 +12,8 @@ from ..utils import (
 )
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
+from ..engines import SkyulfDataFrame, get_engine
+from ..engines.sklearn_bridge import SklearnBridge
 
 # --- Base Binning Applier ---
 
@@ -24,10 +26,11 @@ class BaseBinningApplier(BaseApplier):
 
     def apply(  # noqa: C901
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
+    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         bin_edges_map = params.get("bin_edges", {})
         if not bin_edges_map:
@@ -44,6 +47,59 @@ class BaseBinningApplier(BaseApplier):
         precision = params.get("precision", 3)
         custom_labels_map = params.get("custom_labels", {})
 
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+
+            exprs = []
+            cols_to_drop = []
+
+            for col, edges in bin_edges_map.items():
+                if col not in X.columns:
+                    continue
+                
+                if drop_original:
+                    cols_to_drop.append(col)
+
+                sorted_edges = sorted(list(set(edges)))
+                if len(sorted_edges) < 2:
+                    continue
+
+                # Determine labels
+                labels = None
+                col_custom_labels = custom_labels_map.get(col)
+                if col_custom_labels and len(col_custom_labels) == len(sorted_edges) - 1:
+                    labels = col_custom_labels
+
+                # Polars cut
+                # breaks are the internal cut points
+                breaks = sorted_edges[1:-1]
+                
+                # Polars cut
+                cut_expr = pl.col(col).cut(
+                    breaks=breaks,
+                    labels=labels,
+                    left_closed=False, # (a, b]
+                    include_breaks=False
+                )
+                
+                target_col_name = f"{col}{output_suffix}"
+                
+                if label_format in ["ordinal", "bin_index"] and not labels:
+                    # We want integer indices.
+                    # Polars cut returns Categorical. Cast to UInt32 gives the physical index.
+                    exprs.append(cut_expr.cast(pl.UInt32).alias(target_col_name))
+                else:
+                    # Range or Custom Labels
+                    exprs.append(cut_expr.alias(target_col_name))
+
+            X_out = X.with_columns(exprs)
+            if drop_original:
+                X_out = X_out.drop(cols_to_drop)
+            
+            return pack_pipeline_output(X_out, y, is_tuple)
+
+        # Pandas Path
         df_out = X.copy()
         processed_cols = []
 
@@ -163,9 +219,15 @@ class GeneralBinningCalculator(BaseCalculator):
     """
 
     def fit(  # noqa: C901
-        self, df: Union[pd.DataFrame, tuple], config: Dict[str, Any]
+        self, df: SkyulfDataFrame, config: Dict[str, Any]
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+        
+        # Ensure X is pandas for fitting logic
+        engine = get_engine(X)
+        if engine.name == "polars":
+            X = X.to_pandas()
+
         columns = resolve_columns(X, config, detect_numeric_columns)
 
         global_strategy = config.get("strategy", "equal_width")
@@ -288,10 +350,16 @@ class CustomBinningCalculator(BaseCalculator):
 
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+        
+        # Ensure X is pandas for fitting logic
+        engine = get_engine(X)
+        if engine.name == "polars":
+            X = X.to_pandas()
+
         columns = resolve_columns(X, config, detect_numeric_columns)
         bins = config.get("bins")
 
@@ -328,7 +396,7 @@ class KBinsDiscretizerCalculator(GeneralBinningCalculator):
 
     def fit(
         self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        df: SkyulfDataFrame,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         new_config = config.copy()

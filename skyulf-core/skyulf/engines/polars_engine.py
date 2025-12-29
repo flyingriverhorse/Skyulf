@@ -49,6 +49,8 @@ class SkyulfPolarsWrapper:
         return getattr(self._df, name)
 
 class PolarsEngine(BaseEngine):
+    name = "polars"
+
     @classmethod
     def is_compatible(cls, data: Any) -> bool:
         if not HAS_POLARS: return False
