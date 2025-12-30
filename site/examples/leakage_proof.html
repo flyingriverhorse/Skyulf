@@ -8,31 +8,31 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/inspection.html">
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/examples/leakage_proof.html">
       
       
-        <link rel="prev" href="resampling.html">
+        <link rel="prev" href="quickstart.html">
       
       
-        <link rel="next" href="../modeling/index.html">
+        <link rel="next" href="../user_guide/overview.html">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
     
     
       
-        <title>inspection - Skyulf</title>
+        <title>Leakage Proof - Skyulf</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,9 +51,9 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#api-preprocessinginspection" class="md-skip">
+        <a href="#proof-of-trust-preventing-data-leakage-with-skyulf" class="md-skip">
           Skip to content
         </a>
       
@@ -92,7 +92,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              inspection
+              Leakage Proof
             
           </span>
         </div>
@@ -223,7 +223,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../index.html" class="md-tabs__link">
+      <a href="../index.html" class="md-tabs__link">
         
   
   
@@ -244,7 +244,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../guides/getting_started.html" class="md-tabs__link">
+        <a href="../guides/getting_started.html" class="md-tabs__link">
           
   
   
@@ -260,11 +260,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../../examples/quickstart.html" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="quickstart.html" class="md-tabs__link">
           
   
   
@@ -284,7 +286,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../user_guide/overview.html" class="md-tabs__link">
+        <a href="../user_guide/overview.html" class="md-tabs__link">
           
   
   
@@ -300,13 +302,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../preprocessing_nodes.html" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
           
   
   
@@ -326,7 +326,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../contributing/writing_docs.html" class="md-tabs__link">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
           
   
   
@@ -362,7 +362,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -392,7 +392,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../index.html" class="md-nav__link">
+      <a href="../index.html" class="md-nav__link">
         
   
   
@@ -473,7 +473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/getting_started.html" class="md-nav__link">
+      <a href="../guides/getting_started.html" class="md-nav__link">
         
   
   
@@ -501,7 +501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/recipes.html" class="md-nav__link">
+      <a href="../guides/recipes.html" class="md-nav__link">
         
   
   
@@ -529,7 +529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture.html" class="md-nav__link">
+      <a href="../architecture.html" class="md-nav__link">
         
   
   
@@ -557,7 +557,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../data_architecture.html" class="md-nav__link">
+      <a href="../data_architecture.html" class="md-nav__link">
         
   
   
@@ -585,7 +585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../performance.html" class="md-nav__link">
+      <a href="../performance.html" class="md-nav__link">
         
   
   
@@ -613,7 +613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/adding_new_engine.html" class="md-nav__link">
+      <a href="../guides/adding_new_engine.html" class="md-nav__link">
         
   
   
@@ -645,28 +645,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
   
@@ -684,7 +687,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -702,7 +705,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/quickstart.html" class="md-nav__link">
+      <a href="quickstart.html" class="md-nav__link">
         
   
   
@@ -727,10 +730,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../../examples/leakage_proof.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="leakage_proof.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -746,6 +776,125 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-skyulf-guarantee" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Skyulf Guarantee
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-setup-and-data-loading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Setup and Data Loading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-split-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Split Data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-define-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Define Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-verification-1-imputation-leakage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Verification 1: Imputation Leakage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-verification-2-scaling-leakage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Verification 2: Scaling Leakage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-verification-3-target-encoding-leakage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Verification 3: Target Encoding Leakage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-the-ultimate-test-the-poisoned-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. The Ultimate Test: The "Poisoned" Dataset
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conclusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conclusion
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -819,7 +968,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/overview.html" class="md-nav__link">
+      <a href="../user_guide/overview.html" class="md-nav__link">
         
   
   
@@ -847,7 +996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/installation.html" class="md-nav__link">
+      <a href="../user_guide/installation.html" class="md-nav__link">
         
   
   
@@ -875,7 +1024,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/pipeline_quickstart.html" class="md-nav__link">
+      <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
   
@@ -903,7 +1052,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/step_by_step_no_config.html" class="md-nav__link">
+      <a href="../user_guide/step_by_step_no_config.html" class="md-nav__link">
         
   
   
@@ -931,7 +1080,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/validation_vs_sklearn.html" class="md-nav__link">
+      <a href="../user_guide/validation_vs_sklearn.html" class="md-nav__link">
         
   
   
@@ -959,7 +1108,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/configuration.html" class="md-nav__link">
+      <a href="../user_guide/configuration.html" class="md-nav__link">
         
   
   
@@ -987,7 +1136,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
+      <a href="../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
         
   
   
@@ -1015,7 +1164,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/serialization.html" class="md-nav__link">
+      <a href="../user_guide/serialization.html" class="md-nav__link">
         
   
   
@@ -1043,7 +1192,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/extending_custom_nodes.html" class="md-nav__link">
+      <a href="../user_guide/extending_custom_nodes.html" class="md-nav__link">
         
   
   
@@ -1071,7 +1220,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/troubleshooting.html" class="md-nav__link">
+      <a href="../user_guide/troubleshooting.html" class="md-nav__link">
         
   
   
@@ -1103,31 +1252,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
@@ -1145,7 +1291,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1163,7 +1309,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../preprocessing_nodes.html" class="md-nav__link">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
         
   
   
@@ -1191,7 +1337,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../modeling_nodes.html" class="md-nav__link">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
         
   
   
@@ -1216,31 +1362,28 @@
                 
   
   
-    
   
   
-  
     
     
     
     
       
       
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
         
           
-          
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" checked>
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
             
   
   
@@ -1258,7 +1401,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1276,7 +1419,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../pipeline.html" class="md-nav__link">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
         
   
   
@@ -1358,7 +1501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../data/dataset.html" class="md-nav__link">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
         
   
   
@@ -1391,8 +1534,6 @@
                 
   
   
-    
-  
   
   
     
@@ -1405,11 +1546,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3_3" >
         
           
           <label class="md-nav__link" for="__nav_5_3_3" id="__nav_5_3_3_label" tabindex="0">
@@ -1430,7 +1573,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_3_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_3_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5_3_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1448,7 +1591,7 @@
   
   
     <li class="md-nav__item">
-      <a href="index.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
         
   
   
@@ -1476,7 +1619,7 @@
   
   
     <li class="md-nav__item">
-      <a href="base.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
         
   
   
@@ -1504,7 +1647,7 @@
   
   
     <li class="md-nav__item">
-      <a href="pipeline.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
         
   
   
@@ -1532,7 +1675,7 @@
   
   
     <li class="md-nav__item">
-      <a href="split.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
         
   
   
@@ -1560,7 +1703,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cleaning.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
         
   
   
@@ -1588,7 +1731,7 @@
   
   
     <li class="md-nav__item">
-      <a href="drop_and_missing.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
         
   
   
@@ -1616,7 +1759,7 @@
   
   
     <li class="md-nav__item">
-      <a href="imputation.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
         
   
   
@@ -1644,7 +1787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="encoding.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
         
   
   
@@ -1672,7 +1815,7 @@
   
   
     <li class="md-nav__item">
-      <a href="scaling.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
         
   
   
@@ -1700,7 +1843,7 @@
   
   
     <li class="md-nav__item">
-      <a href="outliers.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
         
   
   
@@ -1728,7 +1871,7 @@
   
   
     <li class="md-nav__item">
-      <a href="transformations.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
         
   
   
@@ -1756,7 +1899,7 @@
   
   
     <li class="md-nav__item">
-      <a href="bucketing.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
         
   
   
@@ -1784,7 +1927,7 @@
   
   
     <li class="md-nav__item">
-      <a href="casting.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
         
   
   
@@ -1812,7 +1955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="feature_generation.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
         
   
   
@@ -1840,7 +1983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="feature_selection.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
         
   
   
@@ -1868,7 +2011,7 @@
   
   
     <li class="md-nav__item">
-      <a href="resampling.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
         
   
   
@@ -1893,37 +2036,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    inspection
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="inspection.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
         
   
   
@@ -1939,37 +2055,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#skyulf.preprocessing.inspection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        inspection
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2044,7 +2129,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/index.html" class="md-nav__link">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
         
   
   
@@ -2072,7 +2157,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/base.html" class="md-nav__link">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
         
   
   
@@ -2100,7 +2185,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/sklearn_wrapper.html" class="md-nav__link">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
         
   
   
@@ -2128,7 +2213,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/classification.html" class="md-nav__link">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
         
   
   
@@ -2156,7 +2241,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/regression.html" class="md-nav__link">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
         
   
   
@@ -2184,7 +2269,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/cross_validation.html" class="md-nav__link">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
         
   
   
@@ -2212,7 +2297,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/tuning_tuner.html" class="md-nav__link">
+      <a href="../reference/api/modeling/tuning_tuner.html" class="md-nav__link">
         
   
   
@@ -2317,7 +2402,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/writing_docs.html" class="md-nav__link">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
         
   
   
@@ -2365,48 +2450,420 @@
   
 
 
-<h1 id="api-preprocessinginspection">API: preprocessing.inspection</h1>
+<h1 id="proof-of-trust-preventing-data-leakage-with-skyulf">Proof of Trust: Preventing Data Leakage with Skyulf</h1>
+<p>One of the biggest risks in Machine Learning is <strong>Data Leakage</strong>: when information from the test set (or the future) accidentally "leaks" into the training process. This creates models that look perfect during training but fail in production.</p>
+<p>Common sources of leakage:</p>
+<ol>
+<li><strong>Imputation:</strong> Filling missing values in the Test set using the mean of the <em>entire</em> dataset (including Test).</li>
+<li><strong>Scaling:</strong> Normalizing Test data using the min/max of the <em>entire</em> dataset.</li>
+<li><strong>Target Encoding:</strong> Encoding categorical features using the target mean of the <em>entire</em> dataset.</li>
+</ol>
+<h2 id="the-skyulf-guarantee">The Skyulf Guarantee</h2>
+<p>Skyulf prevents this by design using the <strong>Calculator / Applier</strong> pattern.</p>
+<ul>
+<li><strong>Calculator:</strong> Learns statistics <em>only</em> from the Training data.</li>
+<li><strong>Applier:</strong> Applies those learned statistics to Test data blindly.</li>
+</ul>
+<p>This example proves this behavior using the <strong>Titanic</strong> dataset. We will:</p>
+<ol>
+<li>Load the dataset.</li>
+<li>Split it into Train/Test.</li>
+<li>Run a Skyulf Pipeline.</li>
+<li><strong>Mathematically verify</strong> that the Test data was processed using <em>only</em> Training statistics.</li>
+</ol>
+<h2 id="1-setup-and-data-loading">1. Setup and Data Loading</h2>
+<pre><code class="language-python">import sys
+from pathlib import Path
+import numpy as np
+import pandas as pd
+from sklearn.datasets import fetch_openml
+from sklearn.model_selection import train_test_split
+from skyulf import SkyulfPipeline
+from skyulf.data.dataset import SplitDataset
 
+# Load Titanic Dataset
+print(&quot;Loading Titanic dataset...&quot;)
+titanic = fetch_openml(&quot;titanic&quot;, version=1, as_frame=True)
+df = titanic.frame
 
-<div class="doc doc-object doc-module">
+# Select relevant columns for demonstration
+# 'sex': Categorical (needs encoding)
+# 'age': Numeric with missing values (needs imputation)
+# 'fare': Numeric (needs scaling)
+# 'survived': Target
+cols = ['sex', 'age', 'fare', 'survived']
+df = df[cols].copy()
 
+# Convert target to int
+df['survived'] = df['survived'].astype(int)
 
+print(f&quot;Dataset Shape: {df.shape}&quot;)
+print(df.head())
+print(&quot;\nMissing Values:\n&quot;, df.isnull().sum())
+</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code class="language-text">Loading Titanic dataset...
+Dataset Shape: (1309, 4)
+      sex   age      fare  survived
+0  female  29.0  211.3375         1
+1    male   0.9151.5500         1
+2  female   2.0  151.5500         0
+3    male  30.0  151.5500         0
+4  female  25.0  151.5500         0
 
-<h2 id="skyulf.preprocessing.inspection" class="doc doc-heading">
-            <code>skyulf.preprocessing.inspection</code>
+Missing Values:
+ sex           0
+age         263
+fare          1
+survived      0
+dtype: int64
+</code></pre>
+<h2 id="2-split-data">2. Split Data</h2>
+<p>We split <strong>BEFORE</strong> any processing to simulate a real-world scenario.</p>
+<pre><code class="language-python">X = df.drop(columns=['survived'])
+y = df['survived']
 
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-</h2>
+# Create Skyulf Dataset
+dataset = SplitDataset(
+    train=pd.concat([X_train, y_train], axis=1),
+    test=pd.concat([X_test, y_test], axis=1)
+)
 
-    <div class="doc doc-contents first">
+print(f&quot;Train Shape: {dataset.train.shape}&quot;)
+print(f&quot;Test Shape: {dataset.test.shape}&quot;)
+</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code class="language-text">Train Shape: (916, 4)
+Test Shape: (393, 4)
+</code></pre>
+<h2 id="3-define-pipeline">3. Define Pipeline</h2>
+<p>We intentionally use methods that are prone to leakage if done wrong.</p>
+<pre><code class="language-python">config = {
+    &quot;preprocessing&quot;: [
+        # Imputation 1: Age (Train Mean)
+        {
+            &quot;name&quot;: &quot;impute_age&quot;,
+            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
+            &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]}
+        },
+        # Imputation 2: Fare (Train Mean) - Added for robustness
+        {
+            &quot;name&quot;: &quot;impute_fare&quot;,
+            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
+            &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;fare&quot;]}
+        },
+        # Scaling: Should use Train Mean/Std
+        {
+            &quot;name&quot;: &quot;scale_fare&quot;,
+            &quot;transformer&quot;: &quot;StandardScaler&quot;,
+            &quot;params&quot;: {&quot;columns&quot;: [&quot;fare&quot;]}
+        },
+        # Target Encoding: Should use Train Target Mean
+        # This is the most dangerous one! If it sees Test target, it's 100% leakage.
+        {
+            &quot;name&quot;: &quot;encode_sex&quot;,
+            &quot;transformer&quot;: &quot;TargetEncoder&quot;,
+            &quot;params&quot;: {&quot;columns&quot;: [&quot;sex&quot;], &quot;target_column&quot;: &quot;survived&quot;}
+        }
+    ],
+    &quot;modeling&quot;: {
+        &quot;type&quot;: &quot;random_forest_classifier&quot;,
+        &quot;params&quot;: {&quot;n_estimators&quot;: 10, &quot;random_state&quot;: 42}
+    }
+}
 
+pipeline = SkyulfPipeline(config)
 
+# Fit the pipeline
+# This runs fit() on Train and transform() on Test
+print(&quot;Running pipeline...&quot;)
+metrics = pipeline.fit(dataset, target_column=&quot;survived&quot;)
+print(&quot;Pipeline execution complete.&quot;)
+</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code class="language-text">Running pipeline...
+Pipeline execution complete.
+</code></pre>
+<h2 id="4-verification-1-imputation-leakage">4. Verification 1: Imputation Leakage</h2>
+<p>Did we fill missing 'age' in Test with the Train mean?</p>
+<pre><code class="language-python"># Get the fitted imputer from the pipeline
+imputer_step = pipeline.feature_engineer.fitted_steps[0]
+assert imputer_step['name'] == 'impute_age'
 
+# The fitted transformer is stored in 'artifact'
+artifact = imputer_step['artifact']
+fill_values = artifact['fill_values']
 
+# Calculate Train Mean manually
+train_age_mean = X_train['age'].mean()
+print(f&quot;Train Age Mean: {train_age_mean:.4f}&quot;)
 
+# Check what the imputer learned
+learned_mean = fill_values['age']
+print(f&quot;Imputer Learned Mean: {learned_mean:.4f}&quot;)
 
+# Verify
+np.testing.assert_allclose(train_age_mean, learned_mean)
 
+# --- NEW: Explicitly check against Full Dataset Mean ---
+full_age_mean = df['age'].mean()
+print(f&quot;Full Dataset Age Mean: {full_age_mean:.4f}&quot;)
 
+# Assert that learned mean is NOT the full mean (additional sanity check)
+# Note: In some datasets, train mean could equal full mean by chance.
+if abs(learned_mean - full_age_mean) &gt; 1e-4:
+    print(&quot;✅ Imputation Sanity Check Passed: Learned mean differs from Full Dataset mean.&quot;)
+else:
+    print(&quot;⚠️ Warning: Train mean equals Full mean (could be chance, but check split).&quot;)
 
+print(&quot;✅ Imputation Proof: The imputer learned the mean ONLY from the Training set.&quot;)
+</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code class="language-text">Train Age Mean: 29.1023
+Imputer Learned Mean: 29.1023
+Full Dataset Age Mean: 29.8811
+✅ Imputation Sanity Check Passed: Learned mean differs from Full Dataset mean.
+✅ Imputation Proof: The imputer learned the mean ONLY from the Training set.
+</code></pre>
+<h2 id="5-verification-2-scaling-leakage">5. Verification 2: Scaling Leakage</h2>
+<p>Did we scale 'fare' using Train Mean/Std?</p>
+<pre><code class="language-python"># Note: Index is 2 because we added impute_fare at index 1
+scaler_step = pipeline.feature_engineer.fitted_steps[2]
+assert scaler_step['name'] == 'scale_fare'
 
-<div class="doc doc-children">
+artifact = scaler_step['artifact']
 
+# Calculate Train Stats manually (Exact)
+# We must use the imputed fare for manual calculation to match the pipeline's flow.
+train_fare_imputed = X_train[&quot;fare&quot;].fillna(X_train[&quot;fare&quot;].mean())
+train_fare_mean = train_fare_imputed.mean()
+train_fare_std  = train_fare_imputed.std(ddof=0) # Sklearn uses ddof=0 for std
 
+print(f&quot;Train Fare Mean: {train_fare_mean:.4f}, Std: {train_fare_std:.4f}&quot;)
 
+# Check what the scaler learned
+columns = artifact['columns']
+fare_idx = columns.index('fare')
 
+learned_mean = artifact['mean'][fare_idx]
+learned_scale = artifact['scale'][fare_idx]
+print(f&quot;Scaler Learned Mean: {learned_mean:.4f}, Scale: {learned_scale:.4f}&quot;)
 
+# Verify (Tight tolerance now possible)
+np.testing.assert_allclose(train_fare_mean, learned_mean)
+np.testing.assert_allclose(train_fare_std, learned_scale)
 
+# --- NEW: Explicitly check against Full Dataset Stats ---
+full_fare_mean = df['fare'].mean()
+full_fare_std = df['fare'].std(ddof=0)
+print(f&quot;Full Dataset Fare Mean: {full_fare_mean:.4f}, Std: {full_fare_std:.4f}&quot;)
 
+# Additional Sanity Checks
+if abs(learned_mean - full_fare_mean) &gt; 1e-4:
+    print(&quot;✅ Scaling Mean Sanity Check Passed: Learned mean differs from Full Dataset mean.&quot;)
+else:
+    print(&quot;⚠️ Warning: Train mean equals Full mean.&quot;)
 
+if abs(learned_scale - full_fare_std) &gt; 1e-4:
+    print(&quot;✅ Scaling Std Sanity Check Passed: Learned std differs from Full Dataset std.&quot;)
+else:
+    print(&quot;⚠️ Warning: Train std equals Full std.&quot;)
 
+print(&quot;✅ Scaling Proof: The scaler learned stats ONLY from the Training set.&quot;)
+</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code class="language-text">Train Fare Mean: 33.7092, Std: 52.7829
+Scaler Learned Mean: 33.7092, Scale: 52.7829
+Full Dataset Fare Mean: 33.2955, Std: 51.7389
+✅ Scaling Mean Sanity Check Passed: Learned mean differs from Full Dataset mean.
+✅ Scaling Std Sanity Check Passed: Learned std differs from Full Dataset std.
+✅ Scaling Proof: The scaler learned stats ONLY from the Training set.
+</code></pre>
+<h2 id="6-verification-3-target-encoding-leakage">6. Verification 3: Target Encoding Leakage</h2>
+<p>Did we encode 'sex' using the Target Mean of the Training set?</p>
+<pre><code class="language-python"># Note: Index is 3
+encoder_step = pipeline.feature_engineer.fitted_steps[3]
+assert encoder_step['name'] == 'encode_sex'
 
+artifact = encoder_step['artifact']
+encoder = artifact['encoder_object']
 
+# Calculate Train Target Mean for 'sex' manually
+train_sex_means = pd.concat([X_train, y_train], axis=1).groupby('sex', observed=True)['survived'].mean()
+print(&quot;Train Target Means:\n&quot;, train_sex_means)
 
-  </div>
+# Check what the encoder learned
+categories = encoder.categories_[0]
+encodings = encoder.encodings_[0]
 
-    </div>
+print(&quot;\nEncoder Learned Means:&quot;)
+for cat, enc in zip(categories, encodings):
+    print(f&quot;  {cat}: {enc:.6f}&quot;)
 
-</div>
+# Verify
+# Note: Sklearn's TargetEncoder uses cross-fitting and shrinkage (smoothing), 
+# so the learned encodings will NOT equal the raw conditional means of the training set.
+# However, they must be **invariant** to changes in the Test set.
+
+full_sex_means = pd.concat([X, y], axis=1).groupby('sex', observed=True)['survived'].mean()
+print(&quot;\nFull Dataset Means (Leakage!):\n&quot;, full_sex_means)
+
+# Check 'male'
+male_train_mean = train_sex_means['male']
+male_full_mean = full_sex_means['male']
+male_encoded = encodings[list(categories).index('male')]
+
+print(f&quot;\nComparison for 'male':&quot;)
+print(f&quot;  Train Mean: {male_train_mean:.6f}&quot;)
+print(f&quot;  Full Mean:  {male_full_mean:.6f}&quot;)
+print(f&quot;  Encoded:    {male_encoded:.6f}&quot;)
+
+assert abs(male_encoded - male_full_mean) &gt; 1e-4, &quot;Leakage detected! Encoded value matches Full Mean.&quot;
+print(&quot;✅ Target Encoding Proof: The encoder did NOT use the full dataset statistics.&quot;)
+</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code class="language-text">Train Target Means:
+ sex
+female    0.694444
+male      0.179054
+Name: survived, dtype: float64
+
+Encoder Learned Means:
+  female: 0.693502
+  male: 0.179250
+
+Full Dataset Means (Leakage!):
+ sex
+female    0.727468
+male      0.190985
+Name: survived, dtype: float64
+
+Comparison for 'male':
+  Train Mean: 0.179054
+  Full Mean:  0.190985
+  Encoded:    0.179250
+✅ Target Encoding Proof: The encoder did NOT use the full dataset statistics.
+</code></pre>
+<h2 id="7-the-ultimate-test-the-poisoned-dataset">7. The Ultimate Test: The "Poisoned" Dataset</h2>
+<p>To prove beyond doubt that the Test set is ignored during training, we will run an experiment:</p>
+<ol>
+<li>Take the original dataset.</li>
+<li><strong>"Poison" the Test set</strong> with extreme outliers and flipped labels.</li>
+<li>Train a <strong>new pipeline</strong> on this poisoned dataset.</li>
+<li>Compare the learned parameters with the original pipeline.</li>
+</ol>
+<p><strong>Hypothesis:</strong> If there is NO leakage, the learned parameters (Imputation Mean, Scaling Stats, Encodings) must be <strong>identical</strong> to the original run, because the Training set hasn't changed.</p>
+<pre><code class="language-python"># Create a Poisoned Dataset
+# We keep Train exactly the same, but corrupt Test.
+X_test_poisoned = X_test.copy()
+y_test_poisoned = y_test.copy()
+
+# 1. Poison 'age' (Imputation)
+# Set all test ages to a massive number. If leakage exists, the mean will skyrocket.
+X_test_poisoned['age'] = 10000.0 
+
+# 2. Poison 'fare' (Scaling)
+# Set all test fares to a massive number.
+X_test_poisoned['fare'] = 1000000.0 
+
+# 3. Poison 'survived' (Target Encoding)
+# Flip all labels: 0-&gt;1, 1-&gt;0. If leakage exists, encodings will flip.
+y_test_poisoned = 1 - y_test_poisoned
+
+# Create Skyulf Dataset with Poisoned Test
+dataset_poisoned = SplitDataset(
+    train=pd.concat([X_train, y_train], axis=1),
+    test=pd.concat([X_test_poisoned, y_test_poisoned], axis=1)
+)
+
+print(&quot;Poisoned Test Stats:&quot;)
+print(f&quot;  Age Mean: {X_test_poisoned['age'].mean():.2f}&quot;)
+print(f&quot;  Fare Mean: {X_test_poisoned['fare'].mean():.2f}&quot;)
+print(f&quot;  Target Mean: {y_test_poisoned.mean():.2f}&quot;)
+
+# Run Pipeline on Poisoned Data
+pipeline_poisoned = SkyulfPipeline(config) # Same config
+print(&quot;\nRunning pipeline on Poisoned Dataset...&quot;)
+pipeline_poisoned.fit(dataset_poisoned, target_column=&quot;survived&quot;)
+
+# Compare Artifacts
+
+# 1. Imputation (Age)
+original_age_mean = pipeline.feature_engineer.fitted_steps[0]['artifact']['fill_values']['age']
+poisoned_age_mean = pipeline_poisoned.feature_engineer.fitted_steps[0]['artifact']['fill_values']['age']
+
+print(f&quot;\nImputation Comparison:&quot;)
+print(f&quot;  Original: {original_age_mean:.4f}&quot;)
+print(f&quot;  Poisoned: {poisoned_age_mean:.4f}&quot;)
+np.testing.assert_allclose(original_age_mean, poisoned_age_mean)
+print(&quot;✅ Imputation is unaffected by Test data.&quot;)
+
+# 2. Scaling (Fare)
+# Note: Index is 2
+original_scaler = pipeline.feature_engineer.fitted_steps[2]['artifact']
+poisoned_scaler = pipeline_poisoned.feature_engineer.fitted_steps[2]['artifact']
+
+original_fare_mean = original_scaler['mean'][0] # fare is only col
+poisoned_fare_mean = poisoned_scaler['mean'][0]
+original_fare_scale = original_scaler['scale'][0]
+poisoned_fare_scale = poisoned_scaler['scale'][0]
+
+print(f&quot;\nScaling Comparison:&quot;)
+print(f&quot;  Original Mean: {original_fare_mean:.4f}, Scale: {original_fare_scale:.4f}&quot;)
+print(f&quot;  Poisoned Mean: {poisoned_fare_mean:.4f}, Scale: {poisoned_fare_scale:.4f}&quot;)
+
+np.testing.assert_allclose(original_fare_mean, poisoned_fare_mean)
+np.testing.assert_allclose(original_fare_scale, poisoned_fare_scale)
+print(&quot;✅ Scaling is unaffected by Test data.&quot;)
+
+# 3. Target Encoding
+# Note: Index is 3
+original_encodings = pipeline.feature_engineer.fitted_steps[3]['artifact']['encoder_object'].encodings_[0]
+poisoned_encodings = pipeline_poisoned.feature_engineer.fitted_steps[3]['artifact']['encoder_object'].encodings_[0]
+
+print(f&quot;\nTarget Encoding Comparison (First 5 values):&quot;)
+print(f&quot;  Original: {original_encodings[:5]}&quot;)
+print(f&quot;  Poisoned: {poisoned_encodings[:5]}&quot;)
+np.testing.assert_allclose(original_encodings, poisoned_encodings)
+print(&quot;✅ Target Encoding is unaffected by Test labels.&quot;)
+
+print(&quot;\n🎉 FINAL VERDICT: The pipeline is LEAKAGE-RESISTANT by design.&quot;)
+</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code class="language-text">Poisoned Test Stats:
+  Age Mean: 10000.00
+  Fare Mean: 1000000.00
+  Target Mean: 0.57
+
+Running pipeline on Poisoned Dataset...
+
+Imputation Comparison:
+  Original: 29.1023
+  Poisoned: 29.1023
+✅ Imputation is unaffected by Test data.
+
+Scaling Comparison:
+  Original Mean: 33.7092, Scale: 52.7829
+  Poisoned Mean: 33.7092, Scale: 52.7829
+✅ Scaling is unaffected by Test data.
+
+Target Encoding Comparison (First 5 values):
+  Original: [0.69350186 0.17924998]
+  Poisoned: [0.69350186 0.17924998]
+✅ Target Encoding is unaffected by Test labels.
+
+🎉 FINAL VERDICT: The pipeline is LEAKAGE-RESISTANT by design.
+</code></pre>
+<h2 id="conclusion">Conclusion</h2>
+<p>We have mathematically verified that:</p>
+<ol>
+<li><strong>Imputation</strong> on Test data used the <strong>Train Mean</strong>.</li>
+<li><strong>Scaling</strong> on Test data used the <strong>Train Mean/Std</strong>.</li>
+<li><strong>Target Encoding</strong> used train-derived target statistics (smoothed/cross-fitted), and is invariant to test labels.</li>
+</ol>
+<p>This proves that <strong>Skyulf pipelines are leakage-free by design</strong>. The strict separation of <code>fit()</code> (Calculator) and <code>transform()</code> (Applier) ensures that no information from the Test set (or future data) can influence the model training. Under adversarial ‘poisoned test’ conditions, the learned preprocessing artifacts are invariant to test data and test labels, providing strong empirical evidence that the pipeline fits strictly on training data for these steps.</p>
 
 
 
@@ -2458,10 +2915,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
       
     
   </body>
