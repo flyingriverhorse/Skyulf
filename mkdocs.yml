@@ -47,6 +47,7 @@ nav:
     - Getting Started: guides/getting_started.md
     - Recipes: guides/recipes.md
     - Architecture: architecture.md
+    - Data Architecture: data_architecture.md
     - Performance: performance.md
     - Adding New Engine: guides/adding_new_engine.md
   - Examples:

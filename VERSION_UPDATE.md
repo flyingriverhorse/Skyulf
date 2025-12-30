@@ -11,7 +11,7 @@
 ------------------------------------------------------------
 ## v0.1.6
 **"The Backend Abstraction & Modern Frameworks Update"**
-This release lays the groundwork for backend abstraction, enabling future support for multiple data processing frameworks like Polars and Rust-based extensions.
+This release lays the groundwork for backend abstraction, enabling future support for multiple data processing frameworks like Polars and other extensions.
 
 ### 🚀 Core Engine & Performance (Polars Migration)
 - **Hybrid Engine:** Introduced `SkyulfDataFrame` Protocol and `EngineRegistry` to support both Pandas and Polars backends.
@@ -25,6 +25,7 @@ This release lays the groundwork for backend abstraction, enabling future suppor
 
 ### 📚 Documentation
 - **Leakage Proof:** Added `examples/05_leakage_proof_titanic.ipynb` proving that Skyulf's architecture prevents data leakage.
+- **Leakage Proof Refinement:** Updated `examples/05_leakage_proof_titanic.ipynb` and `docs/examples/leakage_proof.md` with rigorous statistical checks (tolerant math, exact scaling verification) and a "Poisoned Test" experiment to empirically prove leakage resistance.
 - **Performance:** Added benchmarks demonstrating the speed advantages of the new Polars engine.
 
 ------------------------------------------------------------
