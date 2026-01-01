@@ -344,6 +344,39 @@ class Deployment(Base, TimestampMixin):
         }
 
 
+class EDAReport(Base, TimestampMixin):
+    """
+    Stores the results of EDA analysis for a dataset.
+    """
+    __tablename__ = "eda_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    data_source_id = Column(Integer, ForeignKey("data_sources.id"), nullable=False, index=True)
+    status = Column(String(20), default="PENDING", nullable=False) # PENDING, COMPLETED, FAILED
+    config = Column(JSON, nullable=False, default={})
+    profile_data = Column(JSON, nullable=True)
+    error_message = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    test_status = Column(String(20), default="untested", nullable=False)
+    
+    # Relationship
+    data_source = relationship("DataSource", backref="eda_reports")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "data_source_id": self.data_source_id,
+            "status": self.status,
+            "config": self.config,
+            "profile_data": self.profile_data,
+            "error_message": self.error_message,
+            "is_active": self.is_active,
+            "test_status": self.test_status,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
 # Unused tables removed: DataIngestionJob, SystemLog
 # These tables were not used anywhere in the application and caused schema differences
 

@@ -40,6 +40,7 @@ from backend.utils.logging_utils import setup_universal_logging
 from backend.ml_pipeline.api import router as ml_pipeline_router
 from backend.ml_pipeline.deployment.api import router as deployment_router
 from backend.ml_pipeline.model_registry.api import router as model_registry_router
+from backend.eda.router import router as eda_router
 
 # Configure logging
 setup_universal_logging()
@@ -269,6 +270,7 @@ def _include_routers(app: FastAPI) -> None:
 
     app.include_router(deployment_router, prefix="/api", tags=["Deployment"])
     app.include_router(model_registry_router, prefix="/api", tags=["Model Registry"])
+    app.include_router(eda_router, prefix="/api")
 
     # Root redirect
     from fastapi.responses import RedirectResponse

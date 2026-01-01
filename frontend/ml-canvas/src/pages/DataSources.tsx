@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { DatasetService } from '../core/api/datasets';
 import { Dataset } from '../core/types/api';
 import { FileUpload } from '../modules/nodes/data/FileUpload';
-import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2, XCircle } from 'lucide-react';
+import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2, XCircle, BarChart2 } from 'lucide-react';
 import { formatBytes } from '../core/utils/format';
 import { DatasetPreviewModal } from '../components/data/DatasetPreviewModal';
 import { AddSourceModal } from '../components/data/AddSourceModal';
@@ -297,6 +297,14 @@ export const DataSources: React.FC = () => {
                             >
                               <Play size={16} />
                               Canvas
+                            </button>
+                            <button
+                              onClick={() => { navigate(`/eda?dataset_id=${d.id}`); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-md transition-colors"
+                              title="Analyze with EDA"
+                            >
+                              <BarChart2 size={16} />
+                              EDA
                             </button>
                           </>
                         )}
