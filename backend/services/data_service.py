@@ -23,13 +23,14 @@ class DataService:
     def __init__(self):
         pass
 
-    async def load_file(self, path: Union[str, Path], force_type: Optional[str] = None) -> Any:
+    async def load_file(self, path: Union[str, Path], force_type: Optional[str] = None, storage_options: Optional[dict] = None) -> Any:
         """
         Loads a file into a DataFrame (Polars or Pandas).
         
         Args:
             path: Path to the file.
             force_type: 'pandas' or 'polars'. If None, defaults to Polars if available.
+            storage_options: Dictionary containing storage options (e.g. credentials for S3).
             
         Returns:
             A DataFrame object (pl.DataFrame or pd.DataFrame) that is compatible 
@@ -37,7 +38,8 @@ class DataService:
         """
         path_str = str(path)
         
-        if not Path(path_str).exists():
+        # Skip existence check for S3 paths
+        if not path_str.startswith("s3://") and not Path(path_str).exists():
             raise FileNotFoundError(f"File not found: {path_str}")
 
         # Determine which engine to use for loading
@@ -50,35 +52,42 @@ class DataService:
 
         try:
             if use_polars:
-                return self._load_polars(path_str)
+                try:
+                    return self._load_polars(path_str, storage_options)
+                except Exception as pl_err:
+                    logger.warning(f"Polars load failed for {path_str}: {pl_err}. Falling back to Pandas.")
+                    # Fallback to pandas, then convert to Polars
+                    pdf = self._load_pandas(path_str, storage_options)
+                    return pl.from_pandas(pdf)
             else:
-                return self._load_pandas(path_str)
+                return self._load_pandas(path_str, storage_options)
         except Exception as e:
             logger.error(f"Failed to load file {path_str}: {e}")
             raise
 
-    def _load_polars(self, path: str) -> Any:
+    def _load_polars(self, path: str, storage_options: Optional[dict] = None) -> Any:
         """Load using Polars."""
         if path.endswith(".parquet"):
-            return pl.read_parquet(path)
+            return pl.read_parquet(path, storage_options=storage_options)
         elif path.endswith(".csv"):
-            return pl.read_csv(path, ignore_errors=True) # Robust loading
+            # Polars read_csv supports storage_options in recent versions
+            return pl.read_csv(path, ignore_errors=True, storage_options=storage_options) 
         elif path.endswith(".json"):
-            return pl.read_json(path)
+            return pl.read_json(path) # JSON usually local, but if S3 needed, might need scan_ndjson
         else:
             # Fallback to pandas for other formats, then convert
-            return pl.from_pandas(self._load_pandas(path))
+            return pl.from_pandas(self._load_pandas(path, storage_options))
 
-    def _load_pandas(self, path: str) -> pd.DataFrame:
+    def _load_pandas(self, path: str, storage_options: Optional[dict] = None) -> pd.DataFrame:
         """Load using Pandas."""
         if path.endswith(".parquet"):
-            return pd.read_parquet(path)
+            return pd.read_parquet(path, storage_options=storage_options)
         elif path.endswith(".csv"):
-            return pd.read_csv(path)
+            return pd.read_csv(path, storage_options=storage_options)
         elif path.endswith(".json"):
-            return pd.read_json(path)
+            return pd.read_json(path, storage_options=storage_options)
         elif path.endswith(".xlsx") or path.endswith(".xls"):
-            return pd.read_excel(path)
+            return pd.read_excel(path, storage_options=storage_options)
         else:
             raise ValueError(f"Unsupported file format: {path}")
 

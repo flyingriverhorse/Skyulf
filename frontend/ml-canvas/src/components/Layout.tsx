@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive } from 'lucide-react';
+import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive, BarChart2 } from 'lucide-react';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
@@ -55,6 +55,9 @@ export const Layout: React.FC = () => {
           </NavLink>
           <NavLink to="/data" active={isActive('/data')} icon={<Database size={20} />} collapsed={isCollapsed}>
             Data Sources
+          </NavLink>
+          <NavLink to="/eda" active={isActive('/eda')} icon={<BarChart2 size={20} />} collapsed={isCollapsed}>
+            EDA
           </NavLink>
           <NavLink to="/registry" active={isActive('/registry')} icon={<Archive size={20} />} collapsed={isCollapsed}>
             Model Registry

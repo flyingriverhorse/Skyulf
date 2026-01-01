@@ -1,5 +1,6 @@
 # Version Updates
 
+*   **v0.1.7 :** "The Advanced EDA & Profiling Update" — Professional-grade automated data analysis with smart alerts, rich visualizations, and Polars-powered profiling.
 *   **v0.1.6 :** "The Backend Abstraction & Modern Frameworks Update" — Polars migration, leakage proof, and performance optimization.
 *   **v0.1.5 :** "The Registry & Catalog Architecture Update" — Decoupled data loading with Smart Catalog, full S3 integration, and dynamic node registry architecture.
 *   **v0.1.4 :** "The Polynomial, Security & API Update" — Major release combining frontend refactoring, security hardening, backend logic fixes, and critical API routing improvements.
@@ -9,11 +10,33 @@
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
 
 ------------------------------------------------------------
+## v0.1.7
+**"The Advanced EDA & Profiling Update"**
+This release introduces a professional-grade Automated EDA module, enabling deep statistical analysis of datasets directly within the platform.
+
+### 📊 Profiling & EDA
+- **Advanced Profiler:** Implemented `SkyulfProfiler` in `skyulf-core` using Polars for high-performance automated EDA.
+- **Smart Alerts:** Added automated detection for High Correlation, High Cardinality, Constant Columns, and Class Imbalance.
+- **Rich Stats:** Added support for histograms, correlation matrices, and scatter plot sampling in the profile output.
+
+### 🎯 Target Analysis
+- **Supervised EDA:** Added `Target Analysis` tab to the EDA module. Users can now select a target column to analyze correlations and detect leakage.
+- **Categorical Targets:** Added support for categorical targets using Eta-squared (Correlation Ratio) to measure association with numeric features.
+- **History:** Added analysis history sidebar to view and load past reports.
+- **Leakage Detection:** Implemented automated leakage detection (alerting on >95% correlation with target).
+- **Visualization:** Added interactive Bar Charts for top correlated features in the frontend.
+
+### 🐛 Bug Fixes
+- **EDA Histograms:** Fixed an issue where histograms were empty due to incorrect Polars aggregation aliases.
+- **EDA Updates:** Fixed the "Update" button behavior to correctly poll for pending reports.
+
+------------------------------------------------------------
 ## v0.1.6
 **"The Backend Abstraction & Modern Frameworks Update"**
 This release lays the groundwork for backend abstraction, enabling future support for multiple data processing frameworks like Polars and other extensions.
 
-### 🚀 Core Engine & Performance (Polars Migration)
+
+### �🚀 Core Engine & Performance (Polars Migration)
 - **Hybrid Engine:** Introduced `SkyulfDataFrame` Protocol and `EngineRegistry` to support both Pandas and Polars backends.
 - **High Performance:** Migrated key preprocessing nodes (Scalers, Imputers, Encoders, Feature Selection, etc.) to use native Polars expressions, achieving up to **4x speedup** on large datasets.
 - **Sklearn Bridge:** Implemented `SklearnBridge` to seamlessly convert Polars/Arrow data to Numpy for Scikit-Learn compatibility without unnecessary copies.

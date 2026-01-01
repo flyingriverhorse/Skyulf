@@ -1,120 +1,88 @@
-from enum import Enum
-from typing import Any, Dict, List, Optional, Union
-
+from typing import Dict, List, Optional, Union, Any
 from pydantic import BaseModel, Field
+from datetime import datetime
 
+class NumericStats(BaseModel):
+    mean: Optional[float] = None
+    median: Optional[float] = None
+    std: Optional[float] = None
+    min: Optional[float] = None
+    max: Optional[float] = None
+    q25: Optional[float] = None
+    q75: Optional[float] = None
+    skewness: Optional[float] = None
+    kurtosis: Optional[float] = None
+    zeros_count: Optional[int] = None
+    negatives_count: Optional[int] = None
 
-class VariableType(str, Enum):
-    NUMERIC = "Numeric"
-    CATEGORICAL = "Categorical"
-    BOOLEAN = "Boolean"
-    DATETIME = "DateTime"
-    TEXT = "Text"
-    UNSUPPORTED = "Unsupported"
+class CategoricalStats(BaseModel):
+    unique_count: int
+    top_k: List[Dict[str, Any]] = Field(default_factory=list)  # [{"value": "A", "count": 10}, ...]
+    rare_labels_count: int = 0
 
+class DateStats(BaseModel):
+    min_date: Optional[str] = None
+    max_date: Optional[str] = None
+    duration_days: Optional[float] = None
 
-class AlertType(str, Enum):
-    HIGH_CORRELATION = "HighCorrelation"
-    HIGH_CARDINALITY = "HighCardinality"
-    CONSTANT = "Constant"
-    IMBALANCE = "Imbalance"
-    SKEWNESS = "Skewness"
-    MISSING_DATA = "MissingData"
-    DUPLICATES = "Duplicates"
-
-
-class Alert(BaseModel):
-    type: AlertType
-    columns: List[str]
-    details: str
-    severity: str = "Medium"  # Low, Medium, High
-
+class TextStats(BaseModel):
+    avg_length: Optional[float] = None
+    min_length: Optional[int] = None
+    max_length: Optional[int] = None
 
 class HistogramBin(BaseModel):
     start: float
     end: float
     count: int
 
-
-class ValueFrequency(BaseModel):
-    value: str
-    count: int
-    percentage: float
-
-
-class NumericStats(BaseModel):
-    mean: Optional[float] = None
-    std: Optional[float] = None
-    min: Optional[float] = None
-    max: Optional[float] = None
-    median: Optional[float] = None
-    q05: Optional[float] = None
-    q25: Optional[float] = None
-    q75: Optional[float] = None
-    q95: Optional[float] = None
-    skewness: Optional[float] = None
-    kurtosis: Optional[float] = None
-    zeros: Optional[int] = None
-    negatives: Optional[int] = None
-    outliers: Optional[int] = None  # Count of outliers (1.5 IQR)
-    histogram: List[HistogramBin] = Field(default_factory=list)
-
-
-class CategoricalStats(BaseModel):
-    unique_count: int
-    top_values: List[ValueFrequency] = Field(default_factory=list)
-
-
-class DateTimeStats(BaseModel):
-    min: Optional[str] = None
-    max: Optional[str] = None
-    range_days: Optional[float] = None
-
-
-class VariableProfile(BaseModel):
+class ColumnProfile(BaseModel):
     name: str
-    type: VariableType
-    count: int
+    dtype: str  # "Numeric", "Categorical", "Boolean", "DateTime", "Text"
     missing_count: int
     missing_percentage: float
-    memory_usage: Optional[int] = None  # bytes
     
-    # Type specific stats
+    # Type-specific stats
     numeric_stats: Optional[NumericStats] = None
     categorical_stats: Optional[CategoricalStats] = None
-    datetime_stats: Optional[DateTimeStats] = None
-
-
-class CorrelationCell(BaseModel):
-    x: str
-    y: str
-    value: float
-
+    date_stats: Optional[DateStats] = None
+    text_stats: Optional[TextStats] = None
+    
+    # Distribution
+    histogram: Optional[List[HistogramBin]] = None
+    
+    # Quality
+    is_constant: bool = False
+    is_unique: bool = False  # Possible ID
 
 class CorrelationMatrix(BaseModel):
-    method: str  # pearson, spearman
-    cells: List[CorrelationCell]
-
+    columns: List[str]
+    values: List[List[float]]  # 2D array
 
 class ScatterSample(BaseModel):
     x: str
     y: str
     data: List[Dict[str, Any]]  # [{"x": 1, "y": 2}, ...]
 
-
-class DatasetMeta(BaseModel):
-    rows: int
-    cols: int
-    memory_usage: int  # bytes
-    duplicate_rows: int
-    duplicate_percentage: float
-    variable_types: Dict[str, int]  # {"Numeric": 5, "Categorical": 2}
-    quality_score: float = Field(..., ge=0, le=100)  # 0-100 score
-
+class Alert(BaseModel):
+    column: Optional[str] = None
+    type: str  # "High Null", "Constant", "High Cardinality", "Leakage", "Outlier"
+    message: str
+    severity: str = "warning"  # "info", "warning", "error"
 
 class DatasetProfile(BaseModel):
-    meta: DatasetMeta
+    row_count: int
+    column_count: int
+    duplicate_rows: int
+    missing_cells_percentage: float
+    memory_usage_mb: float
+    
+    columns: Dict[str, ColumnProfile]
+    correlations: Optional[CorrelationMatrix] = None
     alerts: List[Alert] = Field(default_factory=list)
-    variables: Dict[str, VariableProfile]
-    correlations: Dict[str, CorrelationMatrix] = Field(default_factory=dict)
-    scatter_samples: List[ScatterSample] = Field(default_factory=list)
+    sample_data: Optional[List[Dict[str, Any]]] = None
+    
+    # Target Analysis
+    target_col: Optional[str] = None
+    target_correlations: Optional[Dict[str, float]] = None
+    
+    generated_at: datetime = Field(default_factory=datetime.now)
