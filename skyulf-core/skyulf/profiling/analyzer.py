@@ -7,7 +7,7 @@ import re
 from .schemas import (
     DatasetProfile, ColumnProfile, NumericStats, CategoricalStats, 
     DateStats, TextStats, Alert, HistogramBin, Recommendation, PCAPoint,
-    GeospatialStats, GeoPoint
+    GeospatialStats, GeoPoint, TimeSeriesAnalysis, TimeSeriesPoint, SeasonalityStats
 )
 from .distributions import calculate_histogram
 from .correlations import calculate_correlations
@@ -23,11 +23,62 @@ except ImportError:
 
 class EDAAnalyzer:
     def __init__(self, df: pl.DataFrame):
-        # We accept eager DataFrame but convert to Lazy for processing
         self.df = df
-        self.lazy_df = df.lazy()
-        self.row_count = df.height
-        self.columns = df.columns
+        # Auto-detect and cast date columns
+        self._cast_date_columns()
+        
+        # We accept eager DataFrame but convert to Lazy for processing
+        self.lazy_df = self.df.lazy()
+        self.row_count = self.df.height
+        self.columns = self.df.columns
+
+    def _cast_date_columns(self):
+        """
+        Attempts to cast string columns to DateTime if they look like dates.
+        """
+        for col in self.df.columns:
+            if self.df[col].dtype in [pl.Utf8, pl.String]:
+                # Check sample (non-null values)
+                sample = self.df[col].drop_nulls().head(20)
+                if len(sample) == 0: continue
+                
+                # 1. Try ISO Datetime (YYYY-MM-DD HH:MM:SS)
+                try:
+                    # strict=False returns null on failure. 
+                    # If sample has no nulls after conversion, it's a match.
+                    parsed = sample.str.to_datetime(strict=False)
+                    if parsed.null_count() == 0:
+                        # Apply to full column
+                        self.df = self.df.with_columns(pl.col(col).str.to_datetime(strict=False).alias(col))
+                        continue
+                except Exception:
+                    pass
+
+                # 2. Try ISO Date (YYYY-MM-DD)
+                try:
+                    parsed = sample.str.to_date(strict=False)
+                    if parsed.null_count() == 0:
+                        self.df = self.df.with_columns(pl.col(col).str.to_date(strict=False).alias(col))
+                        continue
+                except Exception:
+                    pass
+                    
+                # 3. Try common formats (MM/DD/YYYY, DD/MM/YYYY)
+                # Polars requires specific format strings for these
+                common_formats = ["%m/%d/%Y", "%d/%m/%Y", "%m-%d-%Y", "%d-%m-%Y"]
+                for fmt in common_formats:
+                    try:
+                        parsed = sample.str.to_datetime(format=fmt, strict=False)
+                        if parsed.null_count() == 0:
+                            self.df = self.df.with_columns(pl.col(col).str.to_datetime(format=fmt, strict=False).alias(col))
+                            break
+                        
+                        parsed_date = sample.str.to_date(format=fmt, strict=False)
+                        if parsed_date.null_count() == 0:
+                            self.df = self.df.with_columns(pl.col(col).str.to_date(format=fmt, strict=False).alias(col))
+                            break
+                    except Exception:
+                        continue
         
     def analyze(self, target_col: Optional[str] = None) -> DatasetProfile:
         """
@@ -106,7 +157,10 @@ class EDAAnalyzer:
         # 7. Geospatial Analysis
         geospatial = self._analyze_geospatial(numeric_cols, target_col)
 
-        # 8. Smart Recommendations
+        # 8. Time Series Analysis
+        timeseries = self._analyze_timeseries(numeric_cols, target_col)
+
+        # 9. Smart Recommendations
         recommendations = self._generate_recommendations(col_profiles, alerts, target_col)
 
         return DatasetProfile(
@@ -123,7 +177,8 @@ class EDAAnalyzer:
             target_col=target_col,
             target_correlations=target_correlations,
             pca_data=pca_data,
-            geospatial=geospatial
+            geospatial=geospatial,
+            timeseries=timeseries
         )
 
     def _analyze_geospatial(self, numeric_cols: List[str], target_col: Optional[str] = None) -> Optional[GeospatialStats]:
@@ -214,6 +269,133 @@ class EDAAnalyzer:
             )
         except Exception as e:
             print(f"Error in geospatial analysis: {e}")
+            return None
+
+    def _analyze_timeseries(self, numeric_cols: List[str], target_col: Optional[str] = None) -> Optional[TimeSeriesAnalysis]:
+        """
+        Detects DateTime column and performs time series analysis.
+        """
+        try:
+            # Find best date column (highest cardinality)
+            date_cols = []
+            for col in self.columns:
+                if self._get_semantic_type(self.df[col]) == "DateTime":
+                    date_cols.append(col)
+            
+            if not date_cols:
+                return None
+                
+            # Pick the one with most unique values to avoid constant metadata dates
+            best_date_col = None
+            max_unique = -1
+            
+            for col in date_cols:
+                n_unique = self.df[col].n_unique()
+                if n_unique > max_unique:
+                    max_unique = n_unique
+                    best_date_col = col
+            
+            date_col = best_date_col
+                
+            # 1. Trend Analysis (Resample by Day)
+            ts_df = self.lazy_df.sort(date_col)
+            
+            # Select top 3 numeric columns + target to track
+            cols_to_track = numeric_cols[:3]
+            if target_col and target_col in numeric_cols and target_col not in cols_to_track:
+                cols_to_track.append(target_col)
+                
+            if not cols_to_track:
+                # Just track count
+                trend_df = ts_df.group_by(pl.col(date_col).dt.date().alias("date")).agg(
+                    pl.count().alias("count")
+                ).sort("date").collect()
+            else:
+                aggs = [pl.col(c).mean().alias(c) for c in cols_to_track]
+                trend_df = ts_df.group_by(pl.col(date_col).dt.date().alias("date")).agg(
+                    aggs
+                ).sort("date").collect()
+                
+            # Convert to TimeSeriesPoint list
+            trend_points = []
+            for row in trend_df.iter_rows(named=True):
+                if row["date"] is None: continue
+                date_str = str(row["date"])
+                values = {k: v for k, v in row.items() if k != "date" and v is not None}
+                trend_points.append(TimeSeriesPoint(date=date_str, values=values))
+                
+            # 2. Seasonality (Day of Week)
+            # If we have a numeric column to track, use mean, else count
+            agg_expr = pl.count().alias("count")
+            if cols_to_track:
+                # Use the first numeric column for seasonality magnitude
+                target_metric = cols_to_track[0]
+                agg_expr = pl.col(target_metric).mean().alias("count") # Alias as count for frontend compatibility, but it's mean
+            
+            dow_df = self.lazy_df.with_columns(
+                pl.col(date_col).dt.weekday().alias("dow_idx"),
+                pl.col(date_col).dt.strftime("%a").alias("dow_name")
+            ).group_by(["dow_idx", "dow_name"]).agg(
+                agg_expr
+            ).sort("dow_idx").collect()
+            
+            dow_stats = [{"day": row["dow_name"], "count": row["count"]} for row in dow_df.iter_rows(named=True)]
+            
+            # 3. Seasonality (Month of Year)
+            moy_df = self.lazy_df.with_columns(
+                pl.col(date_col).dt.month().alias("month_idx"),
+                pl.col(date_col).dt.strftime("%b").alias("month_name")
+            ).group_by(["month_idx", "month_name"]).agg(
+                agg_expr
+            ).sort("month_idx").collect()
+            
+            moy_stats = [{"month": row["month_name"], "count": row["count"]} for row in moy_df.iter_rows(named=True)]
+            
+            # 4. Autocorrelation (ACF)
+            acf_stats = []
+            if cols_to_track:
+                target_metric = cols_to_track[0]
+                # We need a contiguous series for ACF. trend_df is already sorted by date.
+                # Extract the series
+                series = trend_df[target_metric].to_numpy()
+                
+                # Handle NaNs if any (fill with mean or drop)
+                # Simple fill
+                mask = np.isnan(series)
+                if mask.any():
+                    series[mask] = np.nanmean(series)
+                
+                if len(series) > 10:
+                    # Calculate ACF for lags 1 to 30
+                    n = len(series)
+                    mean = np.mean(series)
+                    var = np.var(series)
+                    
+                    for lag in range(1, min(31, n // 2)):
+                        # Slice arrays
+                        y1 = series[lag:]
+                        y2 = series[:-lag]
+                        
+                        # Pearson correlation
+                        if var == 0:
+                            corr = 0
+                        else:
+                            corr = np.sum((y1 - mean) * (y2 - mean)) / n / var
+                            
+                        acf_stats.append({"lag": lag, "corr": float(corr)})
+
+            return TimeSeriesAnalysis(
+                date_col=date_col,
+                trend=trend_points,
+                seasonality=SeasonalityStats(
+                    day_of_week=dow_stats,
+                    month_of_year=moy_stats
+                ),
+                autocorrelation=acf_stats
+            )
+            
+        except Exception as e:
+            print(f"Error in time series analysis: {e}")
             return None
 
     def _calculate_pca(self, numeric_cols: List[str], target_col: Optional[str] = None) -> Optional[List[PCAPoint]]:
@@ -519,8 +701,40 @@ class EDAAnalyzer:
         elif semantic_type == "DateTime":
             profile.date_stats = self._analyze_date(col)
             
+            # Calculate Histogram for DateTime (Distribution over time)
+            try:
+                # Convert to ms timestamp for histogram
+                ts = self.df[col].dt.timestamp("ms").drop_nulls().to_numpy()
+                if len(ts) > 0:
+                    hist, bin_edges = np.histogram(ts, bins=10)
+                    profile.histogram = []
+                    for i in range(len(hist)):
+                        profile.histogram.append(HistogramBin(
+                            start=float(bin_edges[i]),
+                            end=float(bin_edges[i+1]),
+                            count=int(hist[i])
+                        ))
+            except Exception as e:
+                print(f"Failed to calculate date histogram for {col}: {e}")
+            
         elif semantic_type == "Text":
             profile.text_stats = self._analyze_text(col)
+            
+            # Calculate Length Histogram for Text
+            try:
+                lengths = self.df[col].str.len_bytes().drop_nulls().to_numpy()
+                if len(lengths) > 0:
+                    hist, bin_edges = np.histogram(lengths, bins=10)
+                    profile.histogram = []
+                    for i in range(len(hist)):
+                        profile.histogram.append(HistogramBin(
+                            start=float(bin_edges[i]),
+                            end=float(bin_edges[i+1]),
+                            count=int(hist[i])
+                        ))
+            except Exception as e:
+                print(f"Failed to calculate text histogram for {col}: {e}")
+
             # PII Check
             if self._check_pii(col):
                 alerts.append(Alert(column=col, type="PII", message=f"Column '{col}' may contain PII (Email/Phone).", severity="error"))

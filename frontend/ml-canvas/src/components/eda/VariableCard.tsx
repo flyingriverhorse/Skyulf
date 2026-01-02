@@ -18,10 +18,17 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick }) 
   };
 
   // Prepare mini histogram data if available
-  const histData = profile.histogram ? profile.histogram.map((b: any) => ({
-    name: b.start.toFixed(1),
-    count: b.count
-  })) : [];
+  let miniChartData: any[] = [];
+  
+  if (profile.dtype === 'Numeric' && profile.histogram) {
+      miniChartData = profile.histogram.map((b: any) => ({ name: b.start.toFixed(1), count: b.count }));
+  } else if (profile.dtype === 'Text' && profile.histogram) {
+      miniChartData = profile.histogram.map((b: any) => ({ name: b.start.toFixed(0), count: b.count }));
+  } else if (profile.dtype === 'DateTime' && profile.histogram) {
+      miniChartData = profile.histogram.map((b: any) => ({ name: new Date(b.start).toLocaleDateString(), count: b.count }));
+  } else if (profile.dtype === 'Categorical' && profile.categorical_stats?.top_k) {
+      miniChartData = profile.categorical_stats.top_k.slice(0, 5).map((k: any) => ({ name: k.value, count: k.count }));
+  }
 
   return (
     <div 
@@ -56,11 +63,15 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick }) 
         </div>
 
         {/* Mini Chart */}
-        {profile.dtype === 'Numeric' && histData.length > 0 && (
+        {miniChartData.length > 0 && (
           <div className="h-12 w-24">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={histData}>
-                <Bar dataKey="count" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+              <BarChart data={miniChartData}>
+                <Bar 
+                    dataKey="count" 
+                    fill={profile.dtype === 'Numeric' ? '#3b82f6' : profile.dtype === 'Categorical' ? '#8b5cf6' : '#10b981'} 
+                    radius={[2, 2, 0, 0]} 
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>

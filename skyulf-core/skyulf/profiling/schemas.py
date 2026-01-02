@@ -96,6 +96,20 @@ class GeospatialStats(BaseModel):
     centroid_lon: float
     sample_points: List[GeoPoint]
 
+class TimeSeriesPoint(BaseModel):
+    date: str
+    values: Dict[str, float]
+
+class SeasonalityStats(BaseModel):
+    day_of_week: List[Dict[str, Any]]
+    month_of_year: List[Dict[str, Any]]
+
+class TimeSeriesAnalysis(BaseModel):
+    date_col: str
+    trend: List[TimeSeriesPoint]
+    seasonality: SeasonalityStats
+    autocorrelation: Optional[List[Dict[str, Any]]] = None
+
 class DatasetProfile(BaseModel):
     row_count: int
     column_count: int
@@ -118,5 +132,8 @@ class DatasetProfile(BaseModel):
     
     # Geospatial
     geospatial: Optional[GeospatialStats] = None
+    
+    # Time Series
+    timeseries: Optional[TimeSeriesAnalysis] = None
     
     generated_at: datetime = Field(default_factory=datetime.now)
