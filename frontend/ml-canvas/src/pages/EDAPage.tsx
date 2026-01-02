@@ -5,8 +5,8 @@ import { EDAService } from '../core/api/eda';
 import { VariableCard } from '../components/eda/VariableCard';
 import { CorrelationHeatmap } from '../components/eda/CorrelationHeatmap';
 import { DistributionChart } from '../components/eda/DistributionChart';
-import { Loader2, Play, RefreshCw, AlertCircle, BarChart2, Clock, X, Lightbulb, ScatterChart as ScatterIcon, CheckCircle, Info, Map } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, ScatterChart, Scatter, Legend } from 'recharts';
+import { Loader2, Play, RefreshCw, AlertCircle, BarChart2, Clock, X, Lightbulb, ScatterChart as ScatterIcon, CheckCircle, Info, Map, Calendar } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, ScatterChart, Scatter, Legend, LineChart, Line } from 'recharts';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -131,6 +131,16 @@ export const EDAPage: React.FC = () => {
         // Removed auto-switch to target tab
     }
   }, [report]);
+
+  const InfoTooltip = ({ text }: { text: string }) => (
+    <div className="group relative ml-2 inline-flex items-center">
+        <Info className="w-4 h-4 text-gray-400 cursor-help" />
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none text-center">
+            {text}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+        </div>
+    </div>
+  );
 
   const renderContent = () => {
     if (loading && !report) {
@@ -298,6 +308,7 @@ export const EDAPage: React.FC = () => {
               <Lightbulb className="w-4 h-4" />
               Smart Insights
             </button>
+            {profile.pca_data && (
             <button
               onClick={() => setActiveTab('pca')}
               className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
@@ -309,6 +320,7 @@ export const EDAPage: React.FC = () => {
               <ScatterIcon className="w-4 h-4" />
               Multivariate (PCA)
             </button>
+            )}
             {profile.geospatial && (
                 <button
                 onClick={() => setActiveTab('geospatial')}
@@ -322,6 +334,20 @@ export const EDAPage: React.FC = () => {
                 Geospatial
                 </button>
             )}
+            {profile.timeseries && (
+                <button
+                onClick={() => setActiveTab('timeseries')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                    activeTab === 'timeseries'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                >
+                <Calendar className="w-4 h-4" />
+                Time Series
+                </button>
+            )}
+            {profile.correlations && profile.correlations.values && profile.correlations.values.length > 0 && (
             <button
               onClick={() => setActiveTab('correlations')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
@@ -332,7 +358,8 @@ export const EDAPage: React.FC = () => {
             >
               Correlations
             </button>
-            {profile.target_col && (
+            )}
+            {profile.target_col && profile.target_correlations && Object.keys(profile.target_correlations).length > 0 && (
                 <button
                 onClick={() => setActiveTab('target')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
@@ -392,6 +419,7 @@ export const EDAPage: React.FC = () => {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                     <ScatterIcon className="w-5 h-5 mr-2 text-purple-500" />
                     Multivariate Structure (PCA)
+                    <InfoTooltip text="Reduces data to 2D. Points closer together are similar. Colors show clusters or target values." />
                 </h3>
 
                 {profile.pca_data ? (
@@ -418,7 +446,6 @@ export const EDAPage: React.FC = () => {
                                     }} 
                                 />
                                 <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                                <Legend verticalAlign="top" height={36}/>
                                 {(() => {
                                     // Group data by label for coloring
                                     const groupedData: {[key: string]: any[]} = {};
@@ -431,15 +458,36 @@ export const EDAPage: React.FC = () => {
                                         groupedData[label].push(point);
                                     });
 
-                                    return Object.keys(groupedData).map((label, index) => (
-                                        <Scatter 
-                                            key={label} 
-                                            name={label} 
-                                            data={groupedData[label]} 
-                                            fill={hasLabels ? COLORS[index % COLORS.length] : '#8884d8'} 
-                                            fillOpacity={0.6} 
-                                        />
-                                    ));
+                                    const uniqueLabels = Object.keys(groupedData);
+                                    const isChaotic = uniqueLabels.length > 20;
+
+                                    // If chaotic, show no legend and use single color (or just one group)
+                                    if (isChaotic) {
+                                        return (
+                                            <Scatter 
+                                                name="Data Points" 
+                                                data={profile.pca_data} 
+                                                fill="#8884d8" 
+                                                fillOpacity={0.6} 
+                                            />
+                                        );
+                                    }
+
+                                    // Otherwise show legend and colored groups
+                                    return (
+                                        <>
+                                            <Legend verticalAlign="top" height={36}/>
+                                            {uniqueLabels.map((label, index) => (
+                                                <Scatter 
+                                                    key={label} 
+                                                    name={label} 
+                                                    data={groupedData[label]} 
+                                                    fill={hasLabels ? COLORS[index % COLORS.length] : '#8884d8'} 
+                                                    fillOpacity={0.6} 
+                                                />
+                                            ))}
+                                        </>
+                                    );
                                 })()}
                             </ScatterChart>
                         </ResponsiveContainer>
@@ -678,6 +726,134 @@ export const EDAPage: React.FC = () => {
         )}
 
         {/* Tab Content */}
+        {activeTab === 'timeseries' && profile.timeseries && (
+            <div className="mt-4 space-y-6">
+                {/* Trend Chart */}
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                        <Calendar className="w-5 h-5 mr-2 text-blue-500" />
+                        Trend Analysis ({profile.timeseries.date_col})
+                        <InfoTooltip text="Shows how values change over time. Look for long-term trends (up/down) or sudden shifts." />
+                    </h3>
+                    <div className="h-80 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={profile.timeseries.trend}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis 
+                                    dataKey="date" 
+                                    tick={{ fontSize: 12 }} 
+                                    minTickGap={30}
+                                />
+                                <YAxis />
+                                <Tooltip 
+                                    contentStyle={{ backgroundColor: '#1f2937', border: 'none', color: '#fff' }}
+                                    labelStyle={{ color: '#9ca3af' }}
+                                />
+                                <Legend />
+                                {Object.keys(profile.timeseries.trend[0]?.values || {}).map((key, idx) => (
+                                    <Line 
+                                        key={key}
+                                        type="monotone" 
+                                        dataKey={`values.${key}`} 
+                                        name={key}
+                                        stroke={COLORS[idx % COLORS.length]} 
+                                        dot={false}
+                                        strokeWidth={2}
+                                    />
+                                ))}
+                                {/* Fallback if no values (just count) */}
+                                {(!profile.timeseries.trend[0]?.values || Object.keys(profile.timeseries.trend[0].values).length === 0) && (
+                                     <Line type="monotone" dataKey="count" stroke="#3b82f6" dot={false} />
+                                )}
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Seasonality Grid */}
+                <div className="grid grid-cols-1 gap-6">
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                        <div className="flex items-center mb-4">
+                            <h3 className="text-sm font-medium text-gray-500">Day of Week Seasonality</h3>
+                            <InfoTooltip text="Average values for each day. Helps identify weekly patterns (e.g., lower on weekends)." />
+                        </div>
+                        <div className="h-64 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={profile.timeseries.seasonality.day_of_week}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+                                    <YAxis />
+                                    <Tooltip 
+                                        contentStyle={{ backgroundColor: '#1f2937', border: 'none', color: '#fff' }}
+                                        cursor={{fill: 'transparent'}}
+                                    />
+                                    <Bar dataKey="count" fill="#8884d8" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Monthly Seasonality (Full Width) */}
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                    <div className="flex items-center mb-4">
+                        <h3 className="text-sm font-medium text-gray-500">Monthly Seasonality</h3>
+                        <InfoTooltip text="Average values for each month. Helps identify yearly patterns or seasonal effects." />
+                    </div>
+                    <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={profile.timeseries.seasonality.month_of_year}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                                <YAxis />
+                                <Tooltip 
+                                    contentStyle={{ backgroundColor: '#1f2937', border: 'none', color: '#fff' }}
+                                    cursor={{fill: 'transparent'}}
+                                />
+                                <Bar dataKey="count" fill="#82ca9d" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Autocorrelation (ACF) */}
+                {profile.timeseries.autocorrelation && profile.timeseries.autocorrelation.length > 0 && (
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-medium text-gray-500">Autocorrelation (Lag Analysis)</h3>
+                            <div className="group relative">
+                                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                                <div className="absolute right-0 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+                                    Shows how much the current value depends on past values (lags). 
+                                    High bars indicate repeating patterns or seasonality.
+                                </div>
+                            </div>
+                        </div>
+                        <div className="h-64 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={profile.timeseries.autocorrelation}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis 
+                                        dataKey="lag" 
+                                        tick={{ fontSize: 12 }} 
+                                        label={{ value: 'Lag (Days)', position: 'insideBottom', offset: -5, fontSize: 10 }}
+                                    />
+                                    <YAxis domain={[-1, 1]} />
+                                    <Tooltip 
+                                        contentStyle={{ backgroundColor: '#1f2937', border: 'none', color: '#fff' }}
+                                        cursor={{fill: 'transparent'}}
+                                        formatter={(value: number) => [value.toFixed(3), 'Correlation']}
+                                    />
+                                    <ReferenceLine y={0} stroke="#9ca3af" />
+                                    <Bar dataKey="corr" fill="#f59e0b" radius={[2, 2, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                )}
+            </div>
+        )}
+
         {activeTab === 'variables' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {Object.values(profile.columns).map((col: any) => (
@@ -691,7 +867,12 @@ export const EDAPage: React.FC = () => {
         )}
 
         {activeTab === 'correlations' && profile.correlations && (
-          <div className="mt-4">
+          <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <BarChart2 className="w-5 h-5 mr-2 text-blue-500" />
+                Correlation Matrix
+                <InfoTooltip text="Shows linear relationships between variables. 1 is perfect positive, -1 is perfect negative correlation." />
+            </h3>
             <CorrelationHeatmap data={profile.correlations} />
           </div>
         )}

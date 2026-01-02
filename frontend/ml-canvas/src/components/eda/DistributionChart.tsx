@@ -17,6 +17,18 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile })
       fullName: `${Number(bin.start).toFixed(2)} - ${Number(bin.end).toFixed(2)}`,
       count: bin.count,
     }));
+  } else if (type === 'Text' && profile.histogram) {
+    data = profile.histogram.map((bin: any) => ({
+      name: `${Number(bin.start).toFixed(0)}`, 
+      fullName: `${Number(bin.start).toFixed(0)} - ${Number(bin.end).toFixed(0)} chars`,
+      count: bin.count,
+    }));
+  } else if (type === 'DateTime' && profile.histogram) {
+    data = profile.histogram.map((bin: any) => ({
+      name: new Date(bin.start).toLocaleDateString(undefined, { month: 'short', year: '2-digit' }), 
+      fullName: `${new Date(bin.start).toLocaleDateString()} - ${new Date(bin.end).toLocaleDateString()}`,
+      count: bin.count,
+    }));
   } else if (type === 'Categorical' && profile.categorical_stats?.top_k) {
     data = profile.categorical_stats.top_k.map((item: any) => ({
       name: String(item.value).substring(0, 15) + (String(item.value).length > 15 ? '...' : ''),
