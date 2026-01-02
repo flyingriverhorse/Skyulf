@@ -8,7 +8,8 @@ from .schemas import (
     DatasetProfile, ColumnProfile, NumericStats, CategoricalStats, 
     DateStats, TextStats, Alert, HistogramBin, Recommendation, PCAPoint,
     GeospatialStats, GeoPoint, TimeSeriesAnalysis, TimeSeriesPoint, SeasonalityStats,
-    TargetInteraction, CategoryBoxPlot, BoxPlotStats
+    TargetInteraction, CategoryBoxPlot, BoxPlotStats, OutlierAnalysis, OutlierPoint,
+    NormalityTestResult
 )
 from .distributions import calculate_histogram
 from .correlations import calculate_correlations
@@ -18,15 +19,22 @@ try:
     from sklearn.decomposition import PCA
     from sklearn.preprocessing import StandardScaler
     from sklearn.impute import SimpleImputer
+    from sklearn.ensemble import IsolationForest
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
 
 try:
-    from scipy.stats import f_oneway
+    from scipy.stats import f_oneway, shapiro, kstest, norm
     SCIPY_AVAILABLE = True
 except ImportError:
     SCIPY_AVAILABLE = False
+
+try:
+    from statsmodels.tsa.stattools import adfuller
+    STATSMODELS_AVAILABLE = True
+except ImportError:
+    STATSMODELS_AVAILABLE = False
 
 class EDAAnalyzer:
     def __init__(self, df: pl.DataFrame):
@@ -166,15 +174,20 @@ class EDAAnalyzer:
                 severity="warning"
             ))
             
-        # 5. Sample Data (First 100 rows)
+        # 5. Sample Data (First 1000 rows for scatter plots)
         # We need to collect this from the lazy frame or original df
         # Convert to list of dicts
-        sample_rows = self.df.head(100).to_dicts()
+        sample_rows = self.df.head(5000).to_dicts()
 
         # 6. Multivariate Analysis (PCA)
         pca_data = None
         if SKLEARN_AVAILABLE and len(numeric_cols) >= 2:
             pca_data = self._calculate_pca(numeric_cols, target_col)
+
+        # 6b. Outlier Detection
+        outliers = None
+        if SKLEARN_AVAILABLE and len(numeric_cols) >= 1:
+            outliers = self._detect_outliers(numeric_cols)
 
         # 7. Geospatial Analysis
         geospatial = self._analyze_geospatial(numeric_cols, target_col)
@@ -200,9 +213,72 @@ class EDAAnalyzer:
             target_correlations=target_correlations,
             target_interactions=target_interactions,
             pca_data=pca_data,
+            outliers=outliers,
             geospatial=geospatial,
             timeseries=timeseries
         )
+
+    def _detect_outliers(self, numeric_cols: List[str]) -> Optional[OutlierAnalysis]:
+        """
+        Detects outliers using Isolation Forest.
+        """
+        try:
+            # Prepare data
+            # Limit rows for performance if dataset is huge (e.g. > 50k)
+            limit = 50000
+            df_numeric = self.df.select(numeric_cols).head(limit)
+            
+            # Convert to pandas/numpy
+            X = df_numeric.to_pandas().values
+            
+            # Impute
+            imputer = SimpleImputer(strategy='mean')
+            X = imputer.fit_transform(X)
+            
+            # Fit Isolation Forest
+            clf = IsolationForest(random_state=42, contamination=0.05, n_jobs=-1)
+            clf.fit(X)
+            
+            # Predict: -1 for outliers, 1 for inliers
+            preds = clf.predict(X)
+            scores = clf.decision_function(X) # Lower is more anomalous
+            
+            outlier_indices = np.where(preds == -1)[0]
+            total_outliers = len(outlier_indices)
+            
+            if total_outliers == 0:
+                return None
+                
+            # Get top outliers (lowest scores)
+            # Zip indices and scores
+            scored_indices = list(zip(range(len(scores)), scores))
+            # Sort by score ascending (lowest score = most anomalous)
+            scored_indices.sort(key=lambda x: x[1])
+            
+            top_k = 20
+            top_outliers = []
+            
+            for idx, score in scored_indices[:top_k]:
+                # Only include if it was actually predicted as outlier
+                if preds[idx] == -1:
+                    # Get row values
+                    row_values = df_numeric.row(idx, named=True)
+                    top_outliers.append(OutlierPoint(
+                        index=int(idx), # Cast to int for JSON serialization
+                        values=row_values,
+                        score=float(score)
+                    ))
+                
+            return OutlierAnalysis(
+                method="IsolationForest",
+                total_outliers=total_outliers,
+                outlier_percentage=(total_outliers / len(X)) * 100,
+                top_outliers=top_outliers
+            )
+            
+        except Exception as e:
+            print(f"Error in outlier detection: {e}")
+            return None
 
     def _analyze_geospatial(self, numeric_cols: List[str], target_col: Optional[str] = None) -> Optional[GeospatialStats]:
         """
@@ -407,6 +483,28 @@ class EDAAnalyzer:
                             
                         acf_stats.append({"lag": lag, "corr": float(corr)})
 
+            # 5. Stationarity Test (ADF)
+            stationarity_test = None
+            if STATSMODELS_AVAILABLE and cols_to_track:
+                try:
+                    target_metric = cols_to_track[0]
+                    series = trend_df[target_metric].to_numpy()
+                    # Handle NaNs
+                    mask = np.isnan(series)
+                    if mask.any():
+                        series[mask] = np.nanmean(series)
+                    
+                    if len(series) > 20: # ADF requires sufficient data
+                        result = adfuller(series)
+                        stationarity_test = {
+                            "test_statistic": float(result[0]),
+                            "p_value": float(result[1]),
+                            "is_stationary": float(result[1]) < 0.05,
+                            "metric": target_metric
+                        }
+                except Exception as e:
+                    print(f"ADF test failed: {e}")
+
             return TimeSeriesAnalysis(
                 date_col=date_col,
                 trend=trend_points,
@@ -414,7 +512,8 @@ class EDAAnalyzer:
                     day_of_week=dow_stats,
                     month_of_year=moy_stats
                 ),
-                autocorrelation=acf_stats
+                autocorrelation=acf_stats,
+                stationarity_test=stationarity_test
             )
             
         except Exception as e:
@@ -451,7 +550,7 @@ class EDAAnalyzer:
             X_scaled = scaler.fit_transform(X)
             
             # PCA
-            pca = PCA(n_components=2)
+            pca = PCA(n_components=3)
             X_pca = pca.fit_transform(X_scaled)
             
             # Ensure numpy array (CRITICAL FIX)
@@ -466,7 +565,12 @@ class EDAAnalyzer:
             points = []
             for i in range(len(X_pca)):
                 label_val = str(labels[i]) if labels else None
-                points.append(PCAPoint(x=float(X_pca[i, 0]), y=float(X_pca[i, 1]), label=label_val))
+                points.append(PCAPoint(
+                    x=float(X_pca[i, 0]), 
+                    y=float(X_pca[i, 1]), 
+                    z=float(X_pca[i, 2]) if X_pca.shape[1] > 2 else None,
+                    label=label_val
+                ))
                 
             return points
             
@@ -782,6 +886,30 @@ class EDAAnalyzer:
             profile.numeric_stats = self._analyze_numeric(col)
             profile.histogram = calculate_histogram(self.lazy_df, col)
             
+            # Normality Test (Shapiro-Wilk / KS)
+            if SCIPY_AVAILABLE and profile.numeric_stats and profile.numeric_stats.std and profile.numeric_stats.std > 0:
+                try:
+                    # Sample data (Shapiro is slow on large data, limit to 5000)
+                    sample_data = self.df[col].drop_nulls().head(5000).to_numpy()
+                    if len(sample_data) > 20:
+                        # Use Shapiro-Wilk for N < 5000, else KS test
+                        if len(sample_data) < 5000:
+                            stat, p_value = shapiro(sample_data)
+                            test_name = "Shapiro-Wilk"
+                        else:
+                            # KS Test against normal distribution
+                            stat, p_value = kstest(sample_data, 'norm')
+                            test_name = "Kolmogorov-Smirnov"
+                            
+                        profile.normality_test = NormalityTestResult(
+                            test_name=test_name,
+                            statistic=float(stat),
+                            p_value=float(p_value),
+                            is_normal=float(p_value) > 0.05
+                        )
+                except Exception as e:
+                    print(f"Normality test failed for {col}: {e}")
+
             # Outlier detection (IQR)
             if profile.numeric_stats and profile.numeric_stats.q25 is not None and profile.numeric_stats.q75 is not None:
                 iqr = profile.numeric_stats.q75 - profile.numeric_stats.q25
@@ -927,12 +1055,14 @@ class EDAAnalyzer:
         for row in top_k_df.iter_rows():
             top_k.append({"value": str(row[0]), "count": row[1]})
             
-        # Rare labels (count < 5 or < 1%?)
-        # Let's say appearing less than 5 times
-        # This is expensive to compute exactly if high cardinality.
-        # Approximation: unique_count - count of values with freq > 5?
-        # Let's skip complex rare label count for now to save time, or use simple heuristic.
-        rare_count = 0 
+        # Rare labels (count < 5)
+        # We can use the top_k logic to infer if we have a long tail
+        # Or count rows where col is not in top_k? No, that's not right.
+        # Correct way: group by col, count, filter count < 5, count rows
+        try:
+            rare_count = self.lazy_df.group_by(col).agg(pl.count().alias("cnt")).filter(pl.col("cnt") < 5).select(pl.count()).collect().item()
+        except Exception:
+            rare_count = 0
         
         return CategoricalStats(
             unique_count=unique_count,
@@ -968,10 +1098,28 @@ class EDAAnalyzer:
             pl.col(col).str.len_bytes().max().alias("max_len")
         ]).collect()
         
+        # Most common words (simple tokenization by space)
+        common_words = []
+        try:
+            # Split by space, explode, count
+            # Limit to first 1000 rows for performance if dataset is huge
+            sample_text = self.df.select(col).head(1000)
+            words = sample_text.select(
+                pl.col(col).str.to_lowercase().str.replace_all(r"[^\w\s]", "").str.split(" ").explode().alias("word")
+            ).filter(pl.col("word") != "")
+            
+            word_counts = words.group_by("word").agg(pl.count().alias("count")).sort("count", descending=True).head(10)
+            
+            for row in word_counts.iter_rows(named=True):
+                common_words.append({"word": row["word"], "count": row["count"]})
+        except Exception as e:
+            print(f"Error calculating common words for {col}: {e}")
+
         return TextStats(
             avg_length=stats["avg_len"][0],
             min_length=stats["min_len"][0],
-            max_length=stats["max_len"][0]
+            max_length=stats["max_len"][0],
+            common_words=common_words
         )
 
     def _check_pii(self, col: str) -> bool:

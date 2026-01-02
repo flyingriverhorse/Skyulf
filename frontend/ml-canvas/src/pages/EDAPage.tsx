@@ -3,10 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { DatasetService } from '../core/api/datasets';
 import { EDAService } from '../core/api/eda';
 import { VariableCard } from '../components/eda/VariableCard';
+import { JobsHistoryModal } from '../components/eda/JobsHistoryModal';
 import { CorrelationHeatmap } from '../components/eda/CorrelationHeatmap';
 import { DistributionChart } from '../components/eda/DistributionChart';
-import { Loader2, Play, RefreshCw, AlertCircle, BarChart2, Clock, X, Lightbulb, ScatterChart as ScatterIcon, CheckCircle, Info, Map, Calendar } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, ScatterChart, Scatter, Legend, LineChart, Line, ComposedChart } from 'recharts';
+import { CanvasScatterPlot } from '../components/eda/CanvasScatterPlot';
+import { ThreeDScatterPlot } from '../components/eda/ThreeDScatterPlot';
+import { Loader2, Play, RefreshCw, AlertCircle, BarChart2, Clock, X, Lightbulb, ScatterChart as ScatterIcon, CheckCircle, Info, Map, Calendar, List, AlertTriangle, Box } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Legend, LineChart, Line, ComposedChart, Scatter } from 'recharts';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -26,8 +29,18 @@ export const EDAPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('sample');
   const [targetCol, setTargetCol] = useState<string>('');
+  const [excludedCols, setExcludedCols] = useState<string[]>([]);
   const [history, setHistory] = useState<any[]>([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedVariable, setSelectedVariable] = useState<any>(null);
+  
+  // Scatter Plot State
+  const [scatterX, setScatterX] = useState<string>('');
+  const [scatterY, setScatterY] = useState<string>('');
+  const [scatterZ, setScatterZ] = useState<string>('');
+  const [scatterColor, setScatterColor] = useState<string>('');
+  const [is3D, setIs3D] = useState(false);
+  const [isPCA3D, setIsPCA3D] = useState(false);
 
   useEffect(() => {
     loadDatasets();
@@ -109,11 +122,13 @@ export const EDAPage: React.FC = () => {
     }
   };
 
-  const runAnalysis = async () => {
+  const runAnalysis = async (overrideExcluded?: string[] | any) => {
+    const actualExcluded = Array.isArray(overrideExcluded) ? overrideExcluded : excludedCols;
+
     if (!selectedDataset) return;
     setAnalyzing(true);
     try {
-      await EDAService.analyze(selectedDataset, targetCol || undefined);
+      await EDAService.analyze(selectedDataset, targetCol || undefined, actualExcluded);
       // Reload immediately to get the PENDING state
       loadReport(selectedDataset);
       loadHistory(selectedDataset);
@@ -124,11 +139,34 @@ export const EDAPage: React.FC = () => {
     }
   };
 
-  // Sync target col from report if available
+  const handleToggleExclude = (colName: string, exclude: boolean) => {
+    const message = exclude 
+        ? `Are you sure you want to exclude '${colName}' from the analysis? This will trigger a new analysis.`
+        : `Include '${colName}' back in the analysis? This will trigger a new analysis.`;
+        
+    if (confirm(message)) {
+        let newExcluded = [...excludedCols];
+        if (exclude) {
+            newExcluded.push(colName);
+        } else {
+            newExcluded = newExcluded.filter(c => c !== colName);
+        }
+        setExcludedCols(newExcluded);
+        runAnalysis(newExcluded);
+    }
+  };
+
+  // Sync target col and excluded cols from report if available
   useEffect(() => {
-    if (report && report.profile_data && report.profile_data.target_col) {
-        setTargetCol(report.profile_data.target_col);
-        // Removed auto-switch to target tab
+    if (report && report.profile_data) {
+        if (report.profile_data.target_col) {
+            setTargetCol(report.profile_data.target_col);
+        }
+        if (report.profile_data.excluded_columns) {
+            setExcludedCols(report.profile_data.excluded_columns);
+        } else {
+            setExcludedCols([]);
+        }
     }
   }, [report]);
 
@@ -298,6 +336,16 @@ export const EDAPage: React.FC = () => {
               Variables
             </button>
             <button
+              onClick={() => setActiveTab('bivariate')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'bivariate'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Bivariate
+            </button>
+            <button
               onClick={() => setActiveTab('insights')}
               className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
                 activeTab === 'insights'
@@ -308,6 +356,19 @@ export const EDAPage: React.FC = () => {
               <Lightbulb className="w-4 h-4" />
               Smart Insights
             </button>
+            {profile.outliers && (
+                <button
+                onClick={() => setActiveTab('outliers')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                    activeTab === 'outliers'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                >
+                <AlertTriangle className="w-4 h-4" />
+                Outliers
+                </button>
+            )}
             {profile.pca_data && (
             <button
               onClick={() => setActiveTab('pca')}
@@ -416,82 +477,47 @@ export const EDAPage: React.FC = () => {
 
         {activeTab === 'pca' && (
             <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                    <ScatterIcon className="w-5 h-5 mr-2 text-purple-500" />
-                    Multivariate Structure (PCA)
-                    <InfoTooltip text="Reduces data to 2D. Points closer together are similar. Colors show clusters or target values." />
-                </h3>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                        <ScatterIcon className="w-5 h-5 mr-2 text-purple-500" />
+                        Multivariate Structure (PCA)
+                        <InfoTooltip text="Reduces data to 2D or 3D. Points closer together are similar. Colors show clusters or target values." />
+                    </h3>
+                    <button
+                        onClick={() => setIsPCA3D(!isPCA3D)}
+                        className={`p-2 rounded-md border transition-colors flex items-center gap-2 text-sm ${
+                            isPCA3D 
+                                ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300' 
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300'
+                        }`}
+                    >
+                        <Box className="w-4 h-4" />
+                        {isPCA3D ? 'Switch to 2D' : 'Switch to 3D'}
+                    </button>
+                </div>
 
                 {profile.pca_data ? (
-                    <div className="h-[500px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis 
-                                    type="number" 
-                                    dataKey="x" 
-                                    name="PC1" 
-                                    label={{ value: 'Principal Component 1 (PC1)', position: 'bottom', offset: 20, fill: '#6b7280' }} 
-                                />
-                                <YAxis 
-                                    type="number" 
-                                    dataKey="y" 
-                                    name="PC2" 
-                                    label={{ 
-                                        value: 'Principal Component 2 (PC2)', 
-                                        angle: -90, 
-                                        position: 'insideLeft',
-                                        style: { textAnchor: 'middle' },
-                                        fill: '#6b7280' 
-                                    }} 
-                                />
-                                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                                {(() => {
-                                    // Group data by label for coloring
-                                    const groupedData: {[key: string]: any[]} = {};
-                                    let hasLabels = false;
-                                    
-                                    profile.pca_data.forEach((point: any) => {
-                                        const label = point.label || 'Data Points';
-                                        if (point.label) hasLabels = true;
-                                        if (!groupedData[label]) groupedData[label] = [];
-                                        groupedData[label].push(point);
-                                    });
-
-                                    const uniqueLabels = Object.keys(groupedData);
-                                    const isChaotic = uniqueLabels.length > 20;
-
-                                    // If chaotic, show no legend and use single color (or just one group)
-                                    if (isChaotic) {
-                                        return (
-                                            <Scatter 
-                                                name="Data Points" 
-                                                data={profile.pca_data} 
-                                                fill="#8884d8" 
-                                                fillOpacity={0.6} 
-                                            />
-                                        );
-                                    }
-
-                                    // Otherwise show legend and colored groups
-                                    return (
-                                        <>
-                                            <Legend verticalAlign="top" height={36}/>
-                                            {uniqueLabels.map((label, index) => (
-                                                <Scatter 
-                                                    key={label} 
-                                                    name={label} 
-                                                    data={groupedData[label]} 
-                                                    fill={hasLabels ? COLORS[index % COLORS.length] : '#8884d8'} 
-                                                    fillOpacity={0.6} 
-                                                />
-                                            ))}
-                                        </>
-                                    );
-                                })()}
-                            </ScatterChart>
-                        </ResponsiveContainer>
-                    </div>
+                    isPCA3D ? (
+                        <ThreeDScatterPlot 
+                            data={profile.pca_data} 
+                            xKey="x" 
+                            yKey="y" 
+                            zKey="z"
+                            labelKey="label"
+                            xLabel="PC1"
+                            yLabel="PC2"
+                            zLabel="PC3"
+                        />
+                    ) : (
+                        <CanvasScatterPlot 
+                            data={profile.pca_data} 
+                            xKey="x" 
+                            yKey="y" 
+                            labelKey="label"
+                            xLabel="Principal Component 1 (PC1)"
+                            yLabel="Principal Component 2 (PC2)"
+                        />
+                    )
                 ) : (
                     <div className="h-64 flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded text-gray-400 text-sm text-center p-4">
                         Not enough numeric data for PCA.
@@ -503,7 +529,7 @@ export const EDAPage: React.FC = () => {
                     <div className="text-sm text-blue-700 dark:text-blue-300">
                         <p className="font-medium mb-1">About this visualization</p>
                         <p>
-                            This chart shows a 2D projection of your data using Principal Component Analysis (PCA). 
+                            This chart shows a {isPCA3D ? '3D' : '2D'} projection of your data using Principal Component Analysis (PCA). 
                             Points that are close together share similar characteristics across all numeric features.
                         </p>
                         <p className="mt-1 text-xs opacity-80">
@@ -818,10 +844,23 @@ export const EDAPage: React.FC = () => {
             <div className="mt-4 space-y-6">
                 {/* Trend Chart */}
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                        <Calendar className="w-5 h-5 mr-2 text-blue-500" />
-                        Trend Analysis ({profile.timeseries.date_col})
-                        <InfoTooltip text="Shows how values change over time. Look for long-term trends (up/down) or sudden shifts." />
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center justify-between">
+                        <div className="flex items-center">
+                            <Calendar className="w-5 h-5 mr-2 text-blue-500" />
+                            Trend Analysis ({profile.timeseries.date_col})
+                            <InfoTooltip text="Shows how values change over time. Look for long-term trends (up/down) or sudden shifts." />
+                        </div>
+                        {profile.timeseries.stationarity_test && (
+                            <div className={`text-xs px-3 py-1 rounded-full border flex items-center gap-1 ${
+                                profile.timeseries.stationarity_test.is_stationary 
+                                    ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300' 
+                                    : 'bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-300'
+                            }`}>
+                                <InfoTooltip text="Augmented Dickey-Fuller Test. Stationary (p<0.05) means the data has constant mean/variance over time. Non-Stationary (p>=0.05) means it has a trend or seasonality." />
+                                <span className="font-semibold">ADF Test:</span> {profile.timeseries.stationarity_test.is_stationary ? 'Stationary' : 'Non-Stationary'} 
+                                <span className="opacity-75 ml-1">(p={profile.timeseries.stationarity_test.p_value.toFixed(3)})</span>
+                            </div>
+                        )}
                     </h3>
                     <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
@@ -944,14 +983,197 @@ export const EDAPage: React.FC = () => {
 
         {activeTab === 'variables' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {/* Active Columns */}
             {Object.values(profile.columns).map((col: any) => (
               <VariableCard 
                 key={col.name} 
                 profile={col} 
                 onClick={() => setSelectedVariable(col)} 
+                onToggleExclude={handleToggleExclude}
+                isExcluded={false}
               />
             ))}
+            
+            {/* Excluded Columns (Ghost Cards) */}
+            {profile.excluded_columns && profile.excluded_columns.map((colName: string) => (
+                <VariableCard 
+                    key={colName}
+                    profile={{ name: colName, dtype: 'Excluded', missing_percentage: 0 }}
+                    onClick={() => {}}
+                    onToggleExclude={handleToggleExclude}
+                    isExcluded={true}
+                />
+            ))}
           </div>
+        )}
+
+        {activeTab === 'bivariate' && (
+          <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <ScatterIcon className="w-5 h-5 mr-2 text-blue-500" />
+                Bivariate Analysis (Scatter Plot)
+                <InfoTooltip text="Visualize the relationship between two numeric variables." />
+            </h3>
+            
+            <div className="flex gap-4 mb-6 items-end">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">X Axis</label>
+                    <select 
+                        value={scatterX} 
+                        onChange={(e) => setScatterX(e.target.value)}
+                        className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                    >
+                        <option value="">Select Variable</option>
+                        {Object.values(profile.columns)
+                            .filter((c: any) => c.dtype === 'Numeric')
+                            .map((c: any) => (
+                                <option key={c.name} value={c.name}>{c.name}</option>
+                            ))
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Y Axis</label>
+                    <select 
+                        value={scatterY} 
+                        onChange={(e) => setScatterY(e.target.value)}
+                        className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                    >
+                        <option value="">Select Variable</option>
+                        {Object.values(profile.columns)
+                            .filter((c: any) => c.dtype === 'Numeric')
+                            .map((c: any) => (
+                                <option key={c.name} value={c.name}>{c.name}</option>
+                            ))
+                        }
+                    </select>
+                </div>
+                
+                {is3D && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Z Axis</label>
+                        <select 
+                            value={scatterZ} 
+                            onChange={(e) => setScatterZ(e.target.value)}
+                            className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        >
+                            <option value="">Select Variable</option>
+                            {Object.values(profile.columns)
+                                .filter((c: any) => c.dtype === 'Numeric')
+                                .map((c: any) => (
+                                    <option key={c.name} value={c.name}>{c.name}</option>
+                                ))
+                            }
+                        </select>
+                    </div>
+                )}
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Color By</label>
+                    <select 
+                        value={scatterColor} 
+                        onChange={(e) => setScatterColor(e.target.value)}
+                        className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                    >
+                        <option value="">None</option>
+                        {Object.values(profile.columns)
+                            .map((c: any) => (
+                                <option key={c.name} value={c.name}>{c.name}</option>
+                            ))
+                        }
+                    </select>
+                </div>
+
+                <button
+                    onClick={() => setIs3D(!is3D)}
+                    className={`p-2 rounded-md border transition-colors ${
+                        is3D 
+                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300' 
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300'
+                    }`}
+                    title="Toggle 3D View"
+                >
+                    <Box className="w-5 h-5" />
+                </button>
+            </div>
+
+            {scatterX && scatterY ? (
+                is3D && scatterZ ? (
+                    <ThreeDScatterPlot 
+                        data={profile.sample_data} 
+                        xKey={scatterX} 
+                        yKey={scatterY} 
+                        zKey={scatterZ}
+                        labelKey={scatterColor || undefined}
+                        xLabel={scatterX}
+                        yLabel={scatterY}
+                        zLabel={scatterZ}
+                    />
+                ) : (
+                    <CanvasScatterPlot 
+                        data={profile.sample_data} 
+                        xKey={scatterX} 
+                        yKey={scatterY} 
+                        labelKey={scatterColor || undefined}
+                        xLabel={scatterX}
+                        yLabel={scatterY}
+                    />
+                )
+            ) : (
+                <div className="h-64 flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded text-gray-400 text-sm">
+                    Select X and Y variables to generate scatter plot.
+                </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'outliers' && profile.outliers && (
+            <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                    <AlertTriangle className="w-5 h-5 mr-2 text-red-500" />
+                    Outlier Analysis ({profile.outliers.method})
+                    <InfoTooltip text="Detects anomalous rows using Isolation Forest. Lower scores indicate higher anomaly." />
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-800">
+                        <span className="text-sm text-red-600 dark:text-red-400 block mb-1">Total Outliers</span>
+                        <span className="text-2xl font-bold text-red-700 dark:text-red-300">{profile.outliers.total_outliers}</span>
+                    </div>
+                    <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-800">
+                        <span className="text-sm text-red-600 dark:text-red-400 block mb-1">Percentage</span>
+                        <span className="text-2xl font-bold text-red-700 dark:text-red-300">{profile.outliers.outlier_percentage.toFixed(2)}%</span>
+                    </div>
+                </div>
+
+                <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">Top Anomalous Rows</h4>
+                <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-900">
+                            <tr>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Row Index</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Anomaly Score</th>
+                                {profile.outliers.top_outliers[0] && Object.keys(profile.outliers.top_outliers[0].values).slice(0, 5).map(key => (
+                                    <th key={key} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{key}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            {profile.outliers.top_outliers.map((outlier: any) => (
+                                <tr key={outlier.index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                    <td className="px-4 py-3 text-sm font-mono text-gray-500">{outlier.index}</td>
+                                    <td className="px-4 py-3 text-sm font-mono text-red-600">{outlier.score.toFixed(4)}</td>
+                                    {Object.entries(outlier.values).slice(0, 5).map(([key, val]: any) => (
+                                        <td key={key} className="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">
+                                            {typeof val === 'number' ? val.toFixed(2) : String(val)}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         )}
 
         {activeTab === 'correlations' && profile.correlations && (
@@ -998,13 +1220,22 @@ export const EDAPage: React.FC = () => {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Exploratory Data Analysis</h1>
-            {report && report.created_at && (
-                <p className="text-xs text-gray-500 mt-1">
-                    Last analyzed: {new Date(report.created_at).toLocaleString()}
-                </p>
-            )}
+        <div className="flex items-center gap-4">
+            <div>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Exploratory Data Analysis</h1>
+                {report && report.created_at && (
+                    <p className="text-xs text-gray-500 mt-1">
+                        Last analyzed: {new Date(report.created_at).toLocaleString()}
+                    </p>
+                )}
+            </div>
+            <button 
+                onClick={() => setShowHistoryModal(true)}
+                className="flex items-center px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors ml-4"
+            >
+                <List className="w-4 h-4 mr-2" />
+                Jobs History
+            </button>
         </div>
         <div className="flex items-center gap-4">
           <select
@@ -1107,6 +1338,20 @@ export const EDAPage: React.FC = () => {
                         <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded"><span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Zeros</span> <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.numeric_stats.zeros_count}</span></div>
                         <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded"><span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Skewness</span> <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.numeric_stats.skewness?.toFixed(4)}</span></div>
                         <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded"><span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Kurtosis</span> <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.numeric_stats.kurtosis?.toFixed(4)}</span></div>
+                        {selectedVariable.normality_test && (
+                          <>
+                            <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded">
+                                <span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Normality ({selectedVariable.normality_test.test_name})</span>
+                                <span className={`font-medium ${selectedVariable.normality_test.is_normal ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                    {selectedVariable.normality_test.is_normal ? 'Normal' : 'Not Normal'}
+                                </span>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded">
+                                <span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">P-Value</span>
+                                <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.normality_test.p_value.toFixed(4)}</span>
+                            </div>
+                          </>
+                        )}
                       </>
                     )}
                     {selectedVariable.categorical_stats && (
@@ -1132,10 +1377,57 @@ export const EDAPage: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Additional Lists (Top K / Common Words) */}
+              {selectedVariable.categorical_stats?.top_k && (
+                  <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-100 dark:border-gray-800">
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">Top Categories</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {selectedVariable.categorical_stats.top_k.map((item: any, idx: number) => (
+                              <div key={idx} className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-sm">
+                                  <span className="truncate font-medium text-gray-700 dark:text-gray-300" title={item.value}>{item.value}</span>
+                                  <span className="text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-900 px-2 py-0.5 rounded-full text-xs">{item.count}</span>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              )}
+
+              {selectedVariable.text_stats?.common_words && (
+                  <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-100 dark:border-gray-800">
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">Most Common Words</h3>
+                      <div className="flex flex-wrap gap-2">
+                          {selectedVariable.text_stats.common_words.map((item: any, idx: number) => (
+                              <div key={idx} className="flex items-center p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-sm">
+                                  <span className="font-medium text-blue-600 dark:text-blue-400 mr-2">{item.word}</span>
+                                  <span className="text-gray-500 dark:text-gray-400 text-xs">({item.count})</span>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              )}
             </div>
           </div>
         </div>
       )}
+      
+      <JobsHistoryModal 
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        history={history}
+        onFetchReport={async (id) => {
+            return await EDAService.getReport(id);
+        }}
+        onSelect={(selectedReport) => {
+            setReport(selectedReport);
+            // Also update excluded cols state to match the report
+            if (selectedReport.profile_data?.excluded_columns) {
+                setExcludedCols(selectedReport.profile_data.excluded_columns);
+            } else {
+                setExcludedCols([]);
+            }
+        }}
+      />
     </div>
   );
 };

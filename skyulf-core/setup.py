@@ -28,6 +28,8 @@ setup(
         "pydantic>=2.0.0",
         "optuna>=3.0.0",
         "optuna-integration>=3.0.0",
+        "scipy>=1.10.0",
+        "statsmodels>=0.14.0",
     ],
     extras_require={"dev": ["pytest", "twine", "build"]},
     python_requires=">=3.9",

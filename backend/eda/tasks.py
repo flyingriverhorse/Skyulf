@@ -114,9 +114,21 @@ async def run_eda_analysis(report_id: int, session: AsyncSession):
         # 3. Run Analysis
         # Run in thread pool if CPU bound? Polars releases GIL mostly, so it's fine.
         try:
+            # Check for excluded columns
+            exclude_cols = report.config.get("exclude_cols") if report.config else None
+            if exclude_cols:
+                logger.info(f"Excluding columns: {exclude_cols}")
+                # Polars drop
+                df = df.drop(exclude_cols)
+
             analyzer = EDAAnalyzer(df)
             target_col = report.config.get("target_col") if report.config else None
             profile = analyzer.analyze(target_col=target_col)
+            
+            # Add excluded columns to profile metadata
+            if exclude_cols:
+                profile.excluded_columns = exclude_cols
+                
         except Exception as e:
             report.status = "FAILED"
             report.error_message = f"Analysis failed: {str(e)}"

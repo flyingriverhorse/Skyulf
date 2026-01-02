@@ -14,12 +14,26 @@
 **"The Advanced EDA & Profiling Update"**
 This release introduces a professional-grade Automated EDA module, enabling deep statistical analysis of datasets directly within the platform.
 
-### 📊 Profiling & EDA
+### � Bug Fixes
+- **Backend Schema:** Fixed `ColumnProfile` schema to include `normality_test` field, resolving runtime errors during analysis.
+- **Type Safety:** Added `NormalityTestResult` Pydantic model for better validation.- **Dependencies:** Added `statsmodels`, `scipy`, and `patsy` to `requirements-fastapi.txt` to ensure statistical tests run correctly.
+### �📊 Profiling & EDA
+- **Statistical Tests:** Implemented automated Normality Tests (Shapiro-Wilk/KS) for numeric columns and Stationarity Tests (ADF) for time series.
+- **Visual Indicators:** Added "Normal Dist" badges to variable cards and detailed p-value tooltips to distribution charts.
+- **Detailed Analysis:** Exposed full statistical test results (Test Name, p-value, Conclusion) in the Variable Details modal.
+- **3D Visualization:** Added interactive 3D Scatter Plots for both Bivariate Analysis and PCA using `react-plotly.js`.
+- **PCA Upgrade:** Updated PCA calculation to compute 3 components, enabling 3D visualization of data structure.
+- **Timeseries Analysis:** Added automated detection and visualization of datetime columns with interactive bars.
 - **Geospatial Analysis:** Added automated detection and visualization of Latitude/Longitude columns with interactive scatter maps.
 - **Multivariate Analysis (PCA):** Implemented robust PCA visualization with dynamic coloring by target, legends, and axis labels.
 - **Advanced Profiler:** Implemented `SkyulfProfiler` in `skyulf-core` using Polars for high-performance automated EDA.
 - **Smart Alerts:** Added automated detection for High Correlation, High Cardinality, Constant Columns, and Class Imbalance.
 - **Rich Stats:** Added support for histograms, correlation matrices, and scatter plot sampling in the profile output.
+- **Bivariate Analysis:** Added interactive Scatter Plot tab for visualizing relationships between any two numeric variables.
+- **Outlier Detection:** Implemented Isolation Forest based outlier detection with a dedicated analysis tab.
+- **Performance:** Switched to Canvas-based rendering (Chart.js) for scatter plots to support larger datasets (5000+ points).
+- **UX Improvement:** Increased grid line visibility in 2D scatter plots for better readability.
+- **Statistical Tests:** Added automated Normality Tests (Shapiro-Wilk/KS) for numeric columns and Stationarity Tests (ADF) for time series.
 
 ### 🎯 Target Analysis
 - **Supervised EDA:** Added `Target Analysis` tab to the EDA module. Users can now select a target column to analyze correlations and detect leakage.
@@ -29,6 +43,7 @@ This release introduces a professional-grade Automated EDA module, enabling deep
 - **Visualization:** Added interactive Bar Charts for top correlated features in the frontend.
 
 ### 🐛 Bug Fixes
+- **EDA Visualization:** Fixed correlation heatmap visibility for low values and handled nulls gracefully.
 - **EDA Histograms:** Fixed an issue where histograms were empty due to incorrect Polars aggregation aliases.
 - **EDA Updates:** Fixed the "Update" button behavior to correctly poll for pending reports.
 

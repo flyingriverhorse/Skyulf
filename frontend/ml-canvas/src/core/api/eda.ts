@@ -3,9 +3,10 @@ import axios from 'axios';
 const API_BASE = '/api/eda';
 
 export const EDAService = {
-  analyze: async (datasetId: number, targetCol?: string) => {
+  analyze: async (datasetId: number, targetCol?: string, excludeCols?: string[]) => {
     const response = await axios.post(`${API_BASE}/${datasetId}/analyze`, {
-        target_col: targetCol
+        target_col: targetCol,
+        exclude_cols: excludeCols
     });
     return response.data;
   },

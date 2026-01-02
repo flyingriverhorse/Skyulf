@@ -14,6 +14,7 @@ class NumericStats(BaseModel):
     kurtosis: Optional[float] = None
     zeros_count: Optional[int] = None
     negatives_count: Optional[int] = None
+    normality_test: Optional[Dict[str, Any]] = None
 
 class CategoricalStats(BaseModel):
     unique_count: int
@@ -29,11 +30,18 @@ class TextStats(BaseModel):
     avg_length: Optional[float] = None
     min_length: Optional[int] = None
     max_length: Optional[int] = None
+    common_words: List[Dict[str, Any]] = Field(default_factory=list)
 
 class HistogramBin(BaseModel):
     start: float
     end: float
     count: int
+
+class NormalityTestResult(BaseModel):
+    test_name: str
+    statistic: float
+    p_value: float
+    is_normal: bool
 
 class ColumnProfile(BaseModel):
     name: str
@@ -49,6 +57,7 @@ class ColumnProfile(BaseModel):
     
     # Distribution
     histogram: Optional[List[HistogramBin]] = None
+    normality_test: Optional[NormalityTestResult] = None
     
     # Quality
     is_constant: bool = False
@@ -78,6 +87,7 @@ class Recommendation(BaseModel):
 class PCAPoint(BaseModel):
     x: float
     y: float
+    z: Optional[float] = None
     label: Optional[str] = None # For target coloring
 
 class GeoPoint(BaseModel):
@@ -126,6 +136,19 @@ class TimeSeriesAnalysis(BaseModel):
     trend: List[TimeSeriesPoint]
     seasonality: SeasonalityStats
     autocorrelation: Optional[List[Dict[str, Any]]] = None
+    stationarity_test: Optional[Dict[str, Any]] = None
+
+class OutlierPoint(BaseModel):
+    index: int
+    values: Dict[str, Any] # Key values for context
+    score: float # Anomaly score (lower is more anomalous for IF, or distance for others)
+
+class OutlierAnalysis(BaseModel):
+    method: str # "IsolationForest" or "IQR"
+    total_outliers: int
+    outlier_percentage: float
+    top_outliers: List[OutlierPoint]
+    plot_data: Optional[List[Dict[str, Any]]] = None # For visualization (e.g. PCA projection of outliers)
 
 class DatasetProfile(BaseModel):
     row_count: int
@@ -147,11 +170,15 @@ class DatasetProfile(BaseModel):
     
     # Multivariate
     pca_data: Optional[List[PCAPoint]] = None
+    outliers: Optional[OutlierAnalysis] = None
     
     # Geospatial
     geospatial: Optional[GeospatialStats] = None
     
     # Time Series
     timeseries: Optional[TimeSeriesAnalysis] = None
+    
+    # Metadata
+    excluded_columns: List[str] = Field(default_factory=list)
     
     generated_at: datetime = Field(default_factory=datetime.now)
