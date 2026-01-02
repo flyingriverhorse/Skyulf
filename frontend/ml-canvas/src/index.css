@@ -106,3 +106,12 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-gray-400 dark:bg-gray-600;
 }
+
+@media print {
+  body * { visibility: hidden; }
+  #eda-report-container, #eda-report-container * { visibility: visible; }
+  #eda-report-container { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; overflow: visible !important; }
+  .no-print { display: none !important; }
+  html, body, #root { overflow: visible !important; height: auto !important; }
+  .recharts-wrapper, canvas { visibility: visible !important; }
+}

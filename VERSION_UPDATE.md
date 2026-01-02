@@ -14,10 +14,10 @@
 **"The Advanced EDA & Profiling Update"**
 This release introduces a professional-grade Automated EDA module, enabling deep statistical analysis of datasets directly within the platform.
 
-### � Bug Fixes
+### Bug Fixes
 - **Backend Schema:** Fixed `ColumnProfile` schema to include `normality_test` field, resolving runtime errors during analysis.
 - **Type Safety:** Added `NormalityTestResult` Pydantic model for better validation.- **Dependencies:** Added `statsmodels`, `scipy`, and `patsy` to `requirements-fastapi.txt` to ensure statistical tests run correctly.
-### �📊 Profiling & EDA
+## Profiling & EDA
 - **Statistical Tests:** Implemented automated Normality Tests (Shapiro-Wilk/KS) for numeric columns and Stationarity Tests (ADF) for time series.
 - **Visual Indicators:** Added "Normal Dist" badges to variable cards and detailed p-value tooltips to distribution charts.
 - **Detailed Analysis:** Exposed full statistical test results (Test Name, p-value, Conclusion) in the Variable Details modal.
@@ -33,6 +33,7 @@ This release introduces a professional-grade Automated EDA module, enabling deep
 - **Outlier Detection:** Implemented Isolation Forest based outlier detection with a dedicated analysis tab.
 - **Performance:** Switched to Canvas-based rendering (Chart.js) for scatter plots to support larger datasets (5000+ points).
 - **UX Improvement:** Increased grid line visibility in 2D scatter plots for better readability.
+- **Reporting:** Added "Print / Save as PDF" button to the EDA dashboard for easy report sharing.
 - **Statistical Tests:** Added automated Normality Tests (Shapiro-Wilk/KS) for numeric columns and Stationarity Tests (ADF) for time series.
 
 ### 🎯 Target Analysis
@@ -43,6 +44,10 @@ This release introduces a professional-grade Automated EDA module, enabling deep
 - **Visualization:** Added interactive Bar Charts for top correlated features in the frontend.
 
 ### 🐛 Bug Fixes
+- **EDA Downloads:** Fixed 3D Scatter and PCA plot downloads by implementing `Plotly.toImage` for WebGL contexts.
+- **Correlation Matrix:** Fixed label truncation in downloaded correlation heatmaps by implementing dynamic text measurement and improved layout logic.
+- **Download Layout:** Improved "Download All" feature to use a 2-column grid layout for better readability.
+- **Dark Mode:** Added dark mode support for chart downloads (Autocorrelation, Interactions, etc.) to respect the active theme.
 - **EDA Visualization:** Fixed correlation heatmap visibility for low values and handled nulls gracefully.
 - **EDA Histograms:** Fixed an issue where histograms were empty due to incorrect Polars aggregation aliases.
 - **EDA Updates:** Fixed the "Update" button behavior to correctly poll for pending reports.
