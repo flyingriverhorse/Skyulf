@@ -8,10 +8,11 @@ import { CorrelationHeatmap } from '../components/eda/CorrelationHeatmap';
 import { DistributionChart } from '../components/eda/DistributionChart';
 import { CanvasScatterPlot } from '../components/eda/CanvasScatterPlot';
 import { ThreeDScatterPlot } from '../components/eda/ThreeDScatterPlot';
-import { Loader2, Play, RefreshCw, AlertCircle, BarChart2, Clock, X, Lightbulb, ScatterChart as ScatterIcon, CheckCircle, Info, Map, Calendar, List, AlertTriangle, Box } from 'lucide-react';
+import { Loader2, Play, RefreshCw, AlertCircle, BarChart2, Clock, X, Lightbulb, ScatterChart as ScatterIcon, CheckCircle, Info, Map, Calendar, List, AlertTriangle, Box, Eye, EyeOff, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Legend, LineChart, Line, ComposedChart, Scatter } from 'recharts';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import Plotly from 'plotly.js-dist-min';
 
 // Color palette for PCA clusters
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00C49F', '#FFBB28', '#FF8042', '#a4de6c', '#d0ed57'];
@@ -179,6 +180,379 @@ export const EDAPage: React.FC = () => {
         </div>
     </div>
   );
+
+  const downloadChart = async (elementId: string, filename: string, title?: string, subtitle?: string) => {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    const bgColor = isDarkMode ? '#1f2937' : '#ffffff'; // gray-800 vs white
+    const textColor = isDarkMode ? '#f3f4f6' : '#111827'; // gray-100 vs gray-900
+    const subTextColor = isDarkMode ? '#9ca3af' : '#4b5563'; // gray-400 vs gray-600
+
+    // Helper to draw text on canvas
+    const drawText = (ctx: CanvasRenderingContext2D, width: number) => {
+        if (!title) return 0;
+        ctx.fillStyle = textColor;
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(title, width / 2, 30);
+        
+        if (subtitle) {
+            ctx.fillStyle = subTextColor;
+            ctx.font = '12px sans-serif';
+            ctx.fillText(subtitle, width / 2, 50);
+            return 60; // Height offset
+        }
+        return 40; // Height offset
+    };
+
+    // Check if it's a Plotly chart (3D Scatter)
+    const plotlyDiv = element.querySelector('.js-plotly-plot');
+    if (plotlyDiv) {
+        try {
+            // Use Plotly.toImage to get a high-res PNG
+            const dataUrl = await Plotly.toImage(plotlyDiv as any, { format: 'png', width: 1200, height: 800 });
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            const width = 1200;
+            const height = 800;
+            const headerHeight = title ? (subtitle ? 80 : 50) : 0;
+
+            img.onload = () => {
+                canvas.width = width;
+                canvas.height = height + headerHeight;
+                
+                if (ctx) {
+                    ctx.fillStyle = bgColor;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    // Draw Title
+                    if (title) {
+                        ctx.fillStyle = textColor;
+                        ctx.font = 'bold 24px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(title, width / 2, 40);
+                        
+                        if (subtitle) {
+                            ctx.fillStyle = subTextColor;
+                            ctx.font = '16px sans-serif';
+                            ctx.fillText(subtitle, width / 2, 70);
+                        }
+                    }
+
+                    ctx.drawImage(img, 0, headerHeight);
+                    
+                    const a = document.createElement('a');
+                    a.download = `${filename}.png`;
+                    a.href = canvas.toDataURL('image/png');
+                    a.click();
+                }
+            };
+            img.src = dataUrl;
+        } catch (e) {
+            console.error("Plotly download failed", e);
+        }
+        return;
+    }
+
+    // Check if it's an SVG (Recharts)
+    const svg = element.querySelector('svg');
+    if (svg) {
+        const svgData = new XMLSerializer().serializeToString(svg);
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        // Get dimensions
+        const width = svg.clientWidth || svg.getBoundingClientRect().width || 800;
+        const height = svg.clientHeight || svg.getBoundingClientRect().height || 400;
+        const headerHeight = title ? (subtitle ? 60 : 40) : 0;
+
+        img.onload = () => {
+            canvas.width = width;
+            canvas.height = height + headerHeight;
+            
+            if (ctx) {
+                // Background
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw Title
+                drawText(ctx, width);
+                
+                // Draw Chart
+                ctx.drawImage(img, 0, headerHeight);
+                
+                const a = document.createElement('a');
+                a.download = `${filename}.png`;
+                a.href = canvas.toDataURL('image/png');
+                a.click();
+            }
+        };
+        img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        return;
+    }
+    
+    // Check if it's a Canvas (3D Scatter, Leaflet, Chart.js)
+    // Note: Chart.js and Plotly usually create their own canvas
+    const sourceCanvas = element.querySelector('canvas');
+    if (sourceCanvas) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const width = sourceCanvas.width;
+        const height = sourceCanvas.height;
+        // Scale down if it's high DPI to match text size roughly, or scale text up.
+        // Usually sourceCanvas.width is physical pixels.
+        // Let's assume we draw text relative to that.
+        
+        const headerHeight = title ? (subtitle ? 80 : 50) : 0; // Larger offset for high-res canvas
+
+        canvas.width = width;
+        canvas.height = height + headerHeight;
+
+        if (ctx) {
+            // Background
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Title (Scale font size based on width)
+            if (title) {
+                ctx.fillStyle = textColor;
+                ctx.font = `bold ${Math.max(16, width / 40)}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillText(title, width / 2, headerHeight / 2);
+                
+                if (subtitle) {
+                    ctx.fillStyle = subTextColor;
+                    ctx.font = `${Math.max(12, width / 50)}px sans-serif`;
+                    ctx.fillText(subtitle, width / 2, headerHeight / 2 + (width / 40));
+                }
+            }
+
+            // Draw original canvas
+            ctx.drawImage(sourceCanvas, 0, headerHeight);
+
+            const a = document.createElement('a');
+            a.download = `${filename}.png`;
+            a.href = canvas.toDataURL('image/png');
+            a.click();
+        }
+        return;
+    }
+    
+    // Fallback for Correlation Heatmap (HTML Grid)
+    // Since we can't easily screenshot HTML without a library, we might be stuck.
+    // But wait, CorrelationHeatmap is just divs. 
+    // If the user says "correlation doesnt download works", it's because I was looking for SVG/Canvas and found neither.
+    // I can't fix this without html2canvas.
+    // However, I can try to see if I can construct a canvas from the data directly?
+    // That would be re-implementing the heatmap rendering logic.
+    // Given the constraints, I will disable download for Correlation Matrix if I can't do it, 
+    // OR I can try to find if there is a canvas hidden there.
+    // The code for CorrelationHeatmap uses divs. So it won't work.
+    // I will remove the download button for Correlation Matrix for now or add a note.
+    // actually, I can't easily add html2canvas.
+    // I will remove the download button for Correlation Matrix as requested "correlation doesnt download works" implies it's broken.
+  };
+
+  const downloadCorrelationHeatmap = () => {
+    if (!report?.profile_data?.correlations) return;
+    
+    const data = report.profile_data.correlations;
+    const MAX_COLS = 20;
+    const columns = data.columns.slice(0, MAX_COLS);
+    const values = data.values.slice(0, MAX_COLS).map((row: number[]) => row.slice(0, MAX_COLS));
+    
+    const cellSize = 60;
+    
+    // Calculate dynamic label sizes
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    ctx.font = '12px sans-serif';
+    let maxLabelWidth = 0;
+    columns.forEach((col: string) => {
+        const w = ctx.measureText(col).width;
+        if (w > maxLabelWidth) maxLabelWidth = w;
+    });
+    
+    // Add padding
+    const labelWidth = maxLabelWidth + 40; // Increased padding
+    // For rotated labels, the height depends on the length of the text
+    // sin(45) * width approx 0.7 * width
+    const headerHeight = (maxLabelWidth * 0.7) + 60; // Increased header height
+    const titleHeight = 60;
+    
+    const width = labelWidth + (columns.length * cellSize) + 50; // +50 padding
+    const height = headerHeight + (columns.length * cellSize) + titleHeight + 50;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+
+    // Title
+    ctx.fillStyle = '#111827';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Correlation Matrix', width / 2, 40);
+
+    // Helper for color
+    const getColor = (val: number) => {
+        if (val === null) return '#f3f4f6';
+        const opacity = Math.max(0.2, Math.abs(val));
+        if (val > 0) {
+            return `rgba(239, 68, 68, ${opacity})`;
+        } else {
+            return `rgba(59, 130, 246, ${opacity})`;
+        }
+    };
+
+    ctx.font = '12px sans-serif';
+    ctx.textBaseline = 'middle';
+
+    // Draw Grid
+    values.forEach((row: number[], i: number) => {
+        // Row Label (Right aligned)
+        ctx.fillStyle = '#374151';
+        ctx.textAlign = 'right';
+        ctx.fillText(columns[i], labelWidth - 10, headerHeight + titleHeight + (i * cellSize) + (cellSize/2));
+
+        row.forEach((val: number, j: number) => {
+            const x = labelWidth + (j * cellSize);
+            const y = headerHeight + titleHeight + (i * cellSize);
+
+            // Cell
+            ctx.fillStyle = getColor(val);
+            ctx.fillRect(x, y, cellSize - 2, cellSize - 2); // -2 for gap
+
+            // Value
+            if (val !== null) {
+                ctx.fillStyle = Math.abs(val) > 0.5 ? '#ffffff' : '#000000';
+                ctx.textAlign = 'center';
+                ctx.fillText(val.toFixed(2), x + (cellSize/2), y + (cellSize/2));
+            }
+        });
+    });
+
+    // Column Labels (Rotated)
+    ctx.save();
+    columns.forEach((col: string, j: number) => {
+        const x = labelWidth + (j * cellSize) + (cellSize/2);
+        const y = headerHeight + titleHeight - 10;
+        
+        ctx.translate(x, y);
+        ctx.rotate(-Math.PI / 4);
+        ctx.fillStyle = '#374151';
+        ctx.textAlign = 'left';
+        ctx.fillText(col, 0, 0);
+        ctx.rotate(Math.PI / 4);
+        ctx.translate(-x, -y);
+    });
+    ctx.restore();
+
+    // Download
+    const link = document.createElement('a');
+    link.download = 'correlation-matrix.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+
+  const downloadAllInteractions = async () => {
+    if (!report?.profile_data?.target_interactions) return;
+    
+    const interactions = report.profile_data.target_interactions;
+    const chartHeight = 400; // Height per chart
+    const chartWidth = 800;
+    const padding = 40;
+    
+    // 2 Columns Layout
+    const cols = 2;
+    const rows = Math.ceil(interactions.length / cols);
+    
+    const totalWidth = (cols * chartWidth) + ((cols + 1) * padding);
+    const totalHeight = (rows * (chartHeight + padding)) + 100; // +100 for main title
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = totalWidth;
+    canvas.height = totalHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Background
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    const bgColor = isDarkMode ? '#1f2937' : '#ffffff';
+    const textColor = isDarkMode ? '#ffffff' : '#111827';
+    const subTextColor = isDarkMode ? '#9ca3af' : '#4b5563';
+
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Main Title
+    ctx.fillStyle = textColor;
+    ctx.font = 'bold 24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Detailed Interactions (Box Plots)', totalWidth / 2, 50);
+
+    // Draw each chart
+    for (let i = 0; i < interactions.length; i++) {
+        const interaction = interactions[i];
+        const elementId = `interaction-chart-${i}`;
+        const element = document.getElementById(elementId);
+        if (!element) continue;
+
+        const svg = element.querySelector('svg');
+        if (!svg) continue;
+        
+        const row = Math.floor(i / cols);
+        const col = i % cols;
+        
+        const x = padding + (col * (chartWidth + padding));
+        const y = 100 + (row * (chartHeight + padding));
+
+        // Title for this chart
+        ctx.fillStyle = subTextColor;
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${interaction.feature} vs ${report.profile_data.target_col}`, x + 40, y);
+        
+        if (interaction.p_value !== undefined) {
+            ctx.font = '14px sans-serif';
+            ctx.fillStyle = interaction.p_value < 0.05 ? '#059669' : subTextColor;
+            ctx.fillText(`ANOVA p: ${Number(interaction.p_value).toExponential(2)}`, x + 40, y + 20);
+        }
+
+        // Serialize SVG
+        const serializer = new XMLSerializer();
+        const svgString = serializer.serializeToString(svg);
+        const img = new Image();
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+
+        await new Promise<void>((resolve) => {
+            img.onload = () => {
+                ctx.drawImage(img, x, y + 30, chartWidth, chartHeight - 50); // Adjust height to fit
+                URL.revokeObjectURL(url);
+                resolve();
+            };
+            img.src = url;
+        });
+    }
+
+    // Download
+    const link = document.createElement('a');
+    link.download = 'all-interactions.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
 
   const renderContent = () => {
     if (loading && !report) {
@@ -483,19 +857,29 @@ export const EDAPage: React.FC = () => {
                         Multivariate Structure (PCA)
                         <InfoTooltip text="Reduces data to 2D or 3D. Points closer together are similar. Colors show clusters or target values." />
                     </h3>
-                    <button
-                        onClick={() => setIsPCA3D(!isPCA3D)}
-                        className={`p-2 rounded-md border transition-colors flex items-center gap-2 text-sm ${
-                            isPCA3D 
-                                ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300' 
-                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300'
-                        }`}
-                    >
-                        <Box className="w-4 h-4" />
-                        {isPCA3D ? 'Switch to 2D' : 'Switch to 3D'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => downloadChart('pca-chart', 'pca-analysis', 'Multivariate Structure (PCA)', isPCA3D ? '3D Projection' : '2D Projection')}
+                            className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+                            title="Download Chart"
+                        >
+                            <Download className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => setIsPCA3D(!isPCA3D)}
+                            className={`p-2 rounded-md border transition-colors flex items-center gap-2 text-sm ${
+                                isPCA3D 
+                                    ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300' 
+                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300'
+                            }`}
+                        >
+                            <Box className="w-4 h-4" />
+                            {isPCA3D ? 'Switch to 2D' : 'Switch to 3D'}
+                        </button>
+                    </div>
                 </div>
 
+                <div id="pca-chart">
                 {profile.pca_data ? (
                     isPCA3D ? (
                         <ThreeDScatterPlot 
@@ -523,6 +907,7 @@ export const EDAPage: React.FC = () => {
                         Not enough numeric data for PCA.
                     </div>
                 )}
+                </div>
 
                 <div className="mt-6 flex items-start gap-2 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-800">
                     <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
@@ -659,12 +1044,19 @@ export const EDAPage: React.FC = () => {
                             Target Analysis: <span className="ml-2 text-blue-600">{profile.target_col}</span>
                             <InfoTooltip text="Analyzes relationships between the target variable and other features. Shows top correlations and key drivers." />
                         </h2>
+                        <button
+                            onClick={() => downloadChart('target-analysis-chart', 'target-analysis', `Target Analysis: ${profile.target_col}`, 'Top Associated Features')}
+                            className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+                            title="Download Chart"
+                        >
+                            <Download className="w-4 h-4" />
+                        </button>
                     </div>
                     
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2">
                             <h3 className="text-sm font-medium text-gray-500 mb-4">Top Associated Features</h3>
-                            <div className="h-64 w-full">
+                            <div className="h-64 w-full" id="target-analysis-chart">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart 
                                         data={Object.entries(profile.target_correlations)
@@ -712,17 +1104,40 @@ export const EDAPage: React.FC = () => {
                 {/* Detailed Interactions (Box Plots) */}
                 {profile.target_interactions && profile.target_interactions.length > 0 && (
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 flex items-center">
-                            <ScatterIcon className="w-5 h-5 mr-2 text-purple-500" />
-                            Detailed Interactions (Box Plots)
-                            <InfoTooltip text="Shows distribution of values across categories. The box represents the middle 50% of data (Q1 to Q3). The line inside is the median." />
-                        </h3>
+                        <div className="flex justify-between items-center mb-2">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                                <ScatterIcon className="w-5 h-5 mr-2 text-purple-500" />
+                                Detailed Interactions (Box Plots)
+                                <InfoTooltip text="Shows distribution of values across categories. The box represents the middle 50% of data (Q1 to Q3). The line inside is the median." />
+                            </h3>
+                            <button
+                                onClick={downloadAllInteractions}
+                                className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+                                title="Download All Charts"
+                            >
+                                <Download className="w-4 h-4" />
+                            </button>
+                        </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
                             <span className="font-semibold">ANOVA Analysis:</span> A p-value &lt; 0.05 (highlighted in green) indicates that the feature varies significantly across the target categories, making it a strong predictor.
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {profile.target_interactions.map((interaction: any, idx: number) => (
-                                <div key={idx} className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-100 dark:border-gray-800">
+                                <div key={idx} className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-100 dark:border-gray-800 relative group">
+                                    <div className="absolute top-2 right-2 opacity-100">
+                                        <button
+                                            onClick={() => downloadChart(
+                                                `interaction-chart-${idx}`, 
+                                                `interaction-${interaction.feature}`,
+                                                `${interaction.feature} vs ${profile.target_col}`,
+                                                interaction.p_value !== undefined ? `ANOVA p: ${Number(interaction.p_value).toExponential(2)}` : undefined
+                                            )}
+                                            className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
+                                            title="Download Chart"
+                                        >
+                                            <Download className="w-3 h-3" />
+                                        </button>
+                                    </div>
                                     <div className="text-center mb-2">
                                         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                             {interaction.feature} vs {profile.target_col}
@@ -737,7 +1152,7 @@ export const EDAPage: React.FC = () => {
                                             </span>
                                         )}
                                     </div>
-                                    <div className="h-64 w-full">
+                                    <div className="h-64 w-full" id={`interaction-chart-${idx}`}>
                                         <ResponsiveContainer width="100%" height="100%">
                                             <ComposedChart 
                                                 data={interaction.data.map((d: any) => ({
@@ -850,19 +1265,28 @@ export const EDAPage: React.FC = () => {
                             Trend Analysis ({profile.timeseries.date_col})
                             <InfoTooltip text="Shows how values change over time. Look for long-term trends (up/down) or sudden shifts." />
                         </div>
-                        {profile.timeseries.stationarity_test && (
-                            <div className={`text-xs px-3 py-1 rounded-full border flex items-center gap-1 ${
-                                profile.timeseries.stationarity_test.is_stationary 
-                                    ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300' 
-                                    : 'bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-300'
-                            }`}>
-                                <InfoTooltip text="Augmented Dickey-Fuller Test. Stationary (p<0.05) means the data has constant mean/variance over time. Non-Stationary (p>=0.05) means it has a trend or seasonality." />
-                                <span className="font-semibold">ADF Test:</span> {profile.timeseries.stationarity_test.is_stationary ? 'Stationary' : 'Non-Stationary'} 
-                                <span className="opacity-75 ml-1">(p={profile.timeseries.stationarity_test.p_value.toFixed(3)})</span>
-                            </div>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {profile.timeseries.stationarity_test && (
+                                <div className={`text-xs px-3 py-1 rounded-full border flex items-center gap-1 ${
+                                    profile.timeseries.stationarity_test.is_stationary 
+                                        ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300' 
+                                        : 'bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-300'
+                                }`}>
+                                    <InfoTooltip text="Augmented Dickey-Fuller Test. Stationary (p<0.05) means the data has constant mean/variance over time. Non-Stationary (p>=0.05) means it has a trend or seasonality." />
+                                    <span className="font-semibold">ADF Test:</span> {profile.timeseries.stationarity_test.is_stationary ? 'Stationary' : 'Non-Stationary'} 
+                                    <span className="opacity-75 ml-1">(p={profile.timeseries.stationarity_test.p_value.toFixed(3)})</span>
+                                </div>
+                            )}
+                            <button
+                                onClick={() => downloadChart('trend-chart', 'trend-analysis', `Trend Analysis (${profile.timeseries.date_col})`, profile.timeseries.stationarity_test ? `ADF Test: ${profile.timeseries.stationarity_test.is_stationary ? 'Stationary' : 'Non-Stationary'} (p=${profile.timeseries.stationarity_test.p_value.toFixed(3)})` : undefined)}
+                                className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+                                title="Download Chart"
+                            >
+                                <Download className="w-4 h-4" />
+                            </button>
+                        </div>
                     </h3>
-                    <div className="h-80 w-full">
+                    <div className="h-80 w-full" id="trend-chart">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={profile.timeseries.trend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -899,12 +1323,21 @@ export const EDAPage: React.FC = () => {
 
                 {/* Seasonality Grid */}
                 <div className="grid grid-cols-1 gap-6">
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm relative group">
+                        <div className="absolute top-4 right-4 opacity-100 z-10">
+                            <button
+                                onClick={() => downloadChart('day-seasonality-chart', 'day-seasonality', 'Day of Week Seasonality')}
+                                className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
+                                title="Download Chart"
+                            >
+                                <Download className="w-3 h-3" />
+                            </button>
+                        </div>
                         <div className="flex items-center mb-4">
                             <h3 className="text-sm font-medium text-gray-500">Day of Week Seasonality</h3>
                             <InfoTooltip text="Average values for each day. Helps identify weekly patterns (e.g., lower on weekends)." />
                         </div>
-                        <div className="h-64 w-full">
+                        <div className="h-64 w-full" id="day-seasonality-chart">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={profile.timeseries.seasonality.day_of_week}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -922,12 +1355,21 @@ export const EDAPage: React.FC = () => {
                 </div>
 
                 {/* Monthly Seasonality (Full Width) */}
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm relative group">
+                    <div className="absolute top-4 right-4 opacity-100 z-10">
+                        <button
+                            onClick={() => downloadChart('month-seasonality-chart', 'month-seasonality', 'Monthly Seasonality')}
+                            className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
+                            title="Download Chart"
+                        >
+                            <Download className="w-3 h-3" />
+                        </button>
+                    </div>
                     <div className="flex items-center mb-4">
                         <h3 className="text-sm font-medium text-gray-500">Monthly Seasonality</h3>
                         <InfoTooltip text="Average values for each month. Helps identify yearly patterns or seasonal effects." />
                     </div>
-                    <div className="h-64 w-full">
+                    <div className="h-64 w-full" id="month-seasonality-chart">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={profile.timeseries.seasonality.month_of_year}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -945,18 +1387,28 @@ export const EDAPage: React.FC = () => {
 
                 {/* Autocorrelation (ACF) */}
                 {profile.timeseries.autocorrelation && profile.timeseries.autocorrelation.length > 0 && (
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm relative group">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-sm font-medium text-gray-500">Autocorrelation (Lag Analysis)</h3>
-                            <div className="group relative">
-                                <Info className="w-4 h-4 text-gray-400 cursor-help" />
-                                <div className="absolute right-0 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
-                                    Shows how much the current value depends on past values (lags). 
-                                    High bars indicate repeating patterns or seasonality.
+                            <div className="flex items-center">
+                                <h3 className="text-sm font-medium text-gray-500">Autocorrelation (Lag Analysis)</h3>
+                                <div className="group relative ml-2">
+                                    <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none text-center">
+                                        Shows how much the current value depends on past values (lags). 
+                                        High bars indicate repeating patterns or seasonality.
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+                                    </div>
                                 </div>
                             </div>
+                            <button
+                                onClick={() => downloadChart('autocorrelation-chart', 'autocorrelation', 'Autocorrelation (Lag Analysis)')}
+                                className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
+                                title="Download Chart"
+                            >
+                                <Download className="w-3 h-3" />
+                            </button>
                         </div>
-                        <div className="h-80 w-full pb-6">
+                        <div className="h-80 w-full pb-6" id="autocorrelation-chart">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={profile.timeseries.autocorrelation} margin={{ bottom: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -1009,11 +1461,20 @@ export const EDAPage: React.FC = () => {
 
         {activeTab === 'bivariate' && (
           <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                <ScatterIcon className="w-5 h-5 mr-2 text-blue-500" />
-                Bivariate Analysis (Scatter Plot)
-                <InfoTooltip text="Visualize the relationship between two numeric variables." />
-            </h3>
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <ScatterIcon className="w-5 h-5 mr-2 text-blue-500" />
+                    Bivariate Analysis (Scatter Plot)
+                    <InfoTooltip text="Visualize the relationship between two numeric variables." />
+                </h3>
+                <button
+                    onClick={() => downloadChart('bivariate-chart', 'bivariate-analysis', 'Bivariate Analysis', `${scatterX} vs ${scatterY}`)}
+                    className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+                    title="Download Chart"
+                >
+                    <Download className="w-4 h-4" />
+                </button>
+            </div>
             
             <div className="flex gap-4 mb-6 items-end">
                 <div>
@@ -1097,6 +1558,7 @@ export const EDAPage: React.FC = () => {
                 </button>
             </div>
 
+            <div id="bivariate-chart">
             {scatterX && scatterY ? (
                 is3D && scatterZ ? (
                     <ThreeDScatterPlot 
@@ -1124,6 +1586,7 @@ export const EDAPage: React.FC = () => {
                     Select X and Y variables to generate scatter plot.
                 </div>
             )}
+            </div>
           </div>
         )}
 
@@ -1178,12 +1641,23 @@ export const EDAPage: React.FC = () => {
 
         {activeTab === 'correlations' && profile.correlations && (
           <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                <BarChart2 className="w-5 h-5 mr-2 text-blue-500" />
-                Correlation Matrix
-                <InfoTooltip text="Shows linear relationships between variables. 1 is perfect positive, -1 is perfect negative correlation." />
-            </h3>
-            <CorrelationHeatmap data={profile.correlations} />
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <BarChart2 className="w-5 h-5 mr-2 text-blue-500" />
+                    Correlation Matrix
+                    <InfoTooltip text="Shows linear relationships between variables. 1 is perfect positive, -1 is perfect negative correlation." />
+                </h3>
+                <button
+                    onClick={downloadCorrelationHeatmap}
+                    className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+                    title="Download Chart"
+                >
+                    <Download className="w-4 h-4" />
+                </button>
+            </div>
+            <div id="correlation-heatmap">
+                <CorrelationHeatmap data={profile.correlations} />
+            </div>
           </div>
         )}
 
@@ -1193,17 +1667,33 @@ export const EDAPage: React.FC = () => {
               <thead className="bg-gray-50 dark:bg-gray-900">
                 <tr>
                   {Object.keys(profile.sample_data[0] || {}).map((col) => (
-                    <th key={col} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      {col}
+                    <th key={col} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider group">
+                      <div className="flex items-center gap-2">
+                        {col}
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleExclude(col, !excludedCols.includes(col));
+                            }}
+                            className={`p-1 rounded transition-colors opacity-0 group-hover:opacity-100 ${
+                                excludedCols.includes(col)
+                                    ? 'hover:bg-green-100 text-gray-400 hover:text-green-600 dark:hover:bg-green-900/30 opacity-100' 
+                                    : 'hover:bg-red-100 text-gray-400 hover:text-red-500 dark:hover:bg-red-900/30'
+                            }`}
+                            title={excludedCols.includes(col) ? "Include in analysis" : "Exclude from analysis"}
+                        >
+                            {excludedCols.includes(col) ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                        </button>
+                      </div>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {profile.sample_data.map((row: any, i: number) => (
+                {profile.sample_data.slice(0, 50).map((row: any, i: number) => (
                   <tr key={i}>
-                    {Object.values(row).map((val: any, j: number) => (
-                      <td key={j} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {Object.entries(row).map(([key, val]: [string, any], j: number) => (
+                      <td key={j} className={`px-6 py-4 whitespace-nowrap text-sm ${excludedCols.includes(key) ? 'text-gray-300 dark:text-gray-600 line-through' : 'text-gray-500 dark:text-gray-400'}`}>
                         {val !== null ? String(val) : <span className="italic text-gray-400">null</span>}
                       </td>
                     ))}
@@ -1211,6 +1701,11 @@ export const EDAPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+            {profile.sample_data.length > 50 && (
+                <div className="p-4 text-center text-sm text-gray-500 border-t border-gray-200 dark:border-gray-700">
+                    Showing first 50 rows of {profile.sample_data.length} sample rows.
+                </div>
+            )}
           </div>
         )}
       </div>
@@ -1218,7 +1713,7 @@ export const EDAPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div id="eda-report-container" className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
             <div>
@@ -1229,15 +1724,17 @@ export const EDAPage: React.FC = () => {
                     </p>
                 )}
             </div>
-            <button 
-                onClick={() => setShowHistoryModal(true)}
-                className="flex items-center px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors ml-4"
-            >
-                <List className="w-4 h-4 mr-2" />
-                Jobs History
-            </button>
+            <div className="flex gap-2 no-print">
+                <button 
+                    onClick={() => setShowHistoryModal(true)}
+                    className="flex items-center px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors ml-4"
+                >
+                    <List className="w-4 h-4 mr-2" />
+                    Jobs History
+                </button>
+            </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 no-print">
           <select
             value={selectedDataset || ''}
             onChange={(e) => setSelectedDataset(Number(e.target.value))}
@@ -1305,8 +1802,19 @@ export const EDAPage: React.FC = () => {
             <div className="p-6 space-y-6">
               {/* Distribution Chart */}
               <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-100 dark:border-gray-800">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wider">Distribution</h3>
-                <DistributionChart profile={selectedVariable} />
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Distribution</h3>
+                    <button
+                        onClick={() => downloadChart('distribution-chart', `distribution-${selectedVariable.name}`, `Distribution: ${selectedVariable.name}`)}
+                        className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
+                        title="Download Chart"
+                    >
+                        <Download className="w-3 h-3" />
+                    </button>
+                </div>
+                <div id="distribution-chart">
+                    <DistributionChart profile={selectedVariable} />
+                </div>
               </div>
 
               {/* Detailed Stats Grid */}
