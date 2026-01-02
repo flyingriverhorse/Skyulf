@@ -21,8 +21,9 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({ data }) 
     // -1 (blue) -> 0 (white) -> 1 (red)
     if (value === null) return 'rgba(243, 244, 246, 1)'; // gray-100
     
-    // Use opacity for intensity
-    const opacity = Math.abs(value);
+    // Use opacity for intensity, but ensure minimum visibility
+    // Scale opacity: 0.1 -> 0.4, 1.0 -> 1.0
+    const opacity = Math.max(0.4, Math.abs(value));
     
     if (value > 0) {
       // Red
@@ -66,11 +67,11 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({ data }) 
               {displayValues[i].map((val, j) => (
                 <div 
                   key={j} 
-                  className="h-10 w-full flex items-center justify-center text-[10px] text-gray-900 dark:text-gray-100 rounded-sm cursor-help"
+                  className="h-10 w-full flex items-center justify-center text-[10px] text-gray-900 dark:text-gray-100 rounded-sm cursor-help transition-opacity hover:opacity-80"
                   style={{ backgroundColor: getColor(val) }}
-                  title={`${rowCol} vs ${displayColumns[j]}: ${val.toFixed(3)}`}
+                  title={`${rowCol} vs ${displayColumns[j]}: ${val !== null ? val.toFixed(3) : 'N/A'}`}
                 >
-                  {Math.abs(val) > 0.3 ? val.toFixed(1) : ''}
+                  {val !== null ? val.toFixed(2) : ''}
                 </div>
               ))}
             </React.Fragment>
