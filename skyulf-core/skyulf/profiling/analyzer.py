@@ -9,7 +9,7 @@ from .schemas import (
     DateStats, TextStats, Alert, HistogramBin, Recommendation, PCAPoint,
     GeospatialStats, GeoPoint, TimeSeriesAnalysis, TimeSeriesPoint, SeasonalityStats,
     TargetInteraction, CategoryBoxPlot, BoxPlotStats, OutlierAnalysis, OutlierPoint,
-    NormalityTestResult
+    NormalityTestResult, Filter
 )
 from .distributions import calculate_histogram
 from .correlations import calculate_correlations
@@ -95,10 +95,63 @@ class EDAAnalyzer:
                     except Exception:
                         continue
         
-    def analyze(self, target_col: Optional[str] = None) -> DatasetProfile:
+    def analyze(self, target_col: Optional[str] = None, exclude_cols: Optional[List[str]] = None, filters: Optional[List[Dict[str, Any]]] = None) -> DatasetProfile:
         """
         Main entry point to generate the full profile.
         """
+        # Apply Filters
+        active_filters = []
+        if filters:
+            for f in filters:
+                col = f.get("column")
+                op = f.get("operator")
+                val = f.get("value")
+                
+                if col in self.columns:
+                    if op == "==":
+                        self.df = self.df.filter(pl.col(col) == val)
+                    elif op == "!=":
+                        self.df = self.df.filter(pl.col(col) != val)
+                    elif op == ">":
+                        self.df = self.df.filter(pl.col(col) > val)
+                    elif op == "<":
+                        self.df = self.df.filter(pl.col(col) < val)
+                    elif op == ">=":
+                        self.df = self.df.filter(pl.col(col) >= val)
+                    elif op == "<=":
+                        self.df = self.df.filter(pl.col(col) <= val)
+                    elif op == "in" and isinstance(val, list):
+                        self.df = self.df.filter(pl.col(col).is_in(val))
+                        
+                    active_filters.append(Filter(column=col, operator=op, value=val))
+            
+            # Re-initialize lazy df and stats after filtering
+            self.lazy_df = self.df.lazy()
+            self.row_count = self.df.height
+
+        # Check for empty dataframe after filtering
+        if self.row_count == 0:
+            return DatasetProfile(
+                row_count=0,
+                column_count=len(self.columns),
+                duplicate_rows=0,
+                missing_cells_percentage=0.0,
+                memory_usage_mb=0.0,
+                columns={},
+                correlations=None,
+                alerts=[Alert(type="Empty Data", message="Filters resulted in 0 rows. Please adjust your filters.", severity="warning")],
+                recommendations=[],
+                sample_data=[],
+                active_filters=active_filters,
+                target_col=target_col
+            )
+
+        # Apply Exclusions
+        excluded_columns = []
+        if exclude_cols:
+            excluded_columns = [c for c in exclude_cols if c in self.columns]
+            self.columns = [c for c in self.columns if c not in excluded_columns]
+
         # 1. Basic Info
         # null_count() returns a 1-row DataFrame. We want the sum of that row.
         missing_cells = self.df.null_count().sum_horizontal()[0]
@@ -215,7 +268,9 @@ class EDAAnalyzer:
             pca_data=pca_data,
             outliers=outliers,
             geospatial=geospatial,
-            timeseries=timeseries
+            timeseries=timeseries,
+            excluded_columns=excluded_columns,
+            active_filters=active_filters
         )
 
     def _detect_outliers(self, numeric_cols: List[str]) -> Optional[OutlierAnalysis]:

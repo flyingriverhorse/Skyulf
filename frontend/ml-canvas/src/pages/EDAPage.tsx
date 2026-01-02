@@ -8,7 +8,7 @@ import { CorrelationHeatmap } from '../components/eda/CorrelationHeatmap';
 import { DistributionChart } from '../components/eda/DistributionChart';
 import { CanvasScatterPlot } from '../components/eda/CanvasScatterPlot';
 import { ThreeDScatterPlot } from '../components/eda/ThreeDScatterPlot';
-import { Loader2, Play, RefreshCw, AlertCircle, BarChart2, Clock, X, Lightbulb, ScatterChart as ScatterIcon, CheckCircle, Info, Map, Calendar, List, AlertTriangle, Box, Eye, EyeOff, Download } from 'lucide-react';
+import { Loader2, Play, RefreshCw, AlertCircle, BarChart2, Clock, X, Lightbulb, ScatterChart as ScatterIcon, CheckCircle, Info, Map, Calendar, List, AlertTriangle, Box, Eye, EyeOff, Download, Plus, Filter } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Legend, LineChart, Line, ComposedChart, Scatter } from 'recharts';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -31,10 +31,17 @@ export const EDAPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('sample');
   const [targetCol, setTargetCol] = useState<string>('');
   const [excludedCols, setExcludedCols] = useState<string[]>([]);
+  const [filters, setFilters] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedVariable, setSelectedVariable] = useState<any>(null);
   
+  // Manual Filter State
+  const [showFilterForm, setShowFilterForm] = useState(false);
+  const [newFilterCol, setNewFilterCol] = useState('');
+  const [newFilterOp, setNewFilterOp] = useState('==');
+  const [newFilterVal, setNewFilterVal] = useState('');
+
   // Scatter Plot State
   const [scatterX, setScatterX] = useState<string>('');
   const [scatterY, setScatterY] = useState<string>('');
@@ -123,13 +130,14 @@ export const EDAPage: React.FC = () => {
     }
   };
 
-  const runAnalysis = async (overrideExcluded?: string[] | any) => {
+  const runAnalysis = async (overrideExcluded?: string[] | any, overrideFilters?: any[]) => {
     const actualExcluded = Array.isArray(overrideExcluded) ? overrideExcluded : excludedCols;
+    const actualFilters = Array.isArray(overrideFilters) ? overrideFilters : filters;
 
     if (!selectedDataset) return;
     setAnalyzing(true);
     try {
-      await EDAService.analyze(selectedDataset, targetCol || undefined, actualExcluded);
+      await EDAService.analyze(selectedDataset, targetCol || undefined, actualExcluded, actualFilters);
       // Reload immediately to get the PENDING state
       loadReport(selectedDataset);
       loadHistory(selectedDataset);
@@ -138,6 +146,22 @@ export const EDAPage: React.FC = () => {
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  const handleAddFilter = (column: string, value: any, operator: string = '==') => {
+      // Check if filter already exists to avoid duplicates if needed, 
+      // but for now let's allow multiple filters on same col (e.g. range)
+      const newFilter = { column, operator, value };
+      const newFilters = [...filters, newFilter];
+      setFilters(newFilters);
+      runAnalysis(undefined, newFilters);
+  };
+
+  const handleRemoveFilter = (index: number) => {
+      const newFilters = [...filters];
+      newFilters.splice(index, 1);
+      setFilters(newFilters);
+      runAnalysis(undefined, newFilters);
   };
 
   const handleToggleExclude = (colName: string, exclude: boolean) => {
@@ -1790,6 +1814,110 @@ export const EDAPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Active Filters Bar */}
+      <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-800">
+          <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center mr-2">
+                  <Filter className="w-4 h-4 text-blue-600 dark:text-blue-400 mr-2" />
+                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Active Filters</span>
+                  <InfoTooltip text="Filters are applied to the raw dataset before profiling. You can add filters manually or by clicking on distribution bars to filter on specific range." />
+              </div>
+              
+              {filters.map((filter, idx) => (
+                  <div key={idx} className="flex items-center bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 rounded-full px-3 py-1 text-sm shadow-sm animate-in fade-in zoom-in duration-200">
+                      <span className="font-medium text-gray-700 dark:text-gray-300 mr-1">{filter.column}</span>
+                      <span className="text-gray-500 mx-1">{filter.operator}</span>
+                      <span className="font-mono text-blue-600 dark:text-blue-400">{String(filter.value)}</span>
+                      <button 
+                          onClick={() => handleRemoveFilter(idx)}
+                          className="ml-2 text-gray-400 hover:text-red-500"
+                      >
+                          <X className="w-3 h-3" />
+                      </button>
+                  </div>
+              ))}
+
+              {!showFilterForm ? (
+                  <button 
+                      onClick={() => setShowFilterForm(true)}
+                      className="flex items-center px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 rounded-full hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add Filter
+                  </button>
+              ) : (
+                  <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-1 rounded-md border border-blue-200 dark:border-blue-700 animate-in slide-in-from-left-2 duration-200">
+                      <select 
+                          value={newFilterCol}
+                          onChange={(e) => setNewFilterCol(e.target.value)}
+                          className="text-xs border-none bg-transparent focus:ring-0 py-1 pl-2 pr-6"
+                      >
+                          <option value="" disabled>Column</option>
+                          {report && report.profile_data && Object.keys(report.profile_data.columns).map(col => (
+                              <option key={col} value={col}>{col}</option>
+                          ))}
+                      </select>
+                      <select 
+                          value={newFilterOp}
+                          onChange={(e) => setNewFilterOp(e.target.value)}
+                          className="text-xs border-none bg-gray-50 dark:bg-gray-900 rounded focus:ring-0 py-1 px-2"
+                      >
+                          <option value="==">==</option>
+                          <option value="!=">!=</option>
+                          <option value=">">&gt;</option>
+                          <option value="<">&lt;</option>
+                          <option value=">=">&gt;=</option>
+                          <option value="<=">&lt;=</option>
+                      </select>
+                      <input 
+                          type="text" 
+                          value={newFilterVal}
+                          onChange={(e) => setNewFilterVal(e.target.value)}
+                          placeholder="Value"
+                          className="text-xs border-none bg-transparent focus:ring-0 py-1 w-20"
+                          onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newFilterCol && newFilterVal) {
+                                  handleAddFilter(newFilterCol, isNaN(Number(newFilterVal)) ? newFilterVal : Number(newFilterVal), newFilterOp);
+                                  setShowFilterForm(false);
+                                  setNewFilterCol('');
+                                  setNewFilterVal('');
+                              }
+                          }}
+                      />
+                      <button 
+                          onClick={() => {
+                              if (newFilterCol && newFilterVal) {
+                                  handleAddFilter(newFilterCol, isNaN(Number(newFilterVal)) ? newFilterVal : Number(newFilterVal), newFilterOp);
+                                  setShowFilterForm(false);
+                                  setNewFilterCol('');
+                                  setNewFilterVal('');
+                              }
+                          }}
+                          disabled={!newFilterCol || !newFilterVal}
+                          className="p-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                      >
+                          <Plus className="w-3 h-3" />
+                      </button>
+                      <button 
+                          onClick={() => setShowFilterForm(false)}
+                          className="p-1 text-gray-400 hover:text-gray-600"
+                      >
+                          <X className="w-3 h-3" />
+                      </button>
+                  </div>
+              )}
+
+              {filters.length > 0 && (
+                  <button 
+                      onClick={() => { setFilters([]); runAnalysis(undefined, []); }}
+                      className="ml-auto text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline"
+                  >
+                      Clear All
+                  </button>
+              )}
+          </div>
+      </div>
+
       {renderContent()}
 
       {/* Variable Detail Modal */}
@@ -1821,7 +1949,10 @@ export const EDAPage: React.FC = () => {
               {/* Distribution Chart */}
               <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-100 dark:border-gray-800">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Distribution</h3>
+                    <div className="flex items-center">
+                        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mr-2">Distribution</h3>
+                        <InfoTooltip text="Click on any bar to filter the entire dataset by that range or category." />
+                    </div>
                     <button
                         onClick={() => downloadChart('distribution-chart', `distribution-${selectedVariable.name}`, `Distribution: ${selectedVariable.name}`)}
                         className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
@@ -1831,7 +1962,25 @@ export const EDAPage: React.FC = () => {
                     </button>
                 </div>
                 <div id="distribution-chart">
-                    <DistributionChart profile={selectedVariable} />
+                    <DistributionChart 
+                        profile={selectedVariable} 
+                        onBarClick={(data) => {
+                            if ((selectedVariable.dtype === 'Numeric' || selectedVariable.dtype === 'DateTime') && data.rawBin) {
+                                // Add range filter (>= start AND < end)
+                                const newFilters = [
+                                    ...filters,
+                                    { column: selectedVariable.name, operator: '>=', value: data.rawBin.start },
+                                    { column: selectedVariable.name, operator: '<', value: data.rawBin.end }
+                                ];
+                                setFilters(newFilters);
+                                runAnalysis(undefined, newFilters);
+                                setSelectedVariable(null);
+                            } else if (selectedVariable.dtype === 'Categorical') {
+                                handleAddFilter(selectedVariable.name, data.value, '==');
+                                setSelectedVariable(null);
+                            }
+                        }}
+                    />
                 </div>
               </div>
 

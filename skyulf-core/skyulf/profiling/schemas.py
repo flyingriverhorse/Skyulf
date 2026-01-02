@@ -151,6 +151,11 @@ class OutlierAnalysis(BaseModel):
     top_outliers: List[OutlierPoint]
     plot_data: Optional[List[Dict[str, Any]]] = None # For visualization (e.g. PCA projection of outliers)
 
+class Filter(BaseModel):
+    column: str
+    operator: str # "==", "!=", ">", "<", ">=", "<=", "in"
+    value: Any
+
 class DatasetProfile(BaseModel):
     row_count: int
     column_count: int
@@ -181,5 +186,6 @@ class DatasetProfile(BaseModel):
     
     # Metadata
     excluded_columns: List[str] = Field(default_factory=list)
+    active_filters: Optional[List[Filter]] = None
     
     generated_at: datetime = Field(default_factory=datetime.now)

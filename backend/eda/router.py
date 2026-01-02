@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any
 
 from backend.dependencies import get_db
 from backend.database.models import EDAReport, DataSource
@@ -11,9 +11,15 @@ from backend.eda.tasks import run_eda_background, generate_profile_celery
 
 router = APIRouter(prefix="/eda", tags=["EDA"])
 
+class FilterRequest(BaseModel):
+    column: str
+    operator: str
+    value: Any
+
 class AnalyzeRequest(BaseModel):
     target_col: Optional[str] = None
     exclude_cols: Optional[List[str]] = None
+    filters: Optional[List[FilterRequest]] = None
 
 @router.post("/{dataset_id}/analyze")
 async def trigger_analysis(
@@ -41,6 +47,9 @@ async def trigger_analysis(
         if request.exclude_cols:
             print(f"Excluding columns: {request.exclude_cols}")
             config["exclude_cols"] = request.exclude_cols
+        if request.filters:
+            print(f"Applying filters: {request.filters}")
+            config["filters"] = [f.dict() for f in request.filters]
 
     report = EDAReport(
         data_source_id=dataset_id,
