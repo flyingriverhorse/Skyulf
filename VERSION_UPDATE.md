@@ -15,6 +15,8 @@
 This release introduces a professional-grade Automated EDA module, enabling deep statistical analysis of datasets directly within the platform.
 
 ### 📊 Profiling & EDA
+- **Geospatial Analysis:** Added automated detection and visualization of Latitude/Longitude columns with interactive scatter maps.
+- **Multivariate Analysis (PCA):** Implemented robust PCA visualization with dynamic coloring by target, legends, and axis labels.
 - **Advanced Profiler:** Implemented `SkyulfProfiler` in `skyulf-core` using Polars for high-performance automated EDA.
 - **Smart Alerts:** Added automated detection for High Correlation, High Cardinality, Constant Columns, and Class Imbalance.
 - **Rich Stats:** Added support for histograms, correlation matrices, and scatter plot sampling in the profile output.

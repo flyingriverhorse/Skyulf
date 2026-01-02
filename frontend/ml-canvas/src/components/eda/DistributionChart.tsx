@@ -1,0 +1,78 @@
+import React from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+interface DistributionChartProps {
+  profile: any;
+}
+
+export const DistributionChart: React.FC<DistributionChartProps> = ({ profile }) => {
+  if (!profile) return null;
+
+  let data: any[] = [];
+  const type = profile.dtype;
+
+  if (type === 'Numeric' && profile.histogram) {
+    data = profile.histogram.map((bin: any) => ({
+      name: `${Number(bin.start).toFixed(2)}`, // Simplified label for X-axis
+      fullName: `${Number(bin.start).toFixed(2)} - ${Number(bin.end).toFixed(2)}`,
+      count: bin.count,
+    }));
+  } else if (type === 'Categorical' && profile.categorical_stats?.top_k) {
+    data = profile.categorical_stats.top_k.map((item: any) => ({
+      name: String(item.value).substring(0, 15) + (String(item.value).length > 15 ? '...' : ''),
+      fullName: String(item.value),
+      count: item.count
+    }));
+  } else {
+    return <div className="text-gray-500 text-sm italic p-4 text-center">No distribution data available for this type</div>;
+  }
+
+  if (data.length === 0) {
+    return <div className="text-gray-500 text-sm italic p-4 text-center">No data points</div>;
+  }
+
+  return (
+    <div className="h-64 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={data}
+          margin={{
+            top: 5,
+            right: 30,
+            left: 20,
+            bottom: 30,
+          }}
+        >
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+          <XAxis 
+            dataKey="name" 
+            tick={{ fontSize: 11, fill: '#6b7280' }} 
+            interval="preserveStartEnd"
+            angle={-45}
+            textAnchor="end"
+          />
+          <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} />
+          <Tooltip 
+            content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                const item = payload[0].payload;
+                return (
+                    <div className="bg-gray-800 text-white text-xs p-2 rounded shadow-lg">
+                    <p className="font-semibold mb-1">{item.fullName}</p>
+                    <p>Count: {item.count}</p>
+                    </div>
+                );
+                }
+                return null;
+            }}
+          />
+          <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+            {data.map((_, index) => (
+              <Cell key={`cell-${index}`} fill={type === 'Numeric' ? '#3b82f6' : '#8b5cf6'} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};

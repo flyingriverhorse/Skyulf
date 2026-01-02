@@ -6,10 +6,20 @@ import re
 
 from .schemas import (
     DatasetProfile, ColumnProfile, NumericStats, CategoricalStats, 
-    DateStats, TextStats, Alert, HistogramBin
+    DateStats, TextStats, Alert, HistogramBin, Recommendation, PCAPoint,
+    GeospatialStats, GeoPoint
 )
 from .distributions import calculate_histogram
 from .correlations import calculate_correlations
+
+# Optional imports for PCA (sklearn is a dependency of skyulf-core)
+try:
+    from sklearn.decomposition import PCA
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.impute import SimpleImputer
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
 
 class EDAAnalyzer:
     def __init__(self, df: pl.DataFrame):
@@ -88,6 +98,17 @@ class EDAAnalyzer:
         # Convert to list of dicts
         sample_rows = self.df.head(100).to_dicts()
 
+        # 6. Multivariate Analysis (PCA)
+        pca_data = None
+        if SKLEARN_AVAILABLE and len(numeric_cols) >= 2:
+            pca_data = self._calculate_pca(numeric_cols, target_col)
+
+        # 7. Geospatial Analysis
+        geospatial = self._analyze_geospatial(numeric_cols, target_col)
+
+        # 8. Smart Recommendations
+        recommendations = self._generate_recommendations(col_profiles, alerts, target_col)
+
         return DatasetProfile(
             row_count=self.row_count,
             column_count=len(self.columns),
@@ -97,10 +118,256 @@ class EDAAnalyzer:
             columns=col_profiles,
             correlations=correlations,
             alerts=alerts,
+            recommendations=recommendations,
             sample_data=sample_rows,
             target_col=target_col,
-            target_correlations=target_correlations
+            target_correlations=target_correlations,
+            pca_data=pca_data,
+            geospatial=geospatial
         )
+
+    def _analyze_geospatial(self, numeric_cols: List[str], target_col: Optional[str] = None) -> Optional[GeospatialStats]:
+        """
+        Detects and analyzes geospatial data (Lat/Lon).
+        """
+        try:
+            lat_col = None
+            lon_col = None
+            
+            # Check ALL columns, not just numeric ones, in case they were inferred as strings
+            candidates = {c.lower(): c for c in self.columns}
+            
+            # Latitude detection
+            if 'latitude' in candidates: lat_col = candidates['latitude']
+            elif 'lat' in candidates: lat_col = candidates['lat']
+            
+            # Longitude detection
+            if 'longitude' in candidates: lon_col = candidates['longitude']
+            elif 'lng' in candidates: lon_col = candidates['lng']
+            elif 'lon' in candidates: lon_col = candidates['lon']
+            elif 'long' in candidates: lon_col = candidates['long']
+            
+            if not lat_col or not lon_col:
+                return None
+                
+            # Calculate Stats
+            # We must ensure they are numeric. If they were not in numeric_cols, they might be strings.
+            # We try to cast them to Float64 for the analysis.
+            
+            geo_df = self.lazy_df.select([
+                pl.col(lat_col).cast(pl.Float64, strict=False).alias("lat"),
+                pl.col(lon_col).cast(pl.Float64, strict=False).alias("lon")
+            ])
+            
+            # Check if we have valid data after casting
+            # We can't easily check "if valid" in lazy mode without collecting.
+            # Let's collect stats.
+            
+            stats = geo_df.select([
+                pl.col("lat").min().alias("min_lat"),
+                pl.col("lat").max().alias("max_lat"),
+                pl.col("lat").mean().alias("mean_lat"),
+                pl.col("lon").min().alias("min_lon"),
+                pl.col("lon").max().alias("max_lon"),
+                pl.col("lon").mean().alias("mean_lon")
+            ]).collect().row(0)
+            
+            # If stats are null (e.g. all cast failed), return None
+            if stats[0] is None or stats[3] is None:
+                return None
+            
+            # Sample Points (max 5000)
+            sample_size = min(5000, self.row_count)
+            
+            # We need to fetch original columns + target, then cast in memory or select casted
+            cols_to_fetch = [pl.col(lat_col).cast(pl.Float64, strict=False).alias("lat"), pl.col(lon_col).cast(pl.Float64, strict=False).alias("lon")]
+            
+            if target_col and target_col in self.columns:
+                cols_to_fetch.append(pl.col(target_col).alias("target"))
+                
+            sample_df = self.lazy_df.select(cols_to_fetch).collect().sample(n=sample_size, with_replacement=False, seed=42)
+            
+            points = []
+            rows = sample_df.to_dicts()
+            for row in rows:
+                # Skip if lat/lon is null
+                if row["lat"] is None or row["lon"] is None:
+                    continue
+                    
+                label = str(row["target"]) if "target" in row and row["target"] is not None else None
+                points.append(GeoPoint(
+                    lat=row["lat"],
+                    lon=row["lon"],
+                    label=label
+                ))
+                
+            return GeospatialStats(
+                lat_col=lat_col,
+                lon_col=lon_col,
+                min_lat=stats[0],
+                max_lat=stats[1],
+                centroid_lat=stats[2],
+                min_lon=stats[3],
+                max_lon=stats[4],
+                centroid_lon=stats[5],
+                sample_points=points
+            )
+        except Exception as e:
+            print(f"Error in geospatial analysis: {e}")
+            return None
+
+    def _calculate_pca(self, numeric_cols: List[str], target_col: Optional[str] = None) -> Optional[List[PCAPoint]]:
+        """
+        Calculates 2D PCA projection of the dataset.
+        """
+        try:
+            # Increase sample size for better representation (max 5000 rows)
+            # We use a sample for visualization performance, but 5000 is enough to see structure
+            sample_size = min(5000, self.row_count)
+            
+            # Determine columns to fetch
+            cols_to_fetch = list(numeric_cols)
+            if target_col and target_col in self.columns and target_col not in cols_to_fetch:
+                cols_to_fetch.append(target_col)
+                
+            # Sample once
+            sample_df = self.df.select(cols_to_fetch).sample(n=sample_size, with_replacement=False, seed=42)
+            
+            # Extract Numeric Data for PCA
+            X = sample_df.select(numeric_cols).to_numpy()
+            
+            # Handle missing values
+            if np.isnan(X).any():
+                imputer = SimpleImputer(strategy='mean')
+                X = imputer.fit_transform(X)
+                
+            # Scale
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+            
+            # PCA
+            pca = PCA(n_components=2)
+            X_pca = pca.fit_transform(X_scaled)
+            
+            # Ensure numpy array (CRITICAL FIX)
+            X_pca = np.asarray(X_pca)
+            
+            # Get labels
+            labels = None
+            if target_col and target_col in self.columns:
+                labels = sample_df[target_col].to_list()
+            
+            # Create result
+            points = []
+            for i in range(len(X_pca)):
+                label_val = str(labels[i]) if labels else None
+                points.append(PCAPoint(x=float(X_pca[i, 0]), y=float(X_pca[i, 1]), label=label_val))
+                
+            return points
+            
+        except Exception as e:
+            print(f"Error calculating PCA: {e}")
+            return None
+
+    def _generate_recommendations(self, profiles: Dict[str, ColumnProfile], alerts: List[Alert], target_col: Optional[str]) -> List[Recommendation]:
+        recs = []
+        
+        # 1. High Missing
+        for col, profile in profiles.items():
+            if profile.missing_percentage > 50:
+                recs.append(Recommendation(
+                    column=col,
+                    action="Drop",
+                    reason=f"High missing values ({profile.missing_percentage:.1f}%)",
+                    suggestion=f"Drop column '{col}' as it contains mostly nulls."
+                ))
+            elif profile.missing_percentage > 0:
+                method = "Median" if profile.dtype == "Numeric" else "Mode"
+                recs.append(Recommendation(
+                    column=col,
+                    action="Impute",
+                    reason=f"Missing values ({profile.missing_percentage:.1f}%)",
+                    suggestion=f"Impute '{col}' using {method}."
+                ))
+                
+        # 2. High Skewness (Numeric)
+        for col, profile in profiles.items():
+            if profile.numeric_stats and profile.numeric_stats.skewness:
+                if abs(profile.numeric_stats.skewness) > 1.5:
+                    recs.append(Recommendation(
+                        column=col,
+                        action="Transform",
+                        reason=f"High skewness ({profile.numeric_stats.skewness:.2f})",
+                        suggestion=f"Apply Log or Box-Cox transformation to '{col}'."
+                    ))
+                    
+        # 3. High Cardinality (Categorical)
+        for col, profile in profiles.items():
+            if profile.categorical_stats and profile.dtype == "Categorical":
+                if profile.categorical_stats.unique_count > 50:
+                     recs.append(Recommendation(
+                        column=col,
+                        action="Encode",
+                        reason=f"High cardinality ({profile.categorical_stats.unique_count})",
+                        suggestion=f"Use Target Encoding or Hashing for '{col}' instead of One-Hot."
+                    ))
+                    
+        # 4. Constant Columns
+        for col, profile in profiles.items():
+            if profile.is_constant:
+                recs.append(Recommendation(
+                    column=col,
+                    action="Drop",
+                    reason="Constant value",
+                    suggestion=f"Drop '{col}' as it has zero variance."
+                ))
+                
+        # 5. ID Columns
+        for col, profile in profiles.items():
+            if profile.is_unique and profile.dtype in ["Categorical", "Text", "Numeric"]:
+                 recs.append(Recommendation(
+                    column=col,
+                    action="Drop",
+                    reason="Likely ID column",
+                    suggestion=f"Drop '{col}' as it appears to be a unique identifier."
+                ))
+
+        # 6. Positive Reinforcement (if no critical issues)
+        critical_issues = [r for r in recs if r.action in ["Drop", "Impute"]]
+        if not critical_issues:
+            recs.append(Recommendation(
+                column=None,
+                action="Keep",
+                reason="Clean Dataset",
+                suggestion="No missing values or constant columns found. Data is ready for modeling!"
+            ))
+            
+        # 7. Target Balance (if target selected)
+        if target_col and target_col in profiles:
+            target_profile = profiles[target_col]
+            if target_profile.dtype == "Categorical" and target_profile.categorical_stats:
+                # Check balance
+                counts = [item['count'] for item in target_profile.categorical_stats.top_k]
+                if counts:
+                    min_c = min(counts)
+                    max_c = max(counts)
+                    ratio = min_c / max_c if max_c > 0 else 0
+                    if ratio > 0.8:
+                        recs.append(Recommendation(
+                            column=target_col,
+                            action="Info",
+                            reason="Balanced Target",
+                            suggestion=f"Target classes are well balanced (Ratio: {ratio:.2f})."
+                        ))
+                    elif ratio < 0.2:
+                        recs.append(Recommendation(
+                            column=target_col,
+                            action="Resample",
+                            reason="Imbalanced Target",
+                            suggestion=f"Target is imbalanced (Ratio: {ratio:.2f}). Consider SMOTE or Class Weights."
+                        ))
+
+        return recs
 
     def _calculate_categorical_target_associations(self, target_col: str, numeric_cols: List[str]) -> Dict[str, float]:
         """

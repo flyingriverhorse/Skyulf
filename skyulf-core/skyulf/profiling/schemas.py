@@ -69,6 +69,33 @@ class Alert(BaseModel):
     message: str
     severity: str = "warning"  # "info", "warning", "error"
 
+class Recommendation(BaseModel):
+    column: Optional[str] = None
+    action: str # "Drop", "Impute", "Transform", "Encode"
+    reason: str
+    suggestion: str
+
+class PCAPoint(BaseModel):
+    x: float
+    y: float
+    label: Optional[str] = None # For target coloring
+
+class GeoPoint(BaseModel):
+    lat: float
+    lon: float
+    label: Optional[str] = None
+
+class GeospatialStats(BaseModel):
+    lat_col: str
+    lon_col: str
+    min_lat: float
+    max_lat: float
+    min_lon: float
+    max_lon: float
+    centroid_lat: float
+    centroid_lon: float
+    sample_points: List[GeoPoint]
+
 class DatasetProfile(BaseModel):
     row_count: int
     column_count: int
@@ -79,10 +106,17 @@ class DatasetProfile(BaseModel):
     columns: Dict[str, ColumnProfile]
     correlations: Optional[CorrelationMatrix] = None
     alerts: List[Alert] = Field(default_factory=list)
+    recommendations: List[Recommendation] = Field(default_factory=list)
     sample_data: Optional[List[Dict[str, Any]]] = None
     
     # Target Analysis
     target_col: Optional[str] = None
     target_correlations: Optional[Dict[str, float]] = None
+    
+    # Multivariate
+    pca_data: Optional[List[PCAPoint]] = None
+    
+    # Geospatial
+    geospatial: Optional[GeospatialStats] = None
     
     generated_at: datetime = Field(default_factory=datetime.now)
