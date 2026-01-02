@@ -3,9 +3,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 interface DistributionChartProps {
   profile: any;
+  onBarClick?: (data: any) => void;
 }
 
-export const DistributionChart: React.FC<DistributionChartProps> = ({ profile }) => {
+export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, onBarClick }) => {
   if (!profile) return null;
 
   let data: any[] = [];
@@ -16,24 +17,28 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile })
       name: `${Number(bin.start).toFixed(2)}`, // Simplified label for X-axis
       fullName: `${Number(bin.start).toFixed(2)} - ${Number(bin.end).toFixed(2)}`,
       count: bin.count,
+      rawBin: bin
     }));
   } else if (type === 'Text' && profile.histogram) {
     data = profile.histogram.map((bin: any) => ({
       name: `${Number(bin.start).toFixed(0)}`, 
       fullName: `${Number(bin.start).toFixed(0)} - ${Number(bin.end).toFixed(0)} chars`,
       count: bin.count,
+      rawBin: bin
     }));
   } else if (type === 'DateTime' && profile.histogram) {
     data = profile.histogram.map((bin: any) => ({
       name: new Date(bin.start).toLocaleDateString(undefined, { month: 'short', year: '2-digit' }), 
       fullName: `${new Date(bin.start).toLocaleDateString()} - ${new Date(bin.end).toLocaleDateString()}`,
       count: bin.count,
+      rawBin: bin
     }));
   } else if (type === 'Categorical' && profile.categorical_stats?.top_k) {
     data = profile.categorical_stats.top_k.map((item: any) => ({
       name: String(item.value).substring(0, 15) + (String(item.value).length > 15 ? '...' : ''),
       fullName: String(item.value),
-      count: item.count
+      count: item.count,
+      value: item.value
     }));
   } else {
     return <div className="text-gray-500 text-sm italic p-4 text-center">No distribution data available for this type</div>;
@@ -86,13 +91,19 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile })
                     <div className="bg-gray-800 text-white text-xs p-2 rounded shadow-lg">
                     <p className="font-semibold mb-1">{item.fullName}</p>
                     <p>Count: {item.count}</p>
+                    {onBarClick && <p className="text-blue-300 mt-1 italic">Click to filter</p>}
                     </div>
                 );
                 }
                 return null;
             }}
           />
-          <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+          <Bar 
+            dataKey="count" 
+            radius={[4, 4, 0, 0]} 
+            onClick={(data) => onBarClick && onBarClick(data)}
+            className={onBarClick ? "cursor-pointer hover:opacity-80" : ""}
+          >
             {data.map((_, index) => (
               <Cell key={`cell-${index}`} fill={type === 'Numeric' ? '#3b82f6' : '#8b5cf6'} />
             ))}

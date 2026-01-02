@@ -15,9 +15,16 @@
 This release introduces a professional-grade Automated EDA module, enabling deep statistical analysis of datasets directly within the platform.
 
 ### Bug Fixes
+- **Filtering Stability:** Fixed "Division by Zero" error when filters result in an empty dataset. The analyzer now gracefully returns an empty profile with a warning alert.
 - **Backend Schema:** Fixed `ColumnProfile` schema to include `normality_test` field, resolving runtime errors during analysis.
 - **Type Safety:** Added `NormalityTestResult` Pydantic model for better validation.- **Dependencies:** Added `statsmodels`, `scipy`, and `patsy` to `requirements-fastapi.txt` to ensure statistical tests run correctly.
 ## Profiling & EDA
+- **Interactive Cross-Filtering:** Implemented "Tableau-style" filtering. Clicking on a chart bar (e.g., "Age 20-30") instantly filters the entire dataset and updates all other charts to reflect the selection.
+- **Backend Filtering Engine:** Updated `EDAAnalyzer` to support dynamic filtering (Range, Equality, Set membership) on raw Polars DataFrames before profiling.
+- **State Management:** Filters are persisted in the report configuration, allowing complex multi-step drill-downs.
+- **Frontend Integration:** Added "Active Filters" bar with manual filter creation (Column/Operator/Value) and click handlers on Distribution charts for seamless exploration.
+- **UX Enhancements:** Added contextual tooltips to the Filter Bar and Distribution Charts to guide users on interactive filtering capabilities.
+- **Explainable Outliers:** Added "Why is this an outlier?" column to the anomaly table, showing exactly which features contributed most to the anomaly score (using feature-wise deviation from median).
 - **Statistical Tests:** Implemented automated Normality Tests (Shapiro-Wilk/KS) for numeric columns and Stationarity Tests (ADF) for time series.
 - **Visual Indicators:** Added "Normal Dist" badges to variable cards and detailed p-value tooltips to distribution charts.
 - **Detailed Analysis:** Exposed full statistical test results (Test Name, p-value, Conclusion) in the Variable Details modal.

@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@types/html2canvas": "^0.5.35",
+    "html2canvas": "^1.4.1"
+  }
+}
