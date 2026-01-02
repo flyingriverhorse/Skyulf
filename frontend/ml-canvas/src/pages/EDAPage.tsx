@@ -6,7 +6,7 @@ import { VariableCard } from '../components/eda/VariableCard';
 import { CorrelationHeatmap } from '../components/eda/CorrelationHeatmap';
 import { DistributionChart } from '../components/eda/DistributionChart';
 import { Loader2, Play, RefreshCw, AlertCircle, BarChart2, Clock, X, Lightbulb, ScatterChart as ScatterIcon, CheckCircle, Info, Map, Calendar } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, ScatterChart, Scatter, Legend, LineChart, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, ScatterChart, Scatter, Legend, LineChart, Line, ComposedChart } from 'recharts';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -520,6 +520,7 @@ export const EDAPage: React.FC = () => {
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                         <Map className="w-5 h-5 mr-2 text-blue-500" />
                         Geospatial Analysis
+                        <InfoTooltip text="Visualizes data points on a map based on detected Latitude/Longitude columns. Colors indicate target values." />
                     </h2>
                     <div className="text-sm text-gray-500">
                         Detected columns: <span className="font-mono bg-gray-100 dark:bg-gray-900 px-1 rounded">{profile.geospatial.lat_col}</span>, <span className="font-mono bg-gray-100 dark:bg-gray-900 px-1 rounded">{profile.geospatial.lon_col}</span>
@@ -623,12 +624,14 @@ export const EDAPage: React.FC = () => {
 
         {activeTab === 'target' && profile.target_col && profile.target_correlations && (
             <div className="mt-4 grid grid-cols-1 lg:grid-cols-4 gap-6">
-                {/* Main Analysis Content */}
-                <div className="lg:col-span-3 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                <div className="lg:col-span-3 space-y-6">
+                    {/* Main Analysis Content */}
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                             <BarChart2 className="w-5 h-5 mr-2 text-blue-500" />
                             Target Analysis: <span className="ml-2 text-blue-600">{profile.target_col}</span>
+                            <InfoTooltip text="Analyzes relationships between the target variable and other features. Shows top correlations and key drivers." />
                         </h2>
                     </div>
                     
@@ -680,8 +683,92 @@ export const EDAPage: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Detailed Interactions (Box Plots) */}
+                {profile.target_interactions && profile.target_interactions.length > 0 && (
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 flex items-center">
+                            <ScatterIcon className="w-5 h-5 mr-2 text-purple-500" />
+                            Detailed Interactions (Box Plots)
+                            <InfoTooltip text="Shows distribution of values across categories. The box represents the middle 50% of data (Q1 to Q3). The line inside is the median." />
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                            <span className="font-semibold">ANOVA Analysis:</span> A p-value &lt; 0.05 (highlighted in green) indicates that the feature varies significantly across the target categories, making it a strong predictor.
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {profile.target_interactions.map((interaction: any, idx: number) => (
+                                <div key={idx} className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-100 dark:border-gray-800">
+                                    <div className="text-center mb-2">
+                                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            {interaction.feature} vs {profile.target_col}
+                                        </h4>
+                                        {interaction.p_value !== undefined && interaction.p_value !== null && (
+                                            <span className={`text-xs px-2 py-0.5 rounded-full inline-block mt-1 ${
+                                                interaction.p_value < 0.05 
+                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                                            }`}>
+                                                ANOVA p: {Number(interaction.p_value).toExponential(2)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="h-64 w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <ComposedChart 
+                                                data={interaction.data.map((d: any) => ({
+                                                    ...d,
+                                                    boxBottom: d.stats.q1,
+                                                    boxHeight: d.stats.q3 - d.stats.q1
+                                                }))} 
+                                                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                                            >
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                                <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
+                                                <Tooltip 
+                                                    cursor={{ fill: 'transparent' }}
+                                                    content={({ active, payload }) => {
+                                                        if (active && payload && payload.length) {
+                                                            const data = payload[0].payload;
+                                                            return (
+                                                                <div className="bg-gray-800 text-white text-xs p-2 rounded shadow-lg z-50">
+                                                                    <p className="font-semibold mb-1">{data.name}</p>
+                                                                    <p>Max: {data.stats.max.toFixed(2)}</p>
+                                                                    <p>Q3: {data.stats.q3.toFixed(2)}</p>
+                                                                    <p>Median: {data.stats.median.toFixed(2)}</p>
+                                                                    <p>Q1: {data.stats.q1.toFixed(2)}</p>
+                                                                    <p>Min: {data.stats.min.toFixed(2)}</p>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    }}
+                                                />
+                                                {/* Invisible bar to push the box up to Q1 */}
+                                                <Bar dataKey="boxBottom" stackId="a" fill="transparent" legendType="none" />
+                                                {/* The Box (Q1 to Q3) */}
+                                                <Bar dataKey="boxHeight" stackId="a" fill="#8884d8" fillOpacity={0.6} name="IQR (Q1-Q3)" />
+                                                
+                                                {/* Median, Min, Max Points */}
+                                                <Scatter name="Median" dataKey="stats.median" fill="#ff7300" shape="square" />
+                                                <Scatter name="Max" dataKey="stats.max" fill="#82ca9d" shape="cross" />
+                                                <Scatter name="Min" dataKey="stats.min" fill="#82ca9d" shape="cross" />
+                                            </ComposedChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <p className="text-xs text-center text-gray-400 mt-2">
+                                        * Box: Q1-Q3. Orange square: Median. Green crosses: Min/Max.
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                </div>
+
                 {/* History Sidebar */}
-                <div className="lg:col-span-1 bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm h-fit">
+                <div className="lg:col-span-1">
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm h-fit sticky top-4">
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center justify-between">
                         <div className="flex items-center">
                             <Clock className="w-4 h-4 mr-2" />
@@ -721,6 +808,7 @@ export const EDAPage: React.FC = () => {
                             ))
                         )}
                     </div>
+                </div>
                 </div>
             </div>
         )}
@@ -829,14 +917,14 @@ export const EDAPage: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                        <div className="h-64 w-full">
+                        <div className="h-80 w-full pb-6">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={profile.timeseries.autocorrelation}>
+                                <BarChart data={profile.timeseries.autocorrelation} margin={{ bottom: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                     <XAxis 
                                         dataKey="lag" 
                                         tick={{ fontSize: 12 }} 
-                                        label={{ value: 'Lag (Days)', position: 'insideBottom', offset: -5, fontSize: 10 }}
+                                        label={{ value: 'Lag (Days)', position: 'insideBottom', offset: -15, fontSize: 12 }}
                                     />
                                     <YAxis domain={[-1, 1]} />
                                     <Tooltip 
