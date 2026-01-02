@@ -49,6 +49,7 @@ This release introduces a professional-grade Automated EDA module, enabling deep
 - **Download Layout:** Improved "Download All" feature to use a 2-column grid layout for better readability.
 - **Dark Mode:** Added dark mode support for chart downloads (Autocorrelation, Interactions, etc.) to respect the active theme.
 - **EDA Visualization:** Fixed correlation heatmap visibility for low values and handled nulls gracefully.
+- **Outlier Explanation:** Added "Why is this an outlier?" column to the Outlier Analysis table, showing features with the highest deviation from the median.
 - **EDA Histograms:** Fixed an issue where histograms were empty due to incorrect Polars aggregation aliases.
 - **EDA Updates:** Fixed the "Update" button behavior to correctly poll for pending reports.
 

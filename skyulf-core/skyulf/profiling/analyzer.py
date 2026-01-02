@@ -258,15 +258,39 @@ class EDAAnalyzer:
             top_k = 20
             top_outliers = []
             
+            # Calculate global medians for explanation
+            medians = df_numeric.median().row(0, named=True)
+            
             for idx, score in scored_indices[:top_k]:
                 # Only include if it was actually predicted as outlier
                 if preds[idx] == -1:
                     # Get row values
                     row_values = df_numeric.row(idx, named=True)
+                    
+                    # Generate simple explanation (Z-Score like contribution)
+                    # Find which feature deviates most from median relative to its range/std?
+                    # Simple approach: Calculate absolute % difference from median
+                    explanation = []
+                    for col, val in row_values.items():
+                        med = medians.get(col, 0)
+                        if med != 0:
+                            diff_pct = abs((val - med) / med) * 100
+                            if diff_pct > 50: # Only significant deviations
+                                explanation.append({
+                                    "feature": col,
+                                    "value": val,
+                                    "median": med,
+                                    "diff_pct": diff_pct
+                                })
+                    
+                    # Sort explanation by deviation
+                    explanation.sort(key=lambda x: x["diff_pct"], reverse=True)
+                    
                     top_outliers.append(OutlierPoint(
                         index=int(idx), # Cast to int for JSON serialization
                         values=row_values,
-                        score=float(score)
+                        score=float(score),
+                        explanation=explanation[:3] # Top 3 reasons
                     ))
                 
             return OutlierAnalysis(

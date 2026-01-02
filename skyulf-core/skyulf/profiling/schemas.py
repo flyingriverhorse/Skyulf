@@ -142,6 +142,7 @@ class OutlierPoint(BaseModel):
     index: int
     values: Dict[str, Any] # Key values for context
     score: float # Anomaly score (lower is more anomalous for IF, or distance for others)
+    explanation: Optional[List[Dict[str, Any]]] = None # [{"feature": "Age", "value": 95, "mean": 35, "diff": 60}, ...]
 
 class OutlierAnalysis(BaseModel):
     method: str # "IsolationForest" or "IQR"
