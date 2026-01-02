@@ -1616,6 +1616,7 @@ export const EDAPage: React.FC = () => {
                             <tr>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Row Index</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Anomaly Score</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Why is this an outlier?</th>
                                 {profile.outliers.top_outliers[0] && Object.keys(profile.outliers.top_outliers[0].values).slice(0, 5).map(key => (
                                     <th key={key} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{key}</th>
                                 ))}
@@ -1626,6 +1627,23 @@ export const EDAPage: React.FC = () => {
                                 <tr key={outlier.index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                     <td className="px-4 py-3 text-sm font-mono text-gray-500">{outlier.index}</td>
                                     <td className="px-4 py-3 text-sm font-mono text-red-600">{outlier.score.toFixed(4)}</td>
+                                    <td className="px-4 py-3 text-sm">
+                                        {outlier.explanation ? (
+                                            <div className="space-y-1">
+                                                {outlier.explanation.map((exp: any, i: number) => (
+                                                    <div key={i} className="text-xs">
+                                                        <span className="font-semibold text-gray-700 dark:text-gray-300">{exp.feature}:</span>{' '}
+                                                        <span className="text-red-600 dark:text-red-400">{exp.value.toFixed(2)}</span>{' '}
+                                                        <span className="text-gray-400">
+                                                            (Median: {exp.median.toFixed(2)}, Diff: {exp.diff_pct.toFixed(0)}%)
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="text-gray-400 text-xs">No explanation available</span>
+                                        )}
+                                    </td>
                                     {Object.entries(outlier.values).slice(0, 5).map(([key, val]: any) => (
                                         <td key={key} className="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">
                                             {typeof val === 'number' ? val.toFixed(2) : String(val)}
