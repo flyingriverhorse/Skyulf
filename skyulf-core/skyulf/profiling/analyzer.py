@@ -7,7 +7,8 @@ import re
 from .schemas import (
     DatasetProfile, ColumnProfile, NumericStats, CategoricalStats, 
     DateStats, TextStats, Alert, HistogramBin, Recommendation, PCAPoint,
-    GeospatialStats, GeoPoint, TimeSeriesAnalysis, TimeSeriesPoint, SeasonalityStats
+    GeospatialStats, GeoPoint, TimeSeriesAnalysis, TimeSeriesPoint, SeasonalityStats,
+    TargetInteraction, CategoryBoxPlot, BoxPlotStats
 )
 from .distributions import calculate_histogram
 from .correlations import calculate_correlations
@@ -20,6 +21,12 @@ try:
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
+
+try:
+    from scipy.stats import f_oneway
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
 
 class EDAAnalyzer:
     def __init__(self, df: pl.DataFrame):
@@ -112,6 +119,8 @@ class EDAAnalyzer:
         
         # 3b. Target Analysis
         target_correlations = {}
+        target_interactions = None
+        
         if target_col and target_col in self.columns:
             target_semantic_type = self._get_semantic_type(self.df[target_col])
             
@@ -129,12 +138,25 @@ class EDAAnalyzer:
                                 message=f"Column '{col}' is highly correlated ({corr:.2f}) with target '{target_col}'. Possible leakage.",
                                 severity="warning"
                             ))
+                    
+                    # Calculate Interactions (Box Plots for Categorical Features vs Numeric Target)
+                    # Find categorical columns
+                    cat_cols = [c for c in self.columns if self._get_semantic_type(self.df[c]) == "Categorical" and c != target_col]
+                    if cat_cols:
+                        target_interactions = self._calculate_target_interactions(target_col, cat_cols, is_target_numeric=True)
+
             elif target_semantic_type == "Categorical":
                 # For categorical target, calculate association with numeric features using ANOVA F-value or similar
                 # Or just use correlation ratio (eta)
                 # For now, let's use a simple heuristic: GroupBy Mean Variance?
                 # Let's implement a simple _calculate_categorical_target_associations
                 target_correlations = self._calculate_categorical_target_associations(target_col, numeric_cols)
+                
+                # Calculate Interactions (Box Plots for Numeric Features vs Categorical Target)
+                # Use top associated numeric features (limit handled in _calculate_target_interactions)
+                top_features = list(target_correlations.keys())
+                if top_features:
+                    target_interactions = self._calculate_target_interactions(target_col, top_features, is_target_numeric=False)
         
         # 4. Global Alerts (e.g. High Null % overall)
         if missing_pct > 50:
@@ -176,6 +198,7 @@ class EDAAnalyzer:
             sample_data=sample_rows,
             target_col=target_col,
             target_correlations=target_correlations,
+            target_interactions=target_interactions,
             pca_data=pca_data,
             geospatial=geospatial,
             timeseries=timeseries
@@ -550,6 +573,104 @@ class EDAAnalyzer:
                         ))
 
         return recs
+
+    def _calculate_target_interactions(self, target_col: str, features: List[str], is_target_numeric: bool) -> List[TargetInteraction]:
+        """
+        Calculates Box Plot statistics for interactions between Target and Features.
+        """
+        interactions = []
+        try:
+            # Limit to top 20 features to avoid clutter (increased from 5)
+            features_to_process = features[:20]
+            
+            for feature in features_to_process:
+                # Determine which is categorical (grouping) and which is numeric (values)
+                if is_target_numeric:
+                    group_col = feature
+                    value_col = target_col
+                else:
+                    group_col = target_col
+                    value_col = feature
+                
+                # Check cardinality of group_col
+                n_unique = self.df[group_col].n_unique()
+                if n_unique > 20:
+                    # Skip high cardinality grouping for box plots
+                    continue
+                    
+                # Calculate Box Plot Stats per Group
+                # Group by group_col -> Calculate quantiles of value_col
+                
+                # Polars doesn't support multiple quantiles in one agg easily in older versions, 
+                # but we can do multiple aggs.
+                
+                stats_df = self.lazy_df.group_by(group_col).agg([
+                    pl.col(value_col).min().alias("min"),
+                    pl.col(value_col).quantile(0.25).alias("q1"),
+                    pl.col(value_col).median().alias("median"),
+                    pl.col(value_col).quantile(0.75).alias("q3"),
+                    pl.col(value_col).max().alias("max")
+                ]).collect()
+                
+                category_plots = []
+                for row in stats_df.iter_rows(named=True):
+                    if row[group_col] is None: continue
+                    
+                    # Ensure values are not None (e.g. empty group)
+                    if row["min"] is None: continue
+                    
+                    category_plots.append(CategoryBoxPlot(
+                        name=str(row[group_col]),
+                        stats=BoxPlotStats(
+                            min=float(row["min"]),
+                            q1=float(row["q1"]),
+                            median=float(row["median"]),
+                            q3=float(row["q3"]),
+                            max=float(row["max"])
+                        )
+                    ))
+                
+                # Calculate ANOVA p-value if possible
+                p_value = None
+                if SCIPY_AVAILABLE and len(category_plots) > 1:
+                    try:
+                        # Fetch data for ANOVA
+                        # We need lists of values for each group
+                        anova_data = self.lazy_df.select([
+                            pl.col(group_col), 
+                            pl.col(value_col)
+                        ]).group_by(group_col).agg(
+                            pl.col(value_col)
+                        ).collect()
+                        
+                        groups_data = []
+                        for row in anova_data.iter_rows(named=True):
+                            if row[group_col] is not None and row[value_col] is not None:
+                                # Filter out nulls
+                                vals = [v for v in row[value_col] if v is not None]
+                                if len(vals) > 1:
+                                    groups_data.append(vals)
+                                    
+                        if len(groups_data) > 1:
+                            f_stat, p_val = f_oneway(*groups_data)
+                            if not np.isnan(p_val):
+                                p_value = float(p_val)
+                    except Exception as e:
+                        print(f"ANOVA failed for {feature}: {e}")
+                
+                if category_plots:
+                    interactions.append(TargetInteraction(
+                        feature=feature,
+                        plot_type="boxplot",
+                        data=category_plots,
+                        p_value=p_value
+                    ))
+                    
+            return interactions
+            
+        except Exception as e:
+            print(f"Error calculating target interactions: {e}")
+            return []
 
     def _calculate_categorical_target_associations(self, target_col: str, numeric_cols: List[str]) -> Dict[str, float]:
         """

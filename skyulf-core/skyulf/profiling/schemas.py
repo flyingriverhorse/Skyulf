@@ -100,6 +100,23 @@ class TimeSeriesPoint(BaseModel):
     date: str
     values: Dict[str, float]
 
+class BoxPlotStats(BaseModel):
+    min: float
+    q1: float
+    median: float
+    q3: float
+    max: float
+
+class CategoryBoxPlot(BaseModel):
+    name: str
+    stats: BoxPlotStats
+
+class TargetInteraction(BaseModel):
+    feature: str
+    plot_type: str # "boxplot"
+    data: List[CategoryBoxPlot]
+    p_value: Optional[float] = None # ANOVA p-value
+
 class SeasonalityStats(BaseModel):
     day_of_week: List[Dict[str, Any]]
     month_of_year: List[Dict[str, Any]]
@@ -126,6 +143,7 @@ class DatasetProfile(BaseModel):
     # Target Analysis
     target_col: Optional[str] = None
     target_correlations: Optional[Dict[str, float]] = None
+    target_interactions: Optional[List[TargetInteraction]] = None
     
     # Multivariate
     pca_data: Optional[List[PCAPoint]] = None
