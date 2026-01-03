@@ -39,7 +39,9 @@ def calculate_correlations(df: pl.LazyFrame, numeric_cols: List[str]) -> Optiona
         # Filter out columns with 0 std dev
         valid_cols = []
         for col in numeric_cols:
-            if subset[col].std() > 0:
+            std_val = subset[col].std()
+            # Check for None (all nulls or single value) and 0 variance
+            if std_val is not None and std_val > 1e-9:
                 valid_cols.append(col)
         
         if len(valid_cols) < 2:
@@ -47,7 +49,12 @@ def calculate_correlations(df: pl.LazyFrame, numeric_cols: List[str]) -> Optiona
             
         # Re-select only valid columns
         subset = subset.select(valid_cols)
-        corr_df = subset.corr()
+        
+        # Suppress numpy warnings that might occur during correlation calculation
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            corr_df = subset.corr()
         
         # Convert to our schema
         matrix = []

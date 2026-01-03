@@ -43,6 +43,34 @@ class NormalityTestResult(BaseModel):
     p_value: float
     is_normal: bool
 
+class CausalNode(BaseModel):
+    id: str
+    label: str
+
+class CausalEdge(BaseModel):
+    source: str
+    target: str
+    type: str # "directed", "undirected", "bidirected"
+
+class CausalGraph(BaseModel):
+    nodes: List[CausalNode]
+    edges: List[CausalEdge]
+
+class RuleNode(BaseModel):
+    id: int
+    feature: Optional[str] = None
+    threshold: Optional[float] = None
+    impurity: float
+    samples: int
+    value: List[float] # Class distribution
+    class_name: Optional[str] = None # Predicted class
+    is_leaf: bool
+    children: List[int] = Field(default_factory=list) # IDs of children
+
+class RuleTree(BaseModel):
+    nodes: List[RuleNode]
+    accuracy: Optional[float] = None # Surrogate model accuracy
+
 class ColumnProfile(BaseModel):
     name: str
     dtype: str  # "Numeric", "Categorical", "Boolean", "DateTime", "Text"
@@ -165,6 +193,7 @@ class DatasetProfile(BaseModel):
     
     columns: Dict[str, ColumnProfile]
     correlations: Optional[CorrelationMatrix] = None
+    correlations_with_target: Optional[CorrelationMatrix] = None
     alerts: List[Alert] = Field(default_factory=list)
     recommendations: List[Recommendation] = Field(default_factory=list)
     sample_data: Optional[List[Dict[str, Any]]] = None
@@ -177,6 +206,8 @@ class DatasetProfile(BaseModel):
     # Multivariate
     pca_data: Optional[List[PCAPoint]] = None
     outliers: Optional[OutlierAnalysis] = None
+    causal_graph: Optional[CausalGraph] = None
+    rule_tree: Optional[RuleTree] = None
     
     # Geospatial
     geospatial: Optional[GeospatialStats] = None

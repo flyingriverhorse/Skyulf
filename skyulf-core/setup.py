@@ -31,7 +31,10 @@ setup(
         "scipy>=1.10.0",
         "statsmodels>=0.14.0",
     ],
-    extras_require={"dev": ["pytest", "twine", "build"]},
+    extras_require={
+        "dev": ["pytest", "twine", "build"],
+        "viz": ["matplotlib>=3.7.0", "rich>=13.0.0"],
+    },
     python_requires=">=3.9",
     classifiers=[
         "License :: OSI Approved :: Apache Software License",

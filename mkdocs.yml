@@ -58,6 +58,7 @@ nav:
     - Installation: user_guide/installation.md
     - Pipeline Quickstart: user_guide/pipeline_quickstart.md
     - Step-by-Step (No Config): user_guide/step_by_step_no_config.md
+    - Automated EDA: user_guide/eda_profiling.md
     - Validation vs scikit-learn: user_guide/validation_vs_sklearn.md
     - Configuration: user_guide/configuration.md
     - SplitDataset & Leakage: user_guide/splitdataset_and_leakage.md

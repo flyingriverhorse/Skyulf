@@ -20,9 +20,7 @@
 [![issues](https://img.shields.io/github/issues/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/issues) 
 [![contributors](https://img.shields.io/github/contributors/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/graphs/contributors)
 
-> ⚠️ **Status:** Active Development. Expect bugs, but also expect rapid progress.
-
-**Machine Learning Operations (MLOps) shouldn't be this hard.**
+> **Status:** Active Development. Expect bugs, but also expect rapid progress.
 
 Skyulf is a self-hosted, privacy-first **MLOps Hub**. It is designed to be the "glue" that holds your data science workflow together—without the glue code. Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
 
@@ -30,11 +28,12 @@ Built with a modern stack: **FastAPI** (Backend), **React** (Frontend), **Polars
 
 ## What is the meaning of Skyulf?
 
-I named it Skyulf after two ideas. Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means “wolf,” with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and community-driven.
+I named it Skyulf after two ideas. Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means “wolf,” with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and helpful to community.
 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Using Skyulf as a Library](#using-skyulf-as-a-library)
 - [Key Features](#key-features)
 - [Roadmap](#roadmap)
 - [Version History](#version-history)
@@ -115,10 +114,35 @@ pip install skyulf-core
 uv add skyulf-core
 ```
 
+## Using Skyulf as a Library
+
+Skyulf isn't just a web application; its core logic is available as a standalone Python library (`skyulf-core`). You can use it in your own scripts or Jupyter notebooks for powerful EDA and pipeline building.
+
+### Example: Automated EDA
+
+```python
+import polars as pl
+from skyulf.profiling.analyzer import EDAAnalyzer
+
+# Load your data
+df = pl.read_csv("your_data.csv")
+
+# Run comprehensive analysis
+analyzer = EDAAnalyzer(df)
+profile = analyzer.analyze(target_col="target_variable")
+
+# Access insights
+print(f"Missing Data: {profile.missing_cells_percentage}%")
+print(f"Outliers Detected: {profile.outliers.total_outliers}")
+```
+
+For detailed examples including **Time Series**, **Geospatial Analysis**, and **Causal Inference**, see the [EDA User Guide](docs/user_guide/eda_profiling.md).
+
 ## Key Features
 
 *   **🎨 Visual Feature Canvas:** A node-based editor to clean, transform, and engineer features without writing spaghetti code. (25+ built-in nodes).
-*   **🚀 High-Performance Engine:** Built on **FastAPI** and **Polars** for lightning-fast data processing and easy API extension.
+*   **Automated EDA:** Professional-grade Exploratory Data Analysis with interactive charts, causal discovery (DAGs), outlier detection, and statistical alerts.
+*   **High-Performance Engine:** Built on **FastAPI** and **Polars** for lightning-fast data processing and easy API extension.
 *   **⚡ Async by Default:** Heavy training jobs run in the background via Celery & Redis (or background threads)—your UI never freezes.
 *   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or SQL. Start with SQLite (zero-config) and scale to PostgreSQL.
 *   **☁️ S3 Integration:** Full support for S3-compatible storage (AWS, MinIO) for data ingestion, artifact storage, and model registry.
@@ -130,8 +154,8 @@ uv add skyulf-core
 
 We have a clear vision to turn Skyulf into a complete **App Hub** for AI.
 
-*   **Phase 1: Polish & Stability** (Current Focus) - Architecturing, type safety, and documentation.
-*   **Phase 2: Deepening Data Science** - Advanced EDA, Ethics/Fairness checks, Synthetic Data, and Public Data Hubs, more models, NLP and more.
+*   **Phase 1: Polish & Stability** (Done) - Architecturing, type safety, and documentation.
+*   **Phase 2: Deepening Data Science** (Current Focus) - Advanced EDA, Ethics/Fairness checks, Synthetic Data, and Public Data Hubs, more models, NLP and more.
 *   **Phase 3: The "App Hub" Vision** - Plugin system, GenAI/LLM Builders, and Deployment.
 *   **Phase 4: Expansion** - Real-time collaboration, Edge/IoT export, and Audio support.
 

@@ -1,6 +1,6 @@
 import polars as pl
 import numpy as np
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import re
 
@@ -9,7 +9,8 @@ from .schemas import (
     DateStats, TextStats, Alert, HistogramBin, Recommendation, PCAPoint,
     GeospatialStats, GeoPoint, TimeSeriesAnalysis, TimeSeriesPoint, SeasonalityStats,
     TargetInteraction, CategoryBoxPlot, BoxPlotStats, OutlierAnalysis, OutlierPoint,
-    NormalityTestResult, Filter
+    NormalityTestResult, Filter, CausalGraph, CausalNode, CausalEdge,
+    RuleTree, RuleNode
 )
 from .distributions import calculate_histogram
 from .correlations import calculate_correlations
@@ -20,6 +21,7 @@ try:
     from sklearn.preprocessing import StandardScaler
     from sklearn.impute import SimpleImputer
     from sklearn.ensemble import IsolationForest
+    from sklearn.tree import DecisionTreeClassifier, _tree
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
@@ -35,6 +37,12 @@ try:
     STATSMODELS_AVAILABLE = True
 except ImportError:
     STATSMODELS_AVAILABLE = False
+
+try:
+    from causallearn.search.ConstraintBased.PC import pc
+    CAUSAL_LEARN_AVAILABLE = True
+except ImportError:
+    CAUSAL_LEARN_AVAILABLE = False
 
 class EDAAnalyzer:
     def __init__(self, df: pl.DataFrame):
@@ -53,49 +61,77 @@ class EDAAnalyzer:
         """
         for col in self.df.columns:
             if self.df[col].dtype in [pl.Utf8, pl.String]:
+                # Heuristic: Check column name first to avoid expensive parsing on non-date columns
+                col_lower = col.lower()
+                date_keywords = ["date", "time", "year", "month", "day", "ts", "created", "updated", "at"]
+                if not any(k in col_lower for k in date_keywords):
+                    continue
+
                 # Check sample (non-null values)
-                sample = self.df[col].drop_nulls().head(20)
+                sample = self.df[col].drop_nulls().head(50) # Increased sample size for better entropy
                 if len(sample) == 0: continue
                 
-                # 1. Try ISO Datetime (YYYY-MM-DD HH:MM:SS)
+                best_parsed = None
+                max_months = -1
+                best_method_name = ""
+
+                # Candidate 1: Generic ISO Datetime
                 try:
-                    # strict=False returns null on failure. 
-                    # If sample has no nulls after conversion, it's a match.
                     parsed = sample.str.to_datetime(strict=False)
                     if parsed.null_count() == 0:
-                        # Apply to full column
-                        self.df = self.df.with_columns(pl.col(col).str.to_datetime(strict=False).alias(col))
-                        continue
+                        n_months = parsed.dt.month().n_unique()
+                        if n_months > max_months:
+                            max_months = n_months
+                            best_parsed = (None, "datetime_generic") # format is None
+                            best_method_name = "Generic Datetime"
                 except Exception:
                     pass
 
-                # 2. Try ISO Date (YYYY-MM-DD)
+                # Candidate 2: Generic ISO Date
                 try:
                     parsed = sample.str.to_date(strict=False)
                     if parsed.null_count() == 0:
-                        self.df = self.df.with_columns(pl.col(col).str.to_date(strict=False).alias(col))
-                        continue
+                        n_months = parsed.dt.month().n_unique()
+                        # Prefer Datetime over Date if months are equal, but if Date has more months, take it
+                        if n_months > max_months:
+                            max_months = n_months
+                            best_parsed = (None, "date_generic")
+                            best_method_name = "Generic Date"
                 except Exception:
                     pass
                     
-                # 3. Try common formats (MM/DD/YYYY, DD/MM/YYYY)
-                # Polars requires specific format strings for these
-                common_formats = ["%m/%d/%Y", "%d/%m/%Y", "%m-%d-%Y", "%d-%m-%Y"]
+                # Candidate 3: Common Formats (Ambiguous ones)
+                common_formats = ["%m/%d/%Y", "%d/%m/%Y", "%m-%d-%Y", "%d-%m-%Y", "%Y/%m/%d", "%Y-%m-%d"]
+                
                 for fmt in common_formats:
                     try:
                         parsed = sample.str.to_datetime(format=fmt, strict=False)
                         if parsed.null_count() == 0:
-                            self.df = self.df.with_columns(pl.col(col).str.to_datetime(format=fmt, strict=False).alias(col))
-                            break
-                        
-                        parsed_date = sample.str.to_date(format=fmt, strict=False)
-                        if parsed_date.null_count() == 0:
-                            self.df = self.df.with_columns(pl.col(col).str.to_date(format=fmt, strict=False).alias(col))
-                            break
+                            n_months = parsed.dt.month().n_unique()
+                            # If we find a format that gives MORE months, it's likely the correct one
+                            # e.g. 1/2, 2/2, 3/2 -> D/M/Y gives 1 month (Feb), M/D/Y gives 3 months (Jan, Feb, Mar)
+                            if n_months > max_months:
+                                max_months = n_months
+                                best_parsed = (fmt, "datetime_format")
+                                best_method_name = f"Format {fmt}"
                     except Exception:
                         continue
+                
+                # Apply the winner
+                if best_parsed:
+                    fmt, method = best_parsed
+                    try:
+                        if method == "datetime_generic":
+                            self.df = self.df.with_columns(pl.col(col).str.to_datetime(strict=False).alias(col))
+                        elif method == "date_generic":
+                            self.df = self.df.with_columns(pl.col(col).str.to_date(strict=False).alias(col))
+                        elif method == "datetime_format":
+                            self.df = self.df.with_columns(pl.col(col).str.to_datetime(format=fmt, strict=False).alias(col))
+                    except Exception as e:
+                        print(f"Failed to cast column {col} using {best_method_name}: {e}")
+                    continue
         
-    def analyze(self, target_col: Optional[str] = None, exclude_cols: Optional[List[str]] = None, filters: Optional[List[Dict[str, Any]]] = None) -> DatasetProfile:
+    def analyze(self, target_col: Optional[str] = None, exclude_cols: Optional[List[str]] = None, filters: Optional[List[Dict[str, Any]]] = None, date_col: Optional[str] = None, lat_col: Optional[str] = None, lon_col: Optional[str] = None) -> DatasetProfile:
         """
         Main entry point to generate the full profile.
         """
@@ -172,11 +208,49 @@ class EDAAnalyzer:
             col_profiles[col] = profile
             alerts.extend(col_alerts)
             
+            # Add to numeric_cols if it's Numeric OR if it's Categorical but underlying type is numeric
+            # This ensures it's included in Causal Discovery, PCA, etc.
+            is_numeric_type = self.df[col].dtype in [
+                pl.Float32, pl.Float64, 
+                pl.Int8, pl.Int16, pl.Int32, pl.Int64, 
+                pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64
+            ]
+            
             if profile.dtype == "Numeric":
                 numeric_cols.append(col)
-                
+            elif profile.dtype == "Categorical" and is_numeric_type:
+                numeric_cols.append(col)
+
+        # Auto-encode String Target for Analysis (Causal only)
+        encoded_target_col = None
+        if target_col and target_col in self.columns and target_col not in numeric_cols:
+             # If target is categorical/string, encode it to numeric so it appears in graphs
+             encoded_target = f"{target_col}_encoded"
+             self.df = self.df.with_columns(
+                 pl.col(target_col).cast(pl.Categorical).to_physical().alias(encoded_target)
+             )
+             self.lazy_df = self.df.lazy()
+             encoded_target_col = encoded_target
+        
+        # Define feature columns (numeric columns excluding target)
+        # This ensures PCA and Correlation Matrix only show features, not the target itself
+        feature_cols = [c for c in numeric_cols if c != target_col]
+
         # 3. Correlations
-        correlations = calculate_correlations(self.lazy_df, numeric_cols)
+        correlations = calculate_correlations(self.lazy_df, feature_cols)
+        
+        # 3a. Correlations with Target (Feature Selection)
+        correlations_with_target = None
+        target_corr_cols = []
+        
+        if target_col:
+            if target_col in numeric_cols:
+                target_corr_cols = feature_cols + [target_col]
+            elif encoded_target_col:
+                target_corr_cols = feature_cols + [encoded_target_col]
+                
+        if len(target_corr_cols) >= 2:
+            correlations_with_target = calculate_correlations(self.lazy_df, target_corr_cols)
         
         # 3b. Target Analysis
         target_correlations = {}
@@ -188,7 +262,7 @@ class EDAAnalyzer:
             if target_semantic_type == "Numeric":
                 # Only support numeric target for now for correlation
                 if target_col in numeric_cols:
-                    target_correlations = self._calculate_target_correlations(target_col, numeric_cols)
+                    target_correlations = self._calculate_target_correlations(target_col, feature_cols)
                     
                     # Check for leakage
                     for col, corr in target_correlations.items():
@@ -211,7 +285,7 @@ class EDAAnalyzer:
                 # Or just use correlation ratio (eta)
                 # For now, let's use a simple heuristic: GroupBy Mean Variance?
                 # Let's implement a simple _calculate_categorical_target_associations
-                target_correlations = self._calculate_categorical_target_associations(target_col, numeric_cols)
+                target_correlations = self._calculate_categorical_target_associations(target_col, feature_cols)
                 
                 # Calculate Interactions (Box Plots for Numeric Features vs Categorical Target)
                 # Use top associated numeric features (limit handled in _calculate_target_interactions)
@@ -234,8 +308,8 @@ class EDAAnalyzer:
 
         # 6. Multivariate Analysis (PCA)
         pca_data = None
-        if SKLEARN_AVAILABLE and len(numeric_cols) >= 2:
-            pca_data = self._calculate_pca(numeric_cols, target_col)
+        if SKLEARN_AVAILABLE and len(feature_cols) >= 2:
+            pca_data = self._calculate_pca(feature_cols, target_col)
 
         # 6b. Outlier Detection
         outliers = None
@@ -243,12 +317,32 @@ class EDAAnalyzer:
             outliers = self._detect_outliers(numeric_cols)
 
         # 7. Geospatial Analysis
-        geospatial = self._analyze_geospatial(numeric_cols, target_col)
+        geospatial = self._analyze_geospatial(numeric_cols, target_col, lat_col, lon_col)
 
         # 8. Time Series Analysis
-        timeseries = self._analyze_timeseries(numeric_cols, target_col)
+        timeseries = self._analyze_timeseries(numeric_cols, target_col, date_col)
 
-        # 9. Smart Recommendations
+        # 9. Causal Discovery
+        causal_graph = None
+        
+        # Include encoded target for Causal Discovery
+        causal_cols = numeric_cols.copy()
+        if encoded_target_col:
+            causal_cols.append(encoded_target_col)
+            
+        if CAUSAL_LEARN_AVAILABLE and len(causal_cols) >= 2:
+            causal_graph = self._discover_causal_graph(causal_cols)
+
+        # 10. Rule Discovery (Decision Tree)
+        rule_tree = None
+        if SKLEARN_AVAILABLE and target_col and len(feature_cols) >= 1:
+            # Only run if target is categorical (Classification)
+            # Or we can support Regression too, but let's start with Classification as per user request (Fraud)
+            target_type = self._get_semantic_type(self.df[target_col])
+            if target_type in ["Categorical", "Boolean"]:
+                rule_tree = self._discover_rules(feature_cols, target_col)
+
+        # 11. Smart Recommendations
         recommendations = self._generate_recommendations(col_profiles, alerts, target_col)
 
         return DatasetProfile(
@@ -259,6 +353,7 @@ class EDAAnalyzer:
             memory_usage_mb=memory_usage,
             columns=col_profiles,
             correlations=correlations,
+            correlations_with_target=correlations_with_target,
             alerts=alerts,
             recommendations=recommendations,
             sample_data=sample_rows,
@@ -267,6 +362,8 @@ class EDAAnalyzer:
             target_interactions=target_interactions,
             pca_data=pca_data,
             outliers=outliers,
+            causal_graph=causal_graph,
+            rule_tree=rule_tree,
             geospatial=geospatial,
             timeseries=timeseries,
             excluded_columns=excluded_columns,
@@ -316,6 +413,8 @@ class EDAAnalyzer:
             # Calculate global medians for explanation
             medians = df_numeric.median().row(0, named=True)
             
+            # Vectorized explanation for top outliers
+            # We only process the top_k rows to save time
             for idx, score in scored_indices[:top_k]:
                 # Only include if it was actually predicted as outlier
                 if preds[idx] == -1:
@@ -323,20 +422,22 @@ class EDAAnalyzer:
                     row_values = df_numeric.row(idx, named=True)
                     
                     # Generate simple explanation (Z-Score like contribution)
-                    # Find which feature deviates most from median relative to its range/std?
-                    # Simple approach: Calculate absolute % difference from median
                     explanation = []
-                    for col, val in row_values.items():
-                        med = medians.get(col, 0)
-                        if med != 0:
-                            diff_pct = abs((val - med) / med) * 100
-                            if diff_pct > 50: # Only significant deviations
-                                explanation.append({
-                                    "feature": col,
-                                    "value": val,
-                                    "median": med,
-                                    "diff_pct": diff_pct
-                                })
+                    
+                    # Use list comprehension for speed
+                    explanation = [
+                        {
+                            "feature": col,
+                            "value": val,
+                            "median": medians.get(col, 0),
+                            "diff_pct": abs((val - medians.get(col, 0)) / medians.get(col, 1)) * 100 if medians.get(col, 0) != 0 else 0
+                        }
+                        for col, val in row_values.items()
+                        if val is not None and medians.get(col) is not None
+                    ]
+                    
+                    # Filter significant deviations (> 50%)
+                    explanation = [e for e in explanation if e["diff_pct"] > 50]
                     
                     # Sort explanation by deviation
                     explanation.sort(key=lambda x: x["diff_pct"], reverse=True)
@@ -359,26 +460,160 @@ class EDAAnalyzer:
             print(f"Error in outlier detection: {e}")
             return None
 
-    def _analyze_geospatial(self, numeric_cols: List[str], target_col: Optional[str] = None) -> Optional[GeospatialStats]:
+    def _discover_causal_graph(self, numeric_cols: List[str]) -> Optional[CausalGraph]:
+        """
+        Discovers causal structure using the PC algorithm from causal-learn.
+        """
+        try:
+            # Limit number of columns to prevent hanging on wide datasets
+            # PC algorithm complexity grows exponentially with number of variables
+            if len(numeric_cols) > 15:
+                # Smart Feature Selection
+                # If target is present (encoded or numeric), select Target + Top 14 correlated features
+                # This avoids filtering out low-variance confounders that are highly predictive
+                
+                target_col_name = None
+                # Check if any column looks like a target (encoded or original)
+                # We don't have explicit target_col passed here, but we can infer from numeric_cols
+                # Or better, we should pass target_col to this method. 
+                # For now, let's assume the last column might be target if it matches known target names
+                # But wait, we can calculate correlation matrix for ALL numeric cols
+                
+                # Calculate full correlation matrix
+                corr_matrix = self.df.select([
+                    pl.corr(col, numeric_cols[0]).alias(col) for col in numeric_cols
+                ]) # This is just one row, we need full matrix.
+                
+                # Actually, we can just use variance as fallback if no target info is available easily
+                # But wait, we can check if 'target' or 'target_encoded' is in numeric_cols
+                
+                target_candidates = [c for c in numeric_cols if "target" in c.lower() or "label" in c.lower()]
+                primary_target = target_candidates[0] if target_candidates else None
+                
+                if primary_target:
+                    # Calculate correlation with target
+                    corrs = []
+                    for col in numeric_cols:
+                        if col == primary_target: continue
+                        c = self.df.select(pl.corr(col, primary_target)).item()
+                        if c is not None:
+                            corrs.append((col, abs(c)))
+                    
+                    # Sort by correlation
+                    corrs.sort(key=lambda x: x[1], reverse=True)
+                    
+                    # Select top 14 + target
+                    selected_cols = [x[0] for x in corrs[:14]]
+                    selected_cols.append(primary_target)
+                    numeric_cols = selected_cols
+                else:
+                    # Fallback to Variance
+                    variances = []
+                    for col in numeric_cols:
+                        var = self.df.select(pl.col(col).var()).item()
+                        if var is not None:
+                            variances.append((col, var))
+                    
+                    # Sort by variance descending
+                    variances.sort(key=lambda x: x[1], reverse=True)
+                    
+                    # Take top 15
+                    numeric_cols = [x[0] for x in variances[:15]]
+
+            # 1. Prepare Data
+            # Limit to 5000 rows for performance
+            limit = 5000
+            df_numeric = self.df.select(numeric_cols).drop_nulls().head(limit)
+            
+            if df_numeric.height < 50:
+                return None
+
+            # Convert to numpy array
+            data = df_numeric.to_numpy()
+            
+            # 2. Run PC Algorithm
+            # alpha=0.05 is standard significance level
+            # indep_test='fisherz' is standard for continuous data (partial correlation)
+            cg = pc(data, alpha=0.05, indep_test='fisherz', show_progress=False)
+            
+            # cg.G is the GeneralGraph
+            # cg.G.graph is the adjacency matrix
+            # Nodes are indexed 0..N-1 corresponding to numeric_cols
+            
+            nodes = []
+            edges = []
+            
+            # Create Nodes
+            for i, col in enumerate(numeric_cols):
+                nodes.append(CausalNode(id=col, label=col))
+                
+            # Create Edges
+            # The graph matrix values:
+            # 0: No edge
+            # 1: A -> B (if graph[i,j]=1 and graph[j,i]=-1) ??
+            # Actually causal-learn graph representation:
+            # -1: Tail (--), 1: Arrow (->)
+            # graph[i,j] is the endpoint at j for edge i-j
+            # If graph[i,j] = -1 and graph[j,i] = 1, then i -- > j (i causes j)
+            # If graph[i,j] = -1 and graph[j,i] = -1, then i --- j (undirected)
+            # If graph[i,j] = 1 and graph[j,i] = 1, then i <-> j (bidirected/confounded)
+            
+            adj_matrix = cg.G.graph
+            num_vars = len(numeric_cols)
+            
+            for i in range(num_vars):
+                for j in range(i + 1, num_vars): # Check each pair once
+                    end_j = adj_matrix[i, j] # Endpoint at j
+                    end_i = adj_matrix[j, i] # Endpoint at i
+                    
+                    source = numeric_cols[i]
+                    target = numeric_cols[j]
+                    
+                    if end_j == 0 and end_i == 0:
+                        continue # No edge
+                        
+                    edge_type = "undirected"
+                    
+                    if end_i == -1 and end_j == 1:
+                        # i -> j
+                        edges.append(CausalEdge(source=source, target=target, type="directed"))
+                    elif end_i == 1 and end_j == -1:
+                        # j -> i
+                        edges.append(CausalEdge(source=target, target=source, type="directed"))
+                    elif end_i == -1 and end_j == -1:
+                        # i -- j
+                        edges.append(CausalEdge(source=source, target=target, type="undirected"))
+                    elif end_i == 1 and end_j == 1:
+                        # i <-> j
+                        edges.append(CausalEdge(source=source, target=target, type="bidirected"))
+                        
+            return CausalGraph(nodes=nodes, edges=edges)
+            
+        except Exception as e:
+            print(f"Error in causal discovery: {e}")
+            return None
+
+    def _analyze_geospatial(self, numeric_cols: List[str], target_col: Optional[str] = None, lat_col: Optional[str] = None, lon_col: Optional[str] = None) -> Optional[GeospatialStats]:
         """
         Detects and analyzes geospatial data (Lat/Lon).
         """
         try:
-            lat_col = None
-            lon_col = None
-            
-            # Check ALL columns, not just numeric ones, in case they were inferred as strings
-            candidates = {c.lower(): c for c in self.columns}
-            
-            # Latitude detection
-            if 'latitude' in candidates: lat_col = candidates['latitude']
-            elif 'lat' in candidates: lat_col = candidates['lat']
-            
-            # Longitude detection
-            if 'longitude' in candidates: lon_col = candidates['longitude']
-            elif 'lng' in candidates: lon_col = candidates['lng']
-            elif 'lon' in candidates: lon_col = candidates['lon']
-            elif 'long' in candidates: lon_col = candidates['long']
+            # If not provided, try to detect
+            if not lat_col or not lon_col:
+                # Check ALL columns, not just numeric ones, in case they were inferred as strings
+                candidates = {c.lower(): c for c in self.columns}
+                
+                # Latitude detection
+                if not lat_col:
+                    if 'latitude' in candidates: lat_col = candidates['latitude']
+                    elif 'lat' in candidates: lat_col = candidates['lat']
+                
+                # Longitude detection
+                if not lon_col:
+                    if 'longitude' in candidates: lon_col = candidates['longitude']
+                    elif 'lng' in candidates: lon_col = candidates['lng']
+                    elif 'lon' in candidates: lon_col = candidates['lon']
+                    elif 'long' in candidates: lon_col = candidates['long']
             
             if not lat_col or not lon_col:
                 return None
@@ -449,58 +684,110 @@ class EDAAnalyzer:
             print(f"Error in geospatial analysis: {e}")
             return None
 
-    def _analyze_timeseries(self, numeric_cols: List[str], target_col: Optional[str] = None) -> Optional[TimeSeriesAnalysis]:
+    def _analyze_timeseries(self, numeric_cols: List[str], target_col: Optional[str] = None, date_col: Optional[str] = None) -> Optional[TimeSeriesAnalysis]:
         """
         Detects DateTime column and performs time series analysis.
         """
         try:
-            # Find best date column (highest cardinality)
-            date_cols = []
-            for col in self.columns:
-                if self._get_semantic_type(self.df[col]) == "DateTime":
-                    date_cols.append(col)
+            if not date_col:
+                # Find best date column (highest cardinality)
+                date_cols = []
+                for col in self.columns:
+                    if self._get_semantic_type(self.df[col]) == "DateTime":
+                        date_cols.append(col)
+                
+                if not date_cols:
+                    return None
+                    
+                # Pick the one with most unique values to avoid constant metadata dates
+                best_date_col = None
+                max_unique = -1
+                
+                for col in date_cols:
+                    n_unique = self.df[col].n_unique()
+                    if n_unique > max_unique:
+                        max_unique = n_unique
+                        best_date_col = col
+                
+                date_col = best_date_col
             
-            if not date_cols:
+            if not date_col or date_col not in self.columns:
                 return None
                 
-            # Pick the one with most unique values to avoid constant metadata dates
-            best_date_col = None
-            max_unique = -1
-            
-            for col in date_cols:
-                n_unique = self.df[col].n_unique()
-                if n_unique > max_unique:
-                    max_unique = n_unique
-                    best_date_col = col
-            
-            date_col = best_date_col
-                
-            # 1. Trend Analysis (Resample by Day)
+            # 1. Trend Analysis (Dynamic Resampling)
             ts_df = self.lazy_df.sort(date_col)
+            
+            # Determine ideal interval
+            min_date = self.df[date_col].min()
+            max_date = self.df[date_col].max()
             
             # Select top 3 numeric columns + target to track
             cols_to_track = numeric_cols[:3]
             if target_col and target_col in numeric_cols and target_col not in cols_to_track:
                 cols_to_track.append(target_col)
+
+            # For small datasets, don't resample, just use raw data
+            # This avoids "interpolated" dates appearing in the chart
+            if self.row_count < 1000:
+                trend_df = ts_df.select([
+                    pl.col(date_col).alias("date"),
+                    *cols_to_track
+                ]).drop_nulls().collect()
                 
-            if not cols_to_track:
-                # Just track count
-                trend_df = ts_df.group_by(pl.col(date_col).dt.date().alias("date")).agg(
-                    pl.count().alias("count")
-                ).sort("date").collect()
+                # Convert to list of points
+                trend_points = []
+                for row in trend_df.iter_rows(named=True):
+                    if row["date"] is None: continue
+                    
+                    vals = {k: v for k, v in row.items() if k != "date" and v is not None}
+                    if not vals: continue
+                    
+                    trend_points.append(TimeSeriesPoint(
+                        date=row["date"].isoformat(),
+                        values=vals
+                    ))
             else:
-                aggs = [pl.col(c).mean().alias(c) for c in cols_to_track]
-                trend_df = ts_df.group_by(pl.col(date_col).dt.date().alias("date")).agg(
-                    aggs
-                ).sort("date").collect()
+                interval = "1d" # Default
+                if min_date and max_date:
+                    duration = (max_date - min_date).total_seconds()
+                    # Target ~100 points
+                    ideal_seconds = duration / 100
+                    
+                    if ideal_seconds < 60:
+                        interval = "1s"
+                    elif ideal_seconds < 3600:
+                        interval = "1m"
+                    elif ideal_seconds < 86400:
+                        interval = "1h"
+                    elif ideal_seconds < 604800:
+                        interval = "1d"
+                    else:
+                        interval = "1w"
+
+                if not cols_to_track:
+                    # Just track count
+                    trend_df = ts_df.group_by_dynamic(date_col, every=interval).agg(
+                        pl.count().alias("count")
+                    ).sort(date_col).collect()
+                else:
+                    aggs = [pl.col(c).mean().alias(c) for c in cols_to_track]
+                    trend_df = ts_df.group_by_dynamic(date_col, every=interval).agg(
+                        aggs
+                    ).sort(date_col).collect()
                 
-            # Convert to TimeSeriesPoint list
-            trend_points = []
-            for row in trend_df.iter_rows(named=True):
-                if row["date"] is None: continue
-                date_str = str(row["date"])
-                values = {k: v for k, v in row.items() if k != "date" and v is not None}
-                trend_points.append(TimeSeriesPoint(date=date_str, values=values))
+                # Convert to list of points
+                trend_points = []
+                for row in trend_df.iter_rows(named=True):
+                    # Skip if date is null
+                    if row[date_col] is None: continue
+                    
+                    vals = {k: v for k, v in row.items() if k != date_col and v is not None}
+                    if not vals: continue
+                    
+                    trend_points.append(TimeSeriesPoint(
+                        date=row[date_col].isoformat(),
+                        values=vals
+                    ))
                 
             # 2. Seasonality (Day of Week)
             # If we have a numeric column to track, use mean, else count
@@ -617,16 +904,16 @@ class EDAAnalyzer:
             sample_df = self.df.select(cols_to_fetch).sample(n=sample_size, with_replacement=False, seed=42)
             
             # Extract Numeric Data for PCA
-            X = sample_df.select(numeric_cols).to_numpy()
+            # Use Polars fill_null for better performance than SimpleImputer
+            X_df = sample_df.select(numeric_cols).fill_null(strategy="mean")
+            X = X_df.to_numpy()
             
-            # Handle missing values
-            if np.isnan(X).any():
-                imputer = SimpleImputer(strategy='mean')
-                X = imputer.fit_transform(X)
-                
-            # Scale
-            scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X)
+            # Standardize
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                scaler = StandardScaler()
+                X_scaled = scaler.fit_transform(X)
             
             # PCA
             pca = PCA(n_components=3)
@@ -787,12 +1074,15 @@ class EDAAnalyzer:
                 # Polars doesn't support multiple quantiles in one agg easily in older versions, 
                 # but we can do multiple aggs.
                 
+                # Ensure value_col is numeric (cast if necessary)
+                # Sometimes value_col might be inferred as string if it has mixed types
+                
                 stats_df = self.lazy_df.group_by(group_col).agg([
-                    pl.col(value_col).min().alias("min"),
-                    pl.col(value_col).quantile(0.25).alias("q1"),
-                    pl.col(value_col).median().alias("median"),
-                    pl.col(value_col).quantile(0.75).alias("q3"),
-                    pl.col(value_col).max().alias("max")
+                    pl.col(value_col).cast(pl.Float64, strict=False).min().alias("min"),
+                    pl.col(value_col).cast(pl.Float64, strict=False).quantile(0.25).alias("q1"),
+                    pl.col(value_col).cast(pl.Float64, strict=False).median().alias("median"),
+                    pl.col(value_col).cast(pl.Float64, strict=False).quantile(0.75).alias("q3"),
+                    pl.col(value_col).cast(pl.Float64, strict=False).max().alias("max")
                 ]).collect()
                 
                 category_plots = []
@@ -918,7 +1208,12 @@ class EDAAnalyzer:
             # df.select([pl.corr(col, target_col) for col in features])
             
             exprs = [pl.corr(col, target_col).alias(col) for col in features]
-            result = self.lazy_df.select(exprs).collect()
+            
+            # Suppress numpy warnings during correlation calculation
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                result = self.lazy_df.select(exprs).collect()
             
             corrs = {}
             for col in features:
@@ -933,7 +1228,7 @@ class EDAAnalyzer:
             print(f"Error calculating target correlations: {e}")
             return {}
         
-    def _analyze_column(self, col: str) -> (ColumnProfile, List[Alert]):
+    def _analyze_column(self, col: str) -> Tuple[ColumnProfile, List[Alert]]:
         dtype = str(self.df[col].dtype)
         alerts = []
         
@@ -1069,10 +1364,137 @@ class EDAAnalyzer:
                 
         return profile, alerts
 
+    def _discover_rules(self, feature_cols: List[str], target_col: str) -> Optional[RuleTree]:
+        """
+        Trains a surrogate Decision Tree to extract rules from the data.
+        """
+        try:
+            # Prepare Data
+            # Limit rows for performance
+            limit = 100000
+            df_sample = self.df.select(feature_cols + [target_col]).head(limit)
+            
+            # Handle Missing Values (Simple Imputation)
+            # For categorical, fill with "Missing"
+            # For numeric, fill with Mean
+            
+            # We need to encode categorical features for sklearn
+            # Identify categorical columns
+            cat_cols = [c for c in feature_cols if self._get_semantic_type(df_sample[c]) in ["Categorical", "Boolean", "Text"]]
+            num_cols = [c for c in feature_cols if c not in cat_cols]
+            
+            # Encode Categorical
+            # We use Ordinal Encoding for simplicity in tree visualization (e.g. "Color <= 1.5")
+            # Ideally OneHot is better for accuracy, but Ordinal is better for "Rule Extraction" readability if mapped back
+            # For now, let's use simple factorization (Ordinal)
+            
+            X_data = {}
+            feature_names = []
+            
+            for col in num_cols:
+                # Fill nulls with mean
+                mean_val = df_sample[col].mean()
+                X_data[col] = df_sample[col].fill_null(mean_val).to_numpy()
+                feature_names.append(col)
+                
+            for col in cat_cols:
+                # Fill nulls with "Missing"
+                # Cast to string first
+                s = df_sample[col].cast(pl.Utf8).fill_null("Missing")
+                # Factorize (returns codes, categories)
+                # We need to keep track of mapping if we want to show labels, but for now let's just show codes
+                # Or better: Use OneHot? No, tree becomes huge.
+                # Let's use Factorize.
+                # Polars factorize is experimental or different in versions.
+                # Use cast to Categorical -> to_physical
+                codes = s.cast(pl.Categorical).to_physical().to_numpy()
+                X_data[col] = codes
+                feature_names.append(col)
+                
+            # Construct X matrix
+            # Ensure order matches feature_names
+            X_list = [X_data[col] for col in feature_names]
+            X = np.column_stack(X_list)
+            
+            # Prepare Y
+            y_series = df_sample[target_col].cast(pl.Utf8).fill_null("Missing")
+            y = y_series.cast(pl.Categorical).to_physical().to_numpy()
+            class_names = y_series.cast(pl.Categorical).cat.get_categories().to_list()
+            
+            # Train Tree
+            # Max depth 3 for readability (Decomposition Tree style)
+            clf = DecisionTreeClassifier(max_depth=5, random_state=42)
+            clf.fit(X, y)
+            
+            # Extract Tree Structure
+            tree_ = clf.tree_
+            
+            nodes = []
+            
+            def recurse(node_id):
+                is_leaf = tree_.children_left[node_id] == _tree.TREE_LEAF
+                
+                feature = None
+                threshold = None
+                if not is_leaf:
+                    feature_idx = tree_.feature[node_id]
+                    feature = feature_names[feature_idx]
+                    threshold = float(tree_.threshold[node_id])
+                    
+                value = tree_.value[node_id][0].tolist() # Class counts
+                # Predict class
+                class_idx = np.argmax(value)
+                class_name = str(class_names[class_idx]) if class_idx < len(class_names) else "Unknown"
+                
+                children = []
+                if not is_leaf:
+                    left_id = tree_.children_left[node_id]
+                    right_id = tree_.children_right[node_id]
+                    children = [int(left_id), int(right_id)]
+                    recurse(left_id)
+                    recurse(right_id)
+                    
+                nodes.append(RuleNode(
+                    id=int(node_id),
+                    feature=feature,
+                    threshold=threshold,
+                    impurity=float(tree_.impurity[node_id]),
+                    samples=int(tree_.n_node_samples[node_id]),
+                    value=value,
+                    class_name=class_name,
+                    is_leaf=is_leaf,
+                    children=children
+                ))
+                
+            recurse(0)
+            
+            # Sort nodes by ID
+            nodes.sort(key=lambda x: x.id)
+            
+            return RuleTree(
+                nodes=nodes,
+                accuracy=float(clf.score(X, y))
+            )
+            
+        except Exception as e:
+            print(f"Error in rule discovery: {e}")
+            return None
+
     def _get_semantic_type(self, series: pl.Series) -> str:
         dtype = series.dtype
         
-        if dtype in [pl.Float32, pl.Float64, pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64]:
+        if dtype in [pl.Float32, pl.Float64]:
+            return "Numeric"
+        elif dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64]:
+            # Check cardinality for Integers
+            # If low cardinality -> Categorical (better for plotting/analysis)
+            n_unique = series.n_unique()
+            count = len(series)
+            ratio = n_unique / count if count > 0 else 0
+            
+            if ratio < 0.05 and n_unique < 20:
+                 return "Categorical"
+            
             return "Numeric"
         elif dtype == pl.Boolean:
             return "Boolean"
