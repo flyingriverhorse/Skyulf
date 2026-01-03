@@ -8,6 +8,11 @@ from backend.dependencies import get_db
 from backend.database.models import EDAReport, DataSource
 from backend.config import get_settings
 from backend.eda.tasks import run_eda_background, generate_profile_celery
+from backend.services.data_service import DataService
+from backend.utils.file_utils import extract_file_path_from_source
+from skyulf.profiling.analyzer import EDAAnalyzer
+import polars as pl
+import pandas as pd
 
 router = APIRouter(prefix="/eda", tags=["EDA"])
 
@@ -132,3 +137,114 @@ async def get_report(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     return report.to_dict()
+
+class DecompositionRequest(BaseModel):
+    measure_col: Optional[str] = None
+    measure_agg: str = "count"
+    split_col: Optional[str] = None
+    filters: Optional[List[FilterRequest]] = None
+
+@router.post("/{dataset_id}/decomposition")
+async def get_decomposition(
+    dataset_id: int,
+    request: DecompositionRequest,
+    session: AsyncSession = Depends(get_db)
+):
+    """
+    Calculates the breakdown of a measure by a split column for Decomposition Trees.
+    """
+    try:
+        # 1. Fetch DataSource
+        ds = await session.get(DataSource, dataset_id)
+        if not ds:
+            raise HTTPException(status_code=404, detail="Dataset not found")
+
+        # 2. Resolve File Path
+        source_data_dict = {
+            "config": ds.config or {},
+            "connection_info": ds.source_metadata or {},
+            "file_path": (ds.config or {}).get("file_path"),
+            "source_id": ds.source_id
+        }
+        file_path = extract_file_path_from_source(source_data_dict)
+        
+        if not file_path:
+             # Fallback
+             if ds.source_id and (str(ds.source_id).endswith('.csv') or str(ds.source_id).endswith('.parquet')):
+                 file_path = ds.source_id
+             else:
+                 raise HTTPException(status_code=400, detail="File path not found")
+
+        # 3. Prepare Storage Options (Simplified from tasks.py)
+        storage_options = None
+        if file_path and str(file_path).startswith("s3://"):
+            creds = ds.credentials or {}
+            if not creds:
+                 config_creds = ds.config or {}
+                 creds = {
+                     "aws_access_key_id": config_creds.get("aws_access_key_id"),
+                     "aws_secret_access_key": config_creds.get("aws_secret_access_key"),
+                     "aws_session_token": config_creds.get("aws_session_token"),
+                     "endpoint_url": config_creds.get("endpoint_url")
+                 }
+            
+            if not creds.get("aws_access_key_id"):
+                settings = get_settings()
+                creds = {
+                    "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+                    "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+                    "aws_session_token": settings.AWS_SESSION_TOKEN,
+                    "endpoint_url": None
+                }
+
+            storage_options = {
+                "key": creds.get("aws_access_key_id") or creds.get("key"),
+                "secret": creds.get("aws_secret_access_key") or creds.get("secret"),
+                "token": creds.get("aws_session_token") or creds.get("token"),
+                "endpoint_url": creds.get("endpoint_url")
+            }
+            storage_options = {k: v for k, v in storage_options.items() if v is not None}
+
+        # 4. Load Data
+        data_service = DataService()
+        try:
+            df = await data_service.load_file(file_path, storage_options=storage_options)
+            # Ensure Polars DataFrame
+            if isinstance(df, pd.DataFrame):
+                try:
+                    df = pl.from_pandas(df)
+                except Exception:
+                    # Fallback: convert object cols to string to handle mixed types
+                    for col in df.columns:
+                        if df[col].dtype == 'object':
+                            df[col] = df[col].astype(str)
+                    df = pl.from_pandas(df)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to load dataset: {str(e)}")
+
+        # 5. Run Analysis
+        analyzer = EDAAnalyzer(df)
+        
+        filters_dict = [f.dict() for f in request.filters] if request.filters else []
+        
+        # Handle empty string split_col from frontend
+        split_col_arg = request.split_col
+        if split_col_arg == "":
+            split_col_arg = None
+
+        result = analyzer.get_decomposition_split(
+            measure_col=request.measure_col,
+            measure_agg=request.measure_agg,
+            split_col=split_col_arg,
+            filters=filters_dict
+        )
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"CRITICAL ERROR in get_decomposition: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+

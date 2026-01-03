@@ -19,7 +19,8 @@ import { CorrelationsTab } from '../components/eda/tabs/CorrelationsTab';
 import { SampleDataTab } from '../components/eda/tabs/SampleDataTab';
 import { CausalTab } from '../components/eda/tabs/CausalTab';
 import { RuleDiscoveryTab } from '../components/eda/tabs/RuleDiscoveryTab';
-import { Loader2, Play, RefreshCw, AlertCircle, BarChart2, Lightbulb, ScatterChart as ScatterIcon, Map, Calendar, List, AlertTriangle, Network, GitBranch } from 'lucide-react';
+import { DecompositionTab } from '../components/eda/tabs/DecompositionTab';
+import { Loader2, Play, RefreshCw, AlertCircle, BarChart2, Lightbulb, ScatterChart as ScatterIcon, Map, Calendar, List, AlertTriangle, Network, GitBranch, Split } from 'lucide-react';
 import { downloadChart } from '../core/utils/chartUtils';
 
 export const EDAPage: React.FC = () => {
@@ -438,6 +439,17 @@ export const EDAPage: React.FC = () => {
               Decision Tree
             </button>
             )}
+            <button
+              onClick={() => setActiveTab('decomposition')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                activeTab === 'decomposition'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Split className="w-4 h-4" />
+              Decomposition Tree
+            </button>
             {profile.target_col && profile.target_correlations && Object.keys(profile.target_correlations).length > 0 && (
                 <button
                 onClick={() => setActiveTab('target')}
@@ -531,6 +543,14 @@ export const EDAPage: React.FC = () => {
 
         {activeTab === 'rules' && profile.rule_tree && (
             <RuleDiscoveryTab profile={profile} />
+        )}
+
+        {activeTab === 'decomposition' && selectedDataset && (
+            <DecompositionTab 
+                datasetId={selectedDataset}
+                columns={report?.profile_data?.columns ? Object.keys(report.profile_data.columns) : []}
+                initialFilters={filters}
+            />
         )}
 
         {activeTab === 'sample' && profile.sample_data && (
