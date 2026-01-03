@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Hash, AlignLeft, Calendar } from 'lucide-react';
+import { X, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Hash, AlignLeft, Calendar, Ban } from 'lucide-react';
+import { EDAService } from '../../core/api/eda';
 
 interface JobsHistoryModalProps {
   isOpen: boolean;
@@ -7,17 +8,35 @@ interface JobsHistoryModalProps {
   history: any[];
   onSelect: (report: any) => void;
   onFetchReport: (id: number) => Promise<any>;
+  onRefresh?: () => void;
 }
 
-export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onClose, history, onSelect, onFetchReport }) => {
+export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onClose, history, onSelect, onFetchReport, onRefresh }) => {
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [cancelling, setCancelling] = useState<number | null>(null);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
     setSelectedJob(null);
     onClose();
+  };
+
+  const handleCancel = async (e: React.MouseEvent, jobId: number) => {
+    e.stopPropagation();
+    if (confirm("Are you sure you want to cancel this analysis?")) {
+        setCancelling(jobId);
+        try {
+            await EDAService.cancelJob(jobId);
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            console.error("Failed to cancel job", err);
+            alert("Failed to cancel job");
+        } finally {
+            setCancelling(null);
+        }
+    }
   };
 
   const handleJobClick = async (job: any) => {
@@ -87,15 +106,25 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                       <div className={`p-2 rounded-full ${
                         job.status === 'COMPLETED' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
                         job.status === 'FAILED' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+                        job.status === 'CANCELLED' ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' :
                         'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400'
                       }`}>
                         {job.status === 'COMPLETED' ? <CheckCircle className="w-5 h-5" /> :
                          job.status === 'FAILED' ? <AlertCircle className="w-5 h-5" /> :
+                         job.status === 'CANCELLED' ? <Ban className="w-5 h-5" /> :
                          <Loader2 className="w-5 h-5 animate-spin" />}
                       </div>
                       <div>
-                        <div className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                        <div className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-2">
                           Analysis #{job.id}
+                          <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                            job.status === 'COMPLETED' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800' :
+                            job.status === 'FAILED' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800' :
+                            job.status === 'CANCELLED' ? 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700' :
+                            'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800'
+                          }`}>
+                            {job.status}
+                          </span>
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           {new Date(job.created_at).toLocaleString()}
@@ -103,7 +132,23 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                       </div>
                     </div>
                     
-                    <div className="text-right">
+                    <div className="text-right flex items-center gap-4">
+                      {/* Cancel Button for Pending/Running Jobs */}
+                      {(job.status === 'PENDING' || job.status === 'STARTED' || job.status === 'RUNNING') && (
+                        <button
+                            onClick={(e) => handleCancel(e, job.id)}
+                            disabled={cancelling === job.id}
+                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
+                            title="Cancel Analysis"
+                        >
+                            {cancelling === job.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Ban className="w-4 h-4" />
+                            )}
+                        </button>
+                      )}
+                      
                       {/* Note: excluded_columns is not available in history list summary */}
                     </div>
                   </div>

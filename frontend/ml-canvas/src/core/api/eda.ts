@@ -28,6 +28,11 @@ export const EDAService = {
     return response.data;
   },
 
+  cancelJob: async (reportId: number) => {
+    const response = await axios.post(`${API_BASE}/reports/${reportId}/cancel`);
+    return response.data;
+  },
+
   getHistory: async (datasetId: number) => {
     const response = await axios.get(`${API_BASE}/${datasetId}/history`);
     return response.data;

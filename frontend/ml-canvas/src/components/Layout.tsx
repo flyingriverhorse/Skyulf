@@ -31,7 +31,7 @@ export const Layout: React.FC = () => {
   };
 
   const isActive = (path: string) => location.pathname === path;
-  const isCollapsed = location.pathname === '/canvas';
+  const isCollapsed = location.pathname === '/canvas' || location.pathname === '/eda';
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
@@ -50,14 +50,14 @@ export const Layout: React.FC = () => {
           <NavLink to="/" active={isActive('/')} icon={<LayoutDashboard size={20} />} collapsed={isCollapsed}>
             Dashboard
           </NavLink>
+          <NavLink to="/eda" active={isActive('/eda')} icon={<BarChart2 size={20} />} collapsed={isCollapsed}>
+            EDA
+          </NavLink>
           <NavLink to="/canvas" active={isActive('/canvas')} icon={<GitBranch size={20} />} collapsed={isCollapsed}>
             ML Canvas
           </NavLink>
           <NavLink to="/data" active={isActive('/data')} icon={<Database size={20} />} collapsed={isCollapsed}>
             Data Sources
-          </NavLink>
-          <NavLink to="/eda" active={isActive('/eda')} icon={<BarChart2 size={20} />} collapsed={isCollapsed}>
-            EDA
           </NavLink>
           <NavLink to="/registry" active={isActive('/registry')} icon={<Archive size={20} />} collapsed={isCollapsed}>
             Model Registry
