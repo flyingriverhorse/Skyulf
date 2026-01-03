@@ -141,7 +141,7 @@ export const VariableDetailModal: React.FC<VariableDetailModalProps> = ({
                         <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded">
                             <div className="flex items-center gap-1 mb-1">
                                 <span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Normality ({selectedVariable.normality_test.test_name})</span>
-                                <InfoTooltip text="Shapiro-Wilk test is limited to the top 5,000 samples for performance and statistical stability. For larger datasets, rely on Skewness and Kurtosis." />
+                                <InfoTooltip text="Normality tests are performed on a sample of up to 5,000 rows. Shapiro-Wilk is used for smaller datasets (<5,000), and Kolmogorov-Smirnov for larger ones. For very large datasets, rely on Skewness and Kurtosis." />
                             </div>
                             <span className={`font-medium ${selectedVariable.normality_test.is_normal ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                                 {selectedVariable.normality_test.is_normal ? 'Normal' : 'Not Normal'}

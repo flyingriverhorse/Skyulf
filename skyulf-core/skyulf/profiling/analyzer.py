@@ -1265,14 +1265,18 @@ class EDAAnalyzer:
                 try:
                     # Sample data (Shapiro is slow on large data, limit to 5000)
                     sample_data = self.df[col].drop_nulls().head(5000).to_numpy()
-                    if len(sample_data) > 20:
+                    
+                    # Ensure sample has variance before testing
+                    if len(sample_data) > 20 and np.std(sample_data) > 1e-10:
                         # Use Shapiro-Wilk for N < 5000, else KS test
                         if len(sample_data) < 5000:
                             stat, p_value = shapiro(sample_data)
                             test_name = "Shapiro-Wilk"
                         else:
                             # KS Test against normal distribution
-                            stat, p_value = kstest(sample_data, 'norm')
+                            # Must provide mean/std to test against fitted normal, not standard normal
+                            mean, std = np.mean(sample_data), np.std(sample_data)
+                            stat, p_value = kstest(sample_data, 'norm', args=(mean, std))
                             test_name = "Kolmogorov-Smirnov"
                             
                         profile.normality_test = NormalityTestResult(
