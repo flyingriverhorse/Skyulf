@@ -1668,3 +1668,151 @@ class EDAAnalyzer:
             # Phone check is tricky, maybe skip for now or refine
             
         return False
+
+    def get_decomposition_split(
+        self, 
+        measure_col: Optional[str], 
+        measure_agg: str, 
+        split_col: Optional[str], 
+        filters: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Calculates the breakdown of a measure by a split column.
+        Used for Decomposition Trees.
+        """
+        # 1. Apply Filters
+        filtered_df = self.df
+        for f in filters:
+            col = f['column']
+            op = f['operator']
+            val = f['value']
+            
+            if col not in filtered_df.columns:
+                continue
+            
+            # Handle type mismatch for numeric columns vs string values (from frontend)
+            dtype = filtered_df.schema[col]
+            is_numeric = dtype in (pl.Float32, pl.Float64, pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64)
+            
+            if is_numeric and isinstance(val, str):
+                if val == "Unknown":
+                    # "Unknown" represents nulls in our visualization
+                    if op == '==':
+                        filtered_df = filtered_df.filter(pl.col(col).is_null())
+                    elif op == '!=':
+                        filtered_df = filtered_df.filter(pl.col(col).is_not_null())
+                    continue
+                else:
+                    try:
+                        if dtype in (pl.Float32, pl.Float64):
+                            val = float(val)
+                        else:
+                            # Handle "1.0" string for int columns
+                            val = int(float(val))
+                    except ValueError:
+                        # If casting fails, we can't filter numeric col by this string.
+                        # It might be a mismatch. We can try casting the column to string?
+                        # Or just ignore?
+                        # Let's cast column to string as fallback, though slower.
+                        pass
+
+            # Apply filter
+            # If we still have a string val and numeric col, we cast col to string to be safe
+            if is_numeric and isinstance(val, str):
+                 col_expr = pl.col(col).cast(pl.Utf8)
+            else:
+                 col_expr = pl.col(col)
+
+            if op == '==':
+                filtered_df = filtered_df.filter(col_expr == val)
+            elif op == '!=':
+                filtered_df = filtered_df.filter(col_expr != val)
+            elif op == '>':
+                filtered_df = filtered_df.filter(col_expr > val)
+            elif op == '<':
+                filtered_df = filtered_df.filter(col_expr < val)
+            elif op == '>=':
+                filtered_df = filtered_df.filter(col_expr >= val)
+            elif op == '<=':
+                filtered_df = filtered_df.filter(col_expr <= val)
+            elif op == 'in':
+                filtered_df = filtered_df.filter(col_expr.is_in(val))
+
+        # 2. Calculate Measure
+        # If split_col is None, return global aggregate
+        if not split_col:
+            if not measure_col: # Count rows
+                val = filtered_df.height
+            else:
+                if measure_col not in filtered_df.columns:
+                    return []
+                
+                # Handle nulls in measure col
+                series = filtered_df[measure_col]
+                
+                if measure_agg == 'sum':
+                    val = series.sum()
+                elif measure_agg == 'mean':
+                    val = series.mean()
+                elif measure_agg == 'min':
+                    val = series.min()
+                elif measure_agg == 'max':
+                    val = series.max()
+                else:
+                    val = filtered_df.height # Default to count
+            
+            # Handle None/NaN result
+            if val is None:
+                val = 0
+                
+            return [{"name": "Total", "value": val, "ratio": 1.0}]
+
+        # 3. Group By Split Col
+        if split_col not in filtered_df.columns:
+            return []
+
+        # Handle nulls in split col by filling with "Unknown" or dropping
+        # For visualization, it's better to show them
+        temp_df = filtered_df.with_columns(
+            pl.col(split_col).fill_null("Unknown").cast(pl.Utf8)
+        )
+
+        if not measure_col:
+            # Count
+            agg_df = temp_df.group_by(split_col).agg(pl.len().alias("value"))
+        else:
+            if measure_col not in temp_df.columns:
+                return []
+                
+            if measure_agg == 'sum':
+                agg_df = temp_df.group_by(split_col).agg(pl.col(measure_col).sum().alias("value"))
+            elif measure_agg == 'mean':
+                agg_df = temp_df.group_by(split_col).agg(pl.col(measure_col).mean().alias("value"))
+            elif measure_agg == 'min':
+                agg_df = temp_df.group_by(split_col).agg(pl.col(measure_col).min().alias("value"))
+            elif measure_agg == 'max':
+                agg_df = temp_df.group_by(split_col).agg(pl.col(measure_col).max().alias("value"))
+            else:
+                agg_df = temp_df.group_by(split_col).agg(pl.len().alias("value"))
+
+        # 4. Calculate Ratios
+        total_val = agg_df["value"].sum()
+        if total_val == 0 or total_val is None:
+            # Avoid division by zero
+            result_df = agg_df.with_columns(pl.lit(0.0).alias("ratio"))
+        else:
+            result_df = agg_df.with_columns((pl.col("value") / total_val).alias("ratio"))
+
+        # Sort by value descending
+        result_df = result_df.sort("value", descending=True)
+
+        # Convert to list of dicts
+        results = []
+        for row in result_df.iter_rows(named=True):
+            results.append({
+                "name": str(row[split_col]),
+                "value": row["value"] if row["value"] is not None else 0,
+                "ratio": row["ratio"] if row["ratio"] is not None else 0
+            })
+            
+        return results

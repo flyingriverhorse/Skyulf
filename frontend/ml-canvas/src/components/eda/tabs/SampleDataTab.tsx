@@ -13,7 +13,10 @@ export const SampleDataTab: React.FC<SampleDataTabProps> = ({
     handleToggleExclude
 }) => {
     // Filter out excluded columns from display
-    const visibleColumns = Object.keys(profile.sample_data[0] || {}).filter(col => !excludedCols.includes(col));
+    // Also filter out columns ending in '_encoded' (e.g. target_encoded)
+    const visibleColumns = Object.keys(profile.sample_data[0] || {}).filter(col => 
+        !excludedCols.includes(col) && !col.endsWith('_encoded')
+    );
 
     return (
         <div className="mt-4 overflow-x-auto bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
