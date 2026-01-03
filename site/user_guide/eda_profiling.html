@@ -1171,6 +1171,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#6-smart-date-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Smart Date Detection
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2682,7 +2693,7 @@ profile = analyzer.analyze(
 
 # 3. Visualize
 viz = EDAVisualizer(profile, df)
-viz.summary()  # Prints Data Quality, Stats, Outliers, Alerts to terminal
+viz.summary()  # Prints Data Quality, Stats, Outliers, Target Analysis, Alerts to terminal
 viz.plot()     # Opens Matplotlib plots (Distributions, Correlations, PCA, etc.)
 </code></pre>
 <h3 id="the-manual-way-accessing-raw-stats">The Manual Way (Accessing Raw Stats)</h3>
@@ -2732,6 +2743,8 @@ for alert in profile.alerts:
 <li><strong>Outlier Detection:</strong> Uses Isolation Forest to identify anomalous rows.</li>
 <li><strong>PCA:</strong> Computes Principal Components to visualize high-dimensional data structure.</li>
 <li><strong>Causal Discovery:</strong> Uses the PC Algorithm to infer causal relationships between variables (DAG).</li>
+<li><strong>Decision Tree:</strong> Uses a surrogate Decision Tree model to extract human-readable rules (e.g., "If Age &gt; 50 and Income &lt; 30k -&gt; High Risk"). Provides both a visual tree and a list of text rules. Useful for finding "smoking gun" segments.</li>
+<li><strong>Target Analysis:</strong> Analyzes relationships between features and the target variable (Correlations, ANOVA, Interactions).</li>
 <li><strong>Geospatial:</strong> Automatically detects Lat/Lon columns and computes bounding boxes.</li>
 <li><strong>Time Series:</strong> Detects seasonality and trends in datetime columns.</li>
 </ul>
@@ -2782,7 +2795,7 @@ profile = analyzer.analyze(
 <h3 id="3-causal-discovery">3. Causal Discovery</h3>
 <p>Skyulf integrates <code>causal-learn</code> to perform causal discovery using the PC Algorithm. This helps distinguish between correlation and causation by building a Directed Acyclic Graph (DAG).</p>
 <blockquote>
-<p><strong>Note:</strong> To ensure performance, the causal graph is built using the top 15 variables with the highest variance.</p>
+<p><strong>Note:</strong> To ensure performance on wide datasets, the causal graph is built using the <strong>Target</strong> and the <strong>top 14 features</strong> most correlated with it (instead of just high variance).</p>
 </blockquote>
 <pre><code class="language-python">if profile.causal_graph:
     print(f&quot;Graph has {len(profile.causal_graph.nodes)} nodes and {len(profile.causal_graph.edges)} edges.&quot;)
@@ -2798,7 +2811,7 @@ profile = analyzer.analyze(
     print(f&quot;Centroid: {profile.geospatial.centroid_lat}, {profile.geospatial.centroid_lon}&quot;)
 </code></pre>
 <h3 id="5-time-series-analysis">5. Time Series Analysis</h3>
-<p>Detects datetime columns and analyzes trends and seasonality.</p>
+<p>Detects datetime columns and analyzes trends and seasonality. It automatically adjusts the resampling interval (e.g., 1s, 1h, 1d) based on the data duration to provide meaningful trend lines.</p>
 <pre><code class="language-python">if profile.timeseries:
     print(f&quot;Time Column: {profile.timeseries.date_col}&quot;)
 
@@ -2806,6 +2819,16 @@ profile = analyzer.analyze(
     for point in profile.timeseries.trend[:5]:
         print(f&quot;Date: {point.date}, Value: {point.values}&quot;)
 </code></pre>
+<h3 id="6-smart-date-detection">6. Smart Date Detection</h3>
+<p>Skyulf uses a robust "Tournament Strategy" to correctly identify date formats in ambiguous columns (e.g., distinguishing between <code>MM/DD/YYYY</code> and <code>DD/MM/YYYY</code>).</p>
+<p><strong>How it works:</strong>
+1.  <strong>Heuristic Check:</strong> First, it checks column names for keywords like <code>date</code>, <code>time</code>, <code>created_at</code> to avoid expensive parsing on non-date columns.
+2.  <strong>Candidate Testing:</strong> It attempts to parse a sample of the data using multiple formats:
+    *   ISO Standard (<code>YYYY-MM-DD</code>)
+    *   Common US Format (<code>MM/DD/YYYY</code>)
+    *   Common EU Format (<code>DD/MM/YYYY</code>)
+3.  <strong>Entropy Selection:</strong> For ambiguous cases (e.g., <code>01/02/2023</code> could be Jan 2nd or Feb 1st), it calculates the <strong>Month Entropy</strong> (number of unique months) for each candidate format.
+    *   It selects the format that yields the highest number of unique months, assuming that real-world data typically spans more than just January.</p>
 <h2 id="examples">Examples</h2>
 <p>We provide complete, runnable scripts in the <code>docs/examples/scripts/</code> directory. These examples demonstrate how to use Skyulf as a library with rich terminal output and visualizations.</p>
 <h3 id="prerequisites-for-examples">Prerequisites for Examples</h3>

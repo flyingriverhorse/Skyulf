@@ -70,6 +70,7 @@ class RuleNode(BaseModel):
 class RuleTree(BaseModel):
     nodes: List[RuleNode]
     accuracy: Optional[float] = None # Surrogate model accuracy
+    rules: Optional[List[str]] = None # Human readable rules
 
 class ColumnProfile(BaseModel):
     name: str

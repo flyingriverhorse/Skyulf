@@ -61,6 +61,19 @@ export const RuleDiscoveryTab: React.FC<RuleDiscoveryTabProps> = ({ profile }) =
 
                 <RuleTreeGraph tree={ruleTree} />
             </div>
+
+            {ruleTree.rules && ruleTree.rules.length > 0 && (
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Extracted Rules</h3>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {ruleTree.rules.map((rule: string, idx: number) => (
+                            <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-100 dark:border-gray-700 text-sm font-mono text-gray-700 dark:text-gray-300">
+                                {rule}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

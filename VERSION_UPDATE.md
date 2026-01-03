@@ -14,87 +14,22 @@
 **"The Advanced EDA & Profiling Update"**
 This release introduces a professional-grade Automated EDA module, enabling deep statistical analysis of datasets directly within the platform.
 
-### 🎨 Frontend
-- **Correlation Matrix:** Added dual-view support to display both "Feature Correlations" and "Target Correlations" separately.
-- **Filter Bar:** Added "Excluded Columns" management section, allowing users to easily view, restore, and manage excluded columns directly from the toolbar.
-- **Filter Bar:** Added "Clear All" button for quick filter reset and improved layout with collapsible sections.
-- **Alerts:** Made Data Quality Alerts section collapsible to save screen space.
-
-### 🔧 Core Library
-- **Performance:** Optimized `_calculate_pca` by replacing `SimpleImputer` with native Polars `fill_null` for faster memory handling.
-- **Performance:** Vectorized outlier explanation logic in `_detect_outliers` using Numpy, significantly speeding up anomaly detection on large datasets.
-- **Performance:** Implemented dynamic resampling interval in Time Series analysis to automatically adjust granularity based on date range duration.
-- **Performance:** Added heuristic check in `_cast_date_columns` to skip expensive date parsing on non-date columns.
-- **Causal Discovery:** Improved feature selection logic to prioritize "Target + Top Correlated Features" instead of just high variance when reducing dimensionality for causal graph discovery.
-- **Correlation Analysis:** Split correlation calculation into two distinct matrices: "Feature-Feature" (for multicollinearity checks) and "Feature-Target" (for feature selection).
-- **Target Encoding:** Implemented automatic encoding of categorical targets to ensure they are included in Causal Discovery and Feature Selection analysis.
-- **Box Plots:** Improved logic to treat low-cardinality integers as Categorical, enabling Box Plot generation for classification targets (e.g., Iris dataset).
-- **EDA Visualizer:** Added `EDAVisualizer` class to `skyulf.profiling` for automated generation of Rich terminal dashboards and Matplotlib plots.
-- **EDA Analyzer:** Added support for manual specification of `date_col`, `lat_col`, and `lon_col` in `analyze()` method.
-- **Dependencies:** Added `viz` extra to `setup.py` for installing visualization dependencies (`matplotlib`, `rich`).
-
-### 📚 Documentation
-- **Examples:** Updated `eda_comprehensive.py` to use the new `EDAVisualizer` class, simplifying the user API.
-- **Examples:** Added `eda_timeseries_geo.py` to demonstrate Time Series and Geospatial analysis features.
-
-### 🐛 Bug Fixes
-- **Outlier Detection:** Fixed `TypeError` in `explain_outliers` by handling null values in feature contribution calculation.
-- **Causal Discovery:** Fixed `NaN` errors by dropping null rows before running the PC algorithm.
-- **Performance:** Optimized Causal Discovery to automatically select top 15 columns by variance, preventing server hangs on wide datasets.
-- **Stability:** Suppressed `RuntimeWarning` (division by zero) in `analyzer.py` during statistical calculations.
-
-### 🧠 Causal Inference
-- **Causal Discovery:** Implemented PC Algorithm (via `causal-learn`) to discover cause-effect relationships between variables.
-- **Interactive Graph:** Added interactive DAG visualization using React Flow to explore causal structures.
-- **Independence Tests:** Automated statistical independence testing to build the causal graph.
-
-### 🐛 Bug Fixes
-- **Chart Downloads:** Fixed "Trend Analysis" chart download issue by migrating to `html2canvas` for robust WYSIWYG image generation.
-- **Dependencies:** Added `causal-learn` for causal inference and `html2canvas` for reliable chart exports.
-- **Filtering Stability:** Fixed "Division by Zero" error when filters result in an empty dataset. The analyzer now gracefully returns an empty profile with a warning alert.
-- **Backend Schema:** Fixed `ColumnProfile` schema to include `normality_test` field, resolving runtime errors during analysis.
-- **Type Safety:** Added `NormalityTestResult` Pydantic model for better validation.- **Dependencies:** Added `statsmodels`, `scipy`, and `patsy` to `requirements-fastapi.txt` to ensure statistical tests run correctly.
-## Profiling & EDA
-- **Interactive Cross-Filtering:** Implemented "Tableau-style" filtering. Clicking on a chart bar (e.g., "Age 20-30") instantly filters the entire dataset and updates all other charts to reflect the selection.
-- **Backend Filtering Engine:** Updated `EDAAnalyzer` to support dynamic filtering (Range, Equality, Set membership) on raw Polars DataFrames before profiling.
-- **State Management:** Filters are persisted in the report configuration, allowing complex multi-step drill-downs.
-- **Frontend Integration:** Added "Active Filters" bar with manual filter creation (Column/Operator/Value) and click handlers on Distribution charts for seamless exploration.
-- **UX Enhancements:** Added contextual tooltips to the Filter Bar and Distribution Charts to guide users on interactive filtering capabilities.
-- **Explainable Outliers:** Added "Why is this an outlier?" column to the anomaly table, showing exactly which features contributed most to the anomaly score (using feature-wise deviation from median).
+### 🧠 Advanced Analysis
+- **Decision Trees:** Added automated Decision Tree generation to extract human-readable rules (e.g., "IF Age > 30 AND Income > 50k THEN High Risk") with Purity and Fidelity metrics.
+- **Causal Discovery:** Implemented PC Algorithm (via `causal-learn`) to discover cause-effect relationships between variables with interactive DAG visualization.
+- **Explainable Outliers:** Added "Why is this an outlier?" analysis, showing exactly which features contributed most to the anomaly score.
 - **Statistical Tests:** Implemented automated Normality Tests (Shapiro-Wilk/KS) for numeric columns and Stationarity Tests (ADF) for time series.
-- **Visual Indicators:** Added "Normal Dist" badges to variable cards and detailed p-value tooltips to distribution charts.
-- **Detailed Analysis:** Exposed full statistical test results (Test Name, p-value, Conclusion) in the Variable Details modal.
+
+### 📊 Profiling & Visualization
+- **Interactive Cross-Filtering:** Implemented "Tableau-style" filtering. Clicking on a chart bar instantly filters the entire dataset and updates all other charts.
 - **3D Visualization:** Added interactive 3D Scatter Plots for both Bivariate Analysis and PCA using `react-plotly.js`.
-- **PCA Upgrade:** Updated PCA calculation to compute 3 components, enabling 3D visualization of data structure.
-- **Timeseries Analysis:** Added automated detection and visualization of datetime columns with interactive bars.
-- **Geospatial Analysis:** Added automated detection and visualization of Latitude/Longitude columns with interactive scatter maps.
-- **Multivariate Analysis (PCA):** Implemented robust PCA visualization with dynamic coloring by target, legends, and axis labels.
-- **Advanced Profiler:** Implemented `SkyulfProfiler` in `skyulf-core` using Polars for high-performance automated EDA.
-- **Smart Alerts:** Added automated detection for High Correlation, High Cardinality, Constant Columns, and Class Imbalance.
-- **Rich Stats:** Added support for histograms, correlation matrices, and scatter plot sampling in the profile output.
-- **Bivariate Analysis:** Added interactive Scatter Plot tab for visualizing relationships between any two numeric variables.
-- **Outlier Detection:** Implemented Isolation Forest based outlier detection with a dedicated analysis tab.
-- **Performance:** Switched to Canvas-based rendering (Chart.js) for scatter plots to support larger datasets (5000+ points).
-- **UX Improvement:** Increased grid line visibility in 2D scatter plots for better readability.
-- **Reporting:** Added "Print / Save as PDF" button to the EDA dashboard for easy report sharing.
-- **Statistical Tests:** Added automated Normality Tests (Shapiro-Wilk/KS) for numeric columns and Stationarity Tests (ADF) for time series.
+- **Geospatial & Time Series:** Added automated detection and visualization of Latitude/Longitude maps and Datetime trends.
+- **Target Analysis:** Added supervised EDA to analyze correlations (Pearson/Eta-squared) and detect data leakage against a selected target.
 
-### 🎯 Target Analysis
-- **Supervised EDA:** Added `Target Analysis` tab to the EDA module. Users can now select a target column to analyze correlations and detect leakage.
-- **Categorical Targets:** Added support for categorical targets using Eta-squared (Correlation Ratio) to measure association with numeric features.
-- **History:** Added analysis history sidebar to view and load past reports.
-- **Leakage Detection:** Implemented automated leakage detection (alerting on >95% correlation with target).
-- **Visualization:** Added interactive Bar Charts for top correlated features in the frontend.
-
-### 🐛 Bug Fixes
-- **EDA Downloads:** Fixed 3D Scatter and PCA plot downloads by implementing `Plotly.toImage` for WebGL contexts.
-- **Correlation Matrix:** Fixed label truncation in downloaded correlation heatmaps by implementing dynamic text measurement and improved layout logic.
-- **Download Layout:** Improved "Download All" feature to use a 2-column grid layout for better readability.
-- **Dark Mode:** Added dark mode support for chart downloads (Autocorrelation, Interactions, etc.) to respect the active theme.
-- **EDA Visualization:** Fixed correlation heatmap visibility for low values and handled nulls gracefully.
-- **Outlier Explanation:** Added "Why is this an outlier?" column to the Outlier Analysis table, showing features with the highest deviation from the median.
-- **EDA Histograms:** Fixed an issue where histograms were empty due to incorrect Polars aggregation aliases.
-- **EDA Updates:** Fixed the "Update" button behavior to correctly poll for pending reports.
+### 🚀 Core & Performance
+- **Polars Engine:** Migrated profiling logic to Polars for high-performance analysis on large datasets.
+- **Dynamic Sampling:** Optimized PCA and Correlation calculations to handle wide datasets without server hangs.
+- **Rich Terminal Dashboard:** Added `EDAVisualizer` for generating beautiful CLI-based reports using the `rich` library.
 
 ------------------------------------------------------------
 ## v0.1.6
