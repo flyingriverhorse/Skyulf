@@ -1,5 +1,6 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { InfoTooltip } from '../ui/InfoTooltip';
 
 interface DistributionChartProps {
   profile: any;
@@ -52,7 +53,10 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, o
     <div className="h-64 w-full relative">
       {profile.normality_test && (
         <div className="absolute top-0 right-0 bg-white/90 dark:bg-gray-800/90 p-2 rounded border border-gray-200 dark:border-gray-700 text-xs z-10 shadow-sm">
-            <div className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Normality Test ({profile.normality_test.test_name})</div>
+            <div className="font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center">
+                Normality Test ({profile.normality_test.test_name})
+                <InfoTooltip text="Test limited to top 5,000 samples." align="right" />
+            </div>
             <div className="flex justify-between gap-4">
                 <span className="text-gray-500">p-value:</span>
                 <span className={`font-mono ${profile.normality_test.is_normal ? 'text-green-600' : 'text-red-500'}`}>

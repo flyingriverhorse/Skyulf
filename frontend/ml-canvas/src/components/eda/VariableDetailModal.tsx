@@ -120,12 +120,29 @@ export const VariableDetailModal: React.FC<VariableDetailModalProps> = ({
                     <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded"><span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Min</span> <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.numeric_stats.min}</span></div>
                     <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded"><span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Max</span> <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.numeric_stats.max}</span></div>
                     <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded"><span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Zeros</span> <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.numeric_stats.zeros_count}</span></div>
-                    <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded"><span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Skewness</span> <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.numeric_stats.skewness?.toFixed(4)}</span></div>
-                    <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded"><span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Kurtosis</span> <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.numeric_stats.kurtosis?.toFixed(4)}</span></div>
+                    <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded">
+                        <span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Skewness</span> 
+                        <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.numeric_stats.skewness?.toFixed(4)}</span>
+                        <span className="block text-[10px] text-gray-500 mt-1">
+                            {Math.abs(selectedVariable.numeric_stats.skewness) < 0.5 ? "Symmetric (Normal-like)" : 
+                             Math.abs(selectedVariable.numeric_stats.skewness) < 1 ? "Moderately Skewed" : "Highly Skewed"}
+                        </span>
+                    </div>
+                    <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded">
+                        <span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Kurtosis</span> 
+                        <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.numeric_stats.kurtosis?.toFixed(4)}</span>
+                        <span className="block text-[10px] text-gray-500 mt-1">
+                            {Math.abs(selectedVariable.numeric_stats.kurtosis) < 0.5 ? "Mesokurtic (Normal-like)" : 
+                             selectedVariable.numeric_stats.kurtosis > 0 ? "Leptokurtic (Heavy Tails)" : "Platykurtic (Light Tails)"}
+                        </span>
+                    </div>
                     {selectedVariable.normality_test && (
                       <>
                         <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded">
-                            <span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Normality ({selectedVariable.normality_test.test_name})</span>
+                            <div className="flex items-center gap-1 mb-1">
+                                <span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Normality ({selectedVariable.normality_test.test_name})</span>
+                                <InfoTooltip text="Shapiro-Wilk test is limited to the top 5,000 samples for performance and statistical stability. For larger datasets, rely on Skewness and Kurtosis." />
+                            </div>
                             <span className={`font-medium ${selectedVariable.normality_test.is_normal ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                                 {selectedVariable.normality_test.is_normal ? 'Normal' : 'Not Normal'}
                             </span>

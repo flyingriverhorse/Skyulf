@@ -71,6 +71,7 @@ class RuleTree(BaseModel):
     nodes: List[RuleNode]
     accuracy: Optional[float] = None # Surrogate model accuracy
     rules: Optional[List[str]] = None # Human readable rules
+    feature_importances: Optional[List[Dict[str, Union[str, float]]]] = None # Feature importance from surrogate model
 
 class ColumnProfile(BaseModel):
     name: str

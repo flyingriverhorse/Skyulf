@@ -192,6 +192,23 @@ class EDAVisualizer:
                 for rule in self.profile.rule_tree.rules:
                     console.print(f"[dim]• {rule}[/dim]")
 
+            # Feature Importance
+            if self.profile.rule_tree.feature_importances:
+                console.print("\n[bold]Feature Importance (Surrogate Model)[/bold]")
+                fi_table = Table(show_header=True, header_style="bold green")
+                fi_table.add_column("Feature")
+                fi_table.add_column("Importance", justify="right")
+                fi_table.add_column("Bar", style="dim")
+
+                for item in self.profile.rule_tree.feature_importances[:10]: # Top 10
+                    feature = item.get("feature", "Unknown")
+                    importance = item.get("importance", 0.0)
+                    bar_len = int(importance * 20)
+                    bar = "█" * bar_len
+                    fi_table.add_row(feature, f"{importance:.4f}", bar)
+                
+                console.print(fi_table)
+
         # 9. Alerts
         if self.profile.alerts:
             console.print("\n[bold]9. Smart Alerts[/bold]")

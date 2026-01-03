@@ -21,6 +21,7 @@ This release introduces a professional-grade Automated EDA module, enabling deep
 - **Statistical Tests:** Implemented automated Normality Tests (Shapiro-Wilk/KS) for numeric columns and Stationarity Tests (ADF) for time series.
 
 ### 📊 Profiling & Visualization
+- **Feature Importance:** Added feature importance bar chart to the Decision Tree Discovery tab in EDA, showing which features drive the decision tree rules.
 - **Interactive Cross-Filtering:** Implemented "Tableau-style" filtering. Clicking on a chart bar instantly filters the entire dataset and updates all other charts.
 - **3D Visualization:** Added interactive 3D Scatter Plots for both Bivariate Analysis and PCA using `react-plotly.js`.
 - **Geospatial & Time Series:** Added automated detection and visualization of Latitude/Longitude maps and Datetime trends.
