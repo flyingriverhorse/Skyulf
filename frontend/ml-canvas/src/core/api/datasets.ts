@@ -153,6 +153,14 @@ export interface DatasetProfile {
     missing_cells: number;
     missing_percentage: number;
   };
+  correlations?: {
+    columns: string[];
+    values: number[][];
+  };
+  correlations_with_target?: {
+    columns: string[];
+    values: number[][];
+  };
   columns: Array<{
     name: string;
     dtype: string;

@@ -14,7 +14,43 @@
 **"The Advanced EDA & Profiling Update"**
 This release introduces a professional-grade Automated EDA module, enabling deep statistical analysis of datasets directly within the platform.
 
-### Bug Fixes
+### 🎨 Frontend
+- **Correlation Matrix:** Added dual-view support to display both "Feature Correlations" and "Target Correlations" separately.
+- **Filter Bar:** Added "Excluded Columns" management section, allowing users to easily view, restore, and manage excluded columns directly from the toolbar.
+- **Filter Bar:** Added "Clear All" button for quick filter reset and improved layout with collapsible sections.
+- **Alerts:** Made Data Quality Alerts section collapsible to save screen space.
+
+### 🔧 Core Library
+- **Performance:** Optimized `_calculate_pca` by replacing `SimpleImputer` with native Polars `fill_null` for faster memory handling.
+- **Performance:** Vectorized outlier explanation logic in `_detect_outliers` using Numpy, significantly speeding up anomaly detection on large datasets.
+- **Performance:** Implemented dynamic resampling interval in Time Series analysis to automatically adjust granularity based on date range duration.
+- **Performance:** Added heuristic check in `_cast_date_columns` to skip expensive date parsing on non-date columns.
+- **Causal Discovery:** Improved feature selection logic to prioritize "Target + Top Correlated Features" instead of just high variance when reducing dimensionality for causal graph discovery.
+- **Correlation Analysis:** Split correlation calculation into two distinct matrices: "Feature-Feature" (for multicollinearity checks) and "Feature-Target" (for feature selection).
+- **Target Encoding:** Implemented automatic encoding of categorical targets to ensure they are included in Causal Discovery and Feature Selection analysis.
+- **Box Plots:** Improved logic to treat low-cardinality integers as Categorical, enabling Box Plot generation for classification targets (e.g., Iris dataset).
+- **EDA Visualizer:** Added `EDAVisualizer` class to `skyulf.profiling` for automated generation of Rich terminal dashboards and Matplotlib plots.
+- **EDA Analyzer:** Added support for manual specification of `date_col`, `lat_col`, and `lon_col` in `analyze()` method.
+- **Dependencies:** Added `viz` extra to `setup.py` for installing visualization dependencies (`matplotlib`, `rich`).
+
+### 📚 Documentation
+- **Examples:** Updated `eda_comprehensive.py` to use the new `EDAVisualizer` class, simplifying the user API.
+- **Examples:** Added `eda_timeseries_geo.py` to demonstrate Time Series and Geospatial analysis features.
+
+### 🐛 Bug Fixes
+- **Outlier Detection:** Fixed `TypeError` in `explain_outliers` by handling null values in feature contribution calculation.
+- **Causal Discovery:** Fixed `NaN` errors by dropping null rows before running the PC algorithm.
+- **Performance:** Optimized Causal Discovery to automatically select top 15 columns by variance, preventing server hangs on wide datasets.
+- **Stability:** Suppressed `RuntimeWarning` (division by zero) in `analyzer.py` during statistical calculations.
+
+### 🧠 Causal Inference
+- **Causal Discovery:** Implemented PC Algorithm (via `causal-learn`) to discover cause-effect relationships between variables.
+- **Interactive Graph:** Added interactive DAG visualization using React Flow to explore causal structures.
+- **Independence Tests:** Automated statistical independence testing to build the causal graph.
+
+### 🐛 Bug Fixes
+- **Chart Downloads:** Fixed "Trend Analysis" chart download issue by migrating to `html2canvas` for robust WYSIWYG image generation.
+- **Dependencies:** Added `causal-learn` for causal inference and `html2canvas` for reliable chart exports.
 - **Filtering Stability:** Fixed "Division by Zero" error when filters result in an empty dataset. The analyzer now gracefully returns an empty profile with a warning alert.
 - **Backend Schema:** Fixed `ColumnProfile` schema to include `normality_test` field, resolving runtime errors during analysis.
 - **Type Safety:** Added `NormalityTestResult` Pydantic model for better validation.- **Dependencies:** Added `statsmodels`, `scipy`, and `patsy` to `requirements-fastapi.txt` to ensure statistical tests run correctly.

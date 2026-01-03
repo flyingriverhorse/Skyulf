@@ -24,10 +24,42 @@ Visit the full documentation and project site for guides, API reference, and exa
 
 ```bash
 pip install skyulf-core
+
+# For visualization support (Rich dashboard + Matplotlib plots)
+pip install skyulf-core[viz]
+```
+
+## Quick Start: Automated EDA
+
+Skyulf Core includes a powerful automated Exploratory Data Analysis (EDA) module.
+
+```python
+import polars as pl
+from skyulf.profiling.analyzer import EDAAnalyzer
+from skyulf.profiling.visualizer import EDAVisualizer
+
+# 1. Load Data
+df = pl.read_csv("data.csv")
+
+# 2. Analyze
+analyzer = EDAAnalyzer(df)
+# Optional: Manually specify special columns if auto-detection fails
+profile = analyzer.analyze(
+    target_col="target",
+    date_col="timestamp",  # Optional
+    lat_col="latitude",    # Optional
+    lon_col="longitude"    # Optional
+)
+
+# 3. Visualize
+viz = EDAVisualizer(profile, df)
+viz.summary()  # Prints rich terminal dashboard
+viz.plot()     # Opens interactive plots
 ```
 
 ## Features
 
+- **Automated EDA**: One-line profiling with Data Quality, Outliers, Time Series, and Geospatial analysis.
 - **Type-Safe**: Built with modern Python type hints and Pydantic models.
 - **Modular**: Use only the components you need.
 - **Serializable**: All components are designed to be easily serialized for storage and deployment.

@@ -1,0 +1,446 @@
+from typing import Optional, List, Any
+import polars as pl
+from .schemas import DatasetProfile
+
+class EDAVisualizer:
+    """
+    Helper class to visualize Skyulf EDA results using Rich (terminal) and Matplotlib (plots).
+    """
+    
+    def __init__(self, profile: DatasetProfile, df: Optional[pl.DataFrame] = None):
+        self.profile = profile
+        self.df = df
+        
+    def summary(self):
+        """Prints a rich terminal dashboard summary."""
+        try:
+            from rich.console import Console
+            from rich.table import Table
+            from rich.panel import Panel
+        except ImportError:
+            print("Please install 'rich' to use the terminal summary: pip install rich")
+            return
+
+        console = Console()
+        console.print(Panel.fit("Skyulf EDA Summary", style="bold blue"))
+
+        # 1. Data Quality
+        console.print("\n[bold]1. Data Quality[/bold]")
+        dq_table = Table(show_header=True, header_style="bold magenta")
+        dq_table.add_column("Metric")
+        dq_table.add_column("Value")
+        dq_table.add_row("Rows", str(self.profile.row_count))
+        dq_table.add_row("Columns", str(self.profile.column_count))
+        dq_table.add_row("Missing Cells", f"{self.profile.missing_cells_percentage}%")
+        dq_table.add_row("Duplicate Rows", str(self.profile.duplicate_rows))
+        console.print(dq_table)
+
+        # 2. Numeric Stats
+        console.print("\n[bold]2. Numeric Statistics[/bold]")
+        stats_table = Table(show_header=True, header_style="bold cyan")
+        stats_table.add_column("Column")
+        stats_table.add_column("Skewness", justify="right")
+        stats_table.add_column("Kurtosis", justify="right")
+        stats_table.add_column("Normality (p)", justify="right")
+        stats_table.add_column("Normal?", justify="center")
+
+        has_numeric = False
+        for col_name, col_profile in self.profile.columns.items():
+            if col_profile.dtype == "Numeric" and col_profile.numeric_stats:
+                has_numeric = True
+                stats = col_profile.numeric_stats
+                skew = f"{stats.skewness:.2f}" if stats.skewness is not None else "-"
+                kurt = f"{stats.kurtosis:.2f}" if stats.kurtosis is not None else "-"
+                
+                norm_p = "-"
+                is_normal = "-"
+                if col_profile.normality_test:
+                    norm_p = f"{col_profile.normality_test.p_value:.4f}"
+                    is_normal = "[green]Yes[/green]" if col_profile.normality_test.is_normal else "[red]No[/red]"
+                
+                stats_table.add_row(col_name, skew, kurt, norm_p, is_normal)
+        
+        if has_numeric:
+            console.print(stats_table)
+        else:
+            console.print("[italic]No numeric columns found.[/italic]")
+
+        # 3. Outliers
+        if self.profile.outliers:
+            console.print("\n[bold]3. Outlier Detection[/bold]")
+            console.print(f"Detected [red]{self.profile.outliers.total_outliers}[/red] outliers ({self.profile.outliers.outlier_percentage:.2f}%)")
+            
+            outlier_table = Table(title="Top Anomalies")
+            outlier_table.add_column("Index", justify="right")
+            outlier_table.add_column("Score", justify="right")
+            outlier_table.add_column("Explanation", style="italic")
+            
+            for outlier in self.profile.outliers.top_outliers[:3]:
+                explanation = str(outlier.explanation) if outlier.explanation else "-"
+                outlier_table.add_row(str(outlier.index), f"{outlier.score:.4f}", explanation)
+            
+            console.print(outlier_table)
+
+        # 4. Causal Graph
+        if self.profile.causal_graph:
+            console.print("\n[bold]4. Causal Discovery[/bold]")
+            console.print(f"Graph: {len(self.profile.causal_graph.nodes)} nodes, {len(self.profile.causal_graph.edges)} edges")
+            
+            edge_table = Table(show_header=False)
+            for edge in self.profile.causal_graph.edges:
+                arrow = "->" if edge.type == "directed" else "--"
+                edge_table.add_row(f"{edge.source} {arrow} {edge.target}")
+            console.print(edge_table)
+
+        # 5. Geospatial
+        if self.profile.geospatial:
+            console.print("\n[bold]5. Geospatial Analysis[/bold]")
+            console.print(f"Detected Lat/Lon: {self.profile.geospatial.lat_col}, {self.profile.geospatial.lon_col}")
+            console.print(f"Bounds: ({self.profile.geospatial.min_lat:.4f}, {self.profile.geospatial.min_lon:.4f}) to ({self.profile.geospatial.max_lat:.4f}, {self.profile.geospatial.max_lon:.4f})")
+
+        # 6. Time Series
+        if self.profile.timeseries and self.profile.timeseries.trend:
+            console.print("\n[bold]6. Time Series Analysis[/bold]")
+            console.print(f"Detected Date Column: {self.profile.timeseries.date_col}")
+            
+            min_date = self.profile.timeseries.trend[0].date
+            max_date = self.profile.timeseries.trend[-1].date
+            console.print(f"Range: {min_date} to {max_date}")
+            
+            if self.profile.timeseries.seasonality:
+                # Seasonality object doesn't have 'period' or 'strength' directly on it based on schema
+                # It has day_of_week and month_of_year lists.
+                # Let's just print that seasonality analysis is available.
+                console.print("Seasonality Analysis: Available (Day of Week, Month of Year)")
+
+        # 7. Target Analysis
+        if self.profile.target_col:
+            console.print(f"\n[bold]7. Target Analysis (Target: {self.profile.target_col})[/bold]")
+            
+            # Numeric Target: Correlations
+            if self.profile.target_correlations:
+                corr_table = Table(show_header=True, header_style="bold green", title="Top Correlations")
+                corr_table.add_column("Feature")
+                corr_table.add_column("Correlation", justify="right")
+                
+                # Sort by absolute correlation
+                sorted_corrs = sorted(self.profile.target_correlations.items(), key=lambda x: abs(x[1]), reverse=True)
+                for col, corr in sorted_corrs[:5]:
+                    corr_table.add_row(col, f"{corr:.4f}")
+                console.print(corr_table)
+
+            # Categorical Target: Interactions (ANOVA)
+            if self.profile.target_interactions:
+                # Filter for boxplots (which imply categorical target vs numeric feature)
+                interactions = [i for i in self.profile.target_interactions if i.plot_type == "boxplot"]
+                if interactions:
+                    int_table = Table(show_header=True, header_style="bold green", title="Top Feature Associations (ANOVA)")
+                    int_table.add_column("Feature")
+                    int_table.add_column("p-value", justify="right")
+                    int_table.add_column("Significance", justify="center")
+                    
+                    # Sort by p-value
+                    interactions.sort(key=lambda x: x.p_value if x.p_value is not None else 1.0)
+                    
+                    for interaction in interactions[:5]:
+                        p_val = interaction.p_value
+                        p_str = f"{p_val:.4e}" if p_val is not None else "N/A"
+                        sig = "[green]High[/green]" if p_val is not None and p_val < 0.05 else "[yellow]Low[/yellow]"
+                        int_table.add_row(interaction.feature, p_str, sig)
+                    console.print(int_table)
+
+        # 8. Decision Tree
+        if self.profile.rule_tree:
+            acc_str = f"{self.profile.rule_tree.accuracy:.1%}" if self.profile.rule_tree.accuracy else "N/A"
+            console.print(f"\n[bold]8. Decision Tree Rules (Accuracy: {acc_str})[/bold]")
+            
+            from rich.tree import Tree
+            
+            nodes_map = {n.id: n for n in self.profile.rule_tree.nodes}
+            
+            def add_nodes(node_id, tree):
+                node = nodes_map.get(node_id)
+                if not node: return
+                
+                if node.is_leaf:
+                    total = sum(node.value)
+                    conf = (max(node.value) / total * 100) if total > 0 else 0
+                    tree.add(f"[green]➜ {node.class_name}[/green] ({conf:.1f}%) [dim]n={node.samples}[/dim]")
+                else:
+                    # Left (True)
+                    if len(node.children) > 0:
+                        left_child = nodes_map.get(node.children[0])
+                        if left_child:
+                            branch = tree.add(f"[blue]{node.feature} <= {node.threshold:.2f}[/blue]")
+                            add_nodes(node.children[0], branch)
+                    
+                    # Right (False)
+                    if len(node.children) > 1:
+                        right_child = nodes_map.get(node.children[1])
+                        if right_child:
+                            branch = tree.add(f"[magenta]{node.feature} > {node.threshold:.2f}[/magenta]")
+                            add_nodes(node.children[1], branch)
+
+            if 0 in nodes_map:
+                root = Tree("Root")
+                add_nodes(0, root)
+                console.print(root)
+
+        # 9. Alerts
+        if self.profile.alerts:
+            console.print("\n[bold]9. Smart Alerts[/bold]")
+            for alert in self.profile.alerts:
+                color = "red" if alert.severity == "high" else "yellow"
+                console.print(f"[{color}]• {alert.message}[/{color}]")
+
+    def plot(self):
+        """Generates and shows all available plots using Matplotlib."""
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            print("Please install 'matplotlib' to use plotting: pip install matplotlib")
+            return
+
+        self._plot_distributions()
+        self._plot_correlations()
+        self._plot_correlations_with_target()
+        self._plot_target_interactions()
+        self._plot_scatter_matrix()
+        self._plot_pca()
+        self._plot_geospatial()
+        self._plot_timeseries()
+        
+        print("Displaying plots...")
+        plt.show()
+
+    def _plot_distributions(self):
+        import matplotlib.pyplot as plt
+        
+        numeric_cols = [
+            (name, col) for name, col in self.profile.columns.items() 
+            if col.dtype == "Numeric" and col.histogram
+        ]
+        
+        if not numeric_cols:
+            return
+
+        display_cols = numeric_cols[:4] # Limit to 4
+        n_cols = len(display_cols)
+        
+        plt.figure(figsize=(5 * n_cols, 4))
+        for i, (name, col) in enumerate(display_cols):
+            plt.subplot(1, n_cols, i+1)
+            widths = [b.end - b.start for b in col.histogram]
+            centers = [(b.start + b.end)/2 for b in col.histogram]
+            counts = [b.count for b in col.histogram]
+            
+            plt.bar(centers, counts, width=widths, align='center', alpha=0.7, edgecolor='black', color='skyblue')
+            plt.title(f"Distribution: {name}")
+            plt.xlabel(name)
+            plt.ylabel("Count")
+            plt.grid(axis='y', alpha=0.3)
+        plt.tight_layout()
+
+    def _plot_correlations(self):
+        if not self.profile.correlations:
+            return
+        
+        import matplotlib.pyplot as plt
+        cols = self.profile.correlations.columns
+        matrix = self.profile.correlations.values
+        
+        plt.figure(figsize=(8, 8))
+        im = plt.imshow(matrix, cmap='coolwarm', vmin=-1, vmax=1)
+        plt.colorbar(im, label='Correlation')
+        
+        plt.xticks(range(len(cols)), cols, rotation=45, ha='right')
+        plt.yticks(range(len(cols)), cols)
+        
+        for i in range(len(cols)):
+            for j in range(len(cols)):
+                plt.text(j, i, f"{matrix[i][j]:.2f}", ha="center", va="center", color="black", fontsize=8)
+
+        plt.title("Correlation Matrix")
+        plt.tight_layout()
+
+    def _plot_correlations_with_target(self):
+        if not self.profile.correlations_with_target:
+            return
+        
+        import matplotlib.pyplot as plt
+        cols = self.profile.correlations_with_target.columns
+        matrix = self.profile.correlations_with_target.values
+        
+        plt.figure(figsize=(8, 8))
+        im = plt.imshow(matrix, cmap='coolwarm', vmin=-1, vmax=1)
+        plt.colorbar(im, label='Correlation')
+        
+        plt.xticks(range(len(cols)), cols, rotation=45, ha='right')
+        plt.yticks(range(len(cols)), cols)
+        
+        for i in range(len(cols)):
+            for j in range(len(cols)):
+                plt.text(j, i, f"{matrix[i][j]:.2f}", ha="center", va="center", color="black", fontsize=8)
+
+        plt.title("Correlation Matrix (With Target)")
+        plt.tight_layout()
+
+    def _plot_target_interactions(self):
+        if not self.profile.target_interactions:
+            return
+            
+        import matplotlib.pyplot as plt
+        boxplots = [i for i in self.profile.target_interactions if i.plot_type == "boxplot"]
+        if not boxplots:
+            return
+            
+        boxplots.sort(key=lambda x: x.p_value if x.p_value is not None else 1.0)
+        display_items = boxplots[:6]
+        
+        n_plots = len(display_items)
+        plt.figure(figsize=(5 * n_plots, 5))
+        
+        for i, interaction in enumerate(display_items):
+            plt.subplot(1, n_plots, i+1)
+            bxp_stats = []
+            for cat_data in interaction.data:
+                bxp_stats.append({
+                    'label': cat_data.name,
+                    'whislo': cat_data.stats.min,
+                    'q1': cat_data.stats.q1,
+                    'med': cat_data.stats.median,
+                    'q3': cat_data.stats.q3,
+                    'whishi': cat_data.stats.max,
+                    'fliers': []
+                })
+            ax = plt.gca()
+            ax.bxp(bxp_stats, showfliers=False)
+            title = f"{interaction.feature} by Target"
+            if interaction.p_value is not None:
+                title += f"\n(ANOVA p={interaction.p_value:.4f})"
+            plt.title(title)
+            plt.grid(axis='y', alpha=0.3)
+        plt.tight_layout()
+
+    def _plot_scatter_matrix(self):
+        if self.df is None:
+            return
+            
+        import matplotlib.pyplot as plt
+        try:
+            from pandas.plotting import scatter_matrix
+        except ImportError:
+            return
+
+        numeric_cols = [col for col, dtype in self.df.schema.items() if dtype in (pl.Float64, pl.Float32, pl.Int64, pl.Int32)]
+        if len(numeric_cols) > 5:
+            numeric_cols = numeric_cols[:5]
+            
+        pdf = self.df.select(numeric_cols).to_pandas()
+        
+        colors = None
+        target_col = self.profile.target_col
+        if target_col and target_col in pdf.columns:
+            unique_targets = pdf[target_col].unique()
+            color_map = {val: i for i, val in enumerate(unique_targets)}
+            colors = pdf[target_col].map(color_map)
+        
+        plt.figure(figsize=(10, 10))
+        scatter_matrix(pdf, alpha=0.8, figsize=(10, 10), diagonal='kde', c=colors, cmap='viridis')
+        plt.suptitle("Scatter Matrix")
+
+    def _plot_pca(self):
+        if not self.profile.pca_data:
+            return
+            
+        import matplotlib.pyplot as plt
+        x = [p.x for p in self.profile.pca_data]
+        y = [p.y for p in self.profile.pca_data]
+        labels = [p.label for p in self.profile.pca_data]
+        
+        try:
+            c_values = [float(l) for l in labels]
+        except (ValueError, TypeError):
+            unique_labels = list(set([l for l in labels if l is not None]))
+            label_map = {l: i for i, l in enumerate(unique_labels)}
+            c_values = [label_map.get(l, -1) for l in labels]
+
+        plt.figure(figsize=(8, 6))
+        scatter = plt.scatter(x, y, c=c_values, cmap='viridis', alpha=0.8)
+        plt.colorbar(scatter, label='Target')
+        plt.title("PCA Projection (2D)")
+        plt.xlabel("PC1")
+        plt.ylabel("PC2")
+        plt.grid(True, alpha=0.3)
+
+    def _plot_geospatial(self):
+        if not self.profile.geospatial or not self.profile.geospatial.sample_points:
+            return
+            
+        import matplotlib.pyplot as plt
+        
+        lats = [p.lat for p in self.profile.geospatial.sample_points]
+        lons = [p.lon for p in self.profile.geospatial.sample_points]
+        labels = [p.label for p in self.profile.geospatial.sample_points]
+        
+        # Color by label if available
+        c_values = None
+        if any(labels):
+            try:
+                c_values = [float(l) if l is not None else -1 for l in labels]
+            except (ValueError, TypeError):
+                unique_labels = list(set([l for l in labels if l is not None]))
+                label_map = {l: i for i, l in enumerate(unique_labels)}
+                c_values = [label_map.get(l, -1) for l in labels]
+        
+        plt.figure(figsize=(10, 6))
+        scatter = plt.scatter(lons, lats, c=c_values, cmap='viridis', alpha=0.6, s=10)
+        if c_values:
+            plt.colorbar(scatter, label='Target')
+            
+        plt.title(f"Geospatial Distribution ({len(lats)} points)")
+        plt.xlabel(f"Longitude ({self.profile.geospatial.lon_col})")
+        plt.ylabel(f"Latitude ({self.profile.geospatial.lat_col})")
+        plt.grid(True, alpha=0.3)
+
+    def _plot_timeseries(self):
+        if not self.profile.timeseries or not self.profile.timeseries.trend:
+            return
+            
+        import matplotlib.pyplot as plt
+        from datetime import datetime
+        
+        dates = []
+        values_map = {} # col -> list of values
+        
+        # Initialize lists for each column found in the first point
+        first_point = self.profile.timeseries.trend[0]
+        for col in first_point.values.keys():
+            values_map[col] = []
+            
+        for point in self.profile.timeseries.trend:
+            try:
+                # Parse date string back to datetime for plotting
+                dt = datetime.fromisoformat(point.date)
+                dates.append(dt)
+                
+                for col, val in point.values.items():
+                    if col in values_map:
+                        values_map[col].append(val)
+            except ValueError:
+                continue
+                
+        if not dates:
+            return
+            
+        plt.figure(figsize=(12, 6))
+        for col, values in values_map.items():
+            plt.plot(dates, values, label=col)
+            
+        plt.title(f"Time Series Trend (Daily Aggregation)")
+        plt.xlabel(f"Date ({self.profile.timeseries.date_col})")
+        plt.ylabel("Value (Mean)")
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.xticks(rotation=45)
+        plt.tight_layout()

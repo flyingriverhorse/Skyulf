@@ -14,11 +14,19 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, '../../static/ml_canvas'),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 10000, // Increase limit for Plotly
     rollupOptions: {
       output: {
         entryFileNames: 'assets/[name].js',
         chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name][extname]'
+        assetFileNames: 'assets/[name][extname]',
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-plotly': ['plotly.js-dist-min', 'react-plotly.js'],
+          'vendor-charts': ['recharts', 'chart.js', 'react-chartjs-2'],
+          'vendor-flow': ['@xyflow/react'],
+          'vendor-utils': ['html2canvas', 'lucide-react', 'axios', 'dagre']
+        }
       }
     }
   },
