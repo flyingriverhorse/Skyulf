@@ -39,35 +39,91 @@ class EDAVisualizer:
         console.print("\n[bold]2. Numeric Statistics[/bold]")
         stats_table = Table(show_header=True, header_style="bold cyan")
         stats_table.add_column("Column")
-        stats_table.add_column("Skewness", justify="right")
-        stats_table.add_column("Kurtosis", justify="right")
-        stats_table.add_column("Normality (p)", justify="right")
-        stats_table.add_column("Normal?", justify="center")
+        stats_table.add_column("Mean", justify="right")
+        stats_table.add_column("Std", justify="right")
+        stats_table.add_column("Min", justify="right")
+        stats_table.add_column("Max", justify="right")
+        stats_table.add_column("Skew", justify="right")
+        stats_table.add_column("Kurt", justify="right")
+        stats_table.add_column("Normality", justify="center")
 
         has_numeric = False
         for col_name, col_profile in self.profile.columns.items():
             if col_profile.dtype == "Numeric" and col_profile.numeric_stats:
                 has_numeric = True
                 stats = col_profile.numeric_stats
+                
+                mean = f"{stats.mean:.2f}" if stats.mean is not None else "-"
+                std = f"{stats.std:.2f}" if stats.std is not None else "-"
+                min_val = f"{stats.min:.2f}" if stats.min is not None else "-"
+                max_val = f"{stats.max:.2f}" if stats.max is not None else "-"
                 skew = f"{stats.skewness:.2f}" if stats.skewness is not None else "-"
                 kurt = f"{stats.kurtosis:.2f}" if stats.kurtosis is not None else "-"
                 
-                norm_p = "-"
                 is_normal = "-"
                 if col_profile.normality_test:
-                    norm_p = f"{col_profile.normality_test.p_value:.4f}"
                     is_normal = "[green]Yes[/green]" if col_profile.normality_test.is_normal else "[red]No[/red]"
                 
-                stats_table.add_row(col_name, skew, kurt, norm_p, is_normal)
+                stats_table.add_row(col_name, mean, std, min_val, max_val, skew, kurt, is_normal)
         
         if has_numeric:
             console.print(stats_table)
         else:
             console.print("[italic]No numeric columns found.[/italic]")
 
-        # 3. Outliers
+        # 3. Categorical Stats
+        console.print("\n[bold]3. Categorical Statistics[/bold]")
+        cat_table = Table(show_header=True, header_style="bold yellow")
+        cat_table.add_column("Column")
+        cat_table.add_column("Unique", justify="right")
+        cat_table.add_column("Top Categories (Count)", style="dim")
+        
+        has_cat = False
+        for col_name, col_profile in self.profile.columns.items():
+            if col_profile.dtype == "Categorical" and col_profile.categorical_stats:
+                has_cat = True
+                stats = col_profile.categorical_stats
+                
+                top_cats = []
+                for item in stats.top_k[:3]:
+                    val = str(item.get("value", "N/A"))
+                    count = item.get("count", 0)
+                    top_cats.append(f"{val} ({count})")
+                
+                top_str = ", ".join(top_cats)
+                cat_table.add_row(col_name, str(stats.unique_count), top_str)
+
+        if has_cat:
+            console.print(cat_table)
+        else:
+            console.print("[italic]No categorical columns found.[/italic]")
+
+        # 4. Text Stats
+        console.print("\n[bold]4. Text Statistics[/bold]")
+        text_table = Table(show_header=True, header_style="bold white")
+        text_table.add_column("Column")
+        text_table.add_column("Avg Len", justify="right")
+        text_table.add_column("Min/Max Len", justify="right")
+        
+        has_text = False
+        for col_name, col_profile in self.profile.columns.items():
+            if col_profile.dtype == "Text" and col_profile.text_stats:
+                has_text = True
+                stats = col_profile.text_stats
+                
+                avg_len = f"{stats.avg_length:.1f}" if stats.avg_length else "-"
+                min_max = f"{stats.min_length}/{stats.max_length}" if stats.min_length is not None else "-"
+                
+                text_table.add_row(col_name, avg_len, min_max)
+
+        if has_text:
+            console.print(text_table)
+        else:
+            console.print("[italic]No text columns found.[/italic]")
+
+        # 5. Outliers
         if self.profile.outliers:
-            console.print("\n[bold]3. Outlier Detection[/bold]")
+            console.print("\n[bold]5. Outlier Detection[/bold]")
             console.print(f"Detected [red]{self.profile.outliers.total_outliers}[/red] outliers ({self.profile.outliers.outlier_percentage:.2f}%)")
             
             outlier_table = Table(title="Top Anomalies")
@@ -81,9 +137,9 @@ class EDAVisualizer:
             
             console.print(outlier_table)
 
-        # 4. Causal Graph
+        # 6. Causal Graph
         if self.profile.causal_graph:
-            console.print("\n[bold]4. Causal Discovery[/bold]")
+            console.print("\n[bold]6. Causal Discovery[/bold]")
             console.print(f"Graph: {len(self.profile.causal_graph.nodes)} nodes, {len(self.profile.causal_graph.edges)} edges")
             
             edge_table = Table(show_header=False)
@@ -92,15 +148,15 @@ class EDAVisualizer:
                 edge_table.add_row(f"{edge.source} {arrow} {edge.target}")
             console.print(edge_table)
 
-        # 5. Geospatial
+        # 7. Geospatial Analysis
         if self.profile.geospatial:
-            console.print("\n[bold]5. Geospatial Analysis[/bold]")
+            console.print("\n[bold]7. Geospatial Analysis[/bold]")
             console.print(f"Detected Lat/Lon: {self.profile.geospatial.lat_col}, {self.profile.geospatial.lon_col}")
             console.print(f"Bounds: ({self.profile.geospatial.min_lat:.4f}, {self.profile.geospatial.min_lon:.4f}) to ({self.profile.geospatial.max_lat:.4f}, {self.profile.geospatial.max_lon:.4f})")
 
-        # 6. Time Series
+        # 8. Time Series Analysis
         if self.profile.timeseries and self.profile.timeseries.trend:
-            console.print("\n[bold]6. Time Series Analysis[/bold]")
+            console.print("\n[bold]8. Time Series Analysis[/bold]")
             console.print(f"Detected Date Column: {self.profile.timeseries.date_col}")
             
             min_date = self.profile.timeseries.trend[0].date
@@ -113,9 +169,9 @@ class EDAVisualizer:
                 # Let's just print that seasonality analysis is available.
                 console.print("Seasonality Analysis: Available (Day of Week, Month of Year)")
 
-        # 7. Target Analysis
+        # 9. Target Analysis
         if self.profile.target_col:
-            console.print(f"\n[bold]7. Target Analysis (Target: {self.profile.target_col})[/bold]")
+            console.print(f"\n[bold]9. Target Analysis (Target: {self.profile.target_col})[/bold]")
             
             # Numeric Target: Correlations
             if self.profile.target_correlations:
@@ -149,10 +205,10 @@ class EDAVisualizer:
                         int_table.add_row(interaction.feature, p_str, sig)
                     console.print(int_table)
 
-        # 8. Decision Tree
+        # 10. Decision Tree Rules
         if self.profile.rule_tree:
             acc_str = f"{self.profile.rule_tree.accuracy:.1%}" if self.profile.rule_tree.accuracy else "N/A"
-            console.print(f"\n[bold]8. Decision Tree Rules (Accuracy: {acc_str})[/bold]")
+            console.print(f"\n[bold]10. Decision Tree Rules (Accuracy: {acc_str})[/bold]")
             
             from rich.tree import Tree
             
@@ -209,9 +265,9 @@ class EDAVisualizer:
                 
                 console.print(fi_table)
 
-        # 9. Alerts
+        # 11. Smart Alerts
         if self.profile.alerts:
-            console.print("\n[bold]9. Smart Alerts[/bold]")
+            console.print("\n[bold]11. Smart Alerts[/bold]")
             for alert in self.profile.alerts:
                 color = "red" if alert.severity == "high" else "yellow"
                 console.print(f"[{color}]• {alert.message}[/{color}]")

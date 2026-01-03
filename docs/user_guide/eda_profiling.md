@@ -69,6 +69,9 @@ for alert in profile.alerts:
 ### 1. Comprehensive Profiling
 The analyzer automatically detects column types (Numeric, Categorical, Date, Text, Boolean) and computes relevant statistics:
 *   **Numeric:** Mean, Median, Std Dev, Quantiles, Skewness, Kurtosis, Histogram.
+    *   *Normality Tests:* For performance, normality tests are performed on a sample of up to 5,000 rows.
+        *   **Shapiro-Wilk:** Used for N < 5,000.
+        *   **Kolmogorov-Smirnov:** Used for N >= 5,000 (on a 5k sample).
 *   **Categorical:** Unique count, Mode, Frequency distribution.
 *   **Date:** Min/Max date, Range, Year/Month distribution.
 *   **Text:** Avg length, Common words.

@@ -55,7 +55,7 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, o
         <div className="absolute top-0 right-0 bg-white/90 dark:bg-gray-800/90 p-2 rounded border border-gray-200 dark:border-gray-700 text-xs z-10 shadow-sm">
             <div className="font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center">
                 Normality Test ({profile.normality_test.test_name})
-                <InfoTooltip text="Test limited to top 5,000 samples." align="right" />
+                <InfoTooltip text="Normality tests are performed on a sample of up to 5,000 rows. Shapiro-Wilk is used for smaller datasets (<5,000), and Kolmogorov-Smirnov for larger ones. For very large datasets, rely on Skewness and Kurtosis." align="right" />
             </div>
             <div className="flex justify-between gap-4">
                 <span className="text-gray-500">p-value:</span>
