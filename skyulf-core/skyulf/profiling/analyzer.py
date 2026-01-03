@@ -1470,10 +1470,42 @@ class EDAAnalyzer:
             
             # Sort nodes by ID
             nodes.sort(key=lambda x: x.id)
+
+            # Generate Text Rules
+            rules_text = []
+            
+            def recurse_rules(node_id, current_rule):
+                if tree_.children_left[node_id] == _tree.TREE_LEAF:
+                    # Leaf node
+                    value = tree_.value[node_id][0]
+                    class_idx = np.argmax(value)
+                    class_name = str(class_names[class_idx]) if class_idx < len(class_names) else "Unknown"
+                    total = np.sum(value)
+                    confidence = (value[class_idx] / total) * 100 if total > 0 else 0
+                    
+                    rule_str = f"IF {current_rule} THEN {class_name} (Confidence: {confidence:.1f}%, Samples: {int(total)})"
+                    rules_text.append(rule_str)
+                    return
+
+                # Internal node
+                feature_idx = tree_.feature[node_id]
+                feature_name = feature_names[feature_idx]
+                threshold = tree_.threshold[node_id]
+                
+                # Left child (<= threshold)
+                left_rule = f"{current_rule} AND {feature_name} <= {threshold:.2f}" if current_rule else f"{feature_name} <= {threshold:.2f}"
+                recurse_rules(tree_.children_left[node_id], left_rule)
+                
+                # Right child (> threshold)
+                right_rule = f"{current_rule} AND {feature_name} > {threshold:.2f}" if current_rule else f"{feature_name} > {threshold:.2f}"
+                recurse_rules(tree_.children_right[node_id], right_rule)
+
+            recurse_rules(0, "")
             
             return RuleTree(
                 nodes=nodes,
-                accuracy=float(clf.score(X, y))
+                accuracy=float(clf.score(X, y)),
+                rules=rules_text
             )
             
         except Exception as e:

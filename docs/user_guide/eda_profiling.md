@@ -86,7 +86,7 @@ Skyulf automatically flags potential data quality issues:
 *   **Outlier Detection:** Uses Isolation Forest to identify anomalous rows.
 *   **PCA:** Computes Principal Components to visualize high-dimensional data structure.
 *   **Causal Discovery:** Uses the PC Algorithm to infer causal relationships between variables (DAG).
-*   **Decision Tree:** Uses a surrogate Decision Tree model to extract human-readable rules (e.g., "If Age > 50 and Income < 30k -> High Risk"). Useful for finding "smoking gun" segments.
+*   **Decision Tree:** Uses a surrogate Decision Tree model to extract human-readable rules (e.g., "If Age > 50 and Income < 30k -> High Risk"). Provides both a visual tree and a list of text rules. Useful for finding "smoking gun" segments.
 *   **Target Analysis:** Analyzes relationships between features and the target variable (Correlations, ANOVA, Interactions).
 *   **Geospatial:** Automatically detects Lat/Lon columns and computes bounding boxes.
 *   **Time Series:** Detects seasonality and trends in datetime columns.

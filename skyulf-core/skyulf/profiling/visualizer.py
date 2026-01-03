@@ -186,6 +186,12 @@ class EDAVisualizer:
                 add_nodes(0, root)
                 console.print(root)
 
+            # Print Text Rules if available
+            if self.profile.rule_tree.rules:
+                console.print("\n[italic]Extracted Rules:[/italic]")
+                for rule in self.profile.rule_tree.rules:
+                    console.print(f"[dim]• {rule}[/dim]")
+
         # 9. Alerts
         if self.profile.alerts:
             console.print("\n[bold]9. Smart Alerts[/bold]")
