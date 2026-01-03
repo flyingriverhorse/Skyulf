@@ -10,6 +10,7 @@ from backend.config import get_settings
 from backend.eda.tasks import run_eda_background, generate_profile_celery
 from backend.services.data_service import DataService
 from backend.utils.file_utils import extract_file_path_from_source
+from backend.celery_app import celery_app
 from skyulf.profiling.analyzer import EDAAnalyzer
 import polars as pl
 import pandas as pd
@@ -69,12 +70,47 @@ async def trigger_analysis(
     settings = get_settings()
     if settings.USE_CELERY:
         # Use Celery
-        generate_profile_celery.delay(report.id)
+        task = generate_profile_celery.delay(report.id)
+        
+        # Store task_id in config for cancellation
+        new_config = dict(report.config) if report.config else {}
+        new_config["celery_task_id"] = task.id
+        report.config = new_config
+        
+        session.add(report)
+        await session.commit()
     else:
         # Use BackgroundTasks
         background_tasks.add_task(run_eda_background, report.id)
         
     return {"job_id": report.id, "status": "PENDING"}
+
+@router.post("/reports/{report_id}/cancel")
+async def cancel_analysis(
+    report_id: int,
+    session: AsyncSession = Depends(get_db)
+):
+    """
+    Cancels a running analysis job.
+    """
+    report = await session.get(EDAReport, report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+        
+    if report.status not in ["PENDING", "STARTED", "RUNNING"]:
+        return {"message": "Job is not running", "status": report.status}
+        
+    # Revoke Celery task if exists
+    if report.config and "celery_task_id" in report.config:
+        task_id = report.config["celery_task_id"]
+        celery_app.control.revoke(task_id, terminate=True)
+        
+    report.status = "CANCELLED"
+    report.error_message = "Cancelled by user"
+    session.add(report)
+    await session.commit()
+    
+    return {"message": "Job cancelled", "status": "CANCELLED"}
 
 @router.get("/{dataset_id}/history")
 async def get_report_history(

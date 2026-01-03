@@ -4,9 +4,8 @@ import { DatasetService } from '../core/api/datasets';
 import { EDAService } from '../core/api/eda';
 import { JobsHistoryModal } from '../components/eda/JobsHistoryModal';
 import { VariableDetailModal } from '../components/eda/VariableDetailModal';
-import { OverviewCards } from '../components/eda/OverviewCards';
-import { AlertsSection } from '../components/eda/AlertsSection';
-import { FilterBar } from '../components/eda/FilterBar';
+import { EDASidebar } from '../components/eda/EDASidebar';
+import { DashboardTab } from '../components/eda/tabs/DashboardTab';
 import { InsightsTab } from '../components/eda/tabs/InsightsTab';
 import { PCATab } from '../components/eda/tabs/PCATab';
 import { GeospatialTab } from '../components/eda/tabs/GeospatialTab';
@@ -20,7 +19,7 @@ import { SampleDataTab } from '../components/eda/tabs/SampleDataTab';
 import { CausalTab } from '../components/eda/tabs/CausalTab';
 import { RuleDiscoveryTab } from '../components/eda/tabs/RuleDiscoveryTab';
 import { DecompositionTab } from '../components/eda/tabs/DecompositionTab';
-import { Loader2, Play, RefreshCw, AlertCircle, BarChart2, Lightbulb, ScatterChart as ScatterIcon, Map, Calendar, List, AlertTriangle, Network, GitBranch, Split } from 'lucide-react';
+import { Loader2, RefreshCw, AlertCircle, BarChart2, List, Play } from 'lucide-react';
 import { downloadChart } from '../core/utils/chartUtils';
 
 export const EDAPage: React.FC = () => {
@@ -34,7 +33,7 @@ export const EDAPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('sample');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [targetCol, setTargetCol] = useState<string>('');
   const [excludedCols, setExcludedCols] = useState<string[]>([]);
   const [filters, setFilters] = useState<any[]>([]);
@@ -67,7 +66,7 @@ export const EDAPage: React.FC = () => {
       setScatterY('');
       setScatterZ('');
       setScatterColor('');
-      setActiveTab('sample'); // Reset active tab
+      setActiveTab('dashboard'); // Reset active tab
       loadReport(selectedDataset);
       loadHistory(selectedDataset);
     } else {
@@ -81,7 +80,7 @@ export const EDAPage: React.FC = () => {
       setScatterY('');
       setScatterZ('');
       setScatterColor('');
-      setActiveTab('sample');
+      setActiveTab('dashboard');
     }
   }, [selectedDataset]);
 
@@ -258,7 +257,7 @@ export const EDAPage: React.FC = () => {
                 />
             </div>
             <button
-                onClick={runAnalysis}
+                onClick={() => runAnalysis()}
                 disabled={analyzing}
                 className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
             >
@@ -287,7 +286,7 @@ export const EDAPage: React.FC = () => {
           <p>Analysis Failed</p>
           <p className="text-sm text-gray-600 mt-2">{report.error_message}</p>
           <button
-            onClick={runAnalysis}
+            onClick={() => runAnalysis()}
             className="mt-4 flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -301,265 +300,119 @@ export const EDAPage: React.FC = () => {
     if (!profile) return <div>No profile data</div>;
 
     return (
-      <div className="space-y-6">
-        <OverviewCards profile={profile} />
-        <AlertsSection alerts={profile.alerts} />
+      <div className="flex h-[calc(100vh-124px)] border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-900">
+        <EDASidebar 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab} 
+            profile={profile} 
+            filters={filters}
+            columns={profile.columns ? Object.keys(profile.columns) : []}
+            excludedCols={excludedCols}
+            onAddFilter={handleAddFilter}
+            onRemoveFilter={handleRemoveFilter}
+            onClearFilters={() => { setFilters([]); runAnalysis(undefined, []); }}
+            onToggleExclude={handleToggleExclude}
+        />
+        
+        <div className="flex-1 overflow-y-auto p-6 pt-4 bg-gray-50 dark:bg-gray-900/50">
+            {activeTab === 'dashboard' && (
+                <DashboardTab profile={profile} />
+            )}
 
-        {/* Tabs */}
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab('sample')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'sample'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Sample Data
-            </button>
-            <button
-              onClick={() => setActiveTab('variables')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'variables'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Variables
-            </button>
-            <button
-              onClick={() => setActiveTab('bivariate')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'bivariate'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Bivariate
-            </button>
-            <button
-              onClick={() => setActiveTab('insights')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                activeTab === 'insights'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <Lightbulb className="w-4 h-4" />
-              Smart Insights
-            </button>
-            {profile.outliers && (
-                <button
-                onClick={() => setActiveTab('outliers')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                    activeTab === 'outliers'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-                >
-                <AlertTriangle className="w-4 h-4" />
-                Outliers
-                </button>
+            {activeTab === 'insights' && (
+                <InsightsTab profile={profile} />
             )}
-            {profile.pca_data && (
-            <button
-              onClick={() => setActiveTab('pca')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                activeTab === 'pca'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <ScatterIcon className="w-4 h-4" />
-              Multivariate (PCA)
-            </button>
+
+            {activeTab === 'pca' && (
+                <PCATab 
+                    profile={profile} 
+                    isPCA3D={isPCA3D} 
+                    setIsPCA3D={setIsPCA3D} 
+                    downloadChart={downloadChart} 
+                />
             )}
-            {profile.geospatial && (
-                <button
-                onClick={() => setActiveTab('geospatial')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                    activeTab === 'geospatial'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-                >
-                <Map className="w-4 h-4" />
-                Geospatial
-                </button>
+
+            {activeTab === 'geospatial' && profile.geospatial && (
+                <GeospatialTab profile={profile} />
             )}
-            {profile.timeseries && (
-                <button
-                onClick={() => setActiveTab('timeseries')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                    activeTab === 'timeseries'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-                >
-                <Calendar className="w-4 h-4" />
-                Time Series
-                </button>
+
+            {activeTab === 'target' && profile.target_col && profile.target_correlations && (
+                <TargetAnalysisTab 
+                    profile={profile}
+                    downloadChart={downloadChart}
+                    history={history}
+                    loading={loading}
+                    loadSpecificReport={loadSpecificReport}
+                    report={report}
+                />
             )}
-            {profile.correlations && profile.correlations.values && profile.correlations.values.length > 0 && (
-            <button
-              onClick={() => setActiveTab('correlations')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'correlations'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Correlations
-            </button>
+
+            {activeTab === 'timeseries' && profile.timeseries && (
+                <TimeSeriesTab 
+                    profile={profile}
+                    downloadChart={downloadChart}
+                />
             )}
-            {profile.causal_graph && (
-            <button
-              onClick={() => setActiveTab('causal')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                activeTab === 'causal'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <Network className="w-4 h-4" />
-              Causal Analysis
-            </button>
+
+            {activeTab === 'variables' && (
+                <VariablesTab 
+                    profile={profile}
+                    setSelectedVariable={setSelectedVariable}
+                    handleToggleExclude={handleToggleExclude}
+                />
             )}
-            {profile.rule_tree && (
-            <button
-              onClick={() => setActiveTab('rules')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                activeTab === 'rules'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <GitBranch className="w-4 h-4" />
-              Decision Tree
-            </button>
+
+            {activeTab === 'bivariate' && (
+                <BivariateTab 
+                    profile={profile}
+                    downloadChart={downloadChart}
+                    scatterX={scatterX}
+                    setScatterX={setScatterX}
+                    scatterY={scatterY}
+                    setScatterY={setScatterY}
+                    scatterZ={scatterZ}
+                    setScatterZ={setScatterZ}
+                    scatterColor={scatterColor}
+                    setScatterColor={setScatterColor}
+                    is3D={is3D}
+                    setIs3D={setIs3D}
+                />
             )}
-            <button
-              onClick={() => setActiveTab('decomposition')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                activeTab === 'decomposition'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <Split className="w-4 h-4" />
-              Decomposition Tree
-            </button>
-            {profile.target_col && profile.target_correlations && Object.keys(profile.target_correlations).length > 0 && (
-                <button
-                onClick={() => setActiveTab('target')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === 'target'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-                >
-                Target Analysis
-                </button>
+
+            {activeTab === 'outliers' && profile.outliers && (
+                <OutliersTab profile={profile} />
             )}
-          </nav>
+
+            {activeTab === 'correlations' && (profile.correlations || profile.correlations_with_target) && (
+                <CorrelationsTab 
+                    profile={profile}
+                />
+            )}
+
+            {activeTab === 'causal' && profile.causal_graph && (
+                <CausalTab profile={profile} />
+            )}
+
+            {activeTab === 'rules' && profile.rule_tree && (
+                <RuleDiscoveryTab profile={profile} />
+            )}
+
+            {activeTab === 'decomposition' && selectedDataset && (
+                <DecompositionTab 
+                    datasetId={selectedDataset}
+                    columns={report?.profile_data?.columns ? Object.keys(report.profile_data.columns) : []}
+                    initialFilters={filters}
+                />
+            )}
+
+            {activeTab === 'sample' && profile.sample_data && (
+                <SampleDataTab 
+                    profile={profile}
+                    excludedCols={excludedCols}
+                    handleToggleExclude={handleToggleExclude}
+                />
+            )}
         </div>
-
-        {/* Tab Content */}
-        {activeTab === 'insights' && (
-            <InsightsTab profile={profile} />
-        )}
-
-        {activeTab === 'pca' && (
-            <PCATab 
-                profile={profile} 
-                isPCA3D={isPCA3D} 
-                setIsPCA3D={setIsPCA3D} 
-                downloadChart={downloadChart} 
-            />
-        )}
-
-        {activeTab === 'geospatial' && profile.geospatial && (
-            <GeospatialTab profile={profile} />
-        )}
-
-        {activeTab === 'target' && profile.target_col && profile.target_correlations && (
-            <TargetAnalysisTab 
-                profile={profile}
-                downloadChart={downloadChart}
-                history={history}
-                loading={loading}
-                loadSpecificReport={loadSpecificReport}
-                report={report}
-            />
-        )}
-
-        {/* Tab Content */}
-        {activeTab === 'timeseries' && profile.timeseries && (
-            <TimeSeriesTab 
-                profile={profile}
-                downloadChart={downloadChart}
-            />
-        )}
-
-        {activeTab === 'variables' && (
-            <VariablesTab 
-                profile={profile}
-                setSelectedVariable={setSelectedVariable}
-                handleToggleExclude={handleToggleExclude}
-            />
-        )}
-
-        {activeTab === 'bivariate' && (
-            <BivariateTab 
-                profile={profile}
-                downloadChart={downloadChart}
-                scatterX={scatterX}
-                setScatterX={setScatterX}
-                scatterY={scatterY}
-                setScatterY={setScatterY}
-                scatterZ={scatterZ}
-                setScatterZ={setScatterZ}
-                scatterColor={scatterColor}
-                setScatterColor={setScatterColor}
-                is3D={is3D}
-                setIs3D={setIs3D}
-            />
-        )}
-
-        {activeTab === 'outliers' && profile.outliers && (
-            <OutliersTab profile={profile} />
-        )}
-
-        {activeTab === 'correlations' && (profile.correlations || profile.correlations_with_target) && (
-            <CorrelationsTab 
-                profile={profile}
-            />
-        )}
-
-        {activeTab === 'causal' && profile.causal_graph && (
-            <CausalTab profile={profile} />
-        )}
-
-        {activeTab === 'rules' && profile.rule_tree && (
-            <RuleDiscoveryTab profile={profile} />
-        )}
-
-        {activeTab === 'decomposition' && selectedDataset && (
-            <DecompositionTab 
-                datasetId={selectedDataset}
-                columns={report?.profile_data?.columns ? Object.keys(report.profile_data.columns) : []}
-                initialFilters={filters}
-            />
-        )}
-
-        {activeTab === 'sample' && profile.sample_data && (
-            <SampleDataTab 
-                profile={profile}
-                excludedCols={excludedCols}
-                handleToggleExclude={handleToggleExclude}
-            />
-        )}
       </div>
     );
   };
@@ -624,16 +477,6 @@ export const EDAPage: React.FC = () => {
         </div>
       </div>
 
-      <FilterBar 
-        filters={filters}
-        columns={report?.profile_data?.columns ? Object.keys(report.profile_data.columns) : []}
-        excludedCols={excludedCols}
-        onAddFilter={handleAddFilter}
-        onRemoveFilter={handleRemoveFilter}
-        onClearFilters={() => { setFilters([]); runAnalysis(undefined, []); }}
-        onToggleExclude={handleToggleExclude}
-      />
-
       {renderContent()}
 
       {/* Variable Detail Modal */}
@@ -651,6 +494,7 @@ export const EDAPage: React.FC = () => {
         isOpen={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
         history={history}
+        onRefresh={() => selectedDataset && loadHistory(selectedDataset)}
         onFetchReport={async (id) => {
             return await EDAService.getReport(id);
         }}
