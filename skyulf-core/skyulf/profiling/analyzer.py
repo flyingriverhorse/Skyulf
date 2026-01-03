@@ -1423,9 +1423,21 @@ class EDAAnalyzer:
             
             # Train Tree
             # Max depth 3 for readability (Decomposition Tree style)
-            clf = DecisionTreeClassifier(max_depth=5, random_state=42)
+            clf = DecisionTreeClassifier(max_depth=4, random_state=42)
             clf.fit(X, y)
             
+            # Extract Feature Importance
+            importances = clf.feature_importances_
+            feature_importance_list = []
+            for idx, imp in enumerate(importances):
+                if imp > 0:
+                    feature_importance_list.append({
+                        "feature": feature_names[idx],
+                        "importance": float(imp)
+                    })
+            # Sort by importance
+            feature_importance_list.sort(key=lambda x: x["importance"], reverse=True)
+
             # Extract Tree Structure
             tree_ = clf.tree_
             
@@ -1505,7 +1517,8 @@ class EDAAnalyzer:
             return RuleTree(
                 nodes=nodes,
                 accuracy=float(clf.score(X, y)),
-                rules=rules_text
+                rules=rules_text,
+                feature_importances=feature_importance_list
             )
             
         except Exception as e:
