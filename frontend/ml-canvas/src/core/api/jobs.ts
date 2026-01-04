@@ -1,6 +1,7 @@
 import { apiClient, PipelineConfigModel } from './client';
+import axios from 'axios';
 
-export type JobStatus = 'queued' | 'running' | 'completed' | 'succeeded' | 'failed' | 'cancelled';
+export type JobStatus = 'queued' | 'running' | 'completed' | 'succeeded' | 'failed' | 'cancelled' | 'pending';
 
 export interface JobInfo {
   job_id: string;
@@ -8,7 +9,7 @@ export interface JobInfo {
   node_id: string;
   dataset_id?: string;
   dataset_name?: string;
-  job_type: 'training' | 'tuning';
+  job_type: 'training' | 'tuning' | 'eda' | 'ingestion';
   status: JobStatus;
   start_time: string | null;
   end_time: string | null;
@@ -61,6 +62,45 @@ export const jobsApi = {
     }
     const response = await apiClient.get<JobInfo[]>('/pipeline/jobs', { params });
     return response.data;
+  },
+
+  getEDAJobs: async (limit: number = 50): Promise<JobInfo[]> => {
+    const response = await apiClient.get<any[]>('/eda/jobs/all', { params: { limit } });
+    return response.data.map(job => ({
+      job_id: String(job.id),
+      pipeline_id: 'eda',
+      node_id: 'eda',
+      dataset_id: String(job.dataset_id),
+      dataset_name: job.dataset_name,
+      job_type: 'eda',
+      status: job.status.toLowerCase() as JobStatus,
+      start_time: job.created_at,
+      end_time: job.updated_at || job.created_at,
+      error: job.error,
+      result: null,
+      created_at: job.created_at,
+      target_column: job.target_col
+    }));
+  },
+
+  getIngestionJobs: async (limit: number = 50, skip: number = 0): Promise<JobInfo[]> => {
+    // Use direct axios call to avoid /api prefix since data sources are at /data/api
+    const response = await axios.get<any>('/data/api/sources', { params: { limit, skip } });
+    return response.data.sources.map((source: any) => ({
+      job_id: String(source.id),
+      pipeline_id: 'ingestion',
+      node_id: 'ingestion',
+      dataset_id: String(source.id),
+      dataset_name: source.name,
+      job_type: 'ingestion',
+      status: (source.test_status === 'success' ? 'succeeded' : source.test_status === 'failed' ? 'failed' : 'completed') as JobStatus,
+      start_time: source.created_at,
+      end_time: source.updated_at,
+      error: null,
+      result: null,
+      created_at: source.created_at,
+      model_type: source.type
+    }));
   },
 
   getHyperparameters: async (modelType: string): Promise<unknown[]> => {

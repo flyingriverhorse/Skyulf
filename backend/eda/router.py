@@ -27,6 +27,39 @@ class AnalyzeRequest(BaseModel):
     exclude_cols: Optional[List[str]] = None
     filters: Optional[List[FilterRequest]] = None
 
+@router.get("/jobs/all")
+async def list_all_jobs(
+    limit: int = 50,
+    skip: int = 0,
+    session: AsyncSession = Depends(get_db)
+):
+    """
+    Returns a list of all EDA jobs across all datasets.
+    """
+    query = (
+        select(EDAReport, DataSource.name.label("dataset_name"))
+        .join(DataSource, EDAReport.data_source_id == DataSource.id)
+        .order_by(desc(EDAReport.created_at))
+        .offset(skip)
+        .limit(limit)
+    )
+    result = await session.execute(query)
+    rows = result.all()
+    
+    return [
+        {
+            "id": r.EDAReport.id,
+            "dataset_id": r.EDAReport.data_source_id,
+            "dataset_name": r.dataset_name,
+            "status": r.EDAReport.status,
+            "created_at": r.EDAReport.created_at,
+            "updated_at": r.EDAReport.updated_at,
+            "error": r.EDAReport.error_message,
+            "target_col": r.EDAReport.config.get("target_col") if r.EDAReport.config else None
+        }
+        for r in rows
+    ]
+
 @router.post("/{dataset_id}/analyze")
 async def trigger_analysis(
     dataset_id: int, 

@@ -24,7 +24,6 @@ export const DataSources: React.FC = () => {
   const filteredDatasets = datasets.filter(d => {
     const status = d.source_metadata?.ingestion_status?.status || 'completed';
     if (filterStatus === 'all') return true;
-    if (filterStatus === 'active') return ['processing', 'pending'].includes(status);
     return status === filterStatus;
   });
 
@@ -190,7 +189,7 @@ export const DataSources: React.FC = () => {
       )}
 
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-        {['all', 'active', 'completed', 'failed', 'cancelled'].map(status => (
+        {['all', 'completed', 'failed', 'cancelled'].map(status => (
           <button
             key={status}
             onClick={() => { setFilterStatus(status); }}
@@ -210,7 +209,8 @@ export const DataSources: React.FC = () => {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <th className="px-6 py-4 font-semibold">Dataset Name</th>
+                <th className="px-3 py-4 font-semibold">Dataset Name</th>
+                <th className="px-3 py-4 font-semibold">Type</th>
                 <th className="px-6 py-4 font-semibold">Format</th>
                 <th className="px-6 py-4 font-semibold">Size</th>
                 <th className="px-6 py-4 font-semibold">Created</th>
@@ -220,7 +220,7 @@ export const DataSources: React.FC = () => {
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-900">
               {loading && datasets.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
+                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
                     <div className="flex items-center justify-center gap-2">
                       <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full" />
                       Loading datasets...
@@ -229,7 +229,7 @@ export const DataSources: React.FC = () => {
                 </tr>
               ) : filteredDatasets.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
                     {datasets.length === 0 ? (
                       <>
                         <Database className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
@@ -244,7 +244,7 @@ export const DataSources: React.FC = () => {
               ) : (
                 filteredDatasets.map((d) => (
                   <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-4">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-blue-600 dark:text-blue-400">
                           <FileText size={18} />
@@ -259,6 +259,17 @@ export const DataSources: React.FC = () => {
                           </div>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-3 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                        d.type === 's3' 
+                          ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800'
+                          : d.type === 'file'
+                          ? 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                          : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800'
+                      }`}>
+                        {d.type === 'file' ? 'Upload' : d.type.toUpperCase()}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 uppercase border border-slate-200 dark:border-slate-700">
