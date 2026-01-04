@@ -418,7 +418,7 @@ export const EDAPage: React.FC = () => {
   };
 
   return (
-    <div id="eda-report-container" className="p-6 max-w-7xl mx-auto">
+    <div id="eda-report-container" className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
             <div>

@@ -14,6 +14,9 @@
 **"The Advanced EDA & Profiling Update"**
 This release introduces a professional-grade Automated EDA module, enabling deep statistical analysis of datasets directly within the platform.
 
+### 📚 Documentation
+- **Profiling Comparison Guide:** Added honest comparison article "Skyulf vs. YData Profiling vs. Sweetviz" covering performance, features, and use cases to help users choose the right tool.
+
 ### 🧠 Advanced Analysis
 - **Decision Trees:** Added automated Decision Tree generation to extract human-readable rules (e.g., "IF Age > 30 AND Income > 50k THEN High Risk") with Purity and Fidelity metrics.
 - **Causal Discovery:** Implemented PC Algorithm (via `causal-learn`) to discover cause-effect relationships between variables with interactive DAG visualization.
@@ -31,6 +34,9 @@ This release introduces a professional-grade Automated EDA module, enabling deep
 - **Polars Engine:** Migrated profiling logic to Polars for high-performance analysis on large datasets.
 - **Dynamic Sampling:** Optimized PCA and Correlation calculations to handle wide datasets without server hangs.
 - **Rich Terminal Dashboard:** Added `EDAVisualizer` for generating beautiful CLI-based reports using the `rich` library.
+
+### 🎨 Frontend
+- **Layout:** Fixed layout issue where Dashboard, EDA, and Data Sources pages were not taking full screen width on large screens.
 
 ------------------------------------------------------------
 ## v0.1.6

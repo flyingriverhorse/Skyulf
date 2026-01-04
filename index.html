@@ -91,6 +91,24 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
         
+        /* Lightbox Styles */
+        #lightbox {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        #lightbox.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+        .lightbox-content {
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+        #lightbox.active .lightbox-content {
+            transform: scale(1);
+        }
+        
         /* Custom Gradient Text */
         .text-gradient {
             background: linear-gradient(to right, #38bdf8, #6366f1, #a855f7);
@@ -188,10 +206,14 @@
             <!-- Hero Image / Dashboard Preview -->
             <div class="relative max-w-5xl mx-auto animate-float">
                 <div class="absolute -inset-1 bg-gradient-brand rounded-2xl blur opacity-30"></div>
-                <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-900">
-                    <img src="./static/img/dashboard.jpg" alt="Skyulf Dashboard" class="w-full h-auto object-cover">
+                <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-900 group cursor-pointer zoomable">
+                    <img src="./static/img/dashboard.jpg" alt="Skyulf Dashboard" class="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105">
                     <!-- Overlay Gradient -->
-                    <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60"></div>
+                    <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60 pointer-events-none"></div>
+                    <!-- Zoom Icon -->
+                    <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/40">
+                        <i data-feather="maximize-2" class="text-white w-12 h-12 drop-shadow-lg"></i>
+                    </div>
                 </div>
             </div>
         </div>
@@ -268,9 +290,14 @@
                         </li>
                     </ul>
                 </div>
-                <div class="lg:w-1/2 relative">
+                <div class="lg:w-1/2 relative group cursor-pointer zoomable">
                     <div class="absolute -inset-4 bg-emerald-500/20 rounded-3xl blur-2xl -z-10"></div>
-                    <img src="./static/img/datasource.jpg" alt="Data Ingestion" class="rounded-2xl border border-slate-800 shadow-2xl w-full">
+                    <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl w-full">
+                        <img src="./static/img/datasource.jpg" alt="Data Ingestion" class="w-full transition-transform duration-500 group-hover:scale-105">
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/40">
+                            <i data-feather="maximize-2" class="text-white w-12 h-12 drop-shadow-lg"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -313,14 +340,165 @@
                 </div>
                 <div class="lg:w-1/2 relative">
                     <div class="absolute -inset-4 bg-pink-500/20 rounded-3xl blur-2xl -z-10"></div>
-                    <!-- Placeholder for EDA Image -->
-                    <div class="rounded-2xl border border-slate-800 shadow-2xl w-full bg-slate-900 aspect-video flex items-center justify-center group overflow-hidden relative">
-                         <div class="absolute inset-0 bg-gradient-to-br from-pink-500/10 to-purple-500/10"></div>
-                         <div class="text-center p-6">
-                            <i data-feather="bar-chart-2" class="w-12 h-12 text-pink-400 mx-auto mb-4 opacity-50"></i>
-                            <span class="text-slate-500 font-medium">EDA Dashboard Preview</span>
-                            <p class="text-slate-600 text-sm mt-2">Add screenshot here</p>
-                         </div>
+                    
+                    <!-- Carousel Container -->
+                    <div id="eda-carousel" class="rounded-2xl border border-slate-800 shadow-2xl w-full bg-slate-900 aspect-video relative group overflow-hidden cursor-pointer">
+                        <!-- Slides Container -->
+                        <div id="eda-slides" class="flex transition-transform duration-500 ease-out h-full">
+                            <!-- Slide 1: Dashboard -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/dashboardeda.jpg" class="absolute inset-0 w-full h-full object-cover" alt="EDA Dashboard">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">EDA Dashboard</span>
+                                </div>
+                            </div>
+                            <!-- Slide 2: Smart Insights -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/smart insights.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Smart Insights">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Smart Insights</span>
+                                </div>
+                            </div>
+                            <!-- Slide 3: Variable Analysis -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/variables.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Variable Analysis">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Variable Analysis</span>
+                                </div>
+                            </div>
+                            <!-- Slide 4: Distribution -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/distrubtion.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Distribution Analysis">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Distribution Analysis</span>
+                                </div>
+                            </div>
+                            <!-- Slide 5: Correlations -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/correlations.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Correlation Matrix">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Correlation Matrix</span>
+                                </div>
+                            </div>
+                            <!-- Slide 6: 2D Bivariate -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/2dbivariate.jpg" class="absolute inset-0 w-full h-full object-cover" alt="2D Bivariate Analysis">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">2D Bivariate Analysis</span>
+                                </div>
+                            </div>
+                            <!-- Slide 7: 3D Bivariate -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/3dbivariate.jpg" class="absolute inset-0 w-full h-full object-cover" alt="3D Bivariate Analysis">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">3D Bivariate Analysis</span>
+                                </div>
+                            </div>
+                            <!-- Slide 8: PCA Analysis -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/pca.jpg" class="absolute inset-0 w-full h-full object-cover" alt="PCA Analysis">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">PCA Analysis</span>
+                                </div>
+                            </div>
+                            <!-- Slide 9: 3D PCA -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/3dpca.jpg" class="absolute inset-0 w-full h-full object-cover" alt="3D PCA Analysis">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">3D PCA Analysis</span>
+                                </div>
+                            </div>
+                            <!-- Slide 10: Decision Tree -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/decisiontree.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Decision Tree Rules">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Decision Tree Rules</span>
+                                </div>
+                            </div>
+                            <!-- Slide 11: Feature Importance -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/featureimportance.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Feature Importance">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Feature Importance</span>
+                                </div>
+                            </div>
+                            <!-- Slide 12: Causal Discovery -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/causal.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Causal Discovery">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Causal Discovery</span>
+                                </div>
+                            </div>
+                            <!-- Slide 13: Outliers -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/outliers.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Outlier Detection">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Outlier Detection</span>
+                                </div>
+                            </div>
+                            <!-- Slide 14: Target Analysis -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/target analysis.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Target Analysis">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Target Analysis</span>
+                                </div>
+                            </div>
+                            <!-- Slide 15: Decomposition Tree -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/decompositiontree.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Decomposition Tree">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Decomposition Tree</span>
+                                </div>
+                            </div>
+                            <!-- Slide 16: Detailed Interactions -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/detailedinteractions.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Detailed Interactions">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Detailed Interactions</span>
+                                </div>
+                            </div>
+                            <!-- Slide 17: Sample Data -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/sampledata.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Sample Data">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Sample Data</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Zoom Hint -->
+                        <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 bg-slate-900/60 p-2 rounded-full backdrop-blur-sm">
+                            <i data-feather="maximize-2" class="text-white w-5 h-5"></i>
+                        </div>
+
+                        <!-- Navigation Buttons -->
+                        <button id="eda-prev" class="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-800/80 text-white hover:bg-slate-700 transition-colors opacity-0 group-hover:opacity-100 z-20">
+                            <i data-feather="chevron-left" class="w-6 h-6"></i>
+                        </button>
+                        <button id="eda-next" class="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-800/80 text-white hover:bg-slate-700 transition-colors opacity-0 group-hover:opacity-100 z-20">
+                            <i data-feather="chevron-right" class="w-6 h-6"></i>
+                        </button>
+
+                        <!-- Indicators -->
+                        <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+                            <button class="w-2 h-2 rounded-full bg-white hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -350,9 +528,14 @@
                         </li>
                     </ul>
                 </div>
-                <div class="lg:w-1/2 relative">
+                <div class="lg:w-1/2 relative group cursor-pointer zoomable">
                     <div class="absolute -inset-4 bg-blue-500/20 rounded-3xl blur-2xl -z-10"></div>
-                    <img src="./static/img/canvas.jpg" alt="Feature Canvas" class="rounded-2xl border border-slate-800 shadow-2xl w-full">
+                    <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl w-full">
+                        <img src="./static/img/canvas.jpg" alt="Feature Canvas" class="w-full transition-transform duration-500 group-hover:scale-105">
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/40">
+                            <i data-feather="maximize-2" class="text-white w-12 h-12 drop-shadow-lg"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -385,9 +568,14 @@
                         </div>
                     </div>
                 </div>
-                <div class="lg:w-1/2 relative">
+                <div class="lg:w-1/2 relative group cursor-pointer zoomable">
                     <div class="absolute -inset-4 bg-indigo-500/20 rounded-3xl blur-2xl -z-10"></div>
-                    <img src="./static/img/experiments.jpg" alt="Experiments" class="rounded-2xl border border-slate-800 shadow-2xl w-full">
+                    <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl w-full">
+                        <img src="./static/img/experiments.jpg" alt="Experiments" class="w-full transition-transform duration-500 group-hover:scale-105">
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/40">
+                            <i data-feather="maximize-2" class="text-white w-12 h-12 drop-shadow-lg"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -402,9 +590,14 @@
                         Once you're happy with a model, deploy it to a local inference endpoint. Verify predictions immediately with the built-in JSON editor before moving to production.
                     </p>
                 </div>
-                <div class="lg:w-1/2 relative">
+                <div class="lg:w-1/2 relative group cursor-pointer zoomable">
                     <div class="absolute -inset-4 bg-purple-500/20 rounded-3xl blur-2xl -z-10"></div>
-                    <img src="./static/img/deployment.jpg" alt="Deployment" class="rounded-2xl border border-slate-800 shadow-2xl w-full">
+                    <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl w-full">
+                        <img src="./static/img/deployment.jpg" alt="Deployment" class="w-full transition-transform duration-500 group-hover:scale-105">
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/40">
+                            <i data-feather="maximize-2" class="text-white w-12 h-12 drop-shadow-lg"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -794,6 +987,25 @@
         </div>
     </footer>
 
+    <!-- Lightbox Modal -->
+    <div id="lightbox" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm">
+        <button id="lightbox-close" class="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors z-50">
+            <i data-feather="x" class="w-10 h-10"></i>
+        </button>
+        
+        <div id="lightbox-container" class="lightbox-content relative max-w-[90vw] max-h-[90vh] w-full h-full flex items-center justify-center">
+            <!-- Content will be injected here -->
+        </div>
+
+        <!-- Lightbox Navigation (for carousel) -->
+        <button id="lightbox-prev" class="absolute left-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-slate-800/50 text-white hover:bg-slate-700 transition-colors hidden">
+            <i data-feather="chevron-left" class="w-8 h-8"></i>
+        </button>
+        <button id="lightbox-next" class="absolute right-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-slate-800/50 text-white hover:bg-slate-700 transition-colors hidden">
+            <i data-feather="chevron-right" class="w-8 h-8"></i>
+        </button>
+    </div>
+
     <script>
         feather.replace();
 
@@ -803,6 +1015,186 @@
             if (video) {
                 video.defaultPlaybackRate = 2.0;
                 video.playbackRate = 2.0;
+            }
+
+            // --- Lightbox Logic ---
+            const lightbox = document.getElementById('lightbox');
+            const lightboxContainer = document.getElementById('lightbox-container');
+            const lightboxClose = document.getElementById('lightbox-close');
+            const lightboxPrev = document.getElementById('lightbox-prev');
+            const lightboxNext = document.getElementById('lightbox-next');
+            
+            let isCarouselMode = false;
+            let currentCarouselIndex = 0;
+            let carouselSlides = []; // Will hold the content to show
+
+            function openLightbox(content, isCarousel = false) {
+                lightboxContainer.innerHTML = ''; // Clear previous
+                lightboxContainer.appendChild(content);
+                
+                lightbox.classList.add('active');
+                document.body.style.overflow = 'hidden'; // Prevent scrolling
+                
+                isCarouselMode = isCarousel;
+                if (isCarousel) {
+                    lightboxPrev.classList.remove('hidden');
+                    lightboxNext.classList.remove('hidden');
+                } else {
+                    lightboxPrev.classList.add('hidden');
+                    lightboxNext.classList.add('hidden');
+                }
+                feather.replace();
+            }
+
+            function closeLightbox() {
+                lightbox.classList.remove('active');
+                document.body.style.overflow = '';
+                setTimeout(() => {
+                    lightboxContainer.innerHTML = '';
+                }, 300);
+            }
+
+            lightboxClose.addEventListener('click', closeLightbox);
+            lightbox.addEventListener('click', (e) => {
+                if (e.target === lightbox) closeLightbox();
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && lightbox.classList.contains('active')) closeLightbox();
+                if (!isCarouselMode) return;
+                if (e.key === 'ArrowLeft') showLightboxSlide(currentCarouselIndex - 1);
+                if (e.key === 'ArrowRight') showLightboxSlide(currentCarouselIndex + 1);
+            });
+
+            // --- Static Images Zoom ---
+            const zoomableImages = document.querySelectorAll('.zoomable');
+            zoomableImages.forEach(container => {
+                container.addEventListener('click', () => {
+                    const img = container.querySelector('img');
+                    if (img) {
+                        const clone = img.cloneNode(true);
+                        clone.classList.remove('group-hover:scale-105', 'transition-transform');
+                        clone.classList.add('max-w-full', 'max-h-full', 'object-contain', 'rounded-lg', 'shadow-2xl');
+                        openLightbox(clone, false);
+                    }
+                });
+            });
+
+            // --- EDA Carousel Logic ---
+            const slidesContainer = document.getElementById('eda-slides');
+            if (slidesContainer) {
+                const slides = Array.from(slidesContainer.children); // Get actual slide elements
+                const prevBtn = document.getElementById('eda-prev');
+                const nextBtn = document.getElementById('eda-next');
+                const dots = document.querySelectorAll('.eda-dot');
+                
+                let currentSlide = 0;
+                const totalSlides = slides.length;
+                let autoSlideInterval;
+
+                // Prepare carousel content for lightbox
+                // We clone the content of each slide to use in the lightbox
+                carouselSlides = slides.map(slide => {
+                    const content = slide.cloneNode(true);
+                    // Style the clone for lightbox
+                    content.className = 'w-full h-full flex items-center justify-center relative bg-slate-900 rounded-xl overflow-hidden';
+                    // If it has an image, ensure it fits
+                    const img = content.querySelector('img');
+                    if (img) {
+                        img.className = 'w-full h-full object-contain';
+                    }
+                    return content;
+                });
+
+                function updateSlide() {
+                    slidesContainer.style.transform = `translateX(-${currentSlide * 100}%)`;
+                    // Update dots
+                    dots.forEach((dot, index) => {
+                        if (index === currentSlide) {
+                            dot.classList.remove('bg-white/20');
+                            dot.classList.add('bg-white');
+                        } else {
+                            dot.classList.add('bg-white/20');
+                            dot.classList.remove('bg-white');
+                        }
+                    });
+                }
+
+                function nextSlide() {
+                    currentSlide = (currentSlide + 1) % totalSlides;
+                    updateSlide();
+                }
+
+                function prevSlide() {
+                    currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
+                    updateSlide();
+                }
+
+                function startAutoSlide() {
+                    stopAutoSlide();
+                    autoSlideInterval = setInterval(nextSlide, 5000); 
+                }
+
+                function stopAutoSlide() {
+                    clearInterval(autoSlideInterval);
+                }
+
+                // Event Listeners for Main Carousel
+                if (nextBtn) {
+                    nextBtn.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent opening lightbox
+                        nextSlide();
+                        startAutoSlide();
+                    });
+                }
+
+                if (prevBtn) {
+                    prevBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        prevSlide();
+                        startAutoSlide();
+                    });
+                }
+
+                dots.forEach((dot, index) => {
+                    dot.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        currentSlide = index;
+                        updateSlide();
+                        startAutoSlide();
+                    });
+                });
+
+                // Pause on hover
+                const carousel = document.getElementById('eda-carousel');
+                if (carousel) {
+                    carousel.addEventListener('mouseenter', stopAutoSlide);
+                    carousel.addEventListener('mouseleave', startAutoSlide);
+                    
+                    // Open Lightbox on Click
+                    carousel.addEventListener('click', () => {
+                        currentCarouselIndex = currentSlide;
+                        showLightboxSlide(currentCarouselIndex);
+                    });
+                }
+
+                // Lightbox Carousel Navigation
+                window.showLightboxSlide = (index) => {
+                    // Handle wrapping
+                    if (index < 0) index = totalSlides - 1;
+                    if (index >= totalSlides) index = 0;
+                    
+                    currentCarouselIndex = index;
+                    
+                    // Get content
+                    const content = carouselSlides[currentCarouselIndex].cloneNode(true);
+                    openLightbox(content, true);
+                };
+
+                lightboxPrev.addEventListener('click', () => showLightboxSlide(currentCarouselIndex - 1));
+                lightboxNext.addEventListener('click', () => showLightboxSlide(currentCarouselIndex + 1));
+
+                // Initialize
+                startAutoSlide();
             }
         });
     </script>
