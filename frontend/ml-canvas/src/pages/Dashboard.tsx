@@ -139,7 +139,7 @@ export const Dashboard: React.FC = () => {
         />
         <StatCard 
           title="Success Rate" 
-          value={jobs.length > 0 ? `${Math.round((jobs.filter(j => j.status === 'succeeded').length / jobs.length) * 100)}%` : '-'} 
+          value={jobs.length > 0 ? `${Math.round((jobs.filter(j => j.status === 'succeeded' || j.status === 'completed').length / jobs.length) * 100)}%` : '-'} 
           icon={<CheckCircle className="text-emerald-500" />}
           subtext="Last 50 jobs"
         />
@@ -314,6 +314,7 @@ const StatCard = ({ title, value, icon, subtext, color = "text-slate-900 dark:te
 const StatusBadge = ({ status }: { status: string }) => {
   const styles = {
     succeeded: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
     failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
     running: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
     pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
@@ -321,6 +322,7 @@ const StatusBadge = ({ status }: { status: string }) => {
   
   const icons = {
     succeeded: <CheckCircle size={14} />,
+    completed: <CheckCircle size={14} />,
     failed: <XCircle size={14} />,
     running: <Activity size={14} className="animate-pulse" />,
     pending: <Clock size={14} />,

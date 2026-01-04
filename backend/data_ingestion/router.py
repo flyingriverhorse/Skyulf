@@ -17,12 +17,16 @@ sources_router = APIRouter(prefix="/data/api", tags=["Data Sources"])
 
 
 @sources_router.get("/sources", response_model=DataSourceListResponse)
-async def list_sources(service: DataIngestionService = Depends(get_data_service)):
+async def list_sources(
+    limit: int = 50,
+    skip: int = 0,
+    service: DataIngestionService = Depends(get_data_service),
+):
     """
     List all available data sources.
     """
     # TODO: Get real user ID from auth dependency. For now, list all sources.
-    sources = await service.list_sources(user_id=None)
+    sources = await service.list_sources(user_id=None, limit=limit, skip=skip)
     return DataSourceListResponse(
         sources=[DataSourceRead.model_validate(s) for s in sources]
     )

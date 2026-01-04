@@ -30,13 +30,19 @@ class DataIngestionService:
         self.upload_dir.mkdir(parents=True, exist_ok=True)
         self.data_service = DataService()
 
-    async def list_sources(self, user_id: Optional[int] = None) -> Sequence[DataSource]:
+    async def list_sources(
+        self, user_id: Optional[int] = None, limit: int = 50, skip: int = 0
+    ) -> Sequence[DataSource]:
         """
         List all data sources.
         """
         query = select(DataSource)
         if user_id:
             query = query.where(DataSource.created_by == user_id)
+
+        # Order by created_at desc for consistent pagination
+        query = query.order_by(DataSource.created_at.desc())
+        query = query.offset(skip).limit(limit)
 
         result = await self.session.execute(query)
         return result.scalars().all()

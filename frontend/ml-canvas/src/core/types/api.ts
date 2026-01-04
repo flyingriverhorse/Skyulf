@@ -2,6 +2,7 @@ export interface Dataset {
   id: string;
   source_id?: string;
   name: string;
+  type: string; // 'file', 's3', 'postgres', etc.
   description?: string;
   created_at: string;
   rows?: number;

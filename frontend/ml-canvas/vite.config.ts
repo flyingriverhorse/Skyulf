@@ -32,7 +32,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/data': {
+      '/data/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
       },

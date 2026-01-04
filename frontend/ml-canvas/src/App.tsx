@@ -5,6 +5,7 @@ import { DataSources } from './pages/DataSources';
 import { CanvasPage } from './pages/CanvasPage';
 import { ModelRegistry } from './pages/ModelRegistry';
 import { DeploymentsPage } from './components/pages/DeploymentsPage';
+import { JobsPage } from './pages/Jobs';
 import { EDAPage } from './pages/EDAPage';
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
         {/* Main App Layout (with Sidebar) */}
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
+          <Route path="jobs" element={<JobsPage />} />
           <Route path="data" element={<DataSources />} />
           <Route path="eda" element={<EDAPage />} />
           <Route path="canvas" element={<CanvasPage />} />

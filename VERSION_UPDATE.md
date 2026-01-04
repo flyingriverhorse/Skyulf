@@ -37,6 +37,7 @@ This release introduces a professional-grade Automated EDA module, enabling deep
 
 ### 🎨 Frontend
 - **Layout:** Fixed layout issue where Dashboard, EDA, and Data Sources pages were not taking full screen width on large screens.
+- **Jobs Page:** Implemented Jobs page where users can view Training, ingestion and profiling job history with status and logs.
 
 ------------------------------------------------------------
 ## v0.1.6
