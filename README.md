@@ -22,9 +22,7 @@
 
 > **Status:** Active Development. Expect bugs, but also expect rapid progress.
 
-Skyulf is a self-hosted, privacy-first **MLOps Hub**. It is designed to be the "glue" that holds your data science workflow together—without the glue code. Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
-
-Built with a modern stack: **FastAPI** (Backend), **React** (Frontend), **Polars** (High-Performance Engine), **Celery** (Async Jobs), and **Redis**.
+Skyulf is a self-hosted, privacy-first **MLOps Hub**. It is designed to be the "glue" that holds your data science workflow together (soon with export project option). Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
 
 ## What is the meaning of Skyulf?
 
@@ -116,24 +114,31 @@ uv add skyulf-core
 
 ## Using Skyulf as a Library
 
-Skyulf isn't just a web application; its core logic is available as a standalone Python library (`skyulf-core`). You can use it in your own scripts or Jupyter notebooks for powerful EDA and pipeline building.
+Skyulf isn't just a web application; its core logic is available as a standalone Python library (`skyulf-core`). You can use it in your own scripts or Jupyter notebooks for powerful EDA and pipeline building. Using EDA is a great way to get started and it is really easy to use.
 
 ### Example: Automated EDA
 
 ```python
 import polars as pl
 from skyulf.profiling.analyzer import EDAAnalyzer
+from skyulf.profiling.visualizer import EDAVisualizer
 
-# Load your data
-df = pl.read_csv("your_data.csv")
+# 1. Load Data
+df = pl.read_csv("your_dataset.csv")
 
-# Run comprehensive analysis
+# 2. Run Analysis
 analyzer = EDAAnalyzer(df)
-profile = analyzer.analyze(target_col="target_variable")
+profile = analyzer.analyze(target_col="target")
 
-# Access insights
-print(f"Missing Data: {profile.missing_cells_percentage}%")
-print(f"Outliers Detected: {profile.outliers.total_outliers}")
+# 3. Visualize Results (The Easy Way)
+# This single class handles all the rich terminal output and matplotlib plots
+viz = EDAVisualizer(profile, df)
+
+# Print the dashboard
+viz.summary()
+
+# Show the plots
+viz.plot()
 ```
 
 For detailed examples including **Time Series**, **Geospatial Analysis**, and **Causal Inference**, see the [EDA User Guide](docs/user_guide/eda_profiling.md).

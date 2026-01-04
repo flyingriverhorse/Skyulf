@@ -46,6 +46,7 @@ nav:
   - Guides:
     - Getting Started: guides/getting_started.md
     - Recipes: guides/recipes.md
+    - Skyulf vs. YData vs. Sweetviz: guides/profiling_comparison.md
     - Architecture: architecture.md
     - Data Architecture: data_architecture.md
     - Performance: performance.md
