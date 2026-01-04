@@ -28,14 +28,22 @@ async def test_trigger_analysis_creates_report(client, db_session):
     # 1. Create a dummy data source
     # We need to use a unique source_id to avoid conflicts if DB is persistent
     import uuid
+    import os
     unique_id = str(uuid.uuid4())
     
+    # Create a dummy CSV file in temp
+    temp_dir = "temp"
+    os.makedirs(temp_dir, exist_ok=True)
+    file_path = os.path.abspath(os.path.join(temp_dir, f"test_eda_{unique_id}.csv"))
+    with open(file_path, "w") as f:
+        f.write("col1,col2\n1,2\n3,4")
+
     ds = DataSource(
         name="Test Dataset",
         type="csv",
         source_id=unique_id,
         test_status="untested",
-        config={"format": "csv", "size_bytes": 100, "rows": 10, "columns": 2}
+        config={"format": "csv", "size_bytes": 100, "rows": 10, "columns": 2, "file_path": file_path}
     )
     db_session.add(ds)
     await db_session.commit()
@@ -58,7 +66,9 @@ async def test_trigger_analysis_creates_report(client, db_session):
     assert report.data_source_id == ds.id
     if report.status == "FAILED":
         print(f"Report Failed: {report.error_message}")
-    assert report.status == "PENDING"
+    
+    # It might be PENDING, RUNNING or COMPLETED depending on speed
+    assert report.status in ["PENDING", "RUNNING", "COMPLETED"]
     assert report.config == {}
     assert report.is_active is True
     assert report.test_status == "untested"

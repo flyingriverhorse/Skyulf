@@ -72,7 +72,10 @@ def test_feature_generation_speed():
     applier.apply(df_pl, config_math)
     pl_math_time = time.time() - start
     print(f"Polars: {pl_math_time:.4f}s")
-    print(f"Speedup: {pd_math_time / pl_math_time:.2f}x")
+    if pl_math_time > 0:
+        print(f"Speedup: {pd_math_time / pl_math_time:.2f}x")
+    else:
+        print("Speedup: Infinite (Polars took 0s)")
 
     # 3. Similarity (Python Loop vs map_elements)
     print("\n--- Benchmarking Similarity ---")
