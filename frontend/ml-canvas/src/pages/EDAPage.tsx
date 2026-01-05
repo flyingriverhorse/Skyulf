@@ -19,7 +19,7 @@ import { SampleDataTab } from '../components/eda/tabs/SampleDataTab';
 import { CausalTab } from '../components/eda/tabs/CausalTab';
 import { RuleDiscoveryTab } from '../components/eda/tabs/RuleDiscoveryTab';
 import { DecompositionTab } from '../components/eda/tabs/DecompositionTab';
-import { Loader2, RefreshCw, AlertCircle, BarChart2, List, Play } from 'lucide-react';
+import { Loader2, RefreshCw, AlertCircle, BarChart2, List, Play, HelpCircle } from 'lucide-react';
 import { downloadChart } from '../core/utils/chartUtils';
 
 export const EDAPage: React.FC = () => {
@@ -35,6 +35,7 @@ export const EDAPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [targetCol, setTargetCol] = useState<string>('');
+  const [taskType, setTaskType] = useState<string>(''); // "Classification" or "Regression" or "" (Auto)
   const [excludedCols, setExcludedCols] = useState<string[]>([]);
   const [filters, setFilters] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
@@ -156,7 +157,7 @@ export const EDAPage: React.FC = () => {
     if (!selectedDataset) return;
     setAnalyzing(true);
     try {
-      await EDAService.analyze(selectedDataset, targetCol || undefined, actualExcluded, actualFilters);
+      await EDAService.analyze(selectedDataset, targetCol || undefined, actualExcluded, actualFilters, taskType || undefined);
       // Reload immediately to get the PENDING state
       loadReport(selectedDataset);
       loadHistory(selectedDataset);
@@ -214,6 +215,9 @@ export const EDAPage: React.FC = () => {
     }
   }, [report]);
 
+  // Helper to find existing report for current target
+  const existingReport = targetCol ? history.find(h => h.target_col === targetCol && h.status === 'COMPLETED') : null;
+
   const renderContent = () => {
     if (loading && !report) {
       return (
@@ -247,7 +251,7 @@ export const EDAPage: React.FC = () => {
           <p className="mb-4">No analysis found for this dataset.</p>
           
           <div className="flex flex-col items-center space-y-4">
-            <div className="w-64">
+            <div className="w-64 space-y-2">
                 <input
                 type="text"
                 value={targetCol}
@@ -255,15 +259,44 @@ export const EDAPage: React.FC = () => {
                 placeholder="Target Column (Optional)"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
+                
+                <div className="flex items-center space-x-2">
+                    <select
+                        value={taskType}
+                        onChange={(e) => setTaskType(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                        <option value="">Auto-Detect Task</option>
+                        <option value="Classification">Classification</option>
+                        <option value="Regression">Regression</option>
+                    </select>
+                    <div className="group relative flex items-center">
+                        <HelpCircle className="w-4 h-4 text-gray-400 cursor-help" />
+                        <div className="absolute left-full ml-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                            Force a specific task type. Useful for ID columns (force Classification) or numeric categories (force Regression).
+                        </div>
+                    </div>
+                </div>
             </div>
-            <button
-                onClick={() => runAnalysis()}
-                disabled={analyzing}
-                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-            >
-                {analyzing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
-                Run Analysis
-            </button>
+            <div className="flex gap-2">
+                {existingReport && (
+                    <button
+                        onClick={() => loadSpecificReport(existingReport.id)}
+                        className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Load Existing ({new Date(existingReport.created_at).toLocaleDateString()})
+                    </button>
+                )}
+                <button
+                    onClick={() => runAnalysis()}
+                    disabled={analyzing}
+                    className={`flex items-center px-4 py-2 ${existingReport ? 'bg-gray-600 hover:bg-gray-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-md disabled:opacity-50`}
+                >
+                    {analyzing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                    {existingReport ? 'Run New Analysis' : 'Run Analysis'}
+                </button>
+            </div>
           </div>
         </div>
       );
@@ -464,6 +497,26 @@ export const EDAPage: React.FC = () => {
                     <option key={col} value={col}>{col}</option>
                 ))}
              </select>
+             
+             <div className="flex items-center gap-1">
+                <select
+                    value={taskType}
+                    onChange={(e) => setTaskType(e.target.value)}
+                    disabled={!report || !report.profile_data}
+                    className="block w-32 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border disabled:opacity-50"
+                    title="Force Task Type"
+                >
+                    <option value="">Auto</option>
+                    <option value="Classification">Classif.</option>
+                    <option value="Regression">Regress.</option>
+                </select>
+                <div className="group relative flex items-center">
+                    <HelpCircle className="w-4 h-4 text-gray-400 cursor-help" />
+                    <div className="absolute right-0 top-full mt-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                        Force a specific task type. Useful for ID columns (force Classification) or numeric categories (force Regression).
+                    </div>
+                </div>
+             </div>
           </div>
 
           <button 
@@ -474,8 +527,43 @@ export const EDAPage: React.FC = () => {
           >
             <RefreshCw className={`w-5 h-5 ${analyzing ? 'animate-spin' : ''}`} />
           </button>
+          
+          {/* Quick Load Button if existing report found for selected target */}
+          {existingReport && report && report.id !== existingReport.id && (
+             <button
+                onClick={() => loadSpecificReport(existingReport.id)}
+                className="flex items-center px-3 py-1.5 text-xs bg-green-100 text-green-700 border border-green-200 rounded-md hover:bg-green-200 transition-colors"
+                title={`Load existing analysis from ${new Date(existingReport.created_at).toLocaleString()}`}
+             >
+                <RefreshCw className="w-3 h-3 mr-1" />
+                Load Existing
+             </button>
+          )}
         </div>
       </div>
+
+      {/* Recent Targets Chips */}
+      {history.length > 0 && (
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 no-print">
+            <span className="text-xs text-gray-500 font-medium whitespace-nowrap">Recent Targets:</span>
+            {Array.from(new Set(history.filter(h => h.target_col && h.status === 'COMPLETED').map(h => h.target_col))).slice(0, 5).map(target => (
+                <button
+                    key={target}
+                    onClick={() => {
+                        const match = history.find(h => h.target_col === target && h.status === 'COMPLETED');
+                        if (match) loadSpecificReport(match.id);
+                    }}
+                    className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                        report?.profile_data?.target_col === target 
+                        ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800'
+                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-700'
+                    }`}
+                >
+                    {target}
+                </button>
+            ))}
+        </div>
+      )}
 
       {renderContent()}
 

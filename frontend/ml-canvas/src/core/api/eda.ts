@@ -9,11 +9,12 @@ export interface Filter {
 }
 
 export const EDAService = {
-  analyze: async (datasetId: number, targetCol?: string, excludeCols?: string[], filters?: Filter[]) => {
+  analyze: async (datasetId: number, targetCol?: string, excludeCols?: string[], filters?: Filter[], taskType?: string) => {
     const response = await axios.post(`${API_BASE}/${datasetId}/analyze`, {
         target_col: targetCol,
         exclude_cols: excludeCols,
-        filters: filters
+        filters: filters,
+        task_type: taskType
     });
     return response.data;
   },

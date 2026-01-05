@@ -129,6 +129,16 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           {new Date(job.created_at).toLocaleString()}
                         </div>
+                        {job.target_col && (
+                            <div className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                                <Play className="w-3 h-3" /> Target: {job.target_col}
+                                {job.task_type && (
+                                    <span className="ml-1 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px]">
+                                        {job.task_type}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                       </div>
                     </div>
                     
