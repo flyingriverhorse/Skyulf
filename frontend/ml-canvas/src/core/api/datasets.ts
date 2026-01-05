@@ -161,6 +161,7 @@ export interface DatasetProfile {
     columns: string[];
     values: number[][];
   };
+  vif?: Record<string, number>;
   columns: Array<{
     name: string;
     dtype: string;
@@ -172,6 +173,9 @@ export interface DatasetProfile {
       std: number;
       minimum: number;
       maximum: number;
+    };
+    text_summary?: {
+      sentiment_distribution?: Record<string, number>;
     };
   }>;
 };

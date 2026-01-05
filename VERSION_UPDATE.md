@@ -1,6 +1,5 @@
 # Version Updates
 
-*   **v0.1.9 :** "The Nomenclature & Architecture Refactor" — Renamed core modeling components to "Basic Training" and "Advanced Tuning" for clarity, and reset the database schema.
 *   **v0.1.8 :** "The Regression Rules Update" — Extended EDA capabilities to support regression targets in Decision Tree rule discovery.
 *   **v0.1.7 :** "The Advanced EDA & Profiling Update" — Professional-grade automated data analysis with smart alerts, rich visualizations, and Polars-powered profiling.
 *   **v0.1.6 :** "The Backend Abstraction & Modern Frameworks Update" — Polars migration, leakage proof, and performance optimization.
@@ -10,8 +9,11 @@
 *   **v0.1.2 :** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
+------------------------------------------------------------
+## v0.1.8
+**"The Regression Rules Update"**
+This release extends the Automated EDA module to support regression targets, enabling users to discover rules that drive continuous values.
 
-## v0.1.9
 **"The Nomenclature & Architecture Refactor"**
 This release renames core modeling components to better reflect their purpose and resets the database schema for a clean slate.
 
@@ -28,7 +30,7 @@ This release renames core modeling components to better reflect their purpose an
 - **Node Types:** Updated internal node types to match the backend changes.
 
 ### 📊 Data Drift & Monitoring
-- **Drift Calculator:** Implemented `DriftCalculator` in `skyulf-core` using Polars and Scipy. Supports Wasserstein Distance, KS Test, and PSI.
+- **Drift Calculator:** Implemented `DriftCalculator` in `skyulf-core` using Polars and Scipy. Supports Wasserstein Distance, KS Test, PSI, and **KL Divergence**.
 - **Reference Data:** Updated `PipelineEngine` to automatically save training data as `reference_data_{dataset_name}_{job_id}.joblib` for future drift analysis.
 - **Backend API:** Added `/api/monitoring/drift/calculate` endpoint to compute drift between reference and uploaded current data.
 - **Frontend UI:** Added "Data Drift" page to the ML Canvas for on-demand drift analysis.
@@ -37,12 +39,9 @@ This release renames core modeling components to better reflect their purpose an
 - **Job Discovery:** Improved job discovery logic in `backend/monitoring/router.py` to recursively scan subdirectories using `pathlib`, ensuring all training jobs are found.
 - **UI Improvements:** Replaced the simple dropdown with a searchable List View for selecting Reference Jobs, including metadata like creation date.
 
-------------------------------------------------------------
-## v0.1.8
-**"The Regression Rules Update"**
-This release extends the Automated EDA module to support regression targets, enabling users to discover rules that drive continuous values.
-
 ### 🧠 Advanced Analysis
+- **Multicollinearity (VIF):** Added Variance Inflation Factor (VIF) calculation to the EDA module to detect highly correlated features.
+- **Sentiment Analysis:** Integrated `vaderSentiment` to automatically analyze text columns and provide sentiment distribution (Positive/Neutral/Negative).
 - **Regression Rules:** Extended Decision Tree Discovery to support regression targets (Numeric). The system now generates rules like "IF Feature > X THEN Value = Y" (predicting a mean value) instead of just classification rules.
 - **Unified EDA:** Ensured that all EDA components (Causal Discovery, Correlations, Outliers) work seamlessly with both Classification and Regression targets.
 - **Smart Task Detection:** Added `task_type` override to `analyze()` method, allowing users to force "Classification" or "Regression" regardless of data type.
@@ -50,7 +49,8 @@ This release extends the Automated EDA module to support regression targets, ena
 
 ### 🎨 Frontend
 - **Task Type Selector:** Added a dropdown in the EDA dashboard to manually select "Classification" or "Regression" for the target column, with a helpful tooltip explaining when to use it.
-- **Visualizer Update:** Updated the terminal visualizer to display the detected or selected Task Type in the Data Quality summary.
+- **Visualizer Update:** Updated the terminal visualizer to display the detected or selected Task Type, **VIF scores with severity status, and Sentiment Analysis distributions** in the Data Quality summary.
+- **Bug Fixes:** Fixed a frontend crash when viewing details for Categorical/Boolean columns.
 
 ------------------------------------------------------------
 ## v0.1.7
