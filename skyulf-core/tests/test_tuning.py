@@ -2,7 +2,7 @@
 
 from skyulf.modeling.classification import LogisticRegressionCalculator
 from skyulf.modeling.tuning.schemas import TuningConfig
-from skyulf.modeling.tuning.tuner import TunerCalculator
+from skyulf.modeling.tuning.engine import TuningCalculator
 
 
 def test_tuner_grid_search(sample_classification_data):
@@ -12,7 +12,7 @@ def test_tuner_grid_search(sample_classification_data):
     y = data["target"]
 
     base_calc = LogisticRegressionCalculator()
-    tuner = TunerCalculator(base_calc)
+    tuner = TuningCalculator(base_calc)
 
     config = TuningConfig(
         strategy="grid",

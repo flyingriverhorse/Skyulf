@@ -326,7 +326,7 @@ class StatefulEstimator:
             model_to_evaluate = self.model
             if isinstance(self.model, tuple) and len(self.model) == 2:
                 # Check if first element looks like a model (has fit/predict)
-                # or if it's just a convention from TunerCalculator
+                # or if it's just a convention from TuningCalculator
                 model_to_evaluate = self.model[0]
 
             if problem_type == "classification":

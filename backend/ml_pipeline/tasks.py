@@ -176,7 +176,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
         )
 
         # 5. Run Pipeline
-        result = engine.run(pipeline_config, job_id=job_id)
+        result = engine.run(pipeline_config, job_id=job_id, dataset_name=dataset_name)
 
         # 6. Handle Result
         job.logs = job_logs  # Final log update

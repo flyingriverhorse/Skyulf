@@ -100,6 +100,6 @@ nav:
         - classification: reference/api/modeling/classification.md
         - regression: reference/api/modeling/regression.md
         - cross_validation: reference/api/modeling/cross_validation.md
-        - tuning/tuner: reference/api/modeling/tuning_tuner.md
+        - tuning/engine: reference/api/modeling/tuning_engine.md
   - Contributing:
     - Writing Docs: contributing/writing_docs.md
