@@ -27,6 +27,16 @@ This release renames core modeling components to better reflect their purpose an
 - **Node Labels:** Updated node labels in the ML Canvas to "Basic Training" and "Advanced Tuning".
 - **Node Types:** Updated internal node types to match the backend changes.
 
+### 📊 Data Drift & Monitoring
+- **Drift Calculator:** Implemented `DriftCalculator` in `skyulf-core` using Polars and Scipy. Supports Wasserstein Distance, KS Test, and PSI.
+- **Reference Data:** Updated `PipelineEngine` to automatically save training data as `reference_data_{dataset_name}_{job_id}.joblib` for future drift analysis.
+- **Backend API:** Added `/api/monitoring/drift/calculate` endpoint to compute drift between reference and uploaded current data.
+- **Frontend UI:** Added "Data Drift" page to the ML Canvas for on-demand drift analysis.
+- **Drift Visualization:** Added interactive Histograms (using Recharts) to the Data Drift report, allowing side-by-side comparison of Reference vs. Current distributions.
+- **Schema Drift:** Implemented detection and alerting for Schema Drift (Missing Columns, New Columns).
+- **Job Discovery:** Improved job discovery logic in `backend/monitoring/router.py` to recursively scan subdirectories using `pathlib`, ensuring all training jobs are found.
+- **UI Improvements:** Replaced the simple dropdown with a searchable List View for selecting Reference Jobs, including metadata like creation date.
+
 ------------------------------------------------------------
 ## v0.1.8
 **"The Regression Rules Update"**
@@ -215,7 +225,7 @@ This release focuses on hardening the codebase against runtime errors and improv
 This release resolves critical discrepancies between Training and Tuning workflows, ensuring consistent versioning and full metric visibility.
 
 ### 🎯 Tuning & Evaluation Overhaul
-- **Automatic Refit:** `TunerCalculator` now automatically refits the best model on the full dataset after tuning completes.
+- **Automatic Refit:** `TuningCalculator` now automatically refits the best model on the full dataset after tuning completes.
 - **Unified Execution:** The Backend Engine now uses `StatefulEstimator` for tuning jobs, ensuring the exact same execution path as standard training.
 - **Robust Evaluation:**
     - Fixed evaluation logic to correctly unpack tuning results `(model, result)`.

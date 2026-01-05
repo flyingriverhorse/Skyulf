@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive, BarChart2, Activity } from 'lucide-react';
+import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive, BarChart2, Activity, TrendingUp } from 'lucide-react';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
@@ -55,6 +55,9 @@ export const Layout: React.FC = () => {
           </NavLink>
           <NavLink to="/eda" active={isActive('/eda')} icon={<BarChart2 size={20} />} collapsed={isCollapsed}>
             EDA
+          </NavLink>
+          <NavLink to="/drift" active={isActive('/drift')} icon={<TrendingUp size={20} />} collapsed={isCollapsed}>
+            Data Drift
           </NavLink>
           <NavLink to="/canvas" active={isActive('/canvas')} icon={<GitBranch size={20} />} collapsed={isCollapsed}>
             ML Canvas

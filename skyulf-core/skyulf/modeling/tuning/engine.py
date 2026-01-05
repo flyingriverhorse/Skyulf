@@ -60,7 +60,7 @@ if HAS_OPTUNA:
                 )
 
 
-class TunerCalculator(BaseModelCalculator):
+class TuningCalculator(BaseModelCalculator):
     """Calculator for hyperparameter tuning."""
 
     def __init__(self, model_calculator: BaseModelCalculator):
@@ -559,9 +559,9 @@ class TunerCalculator(BaseModelCalculator):
         )
 
 
-class TunerApplier(BaseModelApplier):
+class TuningApplier(BaseModelApplier):
     """
-    Applier for TunerCalculator.
+    Applier for TuningCalculator.
     Wraps the base model applier to provide predictions using the refitted best model.
     """
 

@@ -787,7 +787,7 @@ class EDAAnalyzer:
                 
             # 2. Seasonality (Day of Week)
             # If we have a numeric column to track, use mean, else count
-            agg_expr = pl.count().alias("count")
+            agg_expr = pl.len().alias("count")
             if cols_to_track:
                 # Use the first numeric column for seasonality magnitude
                 target_metric = cols_to_track[0]
@@ -1173,7 +1173,7 @@ class EDAAnalyzer:
                 # Calculate SS_between
                 # Group by target, get count and mean
                 groups = self.df.group_by(target_col).agg([
-                    pl.count().alias("n"),
+                    pl.len().alias("n"),
                     pl.col(col).mean().alias("mean")
                 ])
                 
@@ -1463,7 +1463,7 @@ class EDAAnalyzer:
             nodes = []
             
             def recurse(node_id):
-                is_leaf = tree_.children_left[node_id] == _tree.TREE_LEAF
+                is_leaf = bool(tree_.children_left[node_id] == _tree.TREE_LEAF)
                 
                 feature = None
                 threshold = None
@@ -1629,7 +1629,7 @@ class EDAAnalyzer:
         # Or count rows where col is not in top_k? No, that's not right.
         # Correct way: group by col, count, filter count < 5, count rows
         try:
-            rare_count = self.lazy_df.group_by(col).agg(pl.count().alias("cnt")).filter(pl.col("cnt") < 5).select(pl.count()).collect().item()
+            rare_count = self.lazy_df.group_by(col).agg(pl.len().alias("cnt")).filter(pl.col("cnt") < 5).select(pl.len()).collect().item()
         except Exception:
             rare_count = 0
         

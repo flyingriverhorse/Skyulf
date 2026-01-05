@@ -1214,6 +1214,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#4-task-type-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Task Type Control
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1415,6 +1426,78 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-drift-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Drift &amp; Monitoring
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Drift &amp; Monitoring">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#concept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concept
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-drift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Drift
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-data-drift-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the Data Drift UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-library-python-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the Library (Python API)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2651,14 +2734,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/api/modeling/tuning_tuner.html" class="md-nav__link">
+      <a href="../reference/api/modeling/tuning_engine.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    tuning/tuner
+    tuning/engine
   
 
     
@@ -2823,9 +2906,10 @@ df = pl.read_csv(&quot;your_dataset.csv&quot;)
 analyzer = EDAAnalyzer(df)
 profile = analyzer.analyze(
     target_col=&quot;target&quot;,
-    date_col=&quot;timestamp&quot;,  # Optional: Manually specify if auto-detection fails
-    lat_col=&quot;latitude&quot;,    # Optional
-    lon_col=&quot;longitude&quot;    # Optional
+    task_type=&quot;Classification&quot;, # Optional: Force &quot;Classification&quot; or &quot;Regression&quot;
+    date_col=&quot;timestamp&quot;,       # Optional: Manually specify if auto-detection fails
+    lat_col=&quot;latitude&quot;,         # Optional
+    lon_col=&quot;longitude&quot;         # Optional
 )
 
 # 3. Visualize
@@ -2883,11 +2967,25 @@ for alert in profile.alerts:
 <li><strong>Outlier Detection:</strong> Uses Isolation Forest to identify anomalous rows.</li>
 <li><strong>PCA:</strong> Computes Principal Components to visualize high-dimensional data structure.</li>
 <li><strong>Causal Discovery:</strong> Uses the PC Algorithm to infer causal relationships between variables (DAG).</li>
-<li><strong>Decision Tree:</strong> Uses a surrogate Decision Tree model to extract human-readable rules (e.g., "If Age &gt; 50 and Income &lt; 30k -&gt; High Risk"). Provides both a visual tree and a list of text rules. Useful for finding "smoking gun" segments.</li>
+<li><strong>Decision Tree (Rule Discovery):</strong> Uses a surrogate Decision Tree model to extract human-readable rules.<ul>
+<li><strong>Classification:</strong> "If Age &gt; 50 -&gt; High Risk (Confidence: 85%)"</li>
+<li><strong>Regression:</strong> "If Age &gt; 50 -&gt; Value = 120.5 (Samples: 100)"</li>
+<li><strong>High Cardinality:</strong> Automatically groups rare classes into "Other" for readable trees (e.g. Top 10 Zip Codes).</li>
+</ul>
+</li>
 <li><strong>Target Analysis:</strong> Analyzes relationships between features and the target variable (Correlations, ANOVA, Interactions).</li>
 <li><strong>Geospatial:</strong> Automatically detects Lat/Lon columns and computes bounding boxes.</li>
 <li><strong>Time Series:</strong> Detects seasonality and trends in datetime columns.</li>
 </ul>
+<h3 id="4-task-type-control">4. Task Type Control</h3>
+<p>By default, Skyulf automatically detects if your target is <strong>Classification</strong> (Categorical) or <strong>Regression</strong> (Numeric). However, you can override this behavior:</p>
+<ul>
+<li><strong>Force Classification:</strong> Useful for ID columns or numeric codes (e.g., Zip Code, Status Code) that should be treated as categories.</li>
+<li><strong>Force Regression:</strong> Useful for ordinal categories (e.g., Rating 1-5) that you want to treat as continuous.</li>
+</ul>
+<pre><code class="language-python"># Force Classification on a numeric ID column
+profile = analyzer.analyze(target_col=&quot;zip_code&quot;, task_type=&quot;Classification&quot;)
+</code></pre>
 <h2 id="visualization-support-skyulf-coreviz">Visualization Support (<code>skyulf-core[viz]</code>)</h2>
 <p>The core library is designed to be lightweight. To use the <code>EDAVisualizer</code> and generate plots, you must install the optional visualization dependencies:</p>
 <pre><code class="language-bash">pip install skyulf-core[viz]
@@ -3025,6 +3123,78 @@ profile = analyzer.analyze(
 - Plots for Time Series Trend and Geospatial Distribution.</p>
 <h2 id="performance">Performance</h2>
 <p>The profiler is built on <strong>Polars</strong>, making it significantly faster than Pandas-based alternatives like <code>pandas-profiling</code> or <code>ydata-profiling</code>, especially for datasets with millions of rows.</p>
+<h2 id="data-drift-monitoring">Data Drift &amp; Monitoring</h2>
+<p>Skyulf includes <strong>Data Drift Detection</strong> module to monitor how your data changes over time, ensuring model reliability in production.</p>
+<h3 id="concept">Concept</h3>
+<p>Data Drift occurs when the statistical properties of the input data (production) change compared to the data used to train the model (reference). This can lead to model degradation.</p>
+<h3 id="metrics">Metrics</h3>
+<p>Skyulf calculates drift using four key statistical metrics for every numerical column:</p>
+<ol>
+<li><strong>Wasserstein Distance (Earth Mover's Distance):</strong> Measures the "work" needed to transform one distribution into the other. Good for detecting shifts in shape and location.</li>
+<li><strong>KS Test (Kolmogorov-Smirnov):</strong> A non-parametric test that compares cumulative distribution functions. The p-value indicates the probability that the two samples come from the same distribution.</li>
+<li><strong>PSI (Population Stability Index):</strong> A widely used industry standard for measuring population shifts.<ul>
+<li><code>PSI &lt; 0.1</code>: No significant drift.</li>
+<li><code>0.1 &lt;= PSI &lt; 0.25</code>: Moderate drift.</li>
+<li><code>PSI &gt;= 0.25</code>: Significant drift (Action required).</li>
+</ul>
+</li>
+<li><strong>KL Divergence (Kullback-Leibler):</strong> Measures how one probability distribution diverges from a second, expected probability distribution.</li>
+</ol>
+<h3 id="schema-drift">Schema Drift</h3>
+<p>The system also monitors for structural changes:
+*   <strong>Missing Columns:</strong> Critical alerts for features present in training but missing in production.
+*   <strong>New Columns:</strong> Alerts for unexpected features appearing in production data.</p>
+<h3 id="using-the-data-drift-ui">Using the Data Drift UI</h3>
+<ol>
+<li>Navigate to the <strong>Data Drift</strong> page in the ML Canvas.</li>
+<li><strong>Step 1:</strong> Select a <strong>Reference Job</strong> (Training Job) from the list. This loads the statistical profile of the data used during training.</li>
+<li><strong>Step 2:</strong> Upload your <strong>Current Data</strong> (Production Data) as a CSV or Parquet file.</li>
+<li><strong>Analyze:</strong> Click "Run Analysis".</li>
+<li><strong>Review Report:</strong><ul>
+<li>Check the <strong>Drift Score</strong> and <strong>Schema Alerts</strong> at the top.</li>
+<li>Expand any column row to see detailed metrics and <strong>Interactive Histograms</strong> comparing the two distributions side-by-side.</li>
+</ul>
+</li>
+</ol>
+<h3 id="using-the-library-python-api">Using the Library (Python API)</h3>
+<p><strong>Script:</strong> <a href="../examples/scripts/data_drift_check.py"><code>docs/examples/scripts/data_drift_check.py</code></a></p>
+<p>You can also use the drift detection engine programmatically within your own scripts or pipelines using <code>skyulf-core</code>.</p>
+<pre><code class="language-python">import polars as pl
+from skyulf.profiling.drift import DriftCalculator
+
+# 1. Load Data (Reference vs Current)
+# Reference: The data your model was trained on
+# Current: The new data from production
+ref_df = pl.read_csv(&quot;training_data.csv&quot;)
+curr_df = pl.read_csv(&quot;production_data.csv&quot;)
+
+# 2. Initialize Calculator
+calculator = DriftCalculator(ref_df, curr_df)
+
+# 3. Calculate Drift
+# You can optionally override default thresholds
+report = calculator.calculate_drift(thresholds={&quot;psi&quot;: 0.2, &quot;wasserstein&quot;: 0.1})
+
+# 4. Inspect Results
+print(f&quot;Drifted Columns: {report.drifted_columns_count}&quot;)
+
+# Check for Schema Drift
+if report.missing_columns:
+    print(f&quot;⚠️ Missing Columns: {report.missing_columns}&quot;)
+if report.new_columns:
+    print(f&quot;ℹ️ New Columns: {report.new_columns}&quot;)
+
+# Check for Statistical Drift
+for col_name, drift_info in report.column_drifts.items():
+    if drift_info.drift_detected:
+        print(f&quot;\n🚨 Drift detected in '{col_name}':&quot;)
+        for metric in drift_info.metrics:
+            status = &quot;FAIL&quot; if metric.has_drift else &quot;PASS&quot;
+            print(f&quot;  - {metric.metric}: {metric.value:.4f} [{status}]&quot;)
+
+        if drift_info.suggestions:
+            print(f&quot;  💡 Suggestion: {drift_info.suggestions[0]}&quot;)
+</code></pre>
 
 
 

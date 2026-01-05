@@ -293,3 +293,79 @@ This example shows how to handle cases where auto-detection might fail or when y
 ## Performance
 
 The profiler is built on **Polars**, making it significantly faster than Pandas-based alternatives like `pandas-profiling` or `ydata-profiling`, especially for datasets with millions of rows.
+
+## Data Drift & Monitoring
+
+Skyulf includes **Data Drift Detection** module to monitor how your data changes over time, ensuring model reliability in production.
+
+### Concept
+Data Drift occurs when the statistical properties of the input data (production) change compared to the data used to train the model (reference). This can lead to model degradation.
+
+### Metrics
+Skyulf calculates drift using four key statistical metrics for every numerical column:
+
+1.  **Wasserstein Distance (Earth Mover's Distance):** Measures the "work" needed to transform one distribution into the other. Good for detecting shifts in shape and location.
+2.  **KS Test (Kolmogorov-Smirnov):** A non-parametric test that compares cumulative distribution functions. The p-value indicates the probability that the two samples come from the same distribution.
+3.  **PSI (Population Stability Index):** A widely used industry standard for measuring population shifts.
+    *   `PSI < 0.1`: No significant drift.
+    *   `0.1 <= PSI < 0.25`: Moderate drift.
+    *   `PSI >= 0.25`: Significant drift (Action required).
+4.  **KL Divergence (Kullback-Leibler):** Measures how one probability distribution diverges from a second, expected probability distribution.
+
+### Schema Drift
+The system also monitors for structural changes:
+*   **Missing Columns:** Critical alerts for features present in training but missing in production.
+*   **New Columns:** Alerts for unexpected features appearing in production data.
+
+### Using the Data Drift UI
+1.  Navigate to the **Data Drift** page in the ML Canvas.
+2.  **Step 1:** Select a **Reference Job** (Training Job) from the list. This loads the statistical profile of the data used during training.
+3.  **Step 2:** Upload your **Current Data** (Production Data) as a CSV or Parquet file.
+4.  **Analyze:** Click "Run Analysis".
+5.  **Review Report:**
+    *   Check the **Drift Score** and **Schema Alerts** at the top.
+    *   Expand any column row to see detailed metrics and **Interactive Histograms** comparing the two distributions side-by-side.
+
+### Using the Library (Python API)
+**Script:** [`docs/examples/scripts/data_drift_check.py`](../examples/scripts/data_drift_check.py)
+
+You can also use the drift detection engine programmatically within your own scripts or pipelines using `skyulf-core`.
+
+```python
+import polars as pl
+from skyulf.profiling.drift import DriftCalculator
+
+# 1. Load Data (Reference vs Current)
+# Reference: The data your model was trained on
+# Current: The new data from production
+ref_df = pl.read_csv("training_data.csv")
+curr_df = pl.read_csv("production_data.csv")
+
+# 2. Initialize Calculator
+calculator = DriftCalculator(ref_df, curr_df)
+
+# 3. Calculate Drift
+# You can optionally override default thresholds
+report = calculator.calculate_drift(thresholds={"psi": 0.2, "wasserstein": 0.1})
+
+# 4. Inspect Results
+print(f"Drifted Columns: {report.drifted_columns_count}")
+
+# Check for Schema Drift
+if report.missing_columns:
+    print(f"⚠️ Missing Columns: {report.missing_columns}")
+if report.new_columns:
+    print(f"ℹ️ New Columns: {report.new_columns}")
+
+# Check for Statistical Drift
+for col_name, drift_info in report.column_drifts.items():
+    if drift_info.drift_detected:
+        print(f"\n🚨 Drift detected in '{col_name}':")
+        for metric in drift_info.metrics:
+            status = "FAIL" if metric.has_drift else "PASS"
+            print(f"  - {metric.metric}: {metric.value:.4f} [{status}]")
+        
+        if drift_info.suggestions:
+            print(f"  💡 Suggestion: {drift_info.suggestions[0]}")
+```
+

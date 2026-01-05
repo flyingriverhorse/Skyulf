@@ -21,7 +21,7 @@ from .modeling.regression import (
     RidgeRegressionApplier,
     RidgeRegressionCalculator,
 )
-from .modeling.tuning.tuner import TunerApplier, TunerCalculator
+from .modeling.tuning.engine import TuningApplier, TuningCalculator
 from .preprocessing.pipeline import FeatureEngineer
 from .registry import NodeRegistry
 
@@ -115,8 +115,8 @@ class SkyulfPipeline:
                         base_applier = RandomForestRegressorApplier()
 
                 if base_calc and base_applier:
-                    calculator = TunerCalculator(base_calc)
-                    applier = TunerApplier(base_applier)
+                    calculator = TuningCalculator(base_calc)
+                    applier = TuningApplier(base_applier)
                 else:
                     raise ValueError(
                         f"Unknown base model type for tuner: {base_model_type}"

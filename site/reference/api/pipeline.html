@@ -2438,14 +2438,14 @@
   
   
     <li class="md-nav__item">
-      <a href="modeling/tuning_tuner.html" class="md-nav__link">
+      <a href="modeling/tuning_engine.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    tuning/tuner
+    tuning/engine
   
 
     
@@ -2901,8 +2901,8 @@
                         <span class="n">base_applier</span> <span class="o">=</span> <span class="n">RandomForestRegressorApplier</span><span class="p">()</span>
 
                 <span class="k">if</span> <span class="n">base_calc</span> <span class="ow">and</span> <span class="n">base_applier</span><span class="p">:</span>
-                    <span class="n">calculator</span> <span class="o">=</span> <span class="n">TunerCalculator</span><span class="p">(</span><span class="n">base_calc</span><span class="p">)</span>
-                    <span class="n">applier</span> <span class="o">=</span> <span class="n">TunerApplier</span><span class="p">(</span><span class="n">base_applier</span><span class="p">)</span>
+                    <span class="n">calculator</span> <span class="o">=</span> <span class="n">TuningCalculator</span><span class="p">(</span><span class="n">base_calc</span><span class="p">)</span>
+                    <span class="n">applier</span> <span class="o">=</span> <span class="n">TuningApplier</span><span class="p">(</span><span class="n">base_applier</span><span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                         <span class="sa">f</span><span class="s2">&quot;Unknown base model type for tuner: </span><span class="si">{</span><span class="n">base_model_type</span><span class="si">}</span><span class="s2">&quot;</span>

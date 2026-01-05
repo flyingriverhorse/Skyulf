@@ -1,4 +1,4 @@
 from .schemas import TuningConfig
-from .tuner import TunerCalculator
+from .engine import TuningCalculator
 
-__all__ = ["TunerCalculator", "TuningConfig"]
+__all__ = ["TuningCalculator", "TuningConfig"]

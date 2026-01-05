@@ -16,7 +16,7 @@ from skyulf.modeling.regression import (
     RidgeRegressionApplier,
     RidgeRegressionCalculator,
 )
-from skyulf.modeling.tuning import TunerCalculator, TuningConfig
+from skyulf.modeling.tuning import TuningCalculator, TuningConfig
 
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
@@ -182,7 +182,7 @@ def test_cross_validation(classification_data, artifact_store):
 def test_hyperparameter_tuning(classification_data, artifact_store):
     # Setup
     model_calculator = LogisticRegressionCalculator()
-    tuner = TunerCalculator(model_calculator)
+    tuner = TuningCalculator(model_calculator)
 
     # Config
     config = TuningConfig(
@@ -215,10 +215,10 @@ def test_hyperparameter_tuning(classification_data, artifact_store):
 def test_halving_strategies(classification_data, artifact_store):
     from skyulf.modeling.classification import LogisticRegressionCalculator
     from skyulf.modeling.tuning.schemas import TuningConfig
-    from skyulf.modeling.tuning.tuner import TunerCalculator
+    from skyulf.modeling.tuning.engine import TuningCalculator
 
     model_calculator = LogisticRegressionCalculator()
-    tuner = TunerCalculator(model_calculator)
+    tuner = TuningCalculator(model_calculator)
 
     X_train = classification_data.train.drop(columns=["target"])
     y_train = classification_data.train["target"]

@@ -2,6 +2,7 @@
 
 import logging
 import time
+import re
 from datetime import datetime
 from typing import Any, Dict, List
 
@@ -23,7 +24,7 @@ from skyulf.modeling.regression import (
     RidgeRegressionApplier,
     RidgeRegressionCalculator,
 )
-from skyulf.modeling.tuning.tuner import TunerApplier, TunerCalculator
+from skyulf.modeling.tuning.engine import TuningApplier, TuningCalculator
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
 from ..artifacts.store import ArtifactStore
@@ -59,18 +60,62 @@ class PipelineEngine:
         self._results: Dict[str, NodeExecutionResult] = {}
         self._node_configs: Dict[str, NodeConfig] = {}
 
+    def _save_reference_data(self, data: Any, job_id: str, target_col: str):
+        """
+        Saves the training data as a reference dataset for future drift detection.
+        Handles SplitDataset (extracts train) and DataFrame/Tuple formats.
+        """
+        if not job_id or job_id == "unknown":
+            return
+
+        try:
+            train_df = None
+            
+            # 1. Extract Training Data
+            if isinstance(data, SplitDataset):
+                raw_train = data.train
+            else:
+                raw_train = data # Assume it's the full dataset if not split
+
+            # 2. Normalize to DataFrame
+            if isinstance(raw_train, pd.DataFrame):
+                train_df = raw_train
+            elif isinstance(raw_train, tuple) and len(raw_train) == 2:
+                # (X, y) tuple
+                X, y = raw_train
+                if isinstance(X, pd.DataFrame):
+                    train_df = X.copy()
+                    # Add target column back if y is compatible
+                    if isinstance(y, (pd.Series, np.ndarray, list)):
+                        train_df[target_col] = y
+            
+            # 3. Save if valid
+            if train_df is not None and not train_df.empty:
+                # Sanitize dataset name
+                safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', self.dataset_name)
+                key = f"reference_data_{safe_name}_{job_id}"
+                
+                self.log(f"Saving reference training data for drift detection: {key}")
+                self.artifact_store.save(key, train_df)
+            else:
+                logger.warning(f"Could not extract reference data for job {job_id}")
+
+        except Exception as e:
+            logger.warning(f"Failed to save reference data: {e}")
+
     def log(self, message: str):
         logger.info(message)
         if self.log_callback:
             self.log_callback(message)
 
     def run(
-        self, config: PipelineConfig, job_id: str = "unknown"
+        self, config: PipelineConfig, job_id: str = "unknown", dataset_name: str = "dataset"
     ) -> PipelineExecutionResult:
         """
         Executes the pipeline defined by the configuration.
         """
         self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
+        self.dataset_name = dataset_name
         start_time = datetime.now()
         self.executed_transformers = []  # Reset for new run
         self._node_configs = {n.node_id: n for n in config.nodes}
@@ -526,6 +571,9 @@ class PipelineEngine:
 
         estimator.fit_predict(data, target_col, fit_config, log_callback=self.log)
 
+        # Save Reference Data for Drift Detection
+        self._save_reference_data(data, job_id, target_col)
+
         # Manually save the model artifact
         self.artifact_store.save(node.node_id, estimator.model)
         if job_id and job_id != "unknown":
@@ -621,8 +669,8 @@ class PipelineEngine:
         calculator, applier = self._get_model_components(algorithm)
 
         # Create Tuner components
-        tuner_calc = TunerCalculator(calculator)
-        tuner_applier = TunerApplier(applier)
+        tuner_calc = TuningCalculator(calculator)
+        tuner_applier = TuningApplier(applier)
 
         # Create StatefulEstimator wrapping the Tuner
         # This ensures consistency with how standard models are trained and evaluated
@@ -668,6 +716,9 @@ class PipelineEngine:
             log_callback=self.log,
             job_id=job_id,
         )
+
+        # Save Reference Data for Drift Detection
+        self._save_reference_data(data, job_id, target_col)
 
         # Save model artifact
         # The model artifact is a tuple: (fitted_model, tuning_result)
