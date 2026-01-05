@@ -13,21 +13,26 @@ from skyulf.modeling.hyperparameters import (
     get_default_search_space,
     get_hyperparameters,
 )
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
 from backend.data_ingestion.service import DataIngestionService
 from backend.database.engine import get_async_session
+import backend.database.engine as db_engine
 from backend.database.models import (
     FeatureEngineeringPipeline,
     AdvancedTuningJob,
     BasicTrainingJob,
+    DataSource,
+    Deployment,
 )
 from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.tasks import run_pipeline_task
 from backend.utils.file_utils import extract_file_path_from_source
 from backend.ml_pipeline.services.evaluation_service import EvaluationService
+from backend.ml_pipeline.resolution import resolve_pipeline_nodes
+from backend.data.catalog import create_catalog_from_options, FileSystemCatalog
 
 from .artifacts.local import LocalArtifactStore
 from .execution.engine import PipelineEngine
@@ -266,7 +271,7 @@ class PipelineConfigModel(BaseModel):
     nodes: List[NodeConfigModel]
     metadata: Dict[str, Any] = {}
     target_node_id: Optional[str] = None
-    job_type: Optional[str] = "basic_training"  # "basic_training", "advanced_tuning", or "preview"
+    job_type: Optional[str] = StepType.BASIC_TRAINING  # "basic_training", "advanced_tuning", or "preview"
 
 
 class RunPipelineResponse(BaseModel):
@@ -299,9 +304,9 @@ async def run_pipeline(  # noqa: C901
     # Try to find model type from target node params
     for node in config.nodes:
         if node.node_id == target_node_id:
-            if node.step_type == "trainer" or node.step_type == "basic_training":
+            if node.step_type == "trainer" or node.step_type == StepType.BASIC_TRAINING:
                 model_type = node.params.get("model_type", "unknown")
-            elif node.step_type == "advanced_tuning":
+            elif node.step_type == StepType.ADVANCED_TUNING:
                 # For tuning nodes, model_type might be in params directly or inside tuning_config?
                 # Usually it's 'algorithm' or 'model_type' in params
                 model_type = node.params.get("algorithm") or node.params.get(
@@ -311,12 +316,10 @@ async def run_pipeline(  # noqa: C901
                 model_type = "preview"
 
         # Try to find dataset_id from data_loader node
-        if node.step_type == "data_loader":
+        if node.step_type == StepType.DATA_LOADER:
             dataset_id = node.params.get("dataset_id", "unknown")
 
     # --- Path Resolution Logic ---
-    from backend.ml_pipeline.resolution import resolve_pipeline_nodes
-    
     ingestion_service = DataIngestionService(db)
     resolved_s3_options = await resolve_pipeline_nodes(config.nodes, ingestion_service)
     # -----------------------------
@@ -486,7 +489,6 @@ async def preview_pipeline(  # noqa: C901
     artifact_store = LocalArtifactStore(temp_dir)
     
     # Resolve paths and credentials for Preview (Async)
-    from backend.ml_pipeline.resolution import resolve_pipeline_nodes
     ingestion_service = DataIngestionService(session)
     resolved_s3_options = await resolve_pipeline_nodes(config.nodes, ingestion_service)
 
@@ -502,7 +504,7 @@ async def preview_pipeline(  # noqa: C901
             params = node.params.copy()
 
             # Force sampling for Data Loader
-            if node.step_type == "data_loader":
+            if node.step_type == StepType.DATA_LOADER:
                 params["sample"] = True
                 params["limit"] = 1000  # Default preview limit
 
@@ -528,7 +530,6 @@ async def preview_pipeline(  # noqa: C901
         )
 
         # 3. Run Engine
-        from backend.data.catalog import create_catalog_from_options
         
         # IMPORTANT: Pass session to create_catalog_from_options so SmartCatalog can resolve IDs
         # But session here is AsyncSession, SmartCatalog expects Sync Session (usually)
@@ -536,12 +537,10 @@ async def preview_pipeline(  # noqa: C901
         # If we pass AsyncSession, query() won't work.
         # We need a sync session for SmartCatalog.
         
-        from backend.database.engine import sync_session_factory
-        
-        if sync_session_factory is None:
+        if db_engine.sync_session_factory is None:
             raise HTTPException(status_code=500, detail="Database not initialized")
             
-        sync_session = sync_session_factory()
+        sync_session = db_engine.sync_session_factory()
         
         try:
             catalog = create_catalog_from_options(resolved_s3_options, config.nodes, session=sync_session)
@@ -816,14 +815,6 @@ async def get_system_stats(session: AsyncSession = Depends(get_async_session)):
     """
     Returns high-level system statistics for the dashboard.
     """
-    from sqlalchemy import func, select
-
-    from backend.database.models import (
-        DataSource,
-        Deployment,
-        AdvancedTuningJob,
-        BasicTrainingJob,
-    )
 
     # Execute queries in parallel or sequence
     # 1. Total Jobs (Training + Tuning)
@@ -930,14 +921,10 @@ async def get_dataset_schema(
             )
 
         # Load sample
-        from backend.data.catalog import FileSystemCatalog
-
         catalog = FileSystemCatalog()
         df = catalog.load(str(path), limit=1000)
 
         # Profile
-        from .data.profiler import DataProfiler
-
         profile = DataProfiler.generate_profile(df)
         return profile
 
@@ -968,8 +955,6 @@ async def list_datasets(session: AsyncSession = Depends(get_async_session)):
     """
     Returns a simple list of available datasets for filtering.
     """
-    from backend.database.models import DataSource
-
     stmt = select(DataSource.source_id, DataSource.name).where(DataSource.is_active)
     result = await session.execute(stmt)
     return [{"id": row.source_id, "name": row.name} for row in result.all()]

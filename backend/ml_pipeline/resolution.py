@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional, cast
 from fastapi import HTTPException
 from backend.data_ingestion.service import DataIngestionService
 from backend.utils.file_utils import extract_file_path_from_source
+from backend.ml_pipeline.constants import StepType
 
 async def resolve_pipeline_nodes(nodes: List[Any], ingestion_service: DataIngestionService) -> Dict[str, Any]:
     """
@@ -23,9 +24,9 @@ async def resolve_pipeline_nodes(nodes: List[Any], ingestion_service: DataIngest
             inputs = getattr(node, "inputs", [])
 
         # Logic to identify data loader
-        is_data_loader = step_type == "data_loader"
+        is_data_loader = step_type == StepType.DATA_LOADER
         is_implicit_loader = (
-            step_type == "feature_engineering"
+            step_type == StepType.FEATURE_ENGINEERING
             and not inputs
             and "dataset_id" in params
         )

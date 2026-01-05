@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from backend.database.models import DataSource, BasicTrainingJob
+from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.execution.graph_utils import extract_job_details
 from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
@@ -90,7 +91,7 @@ class BasicTrainingManager:
             node_id=t_cast(str, job.node_id),
             dataset_id=t_cast(Optional[str], job.dataset_source_id),
             dataset_name=dataset_name,
-            job_type="basic_training",
+            job_type=StepType.BASIC_TRAINING,
             status=JobStatus(job.status),
             start_time=t_cast(Optional[datetime], job.started_at),
             end_time=t_cast(Optional[datetime], job.finished_at),

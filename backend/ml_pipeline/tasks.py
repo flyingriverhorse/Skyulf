@@ -16,7 +16,9 @@ from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 from backend.ml_pipeline.execution.engine import PipelineEngine
 from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
 from backend.ml_pipeline.services.job_service import JobService
+from backend.ml_pipeline.execution.strategies import JobStrategyFactory
 from backend.utils.file_utils import extract_file_path_from_source
+from backend.ml_pipeline.constants import StepType
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +48,12 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
     session = get_db_session()
 
     try:
-        # 1. Get Job (Try BasicTrainingJob first, then AdvancedTuningJob)
-        job = JobService.get_job_by_id_sync(session, job_id)
+        # 1. Get Job and Strategy
+        job, strategy = JobStrategyFactory.find_job(session, job_id)
 
-        if not job:
+        if not job or not strategy:
             logger.error(
-                f"Job {job_id} not found in BasicTrainingJob or AdvancedTuningJob"
+                f"Job {job_id} not found in any known job tables"
             )
             return
 
@@ -78,7 +80,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
                 step_type = getattr(node, "step_type", "")
                 params = getattr(node, "params", {})
 
-            if step_type == "data_loader":
+            if step_type == StepType.DATA_LOADER:
                 dataset_id = params.get("dataset_id") or params.get("path")
                 if dataset_id and str(dataset_id).startswith("s3://"):
                     is_s3_source = True
@@ -150,12 +152,8 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
         job_logs = []
         last_log_update = datetime.now()
 
-        # Add version info to logs
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        if isinstance(job, BasicTrainingJob):
-            job_logs.append(f"[{timestamp}] Training Job Version: {job.version}")
-        elif isinstance(job, AdvancedTuningJob):
-            job_logs.append(f"[{timestamp}] Tuning Job Run: {job.run_number}")
+        # Add version info to logs using strategy
+        job_logs.append(strategy.get_initial_log(job))
 
         def log_callback(msg):
             nonlocal last_log_update
@@ -189,42 +187,10 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
             job.finished_at = datetime.now()
             job.artifact_uri = base_artifact_uri
 
-            # Extract metrics from the last node if available
-            if result.node_results:
-                last_node_id = list(result.node_results.keys())[-1]
-                last_result = result.node_results[last_node_id]
-
-                final_metrics = (
-                    last_result.metrics.copy() if last_result.metrics else {}
-                )
-
-                # Collect dropped columns from all nodes (e.g. Feature Selection, Drop Columns)
-                all_dropped_columns = []
-
-                for node_res in result.node_results.values():
-                    if node_res.metrics and "dropped_columns" in node_res.metrics:
-                        cols = node_res.metrics["dropped_columns"]
-                        if isinstance(cols, list):
-                            all_dropped_columns.extend(cols)
-
-                if all_dropped_columns:
-                    # Deduplicate
-                    all_dropped_columns = list(set(all_dropped_columns))
-                    final_metrics["dropped_columns"] = all_dropped_columns
-
-                job.metrics = final_metrics
-
-                # Special handling for AdvancedTuningJob
-                if isinstance(job, AdvancedTuningJob):
-                    if "best_params" in final_metrics:
-                        job.best_params = final_metrics["best_params"]
-                    if "best_score" in final_metrics:
-                        job.best_score = final_metrics["best_score"]
-                    if "trials" in final_metrics:
-                        job.results = final_metrics["trials"]
+            # Delegate success handling to strategy (metrics, results, etc.)
+            strategy.handle_success(job, result)
 
         else:
-            job.status = "failed"
             # Extract error from the failed node if possible
             error_msg = "Pipeline execution failed"
             if result.node_results:
@@ -234,8 +200,9 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
                             f"Error in node {node_res.node_id}: {node_res.error}"
                         )
                         break
-            job.error_message = error_msg
-            job.finished_at = datetime.now()
+            
+            # Delegate failure handling to strategy
+            strategy.handle_failure(job, error_msg)
 
         session.commit()
         logger.info(f"Job {job_id} finished with status: {job.status}")
@@ -245,18 +212,10 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
         logger.error(traceback.format_exc())
         if session:
             # Re-query to ensure session is valid
-            job = session.query(BasicTrainingJob).filter(BasicTrainingJob.id == job_id).first()
-            if not job:
-                job = (
-                    session.query(AdvancedTuningJob)
-                    .filter(AdvancedTuningJob.id == job_id)
-                    .first()
-                )
+            job, strategy = JobStrategyFactory.find_job(session, job_id)
 
-            if job:
-                job.status = "failed"
-                job.error_message = str(e)
-                job.finished_at = datetime.now()
+            if job and strategy:
+                strategy.handle_failure(job, str(e))
                 session.commit()
     finally:
         session.close()

@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from backend.database.models import Base, Deployment, TrainingJob
+from backend.database.models import Base, Deployment, BasicTrainingJob
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.deployment.service import DeploymentService
 
@@ -87,7 +87,7 @@ async def test_deployment_flow(async_session, tmp_path):
     await async_session.execute(
         text(
             """
-        INSERT INTO training_jobs (id, pipeline_id, node_id, dataset_source_id, user_id, status, version, model_type, graph, artifact_uri, error_message, progress, current_step, started_at, finished_at, created_at, updated_at)
+        INSERT INTO basic_training_jobs (id, pipeline_id, node_id, dataset_source_id, user_id, status, version, model_type, graph, artifact_uri, error_message, progress, current_step, started_at, finished_at, created_at, updated_at)
         VALUES (:id, :pipeline_id, :node_id, :ds_id, :user_id, :status, :version, :model_type, :graph, :artifact_uri, :error_message, :progress, :current_step, :started_at, :finished_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
         ),
@@ -147,7 +147,7 @@ async def test_deployment_predict_decodes_label_encoded_target(async_session, tm
     await async_session.execute(
         text(
             """
-        INSERT INTO training_jobs (id, pipeline_id, node_id, dataset_source_id, user_id, status, version, model_type, graph, artifact_uri, error_message, progress, current_step, started_at, finished_at, created_at, updated_at)
+        INSERT INTO basic_training_jobs (id, pipeline_id, node_id, dataset_source_id, user_id, status, version, model_type, graph, artifact_uri, error_message, progress, current_step, started_at, finished_at, created_at, updated_at)
         VALUES (:id, :pipeline_id, :node_id, :ds_id, :user_id, :status, :version, :model_type, :graph, :artifact_uri, :error_message, :progress, :current_step, :started_at, :finished_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
         ),
