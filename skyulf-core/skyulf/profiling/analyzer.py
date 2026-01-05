@@ -34,9 +34,17 @@ except ImportError:
 
 try:
     from statsmodels.tsa.stattools import adfuller
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+    from statsmodels.tools.tools import add_constant
     STATSMODELS_AVAILABLE = True
 except ImportError:
     STATSMODELS_AVAILABLE = False
+
+try:
+    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+    VADER_AVAILABLE = True
+except ImportError:
+    VADER_AVAILABLE = False
 
 try:
     from causallearn.search.ConstraintBased.PC import pc
@@ -238,6 +246,16 @@ class EDAAnalyzer:
         # 3. Correlations
         correlations = calculate_correlations(self.lazy_df, feature_cols)
         
+        # 3.1 Multicollinearity (VIF)
+        vif_data = self._calculate_vif(feature_cols)
+        if vif_data:
+            # Add alerts for high VIF
+            for col, val in vif_data.items():
+                if val > 10.0:
+                    alerts.append(Alert(type="Multicollinearity", message=f"Column '{col}' has very high VIF ({val:.1f}). Consider removing it.", severity="warning"))
+                elif val > 5.0:
+                    alerts.append(Alert(type="Multicollinearity", message=f"Column '{col}' has high VIF ({val:.1f}).", severity="info"))
+
         # 3a. Correlations with Target (Feature Selection)
         correlations_with_target = None
         target_corr_cols = []
@@ -372,6 +390,7 @@ class EDAAnalyzer:
             outliers=outliers,
             causal_graph=causal_graph,
             rule_tree=rule_tree,
+            vif=vif_data,
             geospatial=geospatial,
             timeseries=timeseries,
             excluded_columns=excluded_columns,
@@ -1343,6 +1362,10 @@ class EDAAnalyzer:
         elif semantic_type == "Text":
             profile.text_stats = self._analyze_text(col)
             
+            # Sentiment Analysis
+            if profile.text_stats:
+                profile.text_stats.sentiment_distribution = self._analyze_sentiment(self.df[col])
+            
             # Calculate Length Histogram for Text
             try:
                 lengths = self.df[col].str.len_bytes().drop_nulls().to_numpy()
@@ -1852,3 +1875,113 @@ class EDAAnalyzer:
             })
             
         return results
+
+    def _calculate_vif(self, numeric_cols: List[str]) -> Optional[Dict[str, float]]:
+        """
+        Calculates Variance Inflation Factor (VIF) for numeric columns to detect multicollinearity.
+        Uses the inverse correlation matrix method: VIF_i = (R^-1)_ii
+        VIF > 5 indicates high multicollinearity.
+        """
+        if len(numeric_cols) < 2:
+            return None
+            
+        try:
+            # Calculate Correlation Matrix using Polars
+            # We use the correlation matrix of the features
+            # VIF_i = 1 / (1 - R_i^2) where R_i^2 is the R^2 of regressing X_i on all other X
+            # This is equivalent to the diagonal elements of the inverse correlation matrix.
+            
+            # 1. Get Correlation Matrix
+            # We can use the existing calculate_correlations or do it here
+            # Let's do it efficiently here using numpy
+            
+            # Select columns and drop nulls (VIF requires complete cases)
+            df_clean = self.df.select(numeric_cols).drop_nulls()
+            
+            # If too few rows, skip
+            if df_clean.height < len(numeric_cols) + 5:
+                return None
+                
+            # Convert to numpy
+            data = df_clean.to_numpy()
+            
+            # Calculate Correlation Matrix (Pearson)
+            # rowvar=False means columns are variables
+            corr_matrix = np.corrcoef(data, rowvar=False)
+            
+            # Check for NaNs in correlation matrix (constant columns)
+            if np.isnan(corr_matrix).any():
+                return None
+                
+            # 2. Calculate Inverse
+            try:
+                inv_corr = np.linalg.inv(corr_matrix)
+            except np.linalg.LinAlgError:
+                # Matrix is singular (perfect multicollinearity)
+                # We can try pseudo-inverse or just return high VIF for all
+                return {col: 999.0 for col in numeric_cols}
+            
+            # 3. Extract Diagonal
+            vif_data = {}
+            for i, col in enumerate(numeric_cols):
+                vif = inv_corr[i, i]
+                # VIF should be >= 1
+                vif = max(1.0, float(vif))
+                vif_data[col] = vif
+                    
+            return vif_data
+        except Exception as e:
+            print(f"Error calculating VIF: {e}")
+            return None
+
+    def _analyze_sentiment(self, text_series: pl.Series) -> Optional[Dict[str, float]]:
+        """
+        Analyzes sentiment of a text column using VADER.
+        Returns distribution ratios: {"positive": 0.6, "neutral": 0.3, "negative": 0.1}
+        """
+        if not VADER_AVAILABLE:
+            return None
+            
+        try:
+            # Sample if too large (max 1000 rows for performance)
+            if text_series.len() > 1000:
+                sample = text_series.sample(1000, seed=42)
+            else:
+                sample = text_series
+                
+            # Drop nulls
+            texts = sample.drop_nulls().to_list()
+            if not texts:
+                return None
+                
+            analyzer = SentimentIntensityAnalyzer()
+            
+            counts = {"positive": 0, "neutral": 0, "negative": 0}
+            total = 0
+            
+            for text in texts:
+                if not isinstance(text, str):
+                    continue
+                    
+                scores = analyzer.polarity_scores(text)
+                compound = scores['compound']
+                
+                if compound >= 0.05:
+                    counts["positive"] += 1
+                elif compound <= -0.05:
+                    counts["negative"] += 1
+                else:
+                    counts["neutral"] += 1
+                total += 1
+            
+            if total == 0:
+                return None
+                
+            # Normalize to ratios
+            return {
+                "positive": counts["positive"] / total,
+                "neutral": counts["neutral"] / total,
+                "negative": counts["negative"] / total
+            }
+        except Exception:
+            return None

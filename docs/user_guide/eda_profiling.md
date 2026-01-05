@@ -75,14 +75,15 @@ The analyzer automatically detects column types (Numeric, Categorical, Date, Tex
         *   **Kolmogorov-Smirnov:** Used for N >= 5,000 (on a 5k sample).
 *   **Categorical:** Unique count, Mode, Frequency distribution.
 *   **Date:** Min/Max date, Range, Year/Month distribution.
-*   **Text:** Avg length, Common words.
+*   **Text:** Avg length, Common words, **Sentiment Analysis** (Positive/Neutral/Negative).
 
 ### 2. Smart Alerts
 Skyulf automatically flags potential data quality issues:
 *   **High Null Rate:** Columns with >50% missing values.
 *   **Constant Columns:** Columns with only 1 unique value.
 *   **High Cardinality:** Categorical columns with too many unique values.
-*   **High Correlation:** Pairs of features with correlation > 0.95 (potential multicollinearity).
+*   **High Correlation:** Pairs of features with correlation > 0.95.
+*   **Multicollinearity (VIF):** Detects features with Variance Inflation Factor > 5.0.
 *   **Class Imbalance:** Target variables with skewed class distributions.
 *   **Data Leakage:** Features with 1.0 correlation to the target.
 

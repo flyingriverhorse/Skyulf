@@ -75,6 +75,28 @@ class EDAVisualizer:
         else:
             console.print("[italic]No numeric columns found.[/italic]")
 
+        # 2.1 VIF (Multicollinearity)
+        if self.profile.vif:
+            console.print("\n[bold]2.1 Multicollinearity (VIF)[/bold]")
+            vif_table = Table(show_header=True, header_style="bold red")
+            vif_table.add_column("Feature")
+            vif_table.add_column("VIF Score", justify="right")
+            vif_table.add_column("Status", justify="center")
+            
+            # Sort by VIF descending
+            sorted_vif = sorted(self.profile.vif.items(), key=lambda x: x[1], reverse=True)
+            
+            for col, val in sorted_vif:
+                status = "[green]OK[/green]"
+                if val > 10:
+                    status = "[red]Severe[/red]"
+                elif val > 5:
+                    status = "[yellow]High[/yellow]"
+                
+                vif_table.add_row(col, f"{val:.2f}", status)
+            
+            console.print(vif_table)
+
         # 3. Categorical Stats
         console.print("\n[bold]3. Categorical Statistics[/bold]")
         cat_table = Table(show_header=True, header_style="bold yellow")
@@ -108,6 +130,7 @@ class EDAVisualizer:
         text_table.add_column("Column")
         text_table.add_column("Avg Len", justify="right")
         text_table.add_column("Min/Max Len", justify="right")
+        text_table.add_column("Sentiment (Pos/Neu/Neg)", justify="center")
         
         has_text = False
         for col_name, col_profile in self.profile.columns.items():
@@ -118,7 +141,14 @@ class EDAVisualizer:
                 avg_len = f"{stats.avg_length:.1f}" if stats.avg_length else "-"
                 min_max = f"{stats.min_length}/{stats.max_length}" if stats.min_length is not None else "-"
                 
-                text_table.add_row(col_name, avg_len, min_max)
+                sentiment_str = "-"
+                if stats.sentiment_distribution:
+                    pos = stats.sentiment_distribution.get("positive", 0) * 100
+                    neu = stats.sentiment_distribution.get("neutral", 0) * 100
+                    neg = stats.sentiment_distribution.get("negative", 0) * 100
+                    sentiment_str = f"[green]{pos:.0f}%[/green] / [grey]{neu:.0f}%[/grey] / [red]{neg:.0f}%[/red]"
+
+                text_table.add_row(col_name, avg_len, min_max, sentiment_str)
 
         if has_text:
             console.print(text_table)

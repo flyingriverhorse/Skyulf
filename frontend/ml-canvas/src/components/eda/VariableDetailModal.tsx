@@ -136,6 +136,21 @@ export const VariableDetailModal: React.FC<VariableDetailModalProps> = ({
                              selectedVariable.numeric_stats.kurtosis > 0 ? "Leptokurtic (Heavy Tails)" : "Platykurtic (Light Tails)"}
                         </span>
                     </div>
+                    {selectedVariable.vif !== undefined && (
+                        <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded">
+                            <div className="flex items-center gap-1 mb-1">
+                                <span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">VIF</span>
+                                <InfoTooltip text="Variance Inflation Factor measures multicollinearity. VIF > 5 indicates high correlation with other variables." />
+                            </div>
+                            <span className={`font-medium ${selectedVariable.vif > 5 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                {selectedVariable.vif.toFixed(2)}
+                            </span>
+                            <span className="block text-[10px] text-gray-500 mt-1">
+                                {selectedVariable.vif > 10 ? "Severe Multicollinearity" : 
+                                 selectedVariable.vif > 5 ? "High Multicollinearity" : "Low Multicollinearity"}
+                            </span>
+                        </div>
+                    )}
                     {selectedVariable.normality_test && (
                       <>
                         <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded">
@@ -166,6 +181,21 @@ export const VariableDetailModal: React.FC<VariableDetailModalProps> = ({
                      <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded"><span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Avg Length</span> <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.text_stats.avg_length?.toFixed(2)}</span></div>
                      <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded"><span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Min Length</span> <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.text_stats.min_length}</span></div>
                      <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded"><span className="text-gray-500 dark:text-gray-400 block text-xs uppercase">Max Length</span> <span className="font-medium text-gray-900 dark:text-white">{selectedVariable.text_stats.max_length}</span></div>
+                     {selectedVariable.text_stats.sentiment_distribution && (
+                        <div className="col-span-2 bg-gray-50 dark:bg-gray-900/50 p-3 rounded">
+                            <span className="text-gray-500 dark:text-gray-400 block text-xs uppercase mb-2">Sentiment Distribution</span>
+                            <div className="flex h-4 rounded-full overflow-hidden">
+                                <div className="bg-green-500 h-full" style={{ width: `${(selectedVariable.text_stats.sentiment_distribution.positive || 0) * 100}%` }} title={`Positive: ${(selectedVariable.text_stats.sentiment_distribution.positive || 0).toFixed(2)}`}></div>
+                                <div className="bg-gray-400 h-full" style={{ width: `${(selectedVariable.text_stats.sentiment_distribution.neutral || 0) * 100}%` }} title={`Neutral: ${(selectedVariable.text_stats.sentiment_distribution.neutral || 0).toFixed(2)}`}></div>
+                                <div className="bg-red-500 h-full" style={{ width: `${(selectedVariable.text_stats.sentiment_distribution.negative || 0) * 100}%` }} title={`Negative: ${(selectedVariable.text_stats.sentiment_distribution.negative || 0).toFixed(2)}`}></div>
+                            </div>
+                            <div className="flex justify-between text-xs mt-1 text-gray-600 dark:text-gray-400">
+                                <span>Pos: {((selectedVariable.text_stats.sentiment_distribution.positive || 0) * 100).toFixed(1)}%</span>
+                                <span>Neu: {((selectedVariable.text_stats.sentiment_distribution.neutral || 0) * 100).toFixed(1)}%</span>
+                                <span>Neg: {((selectedVariable.text_stats.sentiment_distribution.negative || 0) * 100).toFixed(1)}%</span>
+                            </div>
+                        </div>
+                     )}
                   </>
                 )}
                 {selectedVariable.date_stats && (

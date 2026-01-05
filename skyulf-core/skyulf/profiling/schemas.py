@@ -31,6 +31,7 @@ class TextStats(BaseModel):
     min_length: Optional[int] = None
     max_length: Optional[int] = None
     common_words: List[Dict[str, Any]] = Field(default_factory=list)
+    sentiment_distribution: Optional[Dict[str, float]] = None # {"positive": 0.6, "neutral": 0.3, "negative": 0.1}
 
 class HistogramBin(BaseModel):
     start: float
@@ -211,6 +212,7 @@ class DatasetProfile(BaseModel):
     outliers: Optional[OutlierAnalysis] = None
     causal_graph: Optional[CausalGraph] = None
     rule_tree: Optional[RuleTree] = None
+    vif: Optional[Dict[str, float]] = None # Variance Inflation Factor for numeric columns
     
     # Geospatial
     geospatial: Optional[GeospatialStats] = None
