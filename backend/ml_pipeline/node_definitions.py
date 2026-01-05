@@ -1,6 +1,7 @@
 from typing import Any, Dict, List
 
 from pydantic import BaseModel
+from backend.ml_pipeline.constants import StepType
 
 
 class RegistryItem(BaseModel):
@@ -17,7 +18,7 @@ class NodeRegistry:
         return [
             # --- Data Loading ---
             RegistryItem(
-                id="data_loader",
+                id=StepType.DATA_LOADER,
                 name="Data Loader",
                 category="Data Source",
                 description="Loads data from a source.",

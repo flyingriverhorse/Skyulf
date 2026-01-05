@@ -152,7 +152,7 @@ def test_full_inference_pipeline():
     nodes.append(
         NodeConfig(
             node_id="model",
-            step_type="model_training",
+            step_type="basic_training",
             params={"algorithm": "logistic_regression", "target_column": "target"},
             inputs=["splitter"],
         )

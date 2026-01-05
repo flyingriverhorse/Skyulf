@@ -18,6 +18,9 @@ This release renames core modeling components to better reflect their purpose an
 ### 🔧 Backend Refactoring
 - **Renaming:** Renamed `TrainingJob` to `BasicTrainingJob` and `HyperparameterTuningJob` to `AdvancedTuningJob` across the entire codebase (Models, Managers, API, Services).
 - **Step Types:** Updated pipeline step types to `basic_training` and `advanced_tuning`.
+- **Code Quality:** Refactored `backend/ml_pipeline/api.py` to move local imports to the top level, improving code organization and performance.
+- **Code Quality:** Resolved potential circular import issues in `api.py` by using module-level imports for database engine components.
+- **Design Pattern:** Implemented Strategy Pattern for task execution in `backend/ml_pipeline/tasks.py` and `backend/ml_pipeline/execution/strategies.py`, replacing complex `if/elif` chains for job handling.
 - **Database:** Reset the database schema to accommodate the new table names (`basic_training_jobs`, `advanced_tuning_jobs`).
 
 ### 🎨 Frontend Updates

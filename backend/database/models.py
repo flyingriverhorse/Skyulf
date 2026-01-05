@@ -193,10 +193,10 @@ class FeatureEngineeringPipeline(Base, TimestampMixin):
         }
 
 
-class BasicTrainingJob(Base, TimestampMixin):
-    """Background model training jobs triggered from the feature canvas."""
+class MLJob(Base, TimestampMixin):
+    """Abstract base class containing common fields for ML jobs."""
 
-    __tablename__ = "basic_training_jobs"
+    __abstract__ = True
 
     id = Column(String(64), primary_key=True, index=True)
     pipeline_id = Column(String(150), nullable=False, index=True)
@@ -204,9 +204,7 @@ class BasicTrainingJob(Base, TimestampMixin):
     dataset_source_id = Column(String(100), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     status = Column(String(20), nullable=False, default="queued", index=True)
-    version = Column(Integer, nullable=False, default=1)
     model_type = Column(String(100), nullable=False)
-    hyperparameters = Column(JSON, nullable=True)
     job_metadata = Column("metadata", JSON, nullable=True)
     metrics = Column(JSON, nullable=True)
     graph = Column(JSON, nullable=False)
@@ -218,9 +216,8 @@ class BasicTrainingJob(Base, TimestampMixin):
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
 
-    owner = relationship("User", backref="basic_training_jobs")
-
-    def to_dict(self) -> dict:
+    def to_dict_base(self) -> dict:
+        """Convert common model fields to dictionary."""
         return {
             "id": self.id,
             "pipeline_id": self.pipeline_id,
@@ -228,9 +225,7 @@ class BasicTrainingJob(Base, TimestampMixin):
             "dataset_source_id": self.dataset_source_id,
             "user_id": self.user_id,
             "status": self.status,
-            "version": self.version,
             "model_type": self.model_type,
-            "hyperparameters": self.hyperparameters,
             "metadata": self.job_metadata,
             "metrics": self.metrics,
             "artifact_uri": self.artifact_uri,
@@ -245,19 +240,31 @@ class BasicTrainingJob(Base, TimestampMixin):
         }
 
 
-class AdvancedTuningJob(Base, TimestampMixin):
+class BasicTrainingJob(MLJob):
+    """Background model training jobs triggered from the feature canvas."""
+
+    __tablename__ = "basic_training_jobs"
+
+    version = Column(Integer, nullable=False, default=1)
+    hyperparameters = Column(JSON, nullable=True)
+
+    owner = relationship("User", backref="basic_training_jobs")
+
+    def to_dict(self) -> dict:
+        data = self.to_dict_base()
+        data.update({
+            "version": self.version,
+            "hyperparameters": self.hyperparameters,
+        })
+        return data
+
+
+class AdvancedTuningJob(MLJob):
     """Asynchronous hyperparameter tuning jobs triggered from the feature canvas."""
 
     __tablename__ = "advanced_tuning_jobs"
 
-    id = Column(String(64), primary_key=True, index=True)
-    pipeline_id = Column(String(150), nullable=False, index=True)
-    node_id = Column(String(150), nullable=False, index=True)
-    dataset_source_id = Column(String(100), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
-    status = Column(String(20), nullable=False, default="queued", index=True)
     run_number = Column(Integer, nullable=False, default=1)
-    model_type = Column(String(100), nullable=False)
     search_strategy = Column(String(20), nullable=False, default="random")
     search_space = Column(JSON, nullable=True)
     baseline_hyperparameters = Column(JSON, nullable=True)
@@ -265,32 +272,16 @@ class AdvancedTuningJob(Base, TimestampMixin):
     scoring = Column(String(100), nullable=True)
     random_state = Column(Integer, nullable=True)
     cross_validation = Column(JSON, nullable=True)
-    job_metadata = Column("metadata", JSON, nullable=True)
-    metrics = Column(JSON, nullable=True)
     results = Column(JSON, nullable=True)
     best_params = Column(JSON, nullable=True)
     best_score = Column(Float, nullable=True)
-    graph = Column(JSON, nullable=False)
-    artifact_uri = Column(String(500), nullable=True)
-    error_message = Column(Text, nullable=True)
-    progress = Column(Integer, default=0)
-    current_step = Column(String(100), nullable=True)
-    logs = Column(JSON, nullable=True)
-    started_at = Column(DateTime, nullable=True)
-    finished_at = Column(DateTime, nullable=True)
 
     owner = relationship("User", backref="advanced_tuning_jobs")
 
     def to_dict(self) -> dict:
-        return {
-            "id": self.id,
-            "pipeline_id": self.pipeline_id,
-            "node_id": self.node_id,
-            "dataset_source_id": self.dataset_source_id,
-            "user_id": self.user_id,
-            "status": self.status,
+        data = self.to_dict_base()
+        data.update({
             "run_number": self.run_number,
-            "model_type": self.model_type,
             "search_strategy": self.search_strategy,
             "search_space": self.search_space,
             "baseline_hyperparameters": self.baseline_hyperparameters,
@@ -298,21 +289,11 @@ class AdvancedTuningJob(Base, TimestampMixin):
             "scoring": self.scoring,
             "random_state": self.random_state,
             "cross_validation": self.cross_validation,
-            "metadata": self.job_metadata,
-            "metrics": self.metrics,
             "results": self.results,
             "best_params": self.best_params,
             "best_score": self.best_score,
-            "artifact_uri": self.artifact_uri,
-            "error_message": self.error_message,
-            "progress": self.progress,
-            "current_step": self.current_step,
-            "logs": self.logs,
-            "started_at": self.started_at.isoformat() if self.started_at else None,
-            "finished_at": self.finished_at.isoformat() if self.finished_at else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-        }
+        })
+        return data
 
 
 class Deployment(Base, TimestampMixin):

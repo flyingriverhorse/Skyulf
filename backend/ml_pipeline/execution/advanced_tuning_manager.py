@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from backend.database.models import DataSource, AdvancedTuningJob
+from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.execution.graph_utils import (
     determine_search_strategy,
     extract_job_details,
@@ -88,7 +89,7 @@ class AdvancedTuningManager:
             node_id=type_cast(str, job.node_id),
             dataset_id=type_cast(Optional[str], job.dataset_source_id),
             dataset_name=dataset_name,
-            job_type="advanced_tuning",
+            job_type=StepType.ADVANCED_TUNING,
             status=JobStatus(job.status),
             start_time=type_cast(Optional[datetime], job.started_at),
             end_time=type_cast(Optional[datetime], job.finished_at),
