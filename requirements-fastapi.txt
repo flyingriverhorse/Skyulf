@@ -55,7 +55,7 @@ psutil>=5.9.0,<6.0.0      # System and process utilities
 rich>=13.0.0              # Beautiful terminal logging
 
 # === DATA PROCESSING ===
-polars>=0.20.0,<1.0.0     # Fast DataFrame library (V2 Ingestion)
+polars>=0.20.0,<2.0.0     # Fast DataFrame library (V2 Ingestion)
 xlsx2csv>=0.8.0           # Excel to CSV converter for Polars
 openpyxl>=3.1.0           # Excel reading support
 pandas>=2.0.0,<3.0.0      # Data analysis and manipulation
