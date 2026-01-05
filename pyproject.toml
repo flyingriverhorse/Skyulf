@@ -83,7 +83,7 @@ dev = [
     # Test stack
     "pytest>=7.4.0,<10.0.0",
     "pytest-asyncio>=0.21.0,<2.0.0",
-    "pytest-cov>=4.1.0,<5.0.0",
+    "pytest-cov>=4.1.0,<8.0.0",
 
     # Linters/formatters/typecheckers
     "black>=23.0.0,<24.0.0",
