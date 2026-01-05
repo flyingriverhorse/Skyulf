@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
-from backend.ml_pipeline.execution.training_manager import TrainingManager
+from backend.ml_pipeline.execution.basic_training_manager import BasicTrainingManager
 from backend.data.catalog import SmartCatalog
-from backend.database.models import DataSource, TrainingJob
+from backend.database.models import DataSource, BasicTrainingJob
 
 @pytest.mark.asyncio
 async def test_get_job_artifacts_s3_creds():
@@ -73,8 +73,8 @@ async def test_get_training_job_name_resolution():
     session.execute.side_effect = side_effect
     
     # Mock map_training_job_to_info
-    with patch("backend.ml_pipeline.execution.training_manager.TrainingManager.map_training_job_to_info") as mock_map:
-        await TrainingManager.get_training_job(session, "job-123")
+    with patch("backend.ml_pipeline.execution.basic_training_manager.BasicTrainingManager.map_training_job_to_info") as mock_map:
+        await BasicTrainingManager.get_training_job(session, "job-123")
         
         # Verify map called with correct name
         mock_map.assert_called_once()

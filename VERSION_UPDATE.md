@@ -1,5 +1,6 @@
 # Version Updates
 
+*   **v0.1.9 :** "The Nomenclature & Architecture Refactor" — Renamed core modeling components to "Basic Training" and "Advanced Tuning" for clarity, and reset the database schema.
 *   **v0.1.8 :** "The Regression Rules Update" — Extended EDA capabilities to support regression targets in Decision Tree rule discovery.
 *   **v0.1.7 :** "The Advanced EDA & Profiling Update" — Professional-grade automated data analysis with smart alerts, rich visualizations, and Polars-powered profiling.
 *   **v0.1.6 :** "The Backend Abstraction & Modern Frameworks Update" — Polars migration, leakage proof, and performance optimization.
@@ -9,6 +10,19 @@
 *   **v0.1.2 :** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
+
+## v0.1.9
+**"The Nomenclature & Architecture Refactor"**
+This release renames core modeling components to better reflect their purpose and resets the database schema for a clean slate.
+
+### 🔧 Backend Refactoring
+- **Renaming:** Renamed `TrainingJob` to `BasicTrainingJob` and `HyperparameterTuningJob` to `AdvancedTuningJob` across the entire codebase (Models, Managers, API, Services).
+- **Step Types:** Updated pipeline step types to `basic_training` and `advanced_tuning`.
+- **Database:** Reset the database schema to accommodate the new table names (`basic_training_jobs`, `advanced_tuning_jobs`).
+
+### 🎨 Frontend Updates
+- **Node Labels:** Updated node labels in the ML Canvas to "Basic Training" and "Advanced Tuning".
+- **Node Types:** Updated internal node types to match the backend changes.
 
 ------------------------------------------------------------
 ## v0.1.8

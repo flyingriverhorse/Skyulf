@@ -253,7 +253,7 @@ const HyperparameterInput: React.FC<{
     );
 };
 
-export const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (c: ModelTrainingConfig) => void; nodeId?: string }> = ({
+export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (c: ModelTrainingConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
   nodeId,
@@ -392,10 +392,10 @@ export const ModelTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
         await jobsApi.runPipeline({
             ...pipelineConfig,
             target_node_id: nodeId,
-            job_type: 'training'
+            job_type: 'basic_training'
         });
         alert("Training job submitted successfully!");
-        setTab('training');
+        setTab('basic_training');
         toggleJobDrawer(true);
     } catch (error) {
         console.error("Failed to submit training job:", error);

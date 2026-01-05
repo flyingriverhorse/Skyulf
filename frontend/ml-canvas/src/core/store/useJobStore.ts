@@ -5,7 +5,7 @@ interface JobState {
   jobs: JobInfo[];
   isLoading: boolean;
   isDrawerOpen: boolean;
-  activeTab: 'training' | 'tuning';
+  activeTab: 'basic_training' | 'advanced_tuning';
   hasMore: boolean;
   skip: number;
   
@@ -15,7 +15,7 @@ interface JobState {
   submitJob: (payload: RunPipelineRequest) => Promise<string>;
   cancelJob: (jobId: string) => Promise<void>;
   toggleDrawer: (isOpen?: boolean) => void;
-  setTab: (tab: 'training' | 'tuning') => void;
+  setTab: (tab: 'basic_training' | 'advanced_tuning') => void;
   
   // Polling
   startPolling: () => void;
@@ -33,7 +33,7 @@ export const useJobStore = create<JobState>((set, get) => {
     jobs: [],
     isLoading: false,
     isDrawerOpen: false,
-    activeTab: 'training',
+    activeTab: 'basic_training',
     hasMore: true,
     skip: 0,
 

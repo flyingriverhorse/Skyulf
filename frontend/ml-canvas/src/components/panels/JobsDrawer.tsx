@@ -61,21 +61,21 @@ export const JobsDrawer: React.FC = () => {
                 <div className="flex border-b border-gray-200 dark:border-gray-700">
                 <button
                     className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'tuning' 
+                    activeTab === 'advanced_tuning' 
                         ? 'border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-50/50 dark:bg-purple-900/20' 
                         : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                     }`}
-                    onClick={() => setTab('tuning')}
+                    onClick={() => setTab('advanced_tuning')}
                 >
                     Model Optimization
                 </button>
                 <button
                     className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'training' 
+                    activeTab === 'basic_training' 
                         ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20' 
                         : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                     }`}
-                    onClick={() => setTab('training')}
+                    onClick={() => setTab('basic_training')}
                 >
                     Standard Training
                 </button>
@@ -96,7 +96,7 @@ export const JobsDrawer: React.FC = () => {
                 <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50/30 dark:bg-gray-900/30">
                 {filteredJobs.length === 0 ? (
                     <div className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">
-                    No {activeTab === 'tuning' ? 'optimization' : 'training'} jobs found.
+                    No {activeTab === 'advanced_tuning' ? 'optimization' : 'training'} jobs found.
                     </div>
                 ) : (
                     <>
@@ -293,7 +293,7 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                     )}
                                 </div>
                                 
-                                {job.job_type === 'training' && !!(job.result as Record<string, unknown>).metrics && (
+                                {job.job_type === 'basic_training' && !!(job.result as Record<string, unknown>).metrics && (
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                         {Object.entries((job.result as Record<string, unknown>).metrics as Record<string, unknown>).map(([k, v]) => (
                                             <div key={k} className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
@@ -306,8 +306,55 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                     </div>
                                 )}
 
-                                {job.job_type === 'tuning' && (
+                                {job.job_type === 'advanced_tuning' && (
                                     <div className="space-y-4">
+                                        {/* Tuning Configuration */}
+                                        {job.graph && (
+                                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                                <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Tuning Configuration</h4>
+                                                <div className="grid grid-cols-2 gap-4 text-xs">
+                                                    {(() => {
+                                                        const node = (job.graph?.nodes as any[])?.find((n: any) => n.node_id === job.node_id);
+                                                        const config = node?.params?.tuning_config;
+                                                        if (!config) return <div className="text-gray-400 col-span-2">No configuration found</div>;
+                                                        
+                                                        return (
+                                                            <>
+                                                                <div>
+                                                                    <span className="text-gray-500">Strategy:</span>
+                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300 capitalize">{config.strategy}</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-gray-500">Metric:</span>
+                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{config.metric}</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-gray-500">Trials:</span>
+                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{config.n_trials}</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-gray-500">CV Enabled:</span>
+                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{config.cv_enabled ? 'Yes' : 'No'}</span>
+                                                                </div>
+                                                                {config.cv_enabled && (
+                                                                    <>
+                                                                        <div>
+                                                                            <span className="text-gray-500">Folds:</span>
+                                                                            <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{config.cv_folds}</span>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span className="text-gray-500">Shuffle:</span>
+                                                                            <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{config.cv_shuffle ? 'Yes' : 'No'}</span>
+                                                                        </div>
+                                                                    </>
+                                                                )}
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* Best Score */}
                                         {(job.result as Record<string, unknown>).best_score !== undefined && (
                                             <div className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg w-fit">
@@ -426,8 +473,8 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
         </div>
         <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500">
             <span className="font-medium truncate">{job.model_type || 'Unknown Model'}</span>
-            {job.job_type === 'tuning' && !!job.config && !!(job.config as Record<string, unknown>).tuning && (
-                <span className="text-gray-400 truncate">({((job.config as Record<string, unknown>).tuning as Record<string, unknown>)?.strategy as string})</span>
+            {job.job_type === 'advanced_tuning' && job.search_strategy && (
+                <span className="text-gray-400 truncate">({job.search_strategy})</span>
             )}
         </div>
       </div>
@@ -463,7 +510,7 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
                 Error
             </span>
                 ) : job.status === 'completed' && job.result ? (
-                         job.job_type === 'training' && !!(job.result as { metrics?: Record<string, unknown> }).metrics ? (
+                         job.job_type === 'basic_training' && !!(job.result as { metrics?: Record<string, unknown> }).metrics ? (
                <div className="flex flex-wrap gap-1">
                                  {Object.entries((job.result as { metrics: Record<string, unknown> }).metrics).slice(0, 1).map(([k, v]) => (
                    <span key={k} className="text-[10px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 truncate max-w-full">
@@ -471,7 +518,7 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
                    </span>
                  ))}
                </div>
-             ) : job.job_type === 'tuning' ? (
+             ) : job.job_type === 'advanced_tuning' ? (
                <div className="flex flex-wrap gap-1">
                                      {(job.result as { best_score?: number }).best_score !== undefined && (
                        <span className="text-[10px] bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 truncate">

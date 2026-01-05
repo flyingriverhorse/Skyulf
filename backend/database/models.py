@@ -193,10 +193,10 @@ class FeatureEngineeringPipeline(Base, TimestampMixin):
         }
 
 
-class TrainingJob(Base, TimestampMixin):
+class BasicTrainingJob(Base, TimestampMixin):
     """Background model training jobs triggered from the feature canvas."""
 
-    __tablename__ = "training_jobs"
+    __tablename__ = "basic_training_jobs"
 
     id = Column(String(64), primary_key=True, index=True)
     pipeline_id = Column(String(150), nullable=False, index=True)
@@ -218,7 +218,7 @@ class TrainingJob(Base, TimestampMixin):
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
 
-    owner = relationship("User", backref="training_jobs")
+    owner = relationship("User", backref="basic_training_jobs")
 
     def to_dict(self) -> dict:
         return {
@@ -245,10 +245,10 @@ class TrainingJob(Base, TimestampMixin):
         }
 
 
-class HyperparameterTuningJob(Base, TimestampMixin):
+class AdvancedTuningJob(Base, TimestampMixin):
     """Asynchronous hyperparameter tuning jobs triggered from the feature canvas."""
 
-    __tablename__ = "hyperparameter_tuning_jobs"
+    __tablename__ = "advanced_tuning_jobs"
 
     id = Column(String(64), primary_key=True, index=True)
     pipeline_id = Column(String(150), nullable=False, index=True)
@@ -279,7 +279,7 @@ class HyperparameterTuningJob(Base, TimestampMixin):
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
 
-    owner = relationship("User", backref="hyperparameter_tuning_jobs")
+    owner = relationship("User", backref="advanced_tuning_jobs")
 
     def to_dict(self) -> dict:
         return {

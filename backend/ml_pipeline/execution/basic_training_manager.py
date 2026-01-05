@@ -6,7 +6,7 @@ from sqlalchemy import String, cast, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from backend.database.models import DataSource, TrainingJob
+from backend.database.models import DataSource, BasicTrainingJob
 from backend.ml_pipeline.execution.graph_utils import extract_job_details
 from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
@@ -14,7 +14,7 @@ from backend.ml_pipeline.model_registry.service import ModelRegistryService
 
 from backend.ml_pipeline.execution.utils import resolve_dataset_name, get_dataset_map
 
-class TrainingManager:
+class BasicTrainingManager:
     @staticmethod
     async def create_training_job(
         session: AsyncSession,
@@ -39,7 +39,7 @@ class TrainingManager:
             )
             model_type_val = model_type
 
-        job = TrainingJob(
+        job = BasicTrainingJob(
             id=job_id,
             pipeline_id=pipeline_id,
             node_id=node_id,
@@ -58,7 +58,7 @@ class TrainingManager:
 
     @staticmethod
     def map_training_job_to_info(
-        job: TrainingJob, dataset_name: Optional[str]
+        job: BasicTrainingJob, dataset_name: Optional[str]
     ) -> JobInfo:
         # Extract details from graph
         (
@@ -90,7 +90,7 @@ class TrainingManager:
             node_id=t_cast(str, job.node_id),
             dataset_id=t_cast(Optional[str], job.dataset_source_id),
             dataset_name=dataset_name,
-            job_type="training",
+            job_type="basic_training",
             status=JobStatus(job.status),
             start_time=t_cast(Optional[datetime], job.started_at),
             end_time=t_cast(Optional[datetime], job.finished_at),
@@ -110,7 +110,7 @@ class TrainingManager:
     @staticmethod
     async def cancel_training_job(session: AsyncSession, job_id: str) -> bool:
         """Cancels a training job if it is running or queued."""
-        stmt = select(TrainingJob).where(TrainingJob.id == job_id)
+        stmt = select(BasicTrainingJob).where(BasicTrainingJob.id == job_id)
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
 
@@ -123,7 +123,7 @@ class TrainingManager:
         return False
 
     @staticmethod
-    def _update_training_result(job: TrainingJob, result: Dict[str, Any]):
+    def _update_training_result(job: BasicTrainingJob, result: Dict[str, Any]):
         if "metrics" in result:
             job.metrics = result["metrics"]
         if "artifact_uri" in result:
@@ -141,7 +141,7 @@ class TrainingManager:
         logs: Optional[List[str]] = None,
     ) -> bool:
         """Updates training job status (Sync). Returns True if job found and updated."""
-        job = session.query(TrainingJob).filter(TrainingJob.id == job_id).first()
+        job = session.query(BasicTrainingJob).filter(BasicTrainingJob.id == job_id).first()
         if not job:
             return False
 
@@ -155,7 +155,7 @@ class TrainingManager:
             job.logs = current_logs + logs  # type: ignore
 
         if result:
-            TrainingManager._update_training_result(job, result)
+            BasicTrainingManager._update_training_result(job, result)
 
         if status in [
             JobStatus.COMPLETED,
@@ -173,7 +173,7 @@ class TrainingManager:
     ) -> Optional[JobInfo]:
         """Retrieves a training job by ID."""
         # 1. Fetch Job
-        stmt = select(TrainingJob).where(TrainingJob.id == job_id)
+        stmt = select(BasicTrainingJob).where(BasicTrainingJob.id == job_id)
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
 
@@ -183,7 +183,7 @@ class TrainingManager:
         # 2. Resolve Dataset Name
         dataset_name = await resolve_dataset_name(session, job.dataset_source_id)
 
-        return TrainingManager.map_training_job_to_info(job, dataset_name)
+        return BasicTrainingManager.map_training_job_to_info(job, dataset_name)
 
     @staticmethod
     async def list_training_jobs(
@@ -197,9 +197,9 @@ class TrainingManager:
 
         # 2. Fetch Jobs
         result_train = await session.execute(
-            select(TrainingJob)
-            .where(TrainingJob.model_type != "preview")
-            .order_by(TrainingJob.started_at.desc())
+            select(BasicTrainingJob)
+            .where(BasicTrainingJob.model_type != "preview")
+            .order_by(BasicTrainingJob.started_at.desc())
             .limit(limit)
             .offset(skip)
         )
@@ -215,6 +215,6 @@ class TrainingManager:
             if not ds_name and ds_id:
                  ds_name = f"Dataset {ds_id}"
 
-            jobs.append(TrainingManager.map_training_job_to_info(job, ds_name))
+            jobs.append(BasicTrainingManager.map_training_job_to_info(job, ds_name))
             
         return jobs

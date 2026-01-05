@@ -1,16 +1,16 @@
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Sliders } from 'lucide-react';
-import { TuningSettings } from './HyperparameterTuningSettings';
+import { AdvancedTuningSettings } from './AdvancedTuningSettings';
 
-export const HyperparameterTuningNode: NodeDefinition = {
-  type: 'hyperparameter_tuning',
-  label: 'Train Model and Optimize',
+export const AdvancedTuningNode: NodeDefinition = {
+  type: 'advanced_tuning',
+  label: 'Advanced Tuning and Training',
   category: 'Modeling',
   description: 'Automatically optimize model performance.',
   icon: Sliders,
   inputs: [{ id: 'in', label: 'Training Data', type: 'dataset' }],
   outputs: [{ id: 'model', label: 'Best Model', type: 'model' }],
-  settings: TuningSettings,
+  settings: AdvancedTuningSettings,
   validate: (config) => {
     if (!config.target_column) return { isValid: false, message: 'Target column is required.' };
     return { isValid: true };

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.database.models import HyperparameterTuningJob, TrainingJob, DataSource
+from backend.database.models import AdvancedTuningJob, BasicTrainingJob, DataSource
 from backend.ml_pipeline.execution.schemas import (
     NodeExecutionResult,
     PipelineExecutionResult,
@@ -50,7 +50,7 @@ def test_run_pipeline_task_training_job(mock_get_db_session, mock_engine_class):
     session = MagicMock()
     mock_get_db_session.return_value = session
 
-    job = TrainingJob(id=MOCK_JOB_ID, status="queued")
+    job = BasicTrainingJob(id=MOCK_JOB_ID, status="queued")
 
     # Configure query side effects
     # First query returns the job
@@ -90,16 +90,16 @@ def test_run_pipeline_task_tuning_job(mock_get_db_session, mock_engine_class):
     session = MagicMock()
     mock_get_db_session.return_value = session
 
-    job = HyperparameterTuningJob(id=MOCK_JOB_ID, status="queued")
+    job = AdvancedTuningJob(id=MOCK_JOB_ID, status="queued")
 
     # Configure query side effects
-    # First query (TrainingJob) returns None
-    # Second query (HyperparameterTuningJob) returns job
+    # First query (BasicTrainingJob) returns None
+    # Second query (AdvancedTuningJob) returns job
     def side_effect(*args, **kwargs):
         query_mock = MagicMock()
-        if args[0] == TrainingJob:
+        if args[0] == BasicTrainingJob:
             query_mock.filter.return_value.first.return_value = None
-        elif args[0] == HyperparameterTuningJob:
+        elif args[0] == AdvancedTuningJob:
             query_mock.filter.return_value.first.return_value = job
         return query_mock
 
@@ -127,7 +127,7 @@ def test_run_pipeline_task_failure(mock_get_db_session, mock_engine_class):
     session = MagicMock()
     mock_get_db_session.return_value = session
 
-    job = TrainingJob(id=MOCK_JOB_ID, status="queued")
+    job = BasicTrainingJob(id=MOCK_JOB_ID, status="queued")
     session.query.return_value.filter.return_value.first.return_value = job
 
     # Setup Mock Engine to raise exception
@@ -153,7 +153,7 @@ def test_run_pipeline_task_resolves_dataset_id(mock_get_db_session, mock_engine_
     mock_get_db_session.return_value = session
 
     # Setup Job
-    job = TrainingJob(id=MOCK_JOB_ID, status="queued")
+    job = BasicTrainingJob(id=MOCK_JOB_ID, status="queued")
 
     # Setup DataSource Mock
     mock_ds = MagicMock()
@@ -167,10 +167,12 @@ def test_run_pipeline_task_resolves_dataset_id(mock_get_db_session, mock_engine_
         model_name = getattr(model, "__name__", str(model))
         print(f"DEBUG: query called with {model} (name={model_name})")
 
-        if model_name == "TrainingJob":
+        if model_name == "BasicTrainingJob":
             query_mock.filter.return_value.first.return_value = job
         elif model_name == "DataSource":
             print("DEBUG: Returning mock_ds for DataSource")
+            # Ensure name is a string for re.sub
+            mock_ds.name = "Test Dataset"
             query_mock.filter.return_value.first.return_value = mock_ds
         return query_mock
 

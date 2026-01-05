@@ -10,14 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus
-from backend.ml_pipeline.execution.training_manager import TrainingManager
-from backend.ml_pipeline.execution.tuning_manager import TuningJobManager
+from backend.ml_pipeline.execution.basic_training_manager import BasicTrainingManager
+from backend.ml_pipeline.execution.advanced_tuning_manager import AdvancedTuningManager
 
 
 class JobManager:
     """
     Facade for managing training and tuning jobs.
-    Delegates to TrainingManager and TuningJobManager.
+    Delegates to BasicTrainingManager and AdvancedTuningManager.
     """
 
     @staticmethod
@@ -25,15 +25,15 @@ class JobManager:
         session: AsyncSession,
         pipeline_id: str,
         node_id: str,
-        job_type: Literal["training", "tuning", "preview"],
+        job_type: Literal["basic_training", "advanced_tuning", "preview"],
         dataset_id: str = "unknown",
         user_id: Optional[int] = None,
         model_type: str = "unknown",
         graph: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Creates a new job in the database (Async)."""
-        if job_type == "training":
-            return await TrainingManager.create_training_job(
+        if job_type == "basic_training":
+            return await BasicTrainingManager.create_training_job(
                 session,
                 pipeline_id,
                 node_id,
@@ -42,8 +42,8 @@ class JobManager:
                 model_type,
                 graph,
             )
-        elif job_type == "tuning":
-            return await TuningJobManager.create_tuning_job(
+        elif job_type == "advanced_tuning":
+            return await AdvancedTuningManager.create_tuning_job(
                 session,
                 pipeline_id,
                 node_id,
@@ -53,7 +53,7 @@ class JobManager:
                 graph,
             )
         elif job_type == "preview":
-            return await TrainingManager.create_training_job(
+            return await BasicTrainingManager.create_training_job(
                 session,
                 pipeline_id,
                 node_id,
@@ -69,11 +69,11 @@ class JobManager:
     @staticmethod
     async def cancel_job(session: AsyncSession, job_id: str) -> bool:
         """Cancels a job if it is running or queued."""
-        # Try TrainingJob first
-        if await TrainingManager.cancel_training_job(session, job_id):
+        # Try BasicTrainingJob first
+        if await BasicTrainingManager.cancel_training_job(session, job_id):
             return True
-        # Then TuningJob
-        return await TuningJobManager.cancel_tuning_job(session, job_id)
+        # Then AdvancedTuningJob
+        return await AdvancedTuningManager.cancel_tuning_job(session, job_id)
 
     @staticmethod
     def update_status_sync(
@@ -85,48 +85,48 @@ class JobManager:
         logs: Optional[List[str]] = None,
     ):
         """Updates job status (Sync - for Background Tasks)."""
-        # Try TrainingJob first
-        if TrainingManager.update_status_sync(
+        # Try BasicTrainingJob first
+        if BasicTrainingManager.update_status_sync(
             session, job_id, status, error, result, logs
         ):
             return
 
-        # Then TuningJob
-        TuningJobManager.update_status_sync(
+        # Then AdvancedTuningJob
+        AdvancedTuningManager.update_status_sync(
             session, job_id, status, error, result, logs
         )
 
     @staticmethod
     async def get_job(session: AsyncSession, job_id: str) -> Optional[JobInfo]:
         """Retrieves job info (Async)."""
-        # Try TrainingJob
-        job = await TrainingManager.get_training_job(session, job_id)
+        # Try BasicTrainingJob
+        job = await BasicTrainingManager.get_training_job(session, job_id)
         if job:
             return job
 
-        # Then TuningJob
-        return await TuningJobManager.get_tuning_job(session, job_id)
+        # Then AdvancedTuningJob
+        return await AdvancedTuningManager.get_tuning_job(session, job_id)
 
     @staticmethod
     async def list_jobs(
         session: AsyncSession,
         limit: int = 50,
         skip: int = 0,
-        job_type: Optional[Literal["training", "tuning"]] = None,
+        job_type: Optional[Literal["basic_training", "advanced_tuning"]] = None,
     ) -> List[JobInfo]:
         """Lists recent jobs (Async)."""
         jobs = []
 
-        if job_type == "training":
-            jobs = await TrainingManager.list_training_jobs(session, limit, skip)
-        elif job_type == "tuning":
-            jobs = await TuningJobManager.list_tuning_jobs(session, limit, skip)
+        if job_type == "basic_training":
+            jobs = await BasicTrainingManager.list_training_jobs(session, limit, skip)
+        elif job_type == "advanced_tuning":
+            jobs = await AdvancedTuningManager.list_tuning_jobs(session, limit, skip)
         else:
             # Combine both
-            train_jobs = await TrainingManager.list_training_jobs(
+            train_jobs = await BasicTrainingManager.list_training_jobs(
                 session, limit + skip, 0
             )
-            tune_jobs = await TuningJobManager.list_tuning_jobs(
+            tune_jobs = await AdvancedTuningManager.list_tuning_jobs(
                 session, limit + skip, 0
             )
 
@@ -143,18 +143,18 @@ class JobManager:
     async def get_latest_tuning_job_for_node(
         session: AsyncSession, node_id: str
     ) -> Optional[JobInfo]:
-        return await TuningJobManager.get_latest_tuning_job_for_node(session, node_id)
+        return await AdvancedTuningManager.get_latest_tuning_job_for_node(session, node_id)
 
     @staticmethod
     async def get_best_tuning_job_for_model(
         session: AsyncSession, model_type: str
     ) -> Optional[JobInfo]:
-        return await TuningJobManager.get_best_tuning_job_for_model(session, model_type)
+        return await AdvancedTuningManager.get_best_tuning_job_for_model(session, model_type)
 
     @staticmethod
     async def get_tuning_jobs_for_model(
         session: AsyncSession, model_type: str, limit: int = 20
     ) -> List[JobInfo]:
-        return await TuningJobManager.get_tuning_jobs_for_model(
+        return await AdvancedTuningManager.get_tuning_jobs_for_model(
             session, model_type, limit
         )

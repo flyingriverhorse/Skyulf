@@ -203,8 +203,8 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       } else if (node.data.definitionType === 'InvalidValueReplacement') {
           stepType = 'InvalidValueReplacement';
           params = node.data;
-      } else if (node.data.definitionType === 'model_training') {
-          stepType = 'model_training';
+      } else if (node.data.definitionType === 'model_training' || node.data.definitionType === 'basic_training') {
+          stepType = 'basic_training';
           params = {
               target_column: node.data.target_column,
               model_type: node.data.model_type,
@@ -215,8 +215,8 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               cv_shuffle: node.data.cv_shuffle,
               cv_random_state: node.data.cv_random_state
           };
-      } else if (node.data.definitionType === 'hyperparameter_tuning') {
-          stepType = 'model_tuning';
+      } else if (node.data.definitionType === 'hyperparameter_tuning' || node.data.definitionType === 'advanced_tuning') {
+          stepType = 'advanced_tuning';
           params = {
               target_column: node.data.target_column,
               algorithm: node.data.model_type,

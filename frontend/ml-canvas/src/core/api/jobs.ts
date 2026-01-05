@@ -9,7 +9,7 @@ export interface JobInfo {
   node_id: string;
   dataset_id?: string;
   dataset_name?: string;
-  job_type: 'training' | 'tuning' | 'eda' | 'ingestion';
+  job_type: 'basic_training' | 'advanced_tuning' | 'eda' | 'ingestion';
   status: JobStatus;
   start_time: string | null;
   end_time: string | null;
@@ -23,6 +23,7 @@ export interface JobInfo {
   created_at: string;
   metrics?: Record<string, number>;
   config?: unknown;
+  graph?: Record<string, unknown>;
   search_strategy?: string;
   target_column?: string;
   dropped_columns?: string[];
@@ -31,7 +32,7 @@ export interface JobInfo {
 
 export interface RunPipelineRequest extends PipelineConfigModel {
   target_node_id?: string;
-  job_type?: 'training' | 'tuning' | 'preview';
+  job_type?: 'basic_training' | 'advanced_tuning' | 'preview';
 }
 
 export interface RunPipelineResponse {

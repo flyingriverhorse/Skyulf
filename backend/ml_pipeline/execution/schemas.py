@@ -23,7 +23,7 @@ class JobInfo(BaseModel):
     node_id: str
     dataset_id: Optional[str] = None
     dataset_name: Optional[str] = None
-    job_type: Literal["training", "tuning", "preview"]
+    job_type: Literal["training", "tuning", "preview", "basic_training", "advanced_tuning"]
     status: JobStatus
     start_time: Optional[datetime]
     end_time: Optional[datetime] = None
@@ -43,14 +43,14 @@ class JobInfo(BaseModel):
     graph: Optional[Dict[str, Any]] = None
 
 
+from backend.ml_pipeline.constants import StepType
+
 @dataclass
 class NodeConfig:
     """Configuration for a single pipeline node."""
 
     node_id: str
-    step_type: Literal[
-        "data_loader", "feature_engineering", "model_training", "model_tuning"
-    ]
+    step_type: StepType
     params: Dict[str, Any] = field(default_factory=dict)
     inputs: List[str] = field(default_factory=list)  # IDs of upstream nodes
 
