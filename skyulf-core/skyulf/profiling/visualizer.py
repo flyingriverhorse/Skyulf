@@ -33,6 +33,10 @@ class EDAVisualizer:
         dq_table.add_row("Columns", str(self.profile.column_count))
         dq_table.add_row("Missing Cells", f"{self.profile.missing_cells_percentage}%")
         dq_table.add_row("Duplicate Rows", str(self.profile.duplicate_rows))
+        if self.profile.target_col:
+            dq_table.add_row("Target Column", self.profile.target_col)
+            if self.profile.task_type:
+                dq_table.add_row("Task Type", self.profile.task_type)
         console.print(dq_table)
 
         # 2. Numeric Stats
@@ -207,8 +211,27 @@ class EDAVisualizer:
 
         # 10. Decision Tree Rules
         if self.profile.rule_tree:
-            acc_str = f"{self.profile.rule_tree.accuracy:.1%}" if self.profile.rule_tree.accuracy else "N/A"
-            console.print(f"\n[bold]10. Decision Tree Rules (Accuracy: {acc_str})[/bold]")
+            # Check if regression (accuracy might be R2 or similar, but let's check rules format)
+            # Or check if class_name looks like a number
+            is_regression = False
+            if self.profile.rule_tree.nodes and self.profile.rule_tree.nodes[0].class_name:
+                try:
+                    float(self.profile.rule_tree.nodes[0].class_name)
+                    # If root has a numeric class name (mean value), it's likely regression
+                    # But wait, root is not a leaf, so it might not have class_name set correctly in all implementations
+                    # Let's check the first leaf
+                    for node in self.profile.rule_tree.nodes:
+                        if node.is_leaf:
+                            float(node.class_name)
+                            is_regression = True
+                            break
+                except ValueError:
+                    pass
+
+            metric_name = "R²" if is_regression else "Accuracy"
+            acc_str = f"{self.profile.rule_tree.accuracy:.2f}" if is_regression else f"{self.profile.rule_tree.accuracy:.1%}"
+            
+            console.print(f"\n[bold]10. Decision Tree Rules ({metric_name}: {acc_str})[/bold]")
             
             from rich.tree import Tree
             
@@ -219,9 +242,15 @@ class EDAVisualizer:
                 if not node: return
                 
                 if node.is_leaf:
-                    total = sum(node.value)
-                    conf = (max(node.value) / total * 100) if total > 0 else 0
-                    tree.add(f"[green]➜ {node.class_name}[/green] ({conf:.1f}%) [dim]n={node.samples}[/dim]")
+                    if is_regression:
+                        # Regression Leaf
+                        val = float(node.class_name)
+                        tree.add(f"[green]➜ Value = {val:.2f}[/green] [dim]n={node.samples}[/dim]")
+                    else:
+                        # Classification Leaf
+                        total = sum(node.value)
+                        conf = (max(node.value) / total * 100) if total > 0 else 0
+                        tree.add(f"[green]➜ {node.class_name}[/green] ({conf:.1f}%) [dim]n={node.samples}[/dim]")
                 else:
                     # Left (True)
                     if len(node.children) > 0:

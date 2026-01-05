@@ -120,8 +120,9 @@ async def run_eda_analysis(report_id: int, session: AsyncSession):
 
             analyzer = EDAAnalyzer(df)
             target_col = report.config.get("target_col") if report.config else None
+            task_type = report.config.get("task_type") if report.config else None
             
-            profile = analyzer.analyze(target_col=target_col, exclude_cols=exclude_cols, filters=filters)
+            profile = analyzer.analyze(target_col=target_col, exclude_cols=exclude_cols, filters=filters, task_type=task_type)
                 
         except Exception as e:
             report.status = "FAILED"

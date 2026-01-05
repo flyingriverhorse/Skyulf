@@ -128,7 +128,13 @@ df = pl.read_csv("your_dataset.csv")
 
 # 2. Run Analysis
 analyzer = EDAAnalyzer(df)
-profile = analyzer.analyze(target_col="target")
+profile = analyzer.analyze(
+    target_col="target",
+    task_type="Classification", # Optional: Force "Classification" or "Regression"
+    date_col="timestamp",       # Optional: Manually specify if auto-detection fails
+    lat_col="latitude",         # Optional
+    lon_col="longitude"         # Optional
+)
 
 # 3. Visualize Results (The Easy Way)
 # This single class handles all the rich terminal output and matplotlib plots

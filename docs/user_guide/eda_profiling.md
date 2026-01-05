@@ -22,9 +22,10 @@ df = pl.read_csv("your_dataset.csv")
 analyzer = EDAAnalyzer(df)
 profile = analyzer.analyze(
     target_col="target",
-    date_col="timestamp",  # Optional: Manually specify if auto-detection fails
-    lat_col="latitude",    # Optional
-    lon_col="longitude"    # Optional
+    task_type="Classification", # Optional: Force "Classification" or "Regression"
+    date_col="timestamp",       # Optional: Manually specify if auto-detection fails
+    lat_col="latitude",         # Optional
+    lon_col="longitude"         # Optional
 )
 
 # 3. Visualize
@@ -89,10 +90,24 @@ Skyulf automatically flags potential data quality issues:
 *   **Outlier Detection:** Uses Isolation Forest to identify anomalous rows.
 *   **PCA:** Computes Principal Components to visualize high-dimensional data structure.
 *   **Causal Discovery:** Uses the PC Algorithm to infer causal relationships between variables (DAG).
-*   **Decision Tree:** Uses a surrogate Decision Tree model to extract human-readable rules (e.g., "If Age > 50 and Income < 30k -> High Risk"). Provides both a visual tree and a list of text rules. Useful for finding "smoking gun" segments.
+*   **Decision Tree (Rule Discovery):** Uses a surrogate Decision Tree model to extract human-readable rules.
+    *   **Classification:** "If Age > 50 -> High Risk (Confidence: 85%)"
+    *   **Regression:** "If Age > 50 -> Value = 120.5 (Samples: 100)"
+    *   **High Cardinality:** Automatically groups rare classes into "Other" for readable trees (e.g. Top 10 Zip Codes).
 *   **Target Analysis:** Analyzes relationships between features and the target variable (Correlations, ANOVA, Interactions).
 *   **Geospatial:** Automatically detects Lat/Lon columns and computes bounding boxes.
 *   **Time Series:** Detects seasonality and trends in datetime columns.
+
+### 4. Task Type Control
+By default, Skyulf automatically detects if your target is **Classification** (Categorical) or **Regression** (Numeric). However, you can override this behavior:
+
+*   **Force Classification:** Useful for ID columns or numeric codes (e.g., Zip Code, Status Code) that should be treated as categories.
+*   **Force Regression:** Useful for ordinal categories (e.g., Rating 1-5) that you want to treat as continuous.
+
+```python
+# Force Classification on a numeric ID column
+profile = analyzer.analyze(target_col="zip_code", task_type="Classification")
+```
 
 ## Visualization Support (`skyulf-core[viz]`)
 

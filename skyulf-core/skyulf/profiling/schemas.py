@@ -202,6 +202,7 @@ class DatasetProfile(BaseModel):
     
     # Target Analysis
     target_col: Optional[str] = None
+    task_type: Optional[str] = None # "Classification" or "Regression"
     target_correlations: Optional[Dict[str, float]] = None
     target_interactions: Optional[List[TargetInteraction]] = None
     

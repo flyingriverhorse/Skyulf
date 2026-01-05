@@ -21,7 +21,7 @@ try:
     from sklearn.preprocessing import StandardScaler
     from sklearn.impute import SimpleImputer
     from sklearn.ensemble import IsolationForest
-    from sklearn.tree import DecisionTreeClassifier, _tree
+    from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, _tree
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
@@ -68,31 +68,31 @@ class EDAAnalyzer:
                     continue
 
                 # Check sample (non-null values)
-                sample = self.df[col].drop_nulls().head(50) # Increased sample size for better entropy
+                sample = self.df[col].drop_nulls().head(50)
                 if len(sample) == 0: continue
                 
                 best_parsed = None
                 max_months = -1
                 best_method_name = ""
 
-                # Candidate 1: Generic ISO Datetime
+                # Try Generic ISO Datetime
                 try:
                     parsed = sample.str.to_datetime(strict=False)
                     if parsed.null_count() == 0:
                         n_months = parsed.dt.month().n_unique()
                         if n_months > max_months:
                             max_months = n_months
-                            best_parsed = (None, "datetime_generic") # format is None
+                            best_parsed = (None, "datetime_generic")
                             best_method_name = "Generic Datetime"
                 except Exception:
                     pass
 
-                # Candidate 2: Generic ISO Date
+                # Try Generic ISO Date
                 try:
                     parsed = sample.str.to_date(strict=False)
                     if parsed.null_count() == 0:
                         n_months = parsed.dt.month().n_unique()
-                        # Prefer Datetime over Date if months are equal, but if Date has more months, take it
+                        # Prefer Datetime over Date if months are equal
                         if n_months > max_months:
                             max_months = n_months
                             best_parsed = (None, "date_generic")
@@ -100,7 +100,7 @@ class EDAAnalyzer:
                 except Exception:
                     pass
                     
-                # Candidate 3: Common Formats (Ambiguous ones)
+                # Try Common Formats
                 common_formats = ["%m/%d/%Y", "%d/%m/%Y", "%m-%d-%Y", "%d-%m-%Y", "%Y/%m/%d", "%Y-%m-%d"]
                 
                 for fmt in common_formats:
@@ -108,8 +108,7 @@ class EDAAnalyzer:
                         parsed = sample.str.to_datetime(format=fmt, strict=False)
                         if parsed.null_count() == 0:
                             n_months = parsed.dt.month().n_unique()
-                            # If we find a format that gives MORE months, it's likely the correct one
-                            # e.g. 1/2, 2/2, 3/2 -> D/M/Y gives 1 month (Feb), M/D/Y gives 3 months (Jan, Feb, Mar)
+                            # Maximize unique months to disambiguate formats (e.g. D/M/Y vs M/D/Y)
                             if n_months > max_months:
                                 max_months = n_months
                                 best_parsed = (fmt, "datetime_format")
@@ -131,7 +130,7 @@ class EDAAnalyzer:
                         print(f"Failed to cast column {col} using {best_method_name}: {e}")
                     continue
         
-    def analyze(self, target_col: Optional[str] = None, exclude_cols: Optional[List[str]] = None, filters: Optional[List[Dict[str, Any]]] = None, date_col: Optional[str] = None, lat_col: Optional[str] = None, lon_col: Optional[str] = None) -> DatasetProfile:
+    def analyze(self, target_col: Optional[str] = None, exclude_cols: Optional[List[str]] = None, filters: Optional[List[Dict[str, Any]]] = None, date_col: Optional[str] = None, lat_col: Optional[str] = None, lon_col: Optional[str] = None, task_type: Optional[str] = None) -> DatasetProfile:
         """
         Main entry point to generate the full profile.
         """
@@ -335,12 +334,20 @@ class EDAAnalyzer:
 
         # 10. Rule Discovery (Decision Tree)
         rule_tree = None
+        final_task_type = task_type
+        
         if SKLEARN_AVAILABLE and target_col and len(feature_cols) >= 1:
-            # Only run if target is categorical (Classification)
-            # Or we can support Regression too, but let's start with Classification as per user request (Fraud)
+            # Run for both Categorical (Classification) and Numeric (Regression)
             target_type = self._get_semantic_type(self.df[target_col])
-            if target_type in ["Categorical", "Boolean"]:
-                rule_tree = self._discover_rules(feature_cols, target_col)
+            if target_type in ["Categorical", "Boolean", "Numeric"]:
+                rule_tree = self._discover_rules(feature_cols, target_col, task_type)
+                
+                # Infer task type if not provided
+                if not final_task_type:
+                    if target_type == "Numeric":
+                        final_task_type = "Regression"
+                    else:
+                        final_task_type = "Classification"
 
         # 11. Smart Recommendations
         recommendations = self._generate_recommendations(col_profiles, alerts, target_col)
@@ -358,6 +365,7 @@ class EDAAnalyzer:
             recommendations=recommendations,
             sample_data=sample_rows,
             target_col=target_col,
+            task_type=final_task_type,
             target_correlations=target_correlations,
             target_interactions=target_interactions,
             pca_data=pca_data,
@@ -548,15 +556,9 @@ class EDAAnalyzer:
                 nodes.append(CausalNode(id=col, label=col))
                 
             # Create Edges
-            # The graph matrix values:
-            # 0: No edge
-            # 1: A -> B (if graph[i,j]=1 and graph[j,i]=-1) ??
-            # Actually causal-learn graph representation:
-            # -1: Tail (--), 1: Arrow (->)
-            # graph[i,j] is the endpoint at j for edge i-j
-            # If graph[i,j] = -1 and graph[j,i] = 1, then i -- > j (i causes j)
-            # If graph[i,j] = -1 and graph[j,i] = -1, then i --- j (undirected)
-            # If graph[i,j] = 1 and graph[j,i] = 1, then i <-> j (bidirected/confounded)
+            # causal-learn graph: -1=Tail, 1=Arrow.
+            # graph[i,j] is endpoint at j.
+            # i -> j: graph[i,j]=1, graph[j,i]=-1
             
             adj_matrix = cg.G.graph
             num_vars = len(numeric_cols)
@@ -727,7 +729,6 @@ class EDAAnalyzer:
                 cols_to_track.append(target_col)
 
             # For small datasets, don't resample, just use raw data
-            # This avoids "interpolated" dates appearing in the chart
             if self.row_count < 1000:
                 trend_df = ts_df.select([
                     pl.col(date_col).alias("date"),
@@ -747,22 +748,17 @@ class EDAAnalyzer:
                         values=vals
                     ))
             else:
+                # Dynamic resampling based on duration
                 interval = "1d" # Default
                 if min_date and max_date:
                     duration = (max_date - min_date).total_seconds()
-                    # Target ~100 points
-                    ideal_seconds = duration / 100
+                    ideal_seconds = duration / 100 # Target ~100 points
                     
-                    if ideal_seconds < 60:
-                        interval = "1s"
-                    elif ideal_seconds < 3600:
-                        interval = "1m"
-                    elif ideal_seconds < 86400:
-                        interval = "1h"
-                    elif ideal_seconds < 604800:
-                        interval = "1d"
-                    else:
-                        interval = "1w"
+                    if ideal_seconds < 60: interval = "1s"
+                    elif ideal_seconds < 3600: interval = "1m"
+                    elif ideal_seconds < 86400: interval = "1h"
+                    elif ideal_seconds < 604800: interval = "1d"
+                    else: interval = "1w"
 
                 if not cols_to_track:
                     # Just track count
@@ -1368,9 +1364,10 @@ class EDAAnalyzer:
                 
         return profile, alerts
 
-    def _discover_rules(self, feature_cols: List[str], target_col: str) -> Optional[RuleTree]:
+    def _discover_rules(self, feature_cols: List[str], target_col: str, task_type: Optional[str] = None) -> Optional[RuleTree]:
         """
         Trains a surrogate Decision Tree to extract rules from the data.
+        Supports both Classification (Categorical Target) and Regression (Numeric Target).
         """
         try:
             # Prepare Data
@@ -1378,39 +1375,35 @@ class EDAAnalyzer:
             limit = 100000
             df_sample = self.df.select(feature_cols + [target_col]).head(limit)
             
-            # Handle Missing Values (Simple Imputation)
-            # For categorical, fill with "Missing"
-            # For numeric, fill with Mean
+            # Determine Task Type
+            is_regression = False
+            if task_type:
+                if task_type.lower() == "regression":
+                    is_regression = True
+                elif task_type.lower() == "classification":
+                    is_regression = False
+            else:
+                target_type = self._get_semantic_type(df_sample[target_col])
+                is_regression = target_type == "Numeric"
+
+            # Handle Missing Values & Encoding
+            # Numeric: Fill with Mean
+            # Categorical: Fill with "Missing" -> Ordinal Encode (Factorize)
             
-            # We need to encode categorical features for sklearn
-            # Identify categorical columns
             cat_cols = [c for c in feature_cols if self._get_semantic_type(df_sample[c]) in ["Categorical", "Boolean", "Text"]]
             num_cols = [c for c in feature_cols if c not in cat_cols]
-            
-            # Encode Categorical
-            # We use Ordinal Encoding for simplicity in tree visualization (e.g. "Color <= 1.5")
-            # Ideally OneHot is better for accuracy, but Ordinal is better for "Rule Extraction" readability if mapped back
-            # For now, let's use simple factorization (Ordinal)
             
             X_data = {}
             feature_names = []
             
             for col in num_cols:
-                # Fill nulls with mean
                 mean_val = df_sample[col].mean()
                 X_data[col] = df_sample[col].fill_null(mean_val).to_numpy()
                 feature_names.append(col)
                 
             for col in cat_cols:
-                # Fill nulls with "Missing"
-                # Cast to string first
                 s = df_sample[col].cast(pl.Utf8).fill_null("Missing")
-                # Factorize (returns codes, categories)
-                # We need to keep track of mapping if we want to show labels, but for now let's just show codes
-                # Or better: Use OneHot? No, tree becomes huge.
-                # Let's use Factorize.
-                # Polars factorize is experimental or different in versions.
-                # Use cast to Categorical -> to_physical
+                # Use simple factorization (Ordinal) for readability
                 codes = s.cast(pl.Categorical).to_physical().to_numpy()
                 X_data[col] = codes
                 feature_names.append(col)
@@ -1420,14 +1413,36 @@ class EDAAnalyzer:
             X_list = [X_data[col] for col in feature_names]
             X = np.column_stack(X_list)
             
-            # Prepare Y
-            y_series = df_sample[target_col].cast(pl.Utf8).fill_null("Missing")
-            y = y_series.cast(pl.Categorical).to_physical().to_numpy()
-            class_names = y_series.cast(pl.Categorical).cat.get_categories().to_list()
-            
-            # Train Tree
-            # Max depth 3 for readability (Decomposition Tree style)
-            clf = DecisionTreeClassifier(max_depth=4, random_state=42)
+            # Prepare Y and Model
+            if is_regression:
+                # Regression: Fill nulls with mean, keep as numeric
+                y_mean = df_sample[target_col].mean()
+                y = df_sample[target_col].fill_null(y_mean).to_numpy()
+                class_names = [] # Not used for regression
+                
+                # Train Tree (Regressor)
+                clf = DecisionTreeRegressor(max_depth=4, random_state=42)
+            else:
+                # Classification: Encode as categorical
+                y_series = df_sample[target_col].cast(pl.Utf8).fill_null("Missing")
+                
+                # Handle High Cardinality: Group into Top 10 + Other
+                if y_series.n_unique() > 10:
+                    top_10 = y_series.value_counts().sort("count", descending=True).head(10)[target_col].to_list()
+                    # Use Polars expression on a temp DataFrame for speed
+                    temp_df = pl.DataFrame({"y": y_series})
+                    y_series = temp_df.select(
+                        pl.when(pl.col("y").is_in(top_10))
+                        .then(pl.col("y"))
+                        .otherwise(pl.lit("Other"))
+                    ).to_series()
+
+                y = y_series.cast(pl.Categorical).to_physical().to_numpy()
+                class_names = y_series.cast(pl.Categorical).cat.get_categories().to_list()
+                
+                # Train Tree (Classifier)
+                clf = DecisionTreeClassifier(max_depth=4, random_state=42)
+
             clf.fit(X, y)
             
             # Extract Feature Importance
@@ -1456,11 +1471,18 @@ class EDAAnalyzer:
                     feature_idx = tree_.feature[node_id]
                     feature = feature_names[feature_idx]
                     threshold = float(tree_.threshold[node_id])
-                    
-                value = tree_.value[node_id][0].tolist() # Class counts
-                # Predict class
-                class_idx = np.argmax(value)
-                class_name = str(class_names[class_idx]) if class_idx < len(class_names) else "Unknown"
+                
+                # Handle Value & Class Name
+                if is_regression:
+                    # Value is the predicted mean (single float)
+                    val = float(tree_.value[node_id][0][0])
+                    value = [val] # Wrap in list for consistency
+                    class_name = f"{val:.2f}"
+                else:
+                    # Value is class counts
+                    value = tree_.value[node_id][0].tolist()
+                    class_idx = np.argmax(value)
+                    class_name = str(class_names[class_idx]) if class_idx < len(class_names) else "Unknown"
                 
                 children = []
                 if not is_leaf:
@@ -1493,13 +1515,19 @@ class EDAAnalyzer:
             def recurse_rules(node_id, current_rule):
                 if tree_.children_left[node_id] == _tree.TREE_LEAF:
                     # Leaf node
-                    value = tree_.value[node_id][0]
-                    class_idx = np.argmax(value)
-                    class_name = str(class_names[class_idx]) if class_idx < len(class_names) else "Unknown"
-                    total = np.sum(value)
-                    confidence = (value[class_idx] / total) * 100 if total > 0 else 0
+                    total_samples = int(tree_.n_node_samples[node_id])
                     
-                    rule_str = f"IF {current_rule} THEN {class_name} (Confidence: {confidence:.1f}%, Samples: {int(total)})"
+                    if is_regression:
+                        val = float(tree_.value[node_id][0][0])
+                        rule_str = f"IF {current_rule} THEN Value = {val:.2f} (Samples: {total_samples})"
+                    else:
+                        value = tree_.value[node_id][0]
+                        class_idx = np.argmax(value)
+                        class_name = str(class_names[class_idx]) if class_idx < len(class_names) else "Unknown"
+                        total = np.sum(value)
+                        confidence = (value[class_idx] / total) * 100 if total > 0 else 0
+                        rule_str = f"IF {current_rule} THEN {class_name} (Confidence: {confidence:.1f}%, Samples: {int(total)})"
+                        
                     rules_text.append(rule_str)
                     return
 
@@ -1550,22 +1578,13 @@ class EDAAnalyzer:
         elif dtype in [pl.Date, pl.Datetime, pl.Duration]:
             return "DateTime"
         elif dtype == pl.Utf8 or dtype == pl.String:
-            # Check if it looks like a date?
-            # For now, assume Text or Categorical based on cardinality?
-            # Let's stick to "Text" for raw strings, "Categorical" if we cast it or if low cardinality?
-            # The plan says "Categorical" and "Text".
-            
             n_unique = series.n_unique()
             count = len(series)
             ratio = n_unique / count if count > 0 else 0
             
-            # If low cardinality ratio (e.g. < 5%) -> Categorical
+            # Low cardinality ratio (< 5%) -> Categorical
             if ratio < 0.05:
                  return "Categorical"
-            
-            # If absolute low cardinality (e.g. < 20) AND dataset is not tiny (e.g. > 50 rows)
-            # For tiny datasets, we can't be sure, default to Text to be safe, or Categorical?
-            # Let's default to Text for high ratio.
             
             return "Text"
         elif dtype == pl.Categorical:

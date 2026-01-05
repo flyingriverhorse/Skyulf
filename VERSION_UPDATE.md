@@ -1,5 +1,6 @@
 # Version Updates
 
+*   **v0.1.8 :** "The Regression Rules Update" — Extended EDA capabilities to support regression targets in Decision Tree rule discovery.
 *   **v0.1.7 :** "The Advanced EDA & Profiling Update" — Professional-grade automated data analysis with smart alerts, rich visualizations, and Polars-powered profiling.
 *   **v0.1.6 :** "The Backend Abstraction & Modern Frameworks Update" — Polars migration, leakage proof, and performance optimization.
 *   **v0.1.5 :** "The Registry & Catalog Architecture Update" — Decoupled data loading with Smart Catalog, full S3 integration, and dynamic node registry architecture.
@@ -8,6 +9,21 @@
 *   **v0.1.2 :** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
+
+------------------------------------------------------------
+## v0.1.8
+**"The Regression Rules Update"**
+This release extends the Automated EDA module to support regression targets, enabling users to discover rules that drive continuous values.
+
+### 🧠 Advanced Analysis
+- **Regression Rules:** Extended Decision Tree Discovery to support regression targets (Numeric). The system now generates rules like "IF Feature > X THEN Value = Y" (predicting a mean value) instead of just classification rules.
+- **Unified EDA:** Ensured that all EDA components (Causal Discovery, Correlations, Outliers) work seamlessly with both Classification and Regression targets.
+- **Smart Task Detection:** Added `task_type` override to `analyze()` method, allowing users to force "Classification" or "Regression" regardless of data type.
+- **High Cardinality Handling:** Implemented automatic grouping for high-cardinality classification targets (e.g., Zip Codes, IDs). If a target has >10 classes, the system now analyzes the "Top 10" and groups the rest as "Other", preventing unreadable decision trees.
+
+### 🎨 Frontend
+- **Task Type Selector:** Added a dropdown in the EDA dashboard to manually select "Classification" or "Regression" for the target column, with a helpful tooltip explaining when to use it.
+- **Visualizer Update:** Updated the terminal visualizer to display the detected or selected Task Type in the Data Quality summary.
 
 ------------------------------------------------------------
 ## v0.1.7

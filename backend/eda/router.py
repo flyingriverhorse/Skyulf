@@ -26,6 +26,7 @@ class AnalyzeRequest(BaseModel):
     target_col: Optional[str] = None
     exclude_cols: Optional[List[str]] = None
     filters: Optional[List[FilterRequest]] = None
+    task_type: Optional[str] = None # "Classification" or "Regression"
 
 @router.get("/jobs/all")
 async def list_all_jobs(
@@ -89,6 +90,9 @@ async def trigger_analysis(
         if request.filters:
             print(f"Applying filters: {request.filters}")
             config["filters"] = [f.dict() for f in request.filters]
+        if request.task_type:
+            print(f"Setting task_type to {request.task_type}")
+            config["task_type"] = request.task_type
 
     report = EDAReport(
         data_source_id=dataset_id,
@@ -167,7 +171,8 @@ async def get_report_history(
             "id": r.id,
             "created_at": r.created_at,
             "status": r.status,
-            "target_col": r.config.get("target_col") if r.config else None
+            "target_col": r.config.get("target_col") if r.config else None,
+            "task_type": r.config.get("task_type") if r.config else None
         }
         for r in reports
     ]
