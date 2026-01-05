@@ -87,6 +87,8 @@ def _parse_node_info(node: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any]]:
     return nid, ntype, params
 
 
+from backend.ml_pipeline.constants import StepType
+
 def _extract_columns(ntype: str, params: Dict[str, Any]) -> List[str]:
     dropped: List[str] = []
     if ntype in [
@@ -127,8 +129,8 @@ def extract_job_details(
             "train_test_split",
             "TrainTestSplitter",
             "feature_target_split",
-            "model_training",
-            "model_tuning",
+            StepType.BASIC_TRAINING,
+            StepType.ADVANCED_TUNING,
             "hyperparameter_tuning",
         ] and params.get("target_column"):
             target_column = params.get("target_column")

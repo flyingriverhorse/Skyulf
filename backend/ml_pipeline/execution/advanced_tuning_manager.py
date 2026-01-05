@@ -7,7 +7,7 @@ from sqlalchemy import String, cast, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from backend.database.models import DataSource, HyperparameterTuningJob
+from backend.database.models import DataSource, AdvancedTuningJob
 from backend.ml_pipeline.execution.graph_utils import (
     determine_search_strategy,
     extract_job_details,
@@ -17,7 +17,7 @@ from backend.ml_pipeline.model_registry.service import ModelRegistryService
 from backend.ml_pipeline.execution.utils import resolve_dataset_name, get_dataset_map
 
 
-class TuningJobManager:
+class AdvancedTuningManager:
     @staticmethod
     async def create_tuning_job(
         session: AsyncSession,
@@ -38,7 +38,7 @@ class TuningJobManager:
 
         search_strategy = determine_search_strategy(graph, node_id)
 
-        job = HyperparameterTuningJob(
+        job = AdvancedTuningJob(
             id=job_id,
             pipeline_id=pipeline_id,
             node_id=node_id,
@@ -58,7 +58,7 @@ class TuningJobManager:
 
     @staticmethod
     def map_tuning_job_to_info(
-        job: HyperparameterTuningJob, dataset_name: Optional[str]
+        job: AdvancedTuningJob, dataset_name: Optional[str]
     ) -> JobInfo:
         # Extract details from graph
         (
@@ -88,7 +88,7 @@ class TuningJobManager:
             node_id=type_cast(str, job.node_id),
             dataset_id=type_cast(Optional[str], job.dataset_source_id),
             dataset_name=dataset_name,
-            job_type="tuning",
+            job_type="advanced_tuning",
             status=JobStatus(job.status),
             start_time=type_cast(Optional[datetime], job.started_at),
             end_time=type_cast(Optional[datetime], job.finished_at),
@@ -114,8 +114,8 @@ class TuningJobManager:
     @staticmethod
     async def cancel_tuning_job(session: AsyncSession, job_id: str) -> bool:
         """Cancels a tuning job if it is running or queued."""
-        stmt = select(HyperparameterTuningJob).where(
-            HyperparameterTuningJob.id == job_id
+        stmt = select(AdvancedTuningJob).where(
+            AdvancedTuningJob.id == job_id
         )
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
@@ -129,7 +129,7 @@ class TuningJobManager:
         return False
 
     @staticmethod
-    def _update_tuning_result(job: HyperparameterTuningJob, result: Dict[str, Any]):
+    def _update_tuning_result(job: AdvancedTuningJob, result: Dict[str, Any]):
         if "best_params" in result:
             job.best_params = result["best_params"]
         if "best_score" in result:
@@ -150,8 +150,8 @@ class TuningJobManager:
     ) -> bool:
         """Updates tuning job status (Sync). Returns True if job found and updated."""
         job = (
-            session.query(HyperparameterTuningJob)
-            .filter(HyperparameterTuningJob.id == job_id)
+            session.query(AdvancedTuningJob)
+            .filter(AdvancedTuningJob.id == job_id)
             .first()
         )
         if not job:
@@ -167,7 +167,7 @@ class TuningJobManager:
             job.logs = current_logs + logs  # type: ignore
 
         if result:
-            TuningJobManager._update_tuning_result(job, result)
+            AdvancedTuningManager._update_tuning_result(job, result)
 
         if status in [
             JobStatus.COMPLETED,
@@ -184,15 +184,15 @@ class TuningJobManager:
         session: AsyncSession, job_id: str
     ) -> Optional[JobInfo]:
         """Retrieves a tuning job by ID."""
-        stmt = select(HyperparameterTuningJob).where(
-            HyperparameterTuningJob.id == job_id
+        stmt = select(AdvancedTuningJob).where(
+            AdvancedTuningJob.id == job_id
         )
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
 
         if job:
             dataset_name = await resolve_dataset_name(session, job.dataset_source_id)
-            return TuningJobManager.map_tuning_job_to_info(job, dataset_name)
+            return AdvancedTuningManager.map_tuning_job_to_info(job, dataset_name)
         return None
 
     @staticmethod
@@ -207,8 +207,8 @@ class TuningJobManager:
 
         # 2. Fetch Jobs
         result_tune = await session.execute(
-            select(HyperparameterTuningJob)
-            .order_by(HyperparameterTuningJob.started_at.desc())
+            select(AdvancedTuningJob)
+            .order_by(AdvancedTuningJob.started_at.desc())
             .limit(limit)
             .offset(skip)
         )
@@ -224,7 +224,7 @@ class TuningJobManager:
             if not ds_name and ds_id:
                  ds_name = f"Dataset {ds_id}"
 
-            jobs.append(TuningJobManager.map_tuning_job_to_info(job, ds_name))
+            jobs.append(AdvancedTuningManager.map_tuning_job_to_info(job, ds_name))
             
         return jobs
 
@@ -233,16 +233,16 @@ class TuningJobManager:
         session: AsyncSession, node_id: str
     ) -> Optional[JobInfo]:
         result = await session.execute(
-            select(HyperparameterTuningJob)
-            .where(HyperparameterTuningJob.node_id == node_id)
-            .where(HyperparameterTuningJob.status == JobStatus.COMPLETED.value)
-            .order_by(HyperparameterTuningJob.finished_at.desc())
+            select(AdvancedTuningJob)
+            .where(AdvancedTuningJob.node_id == node_id)
+            .where(AdvancedTuningJob.status == JobStatus.COMPLETED.value)
+            .order_by(AdvancedTuningJob.finished_at.desc())
             .limit(1)
         )
         job = result.scalars().first()
 
         if job:
-            return TuningJobManager.map_tuning_job_to_info(job, None)
+            return AdvancedTuningManager.map_tuning_job_to_info(job, None)
         return None
 
     @staticmethod
@@ -250,16 +250,16 @@ class TuningJobManager:
         session: AsyncSession, model_type: str
     ) -> Optional[JobInfo]:
         result = await session.execute(
-            select(HyperparameterTuningJob)
-            .where(HyperparameterTuningJob.model_type == model_type)
-            .where(HyperparameterTuningJob.status == JobStatus.COMPLETED.value)
-            .order_by(HyperparameterTuningJob.finished_at.desc())
+            select(AdvancedTuningJob)
+            .where(AdvancedTuningJob.model_type == model_type)
+            .where(AdvancedTuningJob.status == JobStatus.COMPLETED.value)
+            .order_by(AdvancedTuningJob.finished_at.desc())
             .limit(1)
         )
         job = result.scalars().first()
 
         if job:
-            return TuningJobManager.map_tuning_job_to_info(job, None)
+            return AdvancedTuningManager.map_tuning_job_to_info(job, None)
         return None
 
     @staticmethod
@@ -267,15 +267,15 @@ class TuningJobManager:
         session: AsyncSession, model_type: str, limit: int = 20
     ) -> List[JobInfo]:
         result = await session.execute(
-            select(HyperparameterTuningJob)
-            .where(HyperparameterTuningJob.model_type == model_type)
-            .where(HyperparameterTuningJob.status == JobStatus.COMPLETED.value)
-            .order_by(HyperparameterTuningJob.finished_at.desc())
+            select(AdvancedTuningJob)
+            .where(AdvancedTuningJob.model_type == model_type)
+            .where(AdvancedTuningJob.status == JobStatus.COMPLETED.value)
+            .order_by(AdvancedTuningJob.finished_at.desc())
             .limit(limit)
         )
         jobs = result.scalars().all()
 
         return [
-            TuningJobManager.map_tuning_job_to_info(job, None)
+            AdvancedTuningManager.map_tuning_job_to_info(job, None)
             for job in jobs
         ]

@@ -2,8 +2,9 @@ import pytest
 from sqlalchemy import delete
 
 from backend.database import engine
-from backend.database.models import HyperparameterTuningJob, TrainingJob
+from backend.database.models import AdvancedTuningJob, BasicTrainingJob
 from backend.ml_pipeline.execution.jobs import JobManager
+from backend.ml_pipeline.constants import StepType
 
 
 @pytest.mark.asyncio
@@ -19,11 +20,11 @@ async def test_unified_versioning():
 
         # Cleanup
         await session.execute(
-            delete(TrainingJob).where(TrainingJob.pipeline_id == pipeline_id)
+            delete(BasicTrainingJob).where(BasicTrainingJob.pipeline_id == pipeline_id)
         )
         await session.execute(
-            delete(HyperparameterTuningJob).where(
-                HyperparameterTuningJob.pipeline_id == pipeline_id
+            delete(AdvancedTuningJob).where(
+                AdvancedTuningJob.pipeline_id == pipeline_id
             )
         )
         await session.commit()
@@ -33,11 +34,11 @@ async def test_unified_versioning():
             session,
             pipeline_id,
             node_id,
-            "training",
+            StepType.BASIC_TRAINING,
             dataset_id=dataset_id,
             model_type=model_type,
         )
-        job1 = await session.get(TrainingJob, job1_id)
+        job1 = await session.get(BasicTrainingJob, job1_id)
         assert job1.version == 1
 
         # 2. Create Tuning Job (Should be v2)
@@ -45,11 +46,11 @@ async def test_unified_versioning():
             session,
             pipeline_id,
             node_id,
-            "tuning",
+            StepType.ADVANCED_TUNING,
             dataset_id=dataset_id,
             model_type=model_type,
         )
-        job2 = await session.get(HyperparameterTuningJob, job2_id)
+        job2 = await session.get(AdvancedTuningJob, job2_id)
         assert job2.run_number == 2
 
         # 3. Create Training Job (Should be v3)
@@ -57,11 +58,11 @@ async def test_unified_versioning():
             session,
             pipeline_id,
             node_id,
-            "training",
+            StepType.BASIC_TRAINING,
             dataset_id=dataset_id,
             model_type=model_type,
         )
-        job3 = await session.get(TrainingJob, job3_id)
+        job3 = await session.get(BasicTrainingJob, job3_id)
         assert job3.version == 3
 
         # 4. Create Tuning Job (Should be v4)
@@ -69,9 +70,9 @@ async def test_unified_versioning():
             session,
             pipeline_id,
             node_id,
-            "tuning",
+            StepType.ADVANCED_TUNING,
             dataset_id=dataset_id,
             model_type=model_type,
         )
-        job4 = await session.get(HyperparameterTuningJob, job4_id)
+        job4 = await session.get(AdvancedTuningJob, job4_id)
         assert job4.run_number == 4

@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.config import get_settings
 from backend.data.catalog import FileSystemCatalog, SmartCatalog
-from backend.database.models import DataSource, HyperparameterTuningJob, TrainingJob
+from backend.database.models import DataSource, AdvancedTuningJob, BasicTrainingJob
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 from backend.ml_pipeline.execution.engine import PipelineEngine
@@ -46,12 +46,12 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
     session = get_db_session()
 
     try:
-        # 1. Get Job (Try TrainingJob first, then HyperparameterTuningJob)
+        # 1. Get Job (Try BasicTrainingJob first, then AdvancedTuningJob)
         job = JobService.get_job_by_id_sync(session, job_id)
 
         if not job:
             logger.error(
-                f"Job {job_id} not found in TrainingJob or HyperparameterTuningJob"
+                f"Job {job_id} not found in BasicTrainingJob or AdvancedTuningJob"
             )
             return
 
@@ -152,9 +152,9 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
 
         # Add version info to logs
         timestamp = datetime.now().strftime("%H:%M:%S")
-        if isinstance(job, TrainingJob):
+        if isinstance(job, BasicTrainingJob):
             job_logs.append(f"[{timestamp}] Training Job Version: {job.version}")
-        elif isinstance(job, HyperparameterTuningJob):
+        elif isinstance(job, AdvancedTuningJob):
             job_logs.append(f"[{timestamp}] Tuning Job Run: {job.run_number}")
 
         def log_callback(msg):
@@ -214,8 +214,8 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
 
                 job.metrics = final_metrics
 
-                # Special handling for HyperparameterTuningJob
-                if isinstance(job, HyperparameterTuningJob):
+                # Special handling for AdvancedTuningJob
+                if isinstance(job, AdvancedTuningJob):
                     if "best_params" in final_metrics:
                         job.best_params = final_metrics["best_params"]
                     if "best_score" in final_metrics:
@@ -245,11 +245,11 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
         logger.error(traceback.format_exc())
         if session:
             # Re-query to ensure session is valid
-            job = session.query(TrainingJob).filter(TrainingJob.id == job_id).first()
+            job = session.query(BasicTrainingJob).filter(BasicTrainingJob.id == job_id).first()
             if not job:
                 job = (
-                    session.query(HyperparameterTuningJob)
-                    .filter(HyperparameterTuningJob.id == job_id)
+                    session.query(AdvancedTuningJob)
+                    .filter(AdvancedTuningJob.id == job_id)
                     .first()
                 )
 

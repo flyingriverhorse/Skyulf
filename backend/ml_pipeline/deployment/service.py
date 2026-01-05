@@ -7,7 +7,7 @@ import sklearn
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.database.models import Deployment, HyperparameterTuningJob, TrainingJob
+from backend.database.models import Deployment, AdvancedTuningJob, BasicTrainingJob
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 from backend.ml_pipeline.execution.jobs import JobManager

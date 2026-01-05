@@ -21,9 +21,10 @@ from backend.data_ingestion.service import DataIngestionService
 from backend.database.engine import get_async_session
 from backend.database.models import (
     FeatureEngineeringPipeline,
-    HyperparameterTuningJob,
-    TrainingJob,
+    AdvancedTuningJob,
+    BasicTrainingJob,
 )
+from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.tasks import run_pipeline_task
 from backend.utils.file_utils import extract_file_path_from_source
 from backend.ml_pipeline.services.evaluation_service import EvaluationService
@@ -265,7 +266,7 @@ class PipelineConfigModel(BaseModel):
     nodes: List[NodeConfigModel]
     metadata: Dict[str, Any] = {}
     target_node_id: Optional[str] = None
-    job_type: Optional[str] = "training"  # "training", "tuning", or "preview"
+    job_type: Optional[str] = "basic_training"  # "basic_training", "advanced_tuning", or "preview"
 
 
 class RunPipelineResponse(BaseModel):
@@ -298,9 +299,9 @@ async def run_pipeline(  # noqa: C901
     # Try to find model type from target node params
     for node in config.nodes:
         if node.node_id == target_node_id:
-            if node.step_type == "trainer" or node.step_type == "model_training":
+            if node.step_type == "trainer" or node.step_type == "basic_training":
                 model_type = node.params.get("model_type", "unknown")
-            elif node.step_type == "model_tuning":
+            elif node.step_type == "advanced_tuning":
                 # For tuning nodes, model_type might be in params directly or inside tuning_config?
                 # Usually it's 'algorithm' or 'model_type' in params
                 model_type = node.params.get("algorithm") or node.params.get(
@@ -325,7 +326,7 @@ async def run_pipeline(  # noqa: C901
         session=db,
         pipeline_id=pipeline_id,
         node_id=target_node_id or "unknown",
-        job_type=cast(Literal["training", "tuning", "preview"], config.job_type),
+        job_type=cast(Literal["basic_training", "advanced_tuning", "preview"], config.job_type),
         dataset_id=dataset_id,
         model_type=model_type,
         graph=config.model_dump(),
@@ -512,8 +513,8 @@ async def preview_pipeline(  # noqa: C901
                         Literal[
                             "data_loader",
                             "feature_engineering",
-                            "model_training",
-                            "model_tuning",
+                            "basic_training",
+                            "advanced_tuning",
                         ],
                         node.step_type,
                     ),
@@ -560,7 +561,7 @@ async def preview_pipeline(  # noqa: C901
 
             # If the last node is a modeling node, we can't preview the model object as data.
             # Instead, we preview the input data that went into the model.
-            if target_node.step_type in ["model_training", "model_tuning"]:
+            if target_node.step_type in [StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING]:
                 if target_node.inputs:
                     # Use the input node's output
                     target_node_id = target_node.inputs[0]
@@ -820,14 +821,14 @@ async def get_system_stats(session: AsyncSession = Depends(get_async_session)):
     from backend.database.models import (
         DataSource,
         Deployment,
-        HyperparameterTuningJob,
-        TrainingJob,
+        AdvancedTuningJob,
+        BasicTrainingJob,
     )
 
     # Execute queries in parallel or sequence
     # 1. Total Jobs (Training + Tuning)
-    training_count = await session.scalar(select(func.count(TrainingJob.id)))
-    tuning_count = await session.scalar(select(func.count(HyperparameterTuningJob.id)))
+    training_count = await session.scalar(select(func.count(BasicTrainingJob.id)))
+    tuning_count = await session.scalar(select(func.count(AdvancedTuningJob.id)))
 
     # 2. Active Deployments
     deployment_count = await session.scalar(

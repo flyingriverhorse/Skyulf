@@ -6,6 +6,7 @@ import pytest
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.execution.engine import PipelineEngine
 from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
+from backend.ml_pipeline.constants import StepType
 from backend.data.catalog import FileSystemCatalog
 
 
@@ -34,12 +35,12 @@ def test_pipeline_execution_flow(pipeline_data_csv, tmp_path):
         nodes=[
             NodeConfig(
                 node_id="node_data",
-                step_type="data_loader",
+                step_type=StepType.DATA_LOADER,
                 params={"source": "csv", "path": pipeline_data_csv},
             ),
             NodeConfig(
                 node_id="node_features",
-                step_type="feature_engineering",
+                step_type=StepType.FEATURE_ENGINEERING,
                 inputs=["node_data"],
                 params={
                     "steps": [
@@ -53,7 +54,7 @@ def test_pipeline_execution_flow(pipeline_data_csv, tmp_path):
             ),
             NodeConfig(
                 node_id="node_training",
-                step_type="model_training",
+                step_type=StepType.BASIC_TRAINING,
                 inputs=["node_features"],
                 params={
                     "target_column": "target",
@@ -97,12 +98,12 @@ def test_pipeline_tuning_flow(pipeline_data_csv, tmp_path):
         nodes=[
             NodeConfig(
                 node_id="node_data",
-                step_type="data_loader",
+                step_type=StepType.DATA_LOADER,
                 params={"source": "csv", "path": pipeline_data_csv},
             ),
             NodeConfig(
                 node_id="node_features",
-                step_type="feature_engineering",
+                step_type=StepType.FEATURE_ENGINEERING,
                 inputs=["node_data"],
                 params={
                     "steps": [
@@ -116,7 +117,7 @@ def test_pipeline_tuning_flow(pipeline_data_csv, tmp_path):
             ),
             NodeConfig(
                 node_id="node_tuning",
-                step_type="model_tuning",
+                step_type=StepType.ADVANCED_TUNING,
                 inputs=["node_features"],
                 params={
                     "target_column": "target",

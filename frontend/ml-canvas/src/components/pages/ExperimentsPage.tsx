@@ -27,7 +27,7 @@ interface EvaluationData {
 export const ExperimentsPage: React.FC = () => {
   const { jobs, fetchJobs, hasMore, loadMoreJobs, isLoading } = useJobStore();
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
-  const [filterType, setFilterType] = useState<'all' | 'training' | 'tuning'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'basic_training' | 'advanced_tuning'>('all');
   const [datasets, setDatasets] = useState<{id: string, name: string}[]>([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>('all');
   
@@ -41,6 +41,7 @@ export const ExperimentsPage: React.FC = () => {
   // Table expansion states
   const [isMetricsExpanded, setIsMetricsExpanded] = useState(true);
   const [isParamsExpanded, setIsParamsExpanded] = useState(true);
+  const [isTuningExpanded, setIsTuningExpanded] = useState(true);
 
   // View state
   const [activeView, setActiveView] = useState<'charts' | 'table' | 'evaluation'>('charts');
@@ -286,11 +287,11 @@ export const ExperimentsPage: React.FC = () => {
            <select 
              className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
              value={filterType}
-             onChange={(e) => { setFilterType(e.target.value as 'all' | 'training' | 'tuning'); }}
+             onChange={(e) => { setFilterType(e.target.value as 'all' | 'basic_training' | 'advanced_tuning'); }}
            >
              <option value="all">All Experiments</option>
-             <option value="tuning">Model Optimization</option>
-             <option value="training">Standard Training</option>
+             <option value="advanced_tuning">Model Optimization</option>
+             <option value="basic_training">Standard Training</option>
            </select>
         </div>
       </div>
@@ -315,7 +316,7 @@ export const ExperimentsPage: React.FC = () => {
                     #{job.version} - {job.job_id}
                   </span>
                   <div className="flex items-center gap-2">
-                    {job.status === 'completed' && (job.job_type === 'training' || job.job_type === 'tuning') && (
+                    {job.status === 'completed' && (job.job_type === 'basic_training' || job.job_type === 'advanced_tuning') && (
                         <button 
                             onClick={(e) => { void handleDeploy(e, job.job_id); }}
                             className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900 rounded text-blue-600 dark:text-blue-400"
@@ -335,7 +336,7 @@ export const ExperimentsPage: React.FC = () => {
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                   {job.model_type} • {job.dataset_name || 'Unknown Dataset'}
-                  {job.job_type === 'tuning' && (job.search_strategy || (job.config as { tuning?: { strategy?: string } }).tuning?.strategy) && (
+                  {job.job_type === 'advanced_tuning' && (job.search_strategy || (job.config as { tuning?: { strategy?: string } }).tuning?.strategy) && (
                       <span className="ml-1 text-gray-400">
                           ({job.search_strategy || (job.config as { tuning?: { strategy?: string } }).tuning?.strategy})
                       </span>
@@ -566,11 +567,63 @@ export const ExperimentsPage: React.FC = () => {
                           <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{paramKey}</td>
                           {selectedJobs.map(job => (
                             <td key={job.job_id} className="px-4 py-1.5 font-mono text-gray-600 dark:text-gray-300">
-                              {String(job.hyperparameters?.[paramKey] ?? '-')}
+                              {typeof job.hyperparameters?.[paramKey] === 'object' 
+                                ? JSON.stringify(job.hyperparameters?.[paramKey]) 
+                                : String(job.hyperparameters?.[paramKey] ?? '-')}
                             </td>
                           ))}
                         </tr>
                       ))}
+
+                      {/* Tuning Configuration */}
+                      {selectedJobs.some(j => j.job_type === 'advanced_tuning') && (
+                        <>
+                          <tr 
+                            className="bg-gray-50/50 dark:bg-gray-900/20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
+                            onClick={() => { setIsTuningExpanded(!isTuningExpanded); }}
+                          >
+                            <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2" colSpan={selectedJobs.length + 1}>
+                              {isTuningExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                              Tuning Configuration
+                            </td>
+                          </tr>
+                          {isTuningExpanded && (
+                            <>
+                              {['Strategy', 'Metric', 'Trials', 'CV Enabled', 'Folds', 'Shuffle'].map(field => (
+                                <tr key={field} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                  <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{field}</td>
+                                  {selectedJobs.map(job => {
+                                    if (job.job_type !== 'advanced_tuning') {
+                                      return <td key={job.job_id} className="px-4 py-1.5 text-gray-400">-</td>;
+                                    }
+                                    
+                                    const node = (job.graph?.nodes as any[])?.find((n: any) => n.node_id === job.node_id);
+                                    const config = node?.params?.tuning_config;
+                                    
+                                    if (!config) {
+                                      return <td key={job.job_id} className="px-4 py-1.5 text-gray-400">-</td>;
+                                    }
+
+                                    let value: string | number = '-';
+                                    if (field === 'Strategy') value = config.strategy;
+                                    if (field === 'Metric') value = config.metric;
+                                    if (field === 'Trials') value = config.n_trials;
+                                    if (field === 'CV Enabled') value = config.cv_enabled ? 'Yes' : 'No';
+                                    if (field === 'Folds') value = config.cv_enabled ? config.cv_folds : '-';
+                                    if (field === 'Shuffle') value = config.cv_enabled ? (config.cv_shuffle ? 'Yes' : 'No') : '-';
+
+                                    return (
+                                      <td key={job.job_id} className="px-4 py-1.5 font-mono text-gray-600 dark:text-gray-300 capitalize">
+                                        {value}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </>
+                          )}
+                        </>
+                      )}
                     </tbody>
                   </table>
                 </div>

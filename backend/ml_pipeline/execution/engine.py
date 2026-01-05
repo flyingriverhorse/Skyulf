@@ -27,6 +27,7 @@ from skyulf.modeling.tuning.tuner import TunerApplier, TunerCalculator
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
 from ..artifacts.store import ArtifactStore
+from ..constants import StepType
 from .schemas import (
     NodeConfig,
     NodeExecutionResult,
@@ -112,9 +113,9 @@ class PipelineEngine:
             output_artifact_id = None
             metrics: Dict[str, Any] = {}
 
-            if node.step_type == "data_loader":
+            if node.step_type == StepType.DATA_LOADER:
                 output_artifact_id = self._run_data_loader(node)
-            elif node.step_type == "feature_engineering":
+            elif node.step_type == StepType.FEATURE_ENGINEERING:
                 # Check if it's actually a misconfigured data loader
                 if not node.inputs and "dataset_id" in node.params:
                     logger.warning(
@@ -124,12 +125,12 @@ class PipelineEngine:
                     output_artifact_id = self._run_data_loader(node)
                 else:
                     output_artifact_id, metrics = self._run_feature_engineering(node)
-            elif node.step_type == "model_training":
-                output_artifact_id, metrics = self._run_model_training(
+            elif node.step_type == StepType.BASIC_TRAINING:
+                output_artifact_id, metrics = self._run_basic_training(
                     node, job_id=job_id
                 )
-            elif node.step_type == "model_tuning":
-                output_artifact_id, metrics = self._run_model_tuning(
+            elif node.step_type == StepType.ADVANCED_TUNING:
+                output_artifact_id, metrics = self._run_advanced_tuning(
                     node, job_id=job_id
                 )
             elif node.step_type == "data_preview":
@@ -441,7 +442,7 @@ class PipelineEngine:
 
         return node.node_id, metrics
 
-    def _run_model_training(  # noqa: C901
+    def _run_basic_training(  # noqa: C901
         self, node: NodeConfig, job_id: str = "unknown"
     ) -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset (from Feature Engineering) or DataFrame
@@ -606,7 +607,7 @@ class PipelineEngine:
 
         return node.node_id, metrics
 
-    def _run_model_tuning(  # noqa: C901
+    def _run_advanced_tuning(  # noqa: C901
         self, node: NodeConfig, job_id: str = "unknown"
     ) -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset

@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database.models import (
     DataSource,
     Deployment,
-    HyperparameterTuningJob,
-    TrainingJob,
+    AdvancedTuningJob,
+    BasicTrainingJob,
 )
 from backend.ml_pipeline.services.job_service import JobService
 
@@ -24,18 +24,18 @@ class ModelRegistryService:
         """Calculates the next version number for a given dataset and model type."""
         # Unified versioning: Query both tables and take the max
 
-        # 1. Get max version from TrainingJob
-        stmt_train = select(func.max(TrainingJob.version)).where(
-            TrainingJob.dataset_source_id == dataset_id,
-            TrainingJob.model_type == model_type,
+        # 1. Get max version from BasicTrainingJob
+        stmt_train = select(func.max(BasicTrainingJob.version)).where(
+            BasicTrainingJob.dataset_source_id == dataset_id,
+            BasicTrainingJob.model_type == model_type,
         )
         result_train = await session.execute(stmt_train)
         max_train = result_train.scalar() or 0
 
-        # 2. Get max run_number from HyperparameterTuningJob
-        stmt_tune = select(func.max(HyperparameterTuningJob.run_number)).where(
-            HyperparameterTuningJob.dataset_source_id == dataset_id,
-            HyperparameterTuningJob.model_type == model_type,
+        # 2. Get max run_number from AdvancedTuningJob
+        stmt_tune = select(func.max(AdvancedTuningJob.run_number)).where(
+            AdvancedTuningJob.dataset_source_id == dataset_id,
+            AdvancedTuningJob.model_type == model_type,
         )
         result_tune = await session.execute(stmt_tune)
         max_tune = result_tune.scalar() or 0
@@ -49,11 +49,13 @@ class ModelRegistryService:
 
         # Count total versions (completed jobs)
         train_count = await session.scalar(
-            select(func.count(TrainingJob.id)).where(TrainingJob.status == "completed")
+            select(func.count(BasicTrainingJob.id)).where(
+                BasicTrainingJob.status == "completed"
+            )
         )
         tune_count = await session.scalar(
-            select(func.count(HyperparameterTuningJob.id)).where(
-                HyperparameterTuningJob.status == "completed"
+            select(func.count(AdvancedTuningJob.id)).where(
+                AdvancedTuningJob.status == "completed"
             )
         )
 
@@ -74,7 +76,7 @@ class ModelRegistryService:
     ) -> List[ModelRegistryEntry]:
         """
         Lists all model types and their versions.
-        Aggregates TrainingJob and HyperparameterTuningJob by (model_type, dataset_source_id).
+        Aggregates BasicTrainingJob and AdvancedTuningJob by (model_type, dataset_source_id).
         """
         # Fetch all completed jobs
 
@@ -100,17 +102,17 @@ class ModelRegistryService:
 
         # Fetch Training Jobs
         train_jobs_result = await session.execute(
-            select(TrainingJob)
-            .where(TrainingJob.status == "completed")
-            .order_by(TrainingJob.created_at.desc())
+            select(BasicTrainingJob)
+            .where(BasicTrainingJob.status == "completed")
+            .order_by(BasicTrainingJob.created_at.desc())
         )
         train_jobs = train_jobs_result.scalars().all()
 
         # Fetch Tuning Jobs
         tune_jobs_result = await session.execute(
-            select(HyperparameterTuningJob)
-            .where(HyperparameterTuningJob.status == "completed")
-            .order_by(HyperparameterTuningJob.created_at.desc())
+            select(AdvancedTuningJob)
+            .where(AdvancedTuningJob.status == "completed")
+            .order_by(AdvancedTuningJob.created_at.desc())
         )
         tune_jobs = tune_jobs_result.scalars().all()
 

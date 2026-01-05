@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from backend.database.models import HyperparameterTuningJob, TrainingJob
+from backend.database.models import AdvancedTuningJob, BasicTrainingJob
 
 
 class JobService:
@@ -21,19 +21,19 @@ class JobService:
     @staticmethod
     def get_job_by_id_sync(
         session: Session, job_id: str
-    ) -> Optional[Union[TrainingJob, HyperparameterTuningJob]]:
+    ) -> Optional[Union[BasicTrainingJob, AdvancedTuningJob]]:
         """
-        Retrieves a job by ID (Synchronous), checking both TrainingJob and HyperparameterTuningJob tables.
+        Retrieves a job by ID (Synchronous), checking both BasicTrainingJob and AdvancedTuningJob tables.
         """
-        # 1. Try TrainingJob
-        job = session.query(TrainingJob).filter(TrainingJob.id == job_id).first()
+        # 1. Try BasicTrainingJob
+        job = session.query(BasicTrainingJob).filter(BasicTrainingJob.id == job_id).first()
         if job:
             return job
 
-        # 2. Try HyperparameterTuningJob
+        # 2. Try AdvancedTuningJob
         job = (
-            session.query(HyperparameterTuningJob)
-            .filter(HyperparameterTuningJob.id == job_id)
+            session.query(AdvancedTuningJob)
+            .filter(AdvancedTuningJob.id == job_id)
             .first()
         )
         return job
@@ -41,27 +41,27 @@ class JobService:
     @staticmethod
     async def get_job_by_id(
         session: AsyncSession, job_id: str
-    ) -> Optional[Union[TrainingJob, HyperparameterTuningJob]]:
+    ) -> Optional[Union[BasicTrainingJob, AdvancedTuningJob]]:
         """
-        Retrieves a job by ID, checking both TrainingJob and HyperparameterTuningJob tables.
+        Retrieves a job by ID, checking both BasicTrainingJob and AdvancedTuningJob tables.
 
         Args:
             session: The async database session.
             job_id: The unique identifier of the job.
 
         Returns:
-            The job entity (TrainingJob or HyperparameterTuningJob) if found, else None.
+            The job entity (BasicTrainingJob or AdvancedTuningJob) if found, else None.
         """
-        # 1. Try TrainingJob
-        stmt_train = select(TrainingJob).where(TrainingJob.id == job_id)
+        # 1. Try BasicTrainingJob
+        stmt_train = select(BasicTrainingJob).where(BasicTrainingJob.id == job_id)
         result_train = await session.execute(stmt_train)
         job = result_train.scalar_one_or_none()
         if job:
             return job
 
-        # 2. Try HyperparameterTuningJob
-        stmt_tune = select(HyperparameterTuningJob).where(
-            HyperparameterTuningJob.id == job_id
+        # 2. Try AdvancedTuningJob
+        stmt_tune = select(AdvancedTuningJob).where(
+            AdvancedTuningJob.id == job_id
         )
         result_tune = await session.execute(stmt_tune)
         job = result_tune.scalar_one_or_none()

@@ -306,7 +306,7 @@ const BestParamsModal: React.FC<{
     );
 };
 
-export const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfig) => void; nodeId?: string }> = ({
+export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
   nodeId,
@@ -443,10 +443,10 @@ export const TuningSettings: React.FC<{ config: TuningConfig; onChange: (c: Tuni
         await jobsApi.runPipeline({
             ...pipelineConfig,
             target_node_id: nodeId,
-            job_type: 'tuning'
+            job_type: 'advanced_tuning'
         });
         alert("Tuning job submitted successfully!");
-        setTab('tuning');
+        setTab('advanced_tuning');
         toggleDrawer(true);
     } catch (error) {
         console.error("Failed to submit tuning job:", error);
