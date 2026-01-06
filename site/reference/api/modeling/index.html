@@ -2682,14 +2682,14 @@
   
   
     <li class="md-nav__item">
-      <a href="tuning_tuner.html" class="md-nav__link">
+      <a href="tuning_engine.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    tuning/tuner
+    tuning/engine
   
 
     
@@ -4953,7 +4953,7 @@ Returns DataFrame where columns are classes.</p>
             <span class="n">model_to_evaluate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
                 <span class="c1"># Check if first element looks like a model (has fit/predict)</span>
-                <span class="c1"># or if it&#39;s just a convention from TunerCalculator</span>
+                <span class="c1"># or if it&#39;s just a convention from TuningCalculator</span>
                 <span class="n">model_to_evaluate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
             <span class="k">if</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
@@ -5301,7 +5301,7 @@ Returns DataFrame where columns are classes.</p>
         <span class="n">model_to_evaluate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
             <span class="c1"># Check if first element looks like a model (has fit/predict)</span>
-            <span class="c1"># or if it&#39;s just a convention from TunerCalculator</span>
+            <span class="c1"># or if it&#39;s just a convention from TuningCalculator</span>
             <span class="n">model_to_evaluate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
         <span class="k">if</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
