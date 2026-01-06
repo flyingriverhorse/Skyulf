@@ -1,16 +1,18 @@
 import React, { useMemo } from 'react';
 import { OverviewCards } from '../OverviewCards';
 import { AlertsSection } from '../AlertsSection';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
-import { FileText, Database, AlertTriangle } from 'lucide-react';
+import { Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
+import { FileText, Database, AlertTriangle, EyeOff, Eye } from 'lucide-react';
 
 interface DashboardTabProps {
     profile: any;
+    onToggleExclude?: (column: string, exclude: boolean) => void;
+    excludedCols?: string[];
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
-export const DashboardTab: React.FC<DashboardTabProps> = ({ profile }) => {
+export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExclude, excludedCols = [] }) => {
     
     const dataTypeData = useMemo(() => {
         if (!profile?.columns) return [];
@@ -26,7 +28,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ profile }) => {
         return Object.values(profile.columns)
             .filter((col: any) => col.missing_percentage > 0)
             .sort((a: any, b: any) => b.missing_percentage - a.missing_percentage)
-            .slice(0, 10)
+            .slice(0, 20)
             .map((col: any) => ({
                 name: col.name,
                 value: col.missing_percentage
@@ -77,33 +79,42 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ profile }) => {
                         Top Missing Values
                     </h3>
                     {missingData.length > 0 ? (
-                        <div className="h-64">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart
-                                    data={missingData}
-                                    layout="vertical"
-                                    margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-                                >
-                                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e5e7eb" />
-                                    <XAxis type="number" domain={[0, 100]} unit="%" hide />
-                                    <YAxis 
-                                        dataKey="name" 
-                                        type="category" 
-                                        width={100} 
-                                        tick={{ fontSize: 12, fill: '#6b7280' }}
-                                    />
-                                    <Tooltip 
-                                        formatter={(value: number) => [value.toFixed(1) + '%', 'Missing']}
-                                        contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                                        cursor={{ fill: 'transparent' }}
-                                    />
-                                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
-                                        {missingData.map((_, index) => (
-                                            <Cell key={`cell-${index}`} fill={`hsl(10, 80%, ${60 - index * 5}%)`} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
+                        <div className="h-64 overflow-y-auto pr-2 space-y-3">
+                            {missingData.map((item: any, index: number) => {
+                                const isExcluded = excludedCols.includes(item.name);
+                                return (
+                                    <div key={index} className="flex items-center gap-3 text-sm group">
+                                        <div className="w-32 truncate text-gray-600 dark:text-gray-300 font-medium" title={item.name}>
+                                            {item.name}
+                                        </div>
+                                        <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                                            <div 
+                                                className="h-full rounded-full transition-all duration-500"
+                                                style={{ 
+                                                    width: `${item.value}%`,
+                                                    backgroundColor: `hsl(10, 80%, ${60 - (index * 2)}%)`
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="w-12 text-right text-gray-500 text-xs">
+                                            {item.value.toFixed(1)}%
+                                        </div>
+                                        {onToggleExclude && (
+                                            <button
+                                                onClick={() => onToggleExclude(item.name, !isExcluded)}
+                                                className={`p-1.5 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 ${
+                                                    isExcluded 
+                                                    ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 opacity-100' 
+                                                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-300'
+                                                }`}
+                                                title={isExcluded ? "Include Column" : "Exclude Column"}
+                                            >
+                                                {isExcluded ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className="h-64 flex flex-col items-center justify-center text-gray-400">

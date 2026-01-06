@@ -6,6 +6,7 @@ class NumericStats(BaseModel):
     mean: Optional[float] = None
     median: Optional[float] = None
     std: Optional[float] = None
+    variance: Optional[float] = None
     min: Optional[float] = None
     max: Optional[float] = None
     q25: Optional[float] = None

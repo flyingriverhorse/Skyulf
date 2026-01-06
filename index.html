@@ -55,6 +55,15 @@
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none; /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+    </style>
     <script>
         tailwind.config = {
             theme: {
@@ -345,119 +354,126 @@
                     <div id="eda-carousel" class="rounded-2xl border border-slate-800 shadow-2xl w-full bg-slate-900 aspect-video relative group overflow-hidden cursor-pointer">
                         <!-- Slides Container -->
                         <div id="eda-slides" class="flex transition-transform duration-500 ease-out h-full">
-                            <!-- Slide 1: Dashboard -->
+                            <!-- Dashboard -->
                             <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
                                 <img src="./static/img/eda/dashboardeda.jpg" class="absolute inset-0 w-full h-full object-cover" alt="EDA Dashboard">
                                 <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
                                     <span class="text-white font-medium drop-shadow-md">EDA Dashboard</span>
                                 </div>
                             </div>
-                            <!-- Slide 2: Smart Insights -->
+                            <!-- Smart Insights -->
                             <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
                                 <img src="./static/img/eda/smart insights.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Smart Insights">
                                 <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
                                     <span class="text-white font-medium drop-shadow-md">Smart Insights</span>
                                 </div>
                             </div>
-                            <!-- Slide 3: Variable Analysis -->
+                            <!-- Numeric Distribution -->
                             <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/variables.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Variable Analysis">
+                                <img src="./static/img/eda/numeric_distrubtion.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Numeric Distribution">
                                 <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Variable Analysis</span>
+                                    <span class="text-white font-medium drop-shadow-md">Numeric Distribution</span>
                                 </div>
                             </div>
-                            <!-- Slide 4: Distribution -->
+                            <!-- Text Distribution -->
                             <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/distrubtion.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Distribution Analysis">
+                                <img src="./static/img/eda/text_distrubtion.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Text Distribution">
                                 <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Distribution Analysis</span>
+                                    <span class="text-white font-medium drop-shadow-md">Text Distribution</span>
                                 </div>
                             </div>
-                            <!-- Slide 5: Correlations -->
+                            <!-- Correlation Matrix -->
                             <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
                                 <img src="./static/img/eda/correlations.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Correlation Matrix">
                                 <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
                                     <span class="text-white font-medium drop-shadow-md">Correlation Matrix</span>
                                 </div>
                             </div>
-                            <!-- Slide 6: 2D Bivariate -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/2dbivariate.jpg" class="absolute inset-0 w-full h-full object-cover" alt="2D Bivariate Analysis">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">2D Bivariate Analysis</span>
-                                </div>
-                            </div>
-                            <!-- Slide 7: 3D Bivariate -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/3dbivariate.jpg" class="absolute inset-0 w-full h-full object-cover" alt="3D Bivariate Analysis">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">3D Bivariate Analysis</span>
-                                </div>
-                            </div>
-                            <!-- Slide 8: PCA Analysis -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/pca.jpg" class="absolute inset-0 w-full h-full object-cover" alt="PCA Analysis">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">PCA Analysis</span>
-                                </div>
-                            </div>
-                            <!-- Slide 9: 3D PCA -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/3dpca.jpg" class="absolute inset-0 w-full h-full object-cover" alt="3D PCA Analysis">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">3D PCA Analysis</span>
-                                </div>
-                            </div>
-                            <!-- Slide 10: Decision Tree -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/decisiontree.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Decision Tree Rules">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Decision Tree Rules</span>
-                                </div>
-                            </div>
-                            <!-- Slide 11: Feature Importance -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/featureimportance.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Feature Importance">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Feature Importance</span>
-                                </div>
-                            </div>
-                            <!-- Slide 12: Causal Discovery -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/causal.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Causal Discovery">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Causal Discovery</span>
-                                </div>
-                            </div>
-                            <!-- Slide 13: Outliers -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/outliers.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Outlier Detection">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Outlier Detection</span>
-                                </div>
-                            </div>
-                            <!-- Slide 14: Target Analysis -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/target analysis.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Target Analysis">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Target Analysis</span>
-                                </div>
-                            </div>
-                            <!-- Slide 15: Decomposition Tree -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/decompositiontree.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Decomposition Tree">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Decomposition Tree</span>
-                                </div>
-                            </div>
-                            <!-- Slide 16: Detailed Interactions -->
+                            <!-- Detailed Interactions -->
                             <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
                                 <img src="./static/img/eda/detailedinteractions.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Detailed Interactions">
                                 <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
                                     <span class="text-white font-medium drop-shadow-md">Detailed Interactions</span>
                                 </div>
                             </div>
-                            <!-- Slide 17: Sample Data -->
+                            <!-- 2D Bivariate Analysis -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/2dbivariate.jpg" class="absolute inset-0 w-full h-full object-cover" alt="2D Bivariate Analysis">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">2D Bivariate Analysis</span>
+                                </div>
+                            </div>
+                            <!-- 3D Bivariate Analysis -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/3dbivariate.jpg" class="absolute inset-0 w-full h-full object-cover" alt="3D Bivariate Analysis">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">3D Bivariate Analysis</span>
+                                </div>
+                            </div>
+                            <!-- 2D PCA Analysis -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/2dpca.jpg" class="absolute inset-0 w-full h-full object-cover" alt="2D PCA Analysis">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">2D PCA Analysis</span>
+                                </div>
+                            </div>
+                            <!-- 3D PCA Analysis -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/3dpca.jpg" class="absolute inset-0 w-full h-full object-cover" alt="3D PCA Analysis">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">3D PCA Analysis</span>
+                                </div>
+                            </div>
+                            <!-- Feature Importance -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/featureimportance.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Feature Importance">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Feature Importance</span>
+                                </div>
+                            </div>
+                            <!-- Decision Tree Rules -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/decisiontree.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Decision Tree Rules">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Decision Tree Rules</span>
+                                </div>
+                            </div>
+                            <!-- Decomposition Tree -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/decompositiontree.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Decomposition Tree">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Decomposition Tree</span>
+                                </div>
+                            </div>
+                            <!-- Causal Discovery -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/causal.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Causal Discovery">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Causal Discovery</span>
+                                </div>
+                            </div>
+                            <!-- Outlier Detection -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/outliers.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Outlier Detection">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Outlier Detection</span>
+                                </div>
+                            </div>
+                            <!-- Target Analysis -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/target analysis.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Target Analysis">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Target Analysis</span>
+                                </div>
+                            </div>
+                            <!-- Cluster Segmentation -->
+                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
+                                <img src="./static/img/eda/cluster_Segmentation.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Cluster Segmentation">
+                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
+                                    <span class="text-white font-medium drop-shadow-md">Cluster Segmentation</span>
+                                </div>
+                            </div>
+                            <!-- Sample Data -->
                             <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
                                 <img src="./static/img/eda/sampledata.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Sample Data">
                                 <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
@@ -480,24 +496,28 @@
                         </button>
 
                         <!-- Indicators -->
-                        <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
-                            <button class="w-2 h-2 rounded-full bg-white hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                        <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20 overflow-x-auto max-w-full px-4 no-scrollbar">
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
+                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
                         </div>
                     </div>
                 </div>
