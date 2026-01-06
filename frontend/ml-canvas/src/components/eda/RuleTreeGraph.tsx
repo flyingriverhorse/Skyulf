@@ -227,8 +227,8 @@ export const RuleTreeGraph: React.FC<RuleTreeGraphProps> = ({ tree }) => {
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 italic flex items-center gap-1">
                 <Info className="w-3 h-3" />
-                This tree is a <strong>Surrogate Model</strong> trained on your data to discover rules. 
-                Green paths indicate the condition is met (True), Red paths indicate it is not (False).
+                This tree is a <strong>surrogate (explanatory) model</strong> trained on your data to surface readable rules.
+                Do not treat it as a production-grade predictor. Green paths mean the condition is met (True); red paths mean it is not (False).
             </p>
         </div>
     );

@@ -115,6 +115,11 @@ class Recommendation(BaseModel):
     reason: str
     suggestion: str
 
+class PCAComponent(BaseModel):
+    component: str # "PC1", "PC2", "PC3"
+    explained_variance_ratio: float
+    top_features: Dict[str, float] # feature_name -> weight/loading
+
 class PCAPoint(BaseModel):
     x: float
     y: float
@@ -182,6 +187,25 @@ class OutlierAnalysis(BaseModel):
     top_outliers: List[OutlierPoint]
     plot_data: Optional[List[Dict[str, Any]]] = None # For visualization (e.g. PCA projection of outliers)
 
+class ClusteringPoint(BaseModel):
+    x: float
+    y: float
+    cluster: int
+    label: Optional[str] = None
+
+class ClusterStats(BaseModel):
+    cluster_id: int
+    size: int
+    percentage: float
+    center: Dict[str, float]
+
+class ClusteringAnalysis(BaseModel):
+    method: str = "KMeans"
+    n_clusters: int
+    inertia: float
+    clusters: List[ClusterStats]
+    points: List[ClusteringPoint]
+
 class Filter(BaseModel):
     column: str
     operator: str # "==", "!=", ">", "<", ">=", "<=", "in"
@@ -209,7 +233,9 @@ class DatasetProfile(BaseModel):
     
     # Multivariate
     pca_data: Optional[List[PCAPoint]] = None
+    pca_components: Optional[List[PCAComponent]] = None
     outliers: Optional[OutlierAnalysis] = None
+    clustering: Optional[ClusteringAnalysis] = None
     causal_graph: Optional[CausalGraph] = None
     rule_tree: Optional[RuleTree] = None
     vif: Optional[Dict[str, float]] = None # Variance Inflation Factor for numeric columns

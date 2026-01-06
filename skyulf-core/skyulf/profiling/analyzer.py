@@ -6,11 +6,11 @@ import re
 
 from .schemas import (
     DatasetProfile, ColumnProfile, NumericStats, CategoricalStats, 
-    DateStats, TextStats, Alert, HistogramBin, Recommendation, PCAPoint,
+    DateStats, TextStats, Alert, HistogramBin, Recommendation, PCAPoint, PCAComponent,
     GeospatialStats, GeoPoint, TimeSeriesAnalysis, TimeSeriesPoint, SeasonalityStats,
     TargetInteraction, CategoryBoxPlot, BoxPlotStats, OutlierAnalysis, OutlierPoint,
     NormalityTestResult, Filter, CausalGraph, CausalNode, CausalEdge,
-    RuleTree, RuleNode
+    RuleTree, RuleNode, ClusteringAnalysis, ClusterStats, ClusteringPoint
 )
 from .distributions import calculate_histogram
 from .correlations import calculate_correlations
@@ -21,6 +21,7 @@ try:
     from sklearn.preprocessing import StandardScaler
     from sklearn.impute import SimpleImputer
     from sklearn.ensemble import IsolationForest
+    from sklearn.cluster import KMeans
     from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, _tree
     SKLEARN_AVAILABLE = True
 except ImportError:
@@ -325,13 +326,22 @@ class EDAAnalyzer:
 
         # 6. Multivariate Analysis (PCA)
         pca_data = None
+        pca_components = None
         if SKLEARN_AVAILABLE and len(feature_cols) >= 2:
-            pca_data = self._calculate_pca(feature_cols, target_col)
+            pca_res = self._calculate_pca(feature_cols, target_col)
+            if pca_res:
+                pca_data, pca_components = pca_res
 
         # 6b. Outlier Detection
         outliers = None
         if SKLEARN_AVAILABLE and len(numeric_cols) >= 1:
             outliers = self._detect_outliers(numeric_cols)
+
+        # 6c. Clustering (Post-Hoc Analysis)
+        clustering = None
+        # Use feature_cols (excluding target) for proper unsupervised segmentation
+        if SKLEARN_AVAILABLE and len(feature_cols) >= 2:
+            clustering = self._perform_clustering(feature_cols, target_col)
 
         # 7. Geospatial Analysis
         geospatial = self._analyze_geospatial(numeric_cols, target_col, lat_col, lon_col)
@@ -387,7 +397,9 @@ class EDAAnalyzer:
             target_correlations=target_correlations,
             target_interactions=target_interactions,
             pca_data=pca_data,
+            pca_components=pca_components,
             outliers=outliers,
+            clustering=clustering,
             causal_graph=causal_graph,
             rule_tree=rule_tree,
             vif=vif_data,
@@ -485,6 +497,90 @@ class EDAAnalyzer:
             
         except Exception as e:
             print(f"Error in outlier detection: {e}")
+            return None
+
+    def _perform_clustering(self, numeric_cols: List[str], target_col: Optional[str] = None) -> Optional[ClusteringAnalysis]:
+        """
+        Performs KMeans clustering for Post-Hoc Analysis.
+        Scales data, runs KMeans (k=3 for simplicity in EDA), and projects to 2D for visualization.
+        """
+        try:
+            # 1. Prepare Data using Helper (ensures same sample as PCA if seed is consistent)
+            X_scaled, sample_df, scaler = self._prepare_matrix_sample(numeric_cols, target_col=target_col, limit=5000)
+            
+            if X_scaled is None or sample_df is None or scaler is None:
+                return None
+            
+            # 2. KMeans
+            # We fix k=3 for generic "Low, Medium, High" discovery logic in EDA
+            n_clusters = 3
+            kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+            labels = kmeans.fit_predict(X_scaled)
+            
+            # 3. Calculate Stats for Clusters
+            clusters_stats = []
+            unique_labels, counts = np.unique(labels, return_counts=True)
+            total_points = len(labels)
+            
+            # Centers (inverse transform to be readable)
+            centers_scaled = kmeans.cluster_centers_
+            centers_original = scaler.inverse_transform(centers_scaled)
+            
+            feature_names = numeric_cols
+            
+            for i, label in enumerate(unique_labels):
+                center_dict = {
+                    col: float(val) for col, val in zip(feature_names, centers_original[i])
+                }
+                
+                clusters_stats.append(ClusterStats(
+                    cluster_id=int(label),
+                    size=int(counts[i]),
+                    percentage=float(counts[i] / total_points * 100),
+                    center=center_dict
+                ))
+                
+            # 4. Visualization Data (PCA projection)
+            pca = PCA(n_components=2)
+            X_pca = pca.fit_transform(X_scaled)
+            
+            # Ensure numpy array
+            X_pca = np.asarray(X_pca)
+            
+            # Ensure X_pca is 2D and has at least 2 columns
+            if len(X_pca.shape) == 1:
+                X_pca = X_pca.reshape(-1, 1)
+                
+            if X_pca.shape[1] < 2:
+                # Pad with zeros if PCA yielded only 1 component (e.g. perfect correlation or 1 feature)
+                padding = np.zeros((X_pca.shape[0], 2 - X_pca.shape[1]))
+                X_pca = np.hstack([X_pca, padding])
+            
+            # Get original labels if target available
+            original_labels = None
+            if target_col and target_col in self.columns:
+                original_labels = sample_df[target_col].to_list()
+            
+            points = []
+            for i in range(len(X_pca)):
+                label_val = str(original_labels[i]) if original_labels else None
+                points.append(ClusteringPoint(
+                    x=float(X_pca[i, 0]),
+                    y=float(X_pca[i, 1]),
+                    cluster=int(labels[i]),
+                    label=label_val
+                ))
+                
+            return ClusteringAnalysis(
+                method="KMeans",
+                n_clusters=n_clusters,
+                inertia=float(kmeans.inertia_),
+                clusters=clusters_stats,
+                points=points
+            )
+
+        except Exception as e:
+            print(f"Error in clustering analysis: {e}")
             return None
 
     def _discover_causal_graph(self, numeric_cols: List[str]) -> Optional[CausalGraph]:
@@ -901,48 +997,56 @@ class EDAAnalyzer:
             print(f"Error in time series analysis: {e}")
             return None
 
-    def _calculate_pca(self, numeric_cols: List[str], target_col: Optional[str] = None) -> Optional[List[PCAPoint]]:
+    def _calculate_pca(self, numeric_cols: List[str], target_col: Optional[str] = None) -> Tuple[Optional[List[PCAPoint]], Optional[List[PCAComponent]]]:
         """
-        Calculates 2D PCA projection of the dataset.
+        Calculates 2D PCA projection and extracts component loadings.
         """
         try:
-            # Increase sample size for better representation (max 5000 rows)
-            # We use a sample for visualization performance, but 5000 is enough to see structure
-            sample_size = min(5000, self.row_count)
+            # 1. Prepare Data using Helper
+            X_scaled, sample_df, _ = self._prepare_matrix_sample(numeric_cols, target_col=target_col, limit=5000)
             
-            # Determine columns to fetch
-            cols_to_fetch = list(numeric_cols)
-            if target_col and target_col in self.columns and target_col not in cols_to_fetch:
-                cols_to_fetch.append(target_col)
-                
-            # Sample once
-            sample_df = self.df.select(cols_to_fetch).sample(n=sample_size, with_replacement=False, seed=42)
+            if X_scaled is None or sample_df is None:
+                return None, None
             
-            # Extract Numeric Data for PCA
-            # Use Polars fill_null for better performance than SimpleImputer
-            X_df = sample_df.select(numeric_cols).fill_null(strategy="mean")
-            X = X_df.to_numpy()
-            
-            # Standardize
-            import warnings
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", RuntimeWarning)
-                scaler = StandardScaler()
-                X_scaled = scaler.fit_transform(X)
-            
-            # PCA
+            # 2. PCA
             pca = PCA(n_components=3)
             X_pca = pca.fit_transform(X_scaled)
             
-            # Ensure numpy array (CRITICAL FIX)
+            # Extract Components Info
+            components_list = []
+            if hasattr(pca, 'components_'):
+                # Numeric cols were used in order
+                feature_names = numeric_cols 
+                for i, comp in enumerate(pca.components_):
+                    # Get top features (absolute weight) for this component
+                    weights = {feature_names[j]: float(comp[j]) for j in range(len(feature_names))}
+                    # Sort by absolute weight and take top 5
+                    top_features = dict(sorted(weights.items(), key=lambda item: abs(item[1]), reverse=True)[:5])
+                    
+                    components_list.append(PCAComponent(
+                        component=f"PC{i+1}",
+                        explained_variance_ratio=float(pca.explained_variance_ratio_[i]),
+                        top_features=top_features
+                    ))
+
+            # Ensure numpy array
             X_pca = np.asarray(X_pca)
             
-            # Get labels
+            # Robust shape handling
+            if len(X_pca.shape) == 1:
+                X_pca = X_pca.reshape(-1, 1)
+                
+            # Pad if fewer components than expected (PCA might return fewer if input rank is low)
+            if X_pca.shape[1] < 3:
+                padding = np.zeros((X_pca.shape[0], 3 - X_pca.shape[1]))
+                X_pca = np.hstack([X_pca, padding])
+            
+            # 3. Get labels
             labels = None
             if target_col and target_col in self.columns:
                 labels = sample_df[target_col].to_list()
             
-            # Create result
+            # 4. Create result
             points = []
             for i in range(len(X_pca)):
                 label_val = str(labels[i]) if labels else None
@@ -953,11 +1057,11 @@ class EDAAnalyzer:
                     label=label_val
                 ))
                 
-            return points
+            return points, components_list
             
         except Exception as e:
             print(f"Error calculating PCA: {e}")
-            return None
+            return None, None
 
     def _generate_recommendations(self, profiles: Dict[str, ColumnProfile], alerts: List[Alert], target_col: Optional[str]) -> List[Recommendation]:
         recs = []
@@ -1933,6 +2037,66 @@ class EDAAnalyzer:
         except Exception as e:
             print(f"Error calculating VIF: {e}")
             return None
+
+    def _prepare_matrix_sample(self, numeric_cols: List[str], target_col: Optional[str] = None, limit: int = 5000) -> Tuple[Optional[np.ndarray], Optional[pl.DataFrame], Optional[Any]]:
+        """
+        Helper that:
+        1. Selects numeric cols (+ target if exists)
+        2. Samples dataset (consistent seed=42)
+        3. SimpleImputer (mean)
+        4. StandardScaler
+        
+        Returns: (X_scaled, sample_df, scaler)
+        """
+        try:
+            # Determine columns to fetch
+            cols_to_fetch = list(numeric_cols)
+            if target_col and target_col in self.columns and target_col not in cols_to_fetch:
+                cols_to_fetch.append(target_col)
+                
+            # Sample once
+            # If dataset is smaller than limit, we take all of it.
+            # We use seed=42 to ensure other analysis (PCA vs Clustering) see the same subset if called separately
+            if self.row_count > limit:
+                sample_df = self.df.select(cols_to_fetch).sample(n=limit, with_replacement=False, seed=42)
+            else:
+                sample_df = self.df.select(cols_to_fetch)
+                
+            if sample_df.height < 5:
+                # Not enough data for meaningful PCA/Clustering
+                return None, None, None
+            
+            # Extract Numeric Data
+            X_df = sample_df.select(numeric_cols)
+            
+            # Impute & Scale
+            try:
+                # Polars fill_null preferred for speed
+                # We use fill_null(0) as a final fallback for columns that are entirely null (where mean is null)
+                X_df = X_df.fill_null(strategy="mean").fill_null(0)
+                X = X_df.to_numpy()
+                
+                # Double check for Infs or NaNs in numpy array (can happen with float32 overflows etc)
+                if not np.isfinite(X).all():
+                     X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+                     
+            except Exception:
+                # Fallback to sklearn/pandas if polars fails or we prefer sklearn
+                X = X_df.to_pandas().values
+                imputer = SimpleImputer(strategy='mean')
+                X = imputer.fit_transform(X)
+                # Remaining NaNs?
+                X = np.nan_to_num(X, nan=0.0)
+                
+            # Standardize
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+            
+            return X_scaled, sample_df, scaler
+            
+        except Exception as e:
+            print(f"Error preparing matrix sample: {e}")
+            return None, None, None
 
     def _analyze_sentiment(self, text_series: pl.Series) -> Optional[Dict[str, float]]:
         """

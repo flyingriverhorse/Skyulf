@@ -90,6 +90,7 @@ Skyulf automatically flags potential data quality issues:
 ### 3. Advanced Analysis
 *   **Outlier Detection:** Uses Isolation Forest to identify anomalous rows.
 *   **PCA:** Computes Principal Components to visualize high-dimensional data structure.
+*   **Clustering (Post-Hoc Analysis):** Uses KMeans to automatically discover segments (clusters) in the numeric data and profiles them.
 *   **Causal Discovery:** Uses the PC Algorithm to infer causal relationships between variables (DAG).
 *   **Decision Tree (Rule Discovery):** Uses a surrogate Decision Tree model to extract human-readable rules.
     *   **Classification:** "If Age > 50 -> High Risk (Confidence: 85%)"

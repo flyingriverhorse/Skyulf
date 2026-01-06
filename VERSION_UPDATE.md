@@ -18,6 +18,14 @@ This release extends the Automated EDA module to support regression targets, ena
 This release renames core modeling components to better reflect their purpose and resets the database schema for a clean slate.
 
 ### 🔧 Backend Refactoring
+- **PCA Loadings:** Implemented feature contribution analysis (loadings) for Principal Components in `analyzer.py`.
+- **PCA Visualization:** Added detailed component composition (Variance % and Top Features) to both Frontend and Local Visualizer dashboards.
+- **Clustering Visualization:** Removed redundant Clustering scatter plot from `visualizer.py` (duplicating PCA structure).
+- **Clustering Summary:** Added text-based cluster statistics (centroids, size, inertia) to the `EDAVisualizer.summary()` dashboard.
+- **Clustering:** Add Post-Hoc Clustering (Segmentation) to EDA reports in `analyzer.py`.
+- **Refactoring:** Deduplicated data preparation logic between PCA and Clustering modules.
+- **Leakage Prevention:** Ensured clustering logic uses `feature_cols` (excluding target) for unsupervised learning.
+- **Visualizer:** Added `_plot_clustering` to `EDAVisualizer` for local plotting of segments.
 - **Renaming:** Renamed `TrainingJob` to `BasicTrainingJob` and `HyperparameterTuningJob` to `AdvancedTuningJob` across the entire codebase (Models, Managers, API, Services).
 - **Step Types:** Updated pipeline step types to `basic_training` and `advanced_tuning`.
 - **Code Quality:** Refactored `backend/ml_pipeline/api.py` to move local imports to the top level, improving code organization and performance.
@@ -51,6 +59,9 @@ This release renames core modeling components to better reflect their purpose an
 - **Task Type Selector:** Added a dropdown in the EDA dashboard to manually select "Classification" or "Regression" for the target column, with a helpful tooltip explaining when to use it.
 - **Visualizer Update:** Updated the terminal visualizer to display the detected or selected Task Type, **VIF scores with severity status, and Sentiment Analysis distributions** in the Data Quality summary.
 - **Bug Fixes:** Fixed a frontend crash when viewing details for Categorical/Boolean columns.
+- **EDA UX:** Made excluded-column selection a staged change with an explicit "Apply changes" button (no re-analysis on every toggle), and renamed "Decision Rules" to "Decision Tree" with clearer surrogate-model explanation.
+- **EDA Segmentation:** Added a dedicated "Segmentation" tab that summarizes leaf-node segments derived from the surrogate decision tree (kept separate from the main Decision Tree view).
+- **EDA Consistency:** Excluded columns are now hidden across EDA charts/tabs (not just the sidebar list), while analysis still runs only when you click "Apply changes".
 
 ------------------------------------------------------------
 ## v0.1.7
