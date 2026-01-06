@@ -20,9 +20,9 @@
 [![issues](https://img.shields.io/github/issues/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/issues) 
 [![contributors](https://img.shields.io/github/contributors/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/graphs/contributors)
 
-> **Status:** Active Development. Expect bugs, but also expect rapid progress.
+> **Skyulf:** The Visual MLOps Builder
 
-Skyulf is a self-hosted, privacy-first **MLOps Hub**. It is designed to be the "glue" that holds your data science workflow together (soon with export project option). Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
+Skyulf is a self-hosted, privacy-first. It is designed to be the "glue" that holds your data science workflow together (soon with export project option). Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
 
 ## What is the meaning of Skyulf?
 

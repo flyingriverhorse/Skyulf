@@ -96,7 +96,7 @@ class SklearnCalculator(BaseModelCalculator):
 class SklearnApplier(BaseModelApplier):
     """Base applier for Scikit-Learn models."""
     
-    def predict(self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any) -> pd.Series:
+    def predict(self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any) -> Any:
         # Convert to Numpy
         X_np, _ = SklearnBridge.to_sklearn(df)
         
@@ -116,7 +116,7 @@ class SklearnApplier(BaseModelApplier):
 
     def predict_proba(
         self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any
-    ) -> Optional[pd.DataFrame]:
+    ) -> Optional[Any]:
         if not hasattr(model_artifact, "predict_proba"):
             return None
             
