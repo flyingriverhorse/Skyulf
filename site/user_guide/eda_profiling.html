@@ -2953,19 +2953,21 @@ for alert in profile.alerts:
         *   <strong>Kolmogorov-Smirnov:</strong> Used for N &gt;= 5,000 (on a 5k sample).
 *   <strong>Categorical:</strong> Unique count, Mode, Frequency distribution.
 *   <strong>Date:</strong> Min/Max date, Range, Year/Month distribution.
-*   <strong>Text:</strong> Avg length, Common words.</p>
+*   <strong>Text:</strong> Avg length, Common words, <strong>Sentiment Analysis</strong> (Positive/Neutral/Negative).</p>
 <h3 id="2-smart-alerts">2. Smart Alerts</h3>
 <p>Skyulf automatically flags potential data quality issues:
 *   <strong>High Null Rate:</strong> Columns with &gt;50% missing values.
 *   <strong>Constant Columns:</strong> Columns with only 1 unique value.
 *   <strong>High Cardinality:</strong> Categorical columns with too many unique values.
-*   <strong>High Correlation:</strong> Pairs of features with correlation &gt; 0.95 (potential multicollinearity).
+*   <strong>High Correlation:</strong> Pairs of features with correlation &gt; 0.95.
+*   <strong>Multicollinearity (VIF):</strong> Detects features with Variance Inflation Factor &gt; 5.0.
 *   <strong>Class Imbalance:</strong> Target variables with skewed class distributions.
 *   <strong>Data Leakage:</strong> Features with 1.0 correlation to the target.</p>
 <h3 id="3-advanced-analysis">3. Advanced Analysis</h3>
 <ul>
 <li><strong>Outlier Detection:</strong> Uses Isolation Forest to identify anomalous rows.</li>
 <li><strong>PCA:</strong> Computes Principal Components to visualize high-dimensional data structure.</li>
+<li><strong>Clustering (Post-Hoc Analysis):</strong> Uses KMeans to automatically discover segments (clusters) in the numeric data and profiles them.</li>
 <li><strong>Causal Discovery:</strong> Uses the PC Algorithm to infer causal relationships between variables (DAG).</li>
 <li><strong>Decision Tree (Rule Discovery):</strong> Uses a surrogate Decision Tree model to extract human-readable rules.<ul>
 <li><strong>Classification:</strong> "If Age &gt; 50 -&gt; High Risk (Confidence: 85%)"</li>

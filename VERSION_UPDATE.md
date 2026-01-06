@@ -1,6 +1,6 @@
 # Version Updates
 
-*   **v0.1.8 :** "The Regression Rules Update" — Extended EDA capabilities to support regression targets in Decision Tree rule discovery.
+*   **v0.1.8 :** "The Unsupervised & Monitoring Update" — Major expansion of EDA with Post-Hoc Clustering, PCA Loadings, Drift Monitoring (PSI/KL), and Regression Rules.
 *   **v0.1.7 :** "The Advanced EDA & Profiling Update" — Professional-grade automated data analysis with smart alerts, rich visualizations, and Polars-powered profiling.
 *   **v0.1.6 :** "The Backend Abstraction & Modern Frameworks Update" — Polars migration, leakage proof, and performance optimization.
 *   **v0.1.5 :** "The Registry & Catalog Architecture Update" — Decoupled data loading with Smart Catalog, full S3 integration, and dynamic node registry architecture.
@@ -11,57 +11,30 @@
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
 ------------------------------------------------------------
 ## v0.1.8
-**"The Regression Rules Update"**
-This release extends the Automated EDA module to support regression targets, enabling users to discover rules that drive continuous values.
+**"The Unsupervised & Monitoring Update"**
+This release transforms the platform into a complete lifecycle manager, adding unsupervised learning (Clustering/PCA), production monitoring (Drift), and advanced regression analysis.
 
-**"The Nomenclature & Architecture Refactor"**
-This release renames core modeling components to better reflect their purpose and resets the database schema for a clean slate.
-
-### 🔧 Backend Refactoring
-- **PCA Loadings:** Implemented feature contribution analysis (loadings) for Principal Components in `analyzer.py`.
-- **PCA Visualization:** Added detailed component composition (Variance % and Top Features) to both Frontend and Local Visualizer dashboards.
-- **Clustering Visualization:** Removed redundant Clustering scatter plot from `visualizer.py` (duplicating PCA structure).
-- **Clustering Summary:** Added text-based cluster statistics (centroids, size, inertia) to the `EDAVisualizer.summary()` dashboard.
-- **Clustering:** Add Post-Hoc Clustering (Segmentation) to EDA reports in `analyzer.py`.
-- **Refactoring:** Deduplicated data preparation logic between PCA and Clustering modules.
-- **Leakage Prevention:** Ensured clustering logic uses `feature_cols` (excluding target) for unsupervised learning.
-- **Visualizer:** Added `_plot_clustering` to `EDAVisualizer` for local plotting of segments.
-- **Renaming:** Renamed `TrainingJob` to `BasicTrainingJob` and `HyperparameterTuningJob` to `AdvancedTuningJob` across the entire codebase (Models, Managers, API, Services).
-- **Step Types:** Updated pipeline step types to `basic_training` and `advanced_tuning`.
-- **Code Quality:** Refactored `backend/ml_pipeline/api.py` to move local imports to the top level, improving code organization and performance.
-- **Code Quality:** Resolved potential circular import issues in `api.py` by using module-level imports for database engine components.
-- **Design Pattern:** Implemented Strategy Pattern for task execution in `backend/ml_pipeline/tasks.py` and `backend/ml_pipeline/execution/strategies.py`, replacing complex `if/elif` chains for job handling.
-- **Database:** Reset the database schema to accommodate the new table names (`basic_training_jobs`, `advanced_tuning_jobs`).
-
-### 🎨 Frontend Updates
-- **Node Labels:** Updated node labels in the ML Canvas to "Basic Training" and "Advanced Tuning".
-- **Node Types:** Updated internal node types to match the backend changes.
+### 🧠 Advanced Analysis & Unsupervised Learning
+- **Post-Hoc Clustering:** Implemented K-Means segmentation in EDA to discover natural data groups automatically.
+- **PCA Loadings:** Enhanced PCA to show exactly which features drive variance (Component Loadings) in both 2D and 3D views.
+- **Regression Rules:** Extended Decision Tree Discovery to support regression targets, generating human-readable rules for continuous values.
+- **Deep Profiling:** Added Multicollinearity (VIF) detection and Sentiment Analysis (Positive/Neutral/Negative) for text columns.
 
 ### 📊 Data Drift & Monitoring
-- **Drift Calculator:** Implemented `DriftCalculator` in `skyulf-core` using Polars and Scipy. Supports Wasserstein Distance, KS Test, PSI, and **KL Divergence**.
-- **Reference Data:** Updated `PipelineEngine` to automatically save training data as `reference_data_{dataset_name}_{job_id}.joblib` for future drift analysis.
-- **Backend API:** Added `/api/monitoring/drift/calculate` endpoint to compute drift between reference and uploaded current data.
-- **Frontend UI:** Added "Data Drift" page to the ML Canvas for on-demand drift analysis.
-- **Drift Visualization:** Added interactive Histograms (using Recharts) to the Data Drift report, allowing side-by-side comparison of Reference vs. Current distributions.
-- **Schema Drift:** Implemented detection and alerting for Schema Drift (Missing Columns, New Columns).
-- **Job Discovery:** Improved job discovery logic in `backend/monitoring/router.py` to recursively scan subdirectories using `pathlib`, ensuring all training jobs are found.
-- **UI Improvements:** Replaced the simple dropdown with a searchable List View for selecting Reference Jobs, including metadata like creation date.
+- **Drift Engine:** Implemented `DriftCalculator` using Polars/Scipy (Wasserstein, KS, PSI, KL Divergence).
+- **Reference Management:** Pipeline now automatically persists training data as reference snapshots for future comparison.
+- **Interactive Report:** Added a dedicated Drift Dashboard with interactive histograms comparing Reference vs. Current distributions.
+- **Schema Alerts:** Automated detection and alerting for Schema Drift (missing or new columns).
 
-### 🧠 Advanced Analysis
-- **Multicollinearity (VIF):** Added Variance Inflation Factor (VIF) calculation to the EDA module to detect highly correlated features.
-- **Sentiment Analysis:** Integrated `vaderSentiment` to automatically analyze text columns and provide sentiment distribution (Positive/Neutral/Negative).
-- **Regression Rules:** Extended Decision Tree Discovery to support regression targets (Numeric). The system now generates rules like "IF Feature > X THEN Value = Y" (predicting a mean value) instead of just classification rules.
-- **Unified EDA:** Ensured that all EDA components (Causal Discovery, Correlations, Outliers) work seamlessly with both Classification and Regression targets.
-- **Smart Task Detection:** Added `task_type` override to `analyze()` method, allowing users to force "Classification" or "Regression" regardless of data type.
-- **High Cardinality Handling:** Implemented automatic grouping for high-cardinality classification targets (e.g., Zip Codes, IDs). If a target has >10 classes, the system now analyzes the "Top 10" and groups the rest as "Other", preventing unreadable decision trees.
+### 🔧 Backend Architecture
+- **Strategy Pattern:** Refactored task execution to use the Strategy Pattern, replacing complex conditionals for `basic_training` vs `advanced_tuning`.
+- **Optimization:** Deduplicated data prep logic between PCA and Clustering to ensure consistency and prevent leakage.
+- **Refactoring:** Renamed core job types to "Basic Training" and "Advanced Tuning" across the DB, API, and Frontend tokens for clarity.
 
-### 🎨 Frontend
-- **Task Type Selector:** Added a dropdown in the EDA dashboard to manually select "Classification" or "Regression" for the target column, with a helpful tooltip explaining when to use it.
-- **Visualizer Update:** Updated the terminal visualizer to display the detected or selected Task Type, **VIF scores with severity status, and Sentiment Analysis distributions** in the Data Quality summary.
-- **Bug Fixes:** Fixed a frontend crash when viewing details for Categorical/Boolean columns.
-- **EDA UX:** Made excluded-column selection a staged change with an explicit "Apply changes" button (no re-analysis on every toggle), and renamed "Decision Rules" to "Decision Tree" with clearer surrogate-model explanation.
-- **EDA Segmentation:** Added a dedicated "Segmentation" tab that summarizes leaf-node segments derived from the surrogate decision tree (kept separate from the main Decision Tree view).
-- **EDA Consistency:** Excluded columns are now hidden across EDA charts/tabs (not just the sidebar list), while analysis still runs only when you click "Apply changes".
+### 🎨 Frontend & UX
+- **Consolidated EDA:** Integrated Clustering and PCA into a single "Structure & Segmentation" view, reducing clutter.
+- **Visualizer Parity:** Updated the local `EDAVisualizer` (terminal/matplotlib) to match all Web UI features, including drift and segmentation.
+- **UX Improvements:** Added "Task Type" overrides (Reg/Class) and improved job discovery for monitoring.
 
 ------------------------------------------------------------
 ## v0.1.7
