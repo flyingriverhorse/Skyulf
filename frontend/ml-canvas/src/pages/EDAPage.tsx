@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DatasetService } from '../core/api/datasets';
 import { EDAService } from '../core/api/eda';
@@ -19,6 +19,7 @@ import { SampleDataTab } from '../components/eda/tabs/SampleDataTab';
 import { CausalTab } from '../components/eda/tabs/CausalTab';
 import { RuleDiscoveryTab } from '../components/eda/tabs/RuleDiscoveryTab';
 import { DecompositionTab } from '../components/eda/tabs/DecompositionTab';
+import { ClusteringTab } from '../components/eda/tabs/ClusteringTab';
 import { Loader2, RefreshCw, AlertCircle, BarChart2, List, Play, HelpCircle } from 'lucide-react';
 import { downloadChart } from '../core/utils/chartUtils';
 
@@ -36,7 +37,8 @@ export const EDAPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [targetCol, setTargetCol] = useState<string>('');
   const [taskType, setTaskType] = useState<string>(''); // "Classification" or "Regression" or "" (Auto)
-  const [excludedCols, setExcludedCols] = useState<string[]>([]);
+  const [excludedColsDraft, setExcludedColsDraft] = useState<string[]>([]);
+  const [excludedColsApplied, setExcludedColsApplied] = useState<string[]>([]);
   const [filters, setFilters] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -52,6 +54,27 @@ export const EDAPage: React.FC = () => {
   const [is3D, setIs3D] = useState(false);
   const [isPCA3D, setIsPCA3D] = useState(false);
 
+  const profileForUi = useMemo(() => {
+    const rawProfile = report?.profile_data;
+    if (!rawProfile) return null;
+
+    const excludedSet = new Set(excludedColsDraft);
+    const filteredColumns: Record<string, any> = {};
+    if (rawProfile.columns) {
+      Object.entries(rawProfile.columns).forEach(([name, col]) => {
+        if (!excludedSet.has(name)) {
+          filteredColumns[name] = col;
+        }
+      });
+    }
+
+    return {
+      ...rawProfile,
+      columns: filteredColumns,
+      excluded_columns: excludedColsDraft,
+    };
+  }, [report?.profile_data, excludedColsDraft]);
+
   useEffect(() => {
     loadDatasets();
   }, []);
@@ -59,7 +82,8 @@ export const EDAPage: React.FC = () => {
   useEffect(() => {
     if (selectedDataset) {
       setReport(null); // Clear previous report to show loader
-      setExcludedCols([]); // Reset excluded columns
+      setExcludedColsDraft([]); // Reset excluded columns
+      setExcludedColsApplied([]);
       setFilters([]); // Reset filters
       setTargetCol(''); // Reset target column
       setSelectedVariable(null); // Reset selected variable
@@ -73,7 +97,8 @@ export const EDAPage: React.FC = () => {
     } else {
       setReport(null);
       setHistory([]);
-      setExcludedCols([]);
+      setExcludedColsDraft([]);
+      setExcludedColsApplied([]);
       setFilters([]);
       setTargetCol('');
       setSelectedVariable(null);
@@ -151,7 +176,7 @@ export const EDAPage: React.FC = () => {
   };
 
   const runAnalysis = async (overrideExcluded?: string[] | any, overrideFilters?: any[]) => {
-    const actualExcluded = Array.isArray(overrideExcluded) ? overrideExcluded : excludedCols;
+    const actualExcluded = Array.isArray(overrideExcluded) ? overrideExcluded : excludedColsApplied;
     const actualFilters = Array.isArray(overrideFilters) ? overrideFilters : filters;
 
     if (!selectedDataset) return;
@@ -185,21 +210,19 @@ export const EDAPage: React.FC = () => {
   };
 
   const handleToggleExclude = (colName: string, exclude: boolean) => {
-    const message = exclude 
-        ? `Are you sure you want to exclude '${colName}' from the analysis? This will trigger a new analysis.`
-        : `Include '${colName}' back in the analysis? This will trigger a new analysis.`;
-        
-    if (confirm(message)) {
-        let newExcluded = [...excludedCols];
-        if (exclude) {
-            newExcluded.push(colName);
-        } else {
-            newExcluded = newExcluded.filter(c => c !== colName);
-        }
-        setExcludedCols(newExcluded);
-        runAnalysis(newExcluded);
-    }
+    setExcludedColsDraft((prev) => {
+      if (exclude) {
+        if (prev.includes(colName)) return prev;
+        return [...prev, colName];
+      }
+      return prev.filter((c) => c !== colName);
+    });
   };
+
+    const handleApplyExcluded = () => {
+    setExcludedColsApplied(excludedColsDraft);
+    runAnalysis(excludedColsDraft);
+    };
 
   // Sync target col and excluded cols from report if available
   useEffect(() => {
@@ -207,13 +230,22 @@ export const EDAPage: React.FC = () => {
         if (report.profile_data.target_col) {
             setTargetCol(report.profile_data.target_col);
         }
-        if (report.profile_data.excluded_columns) {
-            setExcludedCols(report.profile_data.excluded_columns);
-        } else {
-            setExcludedCols([]);
-        }
+      const serverExcluded = Array.isArray(report.profile_data.excluded_columns)
+        ? report.profile_data.excluded_columns
+        : [];
+      setExcludedColsApplied(serverExcluded);
+      setExcludedColsDraft(serverExcluded);
     }
-  }, [report]);
+    }, [report?.id]);
+
+    const excludedDirty = (() => {
+    if (excludedColsApplied.length !== excludedColsDraft.length) return true;
+    const appliedSet = new Set(excludedColsApplied);
+    for (const col of excludedColsDraft) {
+      if (!appliedSet.has(col)) return true;
+    }
+    return false;
+    })();
 
   // Helper to find existing report for current target
   const existingReport = targetCol ? history.find(h => h.target_col === targetCol && h.status === 'COMPLETED') : null;
@@ -329,8 +361,10 @@ export const EDAPage: React.FC = () => {
       );
     }
 
-    const profile = report.profile_data;
+    const profile = profileForUi;
     if (!profile) return <div>No profile data</div>;
+
+    const allColumns = report?.profile_data?.columns ? Object.keys(report.profile_data.columns) : [];
 
     return (
       <div className="flex h-[calc(100vh-124px)] border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-900">
@@ -339,12 +373,15 @@ export const EDAPage: React.FC = () => {
             setActiveTab={setActiveTab} 
             profile={profile} 
             filters={filters}
-            columns={profile.columns ? Object.keys(profile.columns) : []}
-            excludedCols={excludedCols}
+          columns={allColumns}
+            excludedCols={excludedColsDraft}
+            excludedDirty={excludedDirty}
+            analyzing={analyzing}
             onAddFilter={handleAddFilter}
             onRemoveFilter={handleRemoveFilter}
             onClearFilters={() => { setFilters([]); runAnalysis(undefined, []); }}
             onToggleExclude={handleToggleExclude}
+            onApplyExcluded={handleApplyExcluded}
         />
         
         <div className="flex-1 overflow-y-auto p-6 pt-4 bg-gray-50 dark:bg-gray-900/50">
@@ -433,7 +470,7 @@ export const EDAPage: React.FC = () => {
             {activeTab === 'decomposition' && selectedDataset && (
                 <DecompositionTab 
                     datasetId={selectedDataset}
-                    columns={report?.profile_data?.columns ? Object.keys(report.profile_data.columns) : []}
+                columns={allColumns}
                     initialFilters={filters}
                 />
             )}
@@ -441,7 +478,7 @@ export const EDAPage: React.FC = () => {
             {activeTab === 'sample' && profile.sample_data && (
                 <SampleDataTab 
                     profile={profile}
-                    excludedCols={excludedCols}
+                excludedCols={excludedColsDraft}
                     handleToggleExclude={handleToggleExclude}
                 />
             )}
@@ -493,7 +530,9 @@ export const EDAPage: React.FC = () => {
                 className="block w-40 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border disabled:opacity-50"
              >
                 <option value="">None</option>
-                {report && report.profile_data && Object.keys(report.profile_data.columns).map(col => (
+               {report && report.profile_data && Object.keys(report.profile_data.columns)
+                  .filter((col) => !excludedColsDraft.includes(col))
+                  .map(col => (
                     <option key={col} value={col}>{col}</option>
                 ))}
              </select>
@@ -588,12 +627,12 @@ export const EDAPage: React.FC = () => {
         }}
         onSelect={(selectedReport) => {
             setReport(selectedReport);
-            // Also update excluded cols state to match the report
-            if (selectedReport.profile_data?.excluded_columns) {
-                setExcludedCols(selectedReport.profile_data.excluded_columns);
-            } else {
-                setExcludedCols([]);
-            }
+          // Also update excluded cols state to match the report
+          const serverExcluded = Array.isArray(selectedReport.profile_data?.excluded_columns)
+            ? selectedReport.profile_data.excluded_columns
+            : [];
+          setExcludedColsApplied(serverExcluded);
+          setExcludedColsDraft(serverExcluded);
         }}
       />
     </div>

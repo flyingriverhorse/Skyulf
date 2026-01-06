@@ -20,7 +20,8 @@ import {
     ChevronDown,
     ChevronUp,
     PanelLeftClose,
-    PanelLeftOpen
+    PanelLeftOpen,
+    Layers
 } from 'lucide-react';
 
 interface FilterItem {
@@ -36,10 +37,13 @@ interface EDASidebarProps {
     filters: FilterItem[];
     columns: string[];
     excludedCols: string[];
+    excludedDirty: boolean;
+    analyzing: boolean;
     onAddFilter: (column: string, value: any, operator: string) => void;
     onRemoveFilter: (index: number) => void;
     onClearFilters: () => void;
     onToggleExclude: (column: string, exclude: boolean) => void;
+    onApplyExcluded: () => void;
 }
 
 export const EDASidebar: React.FC<EDASidebarProps> = ({ 
@@ -49,10 +53,13 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
     filters,
     columns,
     excludedCols,
+    excludedDirty,
+    analyzing,
     onAddFilter,
     onRemoveFilter,
     onClearFilters,
-    onToggleExclude
+    onToggleExclude,
+    onApplyExcluded
 }) => {
     const [showFilters, setShowFilters] = useState(true);
     const [showExclusions, setShowExclusions] = useState(false);
@@ -102,14 +109,14 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
             items: [
                 { id: 'correlations', label: 'Correlations', icon: GitMerge, show: !!(profile.correlations || profile.correlations_with_target) },
                 { id: 'bivariate', label: 'Bivariate', icon: ScatterChart, show: true },
-                { id: 'pca', label: 'PCA Projection', icon: Network, show: !!profile.pca_data },
+                { id: 'pca', label: 'PCA & Clusters', icon: Network, show: !!profile.pca_data || !!profile.clustering },
             ]
         },
         {
             title: "Structure & Causal",
             items: [
                 { id: 'causal', label: 'Causal Graph', icon: Network, show: !!profile.causal_graph },
-                { id: 'rules', label: 'Decision Rules', icon: GitBranch, show: !!profile.rule_tree },
+                { id: 'rules', label: 'Decision Tree', icon: GitBranch, show: !!profile.rule_tree },
                 { id: 'decomposition', label: 'Decomposition', icon: Split, show: true }, // Always show, handles its own empty state
             ]
         },
@@ -237,6 +244,19 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                                     </button>
                                 </div>
                             ))}
+
+                            <button
+                                onClick={onApplyExcluded}
+                                disabled={!excludedDirty || analyzing}
+                                className={`w-full flex items-center justify-center px-2 py-1 text-xs rounded border transition-colors ${
+                                    excludedDirty && !analyzing
+                                        ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700'
+                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-200 dark:border-gray-700 cursor-not-allowed'
+                                }`}
+                                title={excludedDirty ? 'Apply excluded columns to re-run analysis' : 'No pending exclusion changes'}
+                            >
+                                Apply changes
+                            </button>
 
                             {isAddingExclusion ? (
                                 <div className="bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 space-y-2 shadow-sm">

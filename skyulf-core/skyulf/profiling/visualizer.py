@@ -324,9 +324,60 @@ class EDAVisualizer:
                 
                 console.print(fi_table)
 
-        # 11. Smart Alerts
+        # 11. PCA Structure (Latent Features)
+        if self.profile.pca_components:
+             console.print(f"\n[bold]11. PCA Latent Structure[/bold]")
+             pca_table = Table(show_header=True, header_style="bold magenta")
+             pca_table.add_column("Component")
+             pca_table.add_column("Variance")
+             pca_table.add_column("Top Loading Features")
+             
+             for comp in self.profile.pca_components[:3]:
+                 feats = []
+                 for k, v in comp.top_features.items():
+                     sign = "+" if v > 0 else ""
+                     feats.append(f"{k} ({sign}{v:.2f})")
+                 feat_str = ", ".join(feats)
+                 pca_table.add_row(comp.component, f"{comp.explained_variance_ratio:.1%}", feat_str)
+             console.print(pca_table)
+
+        # 12. Clustering Analysis
+        if self.profile.clustering:
+            console.print(f"\n[bold]12. Clustering Structure ({self.profile.clustering.method})[/bold]")
+            console.print(f"Clusters: {self.profile.clustering.n_clusters} | Inertia: {self.profile.clustering.inertia:.2f}")
+
+            cluster_table = Table(show_header=True, header_style="bold cyan")
+            cluster_table.add_column("ID", justify="right")
+            cluster_table.add_column("Size", justify="right")
+            cluster_table.add_column("Size %", justify="right")
+            cluster_table.add_column("Key Characteristics (Centroids)", style="italic")
+
+            for cluster in self.profile.clustering.clusters:
+                # Format centroids
+                features = []
+                # Sort by absolute magnitude or variance? 
+                # Ideally we show top features that deviate from global mean, 
+                # but 'center' here is just the coordinate. 
+                # For now, let's just show top 3 features by order (assuming important ones are first or unsorted)
+                # Or show all if few.
+                
+                # Let's show up to 3 features
+                items = list(cluster.center.items())[:3] 
+                feature_str = ", ".join([f"{k}={v:.2f}" for k, v in items])
+                if len(cluster.center) > 3:
+                     feature_str += "..."
+                
+                cluster_table.add_row(
+                    str(cluster.cluster_id), 
+                    str(cluster.size), 
+                    f"{cluster.percentage:.1f}%",
+                    feature_str
+                )
+            console.print(cluster_table)
+
+        # 12. Smart Alerts
         if self.profile.alerts:
-            console.print("\n[bold]11. Smart Alerts[/bold]")
+            console.print("\n[bold]12. Smart Alerts[/bold]")
             for alert in self.profile.alerts:
                 color = "red" if alert.severity == "high" else "yellow"
                 console.print(f"[{color}]• {alert.message}[/{color}]")
@@ -582,3 +633,4 @@ class EDAVisualizer:
         plt.grid(True, alpha=0.3)
         plt.xticks(rotation=45)
         plt.tight_layout()
+

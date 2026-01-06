@@ -38,8 +38,8 @@ export const RuleDiscoveryTab: React.FC<RuleDiscoveryTabProps> = ({ profile }) =
                             Decision Tree Analysis
                         </h2>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            Visualize how different features combine to predict the target. 
-                            This tree helps identify key segments and decision rules in your data.
+                            This is a <strong>surrogate model</strong>: a simple decision tree trained on your dataset to approximate the relationship between features and the target.
+                            Use it for interpretation (human-readable rules), not as a causal claim or a production model.
                         </p>
                     </div>
                     {ruleTree.accuracy && (
@@ -52,7 +52,7 @@ export const RuleDiscoveryTab: React.FC<RuleDiscoveryTabProps> = ({ profile }) =
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <p className="max-w-xs">
-                                        <strong>Tree Fidelity (Accuracy):</strong> Indicates how well this simplified tree mimics the patterns in your dataset. A higher percentage means these rules are more reliable.
+                                        <strong>Tree Fidelity:</strong> How closely this surrogate tree matches the patterns in your data (higher is better). If fidelity is low, treat extracted rules as exploratory.
                                     </p>
                                 </TooltipContent>
                             </Tooltip>
@@ -69,6 +69,9 @@ export const RuleDiscoveryTab: React.FC<RuleDiscoveryTabProps> = ({ profile }) =
                         <BarChart3 className="w-5 h-5 text-blue-600" />
                         Feature Importance (Surrogate Model)
                     </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        Importances reflect what the <strong>surrogate tree</strong> used to split the data. They may differ from a more complex model’s importances.
+                    </p>
                     <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart
@@ -106,7 +109,7 @@ export const RuleDiscoveryTab: React.FC<RuleDiscoveryTabProps> = ({ profile }) =
 
             {ruleTree.rules && ruleTree.rules.length > 0 && (
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                    <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Extracted Rules</h3>
+                    <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Segmentation-Decision Tree (Surrogate Model)</h3>
                     <div className="space-y-2 max-h-96 overflow-y-auto">
                         {ruleTree.rules.map((rule: string, idx: number) => (
                             <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-100 dark:border-gray-700 text-sm font-mono text-gray-700 dark:text-gray-300">
