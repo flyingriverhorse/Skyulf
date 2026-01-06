@@ -1,7 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { monitoringApi, DriftReport, DriftJobOption } from '../core/api/monitoring';
-import { Loader2, Upload, AlertTriangle, CheckCircle, XCircle, Lightbulb, RefreshCw, Search, Database, Calendar, ChevronDown, ChevronUp, BarChart2 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Loader2, Upload, AlertTriangle, CheckCircle, XCircle, Lightbulb, RefreshCw, Search, Database, Calendar, ChevronDown, ChevronUp, BarChart2, Info } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
+
+const MetricTooltip = ({ label, tooltip, icon }: { label: string, tooltip: string, icon?: React.ReactNode }) => (
+    <div className="group relative flex items-center gap-1 cursor-help">
+        <span className="border-b border-dotted border-gray-400">{label}</span>
+        {icon && <span className="text-gray-400">{icon}</span>}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-2 bg-slate-900 text-white text-xs rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 text-center pointer-events-none">
+            {tooltip}
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-1 border-4 border-transparent border-b-slate-900"></div>
+        </div>
+    </div>
+);
 
 export const DataDriftPage: React.FC = () => {
     const [jobs, setJobs] = useState<DriftJobOption[]>([]);
@@ -75,7 +86,7 @@ export const DataDriftPage: React.FC = () => {
     };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto text-slate-900 dark:text-slate-100">
+        <div className="p-6 w-full text-slate-900 dark:text-slate-100">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold">Data Drift Analysis</h1>
                 <button 
@@ -265,10 +276,34 @@ export const DataDriftPage: React.FC = () => {
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Column</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Wasserstein</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">PSI</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">KL Div</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">KS P-Value</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <MetricTooltip 
+                                            label="Wasserstein" 
+                                            tooltip="Measures distance between distributions. Lower is better. < 0.1 usually means stable." 
+                                            icon={<Info className="w-3 h-3 text-slate-400" />}
+                                        />
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <MetricTooltip 
+                                            label="PSI" 
+                                            tooltip="Population Stability Index. < 0.1: Stable, < 0.2: Minor Drift, > 0.2: Significant Drift." 
+                                            icon={<Info className="w-3 h-3 text-slate-400" />}
+                                        />
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <MetricTooltip 
+                                            label="KL Div" 
+                                            tooltip="Kullback-Leibler Divergence. Measures how one probability distribution diverts from a second." 
+                                            icon={<Info className="w-3 h-3 text-slate-400" />}
+                                        />
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        <MetricTooltip 
+                                            label="KS P-Value" 
+                                            tooltip="Kolmogorov-Smirnov Test. p-value < 0.05 indicates the distributions are significantly different." 
+                                            icon={<Info className="w-3 h-3 text-slate-400" />}
+                                        />
+                                    </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -351,7 +386,7 @@ export const DataDriftPage: React.FC = () => {
                                                                                 tickLine={false}
                                                                                 axisLine={false}
                                                                             />
-                                                                            <Tooltip 
+                                                                            <RechartsTooltip 
                                                                                 cursor={{ fill: 'rgba(0,0,0,0.05)' }}
                                                                                 contentStyle={{ 
                                                                                     backgroundColor: '#1e293b', 

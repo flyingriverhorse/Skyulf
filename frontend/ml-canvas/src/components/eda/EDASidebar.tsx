@@ -21,7 +21,6 @@ import {
     ChevronUp,
     PanelLeftClose,
     PanelLeftOpen,
-    Layers
 } from 'lucide-react';
 
 interface FilterItem {
