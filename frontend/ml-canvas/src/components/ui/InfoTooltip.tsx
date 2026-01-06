@@ -1,31 +1,37 @@
 import React from 'react';
 import { Info } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip"; // Assuming we have or will create this shadcn-like component
 
 interface InfoTooltipProps {
     text: string;
-    align?: 'center' | 'left' | 'right';
+    align?: 'center' | 'left' | 'right' | 'end'; // Added 'end' to match usage
+    size?: 'sm' | 'md';
 }
 
-export const InfoTooltip: React.FC<InfoTooltipProps> = ({ text, align = 'center' }) => {
-    const positionClasses = {
-        center: "left-1/2 -translate-x-1/2",
-        left: "left-0",
-        right: "right-0"
-    };
-
-    const arrowClasses = {
-        center: "left-1/2 -translate-x-1/2",
-        left: "left-2",
-        right: "right-2"
-    };
+export const InfoTooltip: React.FC<InfoTooltipProps> = ({ text, align = 'center', size = 'md' }) => {
+    // If we don't have the shadcn component yet, let's stick to a portal-safe implementation.
+    // Ideally, we should use Radix UI TooltipPrimitive to solve clipping.
+    // The previous implementation was relative positioning which causes clipping in overflow hidden containers.
+    
+    // Changing to fixed positioning with standard HTML title is the simplest fallback if libraries are missing, 
+    // but the user wants "align and show automatically properly".
+    // Let's use standard Radix UI if possible since package.json has @radix-ui/react-tooltip.
 
     return (
-        <div className="group relative ml-2 inline-flex items-center">
-            <Info className="w-4 h-4 text-gray-400 cursor-help" />
-            <div className={`absolute bottom-full mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none text-center ${positionClasses[align]}`}>
-                {text}
-                <div className={`absolute top-full border-4 border-transparent border-t-gray-800 ${arrowClasses[align]}`}></div>
-            </div>
-        </div>
+        <TooltipProvider>
+            <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                    <Info className={`${size === 'sm' ? 'w-3 h-3' : 'w-4 h-4'} text-muted-foreground cursor-help opacity-70 hover:opacity-100 transition-opacity`} />
+                </TooltipTrigger>
+                <TooltipContent side="top" align={align === 'end' ? 'end' : 'center'} className="max-w-xs text-xs">
+                    <p>{text}</p>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
     );
 };

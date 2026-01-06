@@ -1725,6 +1725,7 @@ class EDAAnalyzer:
             pl.col(col).mean().alias("mean"),
             pl.col(col).median().alias("median"),
             pl.col(col).std().alias("std"),
+            pl.col(col).var().alias("variance"),
             pl.col(col).min().alias("min"),
             pl.col(col).max().alias("max"),
             pl.col(col).quantile(0.25).alias("q25"),
@@ -1735,11 +1736,12 @@ class EDAAnalyzer:
             (pl.col(col) < 0).sum().alias("negatives")
         ]).collect()
         
-        row = stats.row(0)
+        row = stats.row(0, named=True)
         return NumericStats(
-            mean=row[0], median=row[1], std=row[2], min=row[3], max=row[4],
-            q25=row[5], q75=row[6], skewness=row[7], kurtosis=row[8],
-            zeros_count=row[9], negatives_count=row[10]
+            mean=row["mean"], median=row["median"], std=row["std"], variance=row.get("variance"),
+            min=row["min"], max=row["max"],
+            q25=row["q25"], q75=row["q75"], skewness=row["skew"], kurtosis=row["kurt"],
+            zeros_count=row["zeros"], negatives_count=row["negatives"]
         )
 
     def _analyze_categorical(self, col: str) -> CategoricalStats:

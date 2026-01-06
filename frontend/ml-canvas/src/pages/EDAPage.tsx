@@ -385,7 +385,11 @@ export const EDAPage: React.FC = () => {
         
         <div className="flex-1 overflow-y-auto p-6 pt-4 bg-gray-50 dark:bg-gray-900/50">
             {activeTab === 'dashboard' && (
-                <DashboardTab profile={profile} />
+                <DashboardTab 
+                    profile={profile} 
+                    onToggleExclude={handleToggleExclude}
+                    excludedCols={excludedColsDraft}
+                />
             )}
 
             {activeTab === 'insights' && (
@@ -428,6 +432,7 @@ export const EDAPage: React.FC = () => {
                     profile={profile}
                     setSelectedVariable={setSelectedVariable}
                     handleToggleExclude={handleToggleExclude}
+                    handleAddFilter={handleAddFilter}
                 />
             )}
 
