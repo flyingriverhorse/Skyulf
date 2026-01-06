@@ -36,6 +36,16 @@ This release transforms the platform into a complete lifecycle manager, adding u
 - **Visualizer Parity:** Updated the local `EDAVisualizer` (terminal/matplotlib) to match all Web UI features, including drift and segmentation.
 - **UX Improvements:** Added "Task Type" overrides (Reg/Class) and improved job discovery for monitoring.
 
+### 📚 Documentation
+- **Medium Draft:** Added a publish-ready article draft on why moving MLOps data processing to Rust + Polars improves performance and reliability.
+- **Engine Notes:** Added internal notes explaining why Skyulf currently uses both Polars and Pandas (and where conversion should happen).
+- **Medium Draft Update:** Refocused the Rust/Polars article to sell Skyulf’s visual UX payoff (latency) and highlight the Calculator/Applier pattern.
+- **Medium Draft Update:** Replaced generic Polars examples with real Skyulf code paths (Polars lazy preview + Calculator/Applier sklearn boundary).
+- **Medium Draft Polish:** Clarified the sklearn Calculator/Applier snippet by explicitly instantiating a model in the example (less “magic” for junior readers).
+- **HN Version:** Added a Hacker News–style short post focused on Skyulf’s interactive UX, Polars previews, and Calculator/Applier boundaries.
+- **HN Version Update:** Replaced the dummy sklearn instantiation with real `SklearnCalculator` / `SklearnApplier` excerpts to better reflect Skyulf’s implementation.
+- **Pipeline Integration:** Updated `FeatureEngineer` to explicitly support `SkyulfDataFrame` in `transform` and `fit_transform` methods, enabling full Polars/Protocol pass-through.
+
 ------------------------------------------------------------
 ## v0.1.7
 **"The Advanced EDA & Profiling Update"**

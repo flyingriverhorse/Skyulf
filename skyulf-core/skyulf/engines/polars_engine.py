@@ -44,6 +44,9 @@ class SkyulfPolarsWrapper:
 
     def copy(self) -> "SkyulfDataFrame":
         return SkyulfPolarsWrapper(self._df.clone())
+
+    def __getitem__(self, key):
+        return self._df[key]
         
     def __getattr__(self, name):
         return getattr(self._df, name)
@@ -74,6 +77,11 @@ class PolarsEngine(BaseEngine):
         if isinstance(data, SkyulfPolarsWrapper):
             return data
         return SkyulfPolarsWrapper(data)
+
+    @classmethod
+    def create_dataframe(cls, data: Any) -> Any:
+        if not HAS_POLARS: raise ImportError("Polars not installed")
+        return pl.DataFrame(data)
 
 # Register automatically
 if HAS_POLARS:

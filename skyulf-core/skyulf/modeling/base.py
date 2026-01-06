@@ -93,10 +93,21 @@ class StatefulEstimator:
             if target_column not in data.columns:
                 raise ValueError(f"Target column '{target_column}' not found in data")
 
-            # Fallback for pure Pandas
-            if isinstance(data, pd.DataFrame):
-                return data.drop(columns=[target_column]), data[target_column]
-
+            # Fallback for pure Pandas or Generic DataFrame
+            # If we reached here without matching Polars explicitly, treat as generic/pandas
+            # Try generic drop if available
+            if hasattr(data, "drop"):
+                # Handle pandas-like drop
+                try:
+                    return data.drop(columns=[target_column]), data[target_column]
+                except TypeError:
+                    # Maybe it doesn't support columns= kwarg, try position or list
+                    pass
+            
+            # Simple attribute access fallback
+            if hasattr(data, target_column):
+                 return data, getattr(data, target_column)
+                 
         raise ValueError(f"Unexpected data type: {type(data)}")
 
     def cross_validate(
