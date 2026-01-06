@@ -19,8 +19,7 @@ import { SampleDataTab } from '../components/eda/tabs/SampleDataTab';
 import { CausalTab } from '../components/eda/tabs/CausalTab';
 import { RuleDiscoveryTab } from '../components/eda/tabs/RuleDiscoveryTab';
 import { DecompositionTab } from '../components/eda/tabs/DecompositionTab';
-import { ClusteringTab } from '../components/eda/tabs/ClusteringTab';
-import { Loader2, RefreshCw, AlertCircle, BarChart2, List, Play, HelpCircle } from 'lucide-react';
+import { Loader2, RefreshCw, AlertCircle, BarChart2, List, Play, HelpCircle, Target } from 'lucide-react';
 import { downloadChart } from '../core/utils/chartUtils';
 
 export const EDAPage: React.FC = () => {
@@ -367,7 +366,7 @@ export const EDAPage: React.FC = () => {
     const allColumns = report?.profile_data?.columns ? Object.keys(report.profile_data.columns) : [];
 
     return (
-      <div className="flex h-[calc(100vh-124px)] border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-900">
+      <div className="flex h-full w-full overflow-hidden bg-white dark:bg-gray-900">
         <EDASidebar 
             activeTab={activeTab} 
             setActiveTab={setActiveTab} 
@@ -488,123 +487,148 @@ export const EDAPage: React.FC = () => {
   };
 
   return (
-    <div id="eda-report-container" className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-4">
+    <div className="flex flex-col h-full w-full overflow-hidden bg-white dark:bg-slate-950">
+      {/* Top Navigation Bar */}
+      <header className="flex-none h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800 px-4 flex items-center justify-between gap-4 z-20 shadow-sm">
+        
+        {/* Left: Title & Dataset */}
+        <div className="flex items-center gap-6">
             <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Exploratory Data Analysis</h1>
+                <h1 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">Exploratory Analysis</h1>
                 {report && report.created_at && (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-[10px] text-gray-500">
                         Last analyzed: {new Date(report.created_at).toLocaleString()}
                     </p>
                 )}
             </div>
-            <div className="flex gap-2 no-print">
-                <button 
-                    onClick={() => setShowHistoryModal(true)}
-                    className="flex items-center px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors ml-4"
+
+            <div className="h-8 w-px bg-gray-200 dark:bg-gray-700 mx-2"></div>
+            
+            <div className="flex flex-col">
+                <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Dataset</label>
+                <select
+                    value={selectedDataset || ''}
+                    onChange={(e) => setSelectedDataset(Number(e.target.value))}
+                    className="block w-48 text-sm font-medium bg-transparent border-none p-0 focus:ring-0 text-gray-900 dark:text-white cursor-pointer hover:text-blue-600"
                 >
-                    <List className="w-4 h-4 mr-2" />
-                    Jobs History
-                </button>
+                    <option value="" disabled>Select a dataset</option>
+                    {datasets.map((ds) => (
+                    <option key={ds.id} value={ds.id}>{ds.name}</option>
+                    ))}
+                </select>
             </div>
         </div>
-        <div className="flex items-center gap-4 no-print">
-          <select
-            value={selectedDataset || ''}
-            onChange={(e) => setSelectedDataset(Number(e.target.value))}
-            className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-          >
-            <option value="" disabled>Select a dataset</option>
-            {datasets.map((ds) => (
-              <option key={ds.id} value={ds.id}>{ds.name}</option>
-            ))}
-          </select>
 
-          <div className="flex items-center gap-2">
-             <span className="text-sm text-gray-500">Target:</span>
-             <select
-                value={targetCol}
-                onChange={(e) => setTargetCol(e.target.value)}
-                disabled={!report || !report.profile_data}
-                className="block w-40 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border disabled:opacity-50"
-             >
-                <option value="">None</option>
-               {report && report.profile_data && Object.keys(report.profile_data.columns)
-                  .filter((col) => !excludedColsDraft.includes(col))
-                  .map(col => (
-                    <option key={col} value={col}>{col}</option>
-                ))}
-             </select>
-             
-             <div className="flex items-center gap-1">
+        {/* Center: Controls */}
+        <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800/50 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col px-2">
+                <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Target Column</label>
+                <select
+                    value={targetCol}
+                    onChange={(e) => setTargetCol(e.target.value)}
+                    disabled={!report || !report.profile_data}
+                    className="block w-36 text-sm bg-transparent border-none p-0 focus:ring-0 text-gray-700 dark:text-gray-200 cursor-pointer disabled:opacity-50"
+                >
+                    <option value="">None</option>
+                    {report && report.profile_data && Object.keys(report.profile_data.columns)
+                        .filter((col) => !excludedColsDraft.includes(col))
+                        .map(col => (
+                            <option key={col} value={col}>{col}</option>
+                    ))}
+                </select>
+            </div>
+
+            <div className="w-px h-8 bg-gray-200 dark:bg-gray-700"></div>
+
+            <div className="flex flex-col px-2">
+                <div className="flex items-center gap-1">
+                    <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Task Type</label>
+                    <div className="group relative">
+                        <HelpCircle className="w-3 h-3 text-gray-400 cursor-help" />
+                        <div className="absolute bottom-full mb-2 w-56 p-2 bg-slate-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none left-1/2 -translate-x-1/2">
+                            Force Classification or Regression.
+                        </div>
+                    </div>
+                </div>
                 <select
                     value={taskType}
                     onChange={(e) => setTaskType(e.target.value)}
                     disabled={!report || !report.profile_data}
-                    className="block w-32 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border disabled:opacity-50"
-                    title="Force Task Type"
+                    className="block w-28 text-sm bg-transparent border-none p-0 focus:ring-0 text-gray-700 dark:text-gray-200 cursor-pointer disabled:opacity-50"
                 >
                     <option value="">Auto</option>
-                    <option value="Classification">Classif.</option>
-                    <option value="Regression">Regress.</option>
+                    <option value="Classification">Classification</option>
+                    <option value="Regression">Regression</option>
                 </select>
-                <div className="group relative flex items-center">
-                    <HelpCircle className="w-4 h-4 text-gray-400 cursor-help" />
-                    <div className="absolute right-0 top-full mt-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
-                        Force a specific task type. Useful for ID columns (force Classification) or numeric categories (force Regression).
-                    </div>
-                </div>
-             </div>
-          </div>
+            </div>
 
-          <button 
-            onClick={() => selectedDataset && runAnalysis()}
-            disabled={!selectedDataset || analyzing}
-            className="p-2 text-gray-500 hover:text-blue-600 rounded-full hover:bg-gray-100"
-            title="Refresh Analysis"
-          >
-            <RefreshCw className={`w-5 h-5 ${analyzing ? 'animate-spin' : ''}`} />
-          </button>
-          
-          {/* Quick Load Button if existing report found for selected target */}
-          {existingReport && report && report.id !== existingReport.id && (
-             <button
-                onClick={() => loadSpecificReport(existingReport.id)}
-                className="flex items-center px-3 py-1.5 text-xs bg-green-100 text-green-700 border border-green-200 rounded-md hover:bg-green-200 transition-colors"
-                title={`Load existing analysis from ${new Date(existingReport.created_at).toLocaleString()}`}
-             >
-                <RefreshCw className="w-3 h-3 mr-1" />
-                Load Existing
-             </button>
-          )}
+            <button
+                onClick={() => selectedDataset && runAnalysis()}
+                disabled={!selectedDataset || analyzing}
+                className={`ml-2 px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center shadow-sm ${
+                    existingReport 
+                        ? 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700 border border-transparent'
+                }`}
+            >
+                {analyzing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                {existingReport ? 'Re-Run' : 'Analyze'}
+            </button>
         </div>
-      </div>
 
-      {/* Recent Targets Chips */}
-      {history.length > 0 && (
-        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 no-print">
-            <span className="text-xs text-gray-500 font-medium whitespace-nowrap">Recent Targets:</span>
-            {Array.from(new Set(history.filter(h => h.target_col && h.status === 'COMPLETED').map(h => h.target_col))).slice(0, 5).map(target => (
+        {/* Right: History & Actions */}
+        <div className="flex items-center gap-3">
+             {existingReport && report && report.id !== existingReport.id && (
                 <button
-                    key={target}
-                    onClick={() => {
-                        const match = history.find(h => h.target_col === target && h.status === 'COMPLETED');
-                        if (match) loadSpecificReport(match.id);
-                    }}
-                    className={`px-2 py-1 text-xs rounded-full border transition-colors ${
-                        report?.profile_data?.target_col === target 
-                        ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800'
-                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-700'
-                    }`}
+                    onClick={() => loadSpecificReport(existingReport.id)}
+                    className="flex items-center px-3 py-1.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 transition-colors"
+                    title={`Load existing from ${new Date(existingReport.created_at).toLocaleString()}`}
                 >
-                    {target}
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    Load Saved
                 </button>
-            ))}
+            )}
+            
+            <button 
+                onClick={() => setShowHistoryModal(true)}
+                className="flex items-center px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-50 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            >
+                <List className="w-4 h-4 mr-2" />
+                History
+            </button>
+        </div>
+      </header>
+
+      {/* Recent Targets Bar */}
+      {history.length > 0 && (
+        <div className="flex-none bg-white dark:bg-slate-950 border-b border-gray-100 dark:border-gray-800 px-4 py-1.5 flex items-center gap-3 overflow-x-auto z-10 shadow-[0_2px_3px_-1px_rgba(0,0,0,0.02)]">
+            <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider whitespace-nowrap">Recent Targets:</span>
+            <div className="flex gap-2">
+                {Array.from(new Set(history.filter(h => h.target_col && h.status === 'COMPLETED').map(h => h.target_col))).slice(0, 8).map(target => (
+                    <button
+                        key={target}
+                        onClick={() => {
+                            const match = history.find(h => h.target_col === target && h.status === 'COMPLETED');
+                            if (match) loadSpecificReport(match.id);
+                        }}
+                        className={`px-2 py-0.5 text-xs rounded-full border transition-colors flex items-center ${
+                            report?.profile_data?.target_col === target 
+                            ? 'bg-blue-50 text-blue-600 border-blue-200 font-medium'
+                            : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700'
+                        }`}
+                    >
+                        <Target className="w-3 h-3 mr-1" />
+                        {target}
+                    </button>
+                ))}
+            </div>
         </div>
       )}
 
-      {renderContent()}
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-hidden relative">
+        {renderContent()}
+      </div>
 
       {/* Variable Detail Modal */}
       <VariableDetailModal 
@@ -627,7 +651,6 @@ export const EDAPage: React.FC = () => {
         }}
         onSelect={(selectedReport) => {
             setReport(selectedReport);
-          // Also update excluded cols state to match the report
           const serverExcluded = Array.isArray(selectedReport.profile_data?.excluded_columns)
             ? selectedReport.profile_data.excluded_columns
             : [];

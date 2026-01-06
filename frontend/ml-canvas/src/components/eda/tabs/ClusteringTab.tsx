@@ -1,7 +1,6 @@
 import React from 'react';
 import { Network, Download, Info } from 'lucide-react';
 import { InfoTooltip } from '../../ui/InfoTooltip';
-import { CanvasScatterPlot } from '../CanvasScatterPlot';
 
 interface ClusterStats {
     cluster_id: number;
