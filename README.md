@@ -152,7 +152,8 @@ For detailed examples including **Time Series**, **Geospatial Analysis**, and **
 ## Key Features
 
 *   **🎨 Visual Feature Canvas:** A node-based editor to clean, transform, and engineer features without writing spaghetti code. (25+ built-in nodes).
-*   **Automated EDA:** Professional-grade Exploratory Data Analysis with interactive charts, causal discovery (DAGs), decision trees for rule extraction, outlier detection, and statistical alerts.
+*   **Automated EDA:** Professional-grade Exploratory Data Analysis with interactive charts, causal discovery (DAGs), decision trees for rule extraction, segmentation, outlier detection, and statistical alerts.
+*   **Drift Analysis** Built on the EDA engine to monitor data and model drift over time with statistical tests and visualizations.
 *   **High-Performance Engine:** Built on **FastAPI** and **Polars** for lightning-fast data processing and easy API extension.
 *   **⚡ Async by Default:** Heavy training jobs run in the background via Celery & Redis (or background threads)—your UI never freezes.
 *   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or SQL. Start with SQLite (zero-config) and scale to PostgreSQL.
