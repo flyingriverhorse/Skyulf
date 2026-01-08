@@ -27,9 +27,9 @@ class BaseBinningApplier(BaseApplier):
 
     def apply(  # noqa: C901
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -51,12 +51,13 @@ class BaseBinningApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            X_pl: Any = X
 
             exprs = []
             cols_to_drop = []
 
             for col, edges in bin_edges_map.items():
-                if col not in X.columns:
+                if col not in X_pl.columns:
                     continue
                 
                 if drop_original:
@@ -94,7 +95,7 @@ class BaseBinningApplier(BaseApplier):
                     # Range or Custom Labels
                     exprs.append(cut_expr.alias(target_col_name))
 
-            X_out = X.with_columns(exprs)
+            X_out = X_pl.with_columns(exprs)
             if drop_original:
                 X_out = X_out.drop(cols_to_drop)
             
@@ -227,7 +228,7 @@ class GeneralBinningCalculator(BaseCalculator):
     """
 
     def fit(  # noqa: C901
-        self, df: SkyulfDataFrame, config: Dict[str, Any]
+        self, df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any], config: Dict[str, Any]
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
         
@@ -365,7 +366,7 @@ class CustomBinningCalculator(BaseCalculator):
 
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -418,7 +419,7 @@ class KBinsDiscretizerCalculator(GeneralBinningCalculator):
 
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         new_config = config.copy()

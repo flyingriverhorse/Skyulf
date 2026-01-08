@@ -92,10 +92,11 @@ def _resolve_estimator(key: Optional[str], problem_type: str) -> Any:
 class VarianceThresholdApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         selected_cols = params.get("selected_columns")
         candidate_columns = params.get("candidate_columns", [])
@@ -108,8 +109,10 @@ class VarianceThresholdApplier(BaseApplier):
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
 
         if cols_to_drop_list and drop_columns:
-            if hasattr(X, "select"):
-                X = X.drop(cols_to_drop_list)
+            if engine.name == "polars":
+                import polars as pl
+                X_pl: Any = X
+                X = X_pl.drop(cols_to_drop_list)
             else:
                 X = X.drop(columns=cols_to_drop_list)
         return pack_pipeline_output(X, y, is_tuple)
@@ -126,10 +129,11 @@ class VarianceThresholdApplier(BaseApplier):
 class VarianceThresholdCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         # Config: {"threshold": 0.0, "columns": [...]}
         threshold = config.get("threshold", 0.0)
@@ -147,7 +151,12 @@ class VarianceThresholdCalculator(BaseCalculator):
         selector = VarianceThreshold(threshold=threshold)
         
         # Use Bridge for fitting
-        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
+        if engine.name == "polars":
+            X_pl: Any = X
+            X_subset = X_pl.select(cols)
+        else:
+            X_subset = X[cols]
+
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
         
         selector.fit(X_np)
@@ -175,10 +184,11 @@ class VarianceThresholdCalculator(BaseCalculator):
 class CorrelationThresholdApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         cols_to_drop = params.get("columns_to_drop", [])
         drop_columns = params.get("drop_columns", True)
@@ -188,8 +198,10 @@ class CorrelationThresholdApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         if drop_columns:
-            if hasattr(X, "select"):
-                X = X.drop(cols_to_drop)
+            if engine.name == "polars":
+                import polars as pl
+                X_pl: Any = X
+                X = X_pl.drop(cols_to_drop)
             else:
                 X = X.drop(columns=cols_to_drop)
         return pack_pipeline_output(X, y, is_tuple)
@@ -206,10 +218,16 @@ class CorrelationThresholdApplier(BaseApplier):
 class CorrelationThresholdCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+        engine = get_engine(X)
+        
+        # Ensure pandas for correlation logic
+        if engine.name == "polars":
+            # X comes in as Any (SkyulfDataFrame), cast to pandas
+            X = X.to_pandas()
 
         # Config: {"threshold": 0.95, "correlation_method": "pearson"}
         threshold = config.get("threshold", 0.95)
@@ -243,10 +261,11 @@ class CorrelationThresholdCalculator(BaseCalculator):
 class UnivariateSelectionApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         selected_cols = params.get("selected_columns")
         candidate_columns = params.get("candidate_columns", [])
@@ -258,8 +277,10 @@ class UnivariateSelectionApplier(BaseApplier):
         cols_to_drop_set = set(candidate_columns) - set(selected_cols)
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
         if cols_to_drop_list and drop_columns:
-            if hasattr(X, "select"):
-                X = X.drop(cols_to_drop_list)
+            if engine.name == "polars":
+                import polars as pl
+                X_pl: Any = X
+                X = X_pl.drop(cols_to_drop_list)
             else:
                 X = X.drop(columns=cols_to_drop_list)
         return pack_pipeline_output(X, y, is_tuple)
@@ -276,13 +297,14 @@ class UnivariateSelectionApplier(BaseApplier):
 class UnivariateSelectionCalculator(BaseCalculator):
     def fit(  # noqa: C901
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: method, k, percentile, alpha, score_func, target_column
         target_col = config.get("target_column")
 
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         if not is_tuple:
             if not target_col or target_col not in X.columns:
@@ -291,10 +313,9 @@ class UnivariateSelectionCalculator(BaseCalculator):
                 )
                 return {}
             # Handle y extraction safely for Polars
-            engine = get_engine(X)
             if engine.name == "polars":
                 import polars as pl
-                y = X.select(target_col).to_series()
+                y = X.select(target_col).to_series().to_pandas()
             else:
                 y = X[target_col]
 
@@ -360,13 +381,12 @@ class UnivariateSelectionCalculator(BaseCalculator):
             return {}
 
         # Use Bridge for fitting
-        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
-        
-        # Fill NA for selection (simple 0 fill)
-        if hasattr(X_subset, "fill_null"): # Polars
-             X_subset = X_subset.fill_null(0)
+        if engine.name == "polars":
+             # Cast X for safety
+             X_pl: Any = X
+             X_subset = X_pl.select(cols).fill_null(0)
         else:
-             X_subset = X_subset.fillna(0)
+             X_subset = X[cols].fillna(0)
              
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
 
@@ -450,10 +470,11 @@ class UnivariateSelectionCalculator(BaseCalculator):
 class ModelBasedSelectionApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         selected_cols = params.get("selected_columns")
         candidate_columns = params.get("candidate_columns", [])
@@ -465,8 +486,10 @@ class ModelBasedSelectionApplier(BaseApplier):
         cols_to_drop_set = set(candidate_columns) - set(selected_cols)
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
         if cols_to_drop_list and drop_columns:
-            if hasattr(X, "select"):
-                X = X.drop(cols_to_drop_list)
+            if engine.name == "polars":
+                import polars as pl
+                X_pl: Any = X
+                X = X_pl.drop(cols_to_drop_list)
             else:
                 X = X.drop(columns=cols_to_drop_list)
         return pack_pipeline_output(X, y, is_tuple)
@@ -483,13 +506,14 @@ class ModelBasedSelectionApplier(BaseApplier):
 class ModelBasedSelectionCalculator(BaseCalculator):
     def fit(  # noqa: C901
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: method (select_from_model, rfe), estimator, target_column
         target_col = config.get("target_column")
 
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         if not is_tuple:
             if not target_col or target_col not in X.columns:
@@ -498,10 +522,9 @@ class ModelBasedSelectionCalculator(BaseCalculator):
                 )
                 return {}
             # Handle y extraction safely for Polars
-            engine = get_engine(X)
             if engine.name == "polars":
                 import polars as pl
-                y = X.select(target_col).to_series()
+                y = X.select(target_col).to_series().to_pandas()
             else:
                 y = X[target_col]
 
@@ -562,13 +585,11 @@ class ModelBasedSelectionCalculator(BaseCalculator):
             return {}
 
         # Use Bridge for fitting
-        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
-        
-        # Fill NA for selection (simple 0 fill)
-        if hasattr(X_subset, "fill_null"): # Polars
-             X_subset = X_subset.fill_null(0)
+        if engine.name == "polars":
+             X_pl: Any = X
+             X_subset = X_pl.select(cols).fill_null(0)
         else:
-             X_subset = X_subset.fillna(0)
+             X_subset = X[cols].fillna(0)
              
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
 
@@ -637,9 +658,9 @@ class ModelBasedSelectionCalculator(BaseCalculator):
 class FeatureSelectionApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         # The params returned by the specific calculator will have a "type" field
         # corresponding to the specific calculator's return value.
         type_name = params.get("type")
@@ -670,7 +691,7 @@ class FeatureSelectionApplier(BaseApplier):
 class FeatureSelectionCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         method = config.get("method", "select_k_best")

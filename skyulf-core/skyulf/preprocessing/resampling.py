@@ -26,23 +26,39 @@ logger = logging.getLogger(__name__)
 class OversamplingApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
+        was_polars = engine.name == "polars"
         target_col = params.get("target_column")
 
         # Resampling requires y. If not provided in tuple, try to extract from dataframe using target_column
         if y is None:
             if target_col and target_col in X.columns:
-                y = X[target_col]
-                X = X.drop(columns=[target_col])
+                if was_polars:
+                    import polars as pl
+                    y = X.select(target_col).to_series()
+                    X = X.drop(target_col)
+                else:
+                    y = X[target_col]
+                    X = X.drop(columns=[target_col])
             else:
                 # Cannot resample without target
                 return pack_pipeline_output(X, y, is_tuple)
+        
+        # Convert to Pandas for imblearn
+        if was_polars:
+            import polars as pl
+            X_pd = X.to_pandas()
+            y_pd = y.to_pandas() if hasattr(y, "to_pandas") else y
+        else:
+            X_pd = X
+            y_pd = y
 
         # Check for non-numeric columns
-        non_numeric_cols = X.select_dtypes(exclude=[np.number]).columns
+        non_numeric_cols = X_pd.select_dtypes(exclude=[np.number]).columns
         if len(non_numeric_cols) > 0:
             raise ValueError(
                 f"Resampling requires all features to be numeric. Found non-numeric columns: {list(non_numeric_cols)}. "
@@ -105,13 +121,18 @@ class OversamplingApplier(BaseApplier):
         if not sampler:
             return pack_pipeline_output(X, y, is_tuple)
 
-        X_res, y_res = sampler.fit_resample(X, y)
+        X_res, y_res = sampler.fit_resample(X_pd, y_pd)
 
         # Ensure we return DataFrame/Series with correct names/columns
         if not isinstance(X_res, pd.DataFrame):
-            X_res = pd.DataFrame(X_res, columns=X.columns)
+            X_res = pd.DataFrame(X_res, columns=X_pd.columns)
         if not isinstance(y_res, pd.Series):
-            y_res = pd.Series(y_res, name=y.name if y is not None else target_col)
+            y_res = pd.Series(y_res, name=y_pd.name if y_pd is not None else target_col)
+
+        # Convert back if needed
+        if was_polars:
+            X_res = pl.from_pandas(X_res)
+            y_res = pl.from_pandas(y_res)
 
         return pack_pipeline_output(X_res, y_res, is_tuple)
 
@@ -127,7 +148,7 @@ class OversamplingApplier(BaseApplier):
 class OversamplingCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: {'method': 'smote', 'target_column': 'target', 'sampling_strategy': 'auto', ...}
@@ -155,23 +176,39 @@ class OversamplingCalculator(BaseCalculator):
 class UndersamplingApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
+        was_polars = engine.name == "polars"
         target_col = params.get("target_column")
 
         # Resampling requires y. If not provided in tuple, try to extract from dataframe using target_column
         if y is None:
             if target_col and target_col in X.columns:
-                y = X[target_col]
-                X = X.drop(columns=[target_col])
+                if was_polars:
+                    import polars as pl
+                    y = X.select(target_col).to_series()
+                    X = X.drop(target_col)
+                else:
+                    y = X[target_col]
+                    X = X.drop(columns=[target_col])
             else:
                 # Cannot resample without target
                 return pack_pipeline_output(X, y, is_tuple)
 
+        # Convert to Pandas for imblearn
+        if was_polars:
+            import polars as pl
+            X_pd = X.to_pandas()
+            y_pd = y.to_pandas() if hasattr(y, "to_pandas") else y
+        else:
+            X_pd = X
+            y_pd = y
+
         # Check for non-numeric columns
-        non_numeric_cols = X.select_dtypes(exclude=[np.number]).columns
+        non_numeric_cols = X_pd.select_dtypes(exclude=[np.number]).columns
         if len(non_numeric_cols) > 0:
             raise ValueError(
                 f"Resampling requires all features to be numeric. Found non-numeric columns: {list(non_numeric_cols)}. "
@@ -206,13 +243,18 @@ class UndersamplingApplier(BaseApplier):
         if not sampler:
             return pack_pipeline_output(X, y, is_tuple)
 
-        X_res, y_res = sampler.fit_resample(X, y)
+        X_res, y_res = sampler.fit_resample(X_pd, y_pd)
 
         # Ensure we return DataFrame/Series with correct names/columns
         if not isinstance(X_res, pd.DataFrame):
-            X_res = pd.DataFrame(X_res, columns=X.columns)
+            X_res = pd.DataFrame(X_res, columns=X_pd.columns)
         if not isinstance(y_res, pd.Series):
-            y_res = pd.Series(y_res, name=y.name if y is not None else target_col)
+            y_res = pd.Series(y_res, name=y_pd.name if y_pd is not None else target_col)
+
+        # Convert back if needed
+        if was_polars:
+            X_res = pl.from_pandas(X_res)
+            y_res = pl.from_pandas(y_res)
 
         return pack_pipeline_output(X_res, y_res, is_tuple)
 
@@ -228,7 +270,7 @@ class UndersamplingApplier(BaseApplier):
 class UndersamplingCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         return {

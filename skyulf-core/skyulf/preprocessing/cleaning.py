@@ -97,9 +97,9 @@ def _auto_detect_datetime_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> L
 class TextCleaningApplier(BaseApplier):
     def apply(  # noqa: C901
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -273,7 +273,7 @@ class TextCleaningApplier(BaseApplier):
 class TextCleaningCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config:
@@ -304,9 +304,9 @@ class TextCleaningCalculator(BaseCalculator):
 class InvalidValueReplacementApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -413,7 +413,7 @@ class InvalidValueReplacementApplier(BaseApplier):
 class InvalidValueReplacementCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -435,9 +435,9 @@ class InvalidValueReplacementCalculator(BaseCalculator):
 class ValueReplacementApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -532,7 +532,7 @@ class ValueReplacementApplier(BaseApplier):
 class ValueReplacementCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -566,9 +566,9 @@ class ValueReplacementCalculator(BaseCalculator):
 class AliasReplacementApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -685,7 +685,7 @@ class AliasReplacementApplier(BaseApplier):
 class AliasReplacementCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)

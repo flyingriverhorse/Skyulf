@@ -11,8 +11,10 @@ from ..engines import SkyulfDataFrame, get_engine
 
 class DatasetProfileApplier(BaseApplier):
     def apply(
-        self, df: SkyulfDataFrame, params: Dict[str, Any]
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+        self,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         # Inspection nodes do not modify data
         return df
 
@@ -27,7 +29,9 @@ class DatasetProfileApplier(BaseApplier):
 )
 class DatasetProfileCalculator(BaseCalculator):
     def fit(
-        self, df: SkyulfDataFrame, config: Dict[str, Any]
+        self,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Generate a lightweight dataset profile
         X, _, _ = unpack_pipeline_input(df)
@@ -90,8 +94,10 @@ class DatasetProfileCalculator(BaseCalculator):
 
 class DataSnapshotApplier(BaseApplier):
     def apply(
-        self, df: SkyulfDataFrame, params: Dict[str, Any]
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+        self,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        params: Dict[str, Any],
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         return df
 
 
@@ -105,7 +111,9 @@ class DataSnapshotApplier(BaseApplier):
 )
 class DataSnapshotCalculator(BaseCalculator):
     def fit(
-        self, df: SkyulfDataFrame, config: Dict[str, Any]
+        self,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
