@@ -12,6 +12,7 @@ from ..utils import (
     unpack_pipeline_input,
 )
 from .base import BaseApplier, BaseCalculator
+from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ..engines import SkyulfDataFrame, get_engine
 
@@ -94,6 +95,13 @@ class IQRApplier(BaseApplier):
 
 
 @NodeRegistry.register("IQR", IQRApplier)
+@node_meta(
+    id="IQR",
+    name="IQR Outlier Removal",
+    category="Preprocessing",
+    description="Remove outliers using Interquartile Range.",
+    params={"factor": 1.5, "columns": []}
+)
 class IQRCalculator(BaseCalculator):
     def fit(
         self,
@@ -228,6 +236,13 @@ class ZScoreApplier(BaseApplier):
 
 
 @NodeRegistry.register("ZScore", ZScoreApplier)
+@node_meta(
+    id="ZScore",
+    name="Z-Score Outlier Removal",
+    category="Preprocessing",
+    description="Remove outliers using Z-Score.",
+    params={"threshold": 3.0, "columns": []}
+)
 class ZScoreCalculator(BaseCalculator):
     def fit(
         self,
@@ -326,6 +341,13 @@ class WinsorizeApplier(BaseApplier):
 
 
 @NodeRegistry.register("Winsorize", WinsorizeApplier)
+@node_meta(
+    id="Winsorize",
+    name="Winsorization",
+    category="Preprocessing",
+    description="Limit extreme values in the data.",
+    params={"limits": [0.05, 0.05], "columns": []}
+)
 class WinsorizeCalculator(BaseCalculator):
     def fit(
         self,
@@ -452,6 +474,13 @@ class ManualBoundsApplier(BaseApplier):
 
 
 @NodeRegistry.register("ManualBounds", ManualBoundsApplier)
+@node_meta(
+    id="ManualBounds",
+    name="Manual Bounds",
+    category="Preprocessing",
+    description="Filter outliers by manually specifying lower and upper bounds for columns.",
+    params={"bounds": {}}
+)
 class ManualBoundsCalculator(BaseCalculator):
     def fit(
         self,
@@ -561,6 +590,13 @@ class EllipticEnvelopeApplier(BaseApplier):
 
 
 @NodeRegistry.register("EllipticEnvelope", EllipticEnvelopeApplier)
+@node_meta(
+    id="EllipticEnvelope",
+    name="Elliptic Envelope",
+    category="Preprocessing",
+    description="Detect outliers in a Gaussian distributed dataset.",
+    params={"contamination": 0.01, "columns": []}
+)
 class EllipticEnvelopeCalculator(BaseCalculator):
     def fit(
         self,

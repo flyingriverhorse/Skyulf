@@ -13,6 +13,7 @@ from imblearn.under_sampling import (
 )
 
 from ..registry import NodeRegistry
+from ..core.meta.decorators import node_meta
 from ..utils import pack_pipeline_output, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
 from ..engines import SkyulfDataFrame, get_engine
@@ -116,6 +117,13 @@ class OversamplingApplier(BaseApplier):
 
 
 @NodeRegistry.register("Oversampling", OversamplingApplier)
+@node_meta(
+    id="Oversampling",
+    name="Oversampling",
+    category="Preprocessing",
+    description="Resample dataset to balance classes by oversampling minority class.",
+    params={"method": "smote", "target_column": "target", "sampling_strategy": "auto"}
+)
 class OversamplingCalculator(BaseCalculator):
     def fit(
         self,
@@ -210,6 +218,13 @@ class UndersamplingApplier(BaseApplier):
 
 
 @NodeRegistry.register("Undersampling", UndersamplingApplier)
+@node_meta(
+    id="Undersampling",
+    name="Undersampling",
+    category="Preprocessing",
+    description="Resample dataset to balance classes by undersampling majority class.",
+    params={"method": "random_under_sampling", "target_column": "target", "sampling_strategy": "auto"}
+)
 class UndersamplingCalculator(BaseCalculator):
     def fit(
         self,

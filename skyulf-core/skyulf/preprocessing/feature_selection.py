@@ -31,6 +31,7 @@ from ..utils import (
 )
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
+from ..core.meta.decorators import node_meta
 from ..engines import SkyulfDataFrame, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
 
@@ -115,6 +116,13 @@ class VarianceThresholdApplier(BaseApplier):
 
 
 @NodeRegistry.register("VarianceThreshold", VarianceThresholdApplier)
+@node_meta(
+    id="VarianceThreshold",
+    name="Variance Threshold",
+    category="Feature Selection",
+    description="Remove features with low variance.",
+    params={"threshold": 0.0}
+)
 class VarianceThresholdCalculator(BaseCalculator):
     def fit(
         self,
@@ -188,6 +196,13 @@ class CorrelationThresholdApplier(BaseApplier):
 
 
 @NodeRegistry.register("CorrelationThreshold", CorrelationThresholdApplier)
+@node_meta(
+    id="CorrelationThreshold",
+    name="Correlation Threshold",
+    category="Feature Selection",
+    description="Remove features highly correlated with others.",
+    params={"threshold": 0.95, "method": "pearson"}
+)
 class CorrelationThresholdCalculator(BaseCalculator):
     def fit(
         self,
@@ -251,6 +266,13 @@ class UnivariateSelectionApplier(BaseApplier):
 
 
 @NodeRegistry.register("UnivariateSelection", UnivariateSelectionApplier)
+@node_meta(
+    id="UnivariateSelection",
+    name="Univariate Selection",
+    category="Feature Selection",
+    description="Select best features based on univariate statistical tests.",
+    params={"method": "SelectKBest", "score_func": "f_classif", "k": 10}
+)
 class UnivariateSelectionCalculator(BaseCalculator):
     def fit(  # noqa: C901
         self,
@@ -451,6 +473,13 @@ class ModelBasedSelectionApplier(BaseApplier):
 
 
 @NodeRegistry.register("ModelBasedSelection", ModelBasedSelectionApplier)
+@node_meta(
+    id="ModelBasedSelection",
+    name="Model-Based Selection",
+    category="Feature Selection",
+    description="Select features based on importance weights.",
+    params={"estimator": "RandomForest", "threshold": "mean", "max_features": None}
+)
 class ModelBasedSelectionCalculator(BaseCalculator):
     def fit(  # noqa: C901
         self,
@@ -631,6 +660,13 @@ class FeatureSelectionApplier(BaseApplier):
 
 
 @NodeRegistry.register("feature_selection", FeatureSelectionApplier)
+@node_meta(
+    id="feature_selection",
+    name="Feature Selection (Wrapper)",
+    category="Feature Selection",
+    description="General wrapper for feature selection strategies.",
+    params={"method": "variance", "threshold": 0.0}
+)
 class FeatureSelectionCalculator(BaseCalculator):
     def fit(
         self,

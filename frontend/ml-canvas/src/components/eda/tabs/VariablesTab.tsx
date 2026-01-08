@@ -14,7 +14,6 @@ interface VariablesTabProps {
 
 export const VariablesTab: React.FC<VariablesTabProps> = ({
     profile,
-    setSelectedVariable,
     handleToggleExclude,
     handleAddFilter
 }) => {

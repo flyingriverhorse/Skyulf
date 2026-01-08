@@ -12,6 +12,7 @@ from sklearn.preprocessing import (
 
 from ..utils import pack_pipeline_output, resolve_columns, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
+from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ..engines import SkyulfDataFrame, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
@@ -136,6 +137,19 @@ class OneHotEncoderApplier(BaseApplier):
 
 
 @NodeRegistry.register("OneHotEncoder", OneHotEncoderApplier)
+@node_meta(
+    id="OneHotEncoder",
+    name="One-Hot Encoder",
+    category="Preprocessing",
+    description="Encodes categorical features as a one-hot numeric array.",
+    params={
+        "handle_unknown": "ignore", 
+        "drop_first": False, 
+        "max_categories": 20, 
+        "columns": [],
+        "include_missing": False
+    }
+)
 class OneHotEncoderCalculator(BaseCalculator):
     def fit(
         self,
@@ -293,6 +307,13 @@ class OrdinalEncoderApplier(BaseApplier):
 
 
 @NodeRegistry.register("OrdinalEncoder", OrdinalEncoderApplier)
+@node_meta(
+    id="OrdinalEncoder",
+    name="Ordinal Encoder",
+    category="Preprocessing",
+    description="Encodes categorical features as an integer array.",
+    params={"columns": []}
+)
 class OrdinalEncoderCalculator(BaseCalculator):
     def fit(
         self,
@@ -409,6 +430,13 @@ class LabelEncoderApplier(BaseApplier):
 
 
 @NodeRegistry.register("LabelEncoder", LabelEncoderApplier)
+@node_meta(
+    id="LabelEncoder",
+    name="Label Encoder",
+    category="Preprocessing",
+    description="Encode target labels with value between 0 and n_classes-1.",
+    params={"columns": []}
+)
 class LabelEncoderCalculator(BaseCalculator):
     def fit(
         self,
@@ -563,6 +591,13 @@ class TargetEncoderApplier(BaseApplier):
 
 
 @NodeRegistry.register("TargetEncoder", TargetEncoderApplier)
+@node_meta(
+    id="TargetEncoder",
+    name="Target Encoder",
+    category="Preprocessing",
+    description="Encode categorical features using target statistics.",
+    params={"smoothing": 10.0, "columns": []}
+)
 class TargetEncoderCalculator(BaseCalculator):
     def fit(
         self,
@@ -669,6 +704,13 @@ class HashEncoderApplier(BaseApplier):
 
 
 @NodeRegistry.register("HashEncoder", HashEncoderApplier)
+@node_meta(
+    id="HashEncoder",
+    name="Hash Encoder",
+    category="Preprocessing",
+    description="Encode categorical features using hashing.",
+    params={"n_components": 8, "columns": []}
+)
 class HashEncoderCalculator(BaseCalculator):
     def fit(
         self,
@@ -760,6 +802,13 @@ class DummyEncoderApplier(BaseApplier):
 
 
 @NodeRegistry.register("DummyEncoder", DummyEncoderApplier)
+@node_meta(
+    id="DummyEncoder",
+    name="Dummy Encoder",
+    category="Preprocessing",
+    description="Convert categorical variables into dummy/indicator variables (pandas.get_dummies).",
+    params={"columns": [], "drop_first": False}
+)
 class DummyEncoderCalculator(BaseCalculator):
     def fit(
         self,

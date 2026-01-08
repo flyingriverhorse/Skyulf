@@ -7,6 +7,7 @@ import pandas as pd
 from sklearn.preprocessing import PolynomialFeatures
 
 from ..registry import NodeRegistry
+from ..core.meta.decorators import node_meta
 from ..utils import detect_numeric_columns, pack_pipeline_output, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
 from ..engines import SkyulfDataFrame, get_engine
@@ -211,6 +212,13 @@ class PolynomialFeaturesApplier(BaseApplier):
 
 @NodeRegistry.register("PolynomialFeatures", PolynomialFeaturesApplier)
 @NodeRegistry.register("PolynomialFeaturesNode", PolynomialFeaturesApplier)
+@node_meta(
+    id="PolynomialFeatures",
+    name="Polynomial Features",
+    category="Feature Engineering",
+    description="Generate polynomial and interaction features.",
+    params={"degree": 2, "interaction_only": False, "include_bias": False}
+)
 class PolynomialFeaturesCalculator(BaseCalculator):
     def fit(
         self,
@@ -634,6 +642,13 @@ class FeatureGenerationApplier(BaseApplier):
 @NodeRegistry.register("FeatureGeneration", FeatureGenerationApplier)
 @NodeRegistry.register("FeatureMath", FeatureGenerationApplier)
 @NodeRegistry.register("FeatureGenerationNode", FeatureGenerationApplier)
+@node_meta(
+    id="FeatureGenerationNode",
+    name="Feature Generation (Math)",
+    category="Feature Engineering",
+    description="Generate new features using mathematical operations.",
+    params={"operations": []}
+)
 class FeatureGenerationCalculator(BaseCalculator):
     def fit(
         self,

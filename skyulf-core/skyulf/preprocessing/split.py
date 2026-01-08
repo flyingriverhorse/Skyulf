@@ -5,6 +5,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from ..registry import NodeRegistry
+from ..core.meta.decorators import node_meta
 from ..data.dataset import SplitDataset
 from .base import BaseApplier, BaseCalculator
 from ..engines import SkyulfDataFrame, get_engine
@@ -46,6 +47,13 @@ class SplitApplier(BaseApplier):
 
 @NodeRegistry.register("Split", SplitApplier)
 @NodeRegistry.register("TrainTestSplitter", SplitApplier)
+@node_meta(
+    id="TrainTestSplitter",
+    name="Train/Test Split",
+    category="Data Operations",
+    description="Split the dataset into training and testing sets.",
+    params={"test_size": 0.2, "validation_size": 0.0, "random_state": 42, "shuffle": True, "stratify": False, "target_column": "target"}
+)
 class SplitCalculator(BaseCalculator):
     def fit(
         self, df: SkyulfDataFrame, config: Dict[str, Any]
@@ -284,6 +292,13 @@ class FeatureTargetSplitApplier(BaseApplier):
 
 
 @NodeRegistry.register("feature_target_split", FeatureTargetSplitApplier)
+@node_meta(
+    id="feature_target_split",
+    name="Feature/Target Split",
+    category="Data Operations",
+    description="Split the dataset into features (X) and target (y).",
+    params={"target_column": "target"}
+)
 class FeatureTargetSplitCalculator(BaseCalculator):
     def fit(
         self,

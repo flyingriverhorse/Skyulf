@@ -51,7 +51,8 @@ const BestParamsModal: React.FC<{
     onClose: () => void; 
     modelType: string; 
     onSelect: (params: unknown) => void;
-}> = ({ isOpen, onClose, modelType: initialModelType, onSelect }) => {
+    availableModels?: RegistryItem[];
+}> = ({ isOpen, onClose, modelType: initialModelType, onSelect, availableModels = [] }) => {
     const [currentModelType, setCurrentModelType] = useState(initialModelType);
     const [jobs, setJobs] = useState<JobInfo[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -107,10 +108,19 @@ const BestParamsModal: React.FC<{
                                     onChange={(e) => { setCurrentModelType(e.target.value); }}
                                     className="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-blue-500 outline-none"
                                 >
-                                    <option value="random_forest_classifier">Random Forest Classifier</option>
-                                    <option value="logistic_regression">Logistic Regression</option>
-                                    <option value="ridge_regression">Ridge Regression</option>
-                                    <option value="random_forest_regressor">Random Forest Regressor</option>
+                                    {availableModels.length > 0 ? (
+                                        availableModels.map(model => (
+                                            <option key={model.id} value={model.id}>{model.name}</option>
+                                        ))
+                                    ) : (
+                                        // Fallback if no models passed (should not happen in normal flow)
+                                        <>
+                                            <option value="random_forest_classifier">Random Forest Classifier</option>
+                                            <option value="logistic_regression">Logistic Regression</option>
+                                            <option value="ridge_regression">Ridge Regression</option>
+                                            <option value="random_forest_regressor">Random Forest Regressor</option>
+                                        </>
+                                    )}
                                 </select>
                             </div>
                         </div>
@@ -326,16 +336,17 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
           setIsLoadingModels(true);
           try {
               const nodes = await registryApi.getAllNodes();
-              const models = nodes.filter(n => n.category === 'Model');
+              // Accept both "Model" (old) and "Modeling" (new skyulf-core)
+              const models = nodes.filter(n => n.category === 'Model' || n.category === 'Modeling');
               setAvailableModels(models);
           } catch (error) {
               console.error("Failed to fetch models:", error);
               // Fallback to static list if API fails
               setAvailableModels([
-                  { id: 'random_forest_classifier', name: 'Random Forest Classifier', category: 'Model', description: '', params: {} },
-                  { id: 'logistic_regression', name: 'Logistic Regression', category: 'Model', description: '', params: {} },
-                  { id: 'ridge_regression', name: 'Ridge Regression', category: 'Model', description: '', params: {} },
-                  { id: 'random_forest_regressor', name: 'Random Forest Regressor', category: 'Model', description: '', params: {} },
+                  { id: 'random_forest_classifier', name: 'Random Forest Classifier', category: 'Modeling', description: '', params: {} },
+                  { id: 'logistic_regression', name: 'Logistic Regression', category: 'Modeling', description: '', params: {} },
+                  { id: 'ridge_regression', name: 'Ridge Regression', category: 'Modeling', description: '', params: {} },
+                  { id: 'random_forest_regressor', name: 'Random Forest Regressor', category: 'Modeling', description: '', params: {} },
               ]);
           } finally {
               setIsLoadingModels(false);
@@ -681,6 +692,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
         isOpen={showParamsModal} 
         onClose={() => { setShowParamsModal(false); }}
         modelType={config.model_type}
+        availableModels={availableModels}
         onSelect={(result) => {
             // result contains { params, modelType }
             // If model type differs, we update it too

@@ -18,6 +18,7 @@ from ..utils import (
     unpack_pipeline_input,
 )
 from .base import BaseApplier, BaseCalculator
+from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ..engines import SkyulfDataFrame, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
@@ -84,6 +85,13 @@ class SimpleImputerApplier(BaseApplier):
 
 
 @NodeRegistry.register("SimpleImputer", SimpleImputerApplier)
+@node_meta(
+    id="SimpleImputer",
+    name="Simple Imputer",
+    category="Preprocessing",
+    description="Imputes missing values using mean, median, or constant.",
+    params={"strategy": "mean", "fill_value": None, "columns": []}
+)
 class SimpleImputerCalculator(BaseCalculator):
     def fit(
         self,
@@ -268,6 +276,13 @@ class KNNImputerApplier(BaseApplier):
 
 
 @NodeRegistry.register("KNNImputer", KNNImputerApplier)
+@node_meta(
+    id="KNNImputer",
+    name="KNN Imputer",
+    category="Preprocessing",
+    description="Impute missing values using k-Nearest Neighbors.",
+    params={"n_neighbors": 5, "weights": "uniform", "columns": []}
+)
 class KNNImputerCalculator(BaseCalculator):
     def fit(
         self,
@@ -365,6 +380,13 @@ class IterativeImputerApplier(BaseApplier):
 
 
 @NodeRegistry.register("IterativeImputer", IterativeImputerApplier)
+@node_meta(
+    id="IterativeImputer",
+    name="Iterative Imputer (MICE)",
+    category="Preprocessing",
+    description="Multivariate imputation using chained equations.",
+    params={"max_iter": 10, "random_state": 0, "estimator": "bayesian_ridge", "columns": []}
+)
 class IterativeImputerCalculator(BaseCalculator):
     def fit(
         self,

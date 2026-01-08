@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import PowerTransformer, StandardScaler
 
+from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ..utils import (
     detect_numeric_columns,
@@ -89,6 +90,13 @@ class PowerTransformerApplier(BaseApplier):
 
 
 @NodeRegistry.register("PowerTransformer", PowerTransformerApplier)
+@node_meta(
+    id="PowerTransformer",
+    name="Power Transformer",
+    category="Preprocessing",
+    description="Apply a power transform featurewise to make data more Gaussian-like.",
+    params={"method": "yeo-johnson", "standardize": True, "columns": []}
+)
 class PowerTransformerCalculator(BaseCalculator):
     def fit(
         self,
@@ -201,6 +209,13 @@ class SimpleTransformationApplier(BaseApplier):
 
 
 @NodeRegistry.register("SimpleTransformation", SimpleTransformationApplier)
+@node_meta(
+    id="SimpleTransformation",
+    name="Simple Transformation",
+    category="Preprocessing",
+    description="Apply simple mathematical transformations (log, sqrt, etc.).",
+    params={"func": "log", "columns": []}
+)
 class SimpleTransformationCalculator(BaseCalculator):
     def fit(
         self,
@@ -292,6 +307,13 @@ class GeneralTransformationApplier(BaseApplier):
 
 
 @NodeRegistry.register("GeneralTransformation", GeneralTransformationApplier)
+@node_meta(
+    id="GeneralTransformation",
+    name="General Transformation",
+    category="Preprocessing",
+    description="Apply various function transformations (log, sqrt, square, exp) to columns.",
+    params={"transformations": []}
+)
 class GeneralTransformationCalculator(BaseCalculator):
     def fit(
         self,
