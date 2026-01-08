@@ -13,6 +13,7 @@ import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { getIncomers } from '@xyflow/react';
+import { StepType } from '../../../core/constants/stepTypes';
 
 export interface TuningConfig {
   target_column: string;
@@ -453,7 +454,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         await jobsApi.runPipeline({
             ...pipelineConfig,
             target_node_id: nodeId,
-            job_type: 'advanced_tuning'
+            job_type: StepType.ADVANCED_TUNING
         });
         alert("Tuning job submitted successfully!");
         setTab('advanced_tuning');

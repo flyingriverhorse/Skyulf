@@ -1,9 +1,10 @@
 import { BrainCircuit } from 'lucide-react';
 import { BasicTrainingSettings } from './BasicTrainingSettings';
 import { createModelingNode } from '../../../core/factories/nodeFactory';
+import { StepType } from '../../../core/constants/stepTypes';
 
 export const BasicTrainingNode = createModelingNode({
-  type: 'basic_training',
+  type: StepType.BASIC_TRAINING,
   label: 'Basic Training',
   description: 'Train a model with fixed or default parameters.',
   icon: BrainCircuit,

@@ -1,6 +1,7 @@
 import { Node, Edge } from '@xyflow/react';
 import { PipelineConfigModel, NodeConfigModel } from '../api/client';
 import { v4 as uuidv4 } from 'uuid';
+import { StepType as BackendStepType } from '../constants/stepTypes';
 
 export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): PipelineConfigModel => {
     const sortedNodes: NodeConfigModel[] = [];
@@ -29,7 +30,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       const inputs = incomingEdges.map(e => e.source);
 
       if (node.data.definitionType === 'dataset_node') {
-        stepType = 'data_loader';
+        stepType = BackendStepType.DATA_LOADER;
         params = { 
             dataset_id: node.data.datasetId,
         };
@@ -203,8 +204,8 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       } else if (node.data.definitionType === 'InvalidValueReplacement') {
           stepType = 'InvalidValueReplacement';
           params = node.data;
-      } else if (node.data.definitionType === 'model_training' || node.data.definitionType === 'basic_training') {
-          stepType = 'basic_training';
+      } else if (node.data.definitionType === 'model_training' || node.data.definitionType === BackendStepType.BASIC_TRAINING) {
+          stepType = BackendStepType.BASIC_TRAINING;
           params = {
               target_column: node.data.target_column,
               model_type: node.data.model_type,
@@ -215,8 +216,8 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               cv_shuffle: node.data.cv_shuffle,
               cv_random_state: node.data.cv_random_state
           };
-      } else if (node.data.definitionType === 'hyperparameter_tuning' || node.data.definitionType === 'advanced_tuning') {
-          stepType = 'advanced_tuning';
+      } else if (node.data.definitionType === 'hyperparameter_tuning' || node.data.definitionType === BackendStepType.ADVANCED_TUNING) {
+          stepType = BackendStepType.ADVANCED_TUNING;
           params = {
               target_column: node.data.target_column,
               algorithm: node.data.model_type,

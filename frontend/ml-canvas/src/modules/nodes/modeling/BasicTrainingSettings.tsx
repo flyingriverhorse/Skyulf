@@ -12,6 +12,7 @@ import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { getIncomers } from '@xyflow/react';
+import { StepType } from '../../../core/constants/stepTypes';
 
 export interface ModelTrainingConfig {
   target_column: string;
@@ -403,7 +404,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
         await jobsApi.runPipeline({
             ...pipelineConfig,
             target_node_id: nodeId,
-            job_type: 'basic_training'
+            job_type: StepType.BASIC_TRAINING
         });
         alert("Training job submitted successfully!");
         setTab('basic_training');

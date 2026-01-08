@@ -1,9 +1,10 @@
 import { Sliders } from 'lucide-react';
 import { AdvancedTuningSettings } from './AdvancedTuningSettings';
 import { createModelingNode } from '../../../core/factories/nodeFactory';
+import { StepType } from '../../../core/constants/stepTypes';
 
 export const AdvancedTuningNode = createModelingNode({
-  type: 'advanced_tuning',
+  type: StepType.ADVANCED_TUNING,
   label: 'Advanced Tuning and Training',
   description: 'Automatically optimize model performance.',
   icon: Sliders,
