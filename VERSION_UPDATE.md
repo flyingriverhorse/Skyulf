@@ -14,11 +14,22 @@
 
 ### 🏗️ Architecture & Core
 - **Unified Node Registry:** Migrated all ML nodes (Preprocessing, Modeling) to a dynamic registry system using `@node_meta` decorators in `skyulf-core`. This eliminates duplicate node definitions in the backend and ensures consistency.
+### 🔧 Backend Architecture
+- **Polars Compatibility:** Completed comprehensive Polars support for all preprocessing nodes (`Calculator` and `Applier`). Verified with a new comprehensive test suite covering 50+ nodes.
+- **Engine Mechanics:** Added detailed documentation `docs/guides/engine_mechanics.md` explaining the `SkyulfDataFrame` protocol and hybrid execution strategy.
+- **Testing:** Added `tests/test_preprocessing_comprehensive_suite.py` to ensure zero regressions in node logic across both engines.
+
 - **Dynamic Node Discovery:** Updated Backend API to automatically discover and register nodes from `skyulf-core` at runtime.
 - **Frontend Cleanup:** Removed unused `JobsPage.tsx` and updated Training tab names.
 
 ### 🔧 Backend Architecture
 - **Unified Node Registry:** Implemented dynamic node discovery. `skyulf-core` nodes now use a `@node_meta` decorator to self-register, and the Backend API (`/registry`) automatically merges them with static definitions.
+
+### 🧹 Preprocessing & Polars Support
+- **Full Polars Support:** Refactored `skyulf/preprocessing` modules (`bucketing`, `cleaning`, `feature_generation`, `feature_selection`, `inspection`, `resampling`, `transformations`) to support Polars DataFrame natively or via hybrid conversion.
+- **Type Safety:** Updated `BaseCalculator.fit` and `BaseApplier.apply` signatures to `Union[pd.DataFrame, Any, ...]` to fix Liskov Substitution Principle violations and support `polars.DataFrame`.
+- **Hybrid Execution:** Implemented robust "Convert-Process-Convert" pattern for Scikit-Learn/Imbalanced-Learn dependent nodes (SMOTE, Feature Selection) when running on Polars engine.
+- **Bug Fixes:** Fixed `pack_pipeline_output` utility to correctly handle Polars concatenation and target re-attachment.
 
 ### 🎨 Frontend & UX
 - **Node Factories:** Refactored frontend node definitions using a `createModelingNode` factory, reducing boilerplate and enforcing consistency across modeling nodes.

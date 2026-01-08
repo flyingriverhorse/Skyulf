@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Union, cast
 
 import pandas as pd
 
+from ..types import PreprocessingStepConfig
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
 from ..utils import get_data_stats
@@ -37,7 +38,7 @@ class FeatureEngineer:
     Orchestrates a sequence of feature engineering steps.
     """
 
-    def __init__(self, steps_config: List[Dict[str, Any]]):
+    def __init__(self, steps_config: List[PreprocessingStepConfig]):
         self.steps_config = steps_config
         self.fitted_steps: List[Dict[str, Any]] = []
 

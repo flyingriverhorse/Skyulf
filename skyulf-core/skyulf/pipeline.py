@@ -2,10 +2,11 @@
 
 import logging
 import pickle
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, cast
 
 import pandas as pd
 
+from .types import PipelineConfig
 from .data.dataset import SplitDataset
 from .engines import SkyulfDataFrame, get_engine
 from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator
@@ -37,7 +38,7 @@ class SkyulfPipeline:
     2. Modeling (Training/Inference)
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: PipelineConfig):
         """
         Initialize the pipeline.
 
@@ -59,17 +60,21 @@ class SkyulfPipeline:
     def _init_model_estimator(self):
         """Initialize the StatefulEstimator based on config."""
         model_type = self.modeling_config.get("type")
+        if not model_type:
+            return
+
         node_id = self.modeling_config.get("node_id", "model_node")
 
         calculator: Optional[BaseModelCalculator] = None
         applier: Optional[BaseModelApplier] = None
 
         # Try Registry first
-        try:
-            calculator = NodeRegistry.get_calculator(model_type)()
-            applier = NodeRegistry.get_applier(model_type)()
-        except ValueError:
-            pass
+        if model_type:
+            try:
+                calculator = NodeRegistry.get_calculator(model_type)()
+                applier = NodeRegistry.get_applier(model_type)()
+            except ValueError:
+                pass
 
         if calculator is None:
             # Map model types to classes
@@ -94,11 +99,12 @@ class SkyulfPipeline:
                 base_applier: Optional[BaseModelApplier] = None
 
                 # Try Registry for base model
-                try:
-                    base_calc = NodeRegistry.get_calculator(base_model_type)()
-                    base_applier = NodeRegistry.get_applier(base_model_type)()
-                except ValueError:
-                    pass
+                if base_model_type:
+                    try:
+                        base_calc = NodeRegistry.get_calculator(base_model_type)()
+                        base_applier = NodeRegistry.get_applier(base_model_type)()
+                    except ValueError:
+                        pass
 
                 if base_calc is None:
                     if base_model_type == "logistic_regression":
@@ -122,7 +128,7 @@ class SkyulfPipeline:
                         f"Unknown base model type for tuner: {base_model_type}"
                     )
 
-        if calculator is None:
+        if calculator is None or applier is None:
             raise ValueError(f"Unknown model type: {model_type}")
 
         self.model_estimator = StatefulEstimator(
@@ -172,7 +178,7 @@ class SkyulfPipeline:
             _ = self.model_estimator.fit_predict(
                 dataset=dataset,
                 target_column=target_column,
-                config=self.modeling_config,
+                config=cast(Dict[str, Any], self.modeling_config),
             )
 
             # Evaluate

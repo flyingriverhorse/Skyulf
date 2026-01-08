@@ -15,6 +15,7 @@ from .base import BaseApplier, BaseCalculator
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ..engines import SkyulfDataFrame, get_engine
+from ..engines.pandas_engine import SkyulfPandasWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +25,9 @@ logger = logging.getLogger(__name__)
 class IQRApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -37,11 +38,13 @@ class IQRApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+
+            X_pl: Any = X
             
             mask = pl.lit(True)
             
             for col, bound in bounds.items():
-                if col not in X.columns:
+                if col not in X_pl.columns:
                     continue
                 
                 lower = bound["lower"]
@@ -53,31 +56,33 @@ class IQRApplier(BaseApplier):
                 
                 mask = mask & col_mask
             
-            X_filtered = X.filter(mask)
+            # Evaluate mask to get a boolean Series for filtering both X and y
+            mask_series = X_pl.select(mask.alias("mask")).get_column("mask")
+            X_filtered = X_pl.filter(mask_series)
             
+            y_filtered = None
             if y is not None:
-                if isinstance(y, pl.Series):
-                    y_filtered = y.filter(mask)
-                elif isinstance(y, pl.DataFrame):
-                     y_filtered = y.filter(mask)
+                if isinstance(y, (pl.Series, pl.DataFrame)):
+                    y_filtered = y.filter(mask_series)
                 else:
                     y_filtered = y
-            else:
-                y_filtered = None
                 
             return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
 
         # Pandas Path
-        mask = pd.Series(True, index=X.index)
+        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
+        
+        # Determine index from the converted or original DF
+        mask = pd.Series(True, index=X_pd.index)
 
         for col, bound in bounds.items():
-            if col not in X.columns:
+            if col not in X_pd.columns:
                 continue
 
             lower = bound["lower"]
             upper = bound["upper"]
 
-            series = pd.to_numeric(X[col], errors="coerce")
+            series = pd.to_numeric(X_pd[col], errors="coerce")
 
             # Keep values within bounds or NaN
             col_mask = (series >= lower) & (series <= upper)
@@ -85,10 +90,11 @@ class IQRApplier(BaseApplier):
 
             mask = mask & col_mask
 
-        X_filtered = X[mask]
+        X_filtered = X_pd[mask]
 
         if y is not None:
-            y_filtered = y[mask]
+            y_pd: Any = y
+            y_filtered = y_pd[mask]
             return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
 
         return pack_pipeline_output(X_filtered, y, is_tuple)
@@ -105,19 +111,18 @@ class IQRApplier(BaseApplier):
 class IQRCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
         
         engine = get_engine(X)
-        if engine.name == "polars":
-            X = X.to_pandas()
-
+        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
+            
         # Config: {'multiplier': 1.5, 'columns': [...]}
         multiplier = config.get("multiplier", 1.5)
 
-        cols = resolve_columns(X, config, detect_numeric_columns)
+        cols = resolve_columns(X_pd, config, detect_numeric_columns)
 
         if not cols:
             return {}
@@ -125,7 +130,7 @@ class IQRCalculator(BaseCalculator):
         bounds = {}
         warnings = []
         for col in cols:
-            series = pd.to_numeric(X[col], errors="coerce").dropna()
+            series = pd.to_numeric(X_pd[col], errors="coerce").dropna()
             if series.empty:
                 warnings.append(f"Column '{col}': Empty or non-numeric")
                 continue
@@ -153,9 +158,9 @@ class IQRCalculator(BaseCalculator):
 class ZScoreApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -169,10 +174,11 @@ class ZScoreApplier(BaseApplier):
         if engine.name == "polars":
             import polars as pl
             
+            X_pl: Any = X
             mask = pl.lit(True)
             
             for col, stat in stats.items():
-                if col not in X.columns:
+                if col not in X_pl.columns:
                     continue
                 
                 mean = stat["mean"]
@@ -190,25 +196,24 @@ class ZScoreApplier(BaseApplier):
                 
                 mask = mask & col_mask
             
-            X_filtered = X.filter(mask)
+            mask_series = X_pl.select(mask.alias("mask")).get_column("mask")
+            X_filtered = X_pl.filter(mask_series)
             
+            y_filtered = None
             if y is not None:
-                if isinstance(y, pl.Series):
-                    y_filtered = y.filter(mask)
-                elif isinstance(y, pl.DataFrame):
-                     y_filtered = y.filter(mask)
+                if isinstance(y, (pl.Series, pl.DataFrame)):
+                    y_filtered = y.filter(mask_series)
                 else:
                     y_filtered = y
-            else:
-                y_filtered = None
                 
             return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
 
         # Pandas Path
-        mask = pd.Series(True, index=X.index)
+        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
+        mask = pd.Series(True, index=X_pd.index)
 
         for col, stat in stats.items():
-            if col not in X.columns:
+            if col not in X_pd.columns:
                 continue
 
             mean = stat["mean"]
@@ -217,7 +222,7 @@ class ZScoreApplier(BaseApplier):
             if std == 0:
                 continue
 
-            series = pd.to_numeric(X[col], errors="coerce")
+            series = pd.to_numeric(X_pd[col], errors="coerce")
             z_scores = (series - mean) / std
 
             # Keep if abs(z) <= threshold
@@ -226,10 +231,11 @@ class ZScoreApplier(BaseApplier):
 
             mask = mask & col_mask
 
-        X_filtered = X[mask]
+        X_filtered = X_pd[mask]
 
         if y is not None:
-            y_filtered = y[mask]
+            y_pd: Any = y
+            y_filtered = y_pd[mask]
             return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
 
         return pack_pipeline_output(X_filtered, y, is_tuple)
@@ -246,19 +252,17 @@ class ZScoreApplier(BaseApplier):
 class ZScoreCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
-        
         engine = get_engine(X)
-        if engine.name == "polars":
-            X = X.to_pandas()
+        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
 
         # Config: {'threshold': 3.0, 'columns': [...]}
         threshold = config.get("threshold", 3.0)
 
-        cols = resolve_columns(X, config, detect_numeric_columns)
+        cols = resolve_columns(X_pd, config, detect_numeric_columns)
 
         if not cols:
             return {}
@@ -266,7 +270,7 @@ class ZScoreCalculator(BaseCalculator):
         stats = {}
         warnings = []
         for col in cols:
-            series = pd.to_numeric(X[col], errors="coerce").dropna()
+            series = pd.to_numeric(X_pd[col], errors="coerce").dropna()
             if series.empty:
                 warnings.append(f"Column '{col}': Empty or non-numeric")
                 continue
@@ -294,9 +298,9 @@ class ZScoreCalculator(BaseCalculator):
 class WinsorizeApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -308,9 +312,10 @@ class WinsorizeApplier(BaseApplier):
         if engine.name == "polars":
             import polars as pl
             
+            X_pl: Any = X
             exprs = []
             for col, bound in bounds.items():
-                if col not in X.columns:
+                if col not in X_pl.columns:
                     continue
                 
                 lower = bound["lower"]
@@ -320,11 +325,12 @@ class WinsorizeApplier(BaseApplier):
                 # Ensure we cast to float if bounds are float to avoid truncation
                 exprs.append(pl.col(col).cast(pl.Float64).clip(lower, upper).alias(col))
             
-            X_out = X.with_columns(exprs)
+            X_out = X_pl.with_columns(exprs)
             return pack_pipeline_output(X_out, y, is_tuple)
 
         # Pandas Path
-        df_out = X.copy()
+        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
+        df_out = X_pd.copy()
 
         for col, bound in bounds.items():
             if col not in df_out.columns:
@@ -351,20 +357,18 @@ class WinsorizeApplier(BaseApplier):
 class WinsorizeCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
-        
         engine = get_engine(X)
-        if engine.name == "polars":
-            X = X.to_pandas()
+        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
 
         # Config: {'lower_percentile': 5.0, 'upper_percentile': 95.0, 'columns': [...]}
         lower_p = config.get("lower_percentile", 5.0)
         upper_p = config.get("upper_percentile", 95.0)
 
-        cols = resolve_columns(X, config, detect_numeric_columns)
+        cols = resolve_columns(X_pd, config, detect_numeric_columns)
 
         if not cols:
             return {}
@@ -372,7 +376,7 @@ class WinsorizeCalculator(BaseCalculator):
         bounds = {}
         warnings = []
         for col in cols:
-            series = pd.to_numeric(X[col], errors="coerce").dropna()
+            series = pd.to_numeric(X_pd[col], errors="coerce").dropna()
             if series.empty:
                 warnings.append(f"Column '{col}': Empty or non-numeric")
                 continue
@@ -397,9 +401,9 @@ class WinsorizeCalculator(BaseCalculator):
 class ManualBoundsApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -411,10 +415,11 @@ class ManualBoundsApplier(BaseApplier):
         if engine.name == "polars":
             import polars as pl
             
+            X_pl: Any = X
             mask = pl.lit(True)
             
             for col, bound in bounds.items():
-                if col not in X.columns:
+                if col not in X_pl.columns:
                     continue
                 
                 lower = bound.get("lower")
@@ -429,32 +434,31 @@ class ManualBoundsApplier(BaseApplier):
                 col_mask = col_mask | pl.col(col).is_null()
                 mask = mask & col_mask
             
-            X_filtered = X.filter(mask)
+            mask_series = X_pl.select(mask.alias("mask")).get_column("mask")
+            X_filtered = X_pl.filter(mask_series)
             
+            y_filtered = None
             if y is not None:
-                if isinstance(y, pl.Series):
-                    y_filtered = y.filter(mask)
-                elif isinstance(y, pl.DataFrame):
-                     y_filtered = y.filter(mask)
+                if isinstance(y, (pl.Series, pl.DataFrame)):
+                    y_filtered = y.filter(mask_series)
                 else:
                     y_filtered = y
-            else:
-                y_filtered = None
                 
             return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
 
         # Pandas Path
-        mask = pd.Series(True, index=X.index)
+        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
+        mask = pd.Series(True, index=X_pd.index)
 
         for col, bound in bounds.items():
-            if col not in X.columns:
+            if col not in X_pd.columns:
                 continue
 
             lower = bound.get("lower")
             upper = bound.get("upper")
 
-            series = pd.to_numeric(X[col], errors="coerce")
-            col_mask = pd.Series(True, index=X.index)
+            series = pd.to_numeric(X_pd[col], errors="coerce")
+            col_mask = pd.Series(True, index=X_pd.index)
 
             if lower is not None:
                 col_mask = col_mask & (series >= lower)
@@ -464,10 +468,11 @@ class ManualBoundsApplier(BaseApplier):
             col_mask = col_mask | series.isna()
             mask = mask & col_mask
 
-        X_filtered = X[mask]
+        X_filtered = X_pd[mask]
 
         if y is not None:
-            y_filtered = y[mask]
+            y_pd: Any = y
+            y_filtered = y_pd[mask]
             return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
 
         return pack_pipeline_output(X_filtered, y, is_tuple)
@@ -484,7 +489,7 @@ class ManualBoundsApplier(BaseApplier):
 class ManualBoundsCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: {'bounds': {'col1': {'lower': 0, 'upper': 100}, ...}}
@@ -499,9 +504,9 @@ class ManualBoundsCalculator(BaseCalculator):
 class EllipticEnvelopeApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -511,8 +516,8 @@ class EllipticEnvelopeApplier(BaseApplier):
 
         # Polars Path: Convert to Pandas because we use sklearn models
         if engine.name == "polars":
+            # Polars conversion path
             X_pd = X.to_pandas()
-            # We need to convert y too if we are going to filter it
             y_pd = None
             if y is not None:
                 if hasattr(y, "to_pandas"):
@@ -520,28 +525,22 @@ class EllipticEnvelopeApplier(BaseApplier):
                 else:
                     y_pd = y
             
-            # Use the pandas logic (recursive call or just copy paste)
-            # Let's just convert and proceed with pandas logic below
-            X = X_pd
-            y = y_pd
-            # Note: We will return Pandas DataFrame. 
-            # If we want to return Polars, we should convert back.
-            # But pack_pipeline_output handles it? No, pack_pipeline_output just packs what we give.
-            # If input was Polars, output should ideally be Polars.
-            # But for EllipticEnvelope, maybe it's fine to return Pandas?
-            # Or we convert back.
-            
-            # Let's proceed with X as pandas, and at the end convert back if needed.
-            # But wait, `X` variable is now overwritten.
-            
-        # Pandas Path (and Polars converted)
-        mask = pd.Series(True, index=X.index)
+            # We will use X_pd for logic
+        else:
+            # Standard Pandas path
+            # Explicitly alias to Any to avoid "is not indexable" errors from mypy on Union types
+            X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
+            y_pd = y
+
+        X_pd_any: Any = X_pd
+        
+        mask = pd.Series(True, index=X_pd_any.index)
 
         for col, model in models.items():
-            if col not in X.columns:
+            if col not in X_pd_any.columns:
                 continue
 
-            series = pd.to_numeric(X[col], errors="coerce")
+            series = pd.to_numeric(X_pd_any[col], errors="coerce")
             # EllipticEnvelope.predict returns 1 for inliers, -1 for outliers
             # We need to handle NaNs separately as predict might fail or treat them weirdly
 
@@ -557,7 +556,7 @@ class EllipticEnvelopeApplier(BaseApplier):
 
                 # Create mask for this column
                 col_mask = pd.Series(
-                    False, index=X.index
+                    False, index=X_pd_any.index
                 )  # Default to outlier? Or inlier?
                 # Usually we keep inliers. So default to False (outlier) unless proven inlier.
                 # But we also keep NaNs usually? Or drop them?
@@ -571,10 +570,10 @@ class EllipticEnvelopeApplier(BaseApplier):
                 logger.warning(f"EllipticEnvelope predict failed for column {col}: {e}")
                 pass
 
-        X_filtered = X[mask]
+        X_filtered = X_pd_any[mask]
 
-        if y is not None:
-            y_filtered = y[mask]
+        if y_pd is not None:
+            y_filtered = y_pd[mask]
             # If we started with Polars, we might want to convert back.
             if engine.name == "polars":
                 import polars as pl
@@ -600,19 +599,17 @@ class EllipticEnvelopeApplier(BaseApplier):
 class EllipticEnvelopeCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
-        
         engine = get_engine(X)
-        if engine.name == "polars":
-            X = X.to_pandas()
+        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
 
         # Config: {'contamination': 0.01, 'columns': [...]}
         contamination = config.get("contamination", 0.01)
 
-        cols = resolve_columns(X, config, detect_numeric_columns)
+        cols = resolve_columns(X_pd, config, detect_numeric_columns)
 
         if not cols:
             return {}
@@ -620,7 +617,7 @@ class EllipticEnvelopeCalculator(BaseCalculator):
         models = {}
         warnings = []
         for col in cols:
-            series = pd.to_numeric(X[col], errors="coerce").dropna()
+            series = pd.to_numeric(X_pd[col], errors="coerce").dropna()
             if series.shape[0] < 5:
                 warnings.append(f"Column '{col}': Too few samples ({series.shape[0]})")
                 continue

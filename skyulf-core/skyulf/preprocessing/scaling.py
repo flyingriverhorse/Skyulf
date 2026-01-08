@@ -30,9 +30,9 @@ logger = logging.getLogger(__name__)
 class StandardScalerApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
 
         cols = params.get("columns", [])
@@ -50,6 +50,9 @@ class StandardScalerApplier(BaseApplier):
         if engine.__name__ == "PolarsEngine":
             import polars as pl
             # Polars Native Implementation
+            
+            X_pl: Any = X
+
             mean_arr = np.array(mean)
             scale_arr = np.array(scale)
             col_indices = [cols.index(c) for c in valid_cols]
@@ -66,17 +69,14 @@ class StandardScalerApplier(BaseApplier):
                 exprs.append(e)
             
             # Apply transformations
-            # X is Polars DataFrame or Wrapper
-            if hasattr(X, "with_columns"):
-                X_out = X.with_columns(exprs)
-            else:
-                # Should be wrapper or raw polars
-                X_out = X.with_columns(exprs)
-                
+            X_out = X_pl.with_columns(exprs)
+            
             return pack_pipeline_output(X_out, y, is_tuple)
 
         # Pandas/Numpy Implementation (Legacy)
-        X_out = X.copy()
+        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
+        X_out = X_pd.copy()
+        
         mean_arr = np.array(mean)
         scale_arr = np.array(scale)
         col_indices = [cols.index(c) for c in valid_cols]
@@ -104,24 +104,33 @@ class StandardScalerApplier(BaseApplier):
 class StandardScalerCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         # Config: {'with_mean': True, 'with_std': True, 'columns': [...]}
         with_mean = config.get("with_mean", True)
         with_std = config.get("with_std", True)
-
-        cols = resolve_columns(X, config, detect_numeric_columns)
-
-        if not cols:
-            return {}
+        
+        # Casting for strict type checking
+        if engine.name == "polars":
+            X_pl: Any = X
+            cols = resolve_columns(X_pl, config, detect_numeric_columns)
+            if not cols:
+                return {}
+            X_subset = X_pl.select(cols)
+        else:
+            X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
+            cols = resolve_columns(X_pd, config, detect_numeric_columns)
+            if not cols:
+                return {}
+            X_subset = X_pd[cols]
 
         scaler = StandardScaler(with_mean=with_mean, with_std=with_std)
         
         # Use Bridge for fitting
-        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
         
         scaler.fit(X_np)
@@ -143,9 +152,9 @@ class StandardScalerCalculator(BaseCalculator):
 class MinMaxScalerApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -160,6 +169,8 @@ class MinMaxScalerApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            
+            X_pl: Any = X
 
             exprs = []
             for i, col_name in enumerate(cols):
@@ -169,11 +180,13 @@ class MinMaxScalerApplier(BaseApplier):
                         (pl.col(col_name) * scale[i] + min_val[i]).alias(col_name)
                     )
 
-            X_out = X.with_columns(exprs)
+            X_out = X_pl.with_columns(exprs)
             return pack_pipeline_output(X_out, y, is_tuple)
 
         # Pandas Path
-        X_out = X.copy()
+        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
+        X_out = X_pd.copy()
+        
         min_arr = np.array(min_val)
         scale_arr = np.array(scale)
         col_indices = [cols.index(c) for c in valid_cols]
@@ -195,23 +208,31 @@ class MinMaxScalerApplier(BaseApplier):
 class MinMaxScalerCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         # Config: {'feature_range': (0, 1), 'columns': [...]}
         feature_range = config.get("feature_range", (0, 1))
 
-        cols = resolve_columns(X, config, detect_numeric_columns)
-
-        if not cols:
-            return {}
+        if engine.name == "polars":
+            X_pl: Any = X
+            cols = resolve_columns(X_pl, config, detect_numeric_columns)
+            if not cols:
+                return {}
+            X_subset = X_pl.select(cols)
+        else:
+            X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
+            cols = resolve_columns(X_pd, config, detect_numeric_columns)
+            if not cols:
+                return {}
+            X_subset = X_pd[cols]
 
         scaler = MinMaxScaler(feature_range=feature_range)
         
         # Use Bridge for fitting
-        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
         
         scaler.fit(X_np)
@@ -233,9 +254,9 @@ class MinMaxScalerCalculator(BaseCalculator):
 class RobustScalerApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -250,6 +271,8 @@ class RobustScalerApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            
+            X_pl: Any = X
 
             exprs = []
             for i, col_name in enumerate(cols):
@@ -267,11 +290,13 @@ class RobustScalerApplier(BaseApplier):
 
                     exprs.append(expr.alias(col_name))
 
-            X_out = X.with_columns(exprs)
+            X_out = X_pl.with_columns(exprs)
             return pack_pipeline_output(X_out, y, is_tuple)
 
         # Pandas Path
-        X_out = X.copy()
+        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
+        X_out = X_pd.copy()
+        
         col_indices = [cols.index(c) for c in valid_cols]
         vals = X_out[valid_cols].values
 
@@ -301,20 +326,29 @@ class RobustScalerApplier(BaseApplier):
 class RobustScalerCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         # Config: {'quantile_range': (25.0, 75.0), 'with_centering': True, 'with_scaling': True, 'columns': [...]}
         quantile_range = config.get("quantile_range", (25.0, 75.0))
         with_centering = config.get("with_centering", True)
         with_scaling = config.get("with_scaling", True)
 
-        cols = resolve_columns(X, config, detect_numeric_columns)
-
-        if not cols:
-            return {}
+        if engine.name == "polars":
+            X_pl: Any = X
+            cols = resolve_columns(X_pl, config, detect_numeric_columns)
+            if not cols:
+                return {}
+            X_subset = X_pl.select(cols)
+        else:
+            X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
+            cols = resolve_columns(X_pd, config, detect_numeric_columns)
+            if not cols:
+                return {}
+            X_subset = X_pd[cols]
 
         scaler = RobustScaler(
             quantile_range=quantile_range,
@@ -323,7 +357,6 @@ class RobustScalerCalculator(BaseCalculator):
         )
         
         # Use Bridge for fitting
-        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
         
         scaler.fit(X_np)
@@ -345,9 +378,9 @@ class RobustScalerCalculator(BaseCalculator):
 class MaxAbsScalerApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -361,6 +394,8 @@ class MaxAbsScalerApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            
+            X_pl: Any = X
 
             exprs = []
             for i, col_name in enumerate(cols):
@@ -370,11 +405,13 @@ class MaxAbsScalerApplier(BaseApplier):
                         s = 1.0
                     exprs.append((pl.col(col_name) / s).alias(col_name))
 
-            X_out = X.with_columns(exprs)
+            X_out = X_pl.with_columns(exprs)
             return pack_pipeline_output(X_out, y, is_tuple)
 
         # Pandas Path
-        X_out = X.copy()
+        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
+        X_out = X_pd.copy()
+        
         scale_arr = np.array(scale)
         col_indices = [cols.index(c) for c in valid_cols]
 
@@ -399,20 +436,28 @@ class MaxAbsScalerApplier(BaseApplier):
 class MaxAbsScalerCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
-        cols = resolve_columns(X, config, detect_numeric_columns)
-
-        if not cols:
-            return {}
+        if engine.name == "polars":
+            X_pl: Any = X
+            cols = resolve_columns(X_pl, config, detect_numeric_columns)
+            if not cols:
+                return {}
+            X_subset = X_pl.select(cols)
+        else:
+            X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
+            cols = resolve_columns(X_pd, config, detect_numeric_columns)
+            if not cols:
+                return {}
+            X_subset = X_pd[cols]
 
         scaler = MaxAbsScaler()
         
         # Use Bridge for fitting
-        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
         
         scaler.fit(X_np)

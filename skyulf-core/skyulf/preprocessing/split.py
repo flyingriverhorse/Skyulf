@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class SplitApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
     ) -> SplitDataset:
         stratify = params.get("stratify", False)
@@ -56,7 +56,7 @@ class SplitApplier(BaseApplier):
 )
 class SplitCalculator(BaseCalculator):
     def fit(
-        self, df: SkyulfDataFrame, config: Dict[str, Any]
+        self, df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any], config: Dict[str, Any]
     ) -> Dict[str, Any]:
         # No learning from data, just pass through config
         return config
@@ -236,7 +236,11 @@ class DataSplitter:
             if validation is not None:
                 validation = pl.from_pandas(validation)
 
-        return SplitDataset(train=train, test=test, validation=validation)
+        return SplitDataset(
+            train=(train, None),
+            test=(test, None),
+            validation=(validation, None) if validation is not None else None
+        )
 
 
 class FeatureTargetSplitApplier(BaseApplier):
@@ -251,13 +255,15 @@ class FeatureTargetSplitApplier(BaseApplier):
                 "Target column must be specified for FeatureTargetSplitter"
             )
 
-        def split_one(data: Union[pd.DataFrame, SkyulfDataFrame]) -> Tuple[Any, Any]:
+        def split_one(data: Union[pd.DataFrame, SkyulfDataFrame, Any]) -> Tuple[Any, Any]:
             engine = get_engine(data)
             if engine.name == "polars":
-                if target_col not in data.columns:
+                data_pl: Any = data
+                if target_col not in data_pl.columns:
                     raise ValueError(f"Target column '{target_col}' not found in dataset")
-                y = data.select(target_col).to_series()
-                X = data.drop([target_col])
+                import polars as pl
+                y = data_pl.select(pl.col(target_col)).to_series()
+                X = data_pl.drop([target_col])
                 return X, y
             
             # Pandas
@@ -302,7 +308,7 @@ class FeatureTargetSplitApplier(BaseApplier):
 class FeatureTargetSplitCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, SplitDataset, Tuple[Any, ...]],
+        df: Union[pd.DataFrame, SkyulfDataFrame, SplitDataset, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         return config

@@ -99,9 +99,9 @@ def _compute_similarity_score(a: Any, b: Any, method: str) -> float:
 class PolynomialFeaturesApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -120,10 +120,11 @@ class PolynomialFeaturesApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            X_pl: Any = X
             
             # For PolynomialFeatures, we use the pandas/sklearn implementation via conversion
             # to ensure full compatibility with complex degree/interaction logic.
-            X_pd = X.to_pandas()
+            X_pd = X_pl.to_pandas()
             
             poly = PolynomialFeatures(
                 degree=degree, interaction_only=interaction_only, include_bias=include_bias
@@ -156,7 +157,7 @@ class PolynomialFeaturesApplier(BaseApplier):
             df_poly = pl.DataFrame(transformed, schema=new_names)
             
             # Horizontal concat
-            X_out = pl.concat([X, df_poly], how="horizontal")
+            X_out = pl.concat([X_pl, df_poly], how="horizontal")
             
             return pack_pipeline_output(X_out, y, is_tuple)
 
@@ -222,7 +223,7 @@ class PolynomialFeaturesApplier(BaseApplier):
 class PolynomialFeaturesCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Extract configuration parameters
@@ -249,7 +250,8 @@ class PolynomialFeaturesCalculator(BaseCalculator):
         # We use sklearn to get feature names
         # Ensure X is compatible with sklearn (Pandas/Numpy)
         if engine.name == "polars":
-            X_fit = X.select(cols).to_pandas()
+            X_pl: Any = X
+            X_fit = X_pl.select(cols).to_pandas()
         else:
             X_fit = X[cols]
 
@@ -276,9 +278,9 @@ class PolynomialFeaturesCalculator(BaseCalculator):
 class FeatureGenerationApplier(BaseApplier):
     def apply(  # noqa: C901
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -292,8 +294,9 @@ class FeatureGenerationApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            X_pl: Any = X
             
-            X_out = X
+            X_out = X_pl
             
             for i, op in enumerate(operations):
                 op_type = op.get("operation_type", "arithmetic")
@@ -652,7 +655,7 @@ class FeatureGenerationApplier(BaseApplier):
 class FeatureGenerationCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config:
