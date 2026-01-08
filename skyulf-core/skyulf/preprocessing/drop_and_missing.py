@@ -3,6 +3,7 @@ from typing import Any, Dict, Tuple, Union
 import pandas as pd
 
 from ..registry import NodeRegistry
+from ..core.meta.decorators import node_meta
 from ..utils import pack_pipeline_output, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
 from ..engines import SkyulfDataFrame, get_engine
@@ -94,6 +95,13 @@ class DeduplicateApplier(BaseApplier):
 
 
 @NodeRegistry.register("Deduplicate", DeduplicateApplier)
+@node_meta(
+    id="Deduplicate",
+    name="Deduplicate",
+    category="Data Operations",
+    description="Drop duplicate rows.",
+    params={"subset": [], "keep": "first"}
+)
 class DeduplicateCalculator(BaseCalculator):
     def fit(
         self,
@@ -137,6 +145,13 @@ class DropMissingColumnsApplier(BaseApplier):
 
 
 @NodeRegistry.register("DropMissingColumns", DropMissingColumnsApplier)
+@node_meta(
+    id="DropMissingColumns",
+    name="Drop Missing Columns",
+    category="Cleaning",
+    description="Drop columns that exceed missing value threshold.",
+    params={"threshold": 0.5}
+)
 class DropMissingColumnsCalculator(BaseCalculator):
     def fit(
         self,
@@ -271,6 +286,13 @@ class DropMissingRowsApplier(BaseApplier):
 
 
 @NodeRegistry.register("DropMissingRows", DropMissingRowsApplier)
+@node_meta(
+    id="DropMissingRows",
+    name="Drop Missing Rows",
+    category="Cleaning",
+    description="Drop rows containing missing values in specified columns.",
+    params={"subset": [], "how": "any"}
+)
 class DropMissingRowsCalculator(BaseCalculator):
     def fit(
         self,
@@ -332,6 +354,13 @@ class MissingIndicatorApplier(BaseApplier):
 
 
 @NodeRegistry.register("MissingIndicator", MissingIndicatorApplier)
+@node_meta(
+    id="MissingIndicator",
+    name="Missing Indicator",
+    category="Feature Engineering",
+    description="Create binary indicators for missing values.",
+    params={"features": "missing-only", "sparse": "auto"}
+)
 class MissingIndicatorCalculator(BaseCalculator):
     def fit(
         self,

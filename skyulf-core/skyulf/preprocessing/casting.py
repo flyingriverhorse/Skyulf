@@ -5,6 +5,7 @@ import pandas as pd
 
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
+from ..core.meta.decorators import node_meta
 from ..engines import SkyulfDataFrame, get_engine
 from ..utils import pack_pipeline_output, unpack_pipeline_input
 
@@ -223,6 +224,13 @@ class CastingApplier(BaseApplier):
 
 
 @NodeRegistry.register("Casting", CastingApplier)
+@node_meta(
+    id="Casting",
+    name="Type Casting",
+    category="Data Operations",
+    description="Cast columns to specific data types.",
+    params={"type_map": {}, "coerce_on_error": True}
+)
 class CastingCalculator(BaseCalculator):
     def fit(
         self, df: SkyulfDataFrame, config: Dict[str, Any]

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import KBinsDiscretizer
 
+from ..core.meta.decorators import node_meta
 from ..utils import (
     detect_numeric_columns,
     pack_pipeline_output,
@@ -213,6 +214,13 @@ class GeneralBinningApplier(BaseBinningApplier):
 
 
 @NodeRegistry.register("GeneralBinning", GeneralBinningApplier)
+@node_meta(
+    id="GeneralBinning",
+    name="General Binning",
+    category="Preprocessing",
+    description="Bin continuous data into intervals.",
+    params={"n_bins": 5, "strategy": "uniform", "columns": []}
+)
 class GeneralBinningCalculator(BaseCalculator):
     """
     Master calculator that handles mixed strategies and overrides.
@@ -342,6 +350,13 @@ class CustomBinningApplier(GeneralBinningApplier):
 
 
 @NodeRegistry.register("CustomBinning", CustomBinningApplier)
+@node_meta(
+    id="CustomBinning",
+    name="Custom Binning",
+    category="Preprocessing",
+    description="Bin data using custom edges.",
+    params={"bins": [], "columns": []}
+)
 class CustomBinningCalculator(BaseCalculator):
     """
     Calculator for CustomBinning node.
@@ -388,6 +403,13 @@ class KBinsDiscretizerApplier(GeneralBinningApplier):
 
 
 @NodeRegistry.register("KBinsDiscretizer", KBinsDiscretizerApplier)
+@node_meta(
+    id="KBinsDiscretizer",
+    name="K-Bins Discretizer",
+    category="Preprocessing",
+    description="Bin continuous data into intervals using sklearn KBinsDiscretizer.",
+    params={"n_bins": 5, "encode": "ordinal", "strategy": "quantile", "columns": []}
+)
 class KBinsDiscretizerCalculator(GeneralBinningCalculator):
     """
     Calculator for KBinsDiscretizer node.

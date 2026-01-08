@@ -17,6 +17,7 @@ from ..utils import (
     unpack_pipeline_input,
 )
 from .base import BaseApplier, BaseCalculator
+from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ..engines import SkyulfDataFrame, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
@@ -93,6 +94,13 @@ class StandardScalerApplier(BaseApplier):
 
 
 @NodeRegistry.register("StandardScaler", StandardScalerApplier)
+@node_meta(
+    id="StandardScaler",
+    name="Standard Scaler",
+    category="Preprocessing",
+    description="Standardize features by removing the mean and scaling to unit variance.",
+    params={"columns": [], "with_mean": True, "with_std": True}
+)
 class StandardScalerCalculator(BaseCalculator):
     def fit(
         self,
@@ -177,6 +185,13 @@ class MinMaxScalerApplier(BaseApplier):
 
 
 @NodeRegistry.register("MinMaxScaler", MinMaxScalerApplier)
+@node_meta(
+    id="MinMaxScaler",
+    name="Min-Max Scaler",
+    category="Preprocessing",
+    description="Transform features by scaling each feature to a given range.",
+    params={"feature_range": [0, 1], "columns": []}
+)
 class MinMaxScalerCalculator(BaseCalculator):
     def fit(
         self,
@@ -276,6 +291,13 @@ class RobustScalerApplier(BaseApplier):
 
 
 @NodeRegistry.register("RobustScaler", RobustScalerApplier)
+@node_meta(
+    id="RobustScaler",
+    name="Robust Scaler",
+    category="Preprocessing",
+    description="Scale features using statistics that are robust to outliers.",
+    params={"quantile_range": [25.0, 75.0], "with_centering": True, "with_scaling": True, "columns": []}
+)
 class RobustScalerCalculator(BaseCalculator):
     def fit(
         self,
@@ -367,6 +389,13 @@ class MaxAbsScalerApplier(BaseApplier):
 
 
 @NodeRegistry.register("MaxAbsScaler", MaxAbsScalerApplier)
+@node_meta(
+    id="MaxAbsScaler",
+    name="MaxAbs Scaler",
+    category="Preprocessing",
+    description="Scale each feature by its maximum absolute value.",
+    params={"columns": []}
+)
 class MaxAbsScalerCalculator(BaseCalculator):
     def fit(
         self,

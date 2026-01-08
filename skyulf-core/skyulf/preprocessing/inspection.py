@@ -3,6 +3,7 @@ from typing import Any, Dict, Tuple, Union
 import pandas as pd
 
 from ..registry import NodeRegistry
+from ..core.meta.decorators import node_meta
 from ..utils import detect_numeric_columns, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
 from ..engines import SkyulfDataFrame, get_engine
@@ -17,6 +18,13 @@ class DatasetProfileApplier(BaseApplier):
 
 
 @NodeRegistry.register("DatasetProfile", DatasetProfileApplier)
+@node_meta(
+    id="DatasetProfile",
+    name="Dataset Profile",
+    category="Inspection",
+    description="Generate a statistical profile of the dataset.",
+    params={}
+)
 class DatasetProfileCalculator(BaseCalculator):
     def fit(
         self, df: SkyulfDataFrame, config: Dict[str, Any]
@@ -88,6 +96,13 @@ class DataSnapshotApplier(BaseApplier):
 
 
 @NodeRegistry.register("DataSnapshot", DataSnapshotApplier)
+@node_meta(
+    id="DataSnapshot",
+    name="Data Snapshot",
+    category="Inspection",
+    description="Take a snapshot of the first N rows of the dataset.",
+    params={"n_rows": 5}
+)
 class DataSnapshotCalculator(BaseCalculator):
     def fit(
         self, df: SkyulfDataFrame, config: Dict[str, Any]

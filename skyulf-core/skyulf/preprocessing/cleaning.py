@@ -7,6 +7,7 @@ import pandas as pd
 from ..utils import pack_pipeline_output, resolve_columns, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
+from ..core.meta.decorators import node_meta
 from ..engines import SkyulfDataFrame, get_engine
 
 # --- Constants ---
@@ -262,6 +263,13 @@ class TextCleaningApplier(BaseApplier):
 
 
 @NodeRegistry.register("TextCleaning", TextCleaningApplier)
+@node_meta(
+    id="TextCleaning",
+    name="Text Cleaning",
+    category="Cleaning",
+    description="Clean text data (trim, case conversion, remove special chars).",
+    params={"columns": [], "operations": []}
+)
 class TextCleaningCalculator(BaseCalculator):
     def fit(
         self,
@@ -395,6 +403,13 @@ class InvalidValueReplacementApplier(BaseApplier):
 
 
 @NodeRegistry.register("InvalidValueReplacement", InvalidValueReplacementApplier)
+@node_meta(
+    id="InvalidValueReplacement",
+    name="Replace Invalid Values",
+    category="Cleaning",
+    description="Replace specified values with nan.",
+    params={"columns": [], "invalid_values": []}
+)
 class InvalidValueReplacementCalculator(BaseCalculator):
     def fit(
         self,
@@ -507,6 +522,13 @@ class ValueReplacementApplier(BaseApplier):
 
 
 @NodeRegistry.register("ValueReplacement", ValueReplacementApplier)
+@node_meta(
+    id="ValueReplacement",
+    name="Replace Values",
+    category="Cleaning",
+    description="Replace specified values with new values.",
+    params={"columns": [], "mapping": {}}
+)
 class ValueReplacementCalculator(BaseCalculator):
     def fit(
         self,
@@ -653,6 +675,13 @@ class AliasReplacementApplier(BaseApplier):
 
 
 @NodeRegistry.register("AliasReplacement", AliasReplacementApplier)
+@node_meta(
+    id="AliasReplacement",
+    name="Standardize Values",
+    category="Cleaning",
+    description="Standardize common variations in text values (e.g. Yes/No, Country names).",
+    params={"columns": [], "domain": "boolean"}
+)
 class AliasReplacementCalculator(BaseCalculator):
     def fit(
         self,

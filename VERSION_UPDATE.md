@@ -10,6 +10,21 @@
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
 ------------------------------------------------------------
+## v0.1.9
+
+### 🏗️ Architecture & Core
+- **Unified Node Registry:** Migrated all ML nodes (Preprocessing, Modeling) to a dynamic registry system using `@node_meta` decorators in `skyulf-core`. This eliminates duplicate node definitions in the backend and ensures consistency.
+- **Dynamic Node Discovery:** Updated Backend API to automatically discover and register nodes from `skyulf-core` at runtime.
+- **Frontend Cleanup:** Removed unused `JobsPage.tsx` and updated Training tab names.
+
+### 🔧 Backend Architecture
+- **Unified Node Registry:** Implemented dynamic node discovery. `skyulf-core` nodes now use a `@node_meta` decorator to self-register, and the Backend API (`/registry`) automatically merges them with static definitions.
+
+### 🎨 Frontend & UX
+- **Node Factories:** Refactored frontend node definitions using a `createModelingNode` factory, reducing boilerplate and enforcing consistency across modeling nodes.
+- **Jobs Page Labels:** Renamed "Training" tab to "Basic Training" and "Tuning" tab to "Advanced Tuning" to better distinguish between job types.
+
+------------------------------------------------------------
 ## v0.1.8
 **"The Unsupervised & Monitoring Update"**
 This release transforms the platform into a complete lifecycle manager, adding unsupervised learning (Clustering/PCA), production monitoring (Drift), and advanced regression analysis.
@@ -45,6 +60,10 @@ This release transforms the platform into a complete lifecycle manager, adding u
 - **HN Version:** Added a Hacker News–style short post focused on Skyulf’s interactive UX, Polars previews, and Calculator/Applier boundaries.
 - **HN Version Update:** Replaced the dummy sklearn instantiation with real `SklearnCalculator` / `SklearnApplier` excerpts to better reflect Skyulf’s implementation.
 - **Pipeline Integration:** Updated `FeatureEngineer` to explicitly support `SkyulfDataFrame` in `transform` and `fit_transform` methods, enabling full Polars/Protocol pass-through.
+
+### 🐛 Bug Fixes
+- **Job Filtering:** Fixed an issue where the Jobs page would show both training and tuning jobs regardless of the selected tab by handling API parameter aliases correctly.
+- **Cleanup:** Removed unused `JobsPage.tsx` file from frontend.
 
 ------------------------------------------------------------
 ## v0.1.7

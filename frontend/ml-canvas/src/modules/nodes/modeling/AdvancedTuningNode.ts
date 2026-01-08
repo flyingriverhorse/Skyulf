@@ -1,23 +1,14 @@
-import { NodeDefinition } from '../../../core/types/nodes';
 import { Sliders } from 'lucide-react';
 import { AdvancedTuningSettings } from './AdvancedTuningSettings';
+import { createModelingNode } from '../../../core/factories/nodeFactory';
 
-export const AdvancedTuningNode: NodeDefinition = {
+export const AdvancedTuningNode = createModelingNode({
   type: 'advanced_tuning',
   label: 'Advanced Tuning and Training',
-  category: 'Modeling',
   description: 'Automatically optimize model performance.',
   icon: Sliders,
-  inputs: [{ id: 'in', label: 'Training Data', type: 'dataset' }],
-  outputs: [{ id: 'model', label: 'Best Model', type: 'model' }],
   settings: AdvancedTuningSettings,
-  validate: (config) => {
-    if (!config.target_column) return { isValid: false, message: 'Target column is required.' };
-    return { isValid: true };
-  },
-  getDefaultConfig: () => ({
-    target_column: '',
-    model_type: 'random_forest_classifier',
+  defaultConfig: {
     n_trials: 10,
     metric: 'accuracy',
     search_strategy: 'random',
@@ -28,5 +19,6 @@ export const AdvancedTuningNode: NodeDefinition = {
     cv_random_state: 42,
     random_state: 42,
     search_space: {}
-  })
-};
+  },
+  outputs: [{ id: 'model', label: 'Best Model', type: 'model' }]
+});
