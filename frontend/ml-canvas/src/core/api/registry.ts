@@ -6,6 +6,7 @@ export interface RegistryItem {
     category: string;
     description: string;
     params: Record<string, unknown>;
+    tags?: string[];
 }
 
 export const registryApi = {

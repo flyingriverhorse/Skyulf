@@ -25,3 +25,4 @@ class NodeMetadataDict(TypedDict, total=False):
     category: str
     description: str
     params: Dict[str, Any]
+    tags: List[str]

@@ -26,6 +26,7 @@ from skyulf.modeling.regression import (
 )
 from skyulf.modeling.tuning.engine import TuningApplier, TuningCalculator
 from skyulf.preprocessing.pipeline import FeatureEngineer
+from skyulf.registry import NodeRegistry
 
 from ..artifacts.store import ArtifactStore
 from ..constants import StepType
@@ -830,23 +831,28 @@ class PipelineEngine:
 
     def _get_model_components(self, algorithm: str):
         """Factory for model components."""
-        # Normalize algorithm name
+        # Normalize algorithm name to match registry IDs
         algo = algorithm.lower().replace(" ", "_").replace("-", "_")
 
-        if algo in ["logistic_regression", "logisticregression"]:
-            return LogisticRegressionCalculator(), LogisticRegressionApplier()
-        elif algo in [
-            "random_forest_classifier",
-            "randomforestclassifier",
-            "random_forest",
-        ]:
-            return RandomForestClassifierCalculator(), RandomForestClassifierApplier()
-        elif algo in ["ridge_regression", "ridgeregression", "ridge"]:
-            return RidgeRegressionCalculator(), RidgeRegressionApplier()
-        elif algo in ["random_forest_regressor", "randomforestregressor"]:
-            return RandomForestRegressorCalculator(), RandomForestRegressorApplier()
-        else:
-            raise ValueError(f"Unknown algorithm: {algorithm}")
+        # Map legacy aliases to registry IDs
+        alias_map = {
+            "logisticregression": "logistic_regression",
+            "randomforestclassifier": "random_forest_classifier",
+            "random_forest": "random_forest_classifier",
+            "ridgeregression": "ridge_regression",
+            "ridge": "ridge_regression",
+            "randomforestregressor": "random_forest_regressor",
+        }
+        
+        registry_id = alias_map.get(algo, algo)
+
+        try:
+            calculator_cls = NodeRegistry.get_calculator(registry_id)
+            applier_cls = NodeRegistry.get_applier(registry_id)
+            return calculator_cls(), applier_cls()
+        except ValueError:
+             # Fallback: Raise original error if not found in registry
+            raise ValueError(f"Unknown algorithm: {algorithm} (Registry ID: {registry_id})")
 
     def _run_data_preview(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
         """

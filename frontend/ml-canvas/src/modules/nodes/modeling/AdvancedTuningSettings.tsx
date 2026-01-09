@@ -365,6 +365,9 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
   const availableColumns = schema ? Object.values(schema.columns) : [];
   const [availableModels, setAvailableModels] = useState<RegistryItem[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [showScalingAlert, setShowScalingAlert] = useState(true);
+
+  const selectedModelItem = availableModels.find(m => m.id === config.model_type);
 
   // Fetch available models from registry
   useEffect(() => {
@@ -494,6 +497,30 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                             <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
                         </div>
                     </div>
+
+                   {selectedModelItem?.tags?.includes('requires_scaling') && (
+                        <div className="mt-2 text-xs border border-blue-200 dark:border-blue-800 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 overflow-hidden transition-all">
+                            <button 
+                                onClick={() => setShowScalingAlert(!showScalingAlert)}
+                                className="w-full flex items-center justify-between p-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                            >
+                                <div className="flex items-center gap-2 font-semibold">
+                                    <Settings2 className="w-3 h-3" />
+                                    <span>Scale Your Data</span>
+                                </div>
+                                <ChevronDown className={`w-3 h-3 transition-transform ${showScalingAlert ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showScalingAlert && (
+                                <div className="p-2 pt-0 opacity-90 animate-in slide-in-from-top-1 pl-7">
+                                    <p className="opacity-90">
+                                        This model performs best with scaled features. Consider adding a 
+                                        <span className="font-mono mx-1 bg-white dark:bg-black px-1 rounded border border-blue-200 dark:border-blue-800">Scaler</span> 
+                                        node before this step.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                   )}
 
                     <div>
                         <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Target Column</label>

@@ -82,7 +82,17 @@ class SklearnCalculator(BaseModelCalculator):
             log_callback(msg)
 
         # 2. Instantiate Model
-        model = self.model_class(**params)
+        # Filter params to only include those accepted by the model_class constructor
+        import inspect
+        sig = inspect.signature(self.model_class)
+        valid_params = {k: v for k, v in params.items() if k in sig.parameters}
+        
+        # Log dropped params if any (for debugging)
+        dropped = set(params.keys()) - set(valid_params.keys())
+        if dropped:
+            logger.warning(f"Dropped parameters not supported by {self.model_class.__name__}: {dropped}")
+
+        model = self.model_class(**valid_params)
 
         # 3. Fit
         # Convert to Numpy using Bridge (handles Polars/Pandas/Wrappers)

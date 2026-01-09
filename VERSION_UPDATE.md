@@ -1,5 +1,6 @@
 # Version Updates
 
+*   **v0.1.10 :** "The Model Expansion Update" — Added 15 new models (XGBoost, SVM, etc.) and smart UI hints for feature scaling.
 *   **v0.1.9 :** "The Registry & Polars Compatibility Update" — Dynamic node registry system and comprehensive Polars support across all preprocessing nodes.
 *   **v0.1.8 :** "The Unsupervised & Monitoring Update" — Major expansion of EDA with Post-Hoc Clustering, PCA Loadings, Drift Monitoring (PSI/KL), and Regression Rules.
 *   **v0.1.7 :** "The Advanced EDA & Profiling Update" — Professional-grade automated data analysis with smart alerts, rich visualizations, and Polars-powered profiling.
@@ -10,6 +11,18 @@
 *   **v0.1.2 :** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
+------------------------------------------------------------
+## v0.1.10
+
+### 🧠 Model Expansion (15 New Models)
+- **Classification:** Added support for `SVC`, `KNeighborsClassifier`, `DecisionTreeClassifier`, `GradientBoostingClassifier`, `AdaBoostClassifier`, `XGBClassifier`, and `GaussianNB`.
+- **Regression:** Added support for `Lasso`, `ElasticNet`, `SVR`, `KNeighborsRegressor`, `DecisionTreeRegressor`, `GradientBoostingRegressor`, `AdaBoostRegressor`, and `XGBRegressor`.
+- **Hyperparameters:** Added comprehensive hyperparameter definitions for all new models to support the "Advanced Tuning" UI.
+
+### 🎨 Frontend & UX
+- **Smart Recommendations:** The frontend now detects models that require feature scaling (e.g., SVM, KNN, Ridge/Lasso) and displays a "Requires Scaling" hint in the node settings.
+- **Node Metadata:** Enhanced the `@node_meta` decorator and Registry API to support arbitrary tags (e.g., `requires_scaling`), enabling smarter UI behavior.
+
 ------------------------------------------------------------
 ## v0.1.9
 **"The Registry & Polars Compatibility Update"**
