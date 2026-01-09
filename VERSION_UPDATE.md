@@ -1,5 +1,6 @@
 # Version Updates
 
+*   **v0.1.9 :** "The Registry & Polars Compatibility Update" — Dynamic node registry system and comprehensive Polars support across all preprocessing nodes.
 *   **v0.1.8 :** "The Unsupervised & Monitoring Update" — Major expansion of EDA with Post-Hoc Clustering, PCA Loadings, Drift Monitoring (PSI/KL), and Regression Rules.
 *   **v0.1.7 :** "The Advanced EDA & Profiling Update" — Professional-grade automated data analysis with smart alerts, rich visualizations, and Polars-powered profiling.
 *   **v0.1.6 :** "The Backend Abstraction & Modern Frameworks Update" — Polars migration, leakage proof, and performance optimization.
@@ -11,29 +12,26 @@
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
 ------------------------------------------------------------
 ## v0.1.9
+**"The Registry & Polars Compatibility Update"**
+This release finalizes the dynamic node registry system and completes comprehensive Polars support across all preprocessing nodes.
 
 ### 🏗️ Architecture & Core
-- **Unified Node Registry:** Migrated all ML nodes (Preprocessing, Modeling) to a dynamic registry system using `@node_meta` decorators in `skyulf-core`. This eliminates duplicate node definitions in the backend and ensures consistency.
-### 🔧 Backend Architecture
-- **Polars Compatibility:** Completed comprehensive Polars support for all preprocessing nodes (`Calculator` and `Applier`). Verified with a new comprehensive test suite covering 50+ nodes.
-- **Engine Mechanics:** Added detailed documentation `docs/guides/engine_mechanics.md` explaining the `SkyulfDataFrame` protocol and hybrid execution strategy.
-- **Testing:** Added `tests/test_preprocessing_comprehensive_suite.py` to ensure zero regressions in node logic across both engines.
+- **Unified Node Registry:** Migrated all ML nodes to a self-registering system using `@node_meta` in `skyulf-core`, enabling automatic discovery and eliminating backend duplication.
+- **Dynamic Discovery:** Backend API now automatically detects and registers nodes at runtime.
 
-- **Dynamic Node Discovery:** Updated Backend API to automatically discover and register nodes from `skyulf-core` at runtime.
-- **Frontend Cleanup:** Removed unused `JobsPage.tsx` and updated Training tab names.
-
-### 🔧 Backend Architecture
-- **Unified Node Registry:** Implemented dynamic node discovery. `skyulf-core` nodes now use a `@node_meta` decorator to self-register, and the Backend API (`/registry`) automatically merges them with static definitions.
-
-### 🧹 Preprocessing & Polars Support
-- **Full Polars Support:** Refactored `skyulf/preprocessing` modules (`bucketing`, `cleaning`, `feature_generation`, `feature_selection`, `inspection`, `resampling`, `transformations`) to support Polars DataFrame natively or via hybrid conversion.
-- **Type Safety:** Updated `BaseCalculator.fit` and `BaseApplier.apply` signatures to `Union[pd.DataFrame, Any, ...]` to fix Liskov Substitution Principle violations and support `polars.DataFrame`.
-- **Hybrid Execution:** Implemented robust "Convert-Process-Convert" pattern for Scikit-Learn/Imbalanced-Learn dependent nodes (SMOTE, Feature Selection) when running on Polars engine.
-- **Bug Fixes:** Fixed `pack_pipeline_output` utility to correctly handle Polars concatenation and target re-attachment.
+### 🧹 Polars Support & Engine
+- **Full Polars Compatibility:** Completed support for all preprocessing nodes (`Calculator` and `Applier`), including hybrid execution for Scikit-Learn dependencies.
+- **Type Safety:** Updated signatures to generic `Union[pd.DataFrame, Any]` to correctly support `polars.DataFrame`.
+- **Hybrid Execution:** Implemented robust conversion patterns for nodes requiring Scikit-Learn (e.g., SMOTE).
 
 ### 🎨 Frontend & UX
-- **Node Factories:** Refactored frontend node definitions using a `createModelingNode` factory, reducing boilerplate and enforcing consistency across modeling nodes.
-- **Jobs Page Labels:** Renamed "Training" tab to "Basic Training" and "Tuning" tab to "Advanced Tuning" to better distinguish between job types.
+- **Node Factories:** Introduced `createModelingNode` factory to reduce boilerplate and enforce consistency.
+- **UX Improvements:** Renamed training tabs to "Basic Training" and "Advanced Tuning" for clarity.
+
+### 🧪 Quality & Docs
+- **Comprehensive Testing:** Added a test suite covering 50+ nodes to verify Polars/Pandas parity.
+- **Engine Documentation:** Added `docs/guides/engine_mechanics.md` explaining the hybrid execution strategy.
+- **Code Cleanup:** Removed unused `JobsPage.tsx` and refactored older components.
 
 ------------------------------------------------------------
 ## v0.1.8
