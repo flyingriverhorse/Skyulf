@@ -141,8 +141,8 @@ export const JobsPage: React.FC = () => {
       {/* Tabs & Filters */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
-          <TabButton active={activeTab === 'training'} onClick={() => setActiveTab('training')} icon={<Cpu size={16} />} label="Training" />
-          <TabButton active={activeTab === 'tuning'} onClick={() => setActiveTab('tuning')} icon={<Activity size={16} />} label="Tuning" />
+          <TabButton active={activeTab === 'training'} onClick={() => setActiveTab('training')} icon={<Cpu size={16} />} label="Basic Training" />
+          <TabButton active={activeTab === 'tuning'} onClick={() => setActiveTab('tuning')} icon={<Activity size={16} />} label="Advanced Tuning" />
           <TabButton active={activeTab === 'eda'} onClick={() => setActiveTab('eda')} icon={<BarChart2 size={16} />} label="EDA" />
           <TabButton active={activeTab === 'ingestion'} onClick={() => setActiveTab('ingestion')} icon={<Database size={16} />} label="Ingestion" />
         </div>

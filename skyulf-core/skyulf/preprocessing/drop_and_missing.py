@@ -3,6 +3,7 @@ from typing import Any, Dict, Tuple, Union
 import pandas as pd
 
 from ..registry import NodeRegistry
+from ..core.meta.decorators import node_meta
 from ..utils import pack_pipeline_output, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
 from ..engines import SkyulfDataFrame, get_engine
@@ -13,9 +14,9 @@ from ..engines import SkyulfDataFrame, get_engine
 class DeduplicateApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -34,6 +35,7 @@ class DeduplicateApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            X_pl: Any = X
             
             # Map keep parameter
             # Pandas: 'first', 'last', False
@@ -50,13 +52,13 @@ class DeduplicateApplier(BaseApplier):
                 
                 # If y is a Series/DataFrame, we can hstack
                 # But we need to know which columns belong to X and which to y
-                x_cols = X.columns
+                x_cols = X_pl.columns
                 
                 # If y is unnamed or has name collision, rename it temporarily?
                 # Or just use index? Polars has no index.
                 # Best way: add a row index, filter X, get kept indices, filter y.
                 
-                X_with_idx = X.with_row_index("__idx__")
+                X_with_idx = X_pl.with_row_index("__idx__")
                 X_dedup = X_with_idx.unique(subset=subset, keep=pl_keep, maintain_order=True)
                 kept_indices = X_dedup["__idx__"]
                 
@@ -64,8 +66,6 @@ class DeduplicateApplier(BaseApplier):
                 # y must be a DataFrame or Series. If it's a Series, convert to DF to filter?
                 # Or use filter/take
                 if isinstance(y, pl.DataFrame):
-                    y_dedup = y.filter(pl.col("__idx__").is_in(kept_indices)) # Wait, y doesn't have __idx__
-                    # We need to add row index to y too, assuming they are aligned
                     y_dedup = y.with_row_index("__idx__").filter(pl.col("__idx__").is_in(kept_indices)).drop("__idx__")
                 elif isinstance(y, pl.Series):
                     # Series doesn't have with_row_index directly in same way? 
@@ -79,7 +79,7 @@ class DeduplicateApplier(BaseApplier):
                 return pack_pipeline_output(X_out, y_dedup, is_tuple)
             
             else:
-                X_out = X.unique(subset=subset, keep=pl_keep, maintain_order=True)
+                X_out = X_pl.unique(subset=subset, keep=pl_keep, maintain_order=True)
                 return pack_pipeline_output(X_out, y, is_tuple)
 
         # Pandas Path
@@ -94,10 +94,17 @@ class DeduplicateApplier(BaseApplier):
 
 
 @NodeRegistry.register("Deduplicate", DeduplicateApplier)
+@node_meta(
+    id="Deduplicate",
+    name="Deduplicate",
+    category="Data Operations",
+    description="Drop duplicate rows.",
+    params={"subset": [], "keep": "first"}
+)
 class DeduplicateCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -118,18 +125,27 @@ class DeduplicateCalculator(BaseCalculator):
 class DropMissingColumnsApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols_to_drop = params.get("columns_to_drop", [])
-        cols_to_drop_X = [c for c in cols_to_drop if c in X.columns]
+        
+        # Checking X.columns might be tricky if X is Any, but engine check helps
+        if engine.name == "polars":
+            # X is likely Polars, but let's be safe
+            X_pl: Any = X
+            cols_to_drop_X = [c for c in cols_to_drop if c in X_pl.columns]
+        else:
+            cols_to_drop_X = [c for c in cols_to_drop if c in X.columns]
+
 
         if cols_to_drop_X:
             if engine.name == "polars":
-                X = X.drop(cols_to_drop_X)
+                X_pl_data: Any = X
+                X = X_pl_data.drop(cols_to_drop_X)
             else:
                 X = X.drop(columns=cols_to_drop_X)
 
@@ -137,10 +153,17 @@ class DropMissingColumnsApplier(BaseApplier):
 
 
 @NodeRegistry.register("DropMissingColumns", DropMissingColumnsApplier)
+@node_meta(
+    id="DropMissingColumns",
+    name="Drop Missing Columns",
+    category="Cleaning",
+    description="Drop columns that exceed missing value threshold.",
+    params={"threshold": 0.5}
+)
 class DropMissingColumnsCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -154,8 +177,15 @@ class DropMissingColumnsCalculator(BaseCalculator):
 
         cols_to_drop = set()
 
-        if explicit_cols:
-            cols_to_drop.update([c for c in explicit_cols if c in X.columns])
+        # Handle X access depending on engine
+        if engine.name == "polars":
+            X_pl: Any = X
+            if explicit_cols:
+                cols_to_drop.update([c for c in explicit_cols if c in X_pl.columns])
+        else:
+            if explicit_cols:
+                cols_to_drop.update([c for c in explicit_cols if c in X.columns])
+
 
         if threshold is not None:
             try:
@@ -163,12 +193,13 @@ class DropMissingColumnsCalculator(BaseCalculator):
                 if threshold_val > 0:
                     if engine.name == "polars":
                         import polars as pl
+                        X_pl_data: Any = X
                         # Calculate missing percentage for all columns
                         # null_count() returns a DF with 1 row
-                        null_counts = X.null_count()
-                        total_rows = X.height
+                        null_counts = X_pl_data.null_count()
+                        total_rows = X_pl_data.height
                         
-                        for col in X.columns:
+                        for col in X_pl_data.columns:
                             # Get null count for this column
                             # null_counts[col] is a Series of length 1
                             n_null = null_counts[col][0]
@@ -197,9 +228,9 @@ class DropMissingColumnsCalculator(BaseCalculator):
 class DropMissingRowsApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -208,19 +239,25 @@ class DropMissingRowsApplier(BaseApplier):
         threshold = params.get("threshold")
 
         if subset:
-            subset = [c for c in subset if c in X.columns]
+            if engine.name == "polars":
+                X_pl: Any = X
+                subset = [c for c in subset if c in X_pl.columns]
+            else:
+                subset = [c for c in subset if c in X.columns]
+            
             if not subset:
                 subset = None
 
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            X_pl_data: Any = X
             
             # We need to sync X and y, so we use the index trick
-            X_with_idx = X.with_row_index("__idx__")
+            X_with_idx = X_pl_data.with_row_index("__idx__")
             
             # Determine columns to check
-            check_cols = subset if subset else [c for c in X.columns if c != "__idx__"]
+            check_cols = subset if subset else [c for c in X_pl_data.columns if c != "__idx__"]
             
             if threshold is not None:
                 # Keep rows with at least 'threshold' non-null values in check_cols
@@ -271,10 +308,17 @@ class DropMissingRowsApplier(BaseApplier):
 
 
 @NodeRegistry.register("DropMissingRows", DropMissingRowsApplier)
+@node_meta(
+    id="DropMissingRows",
+    name="Drop Missing Rows",
+    category="Cleaning",
+    description="Drop rows containing missing values in specified columns.",
+    params={"subset": [], "how": "any"}
+)
 class DropMissingRowsCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: {'subset': [...], 'how': 'any'|'all', 'threshold': int}
@@ -296,9 +340,9 @@ class DropMissingRowsCalculator(BaseCalculator):
 class MissingIndicatorApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -310,16 +354,18 @@ class MissingIndicatorApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            X_pl: Any = X
             
             exprs = []
             for col in cols:
-                if col in X.columns:
+                # X_pl.columns check
+                if col in X_pl.columns:
                     exprs.append(pl.col(col).is_null().cast(pl.Int64).alias(f"{col}_missing"))
             
             if not exprs:
                  return pack_pipeline_output(X, y, is_tuple)
                  
-            X_out = X.with_columns(exprs)
+            X_out = X_pl.with_columns(exprs)
             return pack_pipeline_output(X_out, y, is_tuple)
 
         # Pandas Path
@@ -332,10 +378,17 @@ class MissingIndicatorApplier(BaseApplier):
 
 
 @NodeRegistry.register("MissingIndicator", MissingIndicatorApplier)
+@node_meta(
+    id="MissingIndicator",
+    name="Missing Indicator",
+    category="Feature Engineering",
+    description="Create binary indicators for missing values.",
+    params={"features": "missing-only", "sparse": "auto"}
+)
 class MissingIndicatorCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -344,12 +397,17 @@ class MissingIndicatorCalculator(BaseCalculator):
         explicit_cols = config.get("columns")
         
         if explicit_cols:
-            cols = [c for c in explicit_cols if c in X.columns]
+            if engine.name == "polars":
+                X_pl_data: Any = X
+                cols = [c for c in explicit_cols if c in X_pl_data.columns]
+            else:
+                 cols = [c for c in explicit_cols if c in X.columns]
         else:
             if engine.name == "polars":
                 import polars as pl
-                null_counts = X.null_count()
-                cols = [c for c in X.columns if null_counts[c][0] > 0]
+                X_pl: Any = X
+                null_counts = X_pl.null_count()
+                cols = [c for c in X_pl.columns if null_counts[c][0] > 0]
             else:
                 cols = X.columns[X.isna().any()].tolist()
                 

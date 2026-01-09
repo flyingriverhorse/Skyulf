@@ -18,6 +18,7 @@ from ..utils import (
     unpack_pipeline_input,
 )
 from .base import BaseApplier, BaseCalculator
+from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ..engines import SkyulfDataFrame, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
@@ -30,9 +31,9 @@ logger = logging.getLogger(__name__)
 class SimpleImputerApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -45,23 +46,29 @@ class SimpleImputerApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            X_pl: Any = X
 
             exprs = []
             # Handle existing columns
-            for col in X.columns:
+            for col in X_pl.columns:
                 if col in cols and col in fill_values:
                     val = fill_values[col]
+                    # fill_null must be applied to the column expression
                     exprs.append(pl.col(col).fill_null(val).alias(col))
                 else:
                     exprs.append(pl.col(col))
 
             # Handle missing columns (restore them)
+            # This logic assumes "restore" means adding them if they are completely missing from input X but were present during fit?
+            # Or is it just adding constant value cols?
+            # The original code iterated cols and checked if col not in X.columns.
+            
             for col in cols:
-                if col not in X.columns and col in fill_values:
+                if col not in X_pl.columns and col in fill_values:
                     val = fill_values[col]
                     exprs.append(pl.lit(val).alias(col))
 
-            X_out = X.select(exprs)
+            X_out = X_pl.select(exprs)
             return pack_pipeline_output(X_out, y, is_tuple)
 
         # Pandas Path
@@ -84,10 +91,17 @@ class SimpleImputerApplier(BaseApplier):
 
 
 @NodeRegistry.register("SimpleImputer", SimpleImputerApplier)
+@node_meta(
+    id="SimpleImputer",
+    name="Simple Imputer",
+    category="Preprocessing",
+    description="Imputes missing values using mean, median, or constant.",
+    params={"strategy": "mean", "fill_value": None, "columns": []}
+)
 class SimpleImputerCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -105,7 +119,7 @@ class SimpleImputerCalculator(BaseCalculator):
         detect_func = (
             detect_numeric_columns
             if strategy in ["mean", "median"]
-            else (lambda d: d.columns.tolist())
+            else (lambda d: d.columns.tolist())  # Explicit type ignored for lambda can be tricky, but logic holds
         )
 
         cols = resolve_columns(X, config, detect_func)
@@ -116,6 +130,7 @@ class SimpleImputerCalculator(BaseCalculator):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            X_pl: Any = X
 
             fill_values = {}
 
@@ -124,14 +139,14 @@ class SimpleImputerCalculator(BaseCalculator):
                     fill_values[col] = fill_value if fill_value is not None else 0
 
             elif strategy == "mean":
-                stats = X.select([pl.col(c).mean() for c in cols]).to_dict(
+                stats = X_pl.select([pl.col(c).mean() for c in cols]).to_dict(
                     as_series=False
                 )
                 for col in cols:
                     fill_values[col] = stats[col][0]
 
             elif strategy == "median":
-                stats = X.select([pl.col(c).median() for c in cols]).to_dict(
+                stats = X_pl.select([pl.col(c).median() for c in cols]).to_dict(
                     as_series=False
                 )
                 for col in cols:
@@ -139,14 +154,14 @@ class SimpleImputerCalculator(BaseCalculator):
 
             elif strategy == "most_frequent":
                 # Mode in Polars returns a list. We take the first one.
-                stats = X.select([pl.col(c).mode().first() for c in cols]).to_dict(
+                stats = X_pl.select([pl.col(c).mode().first() for c in cols]).to_dict(
                     as_series=False
                 )
                 for col in cols:
                     fill_values[col] = stats[col][0]
 
             # Calculate missing counts
-            missing_counts = X.select([pl.col(c).null_count() for c in cols]).to_dict(
+            missing_counts = X_pl.select([pl.col(c).null_count() for c in cols]).to_dict(
                 as_series=False
             )
             missing_counts_dict = {c: missing_counts[c][0] for c in cols}
@@ -202,9 +217,9 @@ class SimpleImputerCalculator(BaseCalculator):
 class KNNImputerApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -218,9 +233,10 @@ class KNNImputerApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            X_pl: Any = X
 
             try:
-                X_subset = X.select(cols)
+                X_subset = X_pl.select(cols)
                 X_np, _ = SklearnBridge.to_sklearn(X_subset)
                 X_transformed = imputer.transform(X_np)
 
@@ -228,7 +244,7 @@ class KNNImputerApplier(BaseApplier):
                 new_cols = [
                     pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)
                 ]
-                X_out = X.with_columns(new_cols)
+                X_out = X_pl.with_columns(new_cols)
                 return pack_pipeline_output(X_out, y, is_tuple)
 
             except Exception as e:
@@ -268,13 +284,21 @@ class KNNImputerApplier(BaseApplier):
 
 
 @NodeRegistry.register("KNNImputer", KNNImputerApplier)
+@node_meta(
+    id="KNNImputer",
+    name="KNN Imputer",
+    category="Preprocessing",
+    description="Impute missing values using k-Nearest Neighbors.",
+    params={"n_neighbors": 5, "weights": "uniform", "columns": []}
+)
 class KNNImputerCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         # Config: {'n_neighbors': 5, 'weights': 'uniform'|'distance', 'columns': [...]}
         n_neighbors = config.get("n_neighbors", 5)
@@ -292,7 +316,14 @@ class KNNImputerCalculator(BaseCalculator):
         imputer = KNNImputer(n_neighbors=n_neighbors, weights=weights)
         
         # Use Bridge for fitting
-        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
+        if engine.name == "polars":
+            # Polars Path
+            X_pl: Any = X
+            X_subset = X_pl.select(cols)
+        else:
+            # Pandas Path
+            X_subset = X[cols]
+
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
         
         imputer.fit(X_np)
@@ -312,9 +343,9 @@ class KNNImputerCalculator(BaseCalculator):
 class IterativeImputerApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -328,16 +359,17 @@ class IterativeImputerApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            X_pl: Any = X
 
             try:
-                X_subset = X.select(cols)
+                X_subset = X_pl.select(cols)
                 X_np, _ = SklearnBridge.to_sklearn(X_subset)
                 X_transformed = imputer.transform(X_np)
 
                 new_cols = [
                     pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)
                 ]
-                X_out = X.with_columns(new_cols)
+                X_out = X_pl.with_columns(new_cols)
                 return pack_pipeline_output(X_out, y, is_tuple)
             except Exception as e:
                 logger.error(f"Iterative Imputation failed: {e}")
@@ -365,13 +397,21 @@ class IterativeImputerApplier(BaseApplier):
 
 
 @NodeRegistry.register("IterativeImputer", IterativeImputerApplier)
+@node_meta(
+    id="IterativeImputer",
+    name="Iterative Imputer (MICE)",
+    category="Preprocessing",
+    description="Multivariate imputation using chained equations.",
+    params={"max_iter": 10, "random_state": 0, "estimator": "bayesian_ridge", "columns": []}
+)
 class IterativeImputerCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         # Config: {'max_iter': 10, 'estimator': 'BayesianRidge'|'DecisionTree'|'ExtraTrees'|'KNeighbors',
         #          'columns': [...]}
@@ -398,7 +438,14 @@ class IterativeImputerCalculator(BaseCalculator):
         )
         
         # Use Bridge for fitting
-        X_subset = X.select(cols) if hasattr(X, "select") else X[cols]
+        if engine.name == "polars":
+            # Polars Path
+            X_pl: Any = X
+            X_subset = X_pl.select(cols)
+        else:
+            # Pandas Path
+            X_subset = X[cols]
+
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
         
         imputer.fit(X_np)

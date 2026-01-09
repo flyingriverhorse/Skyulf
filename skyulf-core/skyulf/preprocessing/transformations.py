@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import PowerTransformer, StandardScaler
 
+from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ..utils import (
     detect_numeric_columns,
@@ -23,10 +24,12 @@ logger = logging.getLogger(__name__)
 class PowerTransformerApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
+        was_polars = engine.name == "polars"
 
         cols = params.get("columns", [])
         lambdas = params.get("lambdas")
@@ -38,7 +41,13 @@ class PowerTransformerApplier(BaseApplier):
         if not valid_cols or lambdas is None:
             return pack_pipeline_output(X, y, is_tuple)
 
-        df_out = X.copy()
+        if was_polars:
+            import polars as pl
+            X_pd = X.to_pandas()
+        else:
+            X_pd = X
+
+        df_out = X_pd.copy()
 
         # Reconstruct PowerTransformer state for application
         # We manually restore the lambdas and internal scaler to apply the transform
@@ -85,17 +94,30 @@ class PowerTransformerApplier(BaseApplier):
             # Fallback?
             pass
 
+        if was_polars:
+            df_out = pl.from_pandas(df_out)
+
         return pack_pipeline_output(df_out, y, is_tuple)
 
 
 @NodeRegistry.register("PowerTransformer", PowerTransformerApplier)
+@node_meta(
+    id="PowerTransformer",
+    name="Power Transformer",
+    category="Preprocessing",
+    description="Apply a power transform featurewise to make data more Gaussian-like.",
+    params={"method": "yeo-johnson", "standardize": True, "columns": []}
+)
 class PowerTransformerCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+        engine = get_engine(X)
+        if engine.name == "polars":
+            X = X.to_pandas()
 
         # Config: {'method': 'yeo-johnson' | 'box-cox', 'standardize': True, 'columns': [...]}
         method = config.get("method", "yeo-johnson")
@@ -150,15 +172,51 @@ class PowerTransformerCalculator(BaseCalculator):
 class SimpleTransformationApplier(BaseApplier):
     def apply(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         transformations = params.get("transformations", [])
         if not transformations:
             return pack_pipeline_output(X, y, is_tuple)
 
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+            X_pl: Any = X
+            X_out = X_pl
+
+            for item in transformations:
+                col = item.get("column")
+                method = item.get("method")
+                if col not in X_out.columns:
+                    continue
+                
+                expr = pl.col(col)
+                
+                if method == "log":
+                    expr = pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).log1p()
+                elif method == "square_root":
+                    # sqrt of neg is nan
+                    expr = pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).sqrt()
+                elif method == "cube_root":
+                    expr = pl.col(col).cbrt()
+                elif method == "reciprocal":
+                    # 1/0 is inf in polars, typically nan in pandas logic above (replace(0, nan))
+                    expr = 1.0 / pl.when(pl.col(col) == 0).then(None).otherwise(pl.col(col))
+                elif method == "square":
+                    expr = pl.col(col).pow(2)
+                elif method == "exponential":
+                    threshold = item.get("clip_threshold", 700)
+                    expr = pl.col(col).clip(upper_bound=threshold).exp()
+                
+                X_out = X_out.with_columns(expr.alias(col))
+            
+            return pack_pipeline_output(X_out, y, is_tuple)
+
+        # Pandas Path
         df_out = X.copy()
 
         for item in transformations:
@@ -201,16 +259,23 @@ class SimpleTransformationApplier(BaseApplier):
 
 
 @NodeRegistry.register("SimpleTransformation", SimpleTransformationApplier)
+@node_meta(
+    id="SimpleTransformation",
+    name="Simple Transformation",
+    category="Preprocessing",
+    description="Apply simple mathematical transformations (log, sqrt, etc.).",
+    params={"func": "log", "columns": []}
+)
 class SimpleTransformationCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
-        config: Dict[str, Any],
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        params: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'}, ...]}
         return {
             "type": "simple_transformation",
-            "transformations": config.get("transformations", []),
+            "transformations": params.get("transformations", []),
         }
 
 
@@ -220,15 +285,84 @@ class SimpleTransformationCalculator(BaseCalculator):
 class GeneralTransformationApplier(BaseApplier):
     def apply(  # noqa: C901
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         transformations = params.get("transformations", [])
         if not transformations:
             return pack_pipeline_output(X, y, is_tuple)
+        
+        # Polars Path
+        if engine.name == "polars":
+            import polars as pl
+            X_pl: Any = X
+            X_out = X_pl
+            
+            for item in transformations:
+                col = item.get("column")
+                method = item.get("method")
+                
+                if col not in X_out.columns:
+                    continue
 
+                if method in ["box-cox", "yeo-johnson"]:
+                    lambdas = item.get("lambdas")
+                    scaler_params = item.get("scaler_params")
+                    if lambdas is None:
+                        continue
+                    
+                    try:
+                        pt = PowerTransformer(method=method, standardize=True)
+                        pt.lambdas_ = np.array(lambdas)
+                        
+                        if scaler_params:
+                            scaler = StandardScaler()
+                            # Handle potential None or list
+                            m = scaler_params.get("mean")
+                            s = scaler_params.get("scale")
+                            if m is not None:
+                                scaler.mean_ = np.array(m)
+                            if s is not None:
+                                scaler.scale_ = np.array(s)
+                                scaler.var_ = np.square(scaler.scale_)
+                            pt._scaler = scaler
+                        
+                        # Get numpy array from polars col
+                        vals = X_out[col].to_numpy().reshape(-1, 1)
+                        trans_vals = pt.transform(vals)
+                        # flatten
+                        flat_vals = trans_vals.ravel()
+                        
+                        X_out = X_out.with_columns(pl.Series(flat_vals).alias(col))
+                        
+                    except Exception as e:
+                        logger.warning(f"Failed to apply {method} for column {col}: {e}")
+                
+                # Simple Transformations (Polars native)
+                else: 
+                    expr = pl.col(col)
+                    if method == "log":
+                        expr = pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).log1p()
+                    elif method in ["sqrt", "square_root"]:
+                        expr = pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).sqrt()
+                    elif method == "cube_root":
+                        expr = pl.col(col).cbrt()
+                    elif method == "reciprocal":
+                        expr = 1.0 / pl.when(pl.col(col) == 0).then(None).otherwise(pl.col(col))
+                    elif method == "square":
+                        expr = pl.col(col).pow(2)
+                    elif method in ["exp", "exponential"]:
+                        threshold = item.get("clip_threshold", 700)
+                        expr = pl.col(col).clip(upper_bound=threshold).exp()
+                    
+                    X_out = X_out.with_columns(expr.alias(col))
+            
+            return pack_pipeline_output(X_out, y, is_tuple)
+
+        # Pandas Path
         df_out = X.copy()
 
         for item in transformations:
@@ -292,15 +426,23 @@ class GeneralTransformationApplier(BaseApplier):
 
 
 @NodeRegistry.register("GeneralTransformation", GeneralTransformationApplier)
+@node_meta(
+    id="GeneralTransformation",
+    name="General Transformation",
+    category="Preprocessing",
+    description="Apply various function transformations (log, sqrt, square, exp) to columns.",
+    params={"transformations": []}
+)
 class GeneralTransformationCalculator(BaseCalculator):
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'},
         #                              {'column': 'col2', 'method': 'yeo-johnson'}]}
         X, _, _ = unpack_pipeline_input(df)
+        engine = get_engine(X)
 
         transformations_config = config.get("transformations", [])
         fitted_transformations = []
@@ -317,8 +459,16 @@ class GeneralTransformationCalculator(BaseCalculator):
             if method in ["box-cox", "yeo-johnson"]:
                 # Fit PowerTransformer
                 try:
+                    # Prepare data (Pandas Series/DataFrame)
+                    if engine.name == "polars":
+                        col_series = X[col].to_pandas()
+                        col_df = col_series.to_frame()
+                    else:
+                        col_series = X[col]
+                        col_df = X[[col]]
+
                     # Box-Cox requires strictly positive
-                    if method == "box-cox" and (X[col] <= 0).any():
+                    if method == "box-cox" and (col_series <= 0).any():
                         logger.warning(
                             f"Skipping Box-Cox for column {col} because it contains non-positive values."
                         )
@@ -326,7 +476,7 @@ class GeneralTransformationCalculator(BaseCalculator):
 
                     # Default to standardize=True for power transforms
                     pt = PowerTransformer(method=method, standardize=True)
-                    pt.fit(X[[col]])
+                    pt.fit(col_df)
 
                     fitted_item["lambdas"] = pt.lambdas_.tolist()
 

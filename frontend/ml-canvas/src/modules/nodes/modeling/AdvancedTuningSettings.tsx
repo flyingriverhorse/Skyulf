@@ -13,6 +13,7 @@ import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { getIncomers } from '@xyflow/react';
+import { StepType } from '../../../core/constants/stepTypes';
 
 export interface TuningConfig {
   target_column: string;
@@ -171,8 +172,9 @@ const SearchSpaceInput: React.FC<{
 const BestParamsModal: React.FC<{ 
     isOpen: boolean; 
     onClose: () => void; 
-    modelType: string; 
-}> = ({ isOpen, onClose, modelType: initialModelType }) => {
+    modelType: string;
+    availableModels?: RegistryItem[];
+}> = ({ isOpen, onClose, modelType: initialModelType, availableModels = [] }) => {
     const [currentModelType, setCurrentModelType] = useState(initialModelType);
     const [jobs, setJobs] = useState<JobInfo[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -228,10 +230,18 @@ const BestParamsModal: React.FC<{
                                     onChange={(e) => { setCurrentModelType(e.target.value); }}
                                     className="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-purple-500 outline-none"
                                 >
-                                    <option value="random_forest_classifier">Random Forest Classifier</option>
-                                    <option value="logistic_regression">Logistic Regression</option>
-                                    <option value="ridge_regression">Ridge Regression</option>
-                                    <option value="random_forest_regressor">Random Forest Regressor</option>
+                                    {availableModels.length > 0 ? (
+                                        availableModels.map(model => (
+                                            <option key={model.id} value={model.id}>{model.name}</option>
+                                        ))
+                                    ) : (
+                                        <>
+                                            <option value="random_forest_classifier">Random Forest Classifier</option>
+                                            <option value="logistic_regression">Logistic Regression</option>
+                                            <option value="ridge_regression">Ridge Regression</option>
+                                            <option value="random_forest_regressor">Random Forest Regressor</option>
+                                        </>
+                                    )}
                                 </select>
                             </div>
                         </div>
@@ -362,16 +372,17 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
           setIsLoadingModels(true);
           try {
               const nodes = await registryApi.getAllNodes();
-              const models = nodes.filter(n => n.category === 'Model');
+              // Accept both "Model" (old) and "Modeling" (new skyulf-core)
+              const models = nodes.filter(n => n.category === 'Model' || n.category === 'Modeling');
               setAvailableModels(models);
           } catch (error) {
               console.error("Failed to fetch models:", error);
               // Fallback
               setAvailableModels([
-                  { id: 'random_forest_classifier', name: 'Random Forest Classifier', category: 'Model', description: '', params: {} },
-                  { id: 'logistic_regression', name: 'Logistic Regression', category: 'Model', description: '', params: {} },
-                  { id: 'ridge_regression', name: 'Ridge Regression', category: 'Model', description: '', params: {} },
-                  { id: 'random_forest_regressor', name: 'Random Forest Regressor', category: 'Model', description: '', params: {} },
+                  { id: 'random_forest_classifier', name: 'Random Forest Classifier', category: 'Modeling', description: '', params: {} },
+                  { id: 'logistic_regression', name: 'Logistic Regression', category: 'Modeling', description: '', params: {} },
+                  { id: 'ridge_regression', name: 'Ridge Regression', category: 'Modeling', description: '', params: {} },
+                  { id: 'random_forest_regressor', name: 'Random Forest Regressor', category: 'Modeling', description: '', params: {} },
               ]);
           } finally {
               setIsLoadingModels(false);
@@ -443,7 +454,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         await jobsApi.runPipeline({
             ...pipelineConfig,
             target_node_id: nodeId,
-            job_type: 'advanced_tuning'
+            job_type: StepType.ADVANCED_TUNING
         });
         alert("Tuning job submitted successfully!");
         setTab('advanced_tuning');
@@ -763,6 +774,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         isOpen={showParamsModal}
         onClose={() => { setShowParamsModal(false); }}
         modelType={config.model_type}
+        availableModels={availableModels}
       />
     </div>
   );

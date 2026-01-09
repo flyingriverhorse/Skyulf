@@ -32,11 +32,17 @@ class FileSystemCatalog(DataCatalog):
         safe_id = os.path.basename(dataset_id)
         return os.path.join(self.base_path, safe_id)
 
-    def load(self, dataset_id: str, **kwargs) -> pd.DataFrame:
+    def load(self, dataset_id: str, **kwargs) -> Any:
         path = self._get_path(dataset_id)
         
+        # Auto-resolve extension if not found (legacy support for simple IDs)
         if not os.path.exists(path):
-            raise FileNotFoundError(f"Dataset {dataset_id} not found at {path}")
+            if os.path.exists(path + ".parquet"):
+                path += ".parquet"
+            elif os.path.exists(path + ".csv"):
+                path += ".csv"
+            else:
+                 raise FileNotFoundError(f"Dataset {dataset_id} not found at {path}")
 
         # Handle sampling if requested
         limit = kwargs.get("limit", None)
@@ -62,7 +68,7 @@ class FileSystemCatalog(DataCatalog):
             logger.error(f"Error loading dataset {dataset_id}: {e}")
             raise e
 
-    def save(self, dataset_id: str, data: pd.DataFrame, **kwargs) -> None:
+    def save(self, dataset_id: str, data: Any, **kwargs) -> None:
         path = self._get_path(dataset_id)
         
         # Ensure directory exists

@@ -39,6 +39,12 @@ class SkyulfPandasWrapper:
     def copy(self) -> "SkyulfDataFrame":
         return SkyulfPandasWrapper(self._df.copy())
         
+    def __getitem__(self, key):
+        return self._df[key]
+
+    def __setitem__(self, key, value):
+        self._df[key] = value
+
     # Allow access to underlying dataframe methods for flexibility, 
     # but this breaks the protocol abstraction if used.
     def __getattr__(self, name):

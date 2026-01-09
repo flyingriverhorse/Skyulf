@@ -1,5 +1,6 @@
 # Version Updates
 
+*   **v0.1.9 :** "The Registry & Polars Compatibility Update" — Dynamic node registry system and comprehensive Polars support across all preprocessing nodes.
 *   **v0.1.8 :** "The Unsupervised & Monitoring Update" — Major expansion of EDA with Post-Hoc Clustering, PCA Loadings, Drift Monitoring (PSI/KL), and Regression Rules.
 *   **v0.1.7 :** "The Advanced EDA & Profiling Update" — Professional-grade automated data analysis with smart alerts, rich visualizations, and Polars-powered profiling.
 *   **v0.1.6 :** "The Backend Abstraction & Modern Frameworks Update" — Polars migration, leakage proof, and performance optimization.
@@ -9,6 +10,29 @@
 *   **v0.1.2 :** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
+------------------------------------------------------------
+## v0.1.9
+**"The Registry & Polars Compatibility Update"**
+This release finalizes the dynamic node registry system and completes comprehensive Polars support across all preprocessing nodes.
+
+### 🏗️ Architecture & Core
+- **Unified Node Registry:** Migrated all ML nodes to a self-registering system using `@node_meta` in `skyulf-core`, enabling automatic discovery and eliminating backend duplication.
+- **Dynamic Discovery:** Backend API now automatically detects and registers nodes at runtime.
+
+### 🧹 Polars Support & Engine
+- **Full Polars Compatibility:** Completed support for all preprocessing nodes (`Calculator` and `Applier`), including hybrid execution for Scikit-Learn dependencies.
+- **Type Safety:** Updated signatures to generic `Union[pd.DataFrame, Any]` to correctly support `polars.DataFrame`.
+- **Hybrid Execution:** Implemented robust conversion patterns for nodes requiring Scikit-Learn (e.g., SMOTE).
+
+### 🎨 Frontend & UX
+- **Node Factories:** Introduced `createModelingNode` factory to reduce boilerplate and enforce consistency.
+- **UX Improvements:** Renamed training tabs to "Basic Training" and "Advanced Tuning" for clarity.
+
+### 🧪 Quality & Docs
+- **Comprehensive Testing:** Added a test suite covering 50+ nodes to verify Polars/Pandas parity.
+- **Engine Documentation:** Added `docs/guides/engine_mechanics.md` explaining the hybrid execution strategy.
+- **Code Cleanup:** Removed unused `JobsPage.tsx` and refactored older components.
+
 ------------------------------------------------------------
 ## v0.1.8
 **"The Unsupervised & Monitoring Update"**
@@ -35,6 +59,20 @@ This release transforms the platform into a complete lifecycle manager, adding u
 - **Consolidated EDA:** Integrated Clustering and PCA into a single "Structure & Segmentation" view, reducing clutter.
 - **Visualizer Parity:** Updated the local `EDAVisualizer` (terminal/matplotlib) to match all Web UI features, including drift and segmentation.
 - **UX Improvements:** Added "Task Type" overrides (Reg/Class) and improved job discovery for monitoring.
+
+### 📚 Documentation
+- **Medium Draft:** Added a publish-ready article draft on why moving MLOps data processing to Rust + Polars improves performance and reliability.
+- **Engine Notes:** Added internal notes explaining why Skyulf currently uses both Polars and Pandas (and where conversion should happen).
+- **Medium Draft Update:** Refocused the Rust/Polars article to sell Skyulf’s visual UX payoff (latency) and highlight the Calculator/Applier pattern.
+- **Medium Draft Update:** Replaced generic Polars examples with real Skyulf code paths (Polars lazy preview + Calculator/Applier sklearn boundary).
+- **Medium Draft Polish:** Clarified the sklearn Calculator/Applier snippet by explicitly instantiating a model in the example (less “magic” for junior readers).
+- **HN Version:** Added a Hacker News–style short post focused on Skyulf’s interactive UX, Polars previews, and Calculator/Applier boundaries.
+- **HN Version Update:** Replaced the dummy sklearn instantiation with real `SklearnCalculator` / `SklearnApplier` excerpts to better reflect Skyulf’s implementation.
+- **Pipeline Integration:** Updated `FeatureEngineer` to explicitly support `SkyulfDataFrame` in `transform` and `fit_transform` methods, enabling full Polars/Protocol pass-through.
+
+### 🐛 Bug Fixes
+- **Job Filtering:** Fixed an issue where the Jobs page would show both training and tuning jobs regardless of the selected tab by handling API parameter aliases correctly.
+- **Cleanup:** Removed unused `JobsPage.tsx` file from frontend.
 
 ------------------------------------------------------------
 ## v0.1.7

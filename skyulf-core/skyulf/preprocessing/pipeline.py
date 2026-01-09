@@ -5,7 +5,9 @@ from typing import Any, Dict, List, Union, cast
 
 import pandas as pd
 
+from ..types import PreprocessingStepConfig
 from ..data.dataset import SplitDataset
+from ..engines import SkyulfDataFrame
 from ..utils import get_data_stats
 from ..registry import NodeRegistry
 from .base import StatefulTransformer
@@ -36,11 +38,11 @@ class FeatureEngineer:
     Orchestrates a sequence of feature engineering steps.
     """
 
-    def __init__(self, steps_config: List[Dict[str, Any]]):
+    def __init__(self, steps_config: List[PreprocessingStepConfig]):
         self.steps_config = steps_config
         self.fitted_steps: List[Dict[str, Any]] = []
 
-    def transform(self, data: pd.DataFrame) -> pd.DataFrame:
+    def transform(self, data: Union[pd.DataFrame, SkyulfDataFrame]) -> Union[pd.DataFrame, SkyulfDataFrame]:
         """
         Apply fitted transformations to new data.
         """
@@ -66,7 +68,7 @@ class FeatureEngineer:
 
         return current_data
 
-    def fit_transform(self, data: Union[pd.DataFrame, Any], node_id_prefix="") -> Any:  # noqa: C901
+    def fit_transform(self, data: Union[pd.DataFrame, SkyulfDataFrame, Any], node_id_prefix="") -> Any:  # noqa: C901
         """
         Runs the pipeline on data.
         Returns: (transformed_data, metrics_dict)
@@ -111,7 +113,7 @@ class FeatureEngineer:
                 # TrainTestSplitter changes DataFrame -> SplitDataset.
                 # We bypass StatefulTransformer to allow this structural change.
                 # It can also handle (X, y) tuple if FeatureTargetSplit was done first.
-                if isinstance(current_data, (pd.DataFrame, tuple)):
+                if isinstance(current_data, (pd.DataFrame, SkyulfDataFrame, tuple)):
                     logger.debug("Executing TrainTestSplitter logic")
                     params = calculator.fit(current_data, params)
                     current_data = applier.apply(current_data, params)
@@ -258,8 +260,8 @@ class FeatureEngineer:
                             )
                             metrics["operations"] = fitted_params["operations"]
                         # Calculate generated features by comparing columns
-                        if isinstance(data_before, pd.DataFrame) and isinstance(
-                            current_data, pd.DataFrame
+                        if isinstance(data_before, (pd.DataFrame, SkyulfDataFrame)) and isinstance(
+                            current_data, (pd.DataFrame, SkyulfDataFrame)
                         ):
                             new_cols = list(
                                 set(current_data.columns) - set(data_before.columns)
@@ -270,8 +272,8 @@ class FeatureEngineer:
                         ):
                             # Check train set
                             if isinstance(
-                                data_before.train, pd.DataFrame
-                            ) and isinstance(current_data.train, pd.DataFrame):
+                                data_before.train, (pd.DataFrame, SkyulfDataFrame)
+                            ) and isinstance(current_data.train, (pd.DataFrame, SkyulfDataFrame)):
                                 new_cols = list(
                                     set(current_data.train.columns)
                                     - set(data_before.train.columns)
@@ -283,8 +285,8 @@ class FeatureEngineer:
                                 # (X, y) tuple
                                 X_before, _ = data_before.train
                                 X_after, _ = current_data.train
-                                if isinstance(X_before, pd.DataFrame) and isinstance(
-                                    X_after, pd.DataFrame
+                                if isinstance(X_before, (pd.DataFrame, SkyulfDataFrame)) and isinstance(
+                                    X_after, (pd.DataFrame, SkyulfDataFrame)
                                 ):
                                     new_cols = list(
                                         set(X_after.columns) - set(X_before.columns)
@@ -305,19 +307,23 @@ class FeatureEngineer:
                     if isinstance(current_data, SplitDataset):
                         if isinstance(current_data.train, tuple):
                             _, y_res = current_data.train
-                        elif isinstance(current_data.train, pd.DataFrame):
+                        elif isinstance(current_data.train, (pd.DataFrame, SkyulfDataFrame)):
                             # Try to find target column from params
                             target_col = params.get("target_column")
                             if target_col and target_col in current_data.train.columns:
                                 y_res = current_data.train[target_col]
                     elif isinstance(current_data, tuple):
                         _, y_res = current_data
-                    elif isinstance(current_data, pd.DataFrame):
+                    elif isinstance(current_data, (pd.DataFrame, SkyulfDataFrame)):
                         target_col = params.get("target_column")
                         if target_col and target_col in current_data.columns:
                             y_res = current_data[target_col]
 
                     if y_res is not None:
+                        # Convert to pandas for consistent metric calculation if needed
+                        if hasattr(y_res, "to_pandas"):
+                            y_res = y_res.to_pandas()
+
                         counts = y_res.value_counts().to_dict()
                         # Convert keys to string to ensure JSON serializability
                         metrics["class_counts"] = {
@@ -350,36 +356,46 @@ class FeatureEngineer:
 
                             # Helper to count diffs
                             def count_diffs(df1, df2):
-                                if isinstance(df1, pd.DataFrame) and isinstance(
-                                    df2, pd.DataFrame
+                                # Convert to pandas for comparison
+                                d1 = df1.to_pandas() if hasattr(df1, "to_pandas") else df1
+                                d2 = df2.to_pandas() if hasattr(df2, "to_pandas") else df2
+
+                                if isinstance(d1, pd.DataFrame) and isinstance(
+                                    d2, pd.DataFrame
                                 ):
-                                    if df1.shape == df2.shape:
-                                        return int(df1.ne(df2).sum().sum())
+                                    if d1.shape == d2.shape:
+                                        return int(d1.ne(d2).sum().sum())
                                 elif (
-                                    isinstance(df1, tuple)
-                                    and isinstance(df2, tuple)
-                                    and len(df1) == 2
-                                    and len(df2) == 2
+                                    isinstance(d1, tuple)
+                                    and isinstance(d2, tuple)
+                                    and len(d1) == 2
+                                    and len(d2) == 2
                                 ):
                                     # Handle (X, y) tuple
                                     diffs = 0
                                     # Compare X (index 0)
-                                    if isinstance(df1[0], pd.DataFrame) and isinstance(
-                                        df2[0], pd.DataFrame
+                                    x1 = d1[0].to_pandas() if hasattr(d1[0], "to_pandas") else d1[0]
+                                    x2 = d2[0].to_pandas() if hasattr(d2[0], "to_pandas") else d2[0]
+
+                                    if isinstance(x1, pd.DataFrame) and isinstance(
+                                        x2, pd.DataFrame
                                     ):
-                                        if df1[0].shape == df2[0].shape:
-                                            diffs += int(df1[0].ne(df2[0]).sum().sum())
+                                        if x1.shape == x2.shape:
+                                            diffs += int(x1.ne(x2).sum().sum())
                                     # Compare y (index 1) - usually Series
+                                    y1 = d1[1].to_pandas() if hasattr(d1[1], "to_pandas") else d1[1]
+                                    y2 = d2[1].to_pandas() if hasattr(d2[1], "to_pandas") else d2[1]
+
                                     if isinstance(
-                                        df1[1], (pd.DataFrame, pd.Series)
-                                    ) and isinstance(df2[1], (pd.DataFrame, pd.Series)):
-                                        if df1[1].shape == df2[1].shape:
-                                            diffs += int(df1[1].ne(df2[1]).sum().sum())  # type: ignore
+                                        y1, (pd.DataFrame, pd.Series)
+                                    ) and isinstance(y2, (pd.DataFrame, pd.Series)):
+                                        if y1.shape == y2.shape:
+                                            diffs += int(y1.ne(y2).sum().sum())  # type: ignore
                                     return diffs
                                 return 0
 
-                            if isinstance(data_before, pd.DataFrame) and isinstance(
-                                current_data, pd.DataFrame
+                            if isinstance(data_before, (pd.DataFrame, SkyulfDataFrame)) and isinstance(
+                                current_data, (pd.DataFrame, SkyulfDataFrame)
                             ):
                                 clipped_count = count_diffs(data_before, current_data)
                             elif isinstance(data_before, SplitDataset) and isinstance(
