@@ -192,11 +192,219 @@ RIDGE_REGRESSION_PARAMS = [
     ),
 ]
 
+# --- Lasso Regression ---
+LASSO_REGRESSION_PARAMS = [
+    HyperparameterField(
+        name="alpha", label="Alpha", type="number", default=1.0, min=0.0001, max=100.0,
+        description="Constant that multiplies the L1 term."
+    ),
+    HyperparameterField(
+        name="selection", label="Selection", type="select", default="cyclic",
+        options=[{"label": "Cyclic", "value": "cyclic"}, {"label": "Random", "value": "random"}],
+        description="If set to 'random', a random coefficient is updated every iteration."
+    ),
+]
+
+# --- ElasticNet Regression ---
+ELASTICNET_REGRESSION_PARAMS = [
+    HyperparameterField(
+        name="alpha", label="Alpha", type="number", default=1.0, min=0.0001, max=100.0,
+        description="Constant that multiplies the penalty terms."
+    ),
+    HyperparameterField(
+        name="l1_ratio", label="L1 Ratio", type="number", default=0.5, min=0.0, max=1.0, step=0.05,
+        description="The ElasticNet mixing parameter (0 <= l1_ratio <= 1)."
+    ),
+    HyperparameterField(
+        name="selection", label="Selection", type="select", default="cyclic",
+        options=[{"label": "Cyclic", "value": "cyclic"}, {"label": "Random", "value": "random"}],
+        description="If set to 'random', a random coefficient is updated every iteration."
+    ),
+]
+
+# --- SVM (SVC & SVR) ---
+SVM_PARAMS = [
+    HyperparameterField(
+        name="C", label="C (Regularization)", type="number", default=1.0, min=0.01, max=1000.0,
+        description="Regularization parameter. The strength of the regularization is inversely proportional to C."
+    ),
+    HyperparameterField(
+        name="kernel", label="Kernel", type="select", default="rbf",
+        options=[
+            {"label": "Linear", "value": "linear"},
+            {"label": "Poly", "value": "poly"},
+            {"label": "RBF", "value": "rbf"},
+            {"label": "Sigmoid", "value": "sigmoid"}
+        ],
+        description="Specifies the kernel type to be used in the algorithm."
+    ),
+    HyperparameterField(
+        name="gamma", label="Gamma", type="select", default="scale",
+        options=[{"label": "Scale", "value": "scale"}, {"label": "Auto", "value": "auto"}],
+        description="Kernel coefficient for 'rbf', 'poly' and 'sigmoid'."
+    ),
+]
+
+# --- K-Neighbors ---
+KNN_PARAMS = [
+    HyperparameterField(
+        name="n_neighbors", label="Number of Neighbors", type="number", default=5, min=1, max=50, step=1,
+        description="Number of neighbors to use."
+    ),
+    HyperparameterField(
+        name="weights", label="Weights", type="select", default="uniform",
+        options=[{"label": "Uniform", "value": "uniform"}, {"label": "Distance", "value": "distance"}],
+        description="Weight function used in prediction."
+    ),
+    HyperparameterField(
+        name="algorithm", label="Algorithm", type="select", default="auto",
+        options=[
+            {"label": "Auto", "value": "auto"},
+            {"label": "Ball Tree", "value": "ball_tree"},
+            {"label": "KD Tree", "value": "kd_tree"},
+            {"label": "Brute", "value": "brute"}
+        ],
+        description="Algorithm used to compute the nearest neighbors."
+    ),
+]
+
+# --- Decision Tree ---
+DECISION_TREE_PARAMS = [
+    HyperparameterField(
+        name="max_depth", label="Max Depth", type="number", default=None, min=1, max=100,
+        description="The maximum depth of the tree."
+    ),
+    HyperparameterField(
+        name="min_samples_split", label="Min Samples Split", type="number", default=2, min=2, max=20,
+        description="The minimum number of samples required to split an internal node."
+    ),
+    HyperparameterField(
+        name="min_samples_leaf", label="Min Samples Leaf", type="number", default=1, min=1, max=20,
+        description="The minimum number of samples required to be at a leaf node."
+    ),
+]
+DECISION_TREE_CLASSIFIER_PARAMS = DECISION_TREE_PARAMS + [
+    HyperparameterField(
+        name="criterion",
+        label="Criterion",
+        type="select",
+        default="gini",
+        options=[
+            {"label": "Gini", "value": "gini"},
+            {"label": "Entropy", "value": "entropy"},
+            {"label": "Log Loss", "value": "log_loss"},
+        ],
+        description="The function to measure the quality of a split.",
+    )
+]
+DECISION_TREE_REGRESSOR_PARAMS = DECISION_TREE_PARAMS + [
+    HyperparameterField(
+        name="criterion",
+        label="Criterion",
+        type="select",
+        default="squared_error",
+        options=[
+            {"label": "Squared Error", "value": "squared_error"},
+            {"label": "Friedman MSE", "value": "friedman_mse"},
+            {"label": "Absolute Error", "value": "absolute_error"},
+            {"label": "Poisson", "value": "poisson"},
+        ],
+        description="The function to measure the quality of a split.",
+    )
+]
+
+# --- Gradient Boosting (Sklearn) ---
+GRADIENT_BOOSTING_PARAMS = [
+    HyperparameterField(
+        name="n_estimators", label="Number of Trees", type="number", default=100, min=10, max=1000, step=10,
+        description="The number of boosting stages to perform."
+    ),
+    HyperparameterField(
+        name="learning_rate", label="Learning Rate", type="number", default=0.1, min=0.001, max=1.0,
+        description="Shrinks the contribution of each tree by learning_rate."
+    ),
+    HyperparameterField(
+        name="max_depth", label="Max Depth", type="number", default=3, min=1, max=20,
+        description="Maximum depth of the individual regression estimators."
+    ),
+    HyperparameterField(
+        name="subsample", label="Subsample", type="number", default=1.0, min=0.1, max=1.0, step=0.1,
+        description="The fraction of samples to be used for fitting the individual base learners."
+    ),
+]
+
+# --- AdaBoost ---
+ADABOOST_PARAMS = [
+    HyperparameterField(
+        name="n_estimators", label="Number of Estimators", type="number", default=50, min=10, max=1000, step=10,
+        description="The maximum number of estimators at which boosting is terminated."
+    ),
+    HyperparameterField(
+        name="learning_rate", label="Learning Rate", type="number", default=1.0, min=0.001, max=5.0,
+        description="Weight applied to each classifier at each boosting iteration."
+    ),
+]
+
+# --- XGBoost ---
+XGBOOST_PARAMS = [
+    HyperparameterField(
+        name="n_estimators", label="Number of Estimators", type="number", default=100, min=10, max=1000, step=10,
+        description="Number of gradient boosted trees."
+    ),
+    HyperparameterField(
+        name="max_depth", label="Max Depth", type="number", default=6, min=1, max=20,
+        description="Maximum tree depth for base learners."
+    ),
+    HyperparameterField(
+        name="learning_rate", label="Learning Rate", type="number", default=0.3, min=0.001, max=1.0,
+        description="Boosting learning rate (eta)."
+    ),
+    HyperparameterField(
+        name="subsample", label="Subsample", type="number", default=1.0, min=0.1, max=1.0, step=0.1,
+        description="Subsample ratio of the training instances."
+    ),
+    HyperparameterField(
+        name="colsample_bytree", label="Colsample By Tree", type="number", default=1.0, min=0.1, max=1.0, step=0.1,
+        description="Subsample ratio of columns when constructing each tree."
+    ),
+]
+
+# --- Gaussian Naive Bayes ---
+GAUSSIAN_NB_PARAMS = [
+    HyperparameterField(
+        name="var_smoothing",
+        label="Var Smoothing",
+        type="number",
+        default=1e-9,
+        min=1e-12,
+        max=1.0,
+        description=(
+            "Portion of the largest variance of all features that is added "
+            "to variances for calculation stability."
+        ),
+    ),
+]
+
 MODEL_HYPERPARAMETERS = {
     "logistic_regression": LOGISTIC_REGRESSION_PARAMS,
     "random_forest_classifier": RANDOM_FOREST_CLASSIFIER_PARAMS,
     "random_forest_regressor": RANDOM_FOREST_PARAMS,
     "ridge_regression": RIDGE_REGRESSION_PARAMS,
+    "lasso_regression": LASSO_REGRESSION_PARAMS,
+    "elasticnet_regression": ELASTICNET_REGRESSION_PARAMS,
+    "svc": SVM_PARAMS,
+    "svr": SVM_PARAMS,
+    "k_neighbors_classifier": KNN_PARAMS,
+    "k_neighbors_regressor": KNN_PARAMS,
+    "decision_tree_classifier": DECISION_TREE_CLASSIFIER_PARAMS,
+    "decision_tree_regressor": DECISION_TREE_REGRESSOR_PARAMS,
+    "gradient_boosting_classifier": GRADIENT_BOOSTING_PARAMS,
+    "gradient_boosting_regressor": GRADIENT_BOOSTING_PARAMS,
+    "adaboost_classifier": ADABOOST_PARAMS,
+    "adaboost_regressor": ADABOOST_PARAMS,
+    "xgboost_classifier": XGBOOST_PARAMS,
+    "xgboost_regressor": XGBOOST_PARAMS,
+    "gaussian_nb": GAUSSIAN_NB_PARAMS,
 }
 
 
@@ -235,6 +443,82 @@ DEFAULT_SEARCH_SPACES = {
         "alpha": [0.01, 0.1, 1.0, 10.0, 100.0],
         "solver": ["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"],
         "fit_intercept": [True, False],
+    },
+    "lasso_regression": {
+        "alpha": [0.001, 0.01, 0.1, 1.0, 10.0],
+    },
+    "elasticnet_regression": {
+        "alpha": [0.001, 0.01, 0.1, 1.0, 10.0],
+        "l1_ratio": [0.1, 0.5, 0.7, 0.9],
+    },
+    "svc": {
+        "C": [0.1, 1.0, 10.0, 100.0],
+        "kernel": ["linear", "rbf", "poly", "sigmoid"],
+        "gamma": ["scale", "auto"],
+    },
+    "svr": {
+        "C": [0.1, 1.0, 10.0, 100.0],
+        "kernel": ["linear", "rbf", "poly", "sigmoid"],
+        "gamma": ["scale", "auto"],
+    },
+    "k_neighbors_classifier": {
+        "n_neighbors": [3, 5, 7, 9, 11],
+        "weights": ["uniform", "distance"],
+        "algorithm": ["auto", "ball_tree", "kd_tree", "brute"],
+    },
+    "k_neighbors_regressor": {
+        "n_neighbors": [3, 5, 7, 9, 11],
+        "weights": ["uniform", "distance"],
+        "algorithm": ["auto", "ball_tree", "kd_tree", "brute"],
+    },
+    "decision_tree_classifier": {
+        "max_depth": [None, 3, 5, 10, 20],
+        "min_samples_split": [2, 5, 10],
+        "min_samples_leaf": [1, 2, 4],
+        "criterion": ["gini", "entropy"],
+    },
+    "decision_tree_regressor": {
+        "max_depth": [None, 3, 5, 10, 20],
+        "min_samples_split": [2, 5, 10],
+        "min_samples_leaf": [1, 2, 4],
+        "criterion": ["squared_error", "friedman_mse", "absolute_error"],
+    },
+    "gradient_boosting_classifier": {
+        "n_estimators": [50, 100, 200, 500],
+        "learning_rate": [0.01, 0.05, 0.1, 0.2],
+        "max_depth": [3, 5, 7, 9],
+        "subsample": [0.6, 0.8, 1.0],
+    },
+    "gradient_boosting_regressor": {
+        "n_estimators": [50, 100, 200, 500],
+        "learning_rate": [0.01, 0.05, 0.1, 0.2],
+        "max_depth": [3, 5, 7, 9],
+        "subsample": [0.6, 0.8, 1.0],
+    },
+    "adaboost_classifier": {
+        "n_estimators": [50, 100, 200, 500],
+        "learning_rate": [0.01, 0.1, 1.0, 1.5],
+    },
+    "adaboost_regressor": {
+        "n_estimators": [50, 100, 200, 500],
+        "learning_rate": [0.01, 0.1, 1.0, 1.5],
+    },
+    "xgboost_classifier": {
+        "n_estimators": [100, 200, 500, 1000],
+        "max_depth": [3, 5, 7, 9],
+        "learning_rate": [0.01, 0.05, 0.1, 0.3],
+        "subsample": [0.6, 0.8, 1.0],
+        "colsample_bytree": [0.6, 0.8, 1.0],
+    },
+    "xgboost_regressor": {
+        "n_estimators": [100, 200, 500, 1000],
+        "max_depth": [3, 5, 7, 9],
+        "learning_rate": [0.01, 0.05, 0.1, 0.3],
+        "subsample": [0.6, 0.8, 1.0],
+        "colsample_bytree": [0.6, 0.8, 1.0],
+    },
+    "gaussian_nb": {
+        "var_smoothing": [1e-9, 1e-8, 1e-7, 1e-6],
     },
 }
 

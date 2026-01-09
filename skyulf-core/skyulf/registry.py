@@ -43,7 +43,8 @@ class NodeRegistry:
                     "name": meta.name,
                     "category": meta.category,
                     "description": meta.description,
-                    "params": meta.params
+                    "params": meta.params,
+                    "tags": meta.tags,
                 }
 
             return calculator_cls

@@ -22,6 +22,7 @@ class RegistryItem(BaseModel):
     category: str
     description: str
     params: Dict[str, Any] = {}
+    tags: List[str] = []
 
 
 class NodeRegistry:

@@ -146,7 +146,13 @@ class TuningCalculator(BaseModelCalculator):
         if not model_cls:
             raise ValueError("Model calculator does not have a model_class attribute")
 
-        model = model_cls(**final_params)
+        # Filter params to only include those accepted by the model_class constructor
+        # This prevents "unexpected keyword argument 'random_state'" for models like KNN/GaussianNB
+        import inspect
+        sig = inspect.signature(model_cls)
+        valid_final_params = {k: v for k, v in final_params.items() if k in sig.parameters}
+
+        model = model_cls(**valid_final_params)
         model.fit(X_np, y_np)
 
         return (model, tuning_result)
