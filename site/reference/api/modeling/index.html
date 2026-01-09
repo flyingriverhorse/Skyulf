@@ -3343,10 +3343,10 @@ Returns DataFrame where columns are classes.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">11</span>
-<span class="normal">12</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">12</span>
 <span class="normal">13</span>
-<span class="normal">14</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogisticRegressionApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
+<span class="normal">14</span>
+<span class="normal">15</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogisticRegressionApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Logistic Regression Applier.&quot;&quot;&quot;</span>
 
     <span class="k">pass</span>
@@ -3402,8 +3402,7 @@ Returns DataFrame where columns are classes.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">17</span>
-<span class="normal">18</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">18</span>
 <span class="normal">19</span>
 <span class="normal">20</span>
 <span class="normal">21</span>
@@ -3415,7 +3414,22 @@ Returns DataFrame where columns are classes.</p>
 <span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
-<span class="normal">30</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;logistic_regression&quot;</span><span class="p">,</span> <span class="n">LogisticRegressionApplier</span><span class="p">)</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;logistic_regression&quot;</span><span class="p">,</span> <span class="n">LogisticRegressionApplier</span><span class="p">)</span>
+<span class="nd">@node_meta</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;logistic_regression&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Logistic Regression&quot;</span><span class="p">,</span>
+    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;Modeling&quot;</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Linear model for classification.&quot;</span><span class="p">,</span>
+    <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;max_iter&quot;</span><span class="p">:</span> <span class="mi">1000</span><span class="p">,</span> <span class="s2">&quot;solver&quot;</span><span class="p">:</span> <span class="s2">&quot;lbfgs&quot;</span><span class="p">,</span> <span class="s2">&quot;random_state&quot;</span><span class="p">:</span> <span class="mi">42</span><span class="p">}</span>
+<span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">LogisticRegressionCalculator</span><span class="p">(</span><span class="n">SklearnCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Logistic Regression Calculator.&quot;&quot;&quot;</span>
 
@@ -3481,10 +3495,10 @@ Returns DataFrame where columns are classes.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RandomForestClassifierApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RandomForestClassifierApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Random Forest Classifier Applier.&quot;&quot;&quot;</span>
 
     <span class="k">pass</span>
@@ -3540,15 +3554,7 @@ Returns DataFrame where columns are classes.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">48</span>
 <span class="normal">49</span>
 <span class="normal">50</span>
 <span class="normal">51</span>
@@ -3556,7 +3562,29 @@ Returns DataFrame where columns are classes.</p>
 <span class="normal">53</span>
 <span class="normal">54</span>
 <span class="normal">55</span>
-<span class="normal">56</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;random_forest_classifier&quot;</span><span class="p">,</span> <span class="n">RandomForestClassifierApplier</span><span class="p">)</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;random_forest_classifier&quot;</span><span class="p">,</span> <span class="n">RandomForestClassifierApplier</span><span class="p">)</span>
+<span class="nd">@node_meta</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;random_forest_classifier&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Random Forest Classifier&quot;</span><span class="p">,</span>
+    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;Modeling&quot;</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Ensemble of decision trees.&quot;</span><span class="p">,</span>
+    <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;n_estimators&quot;</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s2">&quot;max_depth&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;min_samples_split&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">}</span>
+<span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">RandomForestClassifierCalculator</span><span class="p">(</span><span class="n">SklearnCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Random Forest Classifier Calculator.&quot;&quot;&quot;</span>
 
@@ -3625,10 +3653,10 @@ Returns DataFrame where columns are classes.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/regression.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RandomForestRegressorApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RandomForestRegressorApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Random Forest Regressor Applier.&quot;&quot;&quot;</span>
 
     <span class="k">pass</span>
@@ -3684,15 +3712,7 @@ Returns DataFrame where columns are classes.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/regression.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">48</span>
 <span class="normal">49</span>
 <span class="normal">50</span>
 <span class="normal">51</span>
@@ -3700,7 +3720,29 @@ Returns DataFrame where columns are classes.</p>
 <span class="normal">53</span>
 <span class="normal">54</span>
 <span class="normal">55</span>
-<span class="normal">56</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;random_forest_regressor&quot;</span><span class="p">,</span> <span class="n">RandomForestRegressorApplier</span><span class="p">)</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;random_forest_regressor&quot;</span><span class="p">,</span> <span class="n">RandomForestRegressorApplier</span><span class="p">)</span>
+<span class="nd">@node_meta</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;random_forest_regressor&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Random Forest Regressor&quot;</span><span class="p">,</span>
+    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;Modeling&quot;</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Ensemble of decision trees for regression.&quot;</span><span class="p">,</span>
+    <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;n_estimators&quot;</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s2">&quot;max_depth&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;min_samples_split&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">}</span>
+<span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">RandomForestRegressorCalculator</span><span class="p">(</span><span class="n">SklearnCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Random Forest Regressor Calculator.&quot;&quot;&quot;</span>
 
@@ -3769,10 +3811,10 @@ Returns DataFrame where columns are classes.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/regression.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">11</span>
-<span class="normal">12</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">12</span>
 <span class="normal">13</span>
-<span class="normal">14</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RidgeRegressionApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
+<span class="normal">14</span>
+<span class="normal">15</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RidgeRegressionApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Ridge Regression Applier.&quot;&quot;&quot;</span>
 
     <span class="k">pass</span>
@@ -3828,8 +3870,7 @@ Returns DataFrame where columns are classes.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/regression.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">17</span>
-<span class="normal">18</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">18</span>
 <span class="normal">19</span>
 <span class="normal">20</span>
 <span class="normal">21</span>
@@ -3841,7 +3882,22 @@ Returns DataFrame where columns are classes.</p>
 <span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
-<span class="normal">30</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;ridge_regression&quot;</span><span class="p">,</span> <span class="n">RidgeRegressionApplier</span><span class="p">)</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;ridge_regression&quot;</span><span class="p">,</span> <span class="n">RidgeRegressionApplier</span><span class="p">)</span>
+<span class="nd">@node_meta</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;ridge_regression&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Ridge Regression&quot;</span><span class="p">,</span>
+    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;Modeling&quot;</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Linear least squares with l2 regularization.&quot;</span><span class="p">,</span>
+    <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;alpha&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;solver&quot;</span><span class="p">:</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span> <span class="s2">&quot;random_state&quot;</span><span class="p">:</span> <span class="mi">42</span><span class="p">}</span>
+<span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">RidgeRegressionCalculator</span><span class="p">(</span><span class="n">SklearnCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Ridge Regression Calculator.&quot;&quot;&quot;</span>
 
@@ -3950,7 +4006,7 @@ Returns DataFrame where columns are classes.</p>
 <span class="normal">136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SklearnApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Base applier for Scikit-Learn models.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span> <span class="n">model_artifact</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span> <span class="n">model_artifact</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
         <span class="c1"># Convert to Numpy</span>
         <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
 
@@ -3970,7 +4026,7 @@ Returns DataFrame where columns are classes.</p>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">predict_proba</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span> <span class="n">model_artifact</span><span class="p">:</span> <span class="n">Any</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">,</span> <span class="s2">&quot;predict_proba&quot;</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
 
@@ -4689,7 +4745,18 @@ Returns DataFrame where columns are classes.</p>
 <span class="normal">373</span>
 <span class="normal">374</span>
 <span class="normal">375</span>
-<span class="normal">376</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StatefulEstimator</span><span class="p">:</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StatefulEstimator</span><span class="p">:</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">calculator</span><span class="p">:</span> <span class="n">BaseModelCalculator</span><span class="p">,</span> <span class="n">applier</span><span class="p">:</span> <span class="n">BaseModelApplier</span><span class="p">,</span> <span class="n">node_id</span><span class="p">:</span> <span class="nb">str</span>
     <span class="p">):</span>
@@ -4720,9 +4787,20 @@ Returns DataFrame where columns are classes.</p>
             <span class="k">if</span> <span class="n">target_column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Target column &#39;</span><span class="si">{</span><span class="n">target_column</span><span class="si">}</span><span class="s2">&#39; not found in data&quot;</span><span class="p">)</span>
 
-            <span class="c1"># Fallback for pure Pandas</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
-                <span class="k">return</span> <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">target_column</span><span class="p">]),</span> <span class="n">data</span><span class="p">[</span><span class="n">target_column</span><span class="p">]</span>
+            <span class="c1"># Fallback for pure Pandas or Generic DataFrame</span>
+            <span class="c1"># If we reached here without matching Polars explicitly, treat as generic/pandas</span>
+            <span class="c1"># Try generic drop if available</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;drop&quot;</span><span class="p">):</span>
+                <span class="c1"># Handle pandas-like drop</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">target_column</span><span class="p">]),</span> <span class="n">data</span><span class="p">[</span><span class="n">target_column</span><span class="p">]</span>
+                <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+                    <span class="c1"># Maybe it doesn&#39;t support columns= kwarg, try position or list</span>
+                    <span class="k">pass</span>
+
+            <span class="c1"># Simple attribute access fallback</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target_column</span><span class="p">):</span>
+                 <span class="k">return</span> <span class="n">data</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
 
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected data type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
@@ -5033,18 +5111,7 @@ Returns DataFrame where columns are classes.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/base.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">113</span>
 <span class="normal">114</span>
 <span class="normal">115</span>
 <span class="normal">116</span>
@@ -5065,7 +5132,18 @@ Returns DataFrame where columns are classes.</p>
 <span class="normal">131</span>
 <span class="normal">132</span>
 <span class="normal">133</span>
-<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">cross_validate</span><span class="p">(</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">cross_validate</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span>
     <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -5120,18 +5198,7 @@ Returns DataFrame where columns are classes.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/base.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">262</span>
-<span class="normal">263</span>
-<span class="normal">264</span>
-<span class="normal">265</span>
-<span class="normal">266</span>
-<span class="normal">267</span>
-<span class="normal">268</span>
-<span class="normal">269</span>
-<span class="normal">270</span>
-<span class="normal">271</span>
-<span class="normal">272</span>
-<span class="normal">273</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">273</span>
 <span class="normal">274</span>
 <span class="normal">275</span>
 <span class="normal">276</span>
@@ -5234,7 +5301,18 @@ Returns DataFrame where columns are classes.</p>
 <span class="normal">373</span>
 <span class="normal">374</span>
 <span class="normal">375</span>
-<span class="normal">376</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -5371,18 +5449,7 @@ Returns DataFrame where columns are classes.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/base.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">147</span>
 <span class="normal">148</span>
 <span class="normal">149</span>
 <span class="normal">150</span>
@@ -5470,7 +5537,18 @@ Returns DataFrame where columns are classes.</p>
 <span class="normal">232</span>
 <span class="normal">233</span>
 <span class="normal">234</span>
-<span class="normal">235</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_predict</span><span class="p">(</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_predict</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">dataset</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">SplitDataset</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">]],</span>
     <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -5592,18 +5670,7 @@ Returns DataFrame where columns are classes.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/base.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
-<span class="normal">244</span>
-<span class="normal">245</span>
-<span class="normal">246</span>
-<span class="normal">247</span>
-<span class="normal">248</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">248</span>
 <span class="normal">249</span>
 <span class="normal">250</span>
 <span class="normal">251</span>
@@ -5615,7 +5682,18 @@ Returns DataFrame where columns are classes.</p>
 <span class="normal">257</span>
 <span class="normal">258</span>
 <span class="normal">259</span>
-<span class="normal">260</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">refit</span><span class="p">(</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">refit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span>
     <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>

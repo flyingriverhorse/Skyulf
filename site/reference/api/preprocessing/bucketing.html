@@ -2643,8 +2643,7 @@ Expects 'bin_edges' in params: Dict[str, List[float]] mapping column names to bi
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 21</span>
-<span class="normal"> 22</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 22</span>
 <span class="normal"> 23</span>
 <span class="normal"> 24</span>
 <span class="normal"> 25</span>
@@ -2827,7 +2826,9 @@ Expects 'bin_edges' in params: Dict[str, List[float]] mapping column names to bi
 <span class="normal">202</span>
 <span class="normal">203</span>
 <span class="normal">204</span>
-<span class="normal">205</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseBinningApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseBinningApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Base class for applying binning transformations.</span>
 <span class="sd">    Expects &#39;bin_edges&#39; in params: Dict[str, List[float]] mapping column names to bin edges.</span>
@@ -2835,9 +2836,9 @@ Expects 'bin_edges' in params: Dict[str, List[float]] mapping column names to bi
 
     <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">df</span><span class="p">:</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
+        <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">Any</span><span class="p">],</span>
         <span class="n">params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
         <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">is_tuple</span> <span class="o">=</span> <span class="n">unpack_pipeline_input</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
         <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
 
@@ -2859,12 +2860,13 @@ Expects 'bin_edges' in params: Dict[str, List[float]] mapping column names to bi
         <span class="c1"># Polars Path</span>
         <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;polars&quot;</span><span class="p">:</span>
             <span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
+            <span class="n">X_pl</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">X</span>
 
             <span class="n">exprs</span> <span class="o">=</span> <span class="p">[]</span>
             <span class="n">cols_to_drop</span> <span class="o">=</span> <span class="p">[]</span>
 
             <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">edges</span> <span class="ow">in</span> <span class="n">bin_edges_map</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">X_pl</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
                     <span class="k">continue</span>
 
                 <span class="k">if</span> <span class="n">drop_original</span><span class="p">:</span>
@@ -2902,7 +2904,7 @@ Expects 'bin_edges' in params: Dict[str, List[float]] mapping column names to bi
                     <span class="c1"># Range or Custom Labels</span>
                     <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cut_expr</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">target_col_name</span><span class="p">))</span>
 
-            <span class="n">X_out</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">exprs</span><span class="p">)</span>
+            <span class="n">X_out</span> <span class="o">=</span> <span class="n">X_pl</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">exprs</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">drop_original</span><span class="p">:</span>
                 <span class="n">X_out</span> <span class="o">=</span> <span class="n">X_out</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">cols_to_drop</span><span class="p">)</span>
 
@@ -3065,16 +3067,7 @@ Applies specific bin edges to selected columns.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">344</span>
-<span class="normal">345</span>
-<span class="normal">346</span>
-<span class="normal">347</span>
-<span class="normal">348</span>
-<span class="normal">349</span>
-<span class="normal">350</span>
-<span class="normal">351</span>
-<span class="normal">352</span>
-<span class="normal">353</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">353</span>
 <span class="normal">354</span>
 <span class="normal">355</span>
 <span class="normal">356</span>
@@ -3104,7 +3097,30 @@ Applies specific bin edges to selected columns.</p>
 <span class="normal">380</span>
 <span class="normal">381</span>
 <span class="normal">382</span>
-<span class="normal">383</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;CustomBinning&quot;</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;CustomBinning&quot;</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
+<span class="nd">@node_meta</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;CustomBinning&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Custom Binning&quot;</span><span class="p">,</span>
+    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;Preprocessing&quot;</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Bin data using custom edges.&quot;</span><span class="p">,</span>
+    <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;bins&quot;</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">&quot;columns&quot;</span><span class="p">:</span> <span class="p">[]}</span>
+<span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">CustomBinningCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculator for CustomBinning node.</span>
@@ -3113,7 +3129,7 @@ Applies specific bin edges to selected columns.</p>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">df</span><span class="p">:</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
+        <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">Any</span><span class="p">],</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="n">X</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">unpack_pipeline_input</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
@@ -3196,9 +3212,7 @@ Applies specific bin edges to selected columns.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">215</span>
-<span class="normal">216</span>
-<span class="normal">217</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">217</span>
 <span class="normal">218</span>
 <span class="normal">219</span>
 <span class="normal">220</span>
@@ -3318,14 +3332,30 @@ Applies specific bin edges to selected columns.</p>
 <span class="normal">334</span>
 <span class="normal">335</span>
 <span class="normal">336</span>
-<span class="normal">337</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;GeneralBinning&quot;</span><span class="p">,</span> <span class="n">GeneralBinningApplier</span><span class="p">)</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;GeneralBinning&quot;</span><span class="p">,</span> <span class="n">GeneralBinningApplier</span><span class="p">)</span>
+<span class="nd">@node_meta</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;GeneralBinning&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;General Binning&quot;</span><span class="p">,</span>
+    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;Preprocessing&quot;</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Bin continuous data into intervals.&quot;</span><span class="p">,</span>
+    <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;n_bins&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span> <span class="s2">&quot;strategy&quot;</span><span class="p">:</span> <span class="s2">&quot;uniform&quot;</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">:</span> <span class="p">[]}</span>
+<span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">GeneralBinningCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Master calculator that handles mixed strategies and overrides.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">Any</span><span class="p">],</span> <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="n">X</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">unpack_pipeline_input</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
 
@@ -3494,23 +3524,7 @@ Wraps GeneralBinningCalculator with kbins strategy.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">390</span>
-<span class="normal">391</span>
-<span class="normal">392</span>
-<span class="normal">393</span>
-<span class="normal">394</span>
-<span class="normal">395</span>
-<span class="normal">396</span>
-<span class="normal">397</span>
-<span class="normal">398</span>
-<span class="normal">399</span>
-<span class="normal">400</span>
-<span class="normal">401</span>
-<span class="normal">402</span>
-<span class="normal">403</span>
-<span class="normal">404</span>
-<span class="normal">405</span>
-<span class="normal">406</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">406</span>
 <span class="normal">407</span>
 <span class="normal">408</span>
 <span class="normal">409</span>
@@ -3518,7 +3532,37 @@ Wraps GeneralBinningCalculator with kbins strategy.</p>
 <span class="normal">411</span>
 <span class="normal">412</span>
 <span class="normal">413</span>
-<span class="normal">414</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;KBinsDiscretizer&quot;</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;KBinsDiscretizer&quot;</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
+<span class="nd">@node_meta</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;KBinsDiscretizer&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;K-Bins Discretizer&quot;</span><span class="p">,</span>
+    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;Preprocessing&quot;</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Bin continuous data into intervals using sklearn KBinsDiscretizer.&quot;</span><span class="p">,</span>
+    <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;n_bins&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span> <span class="s2">&quot;encode&quot;</span><span class="p">:</span> <span class="s2">&quot;ordinal&quot;</span><span class="p">,</span> <span class="s2">&quot;strategy&quot;</span><span class="p">:</span> <span class="s2">&quot;quantile&quot;</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">:</span> <span class="p">[]}</span>
+<span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">KBinsDiscretizerCalculator</span><span class="p">(</span><span class="n">GeneralBinningCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculator for KBinsDiscretizer node.</span>
@@ -3527,7 +3571,7 @@ Wraps GeneralBinningCalculator with kbins strategy.</p>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">df</span><span class="p">:</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
+        <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">Any</span><span class="p">],</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="n">new_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
