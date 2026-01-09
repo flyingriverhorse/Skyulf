@@ -112,14 +112,14 @@ class JobManager:
         session: AsyncSession,
         limit: int = 50,
         skip: int = 0,
-        job_type: Optional[Literal["basic_training", "advanced_tuning"]] = None,
+        job_type: Optional[str] = None,
     ) -> List[JobInfo]:
         """Lists recent jobs (Async)."""
         jobs = []
 
-        if job_type == "basic_training":
+        if job_type in ["basic_training", "training"]:
             jobs = await BasicTrainingManager.list_training_jobs(session, limit, skip)
-        elif job_type == "advanced_tuning":
+        elif job_type in ["advanced_tuning", "tuning"]:
             jobs = await AdvancedTuningManager.list_tuning_jobs(session, limit, skip)
         else:
             # Combine both

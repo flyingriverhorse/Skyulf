@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 class BaseEngine:
     """Abstract base class for all engines."""
     
+    name: str = "base"
+
     @classmethod
     def is_compatible(cls, data: Any) -> bool:
         """Check if this engine can handle the given data object."""
@@ -35,6 +37,11 @@ class BaseEngine:
     @classmethod
     def wrap(cls, data: Any) -> "SkyulfDataFrame":
         """Wrap the native dataframe in a SkyulfDataFrame compliant wrapper."""
+        raise NotImplementedError
+
+    @classmethod
+    def create_dataframe(cls, data: Any) -> Any:
+        """Create a native dataframe from a dictionary or list."""
         raise NotImplementedError
 
 class EngineRegistry:

@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "../../lib/utils"
+// import { cn } from "../../lib/utils"
 // Assuming utils is present or I need to handle clsx/tailwind-merge manually?
 // package.json has "clsx" and "tailwind-merge".
 // I'll check if @/lib/utils exists.
@@ -45,8 +45,6 @@ export interface ButtonProps
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
-    // Helper for cn if not available
-    const combinedClassName = className ? className : ""; // Placeholder logic
     
     // I need to use `cva` output.
     return (

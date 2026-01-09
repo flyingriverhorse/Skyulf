@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import KBinsDiscretizer
 
+from ..core.meta.decorators import node_meta
 from ..utils import (
     detect_numeric_columns,
     pack_pipeline_output,
@@ -26,9 +27,9 @@ class BaseBinningApplier(BaseApplier):
 
     def apply(  # noqa: C901
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -50,12 +51,13 @@ class BaseBinningApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+            X_pl: Any = X
 
             exprs = []
             cols_to_drop = []
 
             for col, edges in bin_edges_map.items():
-                if col not in X.columns:
+                if col not in X_pl.columns:
                     continue
                 
                 if drop_original:
@@ -93,7 +95,7 @@ class BaseBinningApplier(BaseApplier):
                     # Range or Custom Labels
                     exprs.append(cut_expr.alias(target_col_name))
 
-            X_out = X.with_columns(exprs)
+            X_out = X_pl.with_columns(exprs)
             if drop_original:
                 X_out = X_out.drop(cols_to_drop)
             
@@ -213,13 +215,20 @@ class GeneralBinningApplier(BaseBinningApplier):
 
 
 @NodeRegistry.register("GeneralBinning", GeneralBinningApplier)
+@node_meta(
+    id="GeneralBinning",
+    name="General Binning",
+    category="Preprocessing",
+    description="Bin continuous data into intervals.",
+    params={"n_bins": 5, "strategy": "uniform", "columns": []}
+)
 class GeneralBinningCalculator(BaseCalculator):
     """
     Master calculator that handles mixed strategies and overrides.
     """
 
     def fit(  # noqa: C901
-        self, df: SkyulfDataFrame, config: Dict[str, Any]
+        self, df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any], config: Dict[str, Any]
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
         
@@ -342,6 +351,13 @@ class CustomBinningApplier(GeneralBinningApplier):
 
 
 @NodeRegistry.register("CustomBinning", CustomBinningApplier)
+@node_meta(
+    id="CustomBinning",
+    name="Custom Binning",
+    category="Preprocessing",
+    description="Bin data using custom edges.",
+    params={"bins": [], "columns": []}
+)
 class CustomBinningCalculator(BaseCalculator):
     """
     Calculator for CustomBinning node.
@@ -350,7 +366,7 @@ class CustomBinningCalculator(BaseCalculator):
 
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
@@ -388,6 +404,13 @@ class KBinsDiscretizerApplier(GeneralBinningApplier):
 
 
 @NodeRegistry.register("KBinsDiscretizer", KBinsDiscretizerApplier)
+@node_meta(
+    id="KBinsDiscretizer",
+    name="K-Bins Discretizer",
+    category="Preprocessing",
+    description="Bin continuous data into intervals using sklearn KBinsDiscretizer.",
+    params={"n_bins": 5, "encode": "ordinal", "strategy": "quantile", "columns": []}
+)
 class KBinsDiscretizerCalculator(GeneralBinningCalculator):
     """
     Calculator for KBinsDiscretizer node.
@@ -396,7 +419,7 @@ class KBinsDiscretizerCalculator(GeneralBinningCalculator):
 
     def fit(
         self,
-        df: SkyulfDataFrame,
+        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         new_config = config.copy()

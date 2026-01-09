@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional, Type
 import logging
+from .types import NodeMetadataDict
 
 logger = logging.getLogger(__name__)
 
@@ -7,7 +8,7 @@ logger = logging.getLogger(__name__)
 class NodeRegistry:
     _calculators: Dict[str, Type] = {}
     _appliers: Dict[str, Type] = {}
-    _metadata: Dict[str, Dict[str, Any]] = {}
+    _metadata: Dict[str, NodeMetadataDict] = {}
 
     @classmethod
     def register(
@@ -31,8 +32,19 @@ class NodeRegistry:
             cls._calculators[name] = calculator_cls
             cls._appliers[name] = applier_cls
 
+            # 1. Use passed metadata if available
             if metadata:
                 cls._metadata[name] = metadata
+            # 2. Otherwise check for __node_meta__ (from @node_meta decorator)
+            elif hasattr(calculator_cls, "__node_meta__"):
+                meta = getattr(calculator_cls, "__node_meta__")
+                cls._metadata[name] = {
+                    "id": meta.id,
+                    "name": meta.name,
+                    "category": meta.category,
+                    "description": meta.description,
+                    "params": meta.params
+                }
 
             return calculator_cls
 

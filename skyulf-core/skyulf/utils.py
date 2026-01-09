@@ -90,16 +90,21 @@ def pack_pipeline_output(
             # Helper to get raw df
             raw_df = X
             is_wrapped = False
-            if hasattr(X, "_df"):
+            
+            if isinstance(X, pl.DataFrame):
+                raw_df = X
+                is_wrapped = False
+            elif hasattr(X, "_df"):
                 raw_df = X._df
                 is_wrapped = True
-            
-            # Hstack
+
+            # Merge
             if isinstance(y_series, pl.Series):
-                # Ensure y has a name if it doesn't
                 if y_series.name == "":
                     y_series = y_series.alias("target")
-                result = raw_df.hstack([y_series])
+                result = raw_df.with_columns(y_series)
+            elif isinstance(y_series, pl.DataFrame):
+                result = raw_df.hstack(y_series.get_columns())
             else:
                 result = raw_df.hstack(y_series)
                 
@@ -219,9 +224,11 @@ def detect_numeric_columns(
         if pd.api.types.is_bool_dtype(dtype):
             continue
 
-        # 2. Try to convert to numeric (handles strings like "1.5")
-        numeric_series = pd.to_numeric(series, errors="coerce")
-        valid = numeric_series.dropna()
+        # 2. Strict Numeric Check (Align with Polars behavior)
+        if not pd.api.types.is_numeric_dtype(dtype):
+            continue
+            
+        valid = series.dropna()
 
         if valid.empty:
             continue
