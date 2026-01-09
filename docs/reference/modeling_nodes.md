@@ -58,6 +58,62 @@ Learned params:
 
 - fitted sklearn estimator
 
+### svc
+
+Backed by `sklearn.svm.SVC`.
+
+Defaults:
+- `C=1.0`, `kernel=rbf`, `gamma=scale`
+- `probability=True`, `random_state=42`
+
+### k_neighbors_classifier
+
+Backed by `sklearn.neighbors.KNeighborsClassifier`.
+
+Defaults:
+- `n_neighbors=5`, `weights=uniform`
+- `algorithm=auto`, `n_jobs=-1`
+
+### decision_tree_classifier
+
+Backed by `sklearn.tree.DecisionTreeClassifier`.
+
+Defaults:
+- `max_depth=None`, `min_samples_split=2`
+- `criterion=gini`, `random_state=42`
+
+### gradient_boosting_classifier
+
+Backed by `sklearn.ensemble.GradientBoostingClassifier`.
+
+Defaults:
+- `n_estimators=100`, `learning_rate=0.1`
+- `max_depth=3`, `random_state=42`
+
+### adaboost_classifier
+
+Backed by `sklearn.ensemble.AdaBoostClassifier`.
+
+Defaults:
+- `n_estimators=50`, `learning_rate=1.0`
+- `random_state=42`
+
+### xgboost_classifier
+
+Backed by `xgboost.XGBClassifier`.
+
+Defaults:
+- `n_estimators=100`, `max_depth=6`
+- `learning_rate=0.3`, `n_jobs=-1`
+- `random_state=42`
+
+### gaussian_nb
+
+Backed by `sklearn.naive_bayes.GaussianNB`.
+
+Defaults:
+- `var_smoothing=1e-9`
+
 ## Regression
 
 ### ridge_regression
@@ -68,6 +124,22 @@ Defaults:
 
 - `alpha=1.0`, `solver=auto`, `random_state=42`
 
+### lasso_regression
+
+Backed by `sklearn.linear_model.Lasso`.
+
+Defaults:
+- `alpha=1.0`, `selection=cyclic`
+- `random_state=42`
+
+### elasticnet_regression
+
+Backed by `sklearn.linear_model.ElasticNet`.
+
+Defaults:
+- `alpha=1.0`, `l1_ratio=0.5`
+- `selection=cyclic`, `random_state=42`
+
 ### random_forest_regressor
 
 Backed by `sklearn.ensemble.RandomForestRegressor`.
@@ -77,6 +149,54 @@ Defaults include:
 - `n_estimators=50`, `max_depth=10`
 - `min_samples_split=5`, `min_samples_leaf=2`
 - `n_jobs=-1`, `random_state=42`
+
+### svr
+
+Backed by `sklearn.svm.SVR`.
+
+Defaults:
+- `C=1.0`, `kernel=rbf`, `gamma=scale`
+
+### k_neighbors_regressor
+
+Backed by `sklearn.neighbors.KNeighborsRegressor`.
+
+Defaults:
+- `n_neighbors=5`, `weights=uniform`
+- `algorithm=auto`, `n_jobs=-1`
+
+### decision_tree_regressor
+
+Backed by `sklearn.tree.DecisionTreeRegressor`.
+
+Defaults:
+- `max_depth=None`, `min_samples_split=2`
+- `criterion=squared_error`, `random_state=42`
+
+### gradient_boosting_regressor
+
+Backed by `sklearn.ensemble.GradientBoostingRegressor`.
+
+Defaults:
+- `n_estimators=100`, `learning_rate=0.1`
+- `max_depth=3`, `random_state=42`
+
+### adaboost_regressor
+
+Backed by `sklearn.ensemble.AdaBoostRegressor`.
+
+Defaults:
+- `n_estimators=50`, `learning_rate=1.0`
+- `random_state=42`
+
+### xgboost_regressor
+
+Backed by `xgboost.XGBRegressor`.
+
+Defaults:
+- `n_estimators=100`, `max_depth=6`
+- `learning_rate=0.3`, `n_jobs=-1`
+- `random_state=42`
 
 ## Hyperparameter tuning
 
