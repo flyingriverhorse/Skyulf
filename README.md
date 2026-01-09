@@ -52,7 +52,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install --upgrade pip
 pip install -r requirements-fastapi.txt
-python run_fastapi.py
+python run_skyulf.py
 ```
 
 **Using uv (Faster):**
@@ -60,7 +60,7 @@ python run_fastapi.py
 uv venv
 .\.venv\Scripts\Activate.ps1
 uv pip install -r requirements-fastapi.txt
-python run_fastapi.py
+python run_skyulf.py
 ```
 
 The `run_skyulf.py` script will automatically start the FastAPI server.
