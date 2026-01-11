@@ -83,9 +83,19 @@ class DriftCalculator:
             dtype = self.reference_df[col].dtype
             if dtype not in [pl.Float32, pl.Float64, pl.Int32, pl.Int64]:
                 continue
+            
+            # Ensure current data is also numeric or castable to the reference type
+            curr_series = self.current_df[col]
+            if curr_series.dtype != dtype:
+                try:
+                    # Try to cast current to match reference (e.g. Int to Float, or String to Float)
+                    curr_series = curr_series.cast(dtype, strict=False)
+                except Exception:
+                    # If casting fails completely (unlikely with strict=False), skip
+                    continue
                 
             ref_data = self.reference_df[col].drop_nulls().to_numpy()
-            curr_data = self.current_df[col].drop_nulls().to_numpy()
+            curr_data = curr_series.drop_nulls().to_numpy()
             
             if len(ref_data) == 0 or len(curr_data) == 0:
                 continue
