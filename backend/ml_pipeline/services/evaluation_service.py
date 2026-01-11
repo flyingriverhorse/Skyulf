@@ -84,7 +84,11 @@ class EvaluationService:
                         feature_engineer = bundle.get("feature_engineer")
                         label_encoder = extract_target_label_encoder(feature_engineer)
 
-                        if label_encoder is not None and isinstance(data, dict):
+                        if (
+                            label_encoder is not None
+                            and isinstance(data, dict)
+                            and data.get("problem_type") == "classification"
+                        ):
                             splits = data.get("splits")
                             if isinstance(splits, dict):
                                 for split_data in splits.values():

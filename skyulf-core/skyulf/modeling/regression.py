@@ -5,7 +5,7 @@ from sklearn.ensemble import (
     GradientBoostingRegressor,
     RandomForestRegressor,
 )
-from sklearn.linear_model import ElasticNet, Lasso, Ridge
+from sklearn.linear_model import ElasticNet, Lasso, Ridge, LinearRegression
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
 from sklearn.tree import DecisionTreeRegressor
@@ -14,6 +14,37 @@ from xgboost import XGBRegressor
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
+
+
+# --- Linear Regression ---
+class LinearRegressionApplier(SklearnApplier):
+    """Linear Regression Applier."""
+
+    pass
+
+
+@NodeRegistry.register("linear_regression", LinearRegressionApplier)
+@node_meta(
+    id="linear_regression",
+    name="Linear Regression",
+    category="Modeling",
+    description="Ordinary least squares Linear Regression.",
+    params={"fit_intercept": True, "copy_X": True, "n_jobs": -1},
+    tags=["requires_scaling"],
+)
+class LinearRegressionCalculator(SklearnCalculator):
+    """Linear Regression Calculator."""
+
+    def __init__(self):
+        super().__init__(
+            model_class=LinearRegression,
+            default_params={
+                "fit_intercept": True,
+                "copy_X": True,
+                "n_jobs": -1,
+            },
+            problem_type="regression",
+        )
 
 
 # --- Ridge Regression ---

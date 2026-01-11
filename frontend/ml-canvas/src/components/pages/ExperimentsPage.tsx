@@ -4,7 +4,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ScatterChart, Scatter, LineChart, Line, ReferenceLine
 } from 'recharts';
-import { Filter, Rocket, ChevronDown, ChevronRight, Activity, RefreshCw } from 'lucide-react';
+import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, Activity, RefreshCw, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
 
@@ -32,6 +33,7 @@ export const ExperimentsPage: React.FC = () => {
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>('all');
   
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   
   // Metric visibility toggles
   const [showTrainMetrics, setShowTrainMetrics] = useState(true);
@@ -82,6 +84,25 @@ export const ExperimentsPage: React.FC = () => {
     } catch (err) {
       alert('Failed to deploy model');
       console.error(err);
+    }
+  };
+
+  const handleDownload = async (elementId: string, fileName: string) => {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    // Check for dark mode
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    const backgroundColor = isDarkMode ? '#1f2937' : '#ffffff'; // #1f2937 is tailwind gray-800
+
+    try {
+        const canvas = await html2canvas(element, { backgroundColor } as any);
+        const link = document.createElement('a');
+        link.download = `${fileName}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    } catch (e) {
+        console.error("Failed to download image", e);
     }
   };
 
@@ -298,19 +319,42 @@ export const ExperimentsPage: React.FC = () => {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar List */}
-        <div className="w-1/3 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col">
-          <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-xs font-medium text-gray-500 uppercase">
-            Select Runs to Compare ({selectedJobIds.length})
+        <div className={`${isSidebarCollapsed ? 'w-12' : 'w-80'} border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col relative`}>
+          <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex justify-between items-center h-[41px]">
+            {!isSidebarCollapsed && (
+              <span className="text-xs font-medium text-gray-500 uppercase truncate">
+                Select Runs ({selectedJobIds.length})
+              </span>
+            )}
+            <button 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className={`p-1.5 rounded-lg transition-all duration-200 ${
+                  isSidebarCollapsed 
+                    ? 'mx-auto text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100' 
+                    : 'ml-auto text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+              title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            </button>
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
             {filteredJobs.map(job => (
               <div 
                 key={job.job_id}
                 onClick={() => { toggleJobSelection(job.job_id); }}
-                className={`p-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                className={`border-b border-gray-100 dark:border-gray-700 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${
                   selectedJobIds.includes(job.job_id) ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500' : 'border-l-4 border-l-transparent'
-                }`}
+                } ${isSidebarCollapsed ? 'p-2 flex justify-center' : 'p-3'}`}
+                title={isSidebarCollapsed ? `#${job.version} - ${job.job_id}` : undefined}
               >
+                {isSidebarCollapsed ? (
+                    <div className={`w-2 h-2 rounded-full ${
+                        job.status === 'completed' ? 'bg-green-500' :
+                        job.status === 'failed' ? 'bg-red-500' : 'bg-gray-400'
+                    }`} />
+                ) : (
+                  <>
                 <div className="flex justify-between items-start mb-1">
                   <span className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-300 break-all">
                     #{job.version} - {job.job_id}
@@ -325,13 +369,6 @@ export const ExperimentsPage: React.FC = () => {
                             <Rocket className="w-3 h-3" />
                         </button>
                     )}
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded capitalize ${
-                        job.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                        job.status === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                        'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
-                    }`}>
-                        {job.status}
-                    </span>
                   </div>
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
@@ -348,18 +385,25 @@ export const ExperimentsPage: React.FC = () => {
                     {getDuration(job.start_time, job.end_time)}
                   </span>
                 </div>
+                </>
+                )}
               </div>
             ))}
             
             {hasMore && (
-                <div className="p-2 flex justify-center border-t border-gray-100 dark:border-gray-700">
+                <div className="p-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30">
                     <button 
                         onClick={() => loadMoreJobs()}
                         disabled={isLoading}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 flex items-center gap-1"
+                        className={`w-full py-2 text-xs font-medium rounded-lg border shadow-sm transition-all duration-200 flex items-center justify-center gap-2 ${
+                            isSidebarCollapsed 
+                                ? 'bg-transparent border-transparent text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800' 
+                                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        title="Load More Runs"
                     >
-                        {isLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ChevronDown className="w-3 h-3" />}
-                        Load More
+                        {isLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        {!isSidebarCollapsed && "Load More Runs"}
                     </button>
                 </div>
             )}
@@ -469,7 +513,7 @@ export const ExperimentsPage: React.FC = () => {
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                         <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={metricsData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                            <BarChart data={metricsData} margin={{ top: 5, right: 30, left: 30, bottom: 40 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
                             <XAxis dataKey="name" stroke="#6B7280" fontSize={12} />
                             <YAxis stroke="#6B7280" fontSize={12} />
@@ -756,10 +800,19 @@ export const ExperimentsPage: React.FC = () => {
                                         {evaluationData.problem_type === 'regression' ? (
                                             <div className="grid grid-cols-1 gap-8">
                                                 {/* Scatter Plot: Actual vs Predicted */}
-                                                <div className="h-[300px]">
+                                                <div className="h-[300px] relative group" id={`${splitName}-actual-pred`}>
+                                                    <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-html2canvas-ignore="true">
+                                                       <button 
+                                                         onClick={() => void handleDownload(`${splitName}-actual-pred`, `${splitName}_actual_vs_predicted`)}
+                                                         className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600"
+                                                         title="Download Graph"
+                                                       >
+                                                          <Download className="w-3.5 h-3.5" />
+                                                       </button>
+                                                    </div>
                                                     <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">Actual vs Predicted</h5>
                                                     <ResponsiveContainer width="100%" height="100%">
-                                                        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                                        <ScatterChart margin={{ top: 20, right: 30, bottom: 40, left: 30 }}>
                                                             <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                                                             <XAxis 
                                                                 type="number" 
@@ -774,7 +827,7 @@ export const ExperimentsPage: React.FC = () => {
                                                                 dataKey="y" 
                                                                 name="Predicted" 
                                                                 unit="" 
-                                                                label={{ value: 'Predicted Values', angle: -90, position: 'left', fontSize: 12 }} 
+                                                                label={{ value: 'Predicted Values', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 12 }} 
                                                                 tick={{ fontSize: 11 }}
                                                             />
                                                             <Tooltip 
@@ -809,10 +862,19 @@ export const ExperimentsPage: React.FC = () => {
                                                 </div>
 
                                                 {/* Residual Plot: Residuals vs Predicted */}
-                                                <div className="h-[300px]">
+                                                <div className="h-[300px] relative group" id={`${splitName}-residuals`}>
+                                                    <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-html2canvas-ignore="true">
+                                                       <button 
+                                                         onClick={() => void handleDownload(`${splitName}-residuals`, `${splitName}_residuals`)}
+                                                         className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600"
+                                                         title="Download Graph"
+                                                       >
+                                                          <Download className="w-3.5 h-3.5" />
+                                                       </button>
+                                                    </div>
                                                     <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">Residuals vs Predicted</h5>
                                                     <ResponsiveContainer width="100%" height="100%">
-                                                        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                                        <ScatterChart margin={{ top: 20, right: 30, bottom: 40, left: 30 }}>
                                                             <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                                                             <XAxis 
                                                                 type="number" 
@@ -827,7 +889,7 @@ export const ExperimentsPage: React.FC = () => {
                                                                 dataKey="residual" 
                                                                 name="Residual" 
                                                                 unit="" 
-                                                                label={{ value: 'Residuals (Actual - Predicted)', angle: -90, position: 'left', fontSize: 12 }} 
+                                                                label={{ value: 'Residuals (Actual - Predicted)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 12 }} 
                                                                 tick={{ fontSize: 11 }}
                                                             />
                                                             <Tooltip 
@@ -863,7 +925,16 @@ export const ExperimentsPage: React.FC = () => {
                                         ) : (
                                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                                 {/* Confusion Matrix */}
-                                                <div className="h-[300px] flex flex-col items-center justify-center">
+                                                <div className="h-[300px] flex flex-col items-center justify-center relative group" id={`${splitName}-confusion-matrix`}>
+                                                    <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-html2canvas-ignore="true">
+                                                       <button 
+                                                         onClick={() => void handleDownload(`${splitName}-confusion-matrix`, `${splitName}_confusion_matrix`)}
+                                                         className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600"
+                                                         title="Download Graph"
+                                                       >
+                                                          <Download className="w-3.5 h-3.5" />
+                                                       </button>
+                                                    </div>
                                                     {(() => {
                                                         const proba = splitData.y_proba;
                                                         const classOrder = proba?.classes;
@@ -935,7 +1006,16 @@ export const ExperimentsPage: React.FC = () => {
 
                                                 {/* ROC Curve (if available) */}
                                                 {splitData.y_proba && (
-                                                    <div className="h-[300px] w-full">
+                                                    <div className="h-[300px] w-full relative group" id={`${splitName}-roc`}>
+                                                        <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-html2canvas-ignore="true">
+                                                           <button 
+                                                             onClick={() => void handleDownload(`${splitName}-roc`, `${splitName}_roc_curve`)}
+                                                             className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600"
+                                                             title="Download Graph"
+                                                           >
+                                                              <Download className="w-3.5 h-3.5" />
+                                                           </button>
+                                                        </div>
                                                         <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">ROC Curve</h5>
                                                         {(() => {
                                                             if (!selectedRocClass) return <div className="text-center text-xs text-gray-400">Select a class</div>;
@@ -944,7 +1024,7 @@ export const ExperimentsPage: React.FC = () => {
                                                             
                                                             return (
                                                                 <ResponsiveContainer width="100%" height="100%">
-                                                                    <LineChart data={rocData} margin={{ top: 5, right: 20, bottom: 20, left: 20 }}>
+                                                                    <LineChart data={rocData} margin={{ top: 5, right: 30, bottom: 40, left: 30 }}>
                                                                         <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
                                                                         <XAxis type="number" dataKey="fpr" domain={[0, 1]} label={{ value: 'False Positive Rate', position: 'bottom', offset: 0, fontSize: 12 }} />
                                                                         <YAxis type="number" dataKey="tpr" domain={[0, 1]} label={{ value: 'True Positive Rate', angle: -90, position: 'left', fontSize: 12 }} />
