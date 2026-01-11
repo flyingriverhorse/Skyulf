@@ -1460,6 +1460,83 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#svc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        svc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#k_neighbors_classifier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        k_neighbors_classifier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decision_tree_classifier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        decision_tree_classifier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gradient_boosting_classifier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gradient_boosting_classifier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adaboost_classifier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        adaboost_classifier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#xgboost_classifier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        xgboost_classifier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gaussian_nb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gaussian_nb
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1489,10 +1566,98 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#lasso_regression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lasso_regression
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elasticnet_regression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        elasticnet_regression
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#random_forest_regressor" class="md-nav__link">
     <span class="md-ellipsis">
       
         random_forest_regressor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#svr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        svr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#k_neighbors_regressor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        k_neighbors_regressor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decision_tree_regressor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        decision_tree_regressor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gradient_boosting_regressor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gradient_boosting_regressor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adaboost_regressor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        adaboost_regressor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#xgboost_regressor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        xgboost_regressor
       
     </span>
   </a>
@@ -2693,6 +2858,41 @@
 <ul>
 <li>fitted sklearn estimator</li>
 </ul>
+<h3 id="svc">svc</h3>
+<p>Backed by <code>sklearn.svm.SVC</code>.</p>
+<p>Defaults:
+- <code>C=1.0</code>, <code>kernel=rbf</code>, <code>gamma=scale</code>
+- <code>probability=True</code>, <code>random_state=42</code></p>
+<h3 id="k_neighbors_classifier">k_neighbors_classifier</h3>
+<p>Backed by <code>sklearn.neighbors.KNeighborsClassifier</code>.</p>
+<p>Defaults:
+- <code>n_neighbors=5</code>, <code>weights=uniform</code>
+- <code>algorithm=auto</code>, <code>n_jobs=-1</code></p>
+<h3 id="decision_tree_classifier">decision_tree_classifier</h3>
+<p>Backed by <code>sklearn.tree.DecisionTreeClassifier</code>.</p>
+<p>Defaults:
+- <code>max_depth=None</code>, <code>min_samples_split=2</code>
+- <code>criterion=gini</code>, <code>random_state=42</code></p>
+<h3 id="gradient_boosting_classifier">gradient_boosting_classifier</h3>
+<p>Backed by <code>sklearn.ensemble.GradientBoostingClassifier</code>.</p>
+<p>Defaults:
+- <code>n_estimators=100</code>, <code>learning_rate=0.1</code>
+- <code>max_depth=3</code>, <code>random_state=42</code></p>
+<h3 id="adaboost_classifier">adaboost_classifier</h3>
+<p>Backed by <code>sklearn.ensemble.AdaBoostClassifier</code>.</p>
+<p>Defaults:
+- <code>n_estimators=50</code>, <code>learning_rate=1.0</code>
+- <code>random_state=42</code></p>
+<h3 id="xgboost_classifier">xgboost_classifier</h3>
+<p>Backed by <code>xgboost.XGBClassifier</code>.</p>
+<p>Defaults:
+- <code>n_estimators=100</code>, <code>max_depth=6</code>
+- <code>learning_rate=0.3</code>, <code>n_jobs=-1</code>
+- <code>random_state=42</code></p>
+<h3 id="gaussian_nb">gaussian_nb</h3>
+<p>Backed by <code>sklearn.naive_bayes.GaussianNB</code>.</p>
+<p>Defaults:
+- <code>var_smoothing=1e-9</code></p>
 <h2 id="regression">Regression</h2>
 <h3 id="ridge_regression">ridge_regression</h3>
 <p>Backed by <code>sklearn.linear_model.Ridge</code>.</p>
@@ -2700,6 +2900,16 @@
 <ul>
 <li><code>alpha=1.0</code>, <code>solver=auto</code>, <code>random_state=42</code></li>
 </ul>
+<h3 id="lasso_regression">lasso_regression</h3>
+<p>Backed by <code>sklearn.linear_model.Lasso</code>.</p>
+<p>Defaults:
+- <code>alpha=1.0</code>, <code>selection=cyclic</code>
+- <code>random_state=42</code></p>
+<h3 id="elasticnet_regression">elasticnet_regression</h3>
+<p>Backed by <code>sklearn.linear_model.ElasticNet</code>.</p>
+<p>Defaults:
+- <code>alpha=1.0</code>, <code>l1_ratio=0.5</code>
+- <code>selection=cyclic</code>, <code>random_state=42</code></p>
 <h3 id="random_forest_regressor">random_forest_regressor</h3>
 <p>Backed by <code>sklearn.ensemble.RandomForestRegressor</code>.</p>
 <p>Defaults include:</p>
@@ -2708,6 +2918,36 @@
 <li><code>min_samples_split=5</code>, <code>min_samples_leaf=2</code></li>
 <li><code>n_jobs=-1</code>, <code>random_state=42</code></li>
 </ul>
+<h3 id="svr">svr</h3>
+<p>Backed by <code>sklearn.svm.SVR</code>.</p>
+<p>Defaults:
+- <code>C=1.0</code>, <code>kernel=rbf</code>, <code>gamma=scale</code></p>
+<h3 id="k_neighbors_regressor">k_neighbors_regressor</h3>
+<p>Backed by <code>sklearn.neighbors.KNeighborsRegressor</code>.</p>
+<p>Defaults:
+- <code>n_neighbors=5</code>, <code>weights=uniform</code>
+- <code>algorithm=auto</code>, <code>n_jobs=-1</code></p>
+<h3 id="decision_tree_regressor">decision_tree_regressor</h3>
+<p>Backed by <code>sklearn.tree.DecisionTreeRegressor</code>.</p>
+<p>Defaults:
+- <code>max_depth=None</code>, <code>min_samples_split=2</code>
+- <code>criterion=squared_error</code>, <code>random_state=42</code></p>
+<h3 id="gradient_boosting_regressor">gradient_boosting_regressor</h3>
+<p>Backed by <code>sklearn.ensemble.GradientBoostingRegressor</code>.</p>
+<p>Defaults:
+- <code>n_estimators=100</code>, <code>learning_rate=0.1</code>
+- <code>max_depth=3</code>, <code>random_state=42</code></p>
+<h3 id="adaboost_regressor">adaboost_regressor</h3>
+<p>Backed by <code>sklearn.ensemble.AdaBoostRegressor</code>.</p>
+<p>Defaults:
+- <code>n_estimators=50</code>, <code>learning_rate=1.0</code>
+- <code>random_state=42</code></p>
+<h3 id="xgboost_regressor">xgboost_regressor</h3>
+<p>Backed by <code>xgboost.XGBRegressor</code>.</p>
+<p>Defaults:
+- <code>n_estimators=100</code>, <code>max_depth=6</code>
+- <code>learning_rate=0.3</code>, <code>n_jobs=-1</code>
+- <code>random_state=42</code></p>
 <h2 id="hyperparameter-tuning">Hyperparameter tuning</h2>
 <h3 id="hyperparameter_tuner">hyperparameter_tuner</h3>
 <p>This mode wraps a base model and performs search.</p>

@@ -2651,30 +2651,30 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">562</span>
-<span class="normal">563</span>
-<span class="normal">564</span>
-<span class="normal">565</span>
-<span class="normal">566</span>
-<span class="normal">567</span>
-<span class="normal">568</span>
-<span class="normal">569</span>
-<span class="normal">570</span>
-<span class="normal">571</span>
-<span class="normal">572</span>
-<span class="normal">573</span>
-<span class="normal">574</span>
-<span class="normal">575</span>
-<span class="normal">576</span>
-<span class="normal">577</span>
-<span class="normal">578</span>
-<span class="normal">579</span>
-<span class="normal">580</span>
-<span class="normal">581</span>
-<span class="normal">582</span>
-<span class="normal">583</span>
-<span class="normal">584</span>
-<span class="normal">585</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span>
+<span class="normal">609</span>
+<span class="normal">610</span>
+<span class="normal">611</span>
+<span class="normal">612</span>
+<span class="normal">613</span>
+<span class="normal">614</span>
+<span class="normal">615</span>
+<span class="normal">616</span>
+<span class="normal">617</span>
+<span class="normal">618</span>
+<span class="normal">619</span>
+<span class="normal">620</span>
+<span class="normal">621</span>
+<span class="normal">622</span>
+<span class="normal">623</span>
+<span class="normal">624</span>
+<span class="normal">625</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Applier for TuningCalculator.</span>
 <span class="sd">    Wraps the base model applier to provide predictions using the refitted best model.</span>
@@ -3246,7 +3246,47 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">556</span>
 <span class="normal">557</span>
 <span class="normal">558</span>
-<span class="normal">559</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
+<span class="normal">559</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span>
+<span class="normal">583</span>
+<span class="normal">584</span>
+<span class="normal">585</span>
+<span class="normal">586</span>
+<span class="normal">587</span>
+<span class="normal">588</span>
+<span class="normal">589</span>
+<span class="normal">590</span>
+<span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span>
+<span class="normal">594</span>
+<span class="normal">595</span>
+<span class="normal">596</span>
+<span class="normal">597</span>
+<span class="normal">598</span>
+<span class="normal">599</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculator for hyperparameter tuning.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_calculator</span><span class="p">:</span> <span class="n">BaseModelCalculator</span><span class="p">):</span>
@@ -3298,6 +3338,22 @@ Wraps the base model applier to provide predictions using the refitted best mode
         <span class="c1"># Convert data to Numpy for tuning</span>
         <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
 
+        <span class="c1"># --- VALIDATION: Check for NaNs/Inf in Data ---</span>
+        <span class="c1"># Many tuning errors (&quot;No trials completed&quot;) are actually due to dirty data causing instant failures.</span>
+        <span class="c1"># We catch this early to give a clear message.</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">X_np</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span><span class="n">X_np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">number</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input features (X) contain NaN values. Please use an &#39;Imputer&#39; node before this model.&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input features (X) contain Infinite values. Please scale or clean your data.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">y_np</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span><span class="n">y_np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">number</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">y_np</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Target variable (y) contains NaN values. Please drop rows with missing targets or impute them.&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">y_np</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Target variable (y) contains Infinite values.&quot;</span><span class="p">)</span>
+        <span class="c1"># ----------------------------------------------</span>
+
         <span class="n">validation_data_np</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="n">validation_data</span><span class="p">:</span>
             <span class="n">X_val</span><span class="p">,</span> <span class="n">y_val</span> <span class="o">=</span> <span class="n">validation_data</span>
@@ -3332,7 +3388,13 @@ Wraps the base model applier to provide predictions using the refitted best mode
         <span class="k">if</span> <span class="ow">not</span> <span class="n">model_cls</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Model calculator does not have a model_class attribute&quot;</span><span class="p">)</span>
 
-        <span class="n">model</span> <span class="o">=</span> <span class="n">model_cls</span><span class="p">(</span><span class="o">**</span><span class="n">final_params</span><span class="p">)</span>
+        <span class="c1"># Filter params to only include those accepted by the model_class constructor</span>
+        <span class="c1"># This prevents &quot;unexpected keyword argument &#39;random_state&#39;&quot; for models like KNN/GaussianNB</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
+        <span class="n">sig</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">signature</span><span class="p">(</span><span class="n">model_cls</span><span class="p">)</span>
+        <span class="n">valid_final_params</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">final_params</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">sig</span><span class="o">.</span><span class="n">parameters</span><span class="p">}</span>
+
+        <span class="n">model</span> <span class="o">=</span> <span class="n">model_cls</span><span class="p">(</span><span class="o">**</span><span class="n">valid_final_params</span><span class="p">)</span>
         <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">tuning_result</span><span class="p">)</span>
@@ -3420,6 +3482,18 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
         <span class="c1"># Handle multiclass metrics and map user-friendly names</span>
         <span class="n">metric</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">metric</span>
+
+        <span class="c1"># --- VALIDATION: Metric Consistency Check ---</span>
+        <span class="c1"># The schema defaults metric to &quot;accuracy&quot;. If the user is doing Regression but &quot;accuracy&quot; </span>
+        <span class="c1"># (or another classification metric) is selected, we raise a clear error instead of crashing deeply in sklearn.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;regression&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">metric</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;accuracy&quot;</span><span class="p">,</span> <span class="s2">&quot;f1&quot;</span><span class="p">,</span> <span class="s2">&quot;precision&quot;</span><span class="p">,</span> <span class="s2">&quot;recall&quot;</span><span class="p">,</span> <span class="s2">&quot;roc_auc&quot;</span><span class="p">,</span> <span class="s2">&quot;f1_weighted&quot;</span><span class="p">]:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Configuration Error: You selected &#39;</span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">&#39; as the tuning metric, but this is a Regression model. &quot;</span>
+                    <span class="s2">&quot;Accuracy/F1/AUC are for Classification only. &quot;</span>
+                    <span class="s2">&quot;Please open &#39;Advanced Settings&#39; on this node and select a regression metric (e.g., R2, RMSE, MAE).&quot;</span>
+                <span class="p">)</span>
+        <span class="c1"># -----------------------------------------------</span>
 
         <span class="c1"># Map common user-friendly metrics to sklearn scoring strings</span>
         <span class="n">metric_map</span> <span class="o">=</span> <span class="p">{</span>
@@ -3709,13 +3783,19 @@ Wraps the base model applier to provide predictions using the refitted best mode
             <span class="k">raise</span> <span class="n">e</span>
 
         <span class="c1"># 5. Extract Results</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">searcher</span><span class="p">,</span> <span class="s2">&quot;best_params_&quot;</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;Hyperparameter tuning failed to find any valid combination of parameters. All trials likely failed.&quot;</span>
-            <span class="p">)</span>
-
-        <span class="n">best_params</span> <span class="o">=</span> <span class="n">searcher</span><span class="o">.</span><span class="n">best_params_</span>
-        <span class="n">best_score</span> <span class="o">=</span> <span class="n">searcher</span><span class="o">.</span><span class="n">best_score_</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Accessing best_params_ raises ValueError if no trials completed successfully</span>
+            <span class="n">best_params</span> <span class="o">=</span> <span class="n">searcher</span><span class="o">.</span><span class="n">best_params_</span>
+            <span class="n">best_score</span> <span class="o">=</span> <span class="n">searcher</span><span class="o">.</span><span class="n">best_score_</span>
+        <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s2">&quot;No trials are completed yet&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Hyperparameter tuning failed: All trials failed. &quot;</span>
+                    <span class="s2">&quot;This often happens if the model produces NaN scores (e.g., due to unscaled data for linear models/SVMs, &quot;</span>
+                    <span class="s2">&quot;exploding gradients, or mismatched parameters). &quot;</span>
+                    <span class="s2">&quot;Try adding a &#39;Scale&#39; node before this model or checking for NaN/Infinity in your data.&quot;</span>
+                <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+            <span class="k">raise</span> <span class="n">e</span>
 
         <span class="c1"># Collect trials</span>
         <span class="n">trials</span> <span class="o">=</span> <span class="p">[]</span>
@@ -3840,7 +3920,29 @@ Adapts the generic fit interface to the specific tune method.</p>
 <span class="normal">149</span>
 <span class="normal">150</span>
 <span class="normal">151</span>
-<span class="normal">152</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
@@ -3866,6 +3968,22 @@ Adapts the generic fit interface to the specific tune method.</p>
 
     <span class="c1"># Convert data to Numpy for tuning</span>
     <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
+
+    <span class="c1"># --- VALIDATION: Check for NaNs/Inf in Data ---</span>
+    <span class="c1"># Many tuning errors (&quot;No trials completed&quot;) are actually due to dirty data causing instant failures.</span>
+    <span class="c1"># We catch this early to give a clear message.</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">X_np</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span><span class="n">X_np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">number</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input features (X) contain NaN values. Please use an &#39;Imputer&#39; node before this model.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input features (X) contain Infinite values. Please scale or clean your data.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">y_np</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span><span class="n">y_np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">number</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">y_np</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Target variable (y) contains NaN values. Please drop rows with missing targets or impute them.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">y_np</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Target variable (y) contains Infinite values.&quot;</span><span class="p">)</span>
+    <span class="c1"># ----------------------------------------------</span>
 
     <span class="n">validation_data_np</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">validation_data</span><span class="p">:</span>
@@ -3901,7 +4019,13 @@ Adapts the generic fit interface to the specific tune method.</p>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">model_cls</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Model calculator does not have a model_class attribute&quot;</span><span class="p">)</span>
 
-    <span class="n">model</span> <span class="o">=</span> <span class="n">model_cls</span><span class="p">(</span><span class="o">**</span><span class="n">final_params</span><span class="p">)</span>
+    <span class="c1"># Filter params to only include those accepted by the model_class constructor</span>
+    <span class="c1"># This prevents &quot;unexpected keyword argument &#39;random_state&#39;&quot; for models like KNN/GaussianNB</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
+    <span class="n">sig</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">signature</span><span class="p">(</span><span class="n">model_cls</span><span class="p">)</span>
+    <span class="n">valid_final_params</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">final_params</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">sig</span><span class="o">.</span><span class="n">parameters</span><span class="p">}</span>
+
+    <span class="n">model</span> <span class="o">=</span> <span class="n">model_cls</span><span class="p">(</span><span class="o">**</span><span class="n">valid_final_params</span><span class="p">)</span>
     <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">tuning_result</span><span class="p">)</span>
@@ -3927,29 +4051,7 @@ Adapts the generic fit interface to the specific tune method.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
-<span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">176</span>
 <span class="normal">177</span>
 <span class="normal">178</span>
 <span class="normal">179</span>
@@ -4332,7 +4434,47 @@ Adapts the generic fit interface to the specific tune method.</p>
 <span class="normal">556</span>
 <span class="normal">557</span>
 <span class="normal">558</span>
-<span class="normal">559</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
+<span class="normal">559</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span>
+<span class="normal">583</span>
+<span class="normal">584</span>
+<span class="normal">585</span>
+<span class="normal">586</span>
+<span class="normal">587</span>
+<span class="normal">588</span>
+<span class="normal">589</span>
+<span class="normal">590</span>
+<span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span>
+<span class="normal">594</span>
+<span class="normal">595</span>
+<span class="normal">596</span>
+<span class="normal">597</span>
+<span class="normal">598</span>
+<span class="normal">599</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -4415,6 +4557,18 @@ Adapts the generic fit interface to the specific tune method.</p>
 
     <span class="c1"># Handle multiclass metrics and map user-friendly names</span>
     <span class="n">metric</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">metric</span>
+
+    <span class="c1"># --- VALIDATION: Metric Consistency Check ---</span>
+    <span class="c1"># The schema defaults metric to &quot;accuracy&quot;. If the user is doing Regression but &quot;accuracy&quot; </span>
+    <span class="c1"># (or another classification metric) is selected, we raise a clear error instead of crashing deeply in sklearn.</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;regression&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">metric</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;accuracy&quot;</span><span class="p">,</span> <span class="s2">&quot;f1&quot;</span><span class="p">,</span> <span class="s2">&quot;precision&quot;</span><span class="p">,</span> <span class="s2">&quot;recall&quot;</span><span class="p">,</span> <span class="s2">&quot;roc_auc&quot;</span><span class="p">,</span> <span class="s2">&quot;f1_weighted&quot;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Configuration Error: You selected &#39;</span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">&#39; as the tuning metric, but this is a Regression model. &quot;</span>
+                <span class="s2">&quot;Accuracy/F1/AUC are for Classification only. &quot;</span>
+                <span class="s2">&quot;Please open &#39;Advanced Settings&#39; on this node and select a regression metric (e.g., R2, RMSE, MAE).&quot;</span>
+            <span class="p">)</span>
+    <span class="c1"># -----------------------------------------------</span>
 
     <span class="c1"># Map common user-friendly metrics to sklearn scoring strings</span>
     <span class="n">metric_map</span> <span class="o">=</span> <span class="p">{</span>
@@ -4704,13 +4858,19 @@ Adapts the generic fit interface to the specific tune method.</p>
         <span class="k">raise</span> <span class="n">e</span>
 
     <span class="c1"># 5. Extract Results</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">searcher</span><span class="p">,</span> <span class="s2">&quot;best_params_&quot;</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">&quot;Hyperparameter tuning failed to find any valid combination of parameters. All trials likely failed.&quot;</span>
-        <span class="p">)</span>
-
-    <span class="n">best_params</span> <span class="o">=</span> <span class="n">searcher</span><span class="o">.</span><span class="n">best_params_</span>
-    <span class="n">best_score</span> <span class="o">=</span> <span class="n">searcher</span><span class="o">.</span><span class="n">best_score_</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Accessing best_params_ raises ValueError if no trials completed successfully</span>
+        <span class="n">best_params</span> <span class="o">=</span> <span class="n">searcher</span><span class="o">.</span><span class="n">best_params_</span>
+        <span class="n">best_score</span> <span class="o">=</span> <span class="n">searcher</span><span class="o">.</span><span class="n">best_score_</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">&quot;No trials are completed yet&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Hyperparameter tuning failed: All trials failed. &quot;</span>
+                <span class="s2">&quot;This often happens if the model produces NaN scores (e.g., due to unscaled data for linear models/SVMs, &quot;</span>
+                <span class="s2">&quot;exploding gradients, or mismatched parameters). &quot;</span>
+                <span class="s2">&quot;Try adding a &#39;Scale&#39; node before this model or checking for NaN/Infinity in your data.&quot;</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+        <span class="k">raise</span> <span class="n">e</span>
 
     <span class="c1"># Collect trials</span>
     <span class="n">trials</span> <span class="o">=</span> <span class="p">[]</span>
