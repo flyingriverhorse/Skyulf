@@ -79,6 +79,10 @@ llvmlite>=0.45.0,<1.0.0
 # === NLP ANALYTICS ===
 vaderSentiment>=3.3.2,<4.0.0 # Sentiment scoring utilities
 
+# === Security Dependencies ===
+safety>=3.6.1
+typer>=0.12.0,<1.0.0
+
 # === EXISTING DEPENDENCIES (SHARED WITH FLASK) ===
 # These are already in the main requirements.txt, but listed here for clarity
 # when setting up the FastAPI environment separately

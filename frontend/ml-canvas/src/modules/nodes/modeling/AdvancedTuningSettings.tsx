@@ -589,6 +589,8 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                             <option value="f1">F1 Score</option>
                             <option value="roc_auc">ROC AUC</option>
                             <option value="mse">MSE</option>
+                            <option value="rmse">RMSE</option>
+                            <option value="mae">MAE</option>
                             <option value="r2">R2 Score</option>
                         </select>
                     </div>

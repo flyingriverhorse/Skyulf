@@ -16,12 +16,20 @@
 
 ### 🧠 Model Expansion (15 New Models)
 - **Classification:** Added support for `SVC`, `KNeighborsClassifier`, `DecisionTreeClassifier`, `GradientBoostingClassifier`, `AdaBoostClassifier`, `XGBClassifier`, and `GaussianNB`.
-- **Regression:** Added support for `Lasso`, `ElasticNet`, `SVR`, `KNeighborsRegressor`, `DecisionTreeRegressor`, `GradientBoostingRegressor`, `AdaBoostRegressor`, and `XGBRegressor`.
+- **Regression:** Added support for `LinearRegression`, `Lasso`, `ElasticNet`, `SVR`, `KNeighborsRegressor`, `DecisionTreeRegressor`, `GradientBoostingRegressor`, `AdaBoostRegressor`, and `XGBRegressor`.
 - **Hyperparameters:** Added comprehensive hyperparameter definitions for all new models to support the "Advanced Tuning" UI.
 
 ### 🎨 Frontend & UX
 - **Smart Recommendations:** The frontend now detects models that require feature scaling (e.g., SVM, KNN, Ridge/Lasso) and displays a "Requires Scaling" hint in the node settings.
 - **Node Metadata:** Enhanced the `@node_meta` decorator and Registry API to support arbitrary tags (e.g., `requires_scaling`), enabling smarter UI behavior.
+- **Sidebar UX:** Made the "Select Runs" sidebar in Experiments page collapsible and fixed its width to `320px` (w-80) instead of `33%` (w-1/3) for better space utilization on large screens.
+
+### 🐛 Bug Fixes
+- **Experiments Regression Charts:** Prevented target label decoding from corrupting float `y_true`/`y_pred`, fixing empty "Actual vs Predicted" and "Residuals vs Predicted" graphs.
+- **Visual Alignment:** Fixed positioning of Y-axis labels in regression evaluation charts (Actual vs Predicted, Residuals) to be vertically centered.
+- **Performance:** Optimized Experiments sidebar by removing transition animations to prevent chart resize lag.
+- **Export Capabilities:** Added "Download Graph" button to all Model Evaluation charts (Regression & Classification) using `html2canvas` locally with Dark Mode support.
+- **Chart Exports:** Increased margins on all downloadable charts to prevent axis labels from being clipped in the generated images.
 
 ------------------------------------------------------------
 ## v0.1.9

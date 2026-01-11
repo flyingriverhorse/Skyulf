@@ -152,6 +152,21 @@ RANDOM_FOREST_CLASSIFIER_PARAMS = RANDOM_FOREST_PARAMS + [
     )
 ]
 
+# --- Linear Regression ---
+LINEAR_REGRESSION_PARAMS = [
+    HyperparameterField(
+        name="fit_intercept",
+        label="Fit Intercept",
+        type="select",
+        default=True,
+        options=[
+            {"label": "True", "value": True},
+            {"label": "False", "value": False},
+        ],
+        description="Whether to calculate the intercept for this model.",
+    ),
+]
+
 # --- Ridge Regression ---
 RIDGE_REGRESSION_PARAMS = [
     HyperparameterField(
@@ -392,6 +407,7 @@ MODEL_HYPERPARAMETERS = {
     "ridge_regression": RIDGE_REGRESSION_PARAMS,
     "lasso_regression": LASSO_REGRESSION_PARAMS,
     "elasticnet_regression": ELASTICNET_REGRESSION_PARAMS,
+    "linear_regression": LINEAR_REGRESSION_PARAMS,
     "svc": SVM_PARAMS,
     "svr": SVM_PARAMS,
     "k_neighbors_classifier": KNN_PARAMS,
@@ -450,6 +466,9 @@ DEFAULT_SEARCH_SPACES = {
     "elasticnet_regression": {
         "alpha": [0.001, 0.01, 0.1, 1.0, 10.0],
         "l1_ratio": [0.1, 0.5, 0.7, 0.9],
+    },
+    "linear_regression": {
+        "fit_intercept": [True, False],
     },
     "svc": {
         "C": [0.1, 1.0, 10.0, 100.0],

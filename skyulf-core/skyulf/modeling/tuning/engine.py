@@ -112,6 +112,22 @@ class TuningCalculator(BaseModelCalculator):
         # Convert data to Numpy for tuning
         X_np, y_np = SklearnBridge.to_sklearn((X, y))
 
+        # --- VALIDATION: Check for NaNs/Inf in Data ---
+        # Many tuning errors ("No trials completed") are actually due to dirty data causing instant failures.
+        # We catch this early to give a clear message.
+        if isinstance(X_np, np.ndarray) and np.issubdtype(X_np.dtype, np.number):
+            if np.isnan(X_np).any():
+                raise ValueError("Input features (X) contain NaN values. Please use an 'Imputer' node before this model.")
+            if np.isinf(X_np).any():
+                raise ValueError("Input features (X) contain Infinite values. Please scale or clean your data.")
+        
+        if isinstance(y_np, np.ndarray) and np.issubdtype(y_np.dtype, np.number):
+            if np.isnan(y_np).any():
+                raise ValueError("Target variable (y) contains NaN values. Please drop rows with missing targets or impute them.")
+            if np.isinf(y_np).any():
+                raise ValueError("Target variable (y) contains Infinite values.")
+        # ----------------------------------------------
+
         validation_data_np = None
         if validation_data:
             X_val, y_val = validation_data
@@ -240,6 +256,18 @@ class TuningCalculator(BaseModelCalculator):
 
         # Handle multiclass metrics and map user-friendly names
         metric = config.metric
+        
+        # --- VALIDATION: Metric Consistency Check ---
+        # The schema defaults metric to "accuracy". If the user is doing Regression but "accuracy" 
+        # (or another classification metric) is selected, we raise a clear error instead of crashing deeply in sklearn.
+        if self.model_calculator.problem_type == "regression":
+            if metric in ["accuracy", "f1", "precision", "recall", "roc_auc", "f1_weighted"]:
+                raise ValueError(
+                    f"Configuration Error: You selected '{metric}' as the tuning metric, but this is a Regression model. "
+                    "Accuracy/F1/AUC are for Classification only. "
+                    "Please open 'Advanced Settings' on this node and select a regression metric (e.g., R2, RMSE, MAE)."
+                )
+        # -----------------------------------------------
 
         # Map common user-friendly metrics to sklearn scoring strings
         metric_map = {
@@ -529,13 +557,19 @@ class TuningCalculator(BaseModelCalculator):
             raise e
 
         # 5. Extract Results
-        if not hasattr(searcher, "best_params_"):
-            raise ValueError(
-                "Hyperparameter tuning failed to find any valid combination of parameters. All trials likely failed."
-            )
-
-        best_params = searcher.best_params_
-        best_score = searcher.best_score_
+        try:
+            # Accessing best_params_ raises ValueError if no trials completed successfully
+            best_params = searcher.best_params_
+            best_score = searcher.best_score_
+        except ValueError as e:
+            if "No trials are completed yet" in str(e):
+                raise ValueError(
+                    "Hyperparameter tuning failed: All trials failed. "
+                    "This often happens if the model produces NaN scores (e.g., due to unscaled data for linear models/SVMs, "
+                    "exploding gradients, or mismatched parameters). "
+                    "Try adding a 'Scale' node before this model or checking for NaN/Infinity in your data."
+                ) from e
+            raise e
 
         # Collect trials
         trials = []

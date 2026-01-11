@@ -48,10 +48,23 @@ def decode_int_like(values: List[Any], label_encoder: Any) -> List[Any]:
         import numpy as np
 
         arr = np.asarray(values)
-        # Check if numeric
-        if arr.dtype.kind in {"i", "u", "b", "f"}:
-             decoded = label_encoder.inverse_transform(arr.astype(int))
-             return decoded.tolist() if hasattr(decoded, "tolist") else list(decoded)
-        return values
+        if arr.size == 0:
+            return values
+
+        # Only attempt decoding for numeric arrays that are *integer-like*.
+        # This prevents accidentally decoding true regression targets/predictions
+        # (floats) when a target LabelEncoder exists in the artifact bundle.
+        if arr.dtype.kind not in {"i", "u", "b", "f"}:
+            return values
+
+        if not np.all(np.isfinite(arr)):
+            return values
+
+        int_arr = arr.astype(int)
+        if not np.allclose(arr, int_arr):
+            return values
+
+        decoded = label_encoder.inverse_transform(int_arr)
+        return decoded.tolist() if hasattr(decoded, "tolist") else list(decoded)
     except Exception:
         return values
