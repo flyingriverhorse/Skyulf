@@ -12,6 +12,7 @@ pip install -e ./skyulf-core
 
 `skyulf-core` primarily relies on:
 
+- Polars
 - Pandas
 - NumPy
 - Scikit-Learn
