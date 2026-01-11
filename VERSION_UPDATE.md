@@ -12,6 +12,12 @@
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
 ------------------------------------------------------------
+## v0.1.11
+
+- **Drift Monitoring:** Fixed "Internal Server Error" (500) caused by strict type checks when comparing Reference (Float) vs Current (String) data in `DriftCalculator`. It now attempts safe casting.
+- **Drift Calculation Logic:** Updated `PipelineEngine` to save "Reference Data" at the *Data Loading* or *Splitting* stage (Raw Data) rather than the *Training* stage (Processed/Scaled Data). This ensures that Drift Monitoring compares "Raw vs Raw" data, preventing false alarms when users upload raw files to monitor pipelines that include Scaling/Encoding. (engine.py)
+
+------------------------------------------------------------
 ## v0.1.10
 
 ### 🧠 Model Expansion (15 New Models)

@@ -61,6 +61,36 @@ class PipelineEngine:
         self._results: Dict[str, NodeExecutionResult] = {}
         self._node_configs: Dict[str, NodeConfig] = {}
 
+    def _pipeline_has_training_node(self) -> bool:
+        """Checks if the current pipeline workflow includes a model training step."""
+        return any(
+            node.step_type in [StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING]
+            for node in self._node_configs.values()
+        )
+
+    def _finalize_training_artifacts(self, data: Any, job_id: str, target_col: str, node_id: str, model_artifact: Any):
+        """
+        Finalize training by saving standard artifacts:
+        1. Reference Data for Drift Detection (if not already present).
+        2. Model Artifact (node_id and job_id).
+        """
+        # Save Reference Data for Drift Detection
+        # Only overwrite if it doesn't exist (prefer Raw/Splitter data over Scaled/Transformed data)
+        # Construct the key manually to check existence
+        if job_id and job_id != "unknown":
+             safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', self.dataset_name)
+             key = f"reference_data_{safe_name}_{job_id}"
+             if not self.artifact_store.exists(key):
+                 self._save_reference_data(data, job_id, target_col)
+        else:
+             self._save_reference_data(data, job_id, target_col)
+
+        # Manually save the model artifact
+        self.artifact_store.save(node_id, model_artifact)
+        if job_id and job_id != "unknown":
+            self.log(f"Saving model artifact to job key: {job_id}")
+            self.artifact_store.save(job_id, model_artifact)
+
     def _save_reference_data(self, data: Any, job_id: str, target_col: str):
         """
         Saves the training data as a reference dataset for future drift detection.
@@ -160,7 +190,7 @@ class PipelineEngine:
             metrics: Dict[str, Any] = {}
 
             if node.step_type == StepType.DATA_LOADER:
-                output_artifact_id = self._run_data_loader(node)
+                output_artifact_id = self._run_data_loader(node, job_id=job_id)
             elif node.step_type == StepType.FEATURE_ENGINEERING:
                 # Check if it's actually a misconfigured data loader
                 if not node.inputs and "dataset_id" in node.params:
@@ -168,7 +198,7 @@ class PipelineEngine:
                         f"Node {node.node_id} has step_type='feature_engineering' but looks like a data loader. "
                         "Executing as data loader."
                     )
-                    output_artifact_id = self._run_data_loader(node)
+                    output_artifact_id = self._run_data_loader(node, job_id=job_id)
                 else:
                     output_artifact_id, metrics = self._run_feature_engineering(node)
             elif node.step_type == StepType.BASIC_TRAINING:
@@ -185,7 +215,7 @@ class PipelineEngine:
                 # Try to run as a single transformer step
                 try:
                     logger.debug(f"Running as single transformer: {node.step_type}")
-                    output_artifact_id, metrics = self._run_transformer(node)
+                    output_artifact_id, metrics = self._run_transformer(node, job_id=job_id)
                 except Exception as e:
                     # If it fails or isn't a valid transformer, re-raise
                     if "Unknown transformer type" in str(e):
@@ -400,7 +430,7 @@ class PipelineEngine:
 
     # --- Step Implementations ---
 
-    def _run_data_loader(self, node: NodeConfig) -> str:
+    def _run_data_loader(self, node: NodeConfig, job_id: str = "unknown") -> str:
         # params: {"source": "csv", "path": "...", "sample": True/False, "limit": 1000}
 
         # Some callers use `dataset_id` as a path.
@@ -433,6 +463,15 @@ class PipelineEngine:
             f"Data loaded successfully. Shape: {df.shape} ({len(df)} rows, {len(df.columns)} columns)"
         )
         self.artifact_store.save(node.node_id, df)
+
+        # Save as Reference Data for Drift Detection (Raw Initial State)
+        if job_id != "unknown" and self._pipeline_has_training_node():
+            # We don't have target_col yet, but _save_reference_data splits X/y if tuple.
+            # Here df is full dataframe.
+            # We'll rely on the fact that target_col is just used to re-assemble if it was a tuple.
+            # Since df is a DataFrame, target_col is ignored inside _save_reference_data logic for DF inputs.
+            self._save_reference_data(df, job_id, target_col="")
+            
         return node.node_id
 
     def _run_feature_engineering(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
@@ -572,14 +611,8 @@ class PipelineEngine:
 
         estimator.fit_predict(data, target_col, fit_config, log_callback=self.log)
 
-        # Save Reference Data for Drift Detection
-        self._save_reference_data(data, job_id, target_col)
-
-        # Manually save the model artifact
-        self.artifact_store.save(node.node_id, estimator.model)
-        if job_id and job_id != "unknown":
-            self.log(f"Saving model artifact to job key: {job_id}")
-            self.artifact_store.save(job_id, estimator.model)
+        # Finalize and save artifacts
+        self._finalize_training_artifacts(data, job_id, target_col, node.node_id, estimator.model)
 
         self.log("Model training finished.")
 
@@ -718,14 +751,8 @@ class PipelineEngine:
             job_id=job_id,
         )
 
-        # Save Reference Data for Drift Detection
-        self._save_reference_data(data, job_id, target_col)
-
-        # Save model artifact
-        # The model artifact is a tuple: (fitted_model, tuning_result)
-        self.artifact_store.save(node.node_id, estimator.model)
-        if job_id and job_id != "unknown":
-            self.artifact_store.save(job_id, estimator.model)
+        # Finalize and save artifacts
+        self._finalize_training_artifacts(data, job_id, target_col, node.node_id, estimator.model)
 
         self.log("Tuning and final model retraining finished.")
 
@@ -789,7 +816,7 @@ class PipelineEngine:
 
         return node.node_id, metrics
 
-    def _run_transformer(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
+    def _run_transformer(self, node: NodeConfig, job_id: str = "unknown") -> tuple[str, Dict[str, Any]]:
         """Runs a single transformer node as a 1-step feature engineering pipeline."""
         # Input: DataFrame or SplitDataset
         data = self._resolve_input(node)
@@ -821,6 +848,12 @@ class PipelineEngine:
                 "column_name": node.params.get("new_column"),
             }
         )
+
+        # Check if this was a Splitter, if so update Reference Data to be the Train Split
+        if "Splitter" in node.step_type and job_id != "unknown" and self._pipeline_has_training_node():
+            # processed_data is likely a SplitDataset or tuple (train, test)
+            # _save_reference_data handles extraction of train part
+            self._save_reference_data(processed_data, job_id, target_col="")
 
         # Load fitted params to get metrics (e.g. dropped columns)
         metrics = run_metrics.copy()
