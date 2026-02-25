@@ -16,6 +16,13 @@
 
 - **Drift Monitoring:** Fixed "Internal Server Error" (500) caused by strict type checks when comparing Reference (Float) vs Current (String) data in `DriftCalculator`. It now attempts safe casting.
 - **Drift Calculation Logic:** Updated `PipelineEngine` to save "Reference Data" at the *Data Loading* or *Splitting* stage (Raw Data) rather than the *Training* stage (Processed/Scaled Data). This ensures that Drift Monitoring compares "Raw vs Raw" data, preventing false alarms when users upload raw files to monitor pipelines that include Scaling/Encoding. (engine.py)
+- **Optional Modeling Dependency Handling:** Made XGBoost-based model registration conditional in `skyulf-core` so importing `skyulf.modeling` and EDA/profiling flows no longer fail when `xgboost` is not installed.
+- **Registry Resilience:** Updated backend dynamic node discovery to continue loading available `skyulf` nodes even if optional modeling imports fail.
+- **Package Extras:** Added dedicated `eda` and `modeling-xgboost` extras in `skyulf-core/setup.py` so optional EDA and XGBoost dependencies can be installed explicitly.
+- **Packaging Metadata Alignment:** Added `classifiers` and `urls` to dynamic metadata in `skyulf-core/pyproject.toml` so setuptools applies `setup.py` classifiers and project URLs without warning.
+- **Packaging Warning Cleanup:** Removed deprecated license classifier usage from `skyulf-core/setup.py` to align with modern setuptools metadata behavior.
+- **EDA-First Packaging:** Reduced base `skyulf-core` dependencies by moving tuning (`optuna`, `optuna-integration`) and imbalance preprocessing (`imbalanced-learn`) to optional extras (`tuning`, `preprocessing-imbalanced`) for lighter EDA-only installs.
+- **Build Warning Cleanup:** Added `__init__.py` files under `skyulf-core/skyulf/core` and `skyulf-core/skyulf/core/meta` to avoid setuptools package discovery warnings during build.
 
 ------------------------------------------------------------
 ## v0.1.10

@@ -9,7 +9,12 @@ from sklearn.linear_model import ElasticNet, Lasso, Ridge, LinearRegression
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
 from sklearn.tree import DecisionTreeRegressor
-from xgboost import XGBRegressor
+try:
+    from xgboost import XGBRegressor
+
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
@@ -322,33 +327,34 @@ class AdaBoostRegressorCalculator(SklearnCalculator):
 
 
 # --- XGBoost ---
-class XGBRegressorApplier(SklearnApplier):
-    """XGBoost Regressor Applier."""
+if XGBOOST_AVAILABLE:
+    class XGBRegressorApplier(SklearnApplier):
+        """XGBoost Regressor Applier."""
 
-    pass
+        pass
 
 
-@NodeRegistry.register("xgboost_regressor", XGBRegressorApplier)
-@node_meta(
-    id="xgboost_regressor",
-    name="XGBoost Regressor",
-    category="Modeling",
-    description="Extreme Gradient Boosting regressor.",
-    params={"n_estimators": 100, "max_depth": 6, "learning_rate": 0.3},
-)
-class XGBRegressorCalculator(SklearnCalculator):
-    """XGBoost Regressor Calculator."""
+    @NodeRegistry.register("xgboost_regressor", XGBRegressorApplier)
+    @node_meta(
+        id="xgboost_regressor",
+        name="XGBoost Regressor",
+        category="Modeling",
+        description="Extreme Gradient Boosting regressor.",
+        params={"n_estimators": 100, "max_depth": 6, "learning_rate": 0.3},
+    )
+    class XGBRegressorCalculator(SklearnCalculator):
+        """XGBoost Regressor Calculator."""
 
-    def __init__(self):
-        super().__init__(
-            model_class=XGBRegressor,
-            default_params={
-                "n_estimators": 100,
-                "max_depth": 6,
-                "learning_rate": 0.3,
-                "n_jobs": -1,
-                "random_state": 42,
-                "eval_metric": "rmse",
-            },
-            problem_type="regression",
-        )
+        def __init__(self):
+            super().__init__(
+                model_class=XGBRegressor,
+                default_params={
+                    "n_estimators": 100,
+                    "max_depth": 6,
+                    "learning_rate": 0.3,
+                    "n_jobs": -1,
+                    "random_state": 42,
+                    "eval_metric": "rmse",
+                },
+                problem_type="regression",
+            )
