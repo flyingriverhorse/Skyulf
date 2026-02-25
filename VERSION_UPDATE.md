@@ -1,5 +1,6 @@
 # Version Updates
 
+*   **v0.1.11 :** "The EDA-First Packaging & Drift Reliability Update" — Published `skyulf-core` `0.1.11`, improved optional dependency handling, and hardened drift/runtime stability.
 *   **v0.1.10 :** "The Model Expansion Update" — Added 15 new models (XGBoost, SVM, etc.) and smart UI hints for feature scaling.
 *   **v0.1.9 :** "The Registry & Polars Compatibility Update" — Dynamic node registry system and comprehensive Polars support across all preprocessing nodes.
 *   **v0.1.8 :** "The Unsupervised & Monitoring Update" — Major expansion of EDA with Post-Hoc Clustering, PCA Loadings, Drift Monitoring (PSI/KL), and Regression Rules.
@@ -11,6 +12,10 @@
 *   **v0.1.2 :** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
+
+------------------------------------------------------------
+## v0.1.12
+
 ------------------------------------------------------------
 ## v0.1.11
 
