@@ -8,12 +8,22 @@ logger = logging.getLogger(__name__)
 # Try to import skyulf registry for dynamic node discovery
 try:
     from skyulf.registry import NodeRegistry as SkyulfRegistry
-    import skyulf.preprocessing
-    import skyulf.modeling
+
     SKYULF_AVAILABLE = True
 except ImportError:
     SKYULF_AVAILABLE = False
     logger.warning("Skyulf core registry not available. Using static definitions only.")
+
+if SKYULF_AVAILABLE:
+    try:
+        import skyulf.preprocessing
+    except ImportError as exc:
+        logger.warning(f"Could not import skyulf preprocessing nodes: {exc}")
+
+    try:
+        import skyulf.modeling
+    except ImportError as exc:
+        logger.warning(f"Could not import skyulf modeling nodes: {exc}")
 
 
 class RegistryItem(BaseModel):

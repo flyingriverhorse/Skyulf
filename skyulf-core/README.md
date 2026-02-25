@@ -25,8 +25,23 @@ Visit the full documentation and project site for guides, API reference, and exa
 ```bash
 pip install skyulf-core
 
+# EDA-focused install (core EDA + optional advanced EDA + visualization)
+pip install skyulf-core[eda,viz]
+
 # For visualization support (Rich dashboard + Matplotlib plots)
 pip install skyulf-core[viz]
+
+# For advanced EDA add-ons (sentiment + causal discovery)
+pip install skyulf-core[eda]
+
+# For hyperparameter tuning engines
+pip install skyulf-core[tuning]
+
+# For imbalance-aware preprocessing (e.g., SMOTE)
+pip install skyulf-core[preprocessing-imbalanced]
+
+# For XGBoost modeling nodes
+pip install skyulf-core[modeling-xgboost]
 ```
 
 ## Quick Start: Automated EDA

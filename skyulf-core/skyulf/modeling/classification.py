@@ -10,7 +10,12 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
-from xgboost import XGBClassifier
+try:
+    from xgboost import XGBClassifier
+
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
@@ -241,37 +246,38 @@ class AdaBoostClassifierCalculator(SklearnCalculator):
 
 
 # --- XGBoost ---
-class XGBClassifierApplier(SklearnApplier):
-    """XGBoost Classifier Applier."""
+if XGBOOST_AVAILABLE:
+    class XGBClassifierApplier(SklearnApplier):
+        """XGBoost Classifier Applier."""
 
-    pass
+        pass
 
 
-@NodeRegistry.register("xgboost_classifier", XGBClassifierApplier)
-@node_meta(
-    id="xgboost_classifier",
-    name="XGBoost Classifier",
-    category="Modeling",
-    description="Extreme Gradient Boosting classifier.",
-    params={"n_estimators": 100, "max_depth": 6, "learning_rate": 0.3},
-)
-class XGBClassifierCalculator(SklearnCalculator):
-    """XGBoost Classifier Calculator."""
+    @NodeRegistry.register("xgboost_classifier", XGBClassifierApplier)
+    @node_meta(
+        id="xgboost_classifier",
+        name="XGBoost Classifier",
+        category="Modeling",
+        description="Extreme Gradient Boosting classifier.",
+        params={"n_estimators": 100, "max_depth": 6, "learning_rate": 0.3},
+    )
+    class XGBClassifierCalculator(SklearnCalculator):
+        """XGBoost Classifier Calculator."""
 
-    def __init__(self):
-        super().__init__(
-            model_class=XGBClassifier,
-            default_params={
-                "n_estimators": 100,
-                "max_depth": 6,
-                "learning_rate": 0.3,
-                "n_jobs": -1,
-                "random_state": 42,
-                "use_label_encoder": False,
-                "eval_metric": "logloss",
-            },
-            problem_type="classification",
-        )
+        def __init__(self):
+            super().__init__(
+                model_class=XGBClassifier,
+                default_params={
+                    "n_estimators": 100,
+                    "max_depth": 6,
+                    "learning_rate": 0.3,
+                    "n_jobs": -1,
+                    "random_state": 42,
+                    "use_label_encoder": False,
+                    "eval_metric": "logloss",
+                },
+                problem_type="classification",
+            )
 
 
 # --- Gaussian NB ---

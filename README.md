@@ -107,9 +107,23 @@ This will start the full stack:
 The core machine learning logic of Skyulf (preprocessing, modeling, tuning) is available as a standalone library on PyPI. You can use it to build reproducible pipelines in your own scripts or notebooks, independent of the web platform.
 
 ```bash
+# Base (lightweight)
 pip install skyulf-core
+
+# EDA-focused (recommended for profiling + charts)
+pip install skyulf-core[eda,viz]
+
+# Full optional feature set
+pip install skyulf-core[eda,viz,tuning,preprocessing-imbalanced,modeling-xgboost]
+
 # or
 uv add skyulf-core
+
+# EDA-focused with uv
+uv add "skyulf-core[eda,viz]"
+
+# Full optional feature set with uv
+uv add "skyulf-core[eda,viz,tuning,preprocessing-imbalanced,modeling-xgboost]"
 ```
 
 ## Using Skyulf as a Library
