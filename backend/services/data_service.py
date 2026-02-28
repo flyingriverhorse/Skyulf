@@ -159,11 +159,14 @@ class DataService:
         elif HAS_POLARS:
             # It's Pandas (or other), convert to Polars for fast write
             try:
+                import pandas as pd
                 # Zero-copy convert via Arrow if possible
                 if hasattr(data, "to_arrow"):
                     pl.from_arrow(data.to_arrow()).write_parquet(path_str)
-                else:
+                elif isinstance(data, pd.DataFrame):
                     pl.from_pandas(data).write_parquet(path_str)
+                else:
+                    self._save_pandas(data, path_str)
             except Exception as e:
                 logger.warning(f"Polars write failed ({e}), falling back to Pandas.")
                 self._save_pandas(data, path_str)

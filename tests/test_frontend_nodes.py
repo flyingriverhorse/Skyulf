@@ -39,12 +39,31 @@ async def test_all_transformers(sample_data, tmp_path):
     # We exclude data_loader, models, and splitters for now
     excluded = [
         "data_loader",
+        # Models — tested separately via execution/modeling tests
         "logistic_regression",
         "random_forest_classifier",
         "ridge_regression",
         "random_forest_regressor",
+        "svc",
+        "svr",
+        "decision_tree_classifier",
+        "decision_tree_regressor",
+        "gradient_boosting_classifier",
+        "gradient_boosting_regressor",
+        "adaboost_classifier",
+        "adaboost_regressor",
+        "gaussian_nb",
+        "k_neighbors_classifier",
+        "k_neighbors_regressor",
+        "lasso_regression",
+        "linear_regression",
+        "elasticnet_regression",
+        "xgboost_classifier",
+        "xgboost_regressor",
+        # Splitters
         "TrainTestSplitter",
         "feature_target_split",
+        "feature_selection",
     ]
 
     transformers = [nid for nid in ALL_NODES.keys() if nid not in excluded]

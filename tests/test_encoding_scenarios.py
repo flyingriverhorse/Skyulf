@@ -72,7 +72,9 @@ def test_scenario_2_split_then_xy_then_encode():
     split_df = tt_splitter.apply(df, {'test_size': 0.2, 'random_state': 42})
     
     assert isinstance(split_df, SplitDataset)
-    print(f"Step 1 (Train/Test Split): Train shape={split_df.train.shape}")
+    # split_df.train is (DataFrame, None) tuple — unpack for shape check
+    train_df, _ = split_df.train
+    print(f"Step 1 (Train/Test Split): Train shape={train_df.shape}")
     
     # 2. Feature Target Split (on SplitDataset)
     ft_splitter = FeatureTargetSplitApplier()
