@@ -55,6 +55,11 @@
 - **Callers Updated:** `EvaluationService.get_job_evaluation` and `DeploymentService.predict` now pass `target_column` from the bundled artifact to the extraction function.
 - **Decode Tests:** Added 9 tests (`test_prediction_decode.py`) covering both `__target__` and column-name lookup paths, priority ordering, edge cases, and `decode_int_like` behavior.
 
+### 🔧 CI Stability
+- **mypy Stubs:** Added `ignore_missing_imports` for `rich.*` and `matplotlib.*` in `mypy.ini` — these are optional `[viz]` extras not installed in CI base environment.
+- **Lazy pyarrow Import:** Moved `import pyarrow` in `pandas_engine.py` from top-level to inside `to_arrow()` method, preventing `ModuleNotFoundError` during test collection when pyarrow is not installed.
+- **Skip Parquet Test Without pyarrow:** Added `skipif` guard to `test_backend_catalog.py::test_save_and_load_pandas` so the parquet round-trip test is skipped (not failed) when pyarrow is unavailable in CI.
+
 ------------------------------------------------------------
 ## v0.1.11
 

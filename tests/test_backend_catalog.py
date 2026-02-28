@@ -11,6 +11,14 @@ sys.path.append(os.getcwd())
 
 from backend.data.catalog import FileSystemCatalog
 
+
+def _has_pyarrow() -> bool:
+    try:
+        import pyarrow  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
 class TestFileSystemCatalog:
     @pytest.fixture
     def catalog(self):
@@ -19,6 +27,10 @@ class TestFileSystemCatalog:
         yield cat
         shutil.rmtree(tmp_dir)
 
+    @pytest.mark.skipif(
+        not _has_pyarrow(),
+        reason="pyarrow not installed",
+    )
     def test_save_and_load_pandas(self, catalog):
         """Test that we can act like normal with Pandas despite Any types."""
         df = pd.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
