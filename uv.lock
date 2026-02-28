@@ -4925,7 +4925,7 @@ wheels = [
 
 [[package]]
 name = "skyulf"
-version = "0.1.10"
+version = "0.1.12"
 source = { virtual = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -4964,6 +4964,7 @@ dependencies = [
     { name = "polars" },
     { name = "psutil" },
     { name = "psycopg2-binary" },
+    { name = "pyarrow" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyproj" },
@@ -5043,6 +5044,7 @@ requires-dist = [
     { name = "polars", specifier = ">=1.36.0" },
     { name = "psutil", specifier = ">=5.9.0,<6.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
+    { name = "pyarrow", specifier = ">=21.0.0" },
     { name = "pydantic", specifier = ">=2.4.0,<3.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0,<3.0.0" },
     { name = "pyproj", specifier = ">=3.6.0,<3.8.0" },
