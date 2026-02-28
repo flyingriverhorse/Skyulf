@@ -7,6 +7,14 @@ from backend.data.catalog import FileSystemCatalog, SmartCatalog, S3Catalog
 # Mock data
 MOCK_DF = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
 
+
+def _has_pyarrow() -> bool:
+    try:
+        import pyarrow  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
 class TestFileSystemCatalog:
     def test_load_save_csv(self, tmp_path):
         catalog = FileSystemCatalog(base_path=str(tmp_path))
@@ -20,6 +28,7 @@ class TestFileSystemCatalog:
         loaded_df = catalog.load(dataset_id)
         pd.testing.assert_frame_equal(MOCK_DF, loaded_df)
 
+    @pytest.mark.skipif(not _has_pyarrow(), reason="pyarrow not installed")
     def test_load_save_parquet(self, tmp_path):
         catalog = FileSystemCatalog(base_path=str(tmp_path))
         dataset_id = "test_data.parquet"
