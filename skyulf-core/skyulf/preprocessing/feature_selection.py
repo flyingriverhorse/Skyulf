@@ -226,7 +226,6 @@ class CorrelationThresholdCalculator(BaseCalculator):
         
         # Ensure pandas for correlation logic
         if engine.name == "polars":
-            # X comes in as Any (SkyulfDataFrame), cast to pandas
             X = X.to_pandas()
 
         # Config: {"threshold": 0.95, "correlation_method": "pearson"}
@@ -312,7 +311,6 @@ class UnivariateSelectionCalculator(BaseCalculator):
                     f"UnivariateSelection requires target column '{target_col}' to be present in training data."
                 )
                 return {}
-            # Handle y extraction safely for Polars
             if engine.name == "polars":
                 import polars as pl
                 y = X.select(target_col).to_series().to_pandas()
@@ -402,11 +400,9 @@ class UnivariateSelectionCalculator(BaseCalculator):
         # Handle classification target encoding if needed
         y_fit = y
         
-        # Convert y to numpy/pandas for inspection
+        # Convert y to numpy for inspection
         if hasattr(y, "to_numpy"):
              y_np = y.to_numpy()
-        elif hasattr(y, "to_pandas"):
-             y_np = y.to_pandas().to_numpy()
         else:
              y_np = np.array(y)
              
@@ -521,7 +517,6 @@ class ModelBasedSelectionCalculator(BaseCalculator):
                     f"ModelBasedSelection requires target column '{target_col}' to be present in training data."
                 )
                 return {}
-            # Handle y extraction safely for Polars
             if engine.name == "polars":
                 import polars as pl
                 y = X.select(target_col).to_series().to_pandas()
@@ -596,11 +591,9 @@ class ModelBasedSelectionCalculator(BaseCalculator):
         # Handle classification target encoding if needed
         y_fit = y
         
-        # Convert y to numpy/pandas for inspection
+        # Convert y to numpy for inspection
         if hasattr(y, "to_numpy"):
              y_np = y.to_numpy()
-        elif hasattr(y, "to_pandas"):
-             y_np = y.to_pandas().to_numpy()
         else:
              y_np = np.array(y)
              

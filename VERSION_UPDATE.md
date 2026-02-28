@@ -58,7 +58,9 @@
 ### 🔧 CI Stability
 - **mypy Stubs:** Added `ignore_missing_imports` for `rich.*` and `matplotlib.*` in `mypy.ini` — these are optional `[viz]` extras not installed in CI base environment.
 - **Lazy pyarrow Import:** Moved `import pyarrow` in `pandas_engine.py` from top-level to inside `to_arrow()` method, preventing `ModuleNotFoundError` during test collection when pyarrow is not installed.
-- **Skip Parquet Test Without pyarrow:** Added `skipif` guard to `test_backend_catalog.py::test_save_and_load_pandas` so the parquet round-trip test is skipped (not failed) when pyarrow is unavailable in CI.
+- **Skip Parquet Test Without pyarrow:** Added `skipif` guard to `test_backend_catalog.py::test_save_and_load_pandas` and `test_catalog.py::test_load_save_parquet` so parquet round-trip tests are skipped when pyarrow is unavailable.
+- **KBinsDiscretizer quantile_method:** Fixed `bucketing.py` passing `quantile_method` to non-quantile strategies (kmeans/uniform), which silently failed in sklearn 1.4–1.5.
+- **pyarrow in CI:** Added `pyarrow>=14.0.0` to `requirements-ci.txt` so Polars' `.to_pandas()` and parquet I/O work correctly in CI.
 
 ------------------------------------------------------------
 ## v0.1.11

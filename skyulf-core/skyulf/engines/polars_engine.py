@@ -40,6 +40,7 @@ class SkyulfPolarsWrapper:
         return self._df.to_pandas()
         
     def to_arrow(self) -> Any:
+        import pyarrow as pa
         return self._df.to_arrow()
 
     def copy(self) -> "SkyulfDataFrame":
@@ -67,7 +68,7 @@ class PolarsEngine(BaseEngine):
     @classmethod
     def to_numpy(cls, df: Any) -> Any:
         if isinstance(df, SkyulfPolarsWrapper):
-            return df.to_pandas().to_numpy() # Polars -> Arrow -> Pandas -> Numpy (safest path for now)
+            return df._df.to_numpy()
         if hasattr(df, "to_numpy"):
             return df.to_numpy()
         return np.array(df)
