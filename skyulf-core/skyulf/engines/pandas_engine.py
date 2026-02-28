@@ -1,7 +1,6 @@
 from typing import Any, List, Sequence, Tuple
 import pandas as pd
 import numpy as np
-import pyarrow as pa
 
 from .registry import BaseEngine, EngineRegistry
 from .protocol import SkyulfDataFrame
@@ -34,6 +33,7 @@ class SkyulfPandasWrapper:
         return self._df
         
     def to_arrow(self) -> Any:
+        import pyarrow as pa  # lazy import — optional dependency
         return pa.Table.from_pandas(self._df)
 
     def copy(self) -> "SkyulfDataFrame":
