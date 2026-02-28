@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.1.10"
+version = "0.1.12"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -98,43 +98,6 @@ dev = [
     "ipython>=8.18.1",
     "jupyter>=1.1.1",
 ]
-
-[tool.mypy]
-python_version = "3.10"
-exclude = ["^skyulf/"]
-explicit_package_bases = true
-namespace_packages = true
-
-[[tool.mypy.overrides]]
-module = [
-    "pandas",
-    "pandas.*",
-    "sklearn",
-    "sklearn.*",
-    "joblib",
-    "celery",
-    "celery.*",
-    "optuna",
-    "optuna.*",
-    "optuna_integration",
-    "optuna_integration.*",
-    "imblearn",
-    "imblearn.*",
-    "aiofiles",
-    "psutil",
-    "passlib",
-    "passlib.*",
-    "jose",
-    "jose.*",
-    "aiomysql",
-    "motor",
-    "motor.*",
-    "snowflake",
-    "snowflake.*",
-    "rapidfuzz",
-    "rapidfuzz.*",
-]
-ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

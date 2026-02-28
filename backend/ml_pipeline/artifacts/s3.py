@@ -83,7 +83,7 @@ class S3ArtifactStore(ArtifactStore):
 
     def exists(self, key: str) -> bool:
         path = self._get_s3_path(key)
-        return self.fs.exists(path)
+        return bool(self.fs.exists(path))
 
     def list_artifacts(self) -> list[str]:
         """List all artifacts in the store."""

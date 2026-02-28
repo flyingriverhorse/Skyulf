@@ -245,10 +245,10 @@ class ModelRegistryService:
 
         # Training Jobs
         train_jobs = await session.execute(
-            select(TrainingJob)
-            .where(TrainingJob.status == "completed")
-            .where(TrainingJob.model_type == model_type)
-            .order_by(TrainingJob.created_at.desc())
+            select(BasicTrainingJob)
+            .where(BasicTrainingJob.status == "completed")
+            .where(BasicTrainingJob.model_type == model_type)
+            .order_by(BasicTrainingJob.created_at.desc())
         )
         for job in train_jobs.scalars().all():
             versions.append(
@@ -271,10 +271,10 @@ class ModelRegistryService:
 
         # Tuning Jobs
         tune_jobs = await session.execute(
-            select(HyperparameterTuningJob)
-            .where(HyperparameterTuningJob.status == "completed")
-            .where(HyperparameterTuningJob.model_type == model_type)
-            .order_by(HyperparameterTuningJob.created_at.desc())
+            select(AdvancedTuningJob)
+            .where(AdvancedTuningJob.status == "completed")
+            .where(AdvancedTuningJob.model_type == model_type)
+            .order_by(AdvancedTuningJob.created_at.desc())
         )
         for job in tune_jobs.scalars().all():
             metrics: Dict[str, Any] = cast(Dict[str, Any], job.metrics) or {}
