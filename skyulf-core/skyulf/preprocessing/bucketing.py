@@ -284,7 +284,7 @@ class GeneralBinningCalculator(BaseCalculator):
                 elif strategy == "kmeans":
                     n_bins = override.get("n_bins", default_n_bins)
                     est = KBinsDiscretizer(
-                        n_bins=n_bins, strategy="kmeans", encode="ordinal", quantile_method="averaged_inverted_cdf"
+                        n_bins=n_bins, strategy="kmeans", encode="ordinal",
                     )
                     est.fit(series.values.reshape(-1, 1))  # type: ignore
                     edges = est.bin_edges_[0]
@@ -320,9 +320,14 @@ class GeneralBinningCalculator(BaseCalculator):
                     elif k_strategy == "equal_frequency":
                         sklearn_strategy = "quantile"
 
-                    est = KBinsDiscretizer(
-                        n_bins=n_bins, strategy=sklearn_strategy, encode="ordinal", quantile_method="averaged_inverted_cdf"
-                    )
+                    kbins_kwargs: Dict[str, Any] = {
+                        "n_bins": n_bins,
+                        "strategy": sklearn_strategy,
+                        "encode": "ordinal",
+                    }
+                    if sklearn_strategy == "quantile":
+                        kbins_kwargs["quantile_method"] = "averaged_inverted_cdf"
+                    est = KBinsDiscretizer(**kbins_kwargs)
                     est.fit(series.values.reshape(-1, 1))  # type: ignore
                     edges = est.bin_edges_[0]
 
