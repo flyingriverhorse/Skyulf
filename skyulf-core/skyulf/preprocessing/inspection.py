@@ -61,7 +61,7 @@ class DatasetProfileCalculator(BaseCalculator):
                 # Convert to list of dicts
                 desc_dicts = desc_df.to_dicts()
                 
-                stats = {}
+                stats: dict[str, dict[str, object]] = {}
                 # Initialize stats dicts
                 for col in numeric_cols:
                     stats[col] = {}

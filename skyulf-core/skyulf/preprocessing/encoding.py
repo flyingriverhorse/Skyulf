@@ -19,6 +19,49 @@ from ..engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
 
+# Encoders that destroy the original column structure (create N new columns).
+# These must NEVER be applied to a target column — it would break downstream
+# Feature/Target Split and model training nodes.
+_COLUMN_DESTROYING_ENCODERS = frozenset([
+    "OneHotEncoder", "DummyEncoder", "HashEncoder", "TargetEncoder",
+])
+
+# Encoders that map values in-place and preserve the column name.
+_TARGET_SAFE_ENCODERS = frozenset(["LabelEncoder", "OrdinalEncoder"])
+
+
+def _exclude_target_column(
+    columns: List[str],
+    config: Dict[str, Any],
+    encoder_name: str,
+    y: Any = None,
+) -> List[str]:
+    """Remove the target column from the encoding list for column-destroying encoders.
+
+    Detects the target column from:
+      1. ``config['target_column']`` (explicit pipeline param)
+      2. The ``name`` attribute of ``y`` (if it's a named Series)
+
+    Returns the filtered column list and logs a warning when a column is removed.
+    """
+    if encoder_name not in _COLUMN_DESTROYING_ENCODERS:
+        return columns
+
+    target_col: str | None = config.get("target_column")
+    if target_col is None and y is not None:
+        target_col = getattr(y, "name", None)
+
+    if target_col and target_col in columns:
+        logger.warning(
+            f"{encoder_name}: Excluding target column '{target_col}' from encoding. "
+            f"{encoder_name} would replace the column with multiple derived columns, "
+            "breaking downstream Feature/Target Split and model training. "
+            "Use LabelEncoder or OrdinalEncoder for target columns instead."
+        )
+        columns = [c for c in columns if c != target_col]
+
+    return columns
+
 
 def detect_categorical_columns(df: Any) -> List[str]:
     engine = get_engine(df)
@@ -26,10 +69,10 @@ def detect_categorical_columns(df: Any) -> List[str]:
         import polars as pl
         # Polars dtypes
         df_pl: Any = df
-        return [
+        return list(
             c for c, t in zip(df_pl.columns, df_pl.dtypes) 
             if t in [pl.Utf8, pl.Categorical, pl.Object]
-        ]
+        )
     # Pandas
     return df.select_dtypes(include=["object", "category"]).columns.tolist()
 
@@ -158,10 +201,11 @@ class OneHotEncoderCalculator(BaseCalculator):
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+        X, y, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = resolve_columns(X, config, detect_categorical_columns)
+        cols = _exclude_target_column(cols, config, "OneHotEncoder", y)
 
         if not cols:
             return {}
@@ -630,6 +674,7 @@ class TargetEncoderCalculator(BaseCalculator):
             return {}
 
         cols = resolve_columns(X, config, detect_categorical_columns)
+        cols = _exclude_target_column(cols, config, "TargetEncoder", y)
         if not cols:
             return {}
 
@@ -726,9 +771,10 @@ class HashEncoderCalculator(BaseCalculator):
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+        X, y, _ = unpack_pipeline_input(df)
 
         cols = resolve_columns(X, config, detect_categorical_columns)
+        cols = _exclude_target_column(cols, config, "HashEncoder", y)
         if not cols:
             return {}
 
@@ -825,10 +871,11 @@ class DummyEncoderCalculator(BaseCalculator):
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+        X, y, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
         
         cols = resolve_columns(X, config, detect_categorical_columns)
+        cols = _exclude_target_column(cols, config, "DummyEncoder", y)
 
         # We need to know all possible categories to align columns during transform
         categories = {}

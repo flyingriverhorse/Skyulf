@@ -84,8 +84,8 @@ def pack_pipeline_output(
                 # Try to convert y to Series
                 try:
                     y_series = pl.Series(y)
-                except:
-                    pass # Let it fail or handle otherwise
+                except Exception:
+                    pass  # Let it fail or handle otherwise
             
             # Helper to get raw df
             raw_df = X

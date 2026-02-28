@@ -145,7 +145,7 @@ async def run_eda_analysis(report_id: int, session: AsyncSession):
                 report.status = "FAILED"
                 report.error_message = str(e)
                 await session.commit()
-        except:
+        except Exception:
             pass
 
 async def run_eda_background(report_id: int):

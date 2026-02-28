@@ -1,45 +1,44 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock
-from backend.ml_pipeline.execution.strategies import BasicTrainingStrategy, AdvancedTuningStrategy
-from backend.ml_pipeline.execution.schemas import NodeConfig
-from backend.ml_pipeline.constants import StepType
+from unittest.mock import MagicMock
+from backend.ml_pipeline.execution.strategies import (
+    BasicTrainingStrategy,
+    AdvancedTuningStrategy,
+    JobStrategyFactory,
+)
+from backend.database.models import BasicTrainingJob, AdvancedTuningJob
 
-@pytest.fixture
-def mock_session():
-    return AsyncMock()
 
-@pytest.fixture
-def mock_node_config():
-    return NodeConfig(
-        node_id="test_node",
-        step_type=StepType.BASIC_TRAINING,
-        params={"target_column": "target", "model_type": "rf"}
-    )
+def test_basic_training_strategy_get_job_model() -> None:
+    strategy = BasicTrainingStrategy()
+    assert strategy.get_job_model() is BasicTrainingJob
 
-@pytest.mark.asyncio
-async def test_basic_training_strategy_execute(mock_session, mock_node_config):
-    # Mock the manager
-    with pytest.MonkeyPatch.context() as m:
-        mock_manager = AsyncMock()
-        mock_manager.create_training_job.return_value = "job_123"
-        m.setattr("backend.ml_pipeline.execution.strategies.BasicTrainingManager", mock_manager)
 
-        strategy = BasicTrainingStrategy()
-        job_id = await strategy.execute("pipeline_1", mock_node_config, {}, mock_session)
-        
-        assert job_id == "job_123"
-        mock_manager.create_training_job.assert_called_once()
+def test_basic_training_strategy_initial_log() -> None:
+    strategy = BasicTrainingStrategy()
+    job = MagicMock()
+    job.version = 3
+    log = strategy.get_initial_log(job)
+    assert "Training Job Version: 3" in log
 
-@pytest.mark.asyncio
-async def test_advanced_tuning_strategy_execute(mock_session, mock_node_config):
-    # Mock the manager
-    with pytest.MonkeyPatch.context() as m:
-        mock_manager = AsyncMock()
-        mock_manager.create_tuning_job.return_value = "job_456"
-        m.setattr("backend.ml_pipeline.execution.strategies.AdvancedTuningManager", mock_manager)
 
-        strategy = AdvancedTuningStrategy()
-        job_id = await strategy.execute("pipeline_1", mock_node_config, {}, mock_session)
-        
-        assert job_id == "job_456"
-        mock_manager.create_tuning_job.assert_called_once()
+def test_advanced_tuning_strategy_get_job_model() -> None:
+    strategy = AdvancedTuningStrategy()
+    assert strategy.get_job_model() is AdvancedTuningJob
+
+
+def test_advanced_tuning_strategy_initial_log() -> None:
+    strategy = AdvancedTuningStrategy()
+    job = MagicMock()
+    job.run_number = 5
+    log = strategy.get_initial_log(job)
+    assert "Tuning Job Run: 5" in log
+
+
+def test_strategy_factory_basic() -> None:
+    strategy = JobStrategyFactory.get_strategy("basic_training")
+    assert isinstance(strategy, BasicTrainingStrategy)
+
+
+def test_strategy_factory_advanced() -> None:
+    strategy = JobStrategyFactory.get_strategy("advanced_tuning")
+    assert isinstance(strategy, AdvancedTuningStrategy)

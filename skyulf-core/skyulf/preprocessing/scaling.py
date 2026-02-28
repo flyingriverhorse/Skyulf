@@ -47,7 +47,7 @@ class StandardScalerApplier(BaseApplier):
         # Check Engine
         engine = get_engine(X)
         
-        if engine.__name__ == "PolarsEngine":
+        if engine.name == "polars":
             import polars as pl
             # Polars Native Implementation
             

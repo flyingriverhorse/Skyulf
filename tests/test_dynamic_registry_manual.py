@@ -1,6 +1,12 @@
 import sys
 import os
+import io
 import logging
+
+# Force UTF-8 output to handle emoji on Windows
+if sys.stdout.encoding != "utf-8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 # Add workspace root to sys.path to ensure we can import backend and skyulf-core
 sys.path.append(os.getcwd())

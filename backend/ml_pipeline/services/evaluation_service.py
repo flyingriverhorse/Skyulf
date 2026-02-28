@@ -82,7 +82,10 @@ class EvaluationService:
                     bundle = artifact_store.load(job_id)
                     if isinstance(bundle, dict) and "feature_engineer" in bundle:
                         feature_engineer = bundle.get("feature_engineer")
-                        label_encoder = extract_target_label_encoder(feature_engineer)
+                        target_col_name = bundle.get("target_column")
+                        label_encoder = extract_target_label_encoder(
+                            feature_engineer, target_column=target_col_name
+                        )
 
                         if (
                             label_encoder is not None

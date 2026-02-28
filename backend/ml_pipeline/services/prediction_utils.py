@@ -11,10 +11,18 @@ from typing import Any, List, Optional
 logger = logging.getLogger(__name__)
 
 
-def extract_target_label_encoder(feature_engineer: Any) -> Optional[Any]:
-    """
-    Extracts the target LabelEncoder from a fitted FeatureEngineer pipeline.
-    Walks backwards through steps to find the most recent LabelEncoder with a '__target__' encoder.
+def extract_target_label_encoder(
+    feature_engineer: Any,
+    target_column: Optional[str] = None,
+) -> Optional[Any]:
+    """Extract the target LabelEncoder from a fitted FeatureEngineer pipeline.
+
+    Resolution order (walks steps backwards, most recent wins):
+      1. ``encoders["__target__"]`` — explicit target encoder (LabelEncoder with no columns,
+         or columns list that includes the target after Feature/Target Split).
+      2. ``encoders[target_column]`` — fallback for pipelines where the LabelEncoder ran
+         *before* the Feature/Target Split, so the target was encoded as a regular
+         feature column rather than under the ``__target__`` key.
     """
     fitted_steps = getattr(feature_engineer, "fitted_steps", None)
     if not isinstance(fitted_steps, list):
@@ -32,9 +40,18 @@ def extract_target_label_encoder(feature_engineer: Any) -> Optional[Any]:
         encoders = artifact.get("encoders")
         if not isinstance(encoders, dict):
             continue
+
+        # Priority 1: explicit __target__ key
         target_encoder = encoders.get("__target__")
         if target_encoder is not None and hasattr(target_encoder, "inverse_transform"):
             return target_encoder
+
+        # Priority 2: encoder keyed by the target column name
+        # (happens when LabelEncoder runs before Feature/Target Split)
+        if target_column:
+            col_encoder = encoders.get(target_column)
+            if col_encoder is not None and hasattr(col_encoder, "inverse_transform"):
+                return col_encoder
 
     return None
 
