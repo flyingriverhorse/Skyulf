@@ -2949,12 +2949,7 @@ Applies specific bin edges to selected columns.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">353</span>
-<span class="normal">354</span>
-<span class="normal">355</span>
-<span class="normal">356</span>
-<span class="normal">357</span>
-<span class="normal">358</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">358</span>
 <span class="normal">359</span>
 <span class="normal">360</span>
 <span class="normal">361</span>
@@ -2995,7 +2990,12 @@ Applies specific bin edges to selected columns.</p>
 <span class="normal">396</span>
 <span class="normal">397</span>
 <span class="normal">398</span>
-<span class="normal">399</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;CustomBinning&quot;</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;CustomBinning&quot;</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;CustomBinning&quot;</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Custom Binning&quot;</span><span class="p">,</span>
@@ -5011,7 +5011,12 @@ Returns: (transformed_data, metrics_dict)</p>
 <span class="normal">343</span>
 <span class="normal">344</span>
 <span class="normal">345</span>
-<span class="normal">346</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;GeneralBinning&quot;</span><span class="p">,</span> <span class="n">GeneralBinningApplier</span><span class="p">)</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;GeneralBinning&quot;</span><span class="p">,</span> <span class="n">GeneralBinningApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;GeneralBinning&quot;</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">&quot;General Binning&quot;</span><span class="p">,</span>
@@ -5081,7 +5086,7 @@ Returns: (transformed_data, metrics_dict)</p>
                 <span class="k">elif</span> <span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;kmeans&quot;</span><span class="p">:</span>
                     <span class="n">n_bins</span> <span class="o">=</span> <span class="n">override</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;n_bins&quot;</span><span class="p">,</span> <span class="n">default_n_bins</span><span class="p">)</span>
                     <span class="n">est</span> <span class="o">=</span> <span class="n">KBinsDiscretizer</span><span class="p">(</span>
-                        <span class="n">n_bins</span><span class="o">=</span><span class="n">n_bins</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="s2">&quot;kmeans&quot;</span><span class="p">,</span> <span class="n">encode</span><span class="o">=</span><span class="s2">&quot;ordinal&quot;</span><span class="p">,</span> <span class="n">quantile_method</span><span class="o">=</span><span class="s2">&quot;averaged_inverted_cdf&quot;</span>
+                        <span class="n">n_bins</span><span class="o">=</span><span class="n">n_bins</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="s2">&quot;kmeans&quot;</span><span class="p">,</span> <span class="n">encode</span><span class="o">=</span><span class="s2">&quot;ordinal&quot;</span><span class="p">,</span>
                     <span class="p">)</span>
                     <span class="n">est</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>  <span class="c1"># type: ignore</span>
                     <span class="n">edges</span> <span class="o">=</span> <span class="n">est</span><span class="o">.</span><span class="n">bin_edges_</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
@@ -5117,9 +5122,14 @@ Returns: (transformed_data, metrics_dict)</p>
                     <span class="k">elif</span> <span class="n">k_strategy</span> <span class="o">==</span> <span class="s2">&quot;equal_frequency&quot;</span><span class="p">:</span>
                         <span class="n">sklearn_strategy</span> <span class="o">=</span> <span class="s2">&quot;quantile&quot;</span>
 
-                    <span class="n">est</span> <span class="o">=</span> <span class="n">KBinsDiscretizer</span><span class="p">(</span>
-                        <span class="n">n_bins</span><span class="o">=</span><span class="n">n_bins</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="n">sklearn_strategy</span><span class="p">,</span> <span class="n">encode</span><span class="o">=</span><span class="s2">&quot;ordinal&quot;</span><span class="p">,</span> <span class="n">quantile_method</span><span class="o">=</span><span class="s2">&quot;averaged_inverted_cdf&quot;</span>
-                    <span class="p">)</span>
+                    <span class="n">kbins_kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;n_bins&quot;</span><span class="p">:</span> <span class="n">n_bins</span><span class="p">,</span>
+                        <span class="s2">&quot;strategy&quot;</span><span class="p">:</span> <span class="n">sklearn_strategy</span><span class="p">,</span>
+                        <span class="s2">&quot;encode&quot;</span><span class="p">:</span> <span class="s2">&quot;ordinal&quot;</span><span class="p">,</span>
+                    <span class="p">}</span>
+                    <span class="k">if</span> <span class="n">sklearn_strategy</span> <span class="o">==</span> <span class="s2">&quot;quantile&quot;</span><span class="p">:</span>
+                        <span class="n">kbins_kwargs</span><span class="p">[</span><span class="s2">&quot;quantile_method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;averaged_inverted_cdf&quot;</span>
+                    <span class="n">est</span> <span class="o">=</span> <span class="n">KBinsDiscretizer</span><span class="p">(</span><span class="o">**</span><span class="n">kbins_kwargs</span><span class="p">)</span>
                     <span class="n">est</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>  <span class="c1"># type: ignore</span>
                     <span class="n">edges</span> <span class="o">=</span> <span class="n">est</span><span class="o">.</span><span class="n">bin_edges_</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
@@ -5194,12 +5204,7 @@ Wraps GeneralBinningCalculator with kbins strategy.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">406</span>
-<span class="normal">407</span>
-<span class="normal">408</span>
-<span class="normal">409</span>
-<span class="normal">410</span>
-<span class="normal">411</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">411</span>
 <span class="normal">412</span>
 <span class="normal">413</span>
 <span class="normal">414</span>
@@ -5225,7 +5230,12 @@ Wraps GeneralBinningCalculator with kbins strategy.</p>
 <span class="normal">434</span>
 <span class="normal">435</span>
 <span class="normal">436</span>
-<span class="normal">437</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;KBinsDiscretizer&quot;</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;KBinsDiscretizer&quot;</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;KBinsDiscretizer&quot;</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">&quot;K-Bins Discretizer&quot;</span><span class="p">,</span>
