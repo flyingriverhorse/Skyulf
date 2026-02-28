@@ -24,6 +24,7 @@ setup(
         "numpy>=1.24.0",
         "scikit-learn>=1.4.0,<2.0.0",
         "polars>=1.36.0",
+        "pyarrow>=21.0.0",
         "pydantic>=2.0.0",
         "scipy>=1.10.0",
         "statsmodels>=0.14.0",
