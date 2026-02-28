@@ -91,11 +91,11 @@ class ApiConnector(BaseConnector):
                     # Try to infer
                     try:
                         return pl.DataFrame(response.json())
-                    except BaseException:
+                    except Exception:
                         pass
                     try:
                         return pl.read_csv(io.BytesIO(response.content))
-                    except BaseException:
+                    except Exception:
                         raise ValueError(f"Unsupported content type: {content_type}")
 
         except Exception as e:

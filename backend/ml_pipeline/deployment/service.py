@@ -21,15 +21,21 @@ sklearn.set_config(transform_output="pandas")
 logger = logging.getLogger(__name__)
 
 
-def _maybe_decode_predictions(predictions: Any, feature_engineer: Any) -> Any:
+def _maybe_decode_predictions(
+    predictions: Any,
+    feature_engineer: Any,
+    target_column: Optional[str] = None,
+) -> Any:
     """Decode numeric class predictions to original labels if possible.
 
-    This uses the saved target LabelEncoder fitted during training (stored under
-    the LabelEncoder step artifact as encoders['__target__']). If no encoder is
-    present, or decoding fails, it returns predictions unchanged.
+    Looks for the target LabelEncoder, first under encoders['__target__'], then
+    under encoders[target_column] (for pipelines where encoding happened before
+    the Feature/Target Split).
     """
 
-    target_encoder = extract_target_label_encoder(feature_engineer)
+    target_encoder = extract_target_label_encoder(
+        feature_engineer, target_column=target_column
+    )
     if target_encoder is None:
         return predictions
 
@@ -271,7 +277,9 @@ class DeploymentService:
             # Predict
             try:
                 predictions = estimator.predict(X_transformed)
-                predictions = _maybe_decode_predictions(predictions, feature_engineer)
+                predictions = _maybe_decode_predictions(
+                    predictions, feature_engineer, target_column=target_col
+                )
                 if hasattr(predictions, "tolist"):
                     return cast(List[Any], predictions.tolist())
                 return list(predictions)

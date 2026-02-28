@@ -76,7 +76,11 @@ class StatefulEstimator:
     ) -> tuple[Any, Any]:
         """Helper to extract X and y from DataFrame or Tuple."""
         if isinstance(data, tuple) and len(data) == 2:
-            return data[0], data[1]
+            X, y = data[0], data[1]
+            # If y is None but X is a DataFrame containing the target, extract it
+            if y is None and hasattr(X, "columns") and target_column in X.columns:
+                return self._extract_xy(X, target_column)
+            return X, y
 
         engine = get_engine(data)
 
@@ -220,7 +224,13 @@ class StatefulEstimator:
 
         if not is_test_empty:
             if isinstance(dataset.test, tuple):
-                X_test, _ = dataset.test
+                X_test, y_test_split = dataset.test
+                # If y is None, the target may still be in X — drop it
+                if y_test_split is None and hasattr(X_test, "columns") and target_column in X_test.columns:
+                    try:
+                        X_test = X_test.drop(columns=[target_column])
+                    except TypeError:
+                        X_test = X_test.drop([target_column])
             else:
                 if target_column in dataset.test.columns:
                     try:
@@ -235,7 +245,13 @@ class StatefulEstimator:
         # Validation Predictions
         if dataset.validation is not None:
             if isinstance(dataset.validation, tuple):
-                X_val, _ = dataset.validation
+                X_val, y_val_split = dataset.validation
+                # If y is None, the target may still be in X — drop it
+                if y_val_split is None and hasattr(X_val, "columns") and target_column in X_val.columns:
+                    try:
+                        X_val = X_val.drop(columns=[target_column])
+                    except TypeError:
+                        X_val = X_val.drop([target_column])
             else:
                 if target_column in dataset.validation.columns:
                     X_val = dataset.validation.drop(columns=[target_column])
@@ -301,6 +317,15 @@ class StatefulEstimator:
         def evaluate_split(split_name: str, data: Any):
             if isinstance(data, tuple):
                 X, y = data
+                # If y is None, the target may still be embedded in X
+                if y is None and hasattr(X, "columns"):
+                    if target_column not in X.columns:
+                        return None  # Cannot evaluate without target
+                    y = X[target_column]
+                    try:
+                        X = X.drop(columns=[target_column])
+                    except TypeError:
+                        X = X.drop([target_column])
             elif isinstance(data, pd.DataFrame):
                 if target_column not in data.columns:
                     return None  # Cannot evaluate without target

@@ -275,18 +275,24 @@ class FeatureTargetSplitApplier(BaseApplier):
 
         if isinstance(df, SplitDataset):
             # Apply to all splits
-            # We check if it's NOT a tuple (meaning it's a DataFrame-like object)
-            train = (
-                split_one(df.train) if not isinstance(df.train, tuple) else df.train
-            )
-            test = split_one(df.test) if not isinstance(df.test, tuple) else df.test
+            # If it's a tuple (X, y) with y already present, skip.
+            # If it's a tuple (DataFrame, None), extract target from the DataFrame.
+            def maybe_split(data: Any) -> Tuple[Any, Any]:
+                if isinstance(data, tuple) and len(data) == 2:
+                    X, y = data
+                    if y is not None:
+                        return data  # Already split
+                    # y is None — try to extract from X if it has columns
+                    if hasattr(X, "columns") and target_col in X.columns:
+                        return split_one(X)
+                    return data
+                return split_one(data)
+
+            train = maybe_split(df.train)
+            test = maybe_split(df.test)
             validation = None
             if df.validation is not None:
-                validation = (
-                    split_one(df.validation)
-                    if not isinstance(df.validation, tuple)
-                    else df.validation
-                )
+                validation = maybe_split(df.validation)
 
             return SplitDataset(train=train, test=test, validation=validation)
 
