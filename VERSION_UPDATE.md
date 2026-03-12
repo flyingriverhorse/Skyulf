@@ -1,5 +1,6 @@
 # Version Updates
 
+*   **v0.1.13 :** "The Advanced Tuning Strategies Update" — Exposed deep configuration for Optuna (Samplers/Pruners) and Successive Halving directly in the ML Canvas UI.
 *   **v0.1.12 :** "The Code Quality & Test Coverage Update" — Fixed critical Polars bug, enabled CI auto-triggers, resolved dependency conflicts, aligned versions, and boosted test coverage.
 *   **v0.1.11 :** "The EDA-First Packaging & Drift Reliability Update" — Published `skyulf-core` `0.1.11`, improved optional dependency handling, and hardened drift/runtime stability.
 *   **v0.1.10 :** "The Model Expansion Update" — Added 15 new models (XGBoost, SVM, etc.) and smart UI hints for feature scaling.
@@ -15,6 +16,31 @@
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
 
 ------------------------------------------------------------
+## v0.1.13
+**"The Advanced Tuning Strategies Update"**
+
+This release unlocks granular control over advanced hyperparameter tuning algorithms, allowing users to configure internal properties for Optuna and Successive Halving directly from the visual interface.
+
+### 🧠 Core & Backend
+- **Strategy Parameters Support:** Extended the internal tuning engine and API schemas (`TuningConfig`) to gracefully accept and apply dynamic `strategy_params`.
+- **Optuna Engine Configuration:** Added the ability to dynamically swap Optuna Samplers (`TPE`, `Random`) and Pruners (`Median`, `Hyperband`, `None`) within the optimization study.
+- **Successive Halving Tuning:** Unlocked the `factor` (halving discard rate) and `min_resources` configuration for Halving Grid and Random search methods.
+
+### 🎨 Frontend & Experience
+- **Strategy Settings Modal:** Created a dedicated, dynamic parameters modal (`StrategySettingsModal.tsx`) that changes fields based on the selected tuning strategy.
+- **Educational Tooltips:** Implemented carefully positioned hover tooltips (`?`) to explain complex optimization parameters (like Bayesian samplers or resource budgeting) without cluttering the UI. 
+- **Payload Integration:** Fixed the graph-to-pipeline translator (`pipelineConverter.ts`) to properly bundle `strategy_params` into the backend execution payload.
+
+### 🛠️ How to Use It
+1. Open the **ML Canvas** and add an **Advanced Tuning** node to your workflow.
+2. In the configuration panel, locate the **Tuning Strategy** section.
+3. Change the Search Method to **Optuna**, **Successive Halving (Grid)**, or **Successive Halving (Random)**.
+4. Click the newly revealed **Settings (Gear) icon** next to the dropdown to open the settings modal.
+5. Adjust the advanced algorithm parameters (e.g., set the Halving Factor or change the Optuna Pruner). Hover over the `?` icons if you need help understanding a specific parameter.
+6. Click **Apply Changes**, close the modal, and execute your graph!
+
+
+
 ## v0.1.12
 
 ### 🐛 Bug Fixes

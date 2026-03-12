@@ -315,22 +315,30 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                                 <div className="grid grid-cols-2 gap-4 text-xs">
                                                     {(() => {
                                                         const node = (job.graph?.nodes as any[])?.find((n: any) => n.node_id === job.node_id);
-                                                        const config = node?.params?.tuning_config;
+                                                        const config = Object.keys((job.config as any)?.tuning_config || {}).length > 0 
+                                                            ? (job.config as any)?.tuning_config 
+                                                            : node?.params?.tuning_config;
                                                         if (!config) return <div className="text-gray-400 col-span-2">No configuration found</div>;
                                                         
                                                         return (
                                                             <>
                                                                 <div>
                                                                     <span className="text-gray-500">Strategy:</span>
-                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300 capitalize">{config.strategy}</span>
+                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300 capitalize">{config.strategy || config.search_strategy || '-'}</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-gray-500">Strategy Params:</span>
+                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">
+                                                                        {config.strategy_params && Object.keys(config.strategy_params).length > 0 ? JSON.stringify(config.strategy_params) : '-'}
+                                                                    </span>
                                                                 </div>
                                                                 <div>
                                                                     <span className="text-gray-500">Metric:</span>
-                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{config.metric}</span>
+                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{config.metric || '-'}</span>
                                                                 </div>
                                                                 <div>
                                                                     <span className="text-gray-500">Trials:</span>
-                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{config.n_trials}</span>
+                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{config.n_trials || '-'}</span>
                                                                 </div>
                                                                 <div>
                                                                     <span className="text-gray-500">CV Enabled:</span>
@@ -338,6 +346,10 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                                                 </div>
                                                                 {config.cv_enabled && (
                                                                     <>
+                                                                        <div>
+                                                                            <span className="text-gray-500">CV Method:</span>
+                                                                            <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{config.cv_type || 'Unknown'}</span>
+                                                                        </div>
                                                                         <div>
                                                                             <span className="text-gray-500">Folds:</span>
                                                                             <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{config.cv_folds}</span>

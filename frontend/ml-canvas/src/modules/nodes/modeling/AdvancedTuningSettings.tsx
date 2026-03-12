@@ -14,6 +14,7 @@ import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { getIncomers } from '@xyflow/react';
 import { StepType } from '../../../core/constants/stepTypes';
+import { StrategySettingsModal, StrategyConfig } from './components/StrategySettingsModal';
 
 export interface TuningConfig {
   target_column: string;
@@ -22,6 +23,7 @@ export interface TuningConfig {
   n_trials: number;
   metric: string;
   search_strategy: string;
+  strategy_params?: Record<string, unknown>;
   cv_enabled: boolean;
   cv_folds: number;
   cv_type: string;
@@ -44,9 +46,9 @@ interface HyperparameterDef {
 const Tooltip: React.FC<{ text: string }> = ({ text }) => (
     <div className="group relative flex items-center">
         <HelpCircle className="w-3 h-3 text-gray-400 cursor-help" />
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+        <div className="absolute top-full mt-2 -left-20 hidden group-hover:block w-56 p-2.5 bg-gray-900 text-white text-xs rounded-md shadow-xl z-50">
             {text}
-            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+            <div className="absolute bottom-full left-20 ml-1.5 border-4 border-transparent border-b-gray-900" />
         </div>
     </div>
 );
@@ -324,6 +326,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
   const [searchSpaceDefs, setSearchSpaceDefs] = useState<HyperparameterDef[]>([]);
   const [isLoadingDefs, setIsLoadingDefs] = useState(false);
   const [showParamsModal, setShowParamsModal] = useState(false);
+  const [showStrategyModal, setShowStrategyModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'config' | 'search_space'>('config');
   const [showCV, setShowCV] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_model_optimizer'));
@@ -564,10 +567,44 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                 <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tuning Strategy</label>
                 <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2">
-                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Search Method</label>
-                        <select
-                            value={config.search_strategy ?? 'random'}
-                            onChange={(e) => onChange({ ...config, search_strategy: e.target.value })}
+                      <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-1.5">
+                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                                    Search Method
+                                </label>
+                                <Tooltip text={
+                                    config.search_strategy === 'optuna' ? 'Optuna uses Bayesian optimization (TPE) to efficiently find optimal hyperparameters with early pruning.' :
+                                    config.search_strategy === 'halving_grid' ? 'Successive Halving (Grid) tests all combinations but quickly drops poorly performing candidates to save time.' :
+                                    config.search_strategy === 'halving_random' ? 'Successive Halving (Random) tests random combinations but quickly drops poorly performing candidates.' :
+                                    config.search_strategy === 'grid' ? 'Grid Search tests every single combination in the search space. Can be very slow and computationally expensive.' :
+                                    'Random Search tests a random subset of parameter combinations. Fast and often surprisingly effective compared to Grid Search.'
+                                } />
+                            </div>
+                          {(config.search_strategy === 'halving_grid' || config.search_strategy === 'halving_random' || config.search_strategy === 'optuna') && (
+                              <button
+                                  type="button"
+                                  onClick={() => setShowStrategyModal(true)}
+                                  className="text-blue-600 hover:text-blue-700 dark:text-blue-400 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition group flex items-center justify-center"
+                                  title={`${config.search_strategy.replace('_', ' ')} Settings`}
+                              >
+                                  <Settings2 size={14} className="group-hover:rotate-45 transition-transform duration-300" />
+                              </button>
+                          )}
+                      </div>
+                      <select
+                          value={config.search_strategy ?? 'random'}
+                          onChange={(e) => {
+                              const newStrategy = e.target.value;
+                              // Clear strategy params when switching to plain grid/random to avoid passing junk
+                              const newParams = (newStrategy === 'grid' || newStrategy === 'random') 
+                                                ? {} 
+                                                : config.strategy_params || {};
+                              onChange({ 
+                                  ...config, 
+                                  search_strategy: newStrategy,
+                                  strategy_params: newParams 
+                              });
+                          }}
                             className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
                         >
                             <option value="random">Random Search</option>
@@ -799,11 +836,21 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         </button>
       </div>
 
-      <BestParamsModal 
+      <BestParamsModal
         isOpen={showParamsModal}
         onClose={() => { setShowParamsModal(false); }}
         modelType={config.model_type}
         availableModels={availableModels}
+      />
+
+      <StrategySettingsModal
+        isOpen={showStrategyModal}
+        onClose={() => setShowStrategyModal(false)}
+        strategy={config.search_strategy || 'random'}
+        initialConfig={config.strategy_params as StrategyConfig | undefined}
+        onSave={(newStrategyParams) => {
+            onChange({ ...config, strategy_params: newStrategyParams as Record<string, unknown> });
+        }}
       />
     </div>
   );

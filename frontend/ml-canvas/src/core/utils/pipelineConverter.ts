@@ -222,8 +222,8 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               target_column: node.data.target_column,
               algorithm: node.data.model_type,
               tuning_config: {
-                  strategy: node.data.search_strategy,
-                  metric: node.data.metric,
+                  strategy: node.data.search_strategy,                    strategy_params: node.data.strategy_params,
+                    metric: node.data.metric,
                   n_trials: node.data.n_trials,
                   search_space: node.data.search_space,
                   cv_enabled: node.data.cv_enabled,
@@ -261,3 +261,4 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       metadata: { dataset_source_id: datasetId }
     };
 };
+

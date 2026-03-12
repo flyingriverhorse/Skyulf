@@ -107,6 +107,7 @@ skyulf-mlflow/
 #.tests
 testingdb/
 .testingdb
+temp_test_artifacts*/
 
 #Ignore vscode AI rules
 .github/instructions/
