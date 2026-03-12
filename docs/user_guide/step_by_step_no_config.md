@@ -1,7 +1,7 @@
 # Step-by-Step (No Config)
 
 This tutorial runs an end-to-end workflow **without** building a pipeline `config` dictionary.
-Instead, it uses Skyulf’s low-level building blocks directly:
+Instead, it uses Skyulf's low-level building blocks directly:
 
 - preprocessing **Calculators** and **Appliers**
 - `SplitDataset` to avoid data leakage
@@ -106,4 +106,4 @@ print(preds.get("test", pd.Series(dtype=float)).head())
 
 - Split first (or provide a `SplitDataset`) to prevent leakage.
 - Fit preprocessing on train, reuse the learned `params` for test/inference.
-- Modeling can be driven directly through `StatefulEstimator` when you don’t want a pipeline config.
+- Modeling can be driven directly through `StatefulEstimator` when you don't want a pipeline config.

@@ -294,7 +294,7 @@ A common leakage bug is fitting preprocessing on the full dataset.
 Here we construct a dataset where **train and test have very different distributions**.
 If an imputer learns the mean from the full dataset, it will be pulled toward the test distribution.
 
-Skyulf’s pattern learns from train only (Calculator) and applies to test (Applier).
+Skyulf's pattern learns from train only (Calculator) and applies to test (Applier).
 
 ```python
 from __future__ import annotations
@@ -331,7 +331,7 @@ print("full_mean:", full_mean)
 print("learned_mean:", learned_mean)
 ```
 
-## 3) What this proves (and what it doesn’t)
+## 3) What this proves (and what it doesn't)
 
 - Proves the API supports sklearn-style `X/y` workflows and produces aligned predictions.
 - Proves at least one common leakage-sensitive node (`SimpleImputer`) learns its statistics from the provided training data.

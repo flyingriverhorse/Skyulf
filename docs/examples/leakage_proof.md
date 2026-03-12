@@ -61,7 +61,7 @@ Loading Titanic dataset...
 Dataset Shape: (1309, 4)
       sex   age      fare  survived
 0  female  29.0  211.3375         1
-1    male   0.9151.5500         1
+1    male   0.9  151.5500         1
 2  female   2.0  151.5500         0
 3    male  30.0  151.5500         0
 4  female  25.0  151.5500         0
@@ -456,4 +456,4 @@ We have mathematically verified that:
 2.  **Scaling** on Test data used the **Train Mean/Std**.
 3.  **Target Encoding** used train-derived target statistics (smoothed/cross-fitted), and is invariant to test labels.
 
-This proves that **Skyulf pipelines are leakage-free by design**. The strict separation of `fit()` (Calculator) and `transform()` (Applier) ensures that no information from the Test set (or future data) can influence the model training. Under adversarial ‘poisoned test’ conditions, the learned preprocessing artifacts are invariant to test data and test labels, providing strong empirical evidence that the pipeline fits strictly on training data for these steps.
+This proves that **Skyulf pipelines are leakage-free by design**. The strict separation of `fit()` (Calculator) and `transform()` (Applier) ensures that no information from the Test set (or future data) can influence the model training. Under adversarial 'poisoned test' conditions, the learned preprocessing artifacts are invariant to test data and test labels, providing strong empirical evidence that the pipeline fits strictly on training data for these steps.

@@ -14,7 +14,7 @@ Every preprocessing step in the pipeline config uses:
 }
 ```
 
-Where `params` is passed into the node’s Calculator `fit()`.
+Where `params` is passed into the node's Calculator `fit()`.
 
 ## Splitters
 

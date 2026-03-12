@@ -8,7 +8,7 @@ This guide shows a production-style workflow: split → fit → evaluate → pre
 
 1. A single `pd.DataFrame` that **includes the target column**.
     - You pass `target_column="..."` and Skyulf splits features/target internally.
-    - This is what the quickstart uses, because it’s the simplest onboarding path.
+    - This is what the quickstart uses, because it's the simplest onboarding path.
 
 2. A `SplitDataset` (recommended when you already have train/test splits).
     - Each split can be either a DataFrame (with the target column) **or** a tuple `(X, y)`.
