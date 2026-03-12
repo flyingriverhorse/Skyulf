@@ -48,7 +48,7 @@ Skyulf was designed with machine learning workflows in mind, not just descriptiv
 
 - **Rule Extraction:** Skyulf trains a surrogate Decision Tree on your data and extracts human-readable rules like "If Age > 50 AND Income < 30k → High Risk". This is invaluable for fraud detection, churn analysis, or any use case where you need to explain segments to stakeholders.
 
-- **Feature Importance (from the surrogate tree):** Alongside rules, Skyulf exposes feature importances from the surrogate Decision Tree. This is not a replacement for model explainability, but it’s a fast way to see which columns dominate the tree’s decisions.
+- **Feature Importance (from the surrogate tree):** Alongside rules, Skyulf exposes feature importances from the surrogate Decision Tree. This is not a replacement for model explainability, but it's a fast way to see which columns dominate the tree's decisions.
 
 - **Outlier Detection:** Built-in Isolation Forest identifies anomalous rows and explains *why* they're outliers (which features deviate most from the median). YData shows distribution plots but doesn't flag specific outlier rows.
 

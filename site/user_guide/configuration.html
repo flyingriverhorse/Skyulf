@@ -14,14 +14,14 @@
         <link rel="prev" href="validation_vs_sklearn.html">
       
       
-        <link rel="next" href="splitdataset_and_leakage.html">
+        <link rel="next" href="hyperparameter_tuning.html">
       
       
         
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -331,26 +331,6 @@
   
   
   Reference
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../contributing/writing_docs.html" class="md-tabs__link">
-          
-  
-  
-  Contributing
 
         </a>
       </li>
@@ -669,6 +649,34 @@
     
   
     Adding New Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
   
 
     
@@ -1235,6 +1243,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Modeling config">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#classification-9-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classification (9 models)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#regression-11-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regression (11 models)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Meta
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -1258,6 +1305,34 @@
   
   
     <li class="md-nav__item">
+      <a href="hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="splitdataset_and_leakage.html" class="md-nav__link">
         
   
@@ -1266,6 +1341,34 @@
     
   
     SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
   
 
     
@@ -2463,95 +2566,6 @@
   
 
     
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Contributing
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Contributing
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../contributing/writing_docs.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Writing Docs
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
   </ul>
 </nav>
                   </div>
@@ -2590,7 +2604,7 @@
   &quot;params&quot;: { ... }
 }
 </code></pre>
-<p><code>TransformerType</code> is a string key that <code>FeatureEngineer</code> dispatches to a Calculator/Applier pair.
+<p><code>TransformerType</code> is a string key resolved via the <code>NodeRegistry</code>.
 For the full list and per-node parameters, see:</p>
 <ul>
 <li>Reference → Preprocessing Nodes</li>
@@ -2610,14 +2624,124 @@ For the full list and per-node parameters, see:</p>
 {&quot;name&quot;: &quot;scale&quot;, &quot;transformer&quot;: &quot;StandardScaler&quot;, &quot;params&quot;: {&quot;auto_detect&quot;: True}}
 </code></pre>
 <h3 id="modeling-config">Modeling config</h3>
-<p><code>SkyulfPipeline</code> currently supports these model types:</p>
-<ul>
-<li><code>logistic_regression</code></li>
-<li><code>random_forest_classifier</code></li>
-<li><code>ridge_regression</code></li>
-<li><code>random_forest_regressor</code></li>
-<li><code>hyperparameter_tuner</code></li>
-</ul>
+<p><code>SkyulfPipeline</code> supports the following model types via the <code>NodeRegistry</code>.</p>
+<h4 id="classification-9-models">Classification (9 models)</h4>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Algorithm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>logistic_regression</code></td>
+<td>Logistic Regression</td>
+</tr>
+<tr>
+<td><code>random_forest_classifier</code></td>
+<td>Random Forest Classifier</td>
+</tr>
+<tr>
+<td><code>svc</code></td>
+<td>Support Vector Classifier</td>
+</tr>
+<tr>
+<td><code>k_neighbors_classifier</code></td>
+<td>K-Nearest Neighbors Classifier</td>
+</tr>
+<tr>
+<td><code>decision_tree_classifier</code></td>
+<td>Decision Tree Classifier</td>
+</tr>
+<tr>
+<td><code>gradient_boosting_classifier</code></td>
+<td>Gradient Boosting Classifier</td>
+</tr>
+<tr>
+<td><code>adaboost_classifier</code></td>
+<td>AdaBoost Classifier</td>
+</tr>
+<tr>
+<td><code>xgboost_classifier</code></td>
+<td>XGBoost Classifier <em>(requires <code>skyulf-core[modeling-xgboost]</code>)</em></td>
+</tr>
+<tr>
+<td><code>gaussian_nb</code></td>
+<td>Gaussian Naive Bayes</td>
+</tr>
+</tbody>
+</table>
+<h4 id="regression-11-models">Regression (11 models)</h4>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Algorithm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>linear_regression</code></td>
+<td>Linear Regression</td>
+</tr>
+<tr>
+<td><code>ridge_regression</code></td>
+<td>Ridge Regression</td>
+</tr>
+<tr>
+<td><code>lasso_regression</code></td>
+<td>Lasso Regression</td>
+</tr>
+<tr>
+<td><code>elasticnet_regression</code></td>
+<td>ElasticNet Regression</td>
+</tr>
+<tr>
+<td><code>random_forest_regressor</code></td>
+<td>Random Forest Regressor</td>
+</tr>
+<tr>
+<td><code>svr</code></td>
+<td>Support Vector Regressor</td>
+</tr>
+<tr>
+<td><code>k_neighbors_regressor</code></td>
+<td>K-Nearest Neighbors Regressor</td>
+</tr>
+<tr>
+<td><code>decision_tree_regressor</code></td>
+<td>Decision Tree Regressor</td>
+</tr>
+<tr>
+<td><code>gradient_boosting_regressor</code></td>
+<td>Gradient Boosting Regressor</td>
+</tr>
+<tr>
+<td><code>adaboost_regressor</code></td>
+<td>AdaBoost Regressor</td>
+</tr>
+<tr>
+<td><code>xgboost_regressor</code></td>
+<td>XGBoost Regressor <em>(requires <code>skyulf-core[modeling-xgboost]</code>)</em></td>
+</tr>
+</tbody>
+</table>
+<h4 id="meta">Meta</h4>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hyperparameter_tuner</code></td>
+<td>Wraps any model above with grid, random, Optuna, or halving search</td>
+</tr>
+</tbody>
+</table>
 <p>Example:</p>
 <pre><code class="language-python">{
   &quot;type&quot;: &quot;random_forest_classifier&quot;,
@@ -2632,13 +2756,13 @@ For the full list and per-node parameters, see:</p>
 <pre><code class="language-python">{
   &quot;type&quot;: &quot;hyperparameter_tuner&quot;,
   &quot;base_model&quot;: {&quot;type&quot;: &quot;logistic_regression&quot;},
-  &quot;strategy&quot;: &quot;random&quot;,
+  &quot;strategy&quot;: &quot;optuna&quot;,
   &quot;search_space&quot;: {&quot;C&quot;: [0.1, 1.0, 10.0]},
   &quot;n_trials&quot;: 25,
   &quot;metric&quot;: &quot;accuracy&quot;
 }
 </code></pre>
-<p>See “Modeling Nodes” in Reference for details.</p>
+<p>See "Modeling Nodes" in Reference for details.</p>
 
 
 
@@ -2690,10 +2814,10 @@ For the full list and per-node parameters, see:</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

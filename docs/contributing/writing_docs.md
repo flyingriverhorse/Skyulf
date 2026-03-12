@@ -17,8 +17,39 @@ We use [MkDocs](https://www.mkdocs.org/) with the [Material for MkDocs](https://
 
 ## Directory Structure
 
-*   `docs/`: Contains all markdown files.
-*   `mkdocs.yml`: The main configuration file.
+The `docs/` folder is organized by audience and purpose:
+
+```
+docs/
+  index.md                  # Landing page
+  architecture.md           # System architecture overview
+  data_architecture.md      # Data flow and storage design
+  performance.md            # Benchmark results
+  guides/                   # Onboarding and how-to guides
+    getting_started.md
+    recipes.md
+    ...
+  user_guide/               # In-depth usage documentation
+    installation.md
+    pipeline_quickstart.md
+    configuration.md
+    hyperparameter_tuning.md
+    drift_monitoring.md
+    troubleshooting.md
+    extending_custom_nodes.md
+    ...
+  examples/                 # Runnable examples and proofs
+    quickstart.md
+    leakage_proof.md
+  reference/                # Auto-generated API docs (mkdocstrings)
+    preprocessing_nodes.md
+    modeling_nodes.md
+    api/                    # Module-level API reference
+  contributing/             # Contributor guides
+    writing_docs.md
+```
+
+*   `mkdocs.yml`: The main configuration file (nav, plugins, theme).
 
 ## Adding a New Page
 

@@ -1,4 +1,4 @@
-# Configuration
+﻿# Configuration
 
 This page documents the configuration schema consumed by `SkyulfPipeline` and `FeatureEngineer`.
 
@@ -27,7 +27,7 @@ Each step is:
 }
 ```
 
-`TransformerType` is a string key that `FeatureEngineer` dispatches to a Calculator/Applier pair.
+`TransformerType` is a string key resolved via the `NodeRegistry`.
 For the full list and per-node parameters, see:
 
 - Reference → Preprocessing Nodes
@@ -57,13 +57,43 @@ For the full list and per-node parameters, see:
 
 ### Modeling config
 
-`SkyulfPipeline` currently supports these model types:
+`SkyulfPipeline` supports the following model types via the `NodeRegistry`.
 
-- `logistic_regression`
-- `random_forest_classifier`
-- `ridge_regression`
-- `random_forest_regressor`
-- `hyperparameter_tuner`
+#### Classification (9 models)
+
+| Key | Algorithm |
+|---|---|
+| `logistic_regression` | Logistic Regression |
+| `random_forest_classifier` | Random Forest Classifier |
+| `svc` | Support Vector Classifier |
+| `k_neighbors_classifier` | K-Nearest Neighbors Classifier |
+| `decision_tree_classifier` | Decision Tree Classifier |
+| `gradient_boosting_classifier` | Gradient Boosting Classifier |
+| `adaboost_classifier` | AdaBoost Classifier |
+| `xgboost_classifier` | XGBoost Classifier *(requires `skyulf-core[modeling-xgboost]`)* |
+| `gaussian_nb` | Gaussian Naive Bayes |
+
+#### Regression (11 models)
+
+| Key | Algorithm |
+|---|---|
+| `linear_regression` | Linear Regression |
+| `ridge_regression` | Ridge Regression |
+| `lasso_regression` | Lasso Regression |
+| `elasticnet_regression` | ElasticNet Regression |
+| `random_forest_regressor` | Random Forest Regressor |
+| `svr` | Support Vector Regressor |
+| `k_neighbors_regressor` | K-Nearest Neighbors Regressor |
+| `decision_tree_regressor` | Decision Tree Regressor |
+| `gradient_boosting_regressor` | Gradient Boosting Regressor |
+| `adaboost_regressor` | AdaBoost Regressor |
+| `xgboost_regressor` | XGBoost Regressor *(requires `skyulf-core[modeling-xgboost]`)* |
+
+#### Meta
+
+| Key | Purpose |
+|---|---|
+| `hyperparameter_tuner` | Wraps any model above with grid, random, Optuna, or halving search |
 
 Example:
 
@@ -84,11 +114,11 @@ Tuner example:
 {
   "type": "hyperparameter_tuner",
   "base_model": {"type": "logistic_regression"},
-  "strategy": "random",
+  "strategy": "optuna",
   "search_space": {"C": [0.1, 1.0, 10.0]},
   "n_trials": 25,
   "metric": "accuracy"
 }
 ```
 
-See “Modeling Nodes” in Reference for details.
+See "Modeling Nodes" in Reference for details.

@@ -8,31 +8,31 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/casting.html">
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/guides/engine_mechanics.html">
       
       
-        <link rel="prev" href="bucketing.html">
+        <link rel="prev" href="adding_new_engine.html">
       
       
-        <link rel="next" href="feature_generation.html">
+        <link rel="next" href="../examples/quickstart.html">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
     
     
       
-        <title>casting - Skyulf</title>
+        <title>Engine Mechanics - Skyulf</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,9 +51,9 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#api-preprocessingcasting" class="md-skip">
+        <a href="#skyulf-engine-mechanics" class="md-skip">
           Skip to content
         </a>
       
@@ -92,7 +92,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              casting
+              Engine Mechanics
             
           </span>
         </div>
@@ -223,7 +223,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../index.html" class="md-tabs__link">
+      <a href="../index.html" class="md-tabs__link">
         
   
   
@@ -240,11 +240,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../../guides/getting_started.html" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="getting_started.html" class="md-tabs__link">
           
   
   
@@ -264,7 +266,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../examples/quickstart.html" class="md-tabs__link">
+        <a href="../examples/quickstart.html" class="md-tabs__link">
           
   
   
@@ -284,7 +286,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../contributing/writing_docs.html" class="md-tabs__link">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
           
   
   
@@ -304,7 +306,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../user_guide/overview.html" class="md-tabs__link">
+        <a href="../user_guide/overview.html" class="md-tabs__link">
           
   
   
@@ -320,13 +322,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../preprocessing_nodes.html" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
           
   
   
@@ -362,7 +362,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -392,7 +392,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../index.html" class="md-nav__link">
+      <a href="../index.html" class="md-nav__link">
         
   
   
@@ -416,28 +416,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
             
   
   
@@ -455,7 +458,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -473,7 +476,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/getting_started.html" class="md-nav__link">
+      <a href="getting_started.html" class="md-nav__link">
         
   
   
@@ -501,7 +504,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/recipes.html" class="md-nav__link">
+      <a href="recipes.html" class="md-nav__link">
         
   
   
@@ -529,7 +532,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/profiling_comparison.html" class="md-nav__link">
+      <a href="profiling_comparison.html" class="md-nav__link">
         
   
   
@@ -557,7 +560,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture.html" class="md-nav__link">
+      <a href="../architecture.html" class="md-nav__link">
         
   
   
@@ -585,7 +588,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../data_architecture.html" class="md-nav__link">
+      <a href="../data_architecture.html" class="md-nav__link">
         
   
   
@@ -613,7 +616,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../performance.html" class="md-nav__link">
+      <a href="../performance.html" class="md-nav__link">
         
   
   
@@ -641,7 +644,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/adding_new_engine.html" class="md-nav__link">
+      <a href="adding_new_engine.html" class="md-nav__link">
         
   
   
@@ -666,10 +669,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../../guides/engine_mechanics.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="engine_mechanics.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -685,6 +715,182 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-specifically-what-is-skyulfdataframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Specifically, what is SkyulfDataFrame?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-engine-detection-how-do-we-know-which-one-it-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Engine Detection: How do we know which one it is?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Engine Detection: How do we know which one it is?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-logic-skyulfengines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Logic (skyulf.engines)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-hybrid-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The Hybrid Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The Hybrid Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#path-a-pure-polars-the-fast-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path A: Pure Polars (The Fast Path)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#path-b-the-hybrid-bridge-compatibility-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path B: The "Hybrid Bridge" (Compatibility Path)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Path B: The &#34;Hybrid Bridge&#34; (Compatibility Path)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-arrow-the-zero-copy-magic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Arrow? (The "Zero-Copy" Magic)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-sklearnbridge-utility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The SklearnBridge Utility
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-calculator-vs-applier-in-the-hybrid-world" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Calculator vs. Applier in the Hybrid World
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Calculator vs. Applier in the Hybrid World">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#calculator-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calculator (fit)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#applier-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Applier (apply)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -758,7 +964,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/quickstart.html" class="md-nav__link">
+      <a href="../examples/quickstart.html" class="md-nav__link">
         
   
   
@@ -786,7 +992,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/leakage_proof.html" class="md-nav__link">
+      <a href="../examples/leakage_proof.html" class="md-nav__link">
         
   
   
@@ -875,7 +1081,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/writing_docs.html" class="md-nav__link">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
         
   
   
@@ -964,7 +1170,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/overview.html" class="md-nav__link">
+      <a href="../user_guide/overview.html" class="md-nav__link">
         
   
   
@@ -992,7 +1198,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/installation.html" class="md-nav__link">
+      <a href="../user_guide/installation.html" class="md-nav__link">
         
   
   
@@ -1020,7 +1226,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/pipeline_quickstart.html" class="md-nav__link">
+      <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
   
@@ -1048,7 +1254,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/step_by_step_no_config.html" class="md-nav__link">
+      <a href="../user_guide/step_by_step_no_config.html" class="md-nav__link">
         
   
   
@@ -1076,7 +1282,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/eda_profiling.html" class="md-nav__link">
+      <a href="../user_guide/eda_profiling.html" class="md-nav__link">
         
   
   
@@ -1104,7 +1310,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/validation_vs_sklearn.html" class="md-nav__link">
+      <a href="../user_guide/validation_vs_sklearn.html" class="md-nav__link">
         
   
   
@@ -1132,7 +1338,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/configuration.html" class="md-nav__link">
+      <a href="../user_guide/configuration.html" class="md-nav__link">
         
   
   
@@ -1160,7 +1366,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/hyperparameter_tuning.html" class="md-nav__link">
+      <a href="../user_guide/hyperparameter_tuning.html" class="md-nav__link">
         
   
   
@@ -1188,7 +1394,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
+      <a href="../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
         
   
   
@@ -1216,7 +1422,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/drift_monitoring.html" class="md-nav__link">
+      <a href="../user_guide/drift_monitoring.html" class="md-nav__link">
         
   
   
@@ -1244,7 +1450,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/serialization.html" class="md-nav__link">
+      <a href="../user_guide/serialization.html" class="md-nav__link">
         
   
   
@@ -1272,7 +1478,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/extending_custom_nodes.html" class="md-nav__link">
+      <a href="../user_guide/extending_custom_nodes.html" class="md-nav__link">
         
   
   
@@ -1300,7 +1506,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/troubleshooting.html" class="md-nav__link">
+      <a href="../user_guide/troubleshooting.html" class="md-nav__link">
         
   
   
@@ -1332,31 +1538,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -1374,7 +1577,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1392,7 +1595,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../preprocessing_nodes.html" class="md-nav__link">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
         
   
   
@@ -1420,7 +1623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../modeling_nodes.html" class="md-nav__link">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
         
   
   
@@ -1445,31 +1648,28 @@
                 
   
   
-    
   
   
-  
     
     
     
     
       
       
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
         
           
-          
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3" checked>
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_3" >
         
           
-          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="0">
             
   
   
@@ -1487,7 +1687,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1505,7 +1705,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../pipeline.html" class="md-nav__link">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
         
   
   
@@ -1587,7 +1787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../data/dataset.html" class="md-nav__link">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
         
   
   
@@ -1620,8 +1820,6 @@
                 
   
   
-    
-  
   
   
     
@@ -1634,11 +1832,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_3_3" >
         
           
           <label class="md-nav__link" for="__nav_6_3_3" id="__nav_6_3_3_label" tabindex="0">
@@ -1659,7 +1859,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_3_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_3_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6_3_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1677,7 +1877,7 @@
   
   
     <li class="md-nav__item">
-      <a href="index.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
         
   
   
@@ -1705,7 +1905,7 @@
   
   
     <li class="md-nav__item">
-      <a href="base.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
         
   
   
@@ -1733,7 +1933,7 @@
   
   
     <li class="md-nav__item">
-      <a href="pipeline.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
         
   
   
@@ -1761,7 +1961,7 @@
   
   
     <li class="md-nav__item">
-      <a href="split.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
         
   
   
@@ -1789,7 +1989,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cleaning.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
         
   
   
@@ -1817,7 +2017,7 @@
   
   
     <li class="md-nav__item">
-      <a href="drop_and_missing.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
         
   
   
@@ -1845,7 +2045,7 @@
   
   
     <li class="md-nav__item">
-      <a href="imputation.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
         
   
   
@@ -1873,7 +2073,7 @@
   
   
     <li class="md-nav__item">
-      <a href="encoding.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
         
   
   
@@ -1901,7 +2101,7 @@
   
   
     <li class="md-nav__item">
-      <a href="scaling.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
         
   
   
@@ -1929,7 +2129,7 @@
   
   
     <li class="md-nav__item">
-      <a href="outliers.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
         
   
   
@@ -1957,7 +2157,7 @@
   
   
     <li class="md-nav__item">
-      <a href="transformations.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
         
   
   
@@ -1985,7 +2185,7 @@
   
   
     <li class="md-nav__item">
-      <a href="bucketing.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
         
   
   
@@ -2010,37 +2210,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    casting
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="casting.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
         
   
   
@@ -2056,37 +2229,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#skyulf.preprocessing.casting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        casting
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2099,7 +2241,7 @@
   
   
     <li class="md-nav__item">
-      <a href="feature_generation.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
         
   
   
@@ -2127,7 +2269,7 @@
   
   
     <li class="md-nav__item">
-      <a href="feature_selection.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
         
   
   
@@ -2155,7 +2297,7 @@
   
   
     <li class="md-nav__item">
-      <a href="resampling.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
         
   
   
@@ -2183,7 +2325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="inspection.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
         
   
   
@@ -2273,7 +2415,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/index.html" class="md-nav__link">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
         
   
   
@@ -2301,7 +2443,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/base.html" class="md-nav__link">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
         
   
   
@@ -2329,7 +2471,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/sklearn_wrapper.html" class="md-nav__link">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
         
   
   
@@ -2357,7 +2499,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/classification.html" class="md-nav__link">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
         
   
   
@@ -2385,7 +2527,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/regression.html" class="md-nav__link">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
         
   
   
@@ -2413,7 +2555,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/cross_validation.html" class="md-nav__link">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
         
   
   
@@ -2441,7 +2583,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/tuning_engine.html" class="md-nav__link">
+      <a href="../reference/api/modeling/tuning_engine.html" class="md-nav__link">
         
   
   
@@ -2505,48 +2647,128 @@
   
 
 
-<h1 id="api-preprocessingcasting">API: preprocessing.casting</h1>
+<h1 id="skyulf-engine-mechanics">Skyulf Engine Mechanics</h1>
+<p>This guide explains how Skyulf handles different dataframes (Polars and Pandas) under the hood, ensuring both high performance and compatibility with the Python ML ecosystem (Scikit-Learn).</p>
+<h2 id="1-specifically-what-is-skyulfdataframe">1. Specifically, what is <code>SkyulfDataFrame</code>?</h2>
+<p>You might see <code>SkyulfDataFrame</code> in our type hints. It is <strong>not</strong> a new class. It is a <strong>Type Alias</strong> (Protocol) that means:
+<em>"This variable can be either a <code>polars.DataFrame</code> or a <code>pandas.DataFrame</code>."</em></p>
+<pre><code class="language-python"># Conceptually:
+SkyulfDataFrame = Union[pl.DataFrame, pd.DataFrame]
+</code></pre>
+<p>This ensures our code knows how to handle both formats without forcing you to convert everything manually.</p>
+<h2 id="2-engine-detection-how-do-we-know-which-one-it-is">2. Engine Detection: How do we know which one it is?</h2>
+<p>We don't ask you to specify the engine. We detect it automatically using the <code>get_engine(df)</code> utility.</p>
+<h3 id="the-logic-skyulfengines">The Logic (<code>skyulf.engines</code>)</h3>
+<p>When a DataFrame enters a Calculator or Applier:
+1.  We check <code>isinstance(df, polars.DataFrame)</code>.
+    *   If <strong>True</strong>: We tag it as <code>Engine.POLARS</code>.
+2.  If not, we check <code>isinstance(df, pandas.DataFrame)</code>.
+    *   If <strong>True</strong>: We tag it as <code>Engine.PANDAS</code>.
+3.  Otherwise, we raise an error.</p>
+<pre><code class="language-python">from skyulf.engines import get_engine
 
+def fit(self, df: SkyulfDataFrame, ...):
+    engine = get_engine(df)
 
-<div class="doc doc-object doc-module">
+    if engine.name == &quot;polars&quot;:
+        # Run optimized Polars logic
+    else:
+        # Run standard Pandas logic
+</code></pre>
+<h2 id="3-the-hybrid-architecture">3. The Hybrid Architecture</h2>
+<p>We want the <strong>speed of Polars</strong> but the <strong>ecosystem of Scikit-Learn</strong>. To achieve this, we use a hybrid strategy.</p>
+<h3 id="path-a-pure-polars-the-fast-path">Path A: Pure Polars (The Fast Path)</h3>
+<p>For operations that Polars supports natively, we stay in Polars. This is zero-copy and extremely fast.
+*   <strong>Examples:</strong> <code>StandardScaler</code>, <code>MinMaxScaler</code>, <code>SimpleImputing</code> (mean/median), <code>LogTransformation</code>, <code>Encoding</code>.
+*   <strong>Mechanism:</strong> We construct Polars <strong>expressions</strong> (e.g., <code>pl.col(c).mean()</code>) and apply them lazy or eager.</p>
+<h3 id="path-b-the-hybrid-bridge-compatibility-path">Path B: The "Hybrid Bridge" (Compatibility Path)</h3>
+<p>For complex algorithms that only exist in Scikit-Learn (e.g., <code>IsolationForest</code>, <code>RFE</code>, <code>PolynomialFeatures</code>), we temporarily bridge to Pandas/Numpy.</p>
+<p><strong>The Workflow:</strong>
+1.  <strong>Input:</strong> Receive <code>pl.DataFrame</code>.
+2.  <strong>Bridge:</strong> Convert to <code>pd.DataFrame</code> (using Arrow for speed).
+3.  <strong>Compute:</strong> Run Scikit-Learn (e.g., <code>sklearn_model.fit(df_pandas)</code>).
+4.  <strong>Return:</strong>
+    *   If the result is small (parameters), we just store them.
+    *   If the result is data (transformed rows), we convert the result back to <code>pl.DataFrame</code>.</p>
+<h4 id="why-arrow-the-zero-copy-magic">Why Arrow? (The "Zero-Copy" Magic)</h4>
+<p>A common fear with hybrid systems is: <em>"Won't converting data back and forth double my memory usage and kill performance?"</em></p>
+<p>This is where <strong>Apache Arrow</strong> comes in.
+*   <strong>Polars</strong> is built on top of the Arrow memory format.
+*   <strong>Pandas (2.0+)</strong> supports Arrow backends, and even older Pandas can ingest Arrow very efficiently.</p>
+<p>When we call <code>df_polars.to_pandas()</code>, it doesn't serialize data to Python objects (slow). It hands over the <strong>pointer to the Arrow memory buffer</strong>. This is often <strong>Zero-Copy</strong> (or near zero-copy), meaning the data stays in the same place in RAM, and Pandas just "views" it. This makes the hybrid bridge incredibly lightweight compared to traditional CSV/method conversion.</p>
+<h4 id="the-sklearnbridge-utility">The <code>SklearnBridge</code> Utility</h4>
+<p>To keep our code clean, we use a utility called <code>SklearnBridge</code> in <code>skyulf.engines.sklearn_bridge</code>.</p>
+<p>Instead of writing <code>if polars: to_numpy()</code> everywhere, <code>SklearnBridge</code> handles the standardization:</p>
+<ol>
+<li><strong>Standardizes Input:</strong> Accepts Polars DF, Pandas DF, or Tuples <code>(X, y)</code>.</li>
+<li><strong>Handles Targets (The "Flattening" Problem):</strong><ul>
+<li><strong>The Issue:</strong> DataFrames treat a single column as a 2D structure (a list of lists, like <code>[[1], [2], [3]]</code>, shape <code>(N, 1)</code>).</li>
+<li><strong>The Need:</strong> Scikit-Learn models often expect the target <code>y</code> to be a simple 1D array (like <code>[1, 2, 3]</code>, shape <code>(N,)</code>).</li>
+<li><strong>The Fix:</strong> The Bridge automatically detects this and <strong>"flattens"</strong> (ravels) the array so Scikit-Learn doesn't throw a shape mismatch error.</li>
+</ul>
+</li>
+<li><strong>Safe Output:</strong> Ensures the result is always a Numpy array ready for <code>.fit()</code>.</li>
+</ol>
+<pre><code class="language-python"># Inside your complex Calculator
+from skyulf.engines.sklearn_bridge import SklearnBridge
 
+def fit(self, df, ...):
+    # Doesn't matter if df is Pandas or Polars
+    X_matrix, y_vector = SklearnBridge.to_sklearn(df)
 
-
-<h2 id="skyulf.preprocessing.casting" class="doc doc-heading">
-            <code>skyulf.preprocessing.casting</code>
-
-
-</h2>
-
-    <div class="doc doc-contents first">
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-
-
-  </div>
-
-    </div>
-
-</div>
+    model = IsolationForest()
+    model.fit(X_matrix, y_vector)
+</code></pre>
+<p>This isolates the "compatibility boilerplate" away from your ML logic.</p>
+<p>This allows us to support <em>every</em> ML feature without rewriting Scikit-Learn from scratch in Polars.</p>
+<h2 id="4-calculator-vs-applier-in-the-hybrid-world">4. Calculator vs. Applier in the Hybrid World</h2>
+<h3 id="calculator-fit">Calculator (<code>fit</code>)</h3>
+<ul>
+<li><strong>Polars Engine:</strong> Calculates stats (min, max, mean) using fast Polars aggregations. Returns a simple Python dictionary (e.g., <code>{'mean': 5.2}</code>).</li>
+<li><strong>Pandas Engine:</strong> Calculates stats using <code>.mean()</code>. Returns the same dictionary structure.</li>
+<li><strong>Result:</strong> The <code>params</code> dictionary is <strong>engine-agnostic</strong>. It doesn't care where it came from.</li>
+</ul>
+<h3 id="applier-apply">Applier (<code>apply</code>)</h3>
+<ul>
+<li>Receives the <strong>agnostic params</strong>.</li>
+<li>Checks the <em>current</em> dataframe's engine.</li>
+<li><strong>If Polars:</strong> Uses <code>pl.col("A") - params["mean"]</code>.</li>
+<li><strong>If Pandas:</strong> Uses <code>df["A"] - params["mean"]</code>.</li>
+</ul>
+<p>This means you can <strong>train on Pandas</strong> and <strong>predict on Polars</strong> (or vice versa)!</p>
+<h2 id="summary">Summary</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Feature</th>
+<th style="text-align: left;">Polars Path</th>
+<th style="text-align: left;">Pandas Path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Speed</strong></td>
+<td style="text-align: left;">🚀 High</td>
+<td style="text-align: left;">🐢 Standard</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Memory</strong></td>
+<td style="text-align: left;">Efficient (Rust)</td>
+<td style="text-align: left;">High Overhead</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Compatibility</strong></td>
+<td style="text-align: left;">Native ops (Expr)</td>
+<td style="text-align: left;">Full Scikit-Learn support</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Usage</strong></td>
+<td style="text-align: left;">Default for ETL/Serving</td>
+<td style="text-align: left;">Default for Training complex models</td>
+</tr>
+</tbody>
+</table>
+<p>Skyulf handles the switching for you. You just pass the data.</p>
 
 
 
@@ -2598,10 +2820,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

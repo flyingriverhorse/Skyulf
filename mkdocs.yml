@@ -51,6 +51,7 @@ nav:
     - Data Architecture: data_architecture.md
     - Performance: performance.md
     - Adding New Engine: guides/adding_new_engine.md
+    - Engine Mechanics: guides/engine_mechanics.md
   - Examples:
     - Quickstart: examples/quickstart.md
     - Leakage Proof: examples/leakage_proof.md
@@ -64,7 +65,9 @@ nav:
     - Automated EDA: user_guide/eda_profiling.md
     - Validation vs scikit-learn: user_guide/validation_vs_sklearn.md
     - Configuration: user_guide/configuration.md
+    - Hyperparameter Tuning: user_guide/hyperparameter_tuning.md
     - SplitDataset & Leakage: user_guide/splitdataset_and_leakage.md
+    - Drift Monitoring: user_guide/drift_monitoring.md
     - Serialization: user_guide/serialization.md
     - Extending Skyulf-Core: user_guide/extending_custom_nodes.md
     - Troubleshooting: user_guide/troubleshooting.md
@@ -101,5 +104,3 @@ nav:
         - regression: reference/api/modeling/regression.md
         - cross_validation: reference/api/modeling/cross_validation.md
         - tuning/engine: reference/api/modeling/tuning_engine.md
-  - Contributing:
-    - Writing Docs: contributing/writing_docs.md

@@ -18,6 +18,20 @@
 ---------------------------------------------
 ## v0.1.14
 
+### 📚 Documentation Overhaul
+- **Landing Page:** Rewrote `docs/index.md` from stub to full landing page with feature comparison table, install commands, architecture overview, and navigation guide.
+- **Installation Guide:** Expanded `installation.md` with PyPI install, all 6 optional extras, editable install workflow, runtime deps, Docker reference, and import check.
+- **Configuration:** Updated `configuration.md` model list from 5 to all 20 registered models (9 classification + 11 regression) organized in tables with XGBoost extras noted.
+- **Troubleshooting:** Expanded from 3 items to 11 common issues with clear fix instructions (SMOTE, XGBoost, Optuna imports, target column encoding, Polars version, Celery/Redis, feature scaling NaN).
+- **Custom Nodes Guide:** Replaced outdated `FeatureEngineer` dispatcher reference with current `@node_meta` + `@NodeRegistry.register` pattern including real-world example.
+- **Getting Started:** Rewrote as proper entry point with minimal runnable example and "what just happened" explanation, linking to deeper guides.
+- **New Page: Hyperparameter Tuning:** Created full guide covering all 5 strategies (grid, random, Optuna, halving_grid, halving_random), config reference, strategy-specific params, and CV types.
+- **New Page: Drift Monitoring:** Created guide for `DriftCalculator` with usage examples, metric explanations (Wasserstein, KS, PSI, KL), custom thresholds, and schema drift detection.
+- **mkdocs.yml:** Removed duplicate Contributing nav entry, added Hyperparameter Tuning and Drift Monitoring to User Guide nav.
+- **Smart Quotes:** Replaced Unicode smart quotes with ASCII equivalents across 8 docs files to prevent encoding issues.
+- **Writing Docs:** Added full directory layout tree to `contributing/writing_docs.md`.
+- **Leakage Proof:** Fixed spacing typo in example output (`0.9151.5500` → `0.9  151.5500`).
+
 
 ---------------
 ## v0.1.13
