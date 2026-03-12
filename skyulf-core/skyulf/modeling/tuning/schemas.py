@@ -17,6 +17,9 @@ class TuningConfig:
     search_space: Dict[str, List[Any]] = field(
         default_factory=dict
     )  # e.g. {"C": [0.1, 1.0, 10.0]}
+    strategy_params: Dict[str, Any] = field(
+        default_factory=dict
+    )  # e.g. {"factor": 3, "sampler": "tpe"}
     cv_enabled: bool = True
     cv_folds: int = 5
     cv_type: Literal[

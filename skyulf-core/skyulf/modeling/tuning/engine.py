@@ -440,29 +440,44 @@ class TuningCalculator(BaseModelCalculator):
                 trials=trials,
             )
 
-        elif config.strategy == "halving_grid":
-            searcher = HalvingGridSearchCV(
-                estimator=base_estimator,
-                param_grid=self._clean_search_space(config.search_space),
-                scoring=metric,
-                cv=cv,
-                n_jobs=-1,
-                random_state=config.random_state,
-                refit=False,
-                error_score=np.nan,
-            )
-        elif config.strategy == "halving_random":
-            searcher = HalvingRandomSearchCV(
-                estimator=base_estimator,
-                param_distributions=self._clean_search_space(config.search_space),
-                n_candidates=config.n_trials,  # Map n_trials to n_candidates
-                scoring=metric,
-                cv=cv,
-                n_jobs=-1,
-                random_state=config.random_state,
-                refit=False,
-                error_score=np.nan,
-            )
+        elif config.strategy in ["halving_grid", "halving_random"]:
+            strategy_params = getattr(config, "strategy_params", {})
+            factor = strategy_params.get("factor", 3)
+            resource = strategy_params.get("resource", "n_samples")
+            min_resources = strategy_params.get("min_resources", "exhaust")
+            
+            if isinstance(min_resources, str) and min_resources.isdigit():
+                min_resources = int(min_resources)
+            
+            if config.strategy == "halving_grid":
+                searcher = HalvingGridSearchCV(
+                    estimator=base_estimator,
+                    param_grid=self._clean_search_space(config.search_space),
+                    scoring=metric,
+                    cv=cv,
+                    n_jobs=-1,
+                    random_state=config.random_state,
+                    refit=False,
+                    error_score=np.nan,
+                    factor=factor,
+                    resource=resource,
+                    min_resources=min_resources,
+                )
+            else:
+                searcher = HalvingRandomSearchCV(
+                    estimator=base_estimator,
+                    param_distributions=self._clean_search_space(config.search_space),
+                    n_candidates=config.n_trials,
+                    scoring=metric,
+                    cv=cv,
+                    n_jobs=-1,
+                    random_state=config.random_state,
+                    refit=False,
+                    error_score=np.nan,
+                    factor=factor,
+                    resource=resource,
+                    min_resources=min_resources,
+                )
         elif config.strategy == "optuna":
             if not HAS_OPTUNA:
                 raise ImportError(
@@ -497,6 +512,31 @@ class TuningCalculator(BaseModelCalculator):
 
                 callbacks.append(_optuna_callback)
 
+            # Strategy Parameters logic
+            strategy_params = getattr(config, "strategy_params", {})
+            
+            # Sampler Selection
+            sampler_name = strategy_params.get("sampler", "tpe")
+            if sampler_name == "random":
+                sampler = optuna.samplers.RandomSampler(seed=config.random_state)
+            elif sampler_name == "cmaes":
+                # CMA-ES can fail if search space is not purely continuous, fallback gracefully?
+                # Using it here assuming the user knows what they're doing if they select it.
+                sampler = optuna.samplers.CmaEsSampler(seed=config.random_state)
+            else:
+                sampler = optuna.samplers.TPESampler(seed=config.random_state)
+                
+            # Pruner Selection
+            pruner_name = strategy_params.get("pruner", "median")
+            if pruner_name == "hyperband":
+                pruner = optuna.pruners.HyperbandPruner()
+            elif pruner_name == "none":
+                pruner = optuna.pruners.NopPruner()
+            else:
+                pruner = optuna.pruners.MedianPruner()
+
+            study = optuna.create_study(sampler=sampler, pruner=pruner, direction="maximize")
+
             searcher = OptunaSearchCV(
                 estimator=base_estimator,
                 param_distributions=distributions,
@@ -505,10 +545,10 @@ class TuningCalculator(BaseModelCalculator):
                 cv=cv,  # type: ignore
                 scoring=metric,
                 n_jobs=-1,
-                random_state=config.random_state,
                 refit=False,
                 verbose=0,
                 callbacks=callbacks,
+                study=study,
             )
         else:
             raise ValueError(f"Unknown tuning strategy: {config.strategy}")

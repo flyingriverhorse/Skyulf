@@ -633,26 +633,30 @@ export const ExperimentsPage: React.FC = () => {
                           </tr>
                           {isTuningExpanded && (
                             <>
-                              {['Strategy', 'Metric', 'Trials', 'CV Enabled', 'Folds', 'Shuffle'].map(field => (
+                              {['Strategy', 'Strategy Params', 'Metric', 'Trials', 'CV Enabled', 'CV Method', 'Folds', 'Shuffle'].map(field => (
                                 <tr key={field} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                   <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{field}</td>
                                   {selectedJobs.map(job => {
                                     if (job.job_type !== 'advanced_tuning') {
                                       return <td key={job.job_id} className="px-4 py-1.5 text-gray-400">-</td>;
                                     }
-                                    
+
                                     const node = (job.graph?.nodes as any[])?.find((n: any) => n.node_id === job.node_id);
-                                    const config = node?.params?.tuning_config;
-                                    
+                                    const config = Object.keys((job.config as any)?.tuning_config || {}).length > 0
+                                        ? (job.config as any).tuning_config
+                                        : node?.params?.tuning_config;
+
                                     if (!config) {
                                       return <td key={job.job_id} className="px-4 py-1.5 text-gray-400">-</td>;
                                     }
 
                                     let value: string | number = '-';
-                                    if (field === 'Strategy') value = config.strategy;
-                                    if (field === 'Metric') value = config.metric;
-                                    if (field === 'Trials') value = config.n_trials;
+                                    if (field === 'Strategy') value = config.strategy || '-';
+                                    if (field === 'Strategy Params') value = config.strategy_params && Object.keys(config.strategy_params).length > 0 ? JSON.stringify(config.strategy_params) : '-';
+                                    if (field === 'Metric') value = config.metric || '-';
+                                    if (field === 'Trials') value = config.n_trials || '-';
                                     if (field === 'CV Enabled') value = config.cv_enabled ? 'Yes' : 'No';
+                                    if (field === 'CV Method') value = config.cv_enabled ? (config.cv_type || 'Unknown') : '-';
                                     if (field === 'Folds') value = config.cv_enabled ? config.cv_folds : '-';
                                     if (field === 'Shuffle') value = config.cv_enabled ? (config.cv_shuffle ? 'Yes' : 'No') : '-';
 
