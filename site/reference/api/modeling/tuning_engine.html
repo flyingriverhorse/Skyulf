@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
     
     
       
@@ -2651,30 +2651,30 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">602</span>
-<span class="normal">603</span>
-<span class="normal">604</span>
-<span class="normal">605</span>
-<span class="normal">606</span>
-<span class="normal">607</span>
-<span class="normal">608</span>
-<span class="normal">609</span>
-<span class="normal">610</span>
-<span class="normal">611</span>
-<span class="normal">612</span>
-<span class="normal">613</span>
-<span class="normal">614</span>
-<span class="normal">615</span>
-<span class="normal">616</span>
-<span class="normal">617</span>
-<span class="normal">618</span>
-<span class="normal">619</span>
-<span class="normal">620</span>
-<span class="normal">621</span>
-<span class="normal">622</span>
-<span class="normal">623</span>
-<span class="normal">624</span>
-<span class="normal">625</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">642</span>
+<span class="normal">643</span>
+<span class="normal">644</span>
+<span class="normal">645</span>
+<span class="normal">646</span>
+<span class="normal">647</span>
+<span class="normal">648</span>
+<span class="normal">649</span>
+<span class="normal">650</span>
+<span class="normal">651</span>
+<span class="normal">652</span>
+<span class="normal">653</span>
+<span class="normal">654</span>
+<span class="normal">655</span>
+<span class="normal">656</span>
+<span class="normal">657</span>
+<span class="normal">658</span>
+<span class="normal">659</span>
+<span class="normal">660</span>
+<span class="normal">661</span>
+<span class="normal">662</span>
+<span class="normal">663</span>
+<span class="normal">664</span>
+<span class="normal">665</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Applier for TuningCalculator.</span>
 <span class="sd">    Wraps the base model applier to provide predictions using the refitted best model.</span>
@@ -3286,7 +3286,47 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">596</span>
 <span class="normal">597</span>
 <span class="normal">598</span>
-<span class="normal">599</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
+<span class="normal">599</span>
+<span class="normal">600</span>
+<span class="normal">601</span>
+<span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span>
+<span class="normal">609</span>
+<span class="normal">610</span>
+<span class="normal">611</span>
+<span class="normal">612</span>
+<span class="normal">613</span>
+<span class="normal">614</span>
+<span class="normal">615</span>
+<span class="normal">616</span>
+<span class="normal">617</span>
+<span class="normal">618</span>
+<span class="normal">619</span>
+<span class="normal">620</span>
+<span class="normal">621</span>
+<span class="normal">622</span>
+<span class="normal">623</span>
+<span class="normal">624</span>
+<span class="normal">625</span>
+<span class="normal">626</span>
+<span class="normal">627</span>
+<span class="normal">628</span>
+<span class="normal">629</span>
+<span class="normal">630</span>
+<span class="normal">631</span>
+<span class="normal">632</span>
+<span class="normal">633</span>
+<span class="normal">634</span>
+<span class="normal">635</span>
+<span class="normal">636</span>
+<span class="normal">637</span>
+<span class="normal">638</span>
+<span class="normal">639</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculator for hyperparameter tuning.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_calculator</span><span class="p">:</span> <span class="n">BaseModelCalculator</span><span class="p">):</span>
@@ -3666,29 +3706,44 @@ Wraps the base model applier to provide predictions using the refitted best mode
                 <span class="n">trials</span><span class="o">=</span><span class="n">trials</span><span class="p">,</span>
             <span class="p">)</span>
 
-        <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;halving_grid&quot;</span><span class="p">:</span>
-            <span class="n">searcher</span> <span class="o">=</span> <span class="n">HalvingGridSearchCV</span><span class="p">(</span>
-                <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
-                <span class="n">param_grid</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_clean_search_space</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span><span class="p">),</span>
-                <span class="n">scoring</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
-                <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">,</span>
-                <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
-                <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
-                <span class="n">refit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                <span class="n">error_score</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
-            <span class="p">)</span>
-        <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;halving_random&quot;</span><span class="p">:</span>
-            <span class="n">searcher</span> <span class="o">=</span> <span class="n">HalvingRandomSearchCV</span><span class="p">(</span>
-                <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
-                <span class="n">param_distributions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_clean_search_space</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span><span class="p">),</span>
-                <span class="n">n_candidates</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">n_trials</span><span class="p">,</span>  <span class="c1"># Map n_trials to n_candidates</span>
-                <span class="n">scoring</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
-                <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">,</span>
-                <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
-                <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
-                <span class="n">refit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                <span class="n">error_score</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
-            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;halving_grid&quot;</span><span class="p">,</span> <span class="s2">&quot;halving_random&quot;</span><span class="p">]:</span>
+            <span class="n">strategy_params</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;strategy_params&quot;</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="n">factor</span> <span class="o">=</span> <span class="n">strategy_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;factor&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+            <span class="n">resource</span> <span class="o">=</span> <span class="n">strategy_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource&quot;</span><span class="p">,</span> <span class="s2">&quot;n_samples&quot;</span><span class="p">)</span>
+            <span class="n">min_resources</span> <span class="o">=</span> <span class="n">strategy_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;min_resources&quot;</span><span class="p">,</span> <span class="s2">&quot;exhaust&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">min_resources</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">min_resources</span><span class="o">.</span><span class="n">isdigit</span><span class="p">():</span>
+                <span class="n">min_resources</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">min_resources</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;halving_grid&quot;</span><span class="p">:</span>
+                <span class="n">searcher</span> <span class="o">=</span> <span class="n">HalvingGridSearchCV</span><span class="p">(</span>
+                    <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
+                    <span class="n">param_grid</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_clean_search_space</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span><span class="p">),</span>
+                    <span class="n">scoring</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
+                    <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">,</span>
+                    <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+                    <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
+                    <span class="n">refit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                    <span class="n">error_score</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                    <span class="n">factor</span><span class="o">=</span><span class="n">factor</span><span class="p">,</span>
+                    <span class="n">resource</span><span class="o">=</span><span class="n">resource</span><span class="p">,</span>
+                    <span class="n">min_resources</span><span class="o">=</span><span class="n">min_resources</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">searcher</span> <span class="o">=</span> <span class="n">HalvingRandomSearchCV</span><span class="p">(</span>
+                    <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
+                    <span class="n">param_distributions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_clean_search_space</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span><span class="p">),</span>
+                    <span class="n">n_candidates</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">n_trials</span><span class="p">,</span>
+                    <span class="n">scoring</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
+                    <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">,</span>
+                    <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+                    <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
+                    <span class="n">refit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                    <span class="n">error_score</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                    <span class="n">factor</span><span class="o">=</span><span class="n">factor</span><span class="p">,</span>
+                    <span class="n">resource</span><span class="o">=</span><span class="n">resource</span><span class="p">,</span>
+                    <span class="n">min_resources</span><span class="o">=</span><span class="n">min_resources</span><span class="p">,</span>
+                <span class="p">)</span>
         <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;optuna&quot;</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">HAS_OPTUNA</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
@@ -3723,6 +3778,31 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
                 <span class="n">callbacks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_optuna_callback</span><span class="p">)</span>
 
+            <span class="c1"># Strategy Parameters logic</span>
+            <span class="n">strategy_params</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;strategy_params&quot;</span><span class="p">,</span> <span class="p">{})</span>
+
+            <span class="c1"># Sampler Selection</span>
+            <span class="n">sampler_name</span> <span class="o">=</span> <span class="n">strategy_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sampler&quot;</span><span class="p">,</span> <span class="s2">&quot;tpe&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">sampler_name</span> <span class="o">==</span> <span class="s2">&quot;random&quot;</span><span class="p">:</span>
+                <span class="n">sampler</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">RandomSampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">sampler_name</span> <span class="o">==</span> <span class="s2">&quot;cmaes&quot;</span><span class="p">:</span>
+                <span class="c1"># CMA-ES can fail if search space is not purely continuous, fallback gracefully?</span>
+                <span class="c1"># Using it here assuming the user knows what they&#39;re doing if they select it.</span>
+                <span class="n">sampler</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">CmaEsSampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">sampler</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">TPESampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">)</span>
+
+            <span class="c1"># Pruner Selection</span>
+            <span class="n">pruner_name</span> <span class="o">=</span> <span class="n">strategy_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;pruner&quot;</span><span class="p">,</span> <span class="s2">&quot;median&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">pruner_name</span> <span class="o">==</span> <span class="s2">&quot;hyperband&quot;</span><span class="p">:</span>
+                <span class="n">pruner</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">pruners</span><span class="o">.</span><span class="n">HyperbandPruner</span><span class="p">()</span>
+            <span class="k">elif</span> <span class="n">pruner_name</span> <span class="o">==</span> <span class="s2">&quot;none&quot;</span><span class="p">:</span>
+                <span class="n">pruner</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">pruners</span><span class="o">.</span><span class="n">NopPruner</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">pruner</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">pruners</span><span class="o">.</span><span class="n">MedianPruner</span><span class="p">()</span>
+
+            <span class="n">study</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">create_study</span><span class="p">(</span><span class="n">sampler</span><span class="o">=</span><span class="n">sampler</span><span class="p">,</span> <span class="n">pruner</span><span class="o">=</span><span class="n">pruner</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="s2">&quot;maximize&quot;</span><span class="p">)</span>
+
             <span class="n">searcher</span> <span class="o">=</span> <span class="n">OptunaSearchCV</span><span class="p">(</span>
                 <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
                 <span class="n">param_distributions</span><span class="o">=</span><span class="n">distributions</span><span class="p">,</span>
@@ -3731,10 +3811,10 @@ Wraps the base model applier to provide predictions using the refitted best mode
                 <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
                 <span class="n">scoring</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
                 <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
-                <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
                 <span class="n">refit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                 <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
                 <span class="n">callbacks</span><span class="o">=</span><span class="n">callbacks</span><span class="p">,</span>
+                <span class="n">study</span><span class="o">=</span><span class="n">study</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown tuning strategy: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">strategy</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -4474,7 +4554,47 @@ Adapts the generic fit interface to the specific tune method.</p>
 <span class="normal">596</span>
 <span class="normal">597</span>
 <span class="normal">598</span>
-<span class="normal">599</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
+<span class="normal">599</span>
+<span class="normal">600</span>
+<span class="normal">601</span>
+<span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span>
+<span class="normal">609</span>
+<span class="normal">610</span>
+<span class="normal">611</span>
+<span class="normal">612</span>
+<span class="normal">613</span>
+<span class="normal">614</span>
+<span class="normal">615</span>
+<span class="normal">616</span>
+<span class="normal">617</span>
+<span class="normal">618</span>
+<span class="normal">619</span>
+<span class="normal">620</span>
+<span class="normal">621</span>
+<span class="normal">622</span>
+<span class="normal">623</span>
+<span class="normal">624</span>
+<span class="normal">625</span>
+<span class="normal">626</span>
+<span class="normal">627</span>
+<span class="normal">628</span>
+<span class="normal">629</span>
+<span class="normal">630</span>
+<span class="normal">631</span>
+<span class="normal">632</span>
+<span class="normal">633</span>
+<span class="normal">634</span>
+<span class="normal">635</span>
+<span class="normal">636</span>
+<span class="normal">637</span>
+<span class="normal">638</span>
+<span class="normal">639</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -4741,29 +4861,44 @@ Adapts the generic fit interface to the specific tune method.</p>
             <span class="n">trials</span><span class="o">=</span><span class="n">trials</span><span class="p">,</span>
         <span class="p">)</span>
 
-    <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;halving_grid&quot;</span><span class="p">:</span>
-        <span class="n">searcher</span> <span class="o">=</span> <span class="n">HalvingGridSearchCV</span><span class="p">(</span>
-            <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
-            <span class="n">param_grid</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_clean_search_space</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span><span class="p">),</span>
-            <span class="n">scoring</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
-            <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">,</span>
-            <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
-            <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
-            <span class="n">refit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-            <span class="n">error_score</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
-        <span class="p">)</span>
-    <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;halving_random&quot;</span><span class="p">:</span>
-        <span class="n">searcher</span> <span class="o">=</span> <span class="n">HalvingRandomSearchCV</span><span class="p">(</span>
-            <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
-            <span class="n">param_distributions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_clean_search_space</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span><span class="p">),</span>
-            <span class="n">n_candidates</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">n_trials</span><span class="p">,</span>  <span class="c1"># Map n_trials to n_candidates</span>
-            <span class="n">scoring</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
-            <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">,</span>
-            <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
-            <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
-            <span class="n">refit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-            <span class="n">error_score</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
-        <span class="p">)</span>
+    <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;halving_grid&quot;</span><span class="p">,</span> <span class="s2">&quot;halving_random&quot;</span><span class="p">]:</span>
+        <span class="n">strategy_params</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;strategy_params&quot;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">factor</span> <span class="o">=</span> <span class="n">strategy_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;factor&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="n">resource</span> <span class="o">=</span> <span class="n">strategy_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource&quot;</span><span class="p">,</span> <span class="s2">&quot;n_samples&quot;</span><span class="p">)</span>
+        <span class="n">min_resources</span> <span class="o">=</span> <span class="n">strategy_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;min_resources&quot;</span><span class="p">,</span> <span class="s2">&quot;exhaust&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">min_resources</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">min_resources</span><span class="o">.</span><span class="n">isdigit</span><span class="p">():</span>
+            <span class="n">min_resources</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">min_resources</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;halving_grid&quot;</span><span class="p">:</span>
+            <span class="n">searcher</span> <span class="o">=</span> <span class="n">HalvingGridSearchCV</span><span class="p">(</span>
+                <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
+                <span class="n">param_grid</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_clean_search_space</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span><span class="p">),</span>
+                <span class="n">scoring</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
+                <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">,</span>
+                <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
+                <span class="n">refit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="n">error_score</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="n">factor</span><span class="o">=</span><span class="n">factor</span><span class="p">,</span>
+                <span class="n">resource</span><span class="o">=</span><span class="n">resource</span><span class="p">,</span>
+                <span class="n">min_resources</span><span class="o">=</span><span class="n">min_resources</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">searcher</span> <span class="o">=</span> <span class="n">HalvingRandomSearchCV</span><span class="p">(</span>
+                <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
+                <span class="n">param_distributions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_clean_search_space</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span><span class="p">),</span>
+                <span class="n">n_candidates</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">n_trials</span><span class="p">,</span>
+                <span class="n">scoring</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
+                <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">,</span>
+                <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
+                <span class="n">refit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="n">error_score</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+                <span class="n">factor</span><span class="o">=</span><span class="n">factor</span><span class="p">,</span>
+                <span class="n">resource</span><span class="o">=</span><span class="n">resource</span><span class="p">,</span>
+                <span class="n">min_resources</span><span class="o">=</span><span class="n">min_resources</span><span class="p">,</span>
+            <span class="p">)</span>
     <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;optuna&quot;</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">HAS_OPTUNA</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
@@ -4798,6 +4933,31 @@ Adapts the generic fit interface to the specific tune method.</p>
 
             <span class="n">callbacks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_optuna_callback</span><span class="p">)</span>
 
+        <span class="c1"># Strategy Parameters logic</span>
+        <span class="n">strategy_params</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;strategy_params&quot;</span><span class="p">,</span> <span class="p">{})</span>
+
+        <span class="c1"># Sampler Selection</span>
+        <span class="n">sampler_name</span> <span class="o">=</span> <span class="n">strategy_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sampler&quot;</span><span class="p">,</span> <span class="s2">&quot;tpe&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sampler_name</span> <span class="o">==</span> <span class="s2">&quot;random&quot;</span><span class="p">:</span>
+            <span class="n">sampler</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">RandomSampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">sampler_name</span> <span class="o">==</span> <span class="s2">&quot;cmaes&quot;</span><span class="p">:</span>
+            <span class="c1"># CMA-ES can fail if search space is not purely continuous, fallback gracefully?</span>
+            <span class="c1"># Using it here assuming the user knows what they&#39;re doing if they select it.</span>
+            <span class="n">sampler</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">CmaEsSampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sampler</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">TPESampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">)</span>
+
+        <span class="c1"># Pruner Selection</span>
+        <span class="n">pruner_name</span> <span class="o">=</span> <span class="n">strategy_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;pruner&quot;</span><span class="p">,</span> <span class="s2">&quot;median&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">pruner_name</span> <span class="o">==</span> <span class="s2">&quot;hyperband&quot;</span><span class="p">:</span>
+            <span class="n">pruner</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">pruners</span><span class="o">.</span><span class="n">HyperbandPruner</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">pruner_name</span> <span class="o">==</span> <span class="s2">&quot;none&quot;</span><span class="p">:</span>
+            <span class="n">pruner</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">pruners</span><span class="o">.</span><span class="n">NopPruner</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">pruner</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">pruners</span><span class="o">.</span><span class="n">MedianPruner</span><span class="p">()</span>
+
+        <span class="n">study</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">create_study</span><span class="p">(</span><span class="n">sampler</span><span class="o">=</span><span class="n">sampler</span><span class="p">,</span> <span class="n">pruner</span><span class="o">=</span><span class="n">pruner</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="s2">&quot;maximize&quot;</span><span class="p">)</span>
+
         <span class="n">searcher</span> <span class="o">=</span> <span class="n">OptunaSearchCV</span><span class="p">(</span>
             <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
             <span class="n">param_distributions</span><span class="o">=</span><span class="n">distributions</span><span class="p">,</span>
@@ -4806,10 +4966,10 @@ Adapts the generic fit interface to the specific tune method.</p>
             <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
             <span class="n">scoring</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
             <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
-            <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
             <span class="n">refit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
             <span class="n">callbacks</span><span class="o">=</span><span class="n">callbacks</span><span class="p">,</span>
+            <span class="n">study</span><span class="o">=</span><span class="n">study</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown tuning strategy: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">strategy</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
