@@ -23,6 +23,16 @@
 - **Installation Guide:** Expanded `installation.md` with PyPI install, all 6 optional extras, editable install workflow, runtime deps, Docker reference, and import check.
 - **Configuration:** Updated `configuration.md` model list from 5 to all 20 registered models (9 classification + 11 regression) organized in tables with XGBoost extras noted.
 - **Troubleshooting:** Expanded from 3 items to 11 common issues with clear fix instructions (SMOTE, XGBoost, Optuna imports, target column encoding, Polars version, Celery/Redis, feature scaling NaN).
+
+### 🎨 Landing Page (`index.html`)
+- **Hero CTA:** Added "Get Started" button linking to Platform Setup docs alongside "Star on GitHub".
+- **Pip Install Snippet:** Added copyable `pip install skyulf-core` code block in the hero section.
+- **Naming Consistency:** Renamed "Feature Canvas" to "ML Canvas" in copy and alt text.
+- **Node Count:** Updated "25+ processing nodes" to "30+" to match actual registry.
+- **Footer Links:** Replaced dead `#` placeholder links with real destinations (PyPI, Roadmap, Discussions, Quick Start, License).
+- **Copyright:** Updated footer year to 2025-2026.
+- **Accessibility:** Added `aria-hidden`, `role="dialog"`, and `aria-label` to lightbox modal.
+- **Noscript Fallback:** Added `<noscript>` style block for JS-disabled visitors.
 - **Custom Nodes Guide:** Replaced outdated `FeatureEngineer` dispatcher reference with current `@node_meta` + `@NodeRegistry.register` pattern including real-world example.
 - **Getting Started:** Rewrote as proper entry point with minimal runnable example and "what just happened" explanation, linking to deeper guides.
 - **New Page: Hyperparameter Tuning:** Created full guide covering all 5 strategies (grid, random, Optuna, halving_grid, halving_random), config reference, strategy-specific params, and CV types.
@@ -31,6 +41,16 @@
 - **Smart Quotes:** Replaced Unicode smart quotes with ASCII equivalents across 8 docs files to prevent encoding issues.
 - **Writing Docs:** Added full directory layout tree to `contributing/writing_docs.md`.
 - **Leakage Proof:** Fixed spacing typo in example output (`0.9151.5500` → `0.9  151.5500`).
+- **Quickstart:** Added import‐alternatives tip, "What's Next?" navigation table, and leakage prevention warning to `examples/quickstart.md`.
+- **New Page: FAQ & Comparison:** Created `guides/faq.md` with 4 comparison tables (vs MLflow, Kubeflow/ZenML, scikit‐learn, AutoML) plus general and technical FAQ sections.
+- **New Page: Platform Walkthrough:** Created `guides/platform_walkthrough.md` — 8‐step end‐to‐end workflow (Upload → Drift), node categories table, API quick reference, and architecture diagram.
+- **Preprocessing Reference:** Updated `preprocessing_nodes.md` header to reference NodeRegistry resolution instead of just FeatureEngineer.
+- **New Page: Platform Setup:** Created `guides/platform_setup.md` — full deployment guide covering clone, `.env` configuration, Docker Compose (3-container stack), manual setup, health verification, default credentials, and first steps.
+- **Installation Docker Section:** Expanded from one-liner to full section with `.env` config table, Docker Compose services table, verification URLs, and default credentials.
+- **Landing Page:** Updated "Where to Start" to link Platform Setup, Platform Walkthrough, and Swagger UI instead of just the quickstart.
+- **QUICKSTART.md Fixes:** Corrected uvicorn command (`backend.main:app`), renamed "Feature Canvas" to "ML Canvas", fixed stale `core/feature_engineering` path, documented default credentials.
+- **README.md:** Fixed broken `frontend/feature-canvas/LICENSE` link to `frontend/ml-canvas/LICENSE`.
+- **Quickstart Note:** Corrected stale "skips TrainTestSplitter" note (the example actually includes it).
 
 
 ---------------

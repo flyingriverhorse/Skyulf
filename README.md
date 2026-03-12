@@ -218,7 +218,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and w
 Skyulf uses a split licensing model to balance open standards with sustainable development:
 
 *   **Backend & Core:** [Apache 2.0](LICENSE) (Permissive) - Ideal for integration and enterprise use.
-*   **Frontend (Feature Canvas):** [GNU AGPLv3](frontend/feature-canvas/LICENSE) (Copyleft) - Ensures UI improvements are shared back to the community.
+*   **Frontend (ML Canvas):** [GNU AGPLv3](frontend/ml-canvas/LICENSE) (Copyleft) - Ensures UI improvements are shared back to the community.
 
 **Commercial Use:**
 No separate commercial license is required for internal use or building proprietary plugins on the backend.

@@ -501,6 +501,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guides/recipes.html" class="md-nav__link">
         
   
@@ -869,6 +953,17 @@
     <span class="md-ellipsis">
       
         5. Save and Load
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-whats-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. What's next?
       
     </span>
   </a>
@@ -2547,13 +2642,16 @@
 
 
 <h1 id="quickstart-guide">Quickstart Guide</h1>
-<p>This guide demonstrates how to create a simple end-to-end pipeline using Skyulf Core.</p>
+<p>This guide demonstrates how to create a simple end-to-end pipeline using Skyulf Core — from data creation to training, saving, and loading.</p>
 <h2 id="1-setup">1. Setup</h2>
 <p>First, import the necessary modules.</p>
 <pre><code class="language-python">import numpy as np
 import pandas as pd
 from skyulf import SkyulfPipeline
 </code></pre>
+<blockquote>
+<p><strong>Tip:</strong> You can also use <code>from skyulf.pipeline import SkyulfPipeline</code>.</p>
+</blockquote>
 <h2 id="2-create-dummy-data">2. Create Dummy Data</h2>
 <p>We'll create a synthetic dataset with some missing values and categorical features.</p>
 <pre><code class="language-python">def create_dummy_data(n: int = 200) -&gt; pd.DataFrame:
@@ -2665,6 +2763,40 @@ if os.path.exists(artifact_path):
 1    1
 dtype: int64
 </code></pre>
+<h2 id="6-whats-next">6. What's next?</h2>
+<table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Page</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Add train/test splits for proper evaluation</td>
+<td><a href="../user_guide/pipeline_quickstart.html">Pipeline Quickstart</a></td>
+</tr>
+<tr>
+<td>Hyperparameter tuning (grid, Optuna, halving)</td>
+<td><a href="../user_guide/hyperparameter_tuning.html">Hyperparameter Tuning</a></td>
+</tr>
+<tr>
+<td>All 20 supported models</td>
+<td><a href="../user_guide/configuration.html">Configuration</a></td>
+</tr>
+<tr>
+<td>Full platform walkthrough (UI + API)</td>
+<td><a href="../guides/platform_walkthrough.html">Platform Walkthrough</a></td>
+</tr>
+<tr>
+<td>Troubleshooting</td>
+<td><a href="../user_guide/troubleshooting.html">Troubleshooting</a></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Note:</strong> This example includes a <code>TrainTestSplitter</code> to demonstrate best practice. In production, always split first to prevent <a href="../user_guide/splitdataset_and_leakage.html">data leakage</a>.</p>
+</blockquote>
 
 
 
