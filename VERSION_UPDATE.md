@@ -15,7 +15,11 @@
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
 
-------------------------------------------------------------
+---------------------------------------------
+## v0.1.14
+
+
+---------------
 ## v0.1.13
 **"The Advanced Tuning Strategies Update"**
 
