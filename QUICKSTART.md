@@ -80,7 +80,13 @@ Redis is required for background training. On Windows, install via [WSL](https:/
 ### 4.3 Launch the API server
 
 ```powershell
-python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+python run_skyulf.py
+```
+
+Or with uvicorn directly:
+
+```powershell
+python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Navigate to:
@@ -106,7 +112,7 @@ You can tail logs in `logs/` to watch training and feature-engineering jobs prog
 
 ## 5. Load sample data
 
-1. Sign in to the web UI (default admin credentials live in `config.py`).
+1. Sign in to the web UI with the default credentials: **username** `admin`, **password** `admin123` (defined in `backend/config.py`).
 2. Navigate to **Data Ingestion → Upload** and select a CSV from `data/`.
 3. Save the inferred schema to reuse columns in future experiments.
 
@@ -114,7 +120,7 @@ You can tail logs in `logs/` to watch training and feature-engineering jobs prog
 
 ## 6. Build your first flow
 
-1. Open **Feature Canvas** and drag a **Dataset Source** node onto the grid.
+1. Open the **ML Canvas** and drag a **Dataset Source** node onto the grid.
 2. Connect it to a **Train/Val/Test Split** node (70/15/15 by default).
 3. Finish with a **Model Trainer** node targeting `RandomForestClassifier`.
 4. Hit **Save & Run** — the job is queued immediately.
@@ -126,7 +132,7 @@ You can follow progress from the **Experiments** page or by watching the worker 
 ## 7. Next steps
 
 - Explore the `/docs` OpenAPI schema to wire up your own clients.
-- Peek at `core/feature_engineering` for custom node examples.
+- Peek at `skyulf-core/skyulf/preprocessing/` for custom node examples.
 - Join the [GitHub Discussions](https://github.com/flyingriverhorse/skyulf/discussions) to propose new nodes.
 
 Need help? Open an issue or ping the team on Discussions — we respond fast during the alpha phase.

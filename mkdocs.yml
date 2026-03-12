@@ -45,6 +45,9 @@ nav:
   - Home: index.md
   - Guides:
     - Getting Started: guides/getting_started.md
+    - Platform Setup: guides/platform_setup.md
+    - Platform Walkthrough: guides/platform_walkthrough.md
+    - FAQ & Comparison: guides/faq.md
     - Recipes: guides/recipes.md
     - Skyulf vs. YData vs. Sweetviz: guides/profiling_comparison.md
     - Architecture: architecture.md

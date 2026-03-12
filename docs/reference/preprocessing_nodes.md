@@ -1,6 +1,6 @@
 # Preprocessing Nodes
 
-This page documents the preprocessing node types supported by `FeatureEngineer`.
+This page documents all preprocessing node types supported by Skyulf's `NodeRegistry` (resolved by `FeatureEngineer` at runtime).
 
 ## Step schema
 

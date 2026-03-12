@@ -62,8 +62,9 @@ See [Architecture](architecture.md) and [Data Architecture](data_architecture.md
 
 ### Using the Web Platform
 
-1. Follow the [Quickstart](examples/quickstart.md) to get the backend running.
-2. Open the ML Canvas in your browser and start building pipelines visually.
+1. Follow the [Platform Setup](guides/platform_setup.md) to get the backend running (Docker or manual).
+2. See the [Platform Walkthrough](guides/platform_walkthrough.md) for an 8-step end-to-end guide through the UI.
+3. Explore the interactive API docs at [/docs](http://127.0.0.1:8000/docs) (Swagger UI) or [/redoc](http://127.0.0.1:8000/redoc) (ReDoc).
 
 ### Using skyulf-core as a Library
 

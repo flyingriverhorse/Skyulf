@@ -1,6 +1,6 @@
 # Quickstart Guide
 
-This guide demonstrates how to create a simple end-to-end pipeline using Skyulf Core.
+This guide demonstrates how to create a simple end-to-end pipeline using Skyulf Core — from data creation to training, saving, and loading.
 
 ## 1. Setup
 
@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 from skyulf import SkyulfPipeline
 ```
+
+> **Tip:** You can also use `from skyulf.pipeline import SkyulfPipeline`.
 
 ## 2. Create Dummy Data
 
@@ -144,3 +146,15 @@ if os.path.exists(artifact_path):
 1    1
 dtype: int64
 ```
+
+## 6. What's next?
+
+| Goal | Page |
+|---|---|
+| Add train/test splits for proper evaluation | [Pipeline Quickstart](../user_guide/pipeline_quickstart.md) |
+| Hyperparameter tuning (grid, Optuna, halving) | [Hyperparameter Tuning](../user_guide/hyperparameter_tuning.md) |
+| All 20 supported models | [Configuration](../user_guide/configuration.md) |
+| Full platform walkthrough (UI + API) | [Platform Walkthrough](../guides/platform_walkthrough.md) |
+| Troubleshooting | [Troubleshooting](../user_guide/troubleshooting.md) |
+
+> **Note:** This example includes a `TrainTestSplitter` to demonstrate best practice. In production, always split first to prevent [data leakage](../user_guide/splitdataset_and_leakage.md).

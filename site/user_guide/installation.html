@@ -501,6 +501,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guides/recipes.html" class="md-nav__link">
         
   
@@ -1117,6 +1201,45 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Full platform (Docker)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-configure-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Configure environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-launch-with-docker-compose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Launch with Docker Compose
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-verify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Verify
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2643,9 +2766,82 @@ pip install -e ./skyulf-core
 </ul>
 <h2 id="full-platform-docker">Full platform (Docker)</h2>
 <p>To run the complete Skyulf platform (backend + frontend + Celery workers):</p>
-<pre><code class="language-bash">docker-compose up --build
+<h3 id="1-configure-environment">1. Configure environment</h3>
+<pre><code class="language-bash">cp .env.example .env
 </code></pre>
-<p>See the <a href="../guides/getting_started.html">Quick Start guide</a> for details.</p>
+<p>Key variables to review:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DB_TYPE</code></td>
+<td><code>sqlite</code></td>
+<td>Database backend (<code>sqlite</code> or <code>postgres</code>)</td>
+</tr>
+<tr>
+<td><code>USE_CELERY</code></td>
+<td><code>true</code></td>
+<td>Set <code>false</code> to skip Redis and run tasks in-process</td>
+</tr>
+<tr>
+<td><code>CELERY_BROKER_URL</code></td>
+<td><code>redis://localhost:6379/1</code></td>
+<td>Redis URL for Celery</td>
+</tr>
+<tr>
+<td><code>SECRET_KEY</code></td>
+<td><em>(placeholder)</em></td>
+<td><strong>Change this</strong> in production</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Quick start:</strong> For local development with no Redis, just set <code>USE_CELERY=false</code> in <code>.env</code>.</p>
+</blockquote>
+<h3 id="2-launch-with-docker-compose">2. Launch with Docker Compose</h3>
+<pre><code class="language-bash">docker compose up --build
+</code></pre>
+<p>This starts three containers:</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Port</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>api</code></td>
+<td><code>8000</code></td>
+<td>FastAPI backend + static frontend</td>
+</tr>
+<tr>
+<td><code>redis</code></td>
+<td><code>6379</code></td>
+<td>Message broker for Celery</td>
+</tr>
+<tr>
+<td><code>worker</code></td>
+<td>—</td>
+<td>Celery worker for background training</td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-verify">3. Verify</h3>
+<ul>
+<li>Dashboard: <a href="http://127.0.0.1:8000">http://127.0.0.1:8000</a></li>
+<li>Swagger UI: <a href="http://127.0.0.1:8000/docs">http://127.0.0.1:8000/docs</a></li>
+<li>Health check: <a href="http://127.0.0.1:8000/health">http://127.0.0.1:8000/health</a></li>
+<li>Default login: <strong>admin</strong> / <strong>admin123</strong> (change in production)</li>
+</ul>
+<p>For the full manual setup (without Docker), see the <a href="../guides/platform_setup.html">Platform Setup guide</a>.</p>
 <h2 id="import-check">Import check</h2>
 <p>Verify the installation:</p>
 <pre><code class="language-python">from skyulf.pipeline import SkyulfPipeline

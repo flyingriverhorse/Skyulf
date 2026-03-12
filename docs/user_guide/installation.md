@@ -57,11 +57,45 @@ These are pulled in automatically by `pip install skyulf-core`:
 
 To run the complete Skyulf platform (backend + frontend + Celery workers):
 
+### 1. Configure environment
+
 ```bash
-docker-compose up --build
+cp .env.example .env
 ```
 
-See the [Quick Start guide](../guides/getting_started.md) for details.
+Key variables to review:
+
+| Variable | Default | Description |
+|---|---|---|
+| `DB_TYPE` | `sqlite` | Database backend (`sqlite` or `postgres`) |
+| `USE_CELERY` | `true` | Set `false` to skip Redis and run tasks in-process |
+| `CELERY_BROKER_URL` | `redis://localhost:6379/1` | Redis URL for Celery |
+| `SECRET_KEY` | *(placeholder)* | **Change this** in production |
+
+> **Quick start:** For local development with no Redis, just set `USE_CELERY=false` in `.env`.
+
+### 2. Launch with Docker Compose
+
+```bash
+docker compose up --build
+```
+
+This starts three containers:
+
+| Service | Port | Purpose |
+|---|---|---|
+| `api` | `8000` | FastAPI backend + static frontend |
+| `redis` | `6379` | Message broker for Celery |
+| `worker` | — | Celery worker for background training |
+
+### 3. Verify
+
+- Dashboard: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- Health check: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
+- Default login: **admin** / **admin123** (change in production)
+
+For the full manual setup (without Docker), see the [Platform Setup guide](../guides/platform_setup.md).
 
 ## Import check
 
