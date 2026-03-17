@@ -338,26 +338,6 @@
   
 
       
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../contributing/writing_docs.html" class="md-tabs__link">
-          
-  
-  
-  Contributing
-
-        </a>
-      </li>
-    
-  
-
-      
     </ul>
   </div>
 </nav>
@@ -501,6 +481,90 @@
     
   
     Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
   
 
     
@@ -669,6 +733,34 @@
     
   
     Adding New Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
   
 
     
@@ -1285,6 +1377,62 @@
   
   
     <li class="md-nav__item">
+      <a href="hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="splitdataset_and_leakage.html" class="md-nav__link">
         
   
@@ -1293,6 +1441,34 @@
     
   
     SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
   
 
     
@@ -2490,95 +2666,6 @@
   
 
     
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Contributing
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Contributing
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../contributing/writing_docs.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Writing Docs
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
   </ul>
 </nav>
                   </div>
@@ -2607,7 +2694,7 @@
 <li>A <strong>Calculator</strong> learns from data and returns a <code>params</code> dictionary.</li>
 <li>An <strong>Applier</strong> takes <code>params</code> and transforms data.</li>
 </ul>
-<p>This differs from scikit-learn’s default pattern:</p>
+<p>This differs from scikit-learn's default pattern:</p>
 <ul>
 <li>In scikit-learn, <code>fit()</code> <strong>mutates</strong> the estimator/transformer object (e.g. <code>self.mean_</code>, <code>self.categories_</code>), and <code>transform()</code> uses those hidden internal attributes.</li>
 <li>In Skyulf-core, <code>fit()</code> returns the learned state explicitly as a plain <code>params</code> dictionary (ideally JSON-serializable; sometimes pickled for complex sklearn objects), and <code>apply()</code> uses only that dictionary.</li>
@@ -2618,7 +2705,7 @@
 <p>Use <code>SkyulfPipeline</code> to run preprocessing + modeling end-to-end.</p>
 <h3 id="2-component-way-low-level">2) Component way (low-level)</h3>
 <p>Call calculators/appliers directly for debugging, testing, or custom scripts.</p>
-<p>This is also where you’ll see <code>StatefulEstimator</code> used: it’s a small convenience wrapper that
+<p>This is also where you'll see <code>StatefulEstimator</code> used: it's a small convenience wrapper that
 keeps a fitted model artifact in memory and can run <code>fit_predict()</code> on a <code>SplitDataset</code>.
 <code>SkyulfPipeline</code> uses the same underlying idea internally.</p>
 <h2 id="how-fit-transform-works-in-skyulf">How <code>fit</code> / <code>transform</code> works in Skyulf</h2>
@@ -2641,7 +2728,7 @@ keeps a fitted model artifact in memory and can run <code>fit_predict()</code> o
 </ul>
 </li>
 </ul>
-<p>If you want reproducible “proof-style” checks (sklearn-style <code>X/y</code> split + leakage demonstration), see:</p>
+<p>If you want reproducible "proof-style" checks (sklearn-style <code>X/y</code> split + leakage demonstration), see:</p>
 <ul>
 <li>Validation vs scikit-learn</li>
 </ul>

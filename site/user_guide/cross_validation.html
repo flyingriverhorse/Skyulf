@@ -8,31 +8,31 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/cleaning.html">
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/cross_validation.html">
       
       
-        <link rel="prev" href="split.html">
+        <link rel="prev" href="hyperparameter_tuning.html">
       
       
-        <link rel="next" href="drop_and_missing.html">
+        <link rel="next" href="splitdataset_and_leakage.html">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
     
     
       
-        <title>cleaning - Skyulf</title>
+        <title>Cross-Validation - Skyulf</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,9 +51,9 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#api-preprocessingcleaning" class="md-skip">
+        <a href="#cross-validation" class="md-skip">
           Skip to content
         </a>
       
@@ -92,7 +92,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              cleaning
+              Cross-Validation
             
           </span>
         </div>
@@ -223,7 +223,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../index.html" class="md-tabs__link">
+      <a href="../index.html" class="md-tabs__link">
         
   
   
@@ -244,7 +244,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../guides/getting_started.html" class="md-tabs__link">
+        <a href="../guides/getting_started.html" class="md-tabs__link">
           
   
   
@@ -264,7 +264,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../examples/quickstart.html" class="md-tabs__link">
+        <a href="../examples/quickstart.html" class="md-tabs__link">
           
   
   
@@ -284,31 +284,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../contributing/writing_docs.html" class="md-tabs__link">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
           
   
   
   Contributing
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../../../user_guide/overview.html" class="md-tabs__link">
-          
-  
-  
-  User Guide
 
         </a>
       </li>
@@ -326,7 +306,27 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../preprocessing_nodes.html" class="md-tabs__link">
+        <a href="overview.html" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
           
   
   
@@ -362,7 +362,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -392,7 +392,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../index.html" class="md-nav__link">
+      <a href="../index.html" class="md-nav__link">
         
   
   
@@ -473,7 +473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/getting_started.html" class="md-nav__link">
+      <a href="../guides/getting_started.html" class="md-nav__link">
         
   
   
@@ -501,7 +501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/platform_setup.html" class="md-nav__link">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
         
   
   
@@ -529,7 +529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/platform_walkthrough.html" class="md-nav__link">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
         
   
   
@@ -557,7 +557,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/faq.html" class="md-nav__link">
+      <a href="../guides/faq.html" class="md-nav__link">
         
   
   
@@ -585,7 +585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/recipes.html" class="md-nav__link">
+      <a href="../guides/recipes.html" class="md-nav__link">
         
   
   
@@ -613,7 +613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/profiling_comparison.html" class="md-nav__link">
+      <a href="../guides/profiling_comparison.html" class="md-nav__link">
         
   
   
@@ -641,7 +641,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture.html" class="md-nav__link">
+      <a href="../architecture.html" class="md-nav__link">
         
   
   
@@ -669,7 +669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../data_architecture.html" class="md-nav__link">
+      <a href="../data_architecture.html" class="md-nav__link">
         
   
   
@@ -697,7 +697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../performance.html" class="md-nav__link">
+      <a href="../performance.html" class="md-nav__link">
         
   
   
@@ -725,7 +725,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/adding_new_engine.html" class="md-nav__link">
+      <a href="../guides/adding_new_engine.html" class="md-nav__link">
         
   
   
@@ -753,7 +753,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/engine_mechanics.html" class="md-nav__link">
+      <a href="../guides/engine_mechanics.html" class="md-nav__link">
         
   
   
@@ -842,7 +842,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/quickstart.html" class="md-nav__link">
+      <a href="../examples/quickstart.html" class="md-nav__link">
         
   
   
@@ -870,7 +870,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/leakage_proof.html" class="md-nav__link">
+      <a href="../examples/leakage_proof.html" class="md-nav__link">
         
   
   
@@ -959,7 +959,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/writing_docs.html" class="md-nav__link">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
         
   
   
@@ -967,6 +967,658 @@
     
   
     Writing Docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pipeline_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="step_by_step_no_config.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step-by-Step (No Config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="eda_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated EDA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="cross_validation.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#supported-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-example-standalone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick example (standalone)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-example-pipeline-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick example (pipeline config)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#method-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Method details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#k-fold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        K-Fold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stratified-k-fold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stratified K-Fold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shuffle-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shuffle Split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#time-series-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time Series Split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nested-cv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nested CV
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#return-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Return structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ml-canvas-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ML Canvas UI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integration-with-tuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration with tuning
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="splitdataset_and_leakage.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="serialization.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="extending_custom_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending Skyulf-Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
   
 
     
@@ -1009,466 +1661,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    User Guide
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    User Guide
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/overview.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/installation.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Installation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/pipeline_quickstart.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pipeline Quickstart
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/step_by_step_no_config.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Step-by-Step (No Config)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/eda_profiling.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Automated EDA
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/validation_vs_sklearn.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Validation vs scikit-learn
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/configuration.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/hyperparameter_tuning.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hyperparameter Tuning
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/cross_validation.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Cross-Validation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    SplitDataset & Leakage
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/drift_monitoring.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Drift Monitoring
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/serialization.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Serialization
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/extending_custom_nodes.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Extending Skyulf-Core
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/troubleshooting.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-    
-  
-  
-  
-    
-    
-    
-    
-      
-        
-        
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
-        
-          
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -1486,7 +1682,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1504,7 +1700,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../preprocessing_nodes.html" class="md-nav__link">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
         
   
   
@@ -1532,7 +1728,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../modeling_nodes.html" class="md-nav__link">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
         
   
   
@@ -1557,31 +1753,28 @@
                 
   
   
-    
   
   
-  
     
     
     
     
       
       
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
         
           
-          
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3" checked>
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_3" >
         
           
-          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="0">
             
   
   
@@ -1599,7 +1792,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1617,7 +1810,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../pipeline.html" class="md-nav__link">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
         
   
   
@@ -1699,7 +1892,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../data/dataset.html" class="md-nav__link">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
         
   
   
@@ -1732,8 +1925,6 @@
                 
   
   
-    
-  
   
   
     
@@ -1746,11 +1937,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_3_3" >
         
           
           <label class="md-nav__link" for="__nav_6_3_3" id="__nav_6_3_3_label" tabindex="0">
@@ -1771,7 +1964,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_3_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_3_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6_3_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1789,7 +1982,7 @@
   
   
     <li class="md-nav__item">
-      <a href="index.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
         
   
   
@@ -1817,7 +2010,7 @@
   
   
     <li class="md-nav__item">
-      <a href="base.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
         
   
   
@@ -1845,7 +2038,7 @@
   
   
     <li class="md-nav__item">
-      <a href="pipeline.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
         
   
   
@@ -1873,7 +2066,7 @@
   
   
     <li class="md-nav__item">
-      <a href="split.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
         
   
   
@@ -1898,37 +2091,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    cleaning
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="cleaning.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
         
   
   
@@ -1944,37 +2110,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#skyulf.preprocessing.cleaning" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        cleaning
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1987,7 +2122,7 @@
   
   
     <li class="md-nav__item">
-      <a href="drop_and_missing.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
         
   
   
@@ -2015,7 +2150,7 @@
   
   
     <li class="md-nav__item">
-      <a href="imputation.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
         
   
   
@@ -2043,7 +2178,7 @@
   
   
     <li class="md-nav__item">
-      <a href="encoding.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
         
   
   
@@ -2071,7 +2206,7 @@
   
   
     <li class="md-nav__item">
-      <a href="scaling.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
         
   
   
@@ -2099,7 +2234,7 @@
   
   
     <li class="md-nav__item">
-      <a href="outliers.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
         
   
   
@@ -2127,7 +2262,7 @@
   
   
     <li class="md-nav__item">
-      <a href="transformations.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
         
   
   
@@ -2155,7 +2290,7 @@
   
   
     <li class="md-nav__item">
-      <a href="bucketing.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
         
   
   
@@ -2183,7 +2318,7 @@
   
   
     <li class="md-nav__item">
-      <a href="casting.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
         
   
   
@@ -2211,7 +2346,7 @@
   
   
     <li class="md-nav__item">
-      <a href="feature_generation.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
         
   
   
@@ -2239,7 +2374,7 @@
   
   
     <li class="md-nav__item">
-      <a href="feature_selection.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
         
   
   
@@ -2267,7 +2402,7 @@
   
   
     <li class="md-nav__item">
-      <a href="resampling.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
         
   
   
@@ -2295,7 +2430,7 @@
   
   
     <li class="md-nav__item">
-      <a href="inspection.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
         
   
   
@@ -2385,7 +2520,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/index.html" class="md-nav__link">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
         
   
   
@@ -2413,7 +2548,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/base.html" class="md-nav__link">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
         
   
   
@@ -2441,7 +2576,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/sklearn_wrapper.html" class="md-nav__link">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
         
   
   
@@ -2469,7 +2604,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/classification.html" class="md-nav__link">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
         
   
   
@@ -2497,7 +2632,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/regression.html" class="md-nav__link">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
         
   
   
@@ -2525,7 +2660,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/cross_validation.html" class="md-nav__link">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
         
   
   
@@ -2553,7 +2688,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/tuning_engine.html" class="md-nav__link">
+      <a href="../reference/api/modeling/tuning_engine.html" class="md-nav__link">
         
   
   
@@ -2617,48 +2752,191 @@
   
 
 
-<h1 id="api-preprocessingcleaning">API: preprocessing.cleaning</h1>
+<h1 id="cross-validation">Cross-Validation</h1>
+<p>Skyulf supports five cross-validation strategies out of the box. CV can be used standalone via <code>StatefulEstimator.cross_validate()</code> or inside the hyperparameter tuning pipeline.</p>
+<h2 id="supported-methods">Supported methods</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Key</th>
+<th>Splitter</th>
+<th>Best for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>K-Fold</td>
+<td><code>k_fold</code></td>
+<td><code>sklearn.model_selection.KFold</code></td>
+<td>General purpose</td>
+</tr>
+<tr>
+<td>Stratified K-Fold</td>
+<td><code>stratified_k_fold</code></td>
+<td><code>sklearn.model_selection.StratifiedKFold</code></td>
+<td>Classification with imbalanced classes</td>
+</tr>
+<tr>
+<td>Shuffle Split</td>
+<td><code>shuffle_split</code></td>
+<td><code>sklearn.model_selection.ShuffleSplit</code></td>
+<td>Random repeated train/test splits</td>
+</tr>
+<tr>
+<td>Time Series Split</td>
+<td><code>time_series_split</code></td>
+<td><code>sklearn.model_selection.TimeSeriesSplit</code></td>
+<td>Temporal data (no future leakage)</td>
+</tr>
+<tr>
+<td>Nested CV</td>
+<td><code>nested_cv</code></td>
+<td>Dual-loop (outer KFold/Stratified + inner KFold/Stratified)</td>
+<td>Unbiased generalization estimate</td>
+</tr>
+</tbody>
+</table>
+<h2 id="quick-example-standalone">Quick example (standalone)</h2>
+<pre><code class="language-python">from skyulf.modeling.base import StatefulEstimator
 
+estimator = StatefulEstimator(model_type=&quot;random_forest_classifier&quot;)
+estimator.fit(X_train, y_train)
 
-<div class="doc doc-object doc-module">
+cv_results = estimator.cross_validate(
+    X_train, y_train,
+    n_folds=5,
+    cv_type=&quot;stratified_k_fold&quot;,
+)
 
-
-
-<h2 id="skyulf.preprocessing.cleaning" class="doc doc-heading">
-            <code>skyulf.preprocessing.cleaning</code>
-
-
-</h2>
-
-    <div class="doc doc-contents first">
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-
-
-  </div>
-
-    </div>
-
-</div>
+print(cv_results[&quot;aggregated_metrics&quot;])
+# {'accuracy': {'mean': 0.92, 'std': 0.01, 'min': 0.90, 'max': 0.94}, ...}
+</code></pre>
+<h2 id="quick-example-pipeline-config">Quick example (pipeline config)</h2>
+<pre><code class="language-python">config = {
+    &quot;preprocessing&quot;: [...],
+    &quot;modeling&quot;: {
+        &quot;type&quot;: &quot;random_forest_classifier&quot;,
+        &quot;cv_enabled&quot;: True,
+        &quot;cv_type&quot;: &quot;k_fold&quot;,
+        &quot;cv_folds&quot;: 5,
+    },
+}
+</code></pre>
+<h2 id="method-details">Method details</h2>
+<h3 id="k-fold">K-Fold</h3>
+<p>Splits data into <code>n_folds</code> equal parts. Each fold is used once as validation while the remaining folds form the training set. Data is shuffled by default.</p>
+<pre><code class="language-python">cv_type=&quot;k_fold&quot;, n_folds=5, shuffle=True
+</code></pre>
+<h3 id="stratified-k-fold">Stratified K-Fold</h3>
+<p>Same as K-Fold but preserves the class distribution in each fold. Automatically falls back to K-Fold for regression problems.</p>
+<pre><code class="language-python">cv_type=&quot;stratified_k_fold&quot;, n_folds=5
+</code></pre>
+<h3 id="shuffle-split">Shuffle Split</h3>
+<p>Generates <code>n_folds</code> random train/test splits. Unlike K-Fold, the same sample can appear in the test set of multiple iterations. Uses a fixed 80/20 train/test ratio per split.</p>
+<pre><code class="language-python">cv_type=&quot;shuffle_split&quot;, n_folds=10
+</code></pre>
+<h3 id="time-series-split">Time Series Split</h3>
+<p>Expands the training window forward in time. Fold 1 trains on the first chunk and validates on the second; fold 2 trains on the first two chunks and validates on the third; and so on.</p>
+<pre><code class="language-python">cv_type=&quot;time_series_split&quot;, n_folds=5, time_column=&quot;order_date&quot;
+</code></pre>
+<p><strong>Auto-sort behavior:</strong></p>
+<ol>
+<li>If <code>time_column</code> is provided, data is sorted by that column and the column is dropped from features (prevents date leakage).</li>
+<li>If omitted, the first <code>datetime64</code> column is auto-detected.</li>
+<li>If no datetime column exists, a warning is logged and row order is assumed correct.</li>
+</ol>
+<h3 id="nested-cv">Nested CV</h3>
+<p>Runs a dual-loop cross-validation:</p>
+<ul>
+<li><strong>Outer loop</strong> (K-Fold or Stratified): evaluates generalization on held-out data.</li>
+<li><strong>Inner loop</strong> (3-fold, capped at <code>n_folds - 1</code>): trains within each outer training set to check hyperparameter stability.</li>
+</ul>
+<p>This prevents the optimistic bias that occurs when the same data is used for both tuning and evaluation.</p>
+<pre><code class="language-python">cv_type=&quot;nested_cv&quot;, n_folds=5
+</code></pre>
+<p>Each fold result includes an <code>inner_cv_mean</code> score for diagnostics.</p>
+<h2 id="return-structure">Return structure</h2>
+<p>All CV methods return the same dictionary shape:</p>
+<pre><code class="language-python">{
+    &quot;aggregated_metrics&quot;: {
+        &quot;accuracy&quot;: {&quot;mean&quot;: 0.92, &quot;std&quot;: 0.01, &quot;min&quot;: 0.90, &quot;max&quot;: 0.94},
+        # ... other metrics
+    },
+    &quot;folds&quot;: [
+        {&quot;fold&quot;: 1, &quot;metrics&quot;: {...}},
+        {&quot;fold&quot;: 2, &quot;metrics&quot;: {...}},
+        # ...
+    ],
+    &quot;cv_config&quot;: {
+        &quot;n_folds&quot;: 5,
+        &quot;cv_type&quot;: &quot;k_fold&quot;,
+        &quot;shuffle&quot;: True,
+        &quot;random_state&quot;: 42,
+    },
+}
+</code></pre>
+<p>Nested CV adds <code>inner_cv_mean</code> to each fold entry and <code>inner_folds</code> to <code>cv_config</code>.</p>
+<h2 id="configuration-reference">Configuration reference</h2>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cv_type</code></td>
+<td><code>str</code></td>
+<td><code>"k_fold"</code></td>
+<td>One of <code>k_fold</code>, <code>stratified_k_fold</code>, <code>time_series_split</code>, <code>shuffle_split</code>, <code>nested_cv</code></td>
+</tr>
+<tr>
+<td><code>n_folds</code> / <code>cv_folds</code></td>
+<td><code>int</code></td>
+<td><code>5</code></td>
+<td>Number of CV folds</td>
+</tr>
+<tr>
+<td><code>shuffle</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Shuffle data before splitting (K-Fold / Stratified only)</td>
+</tr>
+<tr>
+<td><code>random_state</code></td>
+<td><code>int</code></td>
+<td><code>42</code></td>
+<td>Random seed</td>
+</tr>
+<tr>
+<td><code>time_column</code> / <code>cv_time_column</code></td>
+<td><code>str\|null</code></td>
+<td><code>null</code></td>
+<td>Column for chronological sorting (Time Series Split)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="ml-canvas-ui">ML Canvas UI</h2>
+<p>Both the <strong>Basic Training</strong> and <strong>Advanced Tuning</strong> nodes expose a CV type dropdown with all five methods. When Time Series Split is selected, an additional date column picker appears with a warning to verify the selected column.</p>
+<h2 id="integration-with-tuning">Integration with tuning</h2>
+<p>When using the <strong>Advanced Tuning</strong> node, cross-validation plays two distinct roles:</p>
+<ol>
+<li>
+<p><strong>During the search:</strong> The CV splitter is passed directly to the search strategy (GridSearchCV, OptunaSearchCV, etc.). Each candidate hyperparameter set is scored using inner CV folds. For <code>nested_cv</code>, the inner splitter uses fewer folds (3 or <code>cv_folds - 1</code>, whichever is smaller) to keep the search fast.</p>
+</li>
+<li>
+<p><strong>After the search (post-tuning evaluation):</strong> A separate <code>cross_validate()</code> call runs with the <code>best_params</code> found by tuning. This gives you the unbiased <code>cv_*_mean</code> / <code>cv_*_std</code> metrics shown in Experiments.</p>
+</li>
+</ol>
+<blockquote>
+<p><strong>Important:</strong> When <code>nested_cv</code> is selected with advanced tuning, the post-tuning evaluation automatically downgrades to <code>stratified_k_fold</code> (classification) or <code>k_fold</code> (regression). This avoids re-running the inner CV loop that already ran during the search — saving computation without losing evaluation quality.</p>
+</blockquote>
+<p>For basic training (no tuning), <code>nested_cv</code> runs the full dual-loop as described above.</p>
+<p>See <a href="hyperparameter_tuning.html">Hyperparameter Tuning</a> for tuning-specific configuration.</p>
 
 
 
@@ -2710,10 +2988,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

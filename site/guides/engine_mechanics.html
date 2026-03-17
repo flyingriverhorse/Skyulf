@@ -11,6 +11,10 @@
         <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/guides/engine_mechanics.html">
       
       
+        <link rel="prev" href="adding_new_engine.html">
+      
+      
+        <link rel="next" href="../examples/quickstart.html">
       
       
         
@@ -21,7 +25,7 @@
     
     
       
-        <title>Skyulf Engine Mechanics - Skyulf</title>
+        <title>Engine Mechanics - Skyulf</title>
       
     
     
@@ -108,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Skyulf Engine Mechanics
+              Engine Mechanics
             
           </span>
         </div>
@@ -236,10 +240,12 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
+      <li class="md-tabs__item md-tabs__item--active">
         <a href="getting_started.html" class="md-tabs__link">
           
   
@@ -332,26 +338,6 @@
   
 
       
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../contributing/writing_docs.html" class="md-tabs__link">
-          
-  
-  
-  Contributing
-
-        </a>
-      </li>
-    
-  
-
-      
     </ul>
   </div>
 </nav>
@@ -430,28 +416,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
             
   
   
@@ -469,7 +458,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -495,6 +484,90 @@
     
   
     Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
   
 
     
@@ -671,6 +744,237 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="engine_mechanics.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-specifically-what-is-skyulfdataframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Specifically, what is SkyulfDataFrame?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-engine-detection-how-do-we-know-which-one-it-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Engine Detection: How do we know which one it is?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Engine Detection: How do we know which one it is?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-logic-skyulfengines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Logic (skyulf.engines)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-hybrid-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The Hybrid Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The Hybrid Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#path-a-pure-polars-the-fast-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path A: Pure Polars (The Fast Path)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#path-b-the-hybrid-bridge-compatibility-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path B: The "Hybrid Bridge" (Compatibility Path)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Path B: The &#34;Hybrid Bridge&#34; (Compatibility Path)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-arrow-the-zero-copy-magic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Arrow? (The "Zero-Copy" Magic)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-sklearnbridge-utility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The SklearnBridge Utility
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-calculator-vs-applier-in-the-hybrid-world" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Calculator vs. Applier in the Hybrid World
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Calculator vs. Applier in the Hybrid World">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#calculator-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calculator (fit)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#applier-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Applier (apply)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1146,6 +1450,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
         
   
@@ -1154,6 +1514,34 @@
     
   
     SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
   
 
     
@@ -2339,95 +2727,6 @@
           </ul>
         </nav>
       
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Contributing
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Contributing
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../contributing/writing_docs.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Writing Docs
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 

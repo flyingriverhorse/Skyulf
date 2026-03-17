@@ -338,26 +338,6 @@
   
 
       
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../contributing/writing_docs.html" class="md-tabs__link">
-          
-  
-  
-  Contributing
-
-        </a>
-      </li>
-    
-  
-
-      
     </ul>
   </div>
 </nav>
@@ -501,6 +481,90 @@
     
   
     Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
   
 
     
@@ -669,6 +733,34 @@
     
   
     Adding New Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
   
 
     
@@ -1212,7 +1304,7 @@
   <a href="#3-what-this-proves-and-what-it-doesnt" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3) What this proves (and what it doesn’t)
+        3) What this proves (and what it doesn't)
       
     </span>
   </a>
@@ -1263,6 +1355,62 @@
   
   
     <li class="md-nav__item">
+      <a href="hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="splitdataset_and_leakage.html" class="md-nav__link">
         
   
@@ -1271,6 +1419,34 @@
     
   
     SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
   
 
     
@@ -2468,95 +2644,6 @@
   
 
     
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Contributing
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Contributing
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../contributing/writing_docs.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Writing Docs
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
   </ul>
 </nav>
                   </div>
@@ -2953,7 +3040,7 @@ print(&quot;Predictions match exactly.&quot;)
 <p>A common leakage bug is fitting preprocessing on the full dataset.</p>
 <p>Here we construct a dataset where <strong>train and test have very different distributions</strong>.
 If an imputer learns the mean from the full dataset, it will be pulled toward the test distribution.</p>
-<p>Skyulf’s pattern learns from train only (Calculator) and applies to test (Applier).</p>
+<p>Skyulf's pattern learns from train only (Calculator) and applies to test (Applier).</p>
 <pre><code class="language-python">from __future__ import annotations
 
 import pandas as pd
@@ -2987,7 +3074,7 @@ print(&quot;train_mean:&quot;, expected_train_mean)
 print(&quot;full_mean:&quot;, full_mean)
 print(&quot;learned_mean:&quot;, learned_mean)
 </code></pre>
-<h2 id="3-what-this-proves-and-what-it-doesnt">3) What this proves (and what it doesn’t)</h2>
+<h2 id="3-what-this-proves-and-what-it-doesnt">3) What this proves (and what it doesn't)</h2>
 <ul>
 <li>Proves the API supports sklearn-style <code>X/y</code> workflows and produces aligned predictions.</li>
 <li>Proves at least one common leakage-sensitive node (<code>SimpleImputer</code>) learns its statistics from the provided training data.</li>

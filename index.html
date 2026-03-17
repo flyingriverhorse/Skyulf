@@ -52,6 +52,9 @@
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
+    <noscript>
+        <style>.zoomable { cursor: default !important; } #lightbox { display: none !important; }</style>
+    </noscript>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -205,10 +208,40 @@
                 The privacy-first MLOps workspace. Ingest data, engineer features visually, and train models without your data ever leaving your infrastructure.
             </p>
             
+            <!-- Quick install snippet -->
+            <div class="max-w-lg mx-auto mb-8 flex flex-col items-center gap-3">
+                <div class="w-full rounded-xl bg-slate-900/80 border border-slate-800 px-5 py-3 flex items-center justify-between gap-3">
+                    <code class="text-sm text-slate-300 font-mono">pip install skyulf-core</code>
+                    <div class="flex items-center gap-3 flex-shrink-0">
+                        <a href="https://pypi.org/project/skyulf-core/" target="_blank" title="View on PyPI">
+                            <img src="https://img.shields.io/pypi/dm/skyulf-core?style=flat-square&color=6366f1&label=downloads" alt="PyPI downloads" class="h-5">
+                        </a>
+                        <button onclick="navigator.clipboard.writeText('pip install skyulf-core'); this.querySelector('i').setAttribute('data-feather','check'); feather.replace();" class="text-slate-500 hover:text-white transition-colors" title="Copy">
+                            <i data-feather="copy" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <a href="https://pypi.org/project/skyulf-core/" target="_blank">
+                        <img src="https://img.shields.io/pypi/v/skyulf-core?style=flat-square&color=38bdf8&label=latest" alt="PyPI version" class="h-5">
+                    </a>
+                    <a href="https://pypi.org/project/skyulf-core/" target="_blank">
+                        <img src="https://img.shields.io/pypi/pyversions/skyulf-core?style=flat-square&color=a855f7" alt="Python versions" class="h-5">
+                    </a>
+                    <a href="https://github.com/flyingriverhorse/skyulf" target="_blank">
+                        <img src="https://img.shields.io/github/stars/flyingriverhorse/skyulf?style=flat-square&color=f59e0b&label=stars" alt="GitHub stars" class="h-5">
+                    </a>
+                </div>
+            </div>
+
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
                 <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-brand text-white font-semibold text-lg hover:opacity-90 transition-opacity shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2">
                     <i data-feather="github" class="w-5 h-5"></i>
                     Star on GitHub
+                </a>
+                <a href="./site/guides/platform_setup.html" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-slate-800 text-white font-semibold text-lg hover:bg-slate-700 transition-colors border border-slate-700 flex items-center justify-center gap-2">
+                    <i data-feather="book-open" class="w-5 h-5"></i>
+                    Get Started
                 </a>
             </div>
 
@@ -531,12 +564,12 @@
                     <div class="inline-block px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-semibold mb-6">FEATURE ENGINEERING</div>
                     <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Stop writing boilerplate.<br>Start designing pipelines.</h2>
                     <p class="text-slate-400 text-lg mb-8 leading-relaxed">
-                        The Feature Canvas lets you visualize your data transformations. Handle missing values, encode categories, scale features, and more—all with drag-and-drop nodes.
+                        The ML Canvas lets you visualize your data transformations. Handle missing values, encode categories, scale features, and more—all with drag-and-drop nodes.
                     </p>
                     <ul class="space-y-4 mb-8">
                         <li class="flex items-center gap-3 text-slate-300">
                             <i data-feather="check-circle" class="w-5 h-5 text-blue-500"></i>
-                            <span>25+ Built-in processing nodes</span>
+                            <span>30+ Built-in processing nodes</span>
                         </li>
                         <li class="flex items-center gap-3 text-slate-300">
                             <i data-feather="check-circle" class="w-5 h-5 text-blue-500"></i>
@@ -551,7 +584,7 @@
                 <div class="lg:w-1/2 relative group cursor-pointer zoomable">
                     <div class="absolute -inset-4 bg-blue-500/20 rounded-3xl blur-2xl -z-10"></div>
                     <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl w-full">
-                        <img src="./static/img/canvas.jpg" alt="Feature Canvas" class="w-full transition-transform duration-500 group-hover:scale-105">
+                        <img src="./static/img/canvas.jpg" alt="ML Canvas" class="w-full transition-transform duration-500 group-hover:scale-105">
                         <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/40">
                             <i data-feather="maximize-2" class="text-white w-12 h-12 drop-shadow-lg"></i>
                         </div>
@@ -1047,10 +1080,10 @@
                 <div>
                     <h4 class="text-white font-semibold mb-4">Product</h4>
                     <ul class="space-y-2 text-slate-400 text-sm">
-                        <li><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block mr-2"></span>Automated feature stores</li>
-                        <li><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block mr-2"></span>Continuous evaluation</li>
-                        <li><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block mr-2"></span>Production backfills</li>
-                        <li><a href="#" class="hover:text-white transition-colors">API Reference</a></li>
+                        <li><a href="#features" class="hover:text-white transition-colors">Features</a></li>
+                        <li><a href="#workflow" class="hover:text-white transition-colors">Workflow</a></li>
+                        <li><a href="#faq" class="hover:text-white transition-colors">FAQ</a></li>
+                        <li><a href="https://pypi.org/project/skyulf-core/" target="_blank" class="hover:text-white transition-colors">PyPI Package</a></li>
                     </ul>
                 </div>
                 
@@ -1059,24 +1092,25 @@
                     <ul class="space-y-2 text-slate-400 text-sm">
                         <li><a href="https://github.com/flyingriverhorse/skyulf" target="_blank" class="hover:text-white transition-colors">GitHub Repository</a></li>
                         <li><a href="./site/index.html" class="hover:text-white transition-colors">Documentation</a></li>
-                        <li><a href="#" class="hover:text-white transition-colors">Blog</a></li>
-                        <li><a href="#" class="hover:text-white transition-colors">Community</a></li>
+                        <li><a href="./site/guides/platform_setup.html" class="hover:text-white transition-colors">Quick Start</a></li>
+                        <li><a href="https://github.com/flyingriverhorse/skyulf/discussions" target="_blank" class="hover:text-white transition-colors">Community</a></li>
                     </ul>
                 </div>
                 
                 <div>
                     <h4 class="text-white font-semibold mb-4">Project</h4>
                     <ul class="space-y-2 text-slate-400 text-sm">
-                        <li><a href="#roadmap" class="hover:text-white transition-colors">Roadmap</a></li>
+                        <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/ROADMAP.md" target="_blank" class="hover:text-white transition-colors">Roadmap</a></li>
                         <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/CONTRIBUTING.md" target="_blank" class="hover:text-white transition-colors">Contributing</a></li>
                         <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/SECURITY.md" target="_blank" class="hover:text-white transition-colors">Security</a></li>
+                        <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/LICENSE" target="_blank" class="hover:text-white transition-colors">License</a></li>
                     </ul>
                 </div>
             </div>
             
             <div class="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div class="text-slate-500 text-sm">
-                    &copy; 2025 Murat Unsal. Apache 2.0 License.
+                    &copy; 2025–2026 Murat Unsal. Apache 2.0 License.
                 </div>
                 <div class="flex gap-6">
                     <a href="https://www.linkedin.com/in/murat-u/" class="text-slate-500 hover:text-white transition-colors"><i data-feather="linkedin" class="w-5 h-5"></i></a>
@@ -1087,7 +1121,7 @@
     </footer>
 
     <!-- Lightbox Modal -->
-    <div id="lightbox" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm">
+    <div id="lightbox" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm" aria-hidden="true" role="dialog" aria-label="Image preview">
         <button id="lightbox-close" class="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors z-50">
             <i data-feather="x" class="w-10 h-10"></i>
         </button>

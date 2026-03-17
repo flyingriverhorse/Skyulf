@@ -338,26 +338,6 @@
   
 
       
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../../../contributing/writing_docs.html" class="md-tabs__link">
-          
-  
-  
-  Contributing
-
-        </a>
-      </li>
-    
-  
-
-      
     </ul>
   </div>
 </nav>
@@ -501,6 +481,90 @@
     
   
     Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
   
 
     
@@ -669,6 +733,34 @@
     
   
     Adding New Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/engine_mechanics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
   
 
     
@@ -1152,6 +1244,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../user_guide/hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
         
   
@@ -1160,6 +1308,34 @@
     
   
     SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
   
 
     
@@ -2438,95 +2614,6 @@
   
 
     
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Contributing
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Contributing
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../contributing/writing_docs.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Writing Docs
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
   </ul>
 </nav>
                   </div>
@@ -2548,6 +2635,16 @@
 
 
 <h1 id="api-modelingcross_validation">API: modeling.cross_validation</h1>
+<p>Cross-validation module providing five strategies: K-Fold, Stratified K-Fold, Shuffle Split, Time Series Split, and Nested CV.</p>
+<p>The main entry point is <code>perform_cross_validation()</code>, which dispatches to the appropriate sklearn splitter (or the custom nested CV loop). For usage details and examples, see the <a href="../../../user_guide/cross_validation.html">Cross-Validation Guide</a>.</p>
+<p><strong>Key functions:</strong></p>
+<ul>
+<li><code>perform_cross_validation()</code> — Run CV with any of the five methods.</li>
+<li><code>_sort_by_time()</code> — Auto-sort data chronologically for Time Series Split.</li>
+<li><code>_build_splitter()</code> — Build a sklearn splitter from a <code>cv_type</code> string.</li>
+<li><code>_perform_nested_cv()</code> — Dual-loop nested CV (outer evaluation + inner HP stability).</li>
+<li><code>_aggregate_metrics()</code> — Compute mean/std/min/max across folds.</li>
+</ul>
 
 
 <div class="doc doc-object doc-module">
@@ -2588,7 +2685,7 @@
 
 
 <h3 id="skyulf.modeling.cross_validation.perform_cross_validation" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">perform_cross_validation</span><span class="p">(</span><span class="n">calculator</span><span class="p">,</span> <span class="n">applier</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">n_folds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">cv_type</span><span class="o">=</span><span class="s1">&#39;k_fold&#39;</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">progress_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">perform_cross_validation</span><span class="p">(</span><span class="n">calculator</span><span class="p">,</span> <span class="n">applier</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">n_folds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">cv_type</span><span class="o">=</span><span class="s1">&#39;k_fold&#39;</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">time_column</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">progress_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h3>
 
@@ -2755,6 +2852,22 @@
           </tr>
           <tr class="doc-section-item">
             <td>
+                <code>time_column</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional column name for sorting when using time_series_split.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                 <code>progress_callback</code>
             </td>
             <td>
@@ -2814,8 +2927,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/cross_validation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 55</span>
-<span class="normal"> 56</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 56</span>
 <span class="normal"> 57</span>
 <span class="normal"> 58</span>
 <span class="normal"> 59</span>
@@ -2950,16 +3062,41 @@
 <span class="normal">188</span>
 <span class="normal">189</span>
 <span class="normal">190</span>
-<span class="normal">191</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">perform_cross_validation</span><span class="p">(</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">perform_cross_validation</span><span class="p">(</span>
     <span class="n">calculator</span><span class="p">:</span> <span class="n">BaseModelCalculator</span><span class="p">,</span>
     <span class="n">applier</span><span class="p">:</span> <span class="n">BaseModelApplier</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="n">n_folds</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
-    <span class="n">cv_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;k_fold&quot;</span><span class="p">,</span>  <span class="c1"># k_fold, stratified_k_fold, time_series_split, shuffle_split</span>
+    <span class="n">cv_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;k_fold&quot;</span><span class="p">,</span>  <span class="c1"># k_fold, stratified_k_fold, time_series_split, shuffle_split, nested_cv</span>
     <span class="n">shuffle</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">random_state</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">,</span>
+    <span class="n">time_column</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">log_callback</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
@@ -2976,17 +3113,39 @@
 <span class="sd">        cv_type: Type of CV.</span>
 <span class="sd">        shuffle: Whether to shuffle data before splitting (for KFold/Stratified).</span>
 <span class="sd">        random_state: Random seed for shuffling.</span>
+<span class="sd">        time_column: Optional column name for sorting when using time_series_split.</span>
 <span class="sd">        progress_callback: Optional callback(current_fold, total_folds).</span>
 <span class="sd">        log_callback: Optional callback for logging messages.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Dict containing aggregated metrics and per-fold details.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
     <span class="n">problem_type</span> <span class="o">=</span> <span class="n">calculator</span><span class="o">.</span><span class="n">problem_type</span>
 
     <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
         <span class="n">log_callback</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Starting Cross-Validation (Folds: </span><span class="si">{</span><span class="n">n_folds</span><span class="si">}</span><span class="s2">, Type: </span><span class="si">{</span><span class="n">cv_type</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+    <span class="c1"># For Time Series Split, sort data chronologically</span>
+    <span class="k">if</span> <span class="n">cv_type</span> <span class="o">==</span> <span class="s2">&quot;time_series_split&quot;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+        <span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">_sort_by_time</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">time_column</span><span class="p">,</span> <span class="n">log_callback</span><span class="p">,</span> <span class="n">logger</span><span class="p">)</span>
+
+    <span class="c1"># Handle nested CV separately </span>
+    <span class="k">if</span> <span class="n">cv_type</span> <span class="o">==</span> <span class="s2">&quot;nested_cv&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_perform_nested_cv</span><span class="p">(</span>
+            <span class="n">calculator</span><span class="o">=</span><span class="n">calculator</span><span class="p">,</span>
+            <span class="n">applier</span><span class="o">=</span><span class="n">applier</span><span class="p">,</span>
+            <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span>
+            <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
+            <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span>
+            <span class="n">n_folds</span><span class="o">=</span><span class="n">n_folds</span><span class="p">,</span>
+            <span class="n">shuffle</span><span class="o">=</span><span class="n">shuffle</span><span class="p">,</span>
+            <span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span><span class="p">,</span>
+            <span class="n">progress_callback</span><span class="o">=</span><span class="n">progress_callback</span><span class="p">,</span>
+            <span class="n">log_callback</span><span class="o">=</span><span class="n">log_callback</span><span class="p">,</span>
+        <span class="p">)</span>
 
     <span class="c1"># 1. Setup Splitter</span>
     <span class="k">if</span> <span class="n">cv_type</span> <span class="o">==</span> <span class="s2">&quot;time_series_split&quot;</span><span class="p">:</span>

@@ -338,26 +338,6 @@
   
 
       
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../contributing/writing_docs.html" class="md-tabs__link">
-          
-  
-  
-  Contributing
-
-        </a>
-      </li>
-    
-  
-
-      
     </ul>
   </div>
 </nav>
@@ -501,6 +481,90 @@
     
   
     Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
   
 
     
@@ -669,6 +733,34 @@
     
   
     Adding New Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
   
 
     
@@ -1152,6 +1244,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
         
   
@@ -1160,6 +1308,34 @@
     
   
     SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
   
 
     
@@ -2703,95 +2879,6 @@
   
 
     
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Contributing
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Contributing
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../contributing/writing_docs.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Writing Docs
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
   </ul>
 </nav>
                   </div>
@@ -2967,6 +3054,45 @@
 </ul>
 <h2 id="cross-validation">Cross-validation</h2>
 <p><code>StatefulEstimator.cross_validate()</code> can perform CV on the train split and returns aggregated fold metrics.</p>
+<p>Five CV methods are supported:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Strategy</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>k_fold</code></td>
+<td>K-Fold</td>
+<td>Default. Shuffled.</td>
+</tr>
+<tr>
+<td><code>stratified_k_fold</code></td>
+<td>Stratified K-Fold</td>
+<td>Preserves class distribution (classification). Falls back to K-Fold for regression.</td>
+</tr>
+<tr>
+<td><code>shuffle_split</code></td>
+<td>Shuffle Split</td>
+<td>Random 80/20 splits; samples may repeat across folds.</td>
+</tr>
+<tr>
+<td><code>time_series_split</code></td>
+<td>Time Series Split</td>
+<td>Expanding window. Auto-sorts by datetime column if <code>cv_time_column</code> is set.</td>
+</tr>
+<tr>
+<td><code>nested_cv</code></td>
+<td>Nested CV</td>
+<td>Outer loop evaluates generalization; inner 3-fold loop checks HP stability. With advanced tuning, post-tuning eval auto-downgrades to <code>stratified_k_fold</code>/<code>k_fold</code> since the inner loop already ran during the search.</td>
+</tr>
+</tbody>
+</table>
+<p>Config keys: <code>cv_enabled</code>, <code>cv_type</code>, <code>cv_folds</code>, <code>cv_time_column</code>.</p>
+<p>See the <a href="../user_guide/cross_validation.html">Cross-Validation Guide</a> for details.</p>
 <p>Note: <code>SkyulfPipeline</code> performs modeling through the same building blocks (a calculator + applier); <code>StatefulEstimator</code>
 is the lightweight wrapper exposed for low-level usage.</p>
 
