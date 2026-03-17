@@ -214,7 +214,8 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               cv_folds: node.data.cv_folds,
               cv_type: node.data.cv_type,
               cv_shuffle: node.data.cv_shuffle,
-              cv_random_state: node.data.cv_random_state
+              cv_random_state: node.data.cv_random_state,
+              cv_time_column: node.data.cv_time_column
           };
       } else if (node.data.definitionType === 'hyperparameter_tuning' || node.data.definitionType === BackendStepType.ADVANCED_TUNING) {
           stepType = BackendStepType.ADVANCED_TUNING;
@@ -231,6 +232,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                   cv_type: node.data.cv_type,
                   cv_shuffle: node.data.cv_shuffle,
                   cv_random_state: node.data.cv_random_state,
+                  cv_time_column: node.data.cv_time_column,
                   random_state: node.data.random_state
               }
           };

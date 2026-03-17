@@ -588,12 +588,14 @@ class PipelineEngine:
                 cv_type=node.params.get("cv_type", "k_fold"),
                 shuffle=node.params.get("cv_shuffle", True),
                 random_state=node.params.get("cv_random_state", 42),
+                time_column=node.params.get("cv_time_column") or None,
                 log_callback=self.log,
             )
 
             # Aggregate metrics for the return value
-            # cv_results structure: {"accuracy": {"mean": 0.9, "std": 0.01, ...}, ...}
-            for metric_name, stats in cv_results.items():
+            # cv_results structure: {"aggregated_metrics": {"accuracy": {"mean": 0.9, ...}}, "folds": [...]}
+            agg_metrics = cv_results.get("aggregated_metrics", cv_results)
+            for metric_name, stats in agg_metrics.items():
                 if isinstance(stats, dict) and "mean" in stats:
                     cv_metrics[f"cv_{metric_name}_mean"] = stats["mean"]
                     cv_metrics[f"cv_{metric_name}_std"] = stats["std"]

@@ -69,6 +69,7 @@ nav:
     - Validation vs scikit-learn: user_guide/validation_vs_sklearn.md
     - Configuration: user_guide/configuration.md
     - Hyperparameter Tuning: user_guide/hyperparameter_tuning.md
+    - Cross-Validation: user_guide/cross_validation.md
     - SplitDataset & Leakage: user_guide/splitdataset_and_leakage.md
     - Drift Monitoring: user_guide/drift_monitoring.md
     - Serialization: user_guide/serialization.md

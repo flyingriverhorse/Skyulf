@@ -18,6 +18,7 @@ export const AdvancedTuningNode = createModelingNode({
     cv_type: 'k_fold',
     cv_shuffle: true,
     cv_random_state: 42,
+    cv_time_column: '',
     random_state: 42,
     search_space: {}
   },

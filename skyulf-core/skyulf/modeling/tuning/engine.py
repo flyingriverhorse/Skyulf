@@ -226,6 +226,34 @@ class TuningCalculator(BaseModelCalculator):
                 cv = ShuffleSplit(
                     n_splits=1, test_size=0.2, random_state=config.random_state
                 )
+            elif config.cv_type == "nested_cv":
+                # Nested CV: outer loop = stratified/kfold, inner loop handled by search CV's own cv param
+                inner_folds = min(3, config.cv_folds - 1) if config.cv_folds > 2 else 2
+                if self.model_calculator.problem_type == "classification":
+                    cv = StratifiedKFold(
+                        n_splits=inner_folds,
+                        shuffle=True,
+                        random_state=config.random_state,
+                    )
+                else:
+                    cv = KFold(
+                        n_splits=inner_folds,
+                        shuffle=True,
+                        random_state=config.random_state,
+                    )
+                # Store outer splitter for post-tuning nested evaluation
+                if self.model_calculator.problem_type == "classification":
+                    self._nested_outer_cv = StratifiedKFold(
+                        n_splits=config.cv_folds,
+                        shuffle=True,
+                        random_state=config.random_state,
+                    )
+                else:
+                    self._nested_outer_cv = KFold(
+                        n_splits=config.cv_folds,
+                        shuffle=True,
+                        random_state=config.random_state,
+                    )
             elif config.cv_type == "time_series_split":
                 cv = TimeSeriesSplit(n_splits=config.cv_folds)
             elif config.cv_type == "shuffle_split":

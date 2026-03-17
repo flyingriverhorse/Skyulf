@@ -14,7 +14,7 @@
         <link rel="prev" href="configuration.html">
       
       
-        <link rel="next" href="splitdataset_and_leakage.html">
+        <link rel="next" href="cross_validation.html">
       
       
         
@@ -1387,6 +1387,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Cross-validation types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#time-column-for-time-series-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time column for Time Series Split
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1426,6 +1443,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2829,7 +2874,13 @@
 <td><code>cv_type</code></td>
 <td><code>str</code></td>
 <td><code>"k_fold"</code></td>
-<td>One of <code>k_fold</code>, <code>stratified_k_fold</code>, <code>time_series_split</code>, <code>shuffle_split</code></td>
+<td>One of <code>k_fold</code>, <code>stratified_k_fold</code>, <code>time_series_split</code>, <code>shuffle_split</code>, <code>nested_cv</code></td>
+</tr>
+<tr>
+<td><code>cv_time_column</code></td>
+<td><code>str\|null</code></td>
+<td><code>null</code></td>
+<td>Column name to sort by when using <code>time_series_split</code>. Auto-detects datetime column if omitted</td>
 </tr>
 </tbody>
 </table>
@@ -2904,8 +2955,23 @@
 <td><code>shuffle_split</code></td>
 <td>When you want random train/test splits per fold</td>
 </tr>
+<tr>
+<td><code>nested_cv</code></td>
+<td>Unbiased evaluation — outer loop for generalization, inner loop for hyperparameter stability</td>
+</tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Nested CV</strong> runs a dual-loop: an outer K-Fold evaluates the model on held-out data, while an inner 3-fold CV (capped at <code>n_folds - 1</code>) trains within each outer training set. This prevents optimistic bias when tuning and evaluating on the same splits.</p>
+</blockquote>
+<h3 id="time-column-for-time-series-split">Time column for Time Series Split</h3>
+<p>When using <code>time_series_split</code>, Skyulf auto-sorts your data chronologically:</p>
+<ol>
+<li>If <code>cv_time_column</code> is set, data is sorted by that column (and the column is dropped from features to prevent leakage).</li>
+<li>If omitted, the first <code>datetime64</code> column is auto-detected and used.</li>
+<li>If no datetime column exists, a warning is logged and row order is assumed correct.</li>
+</ol>
+<p>In the ML Canvas UI, selecting Time Series Split reveals a date column picker.</p>
 <h2 id="install-requirements">Install requirements</h2>
 <p>Optuna strategies require the tuning extra:</p>
 <pre><code class="language-bash">pip install skyulf-core[tuning]

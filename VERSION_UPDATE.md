@@ -18,7 +18,19 @@
 ---------------------------------------------
 ## v0.1.14
 
-### 📚 Documentation Overhaul
+### � Cross-Validation Enhancements
+- **Nested CV:** Implemented nested cross-validation across the full stack (core, backend, frontend). Outer loop evaluates generalization, inner loop validates hyperparameter stability per fold.
+- **Shuffle Split (Advanced Tuning):** Added missing Shuffle Split option to the Advanced Tuning node dropdown — was already supported in backend/core but absent from UI.- **Time Series CV Safeguard:** Added auto-sort by datetime column when Time Series Split is selected. Users can optionally pick a specific date column in the UI; if not set, auto-detects the first datetime64 column. Logs a warning if no datetime column is found.
+- **Time Column UI:** Both Basic Training and Advanced Tuning nodes show a date column selector + amber warning when Time Series Split is chosen. Datetime columns are listed first for convenience.- **Backend CV Fix:** Fixed `aggregated_metrics` extraction in execution engine — CV metrics were not being propagated due to changed return structure.
+
+### 📖 Cross-Validation Docs
+- **New Page:** Created dedicated [Cross-Validation Guide](docs/user_guide/cross_validation.md) documenting all 5 methods with examples, return structure, config reference, and UI notes.
+- **Hyperparameter Tuning:** Added `nested_cv` to CV types table, added `cv_time_column` to config reference, added time column auto-sort explanation.
+- **Modeling Nodes Reference:** Expanded CV section with method table and config keys.
+- **API Reference:** Added introductory content and function list to `cross_validation.md` API page.
+- **mkdocs.yml:** Added Cross-Validation page to User Guide nav.
+
+### �📚 Documentation Overhaul
 - **Landing Page:** Rewrote `docs/index.md` from stub to full landing page with feature comparison table, install commands, architecture overview, and navigation guide.
 - **Installation Guide:** Expanded `installation.md` with PyPI install, all 6 optional extras, editable install workflow, runtime deps, Docker reference, and import check.
 - **Configuration:** Updated `configuration.md` model list from 5 to all 20 registered models (9 classification + 11 regression) organized in tables with XGBoost extras noted.

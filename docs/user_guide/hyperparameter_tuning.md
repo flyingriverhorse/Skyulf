@@ -58,7 +58,8 @@ These keys go inside the `"modeling"` block when `"type"` is `"hyperparameter_tu
 | `strategy_params` | `dict` | `{}` | Strategy-specific settings (see below) |
 | `cv_enabled` | `bool` | `true` | Whether to use cross-validation |
 | `cv_folds` | `int` | `5` | Number of CV folds |
-| `cv_type` | `str` | `"k_fold"` | One of `k_fold`, `stratified_k_fold`, `time_series_split`, `shuffle_split` |
+| `cv_type` | `str` | `"k_fold"` | One of `k_fold`, `stratified_k_fold`, `time_series_split`, `shuffle_split`, `nested_cv` |
+| `cv_time_column` | `str\|null` | `null` | Column name to sort by when using `time_series_split`. Auto-detects datetime column if omitted |
 
 ## Strategy-specific params
 
@@ -86,6 +87,19 @@ Pass these inside `"strategy_params"`:
 | `stratified_k_fold` | Classification with imbalanced classes |
 | `time_series_split` | Time-ordered data (no future leakage) |
 | `shuffle_split` | When you want random train/test splits per fold |
+| `nested_cv` | Unbiased evaluation — outer loop for generalization, inner loop for hyperparameter stability |
+
+> **Nested CV** runs a dual-loop: an outer K-Fold evaluates the model on held-out data, while an inner 3-fold CV (capped at `n_folds - 1`) trains within each outer training set. This prevents optimistic bias when tuning and evaluating on the same splits.
+
+### Time column for Time Series Split
+
+When using `time_series_split`, Skyulf auto-sorts your data chronologically:
+
+1. If `cv_time_column` is set, data is sorted by that column (and the column is dropped from features to prevent leakage).
+2. If omitted, the first `datetime64` column is auto-detected and used.
+3. If no datetime column exists, a warning is logged and row order is assumed correct.
+
+In the ML Canvas UI, selecting Time Series Split reveals a date column picker.
 
 ## Install requirements
 

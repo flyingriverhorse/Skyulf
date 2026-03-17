@@ -15,7 +15,8 @@ export const BasicTrainingNode = createModelingNode({
     cv_folds: 5,
     cv_type: 'k_fold',
     cv_shuffle: true,
-    cv_random_state: 42
+    cv_random_state: 42,
+    cv_time_column: ''
   },
   outputs: [{ id: 'model', label: 'Trained Model', type: 'model' }]
 });
