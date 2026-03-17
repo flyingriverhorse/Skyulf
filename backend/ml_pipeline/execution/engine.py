@@ -792,7 +792,7 @@ class PipelineEngine:
         # Cross-Validation on the tuned model (using best params)
         cv_metrics: Dict[str, Any] = {}
         if tuning_params.get("cv_enabled", False):
-            best_params = tuning_result.best_params if tuning_result else {}
+            best_params: Dict[str, Any] = tuning_result.best_params if tuning_result else {}
             cv_estimator = StatefulEstimator(calculator, applier, node.node_id)
 
             # For advanced tuning, nested_cv's inner loop already ran during
