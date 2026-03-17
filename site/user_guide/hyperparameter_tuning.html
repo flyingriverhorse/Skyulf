@@ -2963,6 +2963,7 @@
 </table>
 <blockquote>
 <p><strong>Nested CV</strong> runs a dual-loop: an outer K-Fold evaluates the model on held-out data, while an inner 3-fold CV (capped at <code>n_folds - 1</code>) trains within each outer training set. This prevents optimistic bias when tuning and evaluating on the same splits.</p>
+<p><strong>With Advanced Tuning:</strong> When <code>nested_cv</code> is selected, the tuning search uses the inner CV folds to score candidates. After finding the best parameters, the post-tuning evaluation automatically uses <code>stratified_k_fold</code> (classification) or <code>k_fold</code> (regression) instead of re-running the full nested loop — because the inner loop already ran during the search.</p>
 </blockquote>
 <h3 id="time-column-for-time-series-split">Time column for Time Series Split</h3>
 <p>When using <code>time_series_split</code>, Skyulf auto-sorts your data chronologically:</p>

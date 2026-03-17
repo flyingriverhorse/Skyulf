@@ -2736,7 +2736,18 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core\skyulf\modeling\tuning\engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">670</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">659</span>
+<span class="normal">660</span>
+<span class="normal">661</span>
+<span class="normal">662</span>
+<span class="normal">663</span>
+<span class="normal">664</span>
+<span class="normal">665</span>
+<span class="normal">666</span>
+<span class="normal">667</span>
+<span class="normal">668</span>
+<span class="normal">669</span>
+<span class="normal">670</span>
 <span class="normal">671</span>
 <span class="normal">672</span>
 <span class="normal">673</span>
@@ -2748,18 +2759,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">679</span>
 <span class="normal">680</span>
 <span class="normal">681</span>
-<span class="normal">682</span>
-<span class="normal">683</span>
-<span class="normal">684</span>
-<span class="normal">685</span>
-<span class="normal">686</span>
-<span class="normal">687</span>
-<span class="normal">688</span>
-<span class="normal">689</span>
-<span class="normal">690</span>
-<span class="normal">691</span>
-<span class="normal">692</span>
-<span class="normal">693</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
+<span class="normal">682</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Applier for TuningCalculator.</span>
 <span class="sd">    Wraps the base model applier to provide predictions using the refitted best model.</span>
@@ -3428,18 +3428,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">653</span>
 <span class="normal">654</span>
 <span class="normal">655</span>
-<span class="normal">656</span>
-<span class="normal">657</span>
-<span class="normal">658</span>
-<span class="normal">659</span>
-<span class="normal">660</span>
-<span class="normal">661</span>
-<span class="normal">662</span>
-<span class="normal">663</span>
-<span class="normal">664</span>
-<span class="normal">665</span>
-<span class="normal">666</span>
-<span class="normal">667</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
+<span class="normal">656</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculator for hyperparameter tuning.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_calculator</span><span class="p">:</span> <span class="n">BaseModelCalculator</span><span class="p">):</span>
@@ -3606,7 +3595,9 @@ Wraps the base model applier to provide predictions using the refitted best mode
                     <span class="n">n_splits</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span>
                 <span class="p">)</span>
             <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">cv_type</span> <span class="o">==</span> <span class="s2">&quot;nested_cv&quot;</span><span class="p">:</span>
-                <span class="c1"># Nested CV: outer loop = stratified/kfold, inner loop handled by search CV&#39;s own cv param</span>
+                <span class="c1"># Nested CV during tuning: use fewer inner folds for</span>
+                <span class="c1"># candidate scoring. The outer evaluation loop runs</span>
+                <span class="c1"># post-tuning in engine.py (as stratified_k_fold).</span>
                 <span class="n">inner_folds</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">cv_folds</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">cv_folds</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="mi">2</span>
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
                     <span class="n">cv</span> <span class="o">=</span> <span class="n">StratifiedKFold</span><span class="p">(</span>
@@ -3617,19 +3608,6 @@ Wraps the base model applier to provide predictions using the refitted best mode
                 <span class="k">else</span><span class="p">:</span>
                     <span class="n">cv</span> <span class="o">=</span> <span class="n">KFold</span><span class="p">(</span>
                         <span class="n">n_splits</span><span class="o">=</span><span class="n">inner_folds</span><span class="p">,</span>
-                        <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                        <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
-                    <span class="p">)</span>
-                <span class="c1"># Store outer splitter for post-tuning nested evaluation</span>
-                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_nested_outer_cv</span> <span class="o">=</span> <span class="n">StratifiedKFold</span><span class="p">(</span>
-                        <span class="n">n_splits</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">cv_folds</span><span class="p">,</span>
-                        <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                        <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
-                    <span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_nested_outer_cv</span> <span class="o">=</span> <span class="n">KFold</span><span class="p">(</span>
-                        <span class="n">n_splits</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">cv_folds</span><span class="p">,</span>
                         <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
                         <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
                     <span class="p">)</span>
@@ -4752,18 +4730,7 @@ Adapts the generic fit interface to the specific tune method.</p>
 <span class="normal">653</span>
 <span class="normal">654</span>
 <span class="normal">655</span>
-<span class="normal">656</span>
-<span class="normal">657</span>
-<span class="normal">658</span>
-<span class="normal">659</span>
-<span class="normal">660</span>
-<span class="normal">661</span>
-<span class="normal">662</span>
-<span class="normal">663</span>
-<span class="normal">664</span>
-<span class="normal">665</span>
-<span class="normal">666</span>
-<span class="normal">667</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
+<span class="normal">656</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -4817,7 +4784,9 @@ Adapts the generic fit interface to the specific tune method.</p>
                 <span class="n">n_splits</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">cv_type</span> <span class="o">==</span> <span class="s2">&quot;nested_cv&quot;</span><span class="p">:</span>
-            <span class="c1"># Nested CV: outer loop = stratified/kfold, inner loop handled by search CV&#39;s own cv param</span>
+            <span class="c1"># Nested CV during tuning: use fewer inner folds for</span>
+            <span class="c1"># candidate scoring. The outer evaluation loop runs</span>
+            <span class="c1"># post-tuning in engine.py (as stratified_k_fold).</span>
             <span class="n">inner_folds</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">cv_folds</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">cv_folds</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="mi">2</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
                 <span class="n">cv</span> <span class="o">=</span> <span class="n">StratifiedKFold</span><span class="p">(</span>
@@ -4828,19 +4797,6 @@ Adapts the generic fit interface to the specific tune method.</p>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">cv</span> <span class="o">=</span> <span class="n">KFold</span><span class="p">(</span>
                     <span class="n">n_splits</span><span class="o">=</span><span class="n">inner_folds</span><span class="p">,</span>
-                    <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                    <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
-                <span class="p">)</span>
-            <span class="c1"># Store outer splitter for post-tuning nested evaluation</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_nested_outer_cv</span> <span class="o">=</span> <span class="n">StratifiedKFold</span><span class="p">(</span>
-                    <span class="n">n_splits</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">cv_folds</span><span class="p">,</span>
-                    <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                    <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
-                <span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_nested_outer_cv</span> <span class="o">=</span> <span class="n">KFold</span><span class="p">(</span>
-                    <span class="n">n_splits</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">cv_folds</span><span class="p">,</span>
                     <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
                     <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
                 <span class="p">)</span>

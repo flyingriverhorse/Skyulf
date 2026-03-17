@@ -3087,7 +3087,7 @@
 <tr>
 <td><code>nested_cv</code></td>
 <td>Nested CV</td>
-<td>Outer loop evaluates generalization; inner 3-fold loop checks HP stability.</td>
+<td>Outer loop evaluates generalization; inner 3-fold loop checks HP stability. With advanced tuning, post-tuning eval auto-downgrades to <code>stratified_k_fold</code>/<code>k_fold</code> since the inner loop already ran during the search.</td>
 </tr>
 </tbody>
 </table>
