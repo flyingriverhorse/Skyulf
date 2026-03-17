@@ -23,6 +23,7 @@ export interface ModelTrainingConfig {
   cv_type: string;
   cv_shuffle: boolean;
   cv_random_state: number;
+  cv_time_column?: string;
 }
 
 interface HyperparameterDef {
@@ -557,9 +558,46 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
                                             <option value="stratified_k_fold">Stratified</option>
                                             <option value="time_series_split">Time Series</option>
                                             <option value="shuffle_split">Shuffle Split</option>
+                                            <option value="nested_cv">Nested CV</option>
                                         </select>
                                     </div>
                                 </div>
+                                {config.cv_type === 'time_series_split' && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-start gap-1.5 p-2 bg-amber-50 dark:bg-amber-900/20 rounded text-xs text-amber-700 dark:text-amber-400">
+                                            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                                            <span>Data must be sorted by time. Select a date column below or ensure your data is pre-sorted.</span>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-500 mb-1">Time Column (optional)</label>
+                                            <select
+                                                value={config.cv_time_column ?? ''}
+                                                onChange={(e) => onChange({ ...config, cv_time_column: e.target.value })}
+                                                className="w-full border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+                                            >
+                                                <option value="">Auto-detect</option>
+                                                {availableColumns
+                                                    .filter((col) => {
+                                                        const dt = String(col.dtype).toLowerCase();
+                                                        return dt.includes('datetime') || dt.includes('date') || dt.includes('time') || dt.includes('timestamp');
+                                                    })
+                                                    .map((col) => (
+                                                        <option key={col.name} value={col.name}>{col.name}</option>
+                                                    ))
+                                                }
+                                                {availableColumns
+                                                    .filter((col) => {
+                                                        const dt = String(col.dtype).toLowerCase();
+                                                        return !(dt.includes('datetime') || dt.includes('date') || dt.includes('time') || dt.includes('timestamp'));
+                                                    })
+                                                    .map((col) => (
+                                                        <option key={col.name} value={col.name}>{col.name}</option>
+                                                    ))
+                                                }
+                                            </select>
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="checkbox"

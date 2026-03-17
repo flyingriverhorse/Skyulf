@@ -123,6 +123,7 @@ class StatefulEstimator:
         cv_type: str = "k_fold",
         shuffle: bool = True,
         random_state: int = 42,
+        time_column: Optional[str] = None,
         progress_callback: Optional[Callable[[int, int], None]] = None,
         log_callback: Optional[Callable[[str], None]] = None,
     ) -> Dict[str, Any]:
@@ -144,6 +145,7 @@ class StatefulEstimator:
             cv_type=cv_type,
             shuffle=shuffle,
             random_state=random_state,
+            time_column=time_column,
             progress_callback=progress_callback,
             log_callback=log_callback,
         )

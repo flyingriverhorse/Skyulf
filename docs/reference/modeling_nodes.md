@@ -222,5 +222,19 @@ Learned params:
 
 `StatefulEstimator.cross_validate()` can perform CV on the train split and returns aggregated fold metrics.
 
+Five CV methods are supported:
+
+| Key | Strategy | Notes |
+|---|---|---|
+| `k_fold` | K-Fold | Default. Shuffled. |
+| `stratified_k_fold` | Stratified K-Fold | Preserves class distribution (classification). Falls back to K-Fold for regression. |
+| `shuffle_split` | Shuffle Split | Random 80/20 splits; samples may repeat across folds. |
+| `time_series_split` | Time Series Split | Expanding window. Auto-sorts by datetime column if `cv_time_column` is set. |
+| `nested_cv` | Nested CV | Outer loop evaluates generalization; inner 3-fold loop checks HP stability. |
+
+Config keys: `cv_enabled`, `cv_type`, `cv_folds`, `cv_time_column`.
+
+See the [Cross-Validation Guide](../user_guide/cross_validation.md) for details.
+
 Note: `SkyulfPipeline` performs modeling through the same building blocks (a calculator + applier); `StatefulEstimator`
 is the lightweight wrapper exposed for low-level usage.

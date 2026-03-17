@@ -23,7 +23,7 @@ class TuningConfig:
     cv_enabled: bool = True
     cv_folds: int = 5
     cv_type: Literal[
-        "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split"
+        "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
     ] = "k_fold"
     cv_shuffle: bool = True
     cv_random_state: int = 42
