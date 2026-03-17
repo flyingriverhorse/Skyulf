@@ -63,7 +63,7 @@ class AdvancedTuningManager:
     ) -> JobInfo:
         # Extract details from graph
         (
-            _,
+            node_params,
             target_column,
             dropped_columns,
         ) = extract_job_details(type_cast(Dict[str, Any], job.graph), type_cast(str, job.node_id))
@@ -110,6 +110,7 @@ class AdvancedTuningManager:
             dropped_columns=dropped_columns,
             logs=type_cast(Optional[List[str]], job.logs),
             graph=type_cast(Dict[str, Any], job.graph),
+            config=type_cast(Optional[Dict[str, Any]], node_params),
         )
 
     @staticmethod

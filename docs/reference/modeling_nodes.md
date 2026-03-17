@@ -230,7 +230,7 @@ Five CV methods are supported:
 | `stratified_k_fold` | Stratified K-Fold | Preserves class distribution (classification). Falls back to K-Fold for regression. |
 | `shuffle_split` | Shuffle Split | Random 80/20 splits; samples may repeat across folds. |
 | `time_series_split` | Time Series Split | Expanding window. Auto-sorts by datetime column if `cv_time_column` is set. |
-| `nested_cv` | Nested CV | Outer loop evaluates generalization; inner 3-fold loop checks HP stability. |
+| `nested_cv` | Nested CV | Outer loop evaluates generalization; inner 3-fold loop checks HP stability. With advanced tuning, post-tuning eval auto-downgrades to `stratified_k_fold`/`k_fold` since the inner loop already ran during the search. |
 
 Config keys: `cv_enabled`, `cv_type`, `cv_folds`, `cv_time_column`.
 

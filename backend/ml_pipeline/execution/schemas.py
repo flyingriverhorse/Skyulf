@@ -41,6 +41,7 @@ class JobInfo(BaseModel):
     dropped_columns: Optional[List[str]] = None
     version: Optional[int] = None
     graph: Optional[Dict[str, Any]] = None
+    config: Optional[Dict[str, Any]] = None
 
 
 from backend.ml_pipeline.constants import StepType

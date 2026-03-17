@@ -90,6 +90,8 @@ Pass these inside `"strategy_params"`:
 | `nested_cv` | Unbiased evaluation — outer loop for generalization, inner loop for hyperparameter stability |
 
 > **Nested CV** runs a dual-loop: an outer K-Fold evaluates the model on held-out data, while an inner 3-fold CV (capped at `n_folds - 1`) trains within each outer training set. This prevents optimistic bias when tuning and evaluating on the same splits.
+>
+> **With Advanced Tuning:** When `nested_cv` is selected, the tuning search uses the inner CV folds to score candidates. After finding the best parameters, the post-tuning evaluation automatically uses `stratified_k_fold` (classification) or `k_fold` (regression) instead of re-running the full nested loop — because the inner loop already ran during the search.
 
 ### Time column for Time Series Split
 

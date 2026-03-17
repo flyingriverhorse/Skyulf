@@ -789,6 +789,46 @@ class PipelineEngine:
         else:
             metrics = {}
 
+        # Cross-Validation on the tuned model (using best params)
+        cv_metrics: Dict[str, Any] = {}
+        if tuning_params.get("cv_enabled", False):
+            best_params = tuning_result.best_params if tuning_result else {}
+            cv_estimator = StatefulEstimator(calculator, applier, node.node_id)
+
+            # For advanced tuning, nested_cv's inner loop already ran during
+            # the search. Post-tuning CV only needs the outer evaluation, so
+            # downgrade to stratified_k_fold (classification) or k_fold (regression).
+            post_cv_type = tuning_params.get("cv_type", "k_fold")
+            if post_cv_type == "nested_cv":
+                is_classification = getattr(calculator, "problem_type", "") == "classification"
+                post_cv_type = "stratified_k_fold" if is_classification else "k_fold"
+                self.log(
+                    "Nested CV inner loop already ran during tuning. "
+                    f"Using {post_cv_type} for post-tuning evaluation."
+                )
+
+            self.log("Running cross-validation on tuned model with best parameters...")
+            try:
+                cv_results = cv_estimator.cross_validate(
+                    data,
+                    target_col,
+                    {"params": best_params},
+                    n_folds=tuning_params.get("cv_folds", 5),
+                    cv_type=post_cv_type,
+                    shuffle=tuning_params.get("cv_shuffle", True),
+                    random_state=tuning_params.get("cv_random_state", 42),
+                    time_column=tuning_params.get("cv_time_column") or None,
+                    log_callback=self.log,
+                )
+
+                agg_metrics = cv_results.get("aggregated_metrics", cv_results)
+                for metric_name, stats in agg_metrics.items():
+                    if isinstance(stats, dict) and "mean" in stats:
+                        cv_metrics[f"cv_{metric_name}_mean"] = stats["mean"]
+                        cv_metrics[f"cv_{metric_name}_std"] = stats["std"]
+            except Exception as e:
+                logger.warning(f"Cross-validation failed for tuned model: {e}")
+
         # Evaluate the tuned model
         try:
             report = estimator.evaluate(data, target_col, job_id=job_id)
@@ -815,6 +855,9 @@ class PipelineEngine:
                     metrics[f"val_{k}"] = v
         except Exception as e:
             logger.warning(f"Failed to evaluate tuned model: {e}")
+
+        # Merge CV metrics
+        metrics.update(cv_metrics)
 
         return node.node_id, metrics
 

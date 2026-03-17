@@ -39,6 +39,7 @@ export const ExperimentsPage: React.FC = () => {
   const [showTrainMetrics, setShowTrainMetrics] = useState(true);
   const [showTestMetrics, setShowTestMetrics] = useState(true);
   const [showValMetrics, setShowValMetrics] = useState(true);
+  const [showCvMetrics, setShowCvMetrics] = useState(true);
 
   // Table expansion states
   const [isMetricsExpanded, setIsMetricsExpanded] = useState(true);
@@ -246,6 +247,7 @@ export const ExperimentsPage: React.FC = () => {
       if (key.startsWith('train_') && !showTrainMetrics) return false;
       if (key.startsWith('test_') && !showTestMetrics) return false;
       if (key.startsWith('val_') && !showValMetrics) return false;
+      if (key.startsWith('cv_') && !showCvMetrics) return false;
       return true;
   });
 
@@ -487,6 +489,15 @@ export const ExperimentsPage: React.FC = () => {
                             />
                             <span className="text-gray-700 dark:text-gray-300">Validation</span>
                         </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                checked={showCvMetrics} 
+                                onChange={e => { setShowCvMetrics(e.target.checked); }}
+                                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            />
+                            <span className="text-gray-700 dark:text-gray-300">Cross-Validation</span>
+                        </label>
                     </div>
                 </div>
 
@@ -589,13 +600,13 @@ export const ExperimentsPage: React.FC = () => {
                              const val = m[metricKey];
                              return (
                                 <td key={job.job_id} className="px-4 py-1.5 font-mono text-gray-600 dark:text-gray-300">
-                                  {typeof val === 'number' ? val.toFixed(4) : '-'}
+                                  {typeof val === 'number' ? (metricKey.endsWith('_std') ? val.toFixed(6) : val.toFixed(4)) : '-'}
                                 </td>
                              );
                           })}
                         </tr>
                       ))}
-                      {/* Hyperparameters */}
+                      {/* Hyperparameters (actual model params only) */}
                       <tr 
                         className="bg-gray-50/50 dark:bg-gray-900/20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
                         onClick={() => { setIsParamsExpanded(!isParamsExpanded); }}
@@ -605,71 +616,104 @@ export const ExperimentsPage: React.FC = () => {
                           Hyperparameters
                         </td>
                       </tr>
-                      {/* Extract all unique hyperparameter keys */}
-                      {isParamsExpanded && Array.from(new Set(selectedJobs.flatMap(job => Object.keys(job.hyperparameters || {})))).map(paramKey => (
-                        <tr key={paramKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                          <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{paramKey}</td>
-                          {selectedJobs.map(job => (
-                            <td key={job.job_id} className="px-4 py-1.5 font-mono text-gray-600 dark:text-gray-300">
-                              {typeof job.hyperparameters?.[paramKey] === 'object' 
-                                ? JSON.stringify(job.hyperparameters?.[paramKey]) 
-                                : String(job.hyperparameters?.[paramKey] ?? '-')}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-
-                      {/* Tuning Configuration */}
-                      {selectedJobs.some(j => j.job_type === 'advanced_tuning') && (
-                        <>
-                          <tr 
-                            className="bg-gray-50/50 dark:bg-gray-900/20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
-                            onClick={() => { setIsTuningExpanded(!isTuningExpanded); }}
-                          >
-                            <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2" colSpan={selectedJobs.length + 1}>
-                              {isTuningExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                              Tuning Configuration
-                            </td>
+                      {/* Extract actual model hyperparameters: best_params for advanced, nested hyperparameters for basic */}
+                      {isParamsExpanded && (() => {
+                        const getModelParams = (job: any): Record<string, any> => {
+                          const hp = job.hyperparameters as Record<string, any> | undefined;
+                          if (!hp) return {};
+                          if (job.job_type === 'advanced_tuning') {
+                            // For advanced tuning, hyperparameters IS the best_params (or search_space) directly
+                            return hp;
+                          }
+                          // Basic training: extract the nested 'hyperparameters' dict (actual model params)
+                          const nested = hp.hyperparameters;
+                          if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+                            return nested as Record<string, any>;
+                          }
+                          return {};
+                        };
+                        const allKeys = Array.from(new Set(selectedJobs.flatMap(job => Object.keys(getModelParams(job)))));
+                        if (allKeys.length === 0) {
+                          return (
+                            <tr className="bg-white dark:bg-gray-800">
+                              <td className="px-4 py-1.5 text-gray-400 dark:text-gray-500 pl-8 italic" colSpan={selectedJobs.length + 1}>
+                                Default parameters (none customized)
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return allKeys.map(paramKey => (
+                          <tr key={paramKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                            <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{paramKey}</td>
+                            {selectedJobs.map(job => {
+                              const params = getModelParams(job);
+                              const val = params[paramKey];
+                              return (
+                                <td key={job.job_id} className="px-4 py-1.5 font-mono text-gray-600 dark:text-gray-300">
+                                  {val === undefined ? '-' : typeof val === 'object' ? JSON.stringify(val) : String(val)}
+                                </td>
+                              );
+                            })}
                           </tr>
-                          {isTuningExpanded && (
-                            <>
-                              {['Strategy', 'Strategy Params', 'Metric', 'Trials', 'CV Enabled', 'CV Method', 'Folds', 'Shuffle'].map(field => (
-                                <tr key={field} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                  <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{field}</td>
-                                  {selectedJobs.map(job => {
-                                    if (job.job_type !== 'advanced_tuning') {
-                                      return <td key={job.job_id} className="px-4 py-1.5 text-gray-400">-</td>;
-                                    }
+                        ));
+                      })()}
 
-                                    const node = (job.graph?.nodes as any[])?.find((n: any) => n.node_id === job.node_id);
-                                    const config = Object.keys((job.config as any)?.tuning_config || {}).length > 0
-                                        ? (job.config as any).tuning_config
-                                        : node?.params?.tuning_config;
+                      {/* Training Configuration */}
+                      <tr 
+                        className="bg-gray-50/50 dark:bg-gray-900/20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
+                        onClick={() => { setIsTuningExpanded(!isTuningExpanded); }}
+                      >
+                        <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2" colSpan={selectedJobs.length + 1}>
+                          {isTuningExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                          Training Configuration
+                        </td>
+                      </tr>
+                      {isTuningExpanded && (
+                        <>
+                          {['Target Column', 'CV Enabled', 'CV Method', 'CV Folds', 'CV Shuffle', 'CV Random State', ...(selectedJobs.some(j => j.job_type === 'advanced_tuning') ? ['Strategy', 'Strategy Params', 'Metric', 'Trials'] : [])].map(field => (
+                            <tr key={field} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                              <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{field}</td>
+                              {selectedJobs.map(job => {
+                                // Resolve config: for advanced tuning use job.config or graph node params,
+                                // for basic training use job.hyperparameters (which contains full node params)
+                                let cfg: Record<string, any> | null = null;
+                                if (job.job_type === 'advanced_tuning') {
+                                  const nodeParams = (job.config as Record<string, any>) || 
+                                    (job.graph?.nodes as any[])?.find((n: any) => n.node_id === job.node_id)?.params;
+                                  cfg = nodeParams || null;
+                                } else {
+                                  cfg = (job.hyperparameters as Record<string, any>) || 
+                                    (job.graph?.nodes as any[])?.find((n: any) => n.node_id === job.node_id)?.params || null;
+                                }
 
-                                    if (!config) {
-                                      return <td key={job.job_id} className="px-4 py-1.5 text-gray-400">-</td>;
-                                    }
+                                if (!cfg) {
+                                  return <td key={job.job_id} className="px-4 py-1.5 text-gray-400">-</td>;
+                                }
 
-                                    let value: string | number = '-';
-                                    if (field === 'Strategy') value = config.strategy || '-';
-                                    if (field === 'Strategy Params') value = config.strategy_params && Object.keys(config.strategy_params).length > 0 ? JSON.stringify(config.strategy_params) : '-';
-                                    if (field === 'Metric') value = config.metric || '-';
-                                    if (field === 'Trials') value = config.n_trials || '-';
-                                    if (field === 'CV Enabled') value = config.cv_enabled ? 'Yes' : 'No';
-                                    if (field === 'CV Method') value = config.cv_enabled ? (config.cv_type || 'Unknown') : '-';
-                                    if (field === 'Folds') value = config.cv_enabled ? config.cv_folds : '-';
-                                    if (field === 'Shuffle') value = config.cv_enabled ? (config.cv_shuffle ? 'Yes' : 'No') : '-';
+                                // For advanced tuning, CV params are inside tuning_config
+                                const tuningConfig = cfg.tuning_config as Record<string, any> | undefined;
+                                const cvSource = job.job_type === 'advanced_tuning' && tuningConfig ? tuningConfig : cfg;
 
-                                    return (
-                                      <td key={job.job_id} className="px-4 py-1.5 font-mono text-gray-600 dark:text-gray-300 capitalize">
-                                        {value}
-                                      </td>
-                                    );
-                                  })}
-                                </tr>
-                              ))}
-                            </>
-                          )}
+                                let value: string | number = '-';
+                                if (field === 'Target Column') value = cfg.target_column || job.target_column || '-';
+                                if (field === 'CV Enabled') value = cvSource.cv_enabled ? 'Yes' : 'No';
+                                if (field === 'CV Method') value = cvSource.cv_enabled ? (cvSource.cv_type || 'Unknown') : '-';
+                                if (field === 'CV Folds') value = cvSource.cv_enabled ? (cvSource.cv_folds ?? '-') : '-';
+                                if (field === 'CV Shuffle') value = cvSource.cv_enabled ? (cvSource.cv_shuffle ? 'Yes' : 'No') : '-';
+                                if (field === 'CV Random State') value = cvSource.cv_enabled ? (cvSource.cv_random_state ?? '-') : '-';
+                                if (field === 'Strategy') value = tuningConfig?.strategy || tuningConfig?.search_strategy || '-';
+                                if (field === 'Strategy Params') value = tuningConfig?.strategy_params && Object.keys(tuningConfig.strategy_params).length > 0 ? JSON.stringify(tuningConfig.strategy_params) : '-';
+                                if (field === 'Metric') value = tuningConfig?.metric || '-';
+                                if (field === 'Trials') value = tuningConfig?.n_trials || '-';
+
+                                return (
+                                  <td key={job.job_id} className="px-4 py-1.5 font-mono text-gray-600 dark:text-gray-300 capitalize">
+                                    {value}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
                         </>
                       )}
                     </tbody>
@@ -747,6 +791,15 @@ export const ExperimentsPage: React.FC = () => {
                                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                             />
                                             <span className="text-gray-700 dark:text-gray-300">Validation</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={showCvMetrics}
+                                                onChange={e => { setShowCvMetrics(e.target.checked); }}
+                                                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                            />
+                                            <span className="text-gray-700 dark:text-gray-300">Cross-Validation</span>
                                         </label>
                                     </div>
 
