@@ -2923,7 +2923,19 @@ print(cv_results[&quot;aggregated_metrics&quot;])
 <h2 id="ml-canvas-ui">ML Canvas UI</h2>
 <p>Both the <strong>Basic Training</strong> and <strong>Advanced Tuning</strong> nodes expose a CV type dropdown with all five methods. When Time Series Split is selected, an additional date column picker appears with a warning to verify the selected column.</p>
 <h2 id="integration-with-tuning">Integration with tuning</h2>
-<p>When using <code>hyperparameter_tuner</code>, the CV splitter is passed directly to the search strategy (GridSearchCV, RandomizedSearchCV, etc.). For nested CV in tuning mode, the inner folds drive the search while the outer folds provide an unbiased evaluation estimate.</p>
+<p>When using the <strong>Advanced Tuning</strong> node, cross-validation plays two distinct roles:</p>
+<ol>
+<li>
+<p><strong>During the search:</strong> The CV splitter is passed directly to the search strategy (GridSearchCV, OptunaSearchCV, etc.). Each candidate hyperparameter set is scored using inner CV folds. For <code>nested_cv</code>, the inner splitter uses fewer folds (3 or <code>cv_folds - 1</code>, whichever is smaller) to keep the search fast.</p>
+</li>
+<li>
+<p><strong>After the search (post-tuning evaluation):</strong> A separate <code>cross_validate()</code> call runs with the <code>best_params</code> found by tuning. This gives you the unbiased <code>cv_*_mean</code> / <code>cv_*_std</code> metrics shown in Experiments.</p>
+</li>
+</ol>
+<blockquote>
+<p><strong>Important:</strong> When <code>nested_cv</code> is selected with advanced tuning, the post-tuning evaluation automatically downgrades to <code>stratified_k_fold</code> (classification) or <code>k_fold</code> (regression). This avoids re-running the inner CV loop that already ran during the search — saving computation without losing evaluation quality.</p>
+</blockquote>
+<p>For basic training (no tuning), <code>nested_cv</code> runs the full dual-loop as described above.</p>
 <p>See <a href="hyperparameter_tuning.html">Hyperparameter Tuning</a> for tuning-specific configuration.</p>
 
 
