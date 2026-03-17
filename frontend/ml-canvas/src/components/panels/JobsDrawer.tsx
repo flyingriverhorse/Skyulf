@@ -3,6 +3,11 @@ import { useJobStore } from '../../core/store/useJobStore';
 import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown } from 'lucide-react';
 import { JobInfo, jobsApi } from '../../core/api/jobs';
 
+const formatMetricValue = (key: string, value: number): string => {
+  if (key.endsWith('_std')) return value.toFixed(6);
+  return value.toFixed(4);
+};
+
 export const JobsDrawer: React.FC = () => {
   const { 
     isDrawerOpen, 
@@ -296,10 +301,10 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                 {job.job_type === 'basic_training' && !!(job.result as Record<string, unknown>).metrics && (
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                         {Object.entries((job.result as Record<string, unknown>).metrics as Record<string, unknown>).map(([k, v]) => (
-                                            <div key={k} className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                            <div key={k} className={`p-3 border rounded-lg ${k.startsWith('cv_') ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
                                                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">{k.replace(/_/g, ' ')}</div>
-                                                <div className="font-mono font-medium text-blue-600 dark:text-blue-400">
-                                                    {typeof v === 'number' ? v.toFixed(4) : String(v)}
+                                                <div className={`font-mono font-medium ${k.startsWith('cv_') ? 'text-purple-600 dark:text-purple-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                                                    {typeof v === 'number' ? formatMetricValue(k, v) : String(v)}
                                                 </div>
                                             </div>
                                         ))}
@@ -385,10 +390,10 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                                     {Object.entries((job.result as Record<string, unknown>).metrics as Record<string, unknown>)
                                                         .filter(([k]) => !['best_score', 'best_params', 'trials'].includes(k))
                                                         .map(([k, v]) => (
-                                                        <div key={k} className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                                        <div key={k} className={`p-3 border rounded-lg ${k.startsWith('cv_') ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
                                                             <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">{k.replace(/_/g, ' ')}</div>
-                                                            <div className="font-mono font-medium text-blue-600 dark:text-blue-400">
-                                                                {typeof v === 'number' ? (v as number).toFixed(4) : String(v)}
+                                                            <div className={`font-mono font-medium ${k.startsWith('cv_') ? 'text-purple-600 dark:text-purple-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                                                                {typeof v === 'number' ? formatMetricValue(k, v as number) : String(v)}
                                                             </div>
                                                         </div>
                                                     ))}

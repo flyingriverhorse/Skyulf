@@ -1,5 +1,6 @@
 # Version Updates
 
+*   **v0.1.14 :** "The Cross-Validation & Experiments Update" — Full CV pipeline for both basic training and advanced tuning, unified experiments comparison, nested CV with smart downgrade for tuning (avoids redundant inner loops), time-series CV safeguards, and comprehensive documentation overhaul.
 *   **v0.1.13 :** "The Advanced Tuning Strategies Update" — Exposed deep configuration for Optuna (Samplers/Pruners) and Successive Halving directly in the ML Canvas UI.
 *   **v0.1.12 :** "The Code Quality & Test Coverage Update" — Fixed critical Polars bug, enabled CI auto-triggers, resolved dependency conflicts, aligned versions, and boosted test coverage.
 *   **v0.1.11 :** "The EDA-First Packaging & Drift Reliability Update" — Published `skyulf-core` `0.1.11`, improved optional dependency handling, and hardened drift/runtime stability.
@@ -18,12 +19,27 @@
 ---------------------------------------------
 ## v0.1.14
 
-### � Cross-Validation Enhancements
+### 🧪 Cross-Validation Enhancements
 - **Nested CV:** Implemented nested cross-validation across the full stack (core, backend, frontend). Outer loop evaluates generalization, inner loop validates hyperparameter stability per fold.
 - **Shuffle Split (Advanced Tuning):** Added missing Shuffle Split option to the Advanced Tuning node dropdown — was already supported in backend/core but absent from UI.- **Time Series CV Safeguard:** Added auto-sort by datetime column when Time Series Split is selected. Users can optionally pick a specific date column in the UI; if not set, auto-detects the first datetime64 column. Logs a warning if no datetime column is found.
 - **Time Column UI:** Both Basic Training and Advanced Tuning nodes show a date column selector + amber warning when Time Series Split is chosen. Datetime columns are listed first for convenience.- **Backend CV Fix:** Fixed `aggregated_metrics` extraction in execution engine — CV metrics were not being propagated due to changed return structure.
 
-### 📖 Cross-Validation Docs
+### 🐛 Bug Fixes
+- **Advanced Tuning CV Metrics:** Fixed cross-validation metrics missing from Advanced Tuning job results. The tuning path now runs `cross_validate()` on the tuned model with best parameters (matching basic training behavior), so `cv_*_mean` / `cv_*_std` metrics appear in experiments and job details.
+- **CV Param Source Fix:** Fixed CV params (`cv_enabled`, `cv_folds`, `cv_type`, `cv_shuffle`) being read from `node.params` instead of `tuning_params` (where the frontend nests them inside `tuning_config`). Without this, `cv_enabled` was always `False` and CV never ran.
+- **CV Std Precision:** Fixed `_aggregate_metrics` using population std (`ddof=0`) instead of sample std (`ddof=1`). Also increased display precision for `_std` metrics to 6 decimal places so near-zero values are visible instead of showing `0.0000`.
+- **Nested CV + Advanced Tuning Redundancy:** When `nested_cv` is selected with advanced tuning, the post-tuning CV evaluation now uses `stratified_k_fold` (classification) or `k_fold` (regression) instead of re-running `_perform_nested_cv`. The inner CV loop already ran during the tuning search, so repeating it was wasteful. The downgrade is problem-type-aware. Also removed dead `_nested_outer_cv` code from `TuningCalculator`.
+
+### 🎨 Frontend
+- **CV Metrics Toggle:** Added "Cross-Validation" checkbox to Experiments page charts and evaluation views (alongside Train/Test/Validation toggles) to filter `cv_*` metrics.
+- **CV Metric Styling:** CV metrics in JobsDrawer now render with purple accent (background + text) to visually distinguish them from train/test/val metrics.
+- **Unified Training Config:** Experiments comparison table now shows Training Configuration (Target Column, CV Enabled, CV Method, CV Folds, CV Shuffle, CV Random State) for both basic training and advanced tuning jobs. Tuning-specific fields (Strategy, Metric, Trials) appear when comparing advanced tuning jobs.
+- **Hyperparameters Parity:** Fixed Hyperparameters section in Experiments comparison to show only actual model hyperparameters for both job types — `best_params` for advanced tuning, nested `hyperparameters` dict for basic training. Previously basic training dumped raw config fields (target_column, cv_enabled, etc.) as "hyperparameters".
+
+### 🔧 Backend
+- **`config` field on JobInfo:** Added `config` field to `JobInfo` schema, populated from full graph node params for advanced tuning jobs so the frontend can display training configuration (target column, CV settings) alongside tuning configuration.
+
+### �📖 Cross-Validation Docs
 - **New Page:** Created dedicated [Cross-Validation Guide](docs/user_guide/cross_validation.md) documenting all 5 methods with examples, return structure, config reference, and UI notes.
 - **Hyperparameter Tuning:** Added `nested_cv` to CV types table, added `cv_time_column` to config reference, added time column auto-sort explanation.
 - **Modeling Nodes Reference:** Expanded CV section with method table and config keys.

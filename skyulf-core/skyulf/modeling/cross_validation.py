@@ -45,7 +45,7 @@ def _aggregate_metrics(
         if values:
             aggregated[key] = {
                 "mean": float(np.mean(values)),
-                "std": float(np.std(values)),
+                "std": float(np.std(values, ddof=1)) if len(values) > 1 else 0.0,
                 "min": float(np.min(values)),
                 "max": float(np.max(values)),
             }
