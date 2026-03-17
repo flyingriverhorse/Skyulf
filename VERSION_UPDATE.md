@@ -1,5 +1,6 @@
 # Version Updates
 
+*   **v0.1.15 :** *(in progress)*
 *   **v0.1.14 :** "The Cross-Validation & Experiments Update" — Full CV pipeline for both basic training and advanced tuning, unified experiments comparison, nested CV with smart downgrade for tuning (avoids redundant inner loops), time-series CV safeguards, and comprehensive documentation overhaul.
 *   **v0.1.13 :** "The Advanced Tuning Strategies Update" — Exposed deep configuration for Optuna (Samplers/Pruners) and Successive Halving directly in the ML Canvas UI.
 *   **v0.1.12 :** "The Code Quality & Test Coverage Update" — Fixed critical Polars bug, enabled CI auto-triggers, resolved dependency conflicts, aligned versions, and boosted test coverage.
@@ -15,6 +16,11 @@
 *   **v0.1.2 :** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
+
+---------------------------------------------
+## v0.1.15
+
+*(in progress)*
 
 ---------------------------------------------
 ## v0.1.14
