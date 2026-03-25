@@ -45,6 +45,12 @@
   - **safety** → kept in dev dependencies section (CLI tool, not a library).
 - **Removed stale commented-out blocks** (Flask-era duplicates) for cleaner file.
 
+### ⚙️ Config Refactoring
+- **Config Package:** Replaced monolithic `backend/config.py` (597 lines) with a `backend/config/` package: `base.py`, `environments.py`, `factory.py`, and `mixins/` directory.
+- **Domain Mixins:** Split 134 settings fields into 10 focused mixin classes: `CoreMixin`, `AWSMixin`, `SecurityMixin`, `DatabaseMixin`, `CeleryMixin`, `FilesMixin`, `SnowflakeMixin`, `LoggingMixin`, `CacheMixin`, `LLMMixin`. Each mixin owns one domain (~10-65 lines).
+- **Zero Shadow Warnings:** Rewrote environment subclasses to use `model_post_init` + `_apply_defaults` instead of re-declaring parent fields, eliminating all Pydantic "shadows parent" warnings.
+- **Backward Compatible:** All 32 existing `from backend.config import ...` imports work unchanged via `__init__.py` re-exports.
+
 ---------------------------------------------
 ## v0.1.14
 
