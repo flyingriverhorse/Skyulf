@@ -9,6 +9,8 @@ pytest-cov>=4.1.0,<5.0.0
 factory-boy>=3.3.0,<4.0.0
 faker>=19.0.0,<20.0.0
 pre-commit>=3.4.0
+moto[s3]>=5.0.0,<6.0.0              # Mock AWS services for testing
+safety>=3.6.1                        # Security vulnerability scanner (CLI)
 types-setuptools
 types-requests
 types-PyYAML

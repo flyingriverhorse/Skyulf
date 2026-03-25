@@ -44,7 +44,14 @@ I named it Skyulf after two ideas. Sky is the open space above Earth, where the 
 
 Prerequisites: **Python 3.10+**
 
-### On Windows PowerShell
+### Fastest Path (One Command)
+
+**Windows:** Double-click `start.bat`  
+**macOS/Linux:** Run `./start.sh`
+
+These scripts auto-create a virtualenv, install deps, generate a `.env` with safe defaults (SQLite, no Redis), and launch the server. Open w when ready.
+
+### On Windows PowerShell (Manual)
 
 **Using pip:**
 ```powershell

@@ -11,22 +11,18 @@ services:
     restart: unless-stopped
 
   api:
-    image: python:3.12-slim
-    working_dir: /app
+    build: .
     volumes:
       - ./:/app
     environment:
       FASTAPI_ENV: development
       HOST: 0.0.0.0
       PORT: 8000
+      USE_CELERY: "true"
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       REDIS_URL: redis://redis:6379/0
       DATABASE_URL: sqlite+aiosqlite:///./mlops_database.db
-    command: >-
-      bash -lc "pip install --upgrade pip && 
-      pip install -r requirements-fastapi.txt && 
-      uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     ports:
       - "8000:8000"
     depends_on:
@@ -34,8 +30,7 @@ services:
     restart: unless-stopped
 
   worker:
-    image: python:3.12-slim
-    working_dir: /app
+    build: .
     volumes:
       - ./:/app
     environment:
@@ -43,15 +38,11 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
     command: >-
-      bash -lc "pip install --upgrade pip && 
-      pip install -r requirements-fastapi.txt && 
-      python -m celery -A celery_worker.celery_app worker --pool=solo --loglevel=info --queues mlops-training"
+      python -m celery -A celery_worker.celery_app worker
+      --pool=solo --loglevel=info --queues mlops-training
     depends_on:
       - redis
     restart: unless-stopped
-
-profiles:
-  - dev
 
 networks:
   default:
