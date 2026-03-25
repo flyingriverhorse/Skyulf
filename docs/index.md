@@ -88,5 +88,5 @@ See [Architecture](architecture.md) and [Data Architecture](data_architecture.md
 
 - **GitHub**: [github.com/flyingriverhorse/Skyulf](https://github.com/flyingriverhorse/Skyulf)
 - **PyPI**: [pypi.org/project/skyulf-core](https://pypi.org/project/skyulf-core/)
-- **Changelog**: [VERSION_UPDATE.md](https://github.com/flyingriverhorse/Skyulf/blob/master/VERSION_UPDATE.md)
+- **Changelog**: [CHANGELOG.md](https://github.com/flyingriverhorse/Skyulf/blob/master/CHANGELOG.md)
 

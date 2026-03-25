@@ -198,7 +198,7 @@ We have a clear vision to turn Skyulf into a complete **App Hub** for AI.
 
 We maintain a detailed changelog of all major updates, new features, and architectural changes.
 
-👉 **[View the full VERSION_UPDATE.md](./VERSION_UPDATE.md)** for the complete history.
+👉 **[View the full CHANGELOG.md](./CHANGELOG.md)** for the complete history.
 
 ## Workflow Overview
 
