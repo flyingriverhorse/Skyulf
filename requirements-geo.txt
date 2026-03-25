@@ -1,0 +1,15 @@
+# Geospatial Stack (Optional)
+# Install with: pip install -r requirements-geo.txt
+#
+# These are NOT required for core Skyulf functionality.
+# Only install if you need geospatial profiling, spatial joins,
+# or coordinate transforms in your ML pipelines.
+#
+# NOTE: Requires Python >= 3.10
+
+geopandas>=0.14.0,<1.2.0   # Geospatial dataframe operations
+shapely>=2.0.2,<2.2.0       # Geometry operations (GEOS bindings)
+pyproj>=3.6.0,<3.8.0        # Coordinate reference system transforms (PROJ bindings)
+rtree>=1.3.0,<2.0.0         # Spatial indexes for faster spatial joins
+libpysal>=4.10.0,<5.0.0     # Spatial weights matrices
+esda>=2.5.0,<3.0.0          # Spatial autocorrelation statistics (Moran's I, etc.)

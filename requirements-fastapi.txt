@@ -1,6 +1,5 @@
 # FastAPI MLops Application Requirements
 # This file contains dependencies specific to the FastAPI implementation
-# NOTE: Geospatial stack requires Python >= 3.10 (see libpysal constraint)
 
 # === LOCAL MONOREPO PACKAGES ===
 # Provides the `skyulf` Python package (core preprocessing/modeling/pipeline engine)
@@ -11,9 +10,9 @@ fastapi>=0.104.0,<1.0.0
 uvicorn[standard]>=0.24.0,<1.0.0
 pydantic>=2.4.0,<3.0.0
 pydantic-settings>=2.0.0,<3.0.0
-email-validator>=2.0.0              # Required for EmailStr validation in Pydantic
 python-dotenv>=1.0.0,<2.0.0        # Environment variable loading
-orjson>=3.9.0                      # High performance JSON serialization
+python-multipart>=0.0.6             # Form data / file upload support for FastAPI
+orjson>=3.9.0                       # High performance JSON serialization
 
 # === ASYNC TASK QUEUE ===
 celery[redis]>=5.4.0,<6.0.0
@@ -24,100 +23,42 @@ causal-learn>=0.1.3.0
 
 # === ASYNC DATABASE SUPPORT ===
 sqlalchemy[asyncio]>=2.0.0,<3.0.0
-aiosqlite>=0.19.0,<1.0.0  # Async SQLite support
-asyncpg>=0.29.0,<1.0.0    # Async PostgreSQL support (optional)
+aiosqlite>=0.19.0,<1.0.0            # Async SQLite support
+asyncpg>=0.29.0,<1.0.0              # Async PostgreSQL support (optional)
 
 # === DATA STORAGE & FORMATS ===
-pyarrow>=21.0.0           # Parquet support for Pandas
-boto3>=1.34.0             # AWS SDK for S3
-s3fs>=2023.12.0           # S3 Filesystem for Pandas
-aiofiles>=24.1.0          # Async file operations
+pyarrow>=21.0.0                      # Parquet support for Pandas/Polars
+boto3>=1.34.0                        # AWS SDK (transitive via s3fs, pinned for stability)
+s3fs>=2023.12.0                      # S3 Filesystem for Pandas
+aiohttp>=3.9.0,<4.0.0               # Pinned to avoid pip backtracking (transitive via s3fs)
+aiofiles>=24.1.0                     # Async file operations
 
 # === STATISTICS & ANALYSIS ===
 scipy>=1.10.0,<2.0.0
 statsmodels>=0.14.0,<1.0.0
-patsy>=0.5.0,<1.0.0         # Required by statsmodels
-
-# === AUTHENTICATION & SECURITY ===
-python-jose[cryptography]>=3.3.0,<4.0.0  # JWT token handling
-passlib[bcrypt]>=1.7.4,<2.0.0             # Password hashing
-python-multipart>=0.0.6,<1.0.0            # Form data support
-bcrypt==4.0.1                              # Pin bcrypt to a compatible version for passlib
-
-# === TEMPLATE SUPPORT ===
-jinja2>=3.1.0,<4.0.0                      # Template engine
+patsy>=0.5.0,<1.0.0                  # Required by statsmodels
 
 # === HTTP CLIENT (ASYNC) ===
-httpx>=0.25.0,<1.0.0      # Async HTTP client (replacement for requests)
+httpx>=0.25.0,<1.0.0
 
-# === SYSTEM MONITORING ===
-psutil>=5.9.0,<6.0.0      # System and process utilities
-rich>=13.0.0              # Beautiful terminal logging
+# === TERMINAL & LOGGING ===
+rich>=13.0.0                         # Beautiful terminal logging
 
 # === DATA PROCESSING ===
-polars>=1.36.0            # Fast DataFrame library (V2 Ingestion)
-xlsx2csv>=0.8.0           # Excel to CSV converter for Polars
-openpyxl>=3.1.0           # Excel reading support
-pandas>=2.0.0,<3.0.0      # Data analysis and manipulation
-numpy>=1.24.0,<2.0.0      # Numerical computing
-scikit-learn>=1.4.0,<2.0.0 # Model selection utilities
-optuna>=4.0,<5             # Bayesian/early-stopping hyperparameter search
-imbalanced-learn>=0.12.0,<1.0.0  # Sampling strategies for imbalanced datasets
-rapidfuzz>=3.6.1,<4.0.0   # Efficient string similarity metrics for feature math
-geopandas>=0.14.0,<1.2.0 # Geospatial dataframe operations
-shapely>=2.0.2,<2.2.0     # Geometry operations
-pyproj>=3.6.0,<3.8.0      # Coordinate reference transforms
-rtree>=1.3.0,<2.0.0       # Spatial indexes for faster spatial joins
-libpysal>=4.10.0,<5.0.0   # Spatial weights
-esda>=2.5.0,<3.0.0        # Spatial autocorrelation statistics
-networkx>=3.0.0,<4.0.0    # Graph algorithms for pipeline execution
-# Optional performance dependencies for pandas
-# Numba enables faster compute paths in pandas (used when compute.use_numba=True)
-numba>=0.60.0,<1.0.0
-llvmlite>=0.45.0,<1.0.0
+polars>=1.36.0                       # Fast DataFrame library (V2 Ingestion)
+xlsx2csv>=0.8.0                      # Excel to CSV converter (used by Polars internally)
+openpyxl>=3.1.0                      # Excel reading support (used by Pandas internally)
+pandas>=2.0.0,<3.0.0
+numpy>=1.24.0
+scikit-learn>=1.4.0,<2.0.0
+optuna>=4.0,<5                       # Bayesian/early-stopping hyperparameter search
+optuna-integration>=4.0,<5           # OptunaSearchCV for sklearn hyperparameter tuning
+imbalanced-learn>=0.12.0,<1.0.0     # Sampling strategies for imbalanced datasets
+rapidfuzz>=3.6.1,<4.0.0             # String similarity metrics for feature engineering
 
 # === NLP ANALYTICS ===
-vaderSentiment>=3.3.2,<4.0.0 # Sentiment scoring utilities
+vaderSentiment>=3.3.2,<4.0.0        # Sentiment scoring utilities
 
-# === Security Dependencies ===
-safety>=3.6.1
-typer>=0.12.0,<1.0.0
-
-# === EXISTING DEPENDENCIES (SHARED WITH FLASK) ===
-# These are already in the main requirements.txt, but listed here for clarity
-# when setting up the FastAPI environment separately
-
-# Data processing
-# pandas>=2.2.0,<2.3.0
-# numpy>=1.26.0,<2.0.0
-
-# External services
-# snowflake-connector-python>=3.7.0,<4.0.0
-# psycopg2-binary>=2.9.9,<3.0.0
-
-# File formats
-# openpyxl>=3.1.2,<4.0.0
-# pyarrow>=15.0.0,<16.0.0
-
-# Web scraping (if needed)
-# beautifulsoup4>=4.12.3,<5.0.0
-# selenium>=4.18.0,<5.0.0
-
-# ML libraries (if needed)
-# scikit-learn>=1.4.0,<2.0.0
-# matplotlib>=3.8.0,<4.0.0
-
-# === DEVELOPMENT DEPENDENCIES ===
-# Only install these in development environment
-pytest>=7.4.0,<10.0.0
-pytest-asyncio>=0.21.0,<2.0.0
-pytest-cov>=4.1.0,<5.0.0
-black>=23.0.0,<24.0.0
-isort>=5.12.0,<6.0.0
-flake8>=6.0.0,<7.0.0
-moto[s3]>=5.0.0,<6.0.0    # Mock AWS services for testing
-mypy>=1.6.0,<2.0.0
-
-# Testing utilities
-factory-boy>=3.3.0,<4.0.0
-faker>=19.0.0,<20.0.0
+# === OPTIONAL EXTRAS (install separately if needed) ===
+# Geospatial:  pip install -r requirements-geo.txt
+# Dev tools:   pip install -r requirements-dev.txt

@@ -1,15 +1,26 @@
 # Skyulf Quickstart
 
-> **Goal:** Get the Skyulf FastAPI workspace, Celery worker, and optional UI assets running locally.
+> **Goal:** Get Skyulf running locally with the least amount of effort.
+
+---
+
+## 0. Fastest path (one command)
+
+After cloning, just double-click **`start.bat`** (Windows) or run **`./start.sh`** (macOS/Linux).
+
+These scripts automatically create a virtual environment, install dependencies, generate a `.env` file with safe defaults (SQLite, no Redis), and launch the server. **No Docker, no Redis, no manual steps.**
+
+Once running, open: http://127.0.0.1:8000/docs
 
 ---
 
 ## 1. Decide how you want to run it
 
-- **Option A – Docker Compose (recommended):** Needs only Docker Desktop (or Docker Engine). Compose launches the FastAPI API, Redis broker, and Celery worker in containers. You do *not* need to install Python or Redis on your host unless you want to develop locally.
-- **Option B – Manual environment:** Requires Python 3.10/3.11 plus a Redis instance you manage (native install, WSL, or Docker). Choose this if you prefer running services directly on your machine or inside an existing virtualenv.
+- **Option A – One-click script (easiest):** Just needs Python 3.10+. Run `start.bat` or `start.sh`. No Docker, no Redis.
+- **Option B – Docker Compose (recommended for production-like setup):** Needs only Docker Desktop. Launches API + Redis + Celery worker in containers.
+- **Option C – Manual environment:** Full control. Requires Python 3.10+ and optionally Redis.
 
-Node.js stays optional for both paths—it’s only necessary if you plan to build the forthcoming frontend bundle yourself.
+Node.js stays optional for all paths—it's only necessary if you plan to build the frontend bundle yourself.
 
 ---
 

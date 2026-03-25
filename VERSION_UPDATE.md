@@ -1,6 +1,6 @@
 # Version Updates
 
-*   **v0.1.15 :** *(in progress)*
+*   **v0.1.15 :** "The Developer Experience & Dependency Cleanup Update" — One-click start scripts with smart Python detection and internet checks, multi-stage Dockerfile for instant rebuilds, 15 unused dependencies removed, and critical bug fixes for installation and runtime stability.
 *   **v0.1.14 :** "The Cross-Validation & Experiments Update" — Full CV pipeline for both basic training and advanced tuning, unified experiments comparison, nested CV with smart downgrade for tuning (avoids redundant inner loops), time-series CV safeguards, and comprehensive documentation overhaul.
 *   **v0.1.13 :** "The Advanced Tuning Strategies Update" — Exposed deep configuration for Optuna (Samplers/Pruners) and Successive Halving directly in the ML Canvas UI.
 *   **v0.1.12 :** "The Code Quality & Test Coverage Update" — Fixed critical Polars bug, enabled CI auto-triggers, resolved dependency conflicts, aligned versions, and boosted test coverage.
@@ -20,7 +20,30 @@
 ---------------------------------------------
 ## v0.1.15
 
-*(in progress)*
+### 🚀 Developer Experience
+- **One-Click Start:** Added `start.bat` (Windows) and `start.sh` (macOS/Linux) scripts that auto-create virtualenv, install deps, generate `.env`, and launch the server with zero manual steps.
+- **Smart Python Detection:** Start scripts now try `python`, `py`, `python3`, and common install paths before giving up. If Python is missing, shows clear install instructions and offers to open the download page (Windows) or prints the right package manager command (macOS/Linux).
+- **Python Version Guard:** Start scripts validate Python is 3.10-3.12. Warns (with option to continue) if on 3.13+ where some deps (numba) may not work yet.
+- **Internet Check:** Start scripts ping `pypi.org` before installing to catch network/proxy issues early with actionable fix instructions.
+- **Dockerfile:** Added multi-stage Dockerfile with layer caching so Docker rebuilds are instant when only code changes (no more 5-min pip reinstalls on every `docker compose up`).
+- **Docker Compose Fix:** Removed `profiles: [dev]` block that silently prevented `docker compose up` from starting any services.
+- **Safe Defaults:** Changed `.env.example` to default `USE_CELERY=false` so new users aren't blocked by missing Redis.
+- **Makefile:** Added Makefile with shortcuts (`make start`, `make docker`, `make lint`, `make test`, etc.).
+- **QUICKSTART Update:** Added "Fastest Path" section at the top of QUICKSTART.md and README.md for one-command startup.
+
+### 🐛 Bug Fixes
+- **Dependency Caps:** Removed overly strict upper bounds on `python-multipart` (`<1.0.0`) and `numpy` (`<2.0.0`) that blocked installation on newer Python/pip versions.
+- **Start Script Robustness (Win+Linux):** Python auto-install now verifies success with exit-code checks and file-size validation (Windows curl >10MB). Added `pacman` support for Arch Linux, macOS Homebrew path fallback, deadsnakes PPA hint for Ubuntu, and clear manual-fix instructions on failure.
+- **Pip Backtracking Fix:** Pinned `aiohttp>=3.9.0,<4.0.0` in requirements to prevent pip from downloading 40+ versions during dependency resolution (caused by loose `s3fs` → `aiobotocore` → `aiohttp` chain). Install now takes minutes instead of 20+.
+- **Internet Retry:** Start scripts now retry the connectivity check 5 times with 10s waits instead of failing immediately on the first timeout.
+
+### 🧹 Dependency Cleanup
+- **Removed 15 unused dependencies** from `requirements-fastapi.txt` after full import audit:
+  - **Geo stack** (geopandas, shapely, pyproj, rtree, libpysal, esda) → moved to `requirements-geo.txt` for optional install.
+  - **Auth scaffold** (python-jose, passlib, bcrypt) → not implemented yet, removed.
+  - **Unused** (email-validator, jinja2, psutil, networkx, numba, llvmlite, typer) → removed.
+  - **safety** → kept in dev dependencies section (CLI tool, not a library).
+- **Removed stale commented-out blocks** (Flask-era duplicates) for cleaner file.
 
 ---------------------------------------------
 ## v0.1.14

@@ -17,7 +17,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import FileResponse, ORJSONResponse
 from fastapi.staticfiles import StaticFiles
 
 # Use absolute imports to fix import issues
@@ -211,19 +211,32 @@ def _setup_templates_and_static(app: FastAPI) -> None:
 
     # Define paths
     base_dir = Path(__file__).parent
+    project_root = base_dir.parent
     static_dir = base_dir / "static"
+    frontend_dir = project_root / "static" / "ml_canvas"
 
     # Verify static directory exists
     if not static_dir.exists():
         logger.warning(f"Static directory not found: {static_dir}")
         static_dir.mkdir(parents=True, exist_ok=True)
 
-    # Setup static files
+    # Setup backend static files
     try:
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
         logger.info(f"[OK] Static files mounted from: {static_dir}")
     except Exception as e:
         logger.error(f"[ERROR] Failed to mount static files: {e}")
+
+    # Mount built frontend assets (/assets/* -> static/ml_canvas/assets/)
+    frontend_assets = frontend_dir / "assets"
+    if frontend_assets.exists():
+        app.mount("/assets", StaticFiles(directory=str(frontend_assets)), name="frontend-assets")
+        logger.info(f"[OK] Frontend assets mounted at /assets from: {frontend_assets}")
+    else:
+        logger.info(
+            "[INFO] Frontend build not found. Run 'cd frontend/ml-canvas && npm run build' "
+            "to enable the ML Canvas UI."
+        )
 
 
 def _add_middleware(app: FastAPI, settings) -> None:
@@ -274,12 +287,20 @@ def _include_routers(app: FastAPI) -> None:
     app.include_router(eda_router, prefix="/api")
     app.include_router(monitoring_router, prefix="/api")
 
-    # Root redirect
+    # Root — serve frontend if built, otherwise redirect to API docs
     from fastapi.responses import RedirectResponse
 
-    @app.get("/", include_in_schema=False)
-    async def root():
-        return RedirectResponse(url="/docs")
+    project_root = Path(__file__).parent.parent
+    frontend_index = project_root / "static" / "ml_canvas" / "index.html"
+
+    if frontend_index.exists():
+        @app.get("/", include_in_schema=False)
+        async def root():
+            return FileResponse(str(frontend_index))
+    else:
+        @app.get("/", include_in_schema=False)
+        async def root():
+            return RedirectResponse(url="/docs")
 
 
 def _add_exception_handlers(app: FastAPI) -> None:
