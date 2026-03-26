@@ -7,7 +7,7 @@ Combines all domain mixins into one flat ``Settings`` class.
 Each mixin lives in ``backend/config/mixins/`` and owns one domain's fields.
 """
 
-from typing import Any, List
+from typing import Any, List, cast
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -64,28 +64,28 @@ class Settings(
     def parse_cors_origins(cls, v: Any) -> List[str]:
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(",")]
-        return v
+        return cast(List[str], v)
 
     @field_validator("ALLOWED_HOSTS", mode="before")
     @classmethod
     def parse_allowed_hosts(cls, v: Any) -> List[str]:
         if isinstance(v, str):
             return [host.strip() for host in v.split(",")]
-        return v
+        return cast(List[str], v)
 
     @field_validator("ALLOWED_EXTENSIONS", mode="before")
     @classmethod
     def parse_allowed_extensions(cls, v: Any) -> List[str]:
         if isinstance(v, str):
             return [ext.strip() for ext in v.split(",")]
-        return v
+        return cast(List[str], v)
 
     @field_validator("API_DOCS_SERVERS", mode="before")
     @classmethod
     def parse_api_docs_servers(cls, v: Any) -> List[str]:
         if isinstance(v, str):
             return [item.strip() for item in v.split(",") if item.strip()]
-        return v
+        return cast(List[str], v)
 
     @model_validator(mode="after")
     def validate_database_config(self) -> "Settings":
