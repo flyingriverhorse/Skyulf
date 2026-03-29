@@ -68,6 +68,12 @@ class S3ArtifactStore(ArtifactStore):
             raise e
 
     def load(self, key: str) -> Any:
+        """Load a joblib artifact from S3.
+
+        Warning:
+            ``joblib.load`` uses pickle internally and can execute arbitrary code.
+            Only load artifacts that were saved by this application.
+        """
         path = self._get_s3_path(key)
         logger.info(f"Loading artifact from S3: {path}")
         

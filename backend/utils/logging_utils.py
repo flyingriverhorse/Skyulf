@@ -105,8 +105,9 @@ def setup_universal_logging(
         file_handler.setFormatter(file_formatter)
         root_logger.addHandler(file_handler)
     except (OSError, IOError) as e:
-        # Fallback if file logging fails
-        print(f"Warning: Could not setup file logging to {log_file}: {e}")
+        # Fallback if file logging fails — use stderr since logging may not be ready
+        import sys
+        print(f"Warning: Could not setup file logging to {log_file}: {e}", file=sys.stderr)
 
     # Console handler with cleaner output for development
     try:

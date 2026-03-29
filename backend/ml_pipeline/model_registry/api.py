@@ -1,7 +1,10 @@
+import logging
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from backend.database.engine import get_async_session
 
@@ -49,8 +52,7 @@ async def list_job_artifacts(
     try:
         return await ModelRegistryService.get_job_artifacts(session, job_id)
     except ValueError as e:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Failed to list artifacts for job %s", job_id)
+        raise HTTPException(status_code=500, detail="Failed to retrieve job artifacts")

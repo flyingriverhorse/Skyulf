@@ -9,6 +9,8 @@ Each mixin lives in ``backend/config/mixins/`` and owns one domain's fields.
 
 from typing import Any, List, cast
 
+import logging
+
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -114,12 +116,13 @@ class Settings(
 
     def configure_pandas(self) -> None:
         """Configure Pandas with optimal settings for the ML platform."""
+        _logger = logging.getLogger(__name__)
         try:
             import pandas as pd
             pd.options.mode.copy_on_write = True
-            print("OK Pandas configured with optimized settings for ML workflows")
+            _logger.info("Pandas configured with optimized settings for ML workflows")
         except ImportError:
-            print("WARNING: Pandas not available, skipping configuration")
+            _logger.warning("Pandas not available, skipping configuration")
 
     def is_field_set(self, field_name: str) -> bool:
         """Return True if the given settings field was explicitly provided by the user."""

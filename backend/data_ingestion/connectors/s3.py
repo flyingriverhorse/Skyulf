@@ -55,7 +55,7 @@ class S3Connector(BaseConnector):
                 lf = pl.scan_csv(self.path, storage_options=options)
                 return {name: str(dtype) for name, dtype in lf.collect_schema().items()}
             except Exception:
-                pass # Fallback to standard flow
+                pass  # Expected fallback: CSV extension but try standard flow next
 
         # Try Parquet first, then CSV
         try:
@@ -96,6 +96,7 @@ class S3Connector(BaseConnector):
                 temp_lf.collect_schema()
                 lf = temp_lf
             except Exception:
+                # Not a valid Parquet file — fall back to CSV
                 lf = pl.scan_csv(self.path, storage_options=options)
             
         if limit:

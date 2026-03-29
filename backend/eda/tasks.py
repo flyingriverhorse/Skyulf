@@ -146,7 +146,7 @@ async def run_eda_analysis(report_id: int, session: AsyncSession):
                 report.error_message = str(e)
                 await session.commit()
         except Exception:
-            pass
+            logger.warning("Failed to update report %s status to FAILED", report_id, exc_info=True)
 
 async def run_eda_background(report_id: int):
     """
