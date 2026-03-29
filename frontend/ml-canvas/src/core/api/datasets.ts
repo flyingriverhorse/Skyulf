@@ -144,6 +144,27 @@ export const DatasetService = {
     }
   },
 
+  exportData: async (id: string, format: 'csv' | 'parquet' = 'csv', limit: number = 10000): Promise<void> => {
+    const params = new URLSearchParams({ format, limit: limit.toString() });
+    const response = await fetch(`${API_BASE}/sources/${encodeURIComponent(id)}/export?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error('Failed to export dataset');
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const filenameMatch = disposition.match(/filename=(.+)/);
+    const filename = filenameMatch ? filenameMatch[1] : `export.${format}`;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
 };
 
 export interface DatasetProfile {

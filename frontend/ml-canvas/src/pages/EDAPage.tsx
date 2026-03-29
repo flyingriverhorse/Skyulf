@@ -21,6 +21,7 @@ import { RuleDiscoveryTab } from '../components/eda/tabs/RuleDiscoveryTab';
 import { DecompositionTab } from '../components/eda/tabs/DecompositionTab';
 import { Loader2, RefreshCw, AlertCircle, BarChart2, List, Play, HelpCircle, Target } from 'lucide-react';
 import { downloadChart } from '../core/utils/chartUtils';
+import { LoadingState, ErrorState } from '../components/shared';
 
 export const EDAPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -251,27 +252,15 @@ export const EDAPage: React.FC = () => {
 
   const renderContent = () => {
     if (loading && !report) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-        </div>
-      );
+      return <LoadingState message="Analyzing dataset..." />;
     }
 
     if (error) {
       return (
-        <div className="flex flex-col items-center justify-center h-64 text-red-500">
-          <AlertCircle className="w-16 h-16 mb-4" />
-          <p>Error</p>
-          <p className="text-sm text-gray-600 mt-2">{error}</p>
-          <button
-            onClick={() => selectedDataset && loadReport(selectedDataset)}
-            className="mt-4 flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Retry
-          </button>
-        </div>
+        <ErrorState
+          error={error}
+          onRetry={() => selectedDataset && loadReport(selectedDataset)}
+        />
       );
     }
 

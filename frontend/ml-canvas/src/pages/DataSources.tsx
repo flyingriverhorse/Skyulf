@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { DatasetService } from '../core/api/datasets';
 import { Dataset } from '../core/types/api';
 import { FileUpload } from '../modules/nodes/data/FileUpload';
-import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2, XCircle, BarChart2 } from 'lucide-react';
+import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2, XCircle, BarChart2, Download } from 'lucide-react';
 import { formatBytes } from '../core/utils/format';
 import { DatasetPreviewModal } from '../components/data/DatasetPreviewModal';
 import { AddSourceModal } from '../components/data/AddSourceModal';
 import { IngestionJobsModal } from '../components/data/IngestionJobsModal';
+import { LoadingState, EmptyState } from '../components/shared';
 
 export const DataSources: React.FC = () => {
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ export const DataSources: React.FC = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [previewDataset, setPreviewDataset] = useState<Dataset | null>(null);
-  const [filterStatus, setFilterStatus] = useState<string>('completed');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
 
   const filteredDatasets = datasets.filter(d => {
     const status = d.source_metadata?.ingestion_status?.status || 'completed';
@@ -189,7 +190,7 @@ export const DataSources: React.FC = () => {
       )}
 
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-        {['all', 'completed', 'failed', 'cancelled'].map(status => (
+        {['all', 'completed', 'processing', 'failed', 'cancelled'].map(status => (
           <button
             key={status}
             onClick={() => { setFilterStatus(status); }}
@@ -220,24 +221,21 @@ export const DataSources: React.FC = () => {
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-900">
               {loading && datasets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full" />
-                      Loading datasets...
-                    </div>
+                  <td colSpan={6}>
+                    <LoadingState message="Loading datasets..." />
                   </td>
                 </tr>
               ) : filteredDatasets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
+                  <td colSpan={6}>
                     {datasets.length === 0 ? (
-                      <>
-                        <Database className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                        <p className="text-lg font-medium text-slate-900 dark:text-slate-100">No datasets found</p>
-                        <p className="text-sm">Upload a dataset to get started with your analysis.</p>
-                      </>
+                      <EmptyState
+                        icon={<Database className="w-12 h-12 text-slate-300 dark:text-slate-600" />}
+                        title="No datasets found"
+                        description="Upload a dataset to get started with your analysis."
+                      />
                     ) : (
-                      <p className="text-lg font-medium text-slate-900 dark:text-slate-100">No datasets match the selected filter</p>
+                      <EmptyState title="No datasets match the selected filter" />
                     )}
                   </td>
                 </tr>
@@ -292,7 +290,7 @@ export const DataSources: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {d.source_metadata?.ingestion_status?.status === 'completed' && (
+                        {(!d.source_metadata?.ingestion_status?.status || d.source_metadata?.ingestion_status?.status === 'completed') && (
                           <>
                             <button
                               onClick={() => { setPreviewDataset(d); }}
@@ -316,6 +314,14 @@ export const DataSources: React.FC = () => {
                             >
                               <BarChart2 size={16} />
                               EDA
+                            </button>
+                            <button
+                              onClick={() => { void DatasetService.exportData(d.id, 'csv'); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors"
+                              title="Download CSV"
+                            >
+                              <Download size={16} />
+                              CSV
                             </button>
                           </>
                         )}
