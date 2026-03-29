@@ -9,6 +9,8 @@ Uses model_post_init to set overrides — avoids Pydantic "shadows parent" warni
 
 from typing import Any, Dict
 
+import logging
+
 from backend.config.base import Settings
 
 
@@ -71,7 +73,7 @@ class DevelopmentSettings(Settings):
         super().model_post_init(__context)
         self.configure_pandas()
         self.setup_logging()
-        print("Running in DEVELOPMENT mode with enhanced ML development features")
+        logging.getLogger(__name__).info("Running in DEVELOPMENT mode with enhanced ML development features")
 
 
 class ProductionSettings(Settings):
@@ -86,7 +88,7 @@ class ProductionSettings(Settings):
         super().model_post_init(__context)
         self.configure_pandas()
         self.setup_logging()
-        print("Running in PRODUCTION mode with enhanced security and ML capabilities")
+        logging.getLogger(__name__).info("Running in PRODUCTION mode with enhanced security and ML capabilities")
 
 
 class TestingSettings(Settings):
@@ -99,4 +101,4 @@ class TestingSettings(Settings):
         _apply_defaults(self, _TEST_DEFAULTS)
         super().model_post_init(__context)
         self.setup_logging()
-        print("[TEST] Running in TESTING mode")
+        logging.getLogger(__name__).info("Running in TESTING mode")

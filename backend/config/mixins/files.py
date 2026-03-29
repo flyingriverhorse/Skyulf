@@ -1,5 +1,6 @@
 """File handling, upload, and directory settings."""
 
+import logging
 from pathlib import Path
 from typing import List
 
@@ -37,4 +38,4 @@ class FilesMixin:
         for directory in directories:
             target_path = directory if isinstance(directory, Path) else Path(directory)
             target_path.mkdir(parents=True, exist_ok=True)
-        print(f"Created {len(directories)} application directories")
+        logging.getLogger(__name__).info("Created %d application directories", len(directories))

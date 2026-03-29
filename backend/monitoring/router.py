@@ -6,9 +6,12 @@ from pydantic import BaseModel
 import polars as pl
 import pandas as pd
 import io
+import logging
 import re
 from datetime import datetime
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+
+logger = logging.getLogger(__name__)
 from backend.config import get_settings
 from skyulf.profiling.drift import DriftCalculator, DriftReport
 
@@ -141,7 +144,8 @@ async def calculate_drift(
             # Assume it's already compatible or fail
             ref_df = pl.DataFrame(ref_data)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load reference data: {str(e)}")
+        logger.exception("Failed to load reference data for job %s", job_id)
+        raise HTTPException(status_code=500, detail="Failed to load reference data")
 
     # 3. Load Current Data
     try:
@@ -155,7 +159,8 @@ async def calculate_drift(
             # Default to CSV
             curr_df = pl.read_csv(io.BytesIO(content))
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to parse uploaded file: {str(e)}")
+        logger.warning("Failed to parse uploaded file: %s", e)
+        raise HTTPException(status_code=400, detail="Failed to parse uploaded file")
 
     # 4. Calculate Drift
     try:
@@ -163,4 +168,5 @@ async def calculate_drift(
         report = calculator.calculate_drift()
         return report
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Drift calculation failed: {str(e)}")
+        logger.exception("Drift calculation failed for job %s", job_id)
+        raise HTTPException(status_code=500, detail="Drift calculation failed")

@@ -15,9 +15,6 @@ from backend.ml_pipeline.services.job_service import JobService
 from backend.ml_pipeline.services.prediction_utils import extract_target_label_encoder
 from backend.config import get_settings
 
-# Ensure sklearn outputs pandas DataFrames where possible to preserve feature names
-sklearn.set_config(transform_output="pandas")
-
 logger = logging.getLogger(__name__)
 
 
@@ -267,9 +264,11 @@ class DeploymentService:
                 logger.info("Estimator inside artifact is a tuple, using the first element.")
                 estimator = estimator[0]
 
-            # Transform
+            # Transform (use config_context so sklearn returns
+            # DataFrames with feature names during inference only)
             try:
-                X_transformed = feature_engineer.transform(df)
+                with sklearn.config_context(transform_output="pandas"):
+                    X_transformed = feature_engineer.transform(df)
             except Exception as e:
                 logger.error(f"Feature engineering failed: {e}")
                 raise ValueError(f"Feature engineering failed: {str(e)}")

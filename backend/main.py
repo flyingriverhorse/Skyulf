@@ -287,15 +287,26 @@ def _include_routers(app: FastAPI) -> None:
     app.include_router(eda_router, prefix="/api")
     app.include_router(monitoring_router, prefix="/api")
 
-    # Root — serve frontend if built, otherwise redirect to API docs
+    # Root & SPA catch-all — serve frontend if built, otherwise redirect to API docs
     from fastapi.responses import RedirectResponse
 
     project_root = Path(__file__).parent.parent
     frontend_index = project_root / "static" / "ml_canvas" / "index.html"
 
+    # Paths that should NOT be caught by the SPA fallback
+    _API_PREFIXES = ("/api/", "/data/", "/ml-workflow/", "/health", "/docs", "/redoc", "/openapi.json", "/static/", "/assets/")
+
     if frontend_index.exists():
         @app.get("/", include_in_schema=False)
         async def root():
+            return FileResponse(str(frontend_index))
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def spa_fallback(request: Request, full_path: str):
+            """Serve index.html for client-side routes (SPA catch-all)."""
+            if any(request.url.path.startswith(prefix) for prefix in _API_PREFIXES):
+                from fastapi import HTTPException
+                raise HTTPException(status_code=404, detail="Not Found")
             return FileResponse(str(frontend_index))
     else:
         @app.get("/", include_in_schema=False)

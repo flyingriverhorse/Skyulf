@@ -1,5 +1,6 @@
 # Version Updates
 
+*   **v0.1.16 :** "The Security Hardening & Quality Patch" — Critical auth default fix, path traversal protection, error message sanitization, dead code removal, dependency cleanup, and test isolation fixes.
 *   **v0.1.15 :** "The Developer Experience & Dependency Cleanup Update" — One-click start scripts with smart Python detection and internet checks, multi-stage Dockerfile for instant rebuilds, 15 unused dependencies removed, and critical bug fixes for installation and runtime stability.
 *   **v0.1.14 :** "The Cross-Validation & Experiments Update" — Full CV pipeline for both basic training and advanced tuning, unified experiments comparison, nested CV with smart downgrade for tuning (avoids redundant inner loops), time-series CV safeguards, and comprehensive documentation overhaul.
 *   **v0.1.13 :** "The Advanced Tuning Strategies Update" — Exposed deep configuration for Optuna (Samplers/Pruners) and Successive Halving directly in the ML Canvas UI.
@@ -16,6 +17,39 @@
 *   **v0.1.2 :** "The Tuning & Versioning Consistency Update" — Unified versioning, robust tuning evaluation, and PyPI release.
 *   **v0.1.1 :** "The Observability & Stability Update" — Full test suite pass, live tuning logs, and VS Code fixes.
 *   **v0.1.0 :** "The Foundation & Deployment Update" — Added Deployments, Polars integration, and Optional Celery.
+
+---------------------------------------------
+## v0.1.16
+
+### 🔒 Security
+- **Auth Fallback Default:** Changed `AUTH_FALLBACK_ENABLED` from `True` to `False` so hardcoded admin/admin123 credentials are no longer active by default. Users must explicitly opt-in via `.env`.
+- **Path Traversal Protection:** Added path validation in `FileSystemCatalog._get_path` (catalog.py) and `LocalArtifactStore._get_path` (local.py) to prevent directory escape attacks. Relative paths are sandboxed via `basename()` stripping; resolved paths are verified to stay inside the allowed directory.
+- **Artifact Store Safety:** Added pickle deserialization warning docstrings to `LocalArtifactStore.load()` and `S3ArtifactStore.load()` documenting the `joblib.load` risk.
+- **Error Message Sanitization:** Replaced `str(e)` in ~10 HTTP 500 responses across `eda/router.py`, `monitoring/router.py`, `deployment/api.py`, `model_registry/api.py`, `ml_pipeline/api.py`, and `data_ingestion/service.py` with generic messages. Full errors now logged server-side only.
+
+### 🐛 Bug Fixes
+- **SPA Routing Fix:** Added catch-all `/{full_path:path}` route in `backend/main.py` so client-side routes (e.g. `/canvas`, `/jobs`, `/data`) serve `index.html` instead of returning a 404 JSON error. API prefixes (`/api/`, `/data/`, `/health`, etc.) are excluded from the fallback.
+- **Test Isolation Fix:** Moved `sklearn.set_config(transform_output="pandas")` from module-level in `deployment/service.py` to a scoped `config_context` inside the predict function. This prevented sklearn's global config from leaking across test modules and causing `PolynomialFeatures` and `KNNImputer` to return DataFrames instead of numpy arrays.
+- **Sklearn Output Resilience:** Added `hasattr(transformed, "values")` guards in `feature_generation.py` (Polars path) and `imputation.py` (KNN + Iterative Polars paths) so transforms work regardless of sklearn's output config.
+- **2 xfailed tests now pass:** `test_feature_generation_nodes` and `test_more_imputation_nodes` are no longer marked xfail — root cause was the global sklearn config leak.
+
+### 🧹 Cleanup
+- **Deleted `backend/legacy_config.py`:** Removed 597 lines of dead code (monolithic config from pre-0.1.15, never imported).
+- **Dependency Audit (`pyproject.toml`):** Moved geo, auth, viz, and NLP dependencies to `[project.optional-dependencies]` groups. Core dependencies trimmed from ~60 to ~30.
+
+### 📝 Code Quality
+- **print() → logger:** Replaced 20 `print()` calls across `eda/router.py`, `config/base.py`, `config/environments.py`, `config/mixins/files.py`, `ml_pipeline/api.py`, and `utils/logging_utils.py` with proper `logger.info()`/`logger.warning()` calls.
+- **Bare except logging:** Added `logger.debug()`/`logger.warning()` to 20+ bare `except Exception` blocks in `serialization.py`, `monitoring/router.py`, `health/routes.py`, `eda/tasks.py`, `prediction_utils.py`, and `s3.py` connector.
+- **Auth TODO Documentation:** Annotated 3 hardcoded `user_id=1` TODOs in `data_ingestion/router.py` as `KNOWN-GAP` security limitations.
+
+### ⚙️ CI/CD
+- **Frontend Build Step:** Added `frontend-build` job to CI workflow that runs `npm ci`, `npm run lint`, and `npm run build` for the ml-canvas frontend.
+
+### 📖 Documentation
+- **README Fix:** Updated stale `config.py` reference to `backend/config/ package with domain mixins`.
+
+### 🧪 Testing
+- **Path Traversal Tests:** Added `tests/test_path_traversal.py` with 14 tests covering `LocalArtifactStore` and `FileSystemCatalog` path traversal protection (sanitization, sandboxing, and escape prevention).
 
 ---------------------------------------------
 ## v0.1.15

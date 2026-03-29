@@ -168,9 +168,9 @@ class DataIngestionService:
                 logger.error(f"Failed to get S3 sample: {e}", exc_info=True)
                 # If it's a 403/404 from S3, it might come as ValueError from connector
                 if "403" in str(e) or "404" in str(e):
-                     raise HTTPException(status_code=400, detail=f"S3 Access Error: {str(e)}")
+                     raise HTTPException(status_code=400, detail="S3 access denied or resource not found")
                 raise HTTPException(
-                    status_code=500, detail=f"Failed to read S3 data sample: {str(e)}"
+                    status_code=500, detail="Failed to read S3 data sample"
                 )
 
         if source.type in ["file", "csv", "txt"]:
@@ -188,7 +188,7 @@ class DataIngestionService:
             except Exception as e:
                 logger.error(f"Failed to get sample: {e}")
                 raise HTTPException(
-                    status_code=500, detail=f"Failed to read data sample: {str(e)}"
+                    status_code=500, detail="Failed to read data sample"
                 )
         
         elif source.type in ["s3", "parquet"]:
@@ -210,7 +210,8 @@ class DataIngestionService:
                     df = await connector.fetch_data(limit=limit)
                     return cast(List[Dict[str, Any]], df.to_dicts())
                  except Exception as e:
-                     raise HTTPException(status_code=500, detail=f"Failed to read local parquet: {e}")
+                     logger.exception("Failed to read local parquet: %s", file_path)
+                     raise HTTPException(status_code=500, detail="Failed to read local parquet file")
 
             try:
                 logger.info(f"Fetching S3 sample from {file_path} with options keys: {list(storage_options.keys())}")
@@ -223,7 +224,7 @@ class DataIngestionService:
             except Exception as e:
                 logger.error(f"Failed to get S3 sample: {e}")
                 raise HTTPException(
-                    status_code=500, detail=f"Failed to read S3 data sample: {str(e)}"
+                    status_code=500, detail="Failed to read S3 data sample"
                 )
 
         # TODO: Handle other source types (SQL, etc.)

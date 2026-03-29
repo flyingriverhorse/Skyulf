@@ -239,6 +239,8 @@ class KNNImputerApplier(BaseApplier):
                 X_subset = X_pl.select(cols)
                 X_np, _ = SklearnBridge.to_sklearn(X_subset)
                 X_transformed = imputer.transform(X_np)
+                if hasattr(X_transformed, "values"):
+                    X_transformed = X_transformed.values
 
                 # Update columns
                 new_cols = [
@@ -365,6 +367,8 @@ class IterativeImputerApplier(BaseApplier):
                 X_subset = X_pl.select(cols)
                 X_np, _ = SklearnBridge.to_sklearn(X_subset)
                 X_transformed = imputer.transform(X_np)
+                if hasattr(X_transformed, "values"):
+                    X_transformed = X_transformed.values
 
                 new_cols = [
                     pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)

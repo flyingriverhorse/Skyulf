@@ -1,9 +1,12 @@
+import logging
 import os
 from typing import Any
 
 import joblib
 
 from .store import ArtifactStore
+
+logger = logging.getLogger(__name__)
 
 
 class LocalArtifactStore(ArtifactStore):
@@ -16,16 +19,29 @@ class LocalArtifactStore(ArtifactStore):
         safe_key = key.replace("/", "_").replace("\\", "_")
         if not safe_key.endswith(".joblib"):
             safe_key += ".joblib"
-        return os.path.join(self.base_path, safe_key)
+        resolved = os.path.realpath(os.path.join(self.base_path, safe_key))
+        base = os.path.realpath(self.base_path)
+        if not resolved.startswith(base + os.sep) and resolved != base:
+            raise PermissionError(
+                f"Access denied: artifact key '{key}' resolves outside the store"
+            )
+        return resolved
 
     def save(self, key: str, data: Any) -> None:
         path = self._get_path(key)
         joblib.dump(data, path)
 
     def load(self, key: str) -> Any:
+        """Load a joblib artifact.
+
+        Warning:
+            ``joblib.load`` uses pickle internally and can execute arbitrary code.
+            Only load artifacts that were saved by this application.
+        """
         path = self._get_path(key)
         if not os.path.exists(path):
             raise FileNotFoundError(f"Artifact not found: {key}")
+        logger.debug("Loading artifact from %s", path)
         return joblib.load(path)
 
     def exists(self, key: str) -> bool:

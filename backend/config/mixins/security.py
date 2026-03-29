@@ -19,8 +19,8 @@ class SecurityMixin:
     MAX_LOGIN_ATTEMPTS: int = 5
     ACCOUNT_LOCKOUT_DURATION_MINUTES: int = 30
 
-    # Developer fallback auth (disable in production)
-    AUTH_FALLBACK_ENABLED: bool = True
+    # Developer fallback auth — off by default; set AUTH_FALLBACK_ENABLED=true in .env to enable
+    AUTH_FALLBACK_ENABLED: bool = False
     AUTH_FALLBACK_USERNAME: str = "admin"
     AUTH_FALLBACK_PASSWORD: str = "admin123"
     AUTH_FALLBACK_DISPLAY_NAME: str = "Fallback Admin"
