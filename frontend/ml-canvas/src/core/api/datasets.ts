@@ -178,4 +178,4 @@ export interface DatasetProfile {
       sentiment_distribution?: Record<string, number>;
     };
   }>;
-};
+}

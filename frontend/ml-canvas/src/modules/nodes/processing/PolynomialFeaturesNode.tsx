@@ -99,7 +99,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
     isExpanded: true
   }),
 
-  settings: ({ config, onChange, nodeId }) => {
+  settings: function PolynomialFeaturesSettings({ config, onChange, nodeId }) {
     const upstreamData = useUpstreamData(nodeId || '');
     const datasetId = upstreamData.find((d) => d.datasetId)?.datasetId as string | undefined;
     const { data: schema } = useDatasetSchema(datasetId);
