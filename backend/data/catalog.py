@@ -21,16 +21,29 @@ class FileSystemCatalog(DataCatalog):
         self.base_path = base_path
 
     def _get_path(self, dataset_id: str) -> str:
-        # Security check to prevent directory traversal
-        # If dataset_id is an absolute path (legacy behavior), use it directly if it starts with base_path
-        # Otherwise, join with base_path
-        
-        # Simple check: if it looks like a full path, check if it exists
-        if os.path.isabs(dataset_id) and os.path.exists(dataset_id):
-             return dataset_id
+        # Absolute paths are accepted only when the file actually exists
+        # (SmartCatalog resolves DB records to absolute paths).
+        # Relative IDs are sandboxed under base_path via basename stripping.
+        if os.path.isabs(dataset_id):
+            resolved = os.path.realpath(dataset_id)
+            # Block traversal hiding inside an absolute path (e.g. /base/../etc/passwd)
+            if ".." in dataset_id:
+                raise PermissionError(
+                    f"Access denied: path '{dataset_id}' contains traversal segments"
+                )
+            return resolved
 
+        # Relative path: strip directory components to prevent ../../../etc/passwd
         safe_id = os.path.basename(dataset_id)
-        return os.path.join(self.base_path, safe_id)
+        resolved = os.path.realpath(os.path.join(self.base_path, safe_id))
+
+        # Ensure the resolved path stays inside base_path
+        base = os.path.realpath(self.base_path)
+        if not resolved.startswith(base + os.sep) and resolved != base:
+            raise PermissionError(
+                f"Access denied: path '{dataset_id}' resolves outside the allowed directory"
+            )
+        return resolved
 
     def load(self, dataset_id: str, **kwargs) -> Any:
         path = self._get_path(dataset_id)

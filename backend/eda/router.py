@@ -12,8 +12,11 @@ from backend.services.data_service import DataService
 from backend.utils.file_utils import extract_file_path_from_source
 from backend.celery_app import celery_app
 from skyulf.profiling.analyzer import EDAAnalyzer
+import logging
 import polars as pl
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/eda", tags=["EDA"])
 
@@ -71,7 +74,7 @@ async def trigger_analysis(
     """
     Triggers an EDA analysis job for the given dataset.
     """
-    print(f"Triggering analysis for dataset {dataset_id}. Request: {request}")
+    logger.info("Triggering analysis for dataset %s. Request: %s", dataset_id, request)
 
     # Check if dataset exists
     ds = await session.get(DataSource, dataset_id)
@@ -82,16 +85,16 @@ async def trigger_analysis(
     config = {}
     if request:
         if request.target_col:
-            print(f"Setting target_col to {request.target_col}")
+            logger.debug("Setting target_col to %s", request.target_col)
             config["target_col"] = request.target_col
         if request.exclude_cols:
-            print(f"Excluding columns: {request.exclude_cols}")
+            logger.debug("Excluding columns: %s", request.exclude_cols)
             config["exclude_cols"] = request.exclude_cols
         if request.filters:
-            print(f"Applying filters: {request.filters}")
+            logger.debug("Applying filters: %s", request.filters)
             config["filters"] = [f.dict() for f in request.filters]
         if request.task_type:
-            print(f"Setting task_type to {request.task_type}")
+            logger.debug("Setting task_type to %s", request.task_type)
             config["task_type"] = request.task_type
 
     report = EDAReport(
@@ -294,7 +297,8 @@ async def get_decomposition(
                             df[col] = df[col].astype(str)
                     df = pl.from_pandas(df)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to load dataset: {str(e)}")
+            logger.exception("Failed to load dataset")
+            raise HTTPException(status_code=500, detail="Failed to load dataset")
 
         # 5. Run Analysis
         analyzer = EDAAnalyzer(df)
@@ -317,8 +321,6 @@ async def get_decomposition(
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
-        print(f"CRITICAL ERROR in get_decomposition: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        logger.exception("Unexpected error in get_decomposition")
+        raise HTTPException(status_code=500, detail="Internal server error")
 

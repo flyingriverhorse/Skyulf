@@ -705,7 +705,7 @@ async def preview_pipeline(  # noqa: C901
                         advisor = AdvisorEngine()
                         recommendations = advisor.analyze(profile)
                     except Exception as e:
-                        print(f"Error generating recommendations: {e}")
+                        logger.warning("Error generating recommendations: %s", e)
 
         return PreviewResponse(
             pipeline_id=result.pipeline_id,
@@ -716,7 +716,8 @@ async def preview_pipeline(  # noqa: C901
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Pipeline preview failed")
+        raise HTTPException(status_code=500, detail="Pipeline preview failed")
     finally:
         # 5. Cleanup
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -764,7 +765,8 @@ async def get_job_evaluation(  # noqa: C901
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Failed to retrieve evaluation for job %s", job_id)
+        raise HTTPException(status_code=500, detail="Failed to retrieve evaluation data")
 
 
 @router.get("/jobs", response_model=List[JobInfo])

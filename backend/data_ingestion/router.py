@@ -25,7 +25,8 @@ async def list_sources(
     """
     List all available data sources.
     """
-    # TODO: Get real user ID from auth dependency. For now, list all sources.
+    # KNOWN-GAP: Auth not implemented yet — all sources are visible.
+    # TODO(auth): Replace None with real user ID from auth dependency.
     sources = await service.list_sources(user_id=None, limit=limit, skip=skip)
     return DataSourceListResponse(
         sources=[DataSourceRead.model_validate(s) for s in sources]
@@ -95,7 +96,8 @@ async def create_database_source(
     """
     Create a database source and start ingestion.
     """
-    # TODO: Get real user ID from auth dependency
+    # KNOWN-GAP: Auth not implemented yet — hardcoded user_id=1.
+    # TODO(auth): Replace with real user ID from auth dependency.
     user_id = 1
     return await service.create_database_source(data, user_id, background_tasks)
 
@@ -109,7 +111,8 @@ async def upload_file(
     """
     Upload a file and start ingestion process.
     """
-    # TODO: Get real user ID from auth dependency
+    # KNOWN-GAP: Auth not implemented yet — hardcoded user_id=1.
+    # TODO(auth): Replace with real user ID from auth dependency.
     user_id = 1
     return await service.handle_file_upload(file, user_id, background_tasks)
 
