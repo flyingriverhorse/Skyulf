@@ -1,4 +1,5 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import Response
 
 from .dependencies import get_data_service
 from .schemas.ingestion import (
@@ -85,6 +86,48 @@ async def delete_source(
     if not success:
         raise HTTPException(status_code=404, detail="Source not found")
     return {"message": "Source deleted successfully"}
+
+
+@sources_router.get("/sources/{source_id}/export")
+async def export_source_data(
+    source_id: str,
+    format: str = Query("csv", pattern="^(csv|parquet)$"),
+    limit: int = Query(1000, ge=1, le=50_000),
+    service: DataIngestionService = Depends(get_data_service),
+) -> Response:
+    """
+    Export data from a source as CSV or Parquet.
+    """
+    data = await service.get_sample(source_id, limit=limit)
+    if not data:
+        raise HTTPException(status_code=404, detail="No data found for this source")
+
+    import io
+
+    import polars as pl
+
+    df = pl.DataFrame(data)
+    source = await service.get_source(source_id)
+    name = source.name if source else f"source_{source_id}"
+    # Sanitise filename
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
+
+    if format == "parquet":
+        buf = io.BytesIO()
+        df.write_parquet(buf)
+        return Response(
+            content=buf.getvalue(),
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f"attachment; filename={safe_name}.parquet"},
+        )
+
+    # Default: CSV
+    csv_bytes = df.write_csv().encode("utf-8")
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={safe_name}.csv"},
+    )
 
 
 @router.post("/database", response_model=IngestionJobResponse)

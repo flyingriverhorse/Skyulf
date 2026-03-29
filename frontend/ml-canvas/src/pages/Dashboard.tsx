@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../core/api/client';
 import { jobsApi } from '../core/api/jobs';
+import { LoadingState, EmptyState } from '../components/shared';
 
 interface SystemStats {
   total_jobs: number;
@@ -220,9 +221,9 @@ export const Dashboard: React.FC = () => {
           </div>
           
           {loading ? (
-             <div className="p-8 text-center text-slate-500">Loading...</div>
+             <LoadingState message="Loading recent jobs..." />
           ) : jobs.length === 0 ? (
-            <div className="p-8 text-center text-slate-500">No recent jobs found.</div>
+            <EmptyState title="No recent jobs found." />
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">

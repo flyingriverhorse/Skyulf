@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { deploymentApi, DeploymentInfo } from '../../core/api/deployment';
-import { Rocket, Power, Clock, CheckCircle, AlertCircle, RefreshCw, Box } from 'lucide-react';
+import { Rocket, Power, Clock, CheckCircle, RefreshCw, Box } from 'lucide-react';
+import { ErrorState, EmptyState } from '../shared';
 
 export const DeploymentsPage: React.FC = () => {
   const [activeDeployment, setActiveDeployment] = useState<DeploymentInfo | null>(null);
@@ -71,10 +72,7 @@ export const DeploymentsPage: React.FC = () => {
 
       <div className="flex-1 overflow-y-auto p-6 space-y-8">
         {error && (
-          <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-800 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5" />
-            {error}
-          </div>
+          <ErrorState error={error} onRetry={() => { void loadData(); }} />
         )}
 
         {/* Active Deployment Section */}
@@ -155,8 +153,8 @@ export const DeploymentsPage: React.FC = () => {
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {history.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                        No deployment history found.
+                      <td colSpan={5}>
+                        <EmptyState title="No deployment history found." />
                       </td>
                     </tr>
                   ) : (
