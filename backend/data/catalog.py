@@ -34,7 +34,8 @@ class FileSystemCatalog(DataCatalog):
             return resolved
 
         # Relative path: strip directory components to prevent ../../../etc/passwd
-        safe_id = os.path.basename(dataset_id)
+        # Normalize backslashes so Windows-style traversal (..\..\) is caught on Linux too
+        safe_id = os.path.basename(dataset_id.replace("\\", "/"))
         resolved = os.path.realpath(os.path.join(self.base_path, safe_id))
 
         # Ensure the resolved path stays inside base_path
