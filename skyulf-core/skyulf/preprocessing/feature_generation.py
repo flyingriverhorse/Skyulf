@@ -132,6 +132,9 @@ class PolynomialFeaturesApplier(BaseApplier):
             poly.fit(X_pd[valid_cols])
             
             transformed = poly.transform(X_pd[valid_cols])
+            # sklearn may return a DataFrame when transform_output="pandas" is set
+            if hasattr(transformed, "values"):
+                transformed = transformed.values
             feature_names = poly.get_feature_names_out(valid_cols)
             
             # Filter logic

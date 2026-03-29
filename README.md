@@ -211,7 +211,7 @@ The high-level flow from dataset to model training inside Skyulf:
 </p>
 
 ## Development
-- Configuration via `config.py` with sane defaults (SQLite, dev CORS)
+- Configuration via `backend/config/` package with domain mixins (SQLite, dev CORS)
 - Lifespan hooks initialize the async DB engine automatically
 - Tests under `tests/` cover core feature engineering and training helpers
 - `docker-compose.yml` to run API + Redis (+ Celery worker)

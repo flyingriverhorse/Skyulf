@@ -84,4 +84,5 @@ def decode_int_like(values: List[Any], label_encoder: Any) -> List[Any]:
         decoded = label_encoder.inverse_transform(int_arr)
         return decoded.tolist() if hasattr(decoded, "tolist") else list(decoded)
     except Exception:
+        logging.getLogger(__name__).debug("Label decoding failed, returning raw values", exc_info=True)
         return values

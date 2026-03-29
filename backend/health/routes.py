@@ -4,6 +4,7 @@ Health Check Endpoints
 Basic health and status endpoints for monitoring and load balancer checks.
 """
 
+import logging
 import time
 from datetime import datetime, timezone
 
@@ -64,6 +65,7 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
 
         database_status = "healthy" if await db_health_check() else "unhealthy"
     except Exception:
+        logging.getLogger(__name__).debug("Database health check failed", exc_info=True)
         database_status = "error"
 
     # Check cache connectivity
@@ -74,6 +76,7 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
             r = redis.from_url(settings.CELERY_BROKER_URL, socket_connect_timeout=1)
             r.ping()
         except Exception:
+            logging.getLogger(__name__).debug("Cache health check failed", exc_info=True)
             cache_status = "unhealthy"
 
     # Check external services

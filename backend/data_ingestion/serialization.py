@@ -433,7 +433,7 @@ class JSONSafeSerializer:
             if np.isinf(obj) or np.isnan(obj):
                 return None
         except Exception:
-            pass
+            logger.debug("numpy inf/nan check failed for %s", type(obj))
         return obj
 
     @staticmethod
@@ -463,6 +463,7 @@ class JSONSafeSerializer:
             try:
                 return JSONSafeSerializer.clean_for_json(obj.to_dict("records"))
             except Exception:
+                logger.debug("to_dict('records') failed for %s", type(obj))
                 return JSONSafeSerializer._NOT_HANDLED
         return JSONSafeSerializer._NOT_HANDLED
 
@@ -472,6 +473,7 @@ class JSONSafeSerializer:
             try:
                 return obj.isoformat()
             except Exception:
+                logger.debug("isoformat() failed for %s", type(obj))
                 return JSONSafeSerializer._NOT_HANDLED
         return JSONSafeSerializer._NOT_HANDLED
 
@@ -482,6 +484,7 @@ class JSONSafeSerializer:
                 value = float(obj)
                 return None if value != value else value
             except Exception:
+                logger.debug("float conversion failed for %s", type(obj))
                 return JSONSafeSerializer._NOT_HANDLED
         return JSONSafeSerializer._NOT_HANDLED
 
@@ -490,6 +493,7 @@ class JSONSafeSerializer:
         try:
             return str(obj)
         except Exception:
+            logger.debug("str() fallback failed for %s", type(obj))
             return None
 
     @staticmethod
