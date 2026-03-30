@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Hash, AlignLeft, Calendar, Ban } from 'lucide-react';
 import { EDAService } from '../../core/api/eda';
+import { useEscapeKey } from '../../core/hooks/useEscapeKey';
 
 interface JobsHistoryModalProps {
   isOpen: boolean;
@@ -16,12 +17,14 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState<number | null>(null);
 
-  if (!isOpen) return null;
-
   const handleClose = () => {
     setSelectedJob(null);
     onClose();
   };
+
+  useEscapeKey(handleClose, isOpen);
+
+  if (!isOpen) return null;
 
   const handleCancel = async (e: React.MouseEvent, jobId: number) => {
     e.stopPropagation();
@@ -61,27 +64,37 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full flex flex-col transition-all duration-300 ${selectedJob ? 'max-w-5xl h-[90vh]' : 'max-w-2xl max-h-[80vh]'}`}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="jobs-history-title"
+        className={`bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full flex flex-col transition-all duration-300 ${selectedJob ? 'max-w-5xl h-[90vh]' : 'max-w-2xl max-h-[80vh]'}`}
+      >
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
             {selectedJob ? (
               <button 
                 onClick={() => setSelectedJob(null)}
                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                aria-label="Back to history"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               </button>
             ) : (
               <Clock className="w-5 h-5 text-blue-500" />
             )}
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            <h2 id="jobs-history-title" className="text-xl font-semibold text-gray-900 dark:text-white">
               {selectedJob ? `Analysis #${selectedJob.id} Details` : 'Analysis History'}
             </h2>
           </div>
           <button 
             onClick={handleClose}
             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
