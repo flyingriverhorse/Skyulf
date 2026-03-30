@@ -91,6 +91,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
     if (Object.keys(updates).length > 0) {
       onChange({ ...config, ...updates });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upstreamDatasetId, upstreamTargetColumn, config.datasetId, config.target_column, onChange]);
 
   const { data: schema, isLoading } = useDatasetSchema(upstreamDatasetId || config.datasetId);

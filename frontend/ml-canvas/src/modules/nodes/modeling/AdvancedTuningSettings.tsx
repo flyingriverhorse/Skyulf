@@ -404,6 +404,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
     if (upstreamTarget && config.target_column !== upstreamTarget) {
         onChange({ ...config, target_column: upstreamTarget });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upstreamData, config.target_column]);
 
   // --- Model & Search Space Logic ---
@@ -451,6 +452,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
       };
 
       void loadModelData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.model_type]);
 
 

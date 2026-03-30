@@ -55,14 +55,15 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
                 setConfig(isHalving ? defaultHalving : defaultOptuna);
             }
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, strategy, initialConfig]);
+
+    useEscapeKey(onClose, isOpen);
 
     if (!isOpen || (!isHalving && !isOptuna)) return null;
 
     const handleSave = () => {
-        // Build correct object and convert types safely
         const finalConfig = { ...config };
-        // If timeout is string basically we delete it so we don't pass it as an empty string to backend
         if (isOptuna && (finalConfig.timeout === '' || finalConfig.timeout === undefined)) {
             delete finalConfig.timeout;
         } else if (isOptuna && typeof finalConfig.timeout === 'string') {
@@ -76,8 +77,6 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
     const handleReset = () => {
         setConfig(isHalving ? defaultHalving : defaultOptuna);
     };
-
-    useEscapeKey(onClose, isOpen);
 
     return (
         <div

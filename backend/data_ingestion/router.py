@@ -108,7 +108,7 @@ async def export_source_data(
 
     df = pl.DataFrame(data)
     source = await service.get_source(source_id)
-    name = source.name if source else f"source_{source_id}"
+    name = str(source.name) if source else f"source_{source_id}"
     # Sanitise filename
     safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
 

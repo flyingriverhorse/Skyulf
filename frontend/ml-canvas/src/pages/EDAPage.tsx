@@ -75,6 +75,7 @@ export const EDAPage: React.FC = () => {
 
   useEffect(() => {
     loadDatasets();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -232,6 +233,7 @@ export const EDAPage: React.FC = () => {
       setExcludedColsApplied(serverExcluded);
       setExcludedColsDraft(serverExcluded);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [report?.id]);
 
     const excludedDirty = (() => {
