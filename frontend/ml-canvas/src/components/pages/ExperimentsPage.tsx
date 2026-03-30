@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ScatterChart, Scatter, LineChart, Line, ReferenceLine
 } from 'recharts';
-import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, RefreshCw, Download } from 'lucide-react';
+import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, RefreshCw, Download, Loader2, Check } from 'lucide-react';
 import { LoadingState, ErrorState } from '../shared';
 import { toPng } from 'html-to-image';
 import { deploymentApi } from '../../core/api/deployment';
@@ -53,6 +53,8 @@ export const ExperimentsPage: React.FC = () => {
   const [isEvalLoading, setIsEvalLoading] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
   const [evalJobId, setEvalJobId] = useState<string | null>(null);
+  const [downloadingChart, setDownloadingChart] = useState<string | null>(null);
+  const [doneChart, setDoneChart] = useState<string | null>(null);
   const [selectedRocClass, setSelectedRocClass] = useState<string | null>(null);
 
   useEffect(() => {
@@ -93,7 +95,7 @@ export const ExperimentsPage: React.FC = () => {
     const element = document.getElementById(elementId);
     if (!element) return;
     
-    // Check for dark mode
+    setDownloadingChart(elementId);
     const isDarkMode = document.documentElement.classList.contains('dark');
     const backgroundColor = isDarkMode ? '#1f2937' : '#ffffff';
 
@@ -109,6 +111,10 @@ export const ExperimentsPage: React.FC = () => {
         link.click();
     } catch (e) {
         console.error('Failed to download image', e);
+    } finally {
+        setDownloadingChart(null);
+        setDoneChart(elementId);
+        setTimeout(() => setDoneChart(null), 1200);
     }
   };
 
@@ -864,10 +870,11 @@ export const ExperimentsPage: React.FC = () => {
                                                     <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
                                                        <button 
                                                          onClick={() => void handleDownload(`${splitName}-actual-pred`, `${splitName}_actual_vs_predicted`)}
-                                                         className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600"
+                                                         disabled={downloadingChart === `${splitName}-actual-pred`}
+                                                         className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"
                                                          title="Download Graph"
                                                        >
-                                                          <Download className="w-3.5 h-3.5" />
+                                                          {downloadingChart === `${splitName}-actual-pred` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-actual-pred` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
                                                        </button>
                                                     </div>
                                                     <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">Actual vs Predicted</h5>
@@ -926,10 +933,11 @@ export const ExperimentsPage: React.FC = () => {
                                                     <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
                                                        <button 
                                                          onClick={() => void handleDownload(`${splitName}-residuals`, `${splitName}_residuals`)}
-                                                         className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600"
+                                                         disabled={downloadingChart === `${splitName}-residuals`}
+                                                         className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"
                                                          title="Download Graph"
                                                        >
-                                                          <Download className="w-3.5 h-3.5" />
+                                                          {downloadingChart === `${splitName}-residuals` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-residuals` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
                                                        </button>
                                                     </div>
                                                     <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">Residuals vs Predicted</h5>
@@ -989,10 +997,11 @@ export const ExperimentsPage: React.FC = () => {
                                                     <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
                                                        <button 
                                                          onClick={() => void handleDownload(`${splitName}-confusion-matrix`, `${splitName}_confusion_matrix`)}
-                                                         className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600"
+                                                         disabled={downloadingChart === `${splitName}-confusion-matrix`}
+                                                         className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"
                                                          title="Download Graph"
                                                        >
-                                                          <Download className="w-3.5 h-3.5" />
+                                                          {downloadingChart === `${splitName}-confusion-matrix` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-confusion-matrix` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
                                                        </button>
                                                     </div>
                                                     {(() => {
@@ -1070,10 +1079,11 @@ export const ExperimentsPage: React.FC = () => {
                                                         <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
                                                            <button 
                                                              onClick={() => void handleDownload(`${splitName}-roc`, `${splitName}_roc_curve`)}
-                                                             className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600"
+                                                             disabled={downloadingChart === `${splitName}-roc`}
+                                                             className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"
                                                              title="Download Graph"
                                                            >
-                                                              <Download className="w-3.5 h-3.5" />
+                                                              {downloadingChart === `${splitName}-roc` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-roc` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
                                                            </button>
                                                         </div>
                                                         <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">ROC Curve</h5>

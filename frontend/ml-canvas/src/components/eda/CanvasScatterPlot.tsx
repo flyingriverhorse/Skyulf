@@ -9,6 +9,7 @@ import {
   ChartOptions
 } from 'chart.js';
 import { Scatter } from 'react-chartjs-2';
+import { COLORS, getChartTheme } from './constants';
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -44,13 +45,11 @@ export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({
       groups[label].push({ x: d[xKey], y: d[yKey], raw: d });
     });
     
-    const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00C49F', '#FFBB28', '#FF8042'];
-    
     Object.keys(groups).forEach((label, idx) => {
       datasets.push({
         label: label,
         data: groups[label],
-        backgroundColor: colors[idx % colors.length],
+        backgroundColor: COLORS[idx % COLORS.length],
         pointRadius: 3,
         pointHoverRadius: 5
       });
@@ -66,6 +65,8 @@ export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({
     });
   }
 
+  const theme = getChartTheme();
+
   const options: ChartOptions<'scatter'> = {
     responsive: true,
     maintainAspectRatio: false,
@@ -74,34 +75,34 @@ export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({
         title: {
           display: !!xLabel,
           text: xLabel,
-          color: '#6b7280',
+          color: theme.axisColor,
           font: {
             weight: 'bold'
           }
         },
         grid: {
-            color: 'rgba(0, 0, 0, 0.2)', // Darker grid lines
+            color: theme.gridColor,
             lineWidth: 1
         },
         ticks: {
-            color: '#6b7280'
+            color: theme.axisColor
         }
       },
       y: {
         title: {
           display: !!yLabel,
           text: yLabel,
-          color: '#6b7280',
+          color: theme.axisColor,
           font: {
             weight: 'bold'
           }
         },
         grid: {
-            color: 'rgba(0, 0, 0, 0.2)', // Darker grid lines
+            color: theme.gridColor,
             lineWidth: 1
         },
         ticks: {
-            color: '#6b7280'
+            color: theme.axisColor
         }
       }
     },

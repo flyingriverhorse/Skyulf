@@ -1,6 +1,8 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { InfoTooltip } from '../ui/InfoTooltip';
+import { getChartTheme } from './constants';
+import { getTooltipContentStyle } from '../../core/utils/chartUtils';
 
 interface DistributionChartProps {
   profile: any;
@@ -49,6 +51,8 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, o
     return <div className="text-gray-500 text-sm italic p-4 text-center">No data points</div>;
   }
 
+  const theme = getChartTheme();
+
   return (
     <div className="h-full w-full min-h-[250px] relative">
       {profile.normality_test && (
@@ -78,21 +82,21 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, o
             bottom: 30,
           }}
         >
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.gridColor} />
           <XAxis 
             dataKey="name" 
-            tick={{ fontSize: 11, fill: '#6b7280' }} 
+            tick={{ fontSize: 11, fill: theme.axisColor }} 
             interval="preserveStartEnd"
             angle={-45}
             textAnchor="end"
           />
-          <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} />
+          <YAxis tick={{ fontSize: 11, fill: theme.axisColor }} />
           <Tooltip 
             content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                 const item = payload[0].payload;
                 return (
-                    <div className="bg-gray-800 text-white text-xs p-2 rounded shadow-lg">
+                    <div style={getTooltipContentStyle()} className="text-xs p-2 rounded shadow-lg">
                     <p className="font-semibold mb-1">{item.fullName}</p>
                     <p>Count: {item.count}</p>
                     {onBarClick && <p className="text-blue-300 mt-1 italic">Click to filter</p>}

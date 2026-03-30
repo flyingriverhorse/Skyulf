@@ -1,7 +1,7 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { CausalGraph } from '../CausalGraph';
 import { InfoTooltip } from '../../ui/InfoTooltip';
-import { Network, Download } from 'lucide-react';
+import { Network, Download, Loader2, Check } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 interface CausalTabProps {
@@ -10,11 +10,13 @@ interface CausalTabProps {
 
 export const CausalTab: React.FC<CausalTabProps> = ({ profile }) => {
     const graph = profile.causal_graph;
+    const [dlState, setDlState] = useState<'idle' | 'downloading' | 'done'>('idle');
 
     const handleDownload = useCallback(() => {
         const el = document.querySelector('#causal-chart .react-flow__viewport') as HTMLElement;
         if (!el) return;
 
+        setDlState('downloading');
         const isDark = document.documentElement.classList.contains('dark');
         const bgColor = isDark ? '#111827' : '#f9fafb';
 
@@ -22,7 +24,6 @@ export const CausalTab: React.FC<CausalTabProps> = ({ profile }) => {
             backgroundColor: bgColor,
             pixelRatio: 2,
             filter: (node) => {
-                // Exclude minimap / controls from export
                 const cls = node?.classList;
                 if (!cls) return true;
                 return !cls.contains('react-flow__controls') && !cls.contains('react-flow__minimap');
@@ -34,7 +35,11 @@ export const CausalTab: React.FC<CausalTabProps> = ({ profile }) => {
                 a.href = dataUrl;
                 a.click();
             })
-            .catch((err) => console.error('Causal graph download failed', err));
+            .catch((err) => console.error('Causal graph download failed', err))
+            .finally(() => {
+                setDlState('done');
+                setTimeout(() => setDlState('idle'), 1200);
+            });
     }, []);
 
     if (!graph) {
@@ -57,10 +62,11 @@ export const CausalTab: React.FC<CausalTabProps> = ({ profile }) => {
                     </h3>
                     <button
                         onClick={handleDownload}
-                        className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+                        disabled={dlState !== 'idle'}
+                        className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 disabled:opacity-50"
                         title="Download Chart"
                     >
-                        <Download className="w-4 h-4" />
+                        {dlState === 'downloading' ? <Loader2 className="w-4 h-4 animate-spin" /> : dlState === 'done' ? <Check className="w-4 h-4 text-green-500" /> : <Download className="w-4 h-4" />}
                     </button>
                 </div>
                 <div className="mb-4 text-sm text-gray-600 dark:text-gray-400 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded border border-yellow-200 dark:border-yellow-800">

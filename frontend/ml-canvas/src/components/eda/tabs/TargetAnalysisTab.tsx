@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { 
     BarChart2, 
     Download, 
     ScatterChart as ScatterIcon, 
     Clock, 
-    Loader2 
+    Loader2,
+    Check
 } from 'lucide-react';
 import { 
     ResponsiveContainer, 
@@ -20,6 +21,7 @@ import {
 } from 'recharts';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
+import { getChartTheme } from '../constants';
 
 interface TargetAnalysisTabProps {
     profile: any;
@@ -38,10 +40,20 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
     loadSpecificReport,
     report
 }) => {
+    const [dlAllState, setDlAllState] = useState<'idle' | 'downloading' | 'done'>('idle');
+
+    const showDone = useCallback(() => {
+        setDlAllState('done');
+        setTimeout(() => setDlAllState('idle'), 1200);
+    }, []);
+
     const downloadAllInteractions = async () => {
         if (!profile?.target_interactions) return;
-        
-        const interactions = profile.target_interactions;
+        setDlAllState('downloading');
+
+        try {
+            const theme = getChartTheme();
+            const interactions = profile.target_interactions;
         const chartHeight = 400; // Height per chart
         const chartWidth = 800;
         const padding = 40;
@@ -59,17 +71,10 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Background
-        const isDarkMode = document.documentElement.classList.contains('dark');
-        const bgColor = isDarkMode ? '#1f2937' : '#ffffff';
-        const textColor = isDarkMode ? '#ffffff' : '#111827';
-        const subTextColor = isDarkMode ? '#9ca3af' : '#4b5563';
-
-        ctx.fillStyle = bgColor;
+        ctx.fillStyle = theme.bgColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Main Title
-        ctx.fillStyle = textColor;
+        ctx.fillStyle = theme.textColor;
         ctx.font = 'bold 24px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('Detailed Interactions (Box Plots)', totalWidth / 2, 50);
@@ -91,14 +96,14 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
             const y = 100 + (row * (chartHeight + padding));
 
             // Title for this chart
-            ctx.fillStyle = subTextColor;
+            ctx.fillStyle = theme.subTextColor;
             ctx.font = 'bold 16px sans-serif';
             ctx.textAlign = 'left';
             ctx.fillText(`${interaction.feature} vs ${profile.target_col}`, x + 40, y);
             
             if (interaction.p_value !== undefined) {
                 ctx.font = '14px sans-serif';
-                ctx.fillStyle = interaction.p_value < 0.05 ? '#059669' : subTextColor;
+                ctx.fillStyle = interaction.p_value < 0.05 ? '#059669' : theme.subTextColor;
                 ctx.fillText(`ANOVA p: ${Number(interaction.p_value).toExponential(2)}`, x + 40, y + 20);
             }
 
@@ -124,6 +129,9 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
         link.download = 'all-interactions.png';
         link.href = canvas.toDataURL('image/png');
         link.click();
+        } finally {
+            showDone();
+        }
     };
 
     return (
@@ -204,10 +212,11 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                             </h3>
                             <button
                                 onClick={downloadAllInteractions}
-                                className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+                                disabled={dlAllState !== 'idle'}
+                                className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 disabled:opacity-50"
                                 title="Download All Charts"
                             >
-                                <Download className="w-4 h-4" />
+                                {dlAllState === 'downloading' ? <Loader2 className="w-4 h-4 animate-spin" /> : dlAllState === 'done' ? <Check className="w-4 h-4 text-green-500" /> : <Download className="w-4 h-4" />}
                             </button>
                         </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
@@ -263,7 +272,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                                         if (active && payload && payload.length) {
                                                             const data = payload[0].payload;
                                                             return (
-                                                                <div className="bg-gray-800 text-white text-xs p-2 rounded shadow-lg z-50">
+                                                                <div style={getTooltipContentStyle()} className="text-xs p-2 rounded shadow-lg z-50">
                                                                     <p className="font-semibold mb-1">{data.name}</p>
                                                                     <p>Max: {data.stats.max.toFixed(2)}</p>
                                                                     <p>Q3: {data.stats.q3.toFixed(2)}</p>
