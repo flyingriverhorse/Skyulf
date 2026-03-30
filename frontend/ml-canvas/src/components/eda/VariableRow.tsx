@@ -195,7 +195,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
 
             {isExpanded && (
                 <div className="p-4 border-t border-border bg-card/30 animate-in slide-in-from-top-2 duration-200">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
                         
                         {/* Stats Column */}
                         <div className="space-y-4">
@@ -246,10 +246,46 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                                             <span className="text-muted-foreground">Skewness</span>
                                             <span>{profile.numeric_stats.skewness?.toFixed(4)}</span>
                                         </div>
+                                        {profile.numeric_stats.skewness != null && (
+                                            <div className="text-[10px] text-muted-foreground pl-2">
+                                                {Math.abs(profile.numeric_stats.skewness) < 0.5 ? '↳ Symmetric' : 
+                                                 Math.abs(profile.numeric_stats.skewness) < 1 ? '↳ Moderately Skewed' : '↳ Highly Skewed'}
+                                            </div>
+                                        )}
                                         <div className="flex justify-between">
                                             <span className="text-muted-foreground">Kurtosis</span>
                                             <span>{profile.numeric_stats.kurtosis?.toFixed(4)}</span>
                                         </div>
+                                        {profile.numeric_stats.kurtosis != null && (
+                                            <div className="text-[10px] text-muted-foreground pl-2">
+                                                {Math.abs(profile.numeric_stats.kurtosis) < 0.5 ? '↳ Mesokurtic (Normal-like)' : 
+                                                 profile.numeric_stats.kurtosis > 0 ? '↳ Leptokurtic (Heavy Tails)' : '↳ Platykurtic (Light Tails)'}
+                                            </div>
+                                        )}
+                                        <div className="my-2 border-t border-dashed" />
+                                        {profile.numeric_stats.zeros_count != null && (
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Zeros</span>
+                                                <span>{profile.numeric_stats.zeros_count}</span>
+                                            </div>
+                                        )}
+                                        {profile.numeric_stats.negatives_count != null && (
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Negatives</span>
+                                                <span>{profile.numeric_stats.negatives_count}</span>
+                                            </div>
+                                        )}
+                                        {profile.vif != null && (
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-muted-foreground flex items-center gap-1">
+                                                    VIF
+                                                    <InfoTooltip text="Variance Inflation Factor. VIF > 5 = high multicollinearity, VIF > 10 = severe." size="sm" />
+                                                </span>
+                                                <span className={profile.vif > 5 ? 'text-red-500 font-semibold' : profile.vif > 2 ? 'text-amber-500' : 'text-green-500'}>
+                                                    {profile.vif.toFixed(2)}
+                                                </span>
+                                            </div>
+                                        )}
                                     </>
                                 )}
                                 {profile.text_stats && (
@@ -309,6 +345,12 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                                                 {String(profile.categorical_stats.top_k?.[0]?.value || '-')}
                                             </span>
                                         </div>
+                                        {profile.categorical_stats.rare_labels_count != null && (
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Rare Labels</span>
+                                                <span>{profile.categorical_stats.rare_labels_count}</span>
+                                            </div>
+                                        )}
                                         {profile.categorical_stats.top_k && profile.categorical_stats.top_k.length > 0 && (
                                             <>
                                                 <div className="my-2 border-t border-dashed" />
@@ -329,14 +371,14 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                         </div>
 
                         {/* Distribution Chart Column */}
-                        <div className="md:col-span-2 flex flex-col h-full min-h-[300px]">
+                        <div className="md:col-span-2 flex flex-col min-h-[300px]">
                             <div className="flex items-center justify-between mb-2">
                                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Distribution</h4>
                                 <Button size="icon" variant="outline" className="h-8 w-8" title="Download Chart" onClick={downloadChart}>
                                     <Download size={16} />
                                 </Button>
                             </div>
-                            <div className="flex-1 bg-background rounded-md border p-4" ref={chartRef}>
+                            <div className="flex-1 bg-background rounded-md border p-4 min-h-0" ref={chartRef}>
                                 <DistributionChart profile={profile} onBarClick={onBarClick} />
                             </div>
                         </div>

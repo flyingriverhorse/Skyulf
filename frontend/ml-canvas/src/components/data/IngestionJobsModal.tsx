@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Loader2, CheckCircle, XCircle, Clock, Ban } from 'lucide-react';
 import { Dataset } from '../../core/types/api';
+import { useEscapeKey } from '../../core/hooks/useEscapeKey';
 import { DatasetService } from '../../core/api/datasets';
 
 interface IngestionJobsModalProps {
@@ -12,6 +13,8 @@ interface IngestionJobsModalProps {
 
 export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, onClose, datasets, onRefresh }) => {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  useEscapeKey(onClose, isOpen);
 
   if (!isOpen) return null;
 
@@ -42,12 +45,20 @@ export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, 
   })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ingestion-modal-title"
+        className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-200"
+      >
         
         <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Data Ingestion Jobs</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-500 dark:hover:text-slate-300">
+          <h2 id="ingestion-modal-title" className="text-xl font-bold text-slate-900 dark:text-slate-100">Data Ingestion Jobs</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-500 dark:hover:text-slate-300" aria-label="Close">
             <X size={24} />
           </button>
         </div>

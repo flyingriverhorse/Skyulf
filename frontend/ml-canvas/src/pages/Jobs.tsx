@@ -4,6 +4,7 @@ import {
   RefreshCw, Database, BarChart2, Cpu
 } from 'lucide-react';
 import { jobsApi, JobInfo } from '../core/api/jobs';
+import { LoadingState, EmptyState } from '../components/shared';
 
 type TabType = 'training' | 'tuning' | 'eda' | 'ingestion';
 
@@ -162,14 +163,9 @@ export const JobsPage: React.FC = () => {
       {/* Jobs Table */}
       <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-500">
-            <RefreshCw className="animate-spin mx-auto mb-4" size={24} />
-            Loading jobs...
-          </div>
+          <LoadingState message="Loading jobs..." />
         ) : filteredJobs.length === 0 ? (
-          <div className="p-12 text-center text-slate-500">
-            No jobs found matching your criteria.
-          </div>
+          <EmptyState title="No jobs found matching your criteria." />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">

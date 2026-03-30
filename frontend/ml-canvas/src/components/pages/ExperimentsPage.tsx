@@ -4,7 +4,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ScatterChart, Scatter, LineChart, Line, ReferenceLine
 } from 'recharts';
-import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, Activity, RefreshCw, Download } from 'lucide-react';
+import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, RefreshCw, Download } from 'lucide-react';
+import { LoadingState, ErrorState } from '../shared';
 import html2canvas from 'html2canvas';
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
@@ -745,14 +746,12 @@ export const ExperimentsPage: React.FC = () => {
                     )}
 
                     {isEvalLoading ? (
-                        <div className="h-64 flex items-center justify-center text-gray-400">
-                            <Activity className="w-6 h-6 animate-spin mr-2" />
-                            Loading evaluation data...
+                        <div className="h-64 flex items-center justify-center">
+                            <LoadingState message="Loading evaluation data..." />
                         </div>
                     ) : evalError ? (
-                        <div className="h-64 flex flex-col items-center justify-center text-red-500 p-4 text-center">
-                            <p className="font-medium">Error loading evaluation data</p>
-                            <p className="text-sm mt-2 opacity-80">{evalError}</p>
+                        <div className="h-64 flex items-center justify-center">
+                            <ErrorState error={evalError} />
                         </div>
                     ) : !evaluationData ? (
                         <div className="h-64 flex items-center justify-center text-gray-400 italic text-center">

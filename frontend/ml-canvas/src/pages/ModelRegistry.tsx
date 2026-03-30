@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Archive, Box, CheckCircle, ChevronRight, X, Play, Folder, FileText, Cloud, HardDrive } from 'lucide-react';
+import { LoadingState, ErrorState, EmptyState } from '../components/shared';
+import { useEscapeKey } from '../core/hooks/useEscapeKey';
 
 interface ArtifactResponse {
   storage_type: string;
@@ -49,6 +51,8 @@ export const ModelRegistry: React.FC = () => {
   const [selectedModel, setSelectedModel] = useState<ModelRegistryEntry | null>(null);
   const [deployingId, setDeployingId] = useState<string | null>(null);
   
+  useEscapeKey(() => setSelectedModel(null), !!selectedModel);
+
   // Artifacts viewing
   const [viewingArtifacts, setViewingArtifacts] = useState<string | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactResponse | null>(null);
@@ -271,13 +275,16 @@ export const ModelRegistry: React.FC = () => {
   });
 
   if (loading && !stats && models.length === 0) return (
-    <div className="p-8 flex justify-center items-center h-full text-slate-500 dark:text-slate-400">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-      Loading registry...
+    <div className="p-8">
+      <LoadingState message="Loading registry..." />
     </div>
   );
   
-  if (error) return <div className="p-8 text-center text-red-600 dark:text-red-400">Error: {error}</div>;
+  if (error) return (
+    <div className="p-8">
+      <ErrorState error={error} />
+    </div>
+  );
 
   return (
     <div className="p-8 min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-200">
@@ -367,11 +374,11 @@ export const ModelRegistry: React.FC = () => {
             <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
               {filteredModels.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
-                    <div className="flex flex-col items-center justify-center">
-                      <Box size={48} className="mb-4 opacity-20" />
-                      <p>No models found matching your filters.</p>
-                    </div>
+                  <td colSpan={8}>
+                    <EmptyState
+                      icon={<Box size={48} className="text-slate-300 dark:text-slate-600" />}
+                      title="No models found matching your filters."
+                    />
                   </td>
                 </tr>
               ) : (

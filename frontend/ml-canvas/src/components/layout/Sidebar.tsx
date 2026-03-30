@@ -22,6 +22,7 @@ export const Sidebar: React.FC = () => {
           onClick={() => setSidebarOpen(true)}
           className="p-2 bg-background border shadow-md rounded-md text-muted-foreground hover:text-foreground transition-colors"
           title="Expand Components"
+          aria-label="Expand components sidebar"
         >
           <PanelLeftOpen className="w-5 h-5" />
         </button>
@@ -48,14 +49,16 @@ export const Sidebar: React.FC = () => {
             onClick={() => setSidebarOpen(false)}
             className="p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
             title="Collapse Sidebar"
+            aria-label="Collapse sidebar"
           >
             <PanelLeftClose className="w-4 h-4" />
           </button>
         </div>
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <input
             placeholder="Search nodes..."
+            aria-label="Search nodes"
             className="w-full pl-9 pr-3 py-2 text-sm border rounded-md bg-muted/50 focus:bg-background focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); }}

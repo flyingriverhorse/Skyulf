@@ -93,6 +93,7 @@ export const DataDriftPage: React.FC = () => {
                     onClick={fetchJobs} 
                     className="p-2 rounded hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300 transition-colors"
                     title="Refresh Jobs"
+                    aria-label="Refresh jobs"
                 >
                     <RefreshCw size={20} className={refreshing ? "animate-spin" : ""} />
                 </button>
