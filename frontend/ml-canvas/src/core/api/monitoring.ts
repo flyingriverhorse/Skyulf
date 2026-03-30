@@ -40,6 +40,12 @@ export interface DriftJobOption {
     dataset_name: string;
     filename: string;
     created_at?: string;
+    model_type?: string;
+    target_column?: string;
+    n_features?: number;
+    n_rows?: number;
+    description?: string;
+    best_metric?: string;
 }
 
 export const monitoringApi = {
@@ -62,5 +68,9 @@ export const monitoringApi = {
             },
         });
         return response.data;
+    },
+
+    updateJobDescription: async (jobId: string, description: string): Promise<void> => {
+        await apiClient.patch(`/monitoring/jobs/${jobId}/description`, { description });
     },
 };

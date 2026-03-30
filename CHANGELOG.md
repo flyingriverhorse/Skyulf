@@ -10,17 +10,25 @@ Each major/minor series has its own file in the [`changelog/`](changelog/) folde
 
 | Series | File | Status | Description |
 |--------|------|--------|-------------|
-| **0.1.x** | [changelog/0.1.x.md](changelog/0.1.x.md) | Active | Foundation through SQL Security (v0.1.0 — v0.1.17) |
-| **0.2.x** | *Coming soon* | Planned | Databricks Integration & Auth |
+| **0.1.x** | [changelog/0.1.x.md](changelog/0.1.x.md) | Stable | Foundation through Theme-Aware Charts (v0.1.0 — v0.1.19) |
+| **0.2.x** | [changelog/0.2.x.md](changelog/0.2.x.md) | Active | Data Drift Redesign & Monitoring (v0.2.0+) |
 
 ---
 
 ## Version Summary
 
+### 0.2.x — Data Drift & Monitoring
+
+| Version | Codename | Highlights |
+|---------|----------|------------|
+| v0.2.0 | The Data Drift Redesign | Enriched job metadata, date-grouped dropdown, inline descriptions, data shape persistence |
+
 ### 0.1.x — Foundation & Growth
 
 | Version | Codename | Highlights |
 |---------|----------|------------|
+| v0.1.19 | The Theme-Aware Charts Patch | Dark mode charts, download feedback checkmarks, color dedup |
+| v0.1.18 | The Lint Zero & EDA Polish Patch | ESLint zero warnings, mypy union-attr fix |
 | v0.1.17 | The SQL Security & Resilience Patch | SQL injection protection, connection pooling, query timeouts, shared UI components, data export endpoint |
 | v0.1.16 | The Security Hardening & Quality Patch | Auth default fix, path traversal protection, error sanitization, dead code removal, dependency cleanup, test isolation fixes |
 | v0.1.15 | The Developer Experience & Dependency Cleanup Update | One-click start scripts, multi-stage Dockerfile, 15 unused deps removed, bug fixes |
