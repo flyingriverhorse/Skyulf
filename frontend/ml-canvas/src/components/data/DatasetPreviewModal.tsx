@@ -53,6 +53,7 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
       setActiveTab('sample');
       setSampleSize(100);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, dataset]);
 
   const fetchData = async (limit: number) => {

@@ -30,6 +30,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       void handleFiles(e.dataTransfer.files[0]);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
