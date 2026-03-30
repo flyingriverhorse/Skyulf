@@ -78,6 +78,7 @@ export const Layout: React.FC = () => {
             onClick={toggleTheme}
             className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} w-full ${isCollapsed ? 'px-2' : 'px-4'} py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors`}
             title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
             {!isCollapsed && (isDarkMode ? 'Light Mode' : 'Dark Mode')}
@@ -96,12 +97,14 @@ export const Layout: React.FC = () => {
 const NavLink = ({ to, children, active, icon, collapsed }: { to: string, children: React.ReactNode, active: boolean, icon?: React.ReactNode, collapsed?: boolean }) => (
   <Link
     to={to}
+    aria-current={active ? 'page' : undefined}
     className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} ${collapsed ? 'px-2' : 'px-4'} py-3 rounded-md text-sm font-medium transition-colors ${
       active 
         ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm' 
         : 'text-slate-400 hover:text-white hover:bg-slate-800'
     }`}
     title={collapsed ? (children as string) : undefined}
+    aria-label={collapsed ? (children as string) : undefined}
   >
     {icon}
     {!collapsed && children}

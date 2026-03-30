@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, RotateCcw, HelpCircle } from 'lucide-react';
+import { useEscapeKey } from '../../../../core/hooks/useEscapeKey';
 
 export interface StrategyConfig {
     // Halving
@@ -76,18 +77,29 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
         setConfig(isHalving ? defaultHalving : defaultOptuna);
     };
 
+    useEscapeKey(onClose, isOpen);
+
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md w-full border border-gray-200 dark:border-gray-700 flex flex-col max-h-[90vh]">
+        <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        >
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="strategy-settings-title"
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md w-full border border-gray-200 dark:border-gray-700 flex flex-col max-h-[90vh]"
+            >
                 
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <h2 id="strategy-settings-title" className="text-lg font-semibold text-gray-900 dark:text-white">
                         {isHalving ? 'Successive Halving Settings' : 'Optuna Settings'}
                     </h2>
                     <button 
                         onClick={onClose}
                         className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-gray-500 transition-colors"
+                        aria-label="Close settings"
                     >
                         <X size={20} />
                     </button>

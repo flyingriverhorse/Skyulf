@@ -50,7 +50,7 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, o
   }
 
   return (
-    <div className="h-64 w-full relative">
+    <div className="h-full w-full min-h-[250px] relative">
       {profile.normality_test && (
         <div className="absolute top-0 right-0 bg-white/90 dark:bg-gray-800/90 p-2 rounded border border-gray-200 dark:border-gray-700 text-xs z-10 shadow-sm">
             <div className="font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center">
