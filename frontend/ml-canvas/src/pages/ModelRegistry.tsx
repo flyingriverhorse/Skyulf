@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Archive, Box, CheckCircle, ChevronRight, X, Play, Folder, FileText, Cloud, HardDrive } from 'lucide-react';
 import { LoadingState, ErrorState, EmptyState } from '../components/shared';
+import { useEscapeKey } from '../core/hooks/useEscapeKey';
 
 interface ArtifactResponse {
   storage_type: string;
@@ -50,6 +51,8 @@ export const ModelRegistry: React.FC = () => {
   const [selectedModel, setSelectedModel] = useState<ModelRegistryEntry | null>(null);
   const [deployingId, setDeployingId] = useState<string | null>(null);
   
+  useEscapeKey(() => setSelectedModel(null), !!selectedModel);
+
   // Artifacts viewing
   const [viewingArtifacts, setViewingArtifacts] = useState<string | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactResponse | null>(null);

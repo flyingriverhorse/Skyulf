@@ -65,6 +65,7 @@ export const DeploymentsPage: React.FC = () => {
           onClick={() => { void loadData(); }}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
           title="Refresh"
+          aria-label="Refresh deployments"
         >
           <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
         </button>

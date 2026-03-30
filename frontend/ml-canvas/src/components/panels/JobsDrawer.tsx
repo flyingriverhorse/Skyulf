@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
 import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown } from 'lucide-react';
 import { JobInfo, jobsApi } from '../../core/api/jobs';
+import { useEscapeKey } from '../../core/hooks/useEscapeKey';
 
 const formatMetricValue = (key: string, value: number): string => {
   if (key.endsWith('_std')) return value.toFixed(6);
@@ -22,6 +23,8 @@ export const JobsDrawer: React.FC = () => {
   } = useJobStore();
 
   const [selectedJob, setSelectedJob] = useState<JobInfo | null>(null);
+
+  useEscapeKey(toggleDrawer, isDrawerOpen);
 
   if (!isDrawerOpen) return null;
 

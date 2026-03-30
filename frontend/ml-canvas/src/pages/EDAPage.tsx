@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { DatasetService } from '../core/api/datasets';
 import { EDAService } from '../core/api/eda';
 import { JobsHistoryModal } from '../components/eda/JobsHistoryModal';
-import { VariableDetailModal } from '../components/eda/VariableDetailModal';
 import { EDASidebar } from '../components/eda/EDASidebar';
 import { DashboardTab } from '../components/eda/tabs/DashboardTab';
 import { InsightsTab } from '../components/eda/tabs/InsightsTab';
@@ -42,7 +41,6 @@ export const EDAPage: React.FC = () => {
   const [filters, setFilters] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [selectedVariable, setSelectedVariable] = useState<any>(null);
   
   // Manual Filter State (Moved to FilterBar)
 
@@ -86,7 +84,6 @@ export const EDAPage: React.FC = () => {
       setExcludedColsApplied([]);
       setFilters([]); // Reset filters
       setTargetCol(''); // Reset target column
-      setSelectedVariable(null); // Reset selected variable
       setScatterX('');
       setScatterY('');
       setScatterZ('');
@@ -101,7 +98,6 @@ export const EDAPage: React.FC = () => {
       setExcludedColsApplied([]);
       setFilters([]);
       setTargetCol('');
-      setSelectedVariable(null);
       setScatterX('');
       setScatterY('');
       setScatterZ('');
@@ -419,7 +415,6 @@ export const EDAPage: React.FC = () => {
             {activeTab === 'variables' && (
                 <VariablesTab 
                     profile={profile}
-                    setSelectedVariable={setSelectedVariable}
                     handleToggleExclude={handleToggleExclude}
                     handleAddFilter={handleAddFilter}
                 />
@@ -624,17 +619,7 @@ export const EDAPage: React.FC = () => {
         {renderContent()}
       </div>
 
-      {/* Variable Detail Modal */}
-      <VariableDetailModal 
-        selectedVariable={selectedVariable}
-        onClose={() => setSelectedVariable(null)}
-        downloadChart={downloadChart}
-        filters={filters}
-        setFilters={setFilters}
-        runAnalysis={runAnalysis}
-        handleAddFilter={handleAddFilter}
-      />
-      
+      {/* Jobs History Modal */}
       <JobsHistoryModal 
         isOpen={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}

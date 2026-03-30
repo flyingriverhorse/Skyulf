@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { VariableRow } from '../VariableRow';
+import { useEscapeKey } from '../../../core/hooks/useEscapeKey';
 import { Input } from '../../ui/input';
 import { Search } from 'lucide-react';
 import { Button } from '../../ui/button';
@@ -7,7 +8,6 @@ import { Badge } from '../../ui/badge';
 
 interface VariablesTabProps {
     profile: any;
-    setSelectedVariable: (variable: any) => void;
     handleToggleExclude: (colName: string, exclude: boolean) => void;
     handleAddFilter: (column: string, value: any, operator: string) => void;
 }
@@ -19,6 +19,8 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedVars, setExpandedVars] = useState<Set<string>>(new Set());
+
+    useEscapeKey(() => setExpandedVars(new Set()), expandedVars.size > 0);
 
     const toggleExpand = (colName: string) => {
         const newExpanded = new Set(expandedVars);

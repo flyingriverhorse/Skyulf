@@ -296,6 +296,7 @@ export const DataSources: React.FC = () => {
                               onClick={() => { setPreviewDataset(d); }}
                               className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
                               title="Preview Dataset"
+                              aria-label="Preview dataset"
                             >
                               <Eye size={16} />
                             </button>
@@ -331,6 +332,7 @@ export const DataSources: React.FC = () => {
                             disabled={cancellingId === d.id}
                             className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-colors disabled:opacity-50"
                             title="Cancel Ingestion"
+                            aria-label="Cancel ingestion"
                           >
                             {cancellingId === d.id ? (
                               <div className="w-4 h-4 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
@@ -344,6 +346,7 @@ export const DataSources: React.FC = () => {
                           disabled={deletingId === d.id}
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50"
                           title="Delete Dataset"
+                          aria-label="Delete dataset"
                         >
                           {deletingId === d.id ? (
                             <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
