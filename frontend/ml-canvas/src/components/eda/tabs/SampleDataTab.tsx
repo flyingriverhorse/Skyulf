@@ -1,5 +1,6 @@
 import React from 'react';
-import { EyeOff } from 'lucide-react';
+import { EyeOff, Table } from 'lucide-react';
+import { EmptyState } from '../../shared/EmptyState';
 
 interface SampleDataTabProps {
     profile: any;
@@ -12,6 +13,10 @@ export const SampleDataTab: React.FC<SampleDataTabProps> = ({
     excludedCols,
     handleToggleExclude
 }) => {
+    if (!profile?.sample_data?.length) {
+        return <EmptyState icon={<Table className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Sample Data" description="No sample rows available for this dataset." />;
+    }
+
     // Filter out excluded columns from display
     // Also filter out columns ending in '_encoded' (e.g. target_encoded)
     const visibleColumns = Object.keys(profile.sample_data[0] || {}).filter(col => 
@@ -32,7 +37,7 @@ export const SampleDataTab: React.FC<SampleDataTabProps> = ({
                                             e.stopPropagation();
                                             handleToggleExclude(col, true);
                                         }}
-                                        className="p-1 rounded transition-colors opacity-0 group-hover:opacity-100 hover:bg-red-100 text-gray-400 hover:text-red-500 dark:hover:bg-red-900/30"
+                                        className="p-1 rounded transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 hover:bg-red-100 text-gray-400 hover:text-red-500 dark:hover:bg-red-900/30"
                                         title="Exclude from analysis"
                                     >
                                         <EyeOff className="w-3 h-3" />

@@ -25,7 +25,7 @@ export default defineConfig({
           'vendor-plotly': ['plotly.js-dist-min', 'react-plotly.js'],
           'vendor-charts': ['recharts', 'chart.js', 'react-chartjs-2'],
           'vendor-flow': ['@xyflow/react'],
-          'vendor-utils': ['html2canvas', 'lucide-react', 'axios', 'dagre']
+          'vendor-utils': ['html-to-image', 'lucide-react', 'axios', 'dagre']
         }
       }
     }

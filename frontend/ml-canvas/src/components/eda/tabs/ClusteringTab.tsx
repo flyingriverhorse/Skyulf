@@ -36,7 +36,7 @@ export const ClusteringTab: React.FC<ClusteringTabProps> = ({ profile, downloadC
     }
 
     return (
-        <div className="mt-4 space-y-6">
+        <div className="mt-4 space-y-6" id="clustering-chart">
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
