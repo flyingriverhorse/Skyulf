@@ -689,6 +689,22 @@ class PipelineEngine:
         # Merge CV metrics
         metrics.update(cv_metrics)
 
+        # Persist data shape for monitoring
+        try:
+            if isinstance(data, pd.DataFrame):
+                metrics["n_rows"] = len(data)
+                metrics["n_features"] = len(data.columns) - 1  # minus target
+            elif hasattr(data, "train") and hasattr(data.train, "shape"):
+                metrics["n_rows"] = data.train.shape[0]
+                metrics["n_features"] = data.train.shape[1] - 1
+            elif isinstance(data, tuple) and len(data) >= 1:
+                first = data[0]
+                if hasattr(first, "shape"):
+                    metrics["n_rows"] = first.shape[0]
+                    metrics["n_features"] = first.shape[1] - 1
+        except Exception:
+            pass
+
         return node.node_id, metrics
 
     def _run_advanced_tuning(  # noqa: C901
@@ -858,6 +874,22 @@ class PipelineEngine:
 
         # Merge CV metrics
         metrics.update(cv_metrics)
+
+        # Persist data shape for monitoring
+        try:
+            if isinstance(data, pd.DataFrame):
+                metrics["n_rows"] = len(data)
+                metrics["n_features"] = len(data.columns) - 1
+            elif hasattr(data, "train") and hasattr(data.train, "shape"):
+                metrics["n_rows"] = data.train.shape[0]
+                metrics["n_features"] = data.train.shape[1] - 1
+            elif isinstance(data, tuple) and len(data) >= 1:
+                first = data[0]
+                if hasattr(first, "shape"):
+                    metrics["n_rows"] = first.shape[0]
+                    metrics["n_features"] = first.shape[1] - 1
+        except Exception:
+            pass
 
         return node.node_id, metrics
 
