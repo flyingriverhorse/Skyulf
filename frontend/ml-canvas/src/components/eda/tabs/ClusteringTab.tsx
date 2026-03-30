@@ -1,6 +1,7 @@
 import React from 'react';
 import { Network, Download, Info } from 'lucide-react';
 import { InfoTooltip } from '../../ui/InfoTooltip';
+import { COLORS } from '../constants';
 
 interface ClusterStats {
     cluster_id: number;
@@ -124,6 +125,6 @@ export const ClusteringTab: React.FC<ClusteringTabProps> = ({ profile, downloadC
 
 // Helper for consistency with ChartJS colors
 const getColorForIndex = (index: number) => {
-    const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00C49F', '#FFBB28', '#FF8042'];
-    return colors[index % colors.length];
+
+    return COLORS[index % COLORS.length];
 };

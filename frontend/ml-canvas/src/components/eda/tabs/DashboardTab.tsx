@@ -4,14 +4,13 @@ import { AlertsSection } from '../AlertsSection';
 import { Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import { FileText, Database, AlertTriangle, EyeOff, Eye } from 'lucide-react';
 import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
+import { COLORS } from '../constants';
 
 interface DashboardTabProps {
     profile: any;
     onToggleExclude?: (column: string, exclude: boolean) => void;
     excludedCols?: string[];
 }
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExclude, excludedCols = [] }) => {
     

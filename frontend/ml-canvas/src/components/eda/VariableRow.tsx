@@ -1,11 +1,13 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
 import { 
     ChevronDown, 
     ChevronRight, 
     Download,
     Eye,
-    EyeOff
+    EyeOff,
+    Loader2,
+    Check
 } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer } from 'recharts';
 import { DistributionChart } from './DistributionChart';
@@ -31,6 +33,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
     handleAddFilter
 }) => {
     const chartRef = useRef<HTMLDivElement>(null);
+    const [dlState, setDlState] = useState<'idle' | 'downloading' | 'done'>('idle');
 
     // Prepare mini histogram data
     let miniChartData: any[] = [];
@@ -47,6 +50,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
 
     const downloadChart = async () => {
         if (!chartRef.current) return;
+        setDlState('downloading');
 
         try {
             const isDark = document.documentElement.classList.contains('dark');
@@ -60,6 +64,9 @@ export const VariableRow: React.FC<VariableRowProps> = ({
             link.click();
         } catch (error) {
             console.error('Failed to download chart', error);
+        } finally {
+            setDlState('done');
+            setTimeout(() => setDlState('idle'), 1200);
         }
     };
 
@@ -375,8 +382,8 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                         <div className="md:col-span-2 flex flex-col min-h-[300px]">
                             <div className="flex items-center justify-between mb-2">
                                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Distribution</h4>
-                                <Button size="icon" variant="outline" className="h-8 w-8" title="Download Chart" onClick={downloadChart}>
-                                    <Download size={16} />
+                                <Button size="icon" variant="outline" className="h-8 w-8" title="Download Chart" onClick={downloadChart} disabled={dlState !== 'idle'}>
+                                    {dlState === 'downloading' ? <Loader2 size={16} className="animate-spin" /> : dlState === 'done' ? <Check size={16} className="text-green-500" /> : <Download size={16} />}
                                 </Button>
                             </div>
                             <div className="flex-1 bg-background rounded-md border p-4 min-h-0" ref={chartRef}>
