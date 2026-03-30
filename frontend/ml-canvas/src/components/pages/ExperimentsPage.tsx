@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, RefreshCw, Download } from 'lucide-react';
 import { LoadingState, ErrorState } from '../shared';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
 
@@ -95,16 +95,20 @@ export const ExperimentsPage: React.FC = () => {
     
     // Check for dark mode
     const isDarkMode = document.documentElement.classList.contains('dark');
-    const backgroundColor = isDarkMode ? '#1f2937' : '#ffffff'; // #1f2937 is tailwind gray-800
+    const backgroundColor = isDarkMode ? '#1f2937' : '#ffffff';
 
     try {
-        const canvas = await html2canvas(element, { backgroundColor } as any);
+        const dataUrl = await toPng(element, {
+            backgroundColor,
+            pixelRatio: 2,
+            filter: (node) => !(node instanceof HTMLElement && node.dataset.exportIgnore === 'true'),
+        });
         const link = document.createElement('a');
         link.download = `${fileName}.png`;
-        link.href = canvas.toDataURL('image/png');
+        link.href = dataUrl;
         link.click();
     } catch (e) {
-        console.error("Failed to download image", e);
+        console.error('Failed to download image', e);
     }
   };
 
@@ -857,7 +861,7 @@ export const ExperimentsPage: React.FC = () => {
                                             <div className="grid grid-cols-1 gap-8">
                                                 {/* Scatter Plot: Actual vs Predicted */}
                                                 <div className="h-[300px] relative group" id={`${splitName}-actual-pred`}>
-                                                    <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-html2canvas-ignore="true">
+                                                    <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
                                                        <button 
                                                          onClick={() => void handleDownload(`${splitName}-actual-pred`, `${splitName}_actual_vs_predicted`)}
                                                          className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600"
@@ -919,7 +923,7 @@ export const ExperimentsPage: React.FC = () => {
 
                                                 {/* Residual Plot: Residuals vs Predicted */}
                                                 <div className="h-[300px] relative group" id={`${splitName}-residuals`}>
-                                                    <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-html2canvas-ignore="true">
+                                                    <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
                                                        <button 
                                                          onClick={() => void handleDownload(`${splitName}-residuals`, `${splitName}_residuals`)}
                                                          className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600"
@@ -982,7 +986,7 @@ export const ExperimentsPage: React.FC = () => {
                                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                                 {/* Confusion Matrix */}
                                                 <div className="h-[300px] flex flex-col items-center justify-center relative group" id={`${splitName}-confusion-matrix`}>
-                                                    <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-html2canvas-ignore="true">
+                                                    <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
                                                        <button 
                                                          onClick={() => void handleDownload(`${splitName}-confusion-matrix`, `${splitName}_confusion_matrix`)}
                                                          className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600"
@@ -1063,7 +1067,7 @@ export const ExperimentsPage: React.FC = () => {
                                                 {/* ROC Curve (if available) */}
                                                 {splitData.y_proba && (
                                                     <div className="h-[300px] w-full relative group" id={`${splitName}-roc`}>
-                                                        <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-html2canvas-ignore="true">
+                                                        <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
                                                            <button 
                                                              onClick={() => void handleDownload(`${splitName}-roc`, `${splitName}_roc_curve`)}
                                                              className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600"

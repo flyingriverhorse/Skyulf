@@ -2,6 +2,7 @@ import React from 'react';
 import { BarChart2, Download } from 'lucide-react';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { CorrelationHeatmap } from '../CorrelationHeatmap';
+import { EmptyState } from '../../shared/EmptyState';
 
 interface CorrelationsTabProps {
     profile: any;
@@ -10,6 +11,9 @@ interface CorrelationsTabProps {
 export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
     profile
 }) => {
+    if (!profile?.correlations) {
+        return <EmptyState icon={<BarChart2 className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Correlation Data" description="Not enough numeric columns to compute correlations." />;
+    }
     const downloadMatrix = (data: any, titleText: string, filename: string) => {
         if (!data) return;
         

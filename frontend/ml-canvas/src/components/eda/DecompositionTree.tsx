@@ -125,6 +125,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     // Calculate connection paths
     React.useLayoutEffect(() => {
         updatePaths();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [levels, splitMenuOpen]); // Recalculate when levels change or menu opens (layout might shift)
 
     // Update cache when state changes
@@ -144,6 +145,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
         } else {
             loadRoot();
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [datasetId, measureCol, measureAgg]);
 
     const loadRoot = async () => {

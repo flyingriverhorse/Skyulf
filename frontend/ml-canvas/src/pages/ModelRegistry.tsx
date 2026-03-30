@@ -159,6 +159,7 @@ export const ModelRegistry: React.FC = () => {
   useEffect(() => {
     void fetchStats();
     void fetchModels(0, true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Infinite scroll listener
@@ -190,6 +191,7 @@ export const ModelRegistry: React.FC = () => {
     if (page > 0) {
       void fetchModels(page, false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
   const handleDeploy = async (jobId: string) => {

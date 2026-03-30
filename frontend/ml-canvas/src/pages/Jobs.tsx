@@ -87,6 +87,7 @@ export const JobsPage: React.FC = () => {
     } else {
       void fetchJobs(true);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const handleLoadMore = () => {

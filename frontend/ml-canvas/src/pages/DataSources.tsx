@@ -43,6 +43,7 @@ export const DataSources: React.FC = () => {
 
   useEffect(() => {
     void fetchDatasets();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -57,6 +58,7 @@ export const DataSources: React.FC = () => {
       }
     }, 5000);
     return () => { clearInterval(interval); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datasets]); // Re-run effect when datasets change to update "hasPending" check
 
   const handleDelete = async (id: string) => {

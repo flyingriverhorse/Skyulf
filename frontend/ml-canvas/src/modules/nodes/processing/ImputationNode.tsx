@@ -34,7 +34,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
-  const availableColumns = schema ? Object.values(schema.columns).map(c => c.name) : [];
+  const availableColumns = useMemo(() => schema ? Object.values(schema.columns).map(c => c.name) : [], [schema]);
   
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;

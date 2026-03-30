@@ -387,6 +387,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
         .catch(console.error)
         .finally(() => { setIsLoadingDefs(false); });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.model_type]);
 
   // Auto-select target column from upstream
@@ -401,6 +402,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
              onChange({ ...config, target_column: upstreamTarget });
         }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upstreamData, config.target_column, onChange]);
 
   const handleTrain = async () => {
