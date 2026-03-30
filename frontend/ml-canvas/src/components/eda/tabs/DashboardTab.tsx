@@ -3,6 +3,7 @@ import { OverviewCards } from '../OverviewCards';
 import { AlertsSection } from '../AlertsSection';
 import { Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import { FileText, Database, AlertTriangle, EyeOff, Eye } from 'lucide-react';
+import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
 
 interface DashboardTabProps {
     profile: any;
@@ -64,7 +65,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExc
                                     ))}
                                 </Pie>
                                 <Tooltip 
-                                    contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                                    contentStyle={getTooltipContentStyle()}
                                 />
                                 <Legend verticalAlign="bottom" height={36}/>
                             </PieChart>
@@ -102,7 +103,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExc
                                         {onToggleExclude && (
                                             <button
                                                 onClick={() => onToggleExclude(item.name, !isExcluded)}
-                                                className={`p-1.5 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 ${
+                                                className={`p-1.5 rounded-md transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 ${
                                                     isExcluded 
                                                     ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 opacity-100' 
                                                     : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-300'

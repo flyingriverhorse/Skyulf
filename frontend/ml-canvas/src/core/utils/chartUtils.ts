@@ -1,5 +1,5 @@
 import Plotly from 'plotly.js-dist-min';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 
 export const downloadChart = async (elementId: string, filename: string, title?: string, subtitle?: string, extraInfo?: string) => {
     const element = document.getElementById(elementId);
@@ -105,44 +105,49 @@ export const downloadChart = async (elementId: string, filename: string, title?:
         return;
     }
 
-    // Use html2canvas for everything else (Recharts, HTML tables, etc.)
-    // This is much more robust than manual SVG serialization
+    // Use html-to-image for everything else (Recharts SVG, HTML tables, etc.)
+    // Handles SVG elements properly unlike html2canvas
     try {
-        const canvas = await html2canvas(element, {
+        const dataUrl = await toPng(element, {
             backgroundColor: bgColor,
-            scale: 2, // High resolution
-            logging: false,
-            useCORS: true
-        } as any);
+            pixelRatio: 2,
+        });
 
-        const finalCanvas = document.createElement('canvas');
-        const ctx = finalCanvas.getContext('2d');
-        
-        const headerHeight = title ? (subtitle ? 80 : 50) : 0;
-        finalCanvas.width = canvas.width;
-        finalCanvas.height = canvas.height + (headerHeight * 2); // Scale header height by 2 for retina
+        const img = new Image();
+        img.onload = () => {
+            const headerHeight = title ? (subtitle ? 80 : 50) : 0;
+            const finalCanvas = document.createElement('canvas');
+            const ctx = finalCanvas.getContext('2d');
 
-        if (ctx) {
-            // Background
-            ctx.fillStyle = bgColor;
-            ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
-            
-            // Draw Title & Extra Info (Scaled)
-            // We need to scale the drawing context to match the high-res canvas
-            ctx.save();
-            ctx.scale(2, 2);
-            drawText(ctx, canvas.width / 2);
-            ctx.restore();
-            
-            // Draw Chart
-            ctx.drawImage(canvas, 0, headerHeight * 2);
-            
-            const a = document.createElement('a');
-            a.download = `${filename}.png`;
-            a.href = finalCanvas.toDataURL('image/png');
-            a.click();
-        }
+            finalCanvas.width = img.width;
+            finalCanvas.height = img.height + (headerHeight * 2);
+
+            if (ctx) {
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+                ctx.save();
+                ctx.scale(2, 2);
+                drawText(ctx, img.width / 2);
+                ctx.restore();
+
+                ctx.drawImage(img, 0, headerHeight * 2);
+
+                const a = document.createElement('a');
+                a.download = `${filename}.png`;
+                a.href = finalCanvas.toDataURL('image/png');
+                a.click();
+            }
+        };
+        img.src = dataUrl;
     } catch (e) {
         console.error("Chart download failed", e);
     }
+};
+
+export const getTooltipContentStyle = (): Record<string, string> => {
+    const isDark = document.documentElement.classList.contains('dark');
+    return isDark
+        ? { backgroundColor: '#1f2937', borderRadius: '8px', border: '1px solid #374151', color: '#f3f4f6', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)' }
+        : { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #e5e7eb', color: '#111827', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' };
 };

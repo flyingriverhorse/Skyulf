@@ -7,6 +7,7 @@ import {
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { ThreeDScatterPlot } from '../ThreeDScatterPlot';
 import { CanvasScatterPlot } from '../CanvasScatterPlot';
+import { EmptyState } from '../../shared/EmptyState';
 
 interface BivariateTabProps {
     profile: any;
@@ -37,6 +38,10 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
     is3D,
     setIs3D
 }) => {
+    if (!profile?.columns || !profile?.sample_data) {
+        return <EmptyState icon={<ScatterIcon className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Data Available" description="Sample data is required for bivariate analysis." />;
+    }
+
     return (
         <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
             <div className="flex justify-between items-center mb-4">
@@ -54,13 +59,13 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                 </button>
             </div>
             
-            <div className="flex gap-4 mb-6 items-end">
+            <div className="flex flex-wrap gap-4 mb-6 items-end">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">X Axis</label>
                     <select 
                         value={scatterX} 
                         onChange={(e) => setScatterX(e.target.value)}
-                        className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
                         <option value="">Select Variable</option>
                         {Object.values(profile.columns)
@@ -76,7 +81,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                     <select 
                         value={scatterY} 
                         onChange={(e) => setScatterY(e.target.value)}
-                        className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
                         <option value="">Select Variable</option>
                         {Object.values(profile.columns)
@@ -94,7 +99,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                         <select 
                             value={scatterZ} 
                             onChange={(e) => setScatterZ(e.target.value)}
-                            className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                            className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                         >
                             <option value="">Select Variable</option>
                             {Object.values(profile.columns)
@@ -112,7 +117,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                     <select 
                         value={scatterColor} 
                         onChange={(e) => setScatterColor(e.target.value)}
-                        className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
                         <option value="">None</option>
                         {Object.values(profile.columns)

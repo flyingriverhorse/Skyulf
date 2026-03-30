@@ -19,6 +19,7 @@ import {
     Scatter 
 } from 'recharts';
 import { InfoTooltip } from '../../ui/InfoTooltip';
+import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
 
 interface TargetAnalysisTabProps {
     profile: any;
@@ -162,8 +163,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                         <XAxis type="number" domain={[0, 1]} />
                                         <YAxis type="category" dataKey="name" width={120} tick={{fontSize: 12}} />
                                         <Tooltip 
-                                            contentStyle={{ backgroundColor: '#1f2937', border: 'none', color: '#fff' }}
-                                            itemStyle={{ color: '#fff' }}
+                                            contentStyle={getTooltipContentStyle()}
                                             formatter={(value: number) => [value.toFixed(3), 'Association']}
                                         />
                                         <ReferenceLine x={0} stroke="#9ca3af" />

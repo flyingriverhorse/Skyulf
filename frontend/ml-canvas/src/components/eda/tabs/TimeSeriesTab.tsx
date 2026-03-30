@@ -19,6 +19,7 @@ import {
 } from 'recharts';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { COLORS } from '../constants';
+import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
 
 interface TimeSeriesTabProps {
     profile: any;
@@ -78,7 +79,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                             />
                             <YAxis />
                             <Tooltip 
-                                contentStyle={{ backgroundColor: '#1f2937', border: 'none', color: '#fff' }}
+                                contentStyle={getTooltipContentStyle()}
                                 labelStyle={{ color: '#9ca3af' }}
                             />
                             <Legend />
@@ -125,7 +126,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                                 <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                                 <YAxis />
                                 <Tooltip 
-                                    contentStyle={{ backgroundColor: '#1f2937', border: 'none', color: '#fff' }}
+                                    contentStyle={getTooltipContentStyle()}
                                     cursor={{fill: 'transparent'}}
                                 />
                                 <Bar dataKey="count" fill="#8884d8" radius={[4, 4, 0, 0]} />
@@ -157,7 +158,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                             <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                             <YAxis />
                             <Tooltip 
-                                contentStyle={{ backgroundColor: '#1f2937', border: 'none', color: '#fff' }}
+                                contentStyle={getTooltipContentStyle()}
                                 cursor={{fill: 'transparent'}}
                             />
                             <Bar dataKey="count" fill="#82ca9d" radius={[4, 4, 0, 0]} />
@@ -200,7 +201,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                                     />
                                     <YAxis domain={[-1, 1]} />
                                     <Tooltip 
-                                        contentStyle={{ backgroundColor: '#1f2937', border: 'none', color: '#fff' }}
+                                        contentStyle={getTooltipContentStyle()}
                                         cursor={{fill: 'transparent'}}
                                         formatter={(value: number) => [value.toFixed(3), 'Correlation']}
                                     />
