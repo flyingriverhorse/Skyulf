@@ -24,6 +24,27 @@ interface CausalGraphProps {
 const nodeWidth = 150;
 const nodeHeight = 40;
 
+const getNodeStyle = (): React.CSSProperties => {
+    const isDark = document.documentElement.classList.contains('dark');
+    return {
+        borderRadius: '5px',
+        padding: '10px',
+        width: nodeWidth,
+        textAlign: 'center',
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        backgroundColor: isDark ? '#1f2937' : '#ffffff',
+        color: isDark ? '#f3f4f6' : '#111827',
+        borderColor: isDark ? '#4b5563' : '#d1d5db',
+    };
+};
+
+const getEdgeStrokeColor = (type: string): string => {
+    const isDark = document.documentElement.classList.contains('dark');
+    if (type === 'directed') return isDark ? '#93c5fd' : '#333333';
+    return isDark ? '#6b7280' : '#999999';
+};
+
 export const CausalGraph: React.FC<CausalGraphProps> = ({ graph }) => {
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -88,16 +109,8 @@ export const CausalGraph: React.FC<CausalGraphProps> = ({ graph }) => {
         const initialNodes: Node[] = graph.nodes.map(n => ({
             id: sanitizeId(n.id),
             data: { label: n.label },
-            position: { x: 0, y: 0 }, // Will be calculated
-            className: 'dark:bg-gray-800 dark:text-white dark:border-gray-600 bg-white text-gray-900 border-gray-300',
-            style: { 
-                borderRadius: '5px',
-                padding: '10px',
-                width: nodeWidth,
-                textAlign: 'center',
-                borderWidth: '1px',
-                borderStyle: 'solid'
-            }
+            position: { x: 0, y: 0 },
+            style: getNodeStyle(),
         }));
 
         const initialEdges: Edge[] = graph.edges.map((e, i) => ({
@@ -105,11 +118,12 @@ export const CausalGraph: React.FC<CausalGraphProps> = ({ graph }) => {
             source: sanitizeId(e.source),
             target: sanitizeId(e.target),
             animated: true,
-            type: 'default', // Bezier curves are smoother for LR layout
+            type: 'default',
             label: e.type === 'directed' ? 'causes' : (e.type === 'bidirected' ? 'confounded' : 'related'),
-            style: { stroke: e.type === 'directed' ? '#333' : '#999', strokeDasharray: e.type === 'directed' ? '0' : '5 5' },
-            markerEnd: e.type === 'directed' ? { type: MarkerType.ArrowClosed } : undefined,
-            markerStart: e.type === 'bidirected' ? { type: MarkerType.ArrowClosed } : undefined,
+            labelStyle: { fill: document.documentElement.classList.contains('dark') ? '#d1d5db' : '#374151', fontSize: 12 },
+            style: { stroke: getEdgeStrokeColor(e.type), strokeDasharray: e.type === 'directed' ? '0' : '5 5' },
+            markerEnd: e.type === 'directed' ? { type: MarkerType.ArrowClosed, color: getEdgeStrokeColor(e.type) } : undefined,
+            markerStart: e.type === 'bidirected' ? { type: MarkerType.ArrowClosed, color: getEdgeStrokeColor(e.type) } : undefined,
         }));
 
         const layouted = getLayoutedElements(initialNodes, initialEdges);

@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { 
     ChevronDown, 
     ChevronRight, 
@@ -47,18 +47,19 @@ export const VariableRow: React.FC<VariableRowProps> = ({
 
     const downloadChart = async () => {
         if (!chartRef.current) return;
-        
+
         try {
-            const canvas = await html2canvas(chartRef.current);
-            const image = canvas.toDataURL("image/png");
-            const link = document.createElement("a");
-            link.href = image;
+            const isDark = document.documentElement.classList.contains('dark');
+            const dataUrl = await toPng(chartRef.current, {
+                backgroundColor: isDark ? '#1f2937' : '#ffffff',
+                pixelRatio: 2,
+            });
+            const link = document.createElement('a');
+            link.href = dataUrl;
             link.download = `${profile.name}_distribution.png`;
-            document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
         } catch (error) {
-            console.error("Failed to download chart", error);
+            console.error('Failed to download chart', error);
         }
     };
 

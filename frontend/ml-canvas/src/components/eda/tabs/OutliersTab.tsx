@@ -1,12 +1,17 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { InfoTooltip } from '../../ui/InfoTooltip';
+import { EmptyState } from '../../shared/EmptyState';
 
 interface OutliersTabProps {
     profile: any;
 }
 
 export const OutliersTab: React.FC<OutliersTabProps> = ({ profile }) => {
+    if (!profile?.outliers?.top_outliers?.length) {
+        return <EmptyState icon={<AlertTriangle className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Outlier Data" description="Outlier analysis did not return any results." />;
+    }
+
     return (
         <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">

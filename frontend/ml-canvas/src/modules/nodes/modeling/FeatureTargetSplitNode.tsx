@@ -51,6 +51,7 @@ const FeatureTargetSplitSettings: React.FC<{ config: FeatureTargetSplitConfig; o
     if (upstreamDatasetId && config.datasetId !== upstreamDatasetId) {
       onChange({ ...config, datasetId: upstreamDatasetId });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upstreamDatasetId, config.datasetId, onChange]);
 
   const { data: schema } = useDatasetSchema(upstreamDatasetId || config.datasetId);

@@ -3,6 +3,7 @@ import { RuleTreeGraph } from '../RuleTreeGraph';
 import { AlertCircle, GitBranch, BarChart3 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
+import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
 
 interface RuleDiscoveryTabProps {
     profile: any;
@@ -90,7 +91,7 @@ export const RuleDiscoveryTab: React.FC<RuleDiscoveryTabProps> = ({ profile }) =
                                 />
                                 <RechartsTooltip 
                                     formatter={(value: number) => [(value * 100).toFixed(1) + '%', 'Importance']}
-                                    contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                                    contentStyle={getTooltipContentStyle()}
                                     cursor={{ fill: 'transparent' }}
                                 />
                                 <Bar dataKey="importance" radius={[0, 4, 4, 0]} barSize={20}>

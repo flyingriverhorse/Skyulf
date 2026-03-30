@@ -4,12 +4,17 @@ import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { COLORS } from '../constants';
+import { EmptyState } from '../../shared/EmptyState';
 
 interface GeospatialTabProps {
     profile: any;
 }
 
 export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
+    if (!profile?.geospatial?.sample_points?.length) {
+        return <EmptyState icon={<Map className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Geospatial Data" description="No latitude/longitude columns were detected in the dataset." />;
+    }
+
     return (
         <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
             <div className="flex items-center justify-between mb-6">
