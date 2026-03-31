@@ -4,7 +4,7 @@ import logging
 import time
 import re
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -67,6 +67,51 @@ class PipelineEngine:
             node.step_type in [StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING]
             for node in self._node_configs.values()
         )
+
+    def _extract_feature_importances(
+        self, model: Any, data: Any, target_col: str
+    ) -> Optional[Dict[str, float]]:
+        """Extract feature importances from a trained sklearn-style model."""
+        try:
+            # Unwrap tuple (model, tuning_result) from advanced tuning
+            actual_model = model[0] if isinstance(model, tuple) else model
+
+            # Get feature names from data
+            feature_names: List[str] = []
+            if isinstance(data, pd.DataFrame):
+                feature_names = [c for c in data.columns if c != target_col]
+            elif hasattr(data, "train"):
+                train = data.train
+                if isinstance(train, pd.DataFrame):
+                    feature_names = [c for c in train.columns if c != target_col]
+                elif isinstance(train, tuple) and len(train) >= 1 and hasattr(train[0], "columns"):
+                    feature_names = list(train[0].columns)
+            elif isinstance(data, tuple) and len(data) >= 1 and hasattr(data[0], "columns"):
+                feature_names = list(data[0].columns)
+
+            if not feature_names:
+                return None
+
+            # Extract importances
+            importances: Optional[Any] = None
+            if hasattr(actual_model, "feature_importances_"):
+                importances = actual_model.feature_importances_
+            elif hasattr(actual_model, "coef_"):
+                coef = actual_model.coef_
+                # For multi-class, coef_ is 2D — take mean of absolute values
+                if hasattr(coef, "ndim") and coef.ndim > 1:
+                    importances = abs(coef).mean(axis=0)
+                else:
+                    importances = abs(coef)
+
+            if importances is not None and len(importances) == len(feature_names):
+                return {
+                    name: round(float(val), 6)
+                    for name, val in zip(feature_names, importances)
+                }
+        except Exception:
+            pass
+        return None
 
     def _finalize_training_artifacts(self, data: Any, job_id: str, target_col: str, node_id: str, model_artifact: Any):
         """
@@ -689,6 +734,11 @@ class PipelineEngine:
         # Merge CV metrics
         metrics.update(cv_metrics)
 
+        # Persist feature importances
+        fi = self._extract_feature_importances(estimator.model, data, target_col)
+        if fi:
+            metrics["feature_importances"] = fi
+
         # Persist data shape for monitoring
         try:
             if isinstance(data, pd.DataFrame):
@@ -874,6 +924,11 @@ class PipelineEngine:
 
         # Merge CV metrics
         metrics.update(cv_metrics)
+
+        # Persist feature importances
+        fi = self._extract_feature_importances(estimator.model, data, target_col)
+        if fi:
+            metrics["feature_importances"] = fi
 
         # Persist data shape for monitoring
         try:

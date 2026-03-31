@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive, BarChart2, Activity, TrendingUp } from 'lucide-react';
+import { monitoringApi } from '../core/api/monitoring';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [driftAlert, setDriftAlert] = useState(false);
 
   useEffect(() => {
     // Check if dark mode is already active
@@ -18,6 +20,12 @@ export const Layout: React.FC = () => {
         setIsDarkMode(true);
       }
     }
+  }, []);
+
+  useEffect(() => {
+    monitoringApi.getDriftStatus()
+      .then(s => setDriftAlert(s.has_drift))
+      .catch(() => {});
   }, []);
 
   const toggleTheme = () => {
@@ -56,7 +64,7 @@ export const Layout: React.FC = () => {
           <NavLink to="/eda" active={isActive('/eda')} icon={<BarChart2 size={20} />} collapsed={isCollapsed}>
             EDA
           </NavLink>
-          <NavLink to="/drift" active={isActive('/drift')} icon={<TrendingUp size={20} />} collapsed={isCollapsed}>
+          <NavLink to="/drift" active={isActive('/drift')} icon={<TrendingUp size={20} />} collapsed={isCollapsed} badge={driftAlert}>
             Data Drift
           </NavLink>
           <NavLink to="/canvas" active={isActive('/canvas')} icon={<GitBranch size={20} />} collapsed={isCollapsed}>
@@ -94,7 +102,7 @@ export const Layout: React.FC = () => {
   );
 };
 
-const NavLink = ({ to, children, active, icon, collapsed }: { to: string, children: React.ReactNode, active: boolean, icon?: React.ReactNode, collapsed?: boolean }) => (
+const NavLink = ({ to, children, active, icon, collapsed, badge }: { to: string, children: React.ReactNode, active: boolean, icon?: React.ReactNode, collapsed?: boolean, badge?: boolean }) => (
   <Link
     to={to}
     aria-current={active ? 'page' : undefined}
@@ -106,7 +114,12 @@ const NavLink = ({ to, children, active, icon, collapsed }: { to: string, childr
     title={collapsed ? (children as string) : undefined}
     aria-label={collapsed ? (children as string) : undefined}
   >
-    {icon}
+    <span className="relative">
+      {icon}
+      {badge && (
+        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-900 dark:border-slate-950" />
+      )}
+    </span>
     {!collapsed && children}
   </Link>
 );

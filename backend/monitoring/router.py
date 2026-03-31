@@ -11,12 +11,12 @@ import re
 from datetime import datetime
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 logger = logging.getLogger(__name__)
 from backend.config import get_settings
 from backend.dependencies import get_db
-from backend.database.models import BasicTrainingJob, AdvancedTuningJob
+from backend.database.models import BasicTrainingJob, AdvancedTuningJob, DriftCheckResult
 from backend.ml_pipeline.execution.graph_utils import extract_job_details
 from skyulf.profiling.drift import DriftCalculator, DriftReport
 
@@ -127,13 +127,24 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
                 if "n_features" in metrics:
                     job.n_features = int(metrics["n_features"])
 
-                # Pick the most useful primary metric
-                for key in ("test_score", "accuracy", "r2", "f1", "rmse"):
+                # Collect all test metrics into a compact summary
+                metric_parts: List[str] = []
+                for key, label in [
+                    ("test_accuracy", "acc"),
+                    ("test_f1_weighted", "f1"),
+                    ("test_precision_weighted", "prec"),
+                    ("test_recall_weighted", "recall"),
+                    ("test_roc_auc", "auc"),
+                    ("test_r2", "r2"),
+                    ("test_rmse", "rmse"),
+                    ("test_mae", "mae"),
+                ]:
                     if key in metrics:
                         val = metrics[key]
                         if isinstance(val, (int, float)):
-                            job.best_metric = f"{key}: {val:.4f}"
-                        break
+                            metric_parts.append(f"{label}: {val:.4f}")
+                if metric_parts:
+                    job.best_metric = " | ".join(metric_parts)
 
         jobs.append(job)
 
@@ -167,12 +178,28 @@ async def update_job_description(
 
     raise HTTPException(status_code=404, detail="Job not found")
 
-@router.post("/drift/calculate", response_model=DriftReport)
+class EnrichedDriftReport(BaseModel):
+    """DriftReport with optional feature importance overlay."""
+    reference_rows: int
+    current_rows: int
+    drifted_columns_count: int
+    column_drifts: Dict[str, Any]
+    missing_columns: List[str] = []
+    new_columns: List[str] = []
+    feature_importances: Optional[Dict[str, float]] = None
+
+
+@router.post("/drift/calculate", response_model=EnrichedDriftReport)
 async def calculate_drift(
     job_id: str = Form(...),
     file: UploadFile = File(...),
-    dataset_name: Optional[str] = Form(None)
-):
+    dataset_name: Optional[str] = Form(None),
+    threshold_psi: Optional[float] = Form(None),
+    threshold_ks: Optional[float] = Form(None),
+    threshold_wasserstein: Optional[float] = Form(None),
+    threshold_kl: Optional[float] = Form(None),
+    db: AsyncSession = Depends(get_db),
+) -> EnrichedDriftReport:
     settings = get_settings()
     base_path = Path(settings.TRAINING_ARTIFACT_DIR)
     
@@ -243,9 +270,156 @@ async def calculate_drift(
 
     # 4. Calculate Drift
     try:
+        custom_thresholds: Dict[str, float] = {}
+        if threshold_psi is not None:
+            custom_thresholds["psi"] = threshold_psi
+        if threshold_ks is not None:
+            custom_thresholds["ks"] = threshold_ks
+        if threshold_wasserstein is not None:
+            custom_thresholds["wasserstein"] = threshold_wasserstein
+        if threshold_kl is not None:
+            custom_thresholds["kl_divergence"] = threshold_kl
         calculator = DriftCalculator(ref_df, curr_df)
-        report = calculator.calculate_drift()
-        return report
+        report = calculator.calculate_drift(thresholds=custom_thresholds or None)
     except Exception as e:
         logger.exception("Drift calculation failed for job %s", job_id)
         raise HTTPException(status_code=500, detail="Drift calculation failed")
+
+    # 5. Save drift check result to DB for history
+    try:
+        # Build per-column summary (PSI + Wasserstein, compact)
+        col_summary: Dict[str, Any] = {}
+        for col_name, col_drift in report.column_drifts.items():
+            metrics_map: Dict[str, float] = {}
+            for m in col_drift.metrics:
+                metrics_map[m.metric] = m.value
+            col_summary[col_name] = {
+                "drifted": col_drift.drift_detected,
+                "psi": metrics_map.get("psi"),
+                "wasserstein": metrics_map.get("wasserstein_distance"),
+                "ks_p_value": metrics_map.get("ks_test_p_value"),
+            }
+
+        check = DriftCheckResult(
+            job_id=job_id,
+            dataset_name=dataset_name,
+            reference_rows=report.reference_rows,
+            current_rows=report.current_rows,
+            drifted_columns_count=report.drifted_columns_count,
+            total_columns=len(report.column_drifts),
+            summary=col_summary,
+            column_drifts=report.model_dump(exclude={"reference_rows", "current_rows", "drifted_columns_count", "missing_columns", "new_columns"}),
+        )
+        db.add(check)
+        await db.commit()
+    except Exception:
+        logger.warning("Failed to save drift check result", exc_info=True)
+
+    # 6. Load feature importances from training job
+    feature_importances: Optional[Dict[str, float]] = None
+    try:
+        for model_cls in (BasicTrainingJob, AdvancedTuningJob):
+            stmt = select(model_cls).where(model_cls.id == job_id)
+            result = await db.execute(stmt)
+            row = result.scalar_one_or_none()
+            if row:
+                job_metrics: Dict[str, Any] = cast(Dict[str, Any], row.metrics or {})
+                if "feature_importances" in job_metrics:
+                    feature_importances = job_metrics["feature_importances"]
+                break
+    except Exception:
+        logger.warning("Could not load feature importances for job %s", job_id)
+
+    return EnrichedDriftReport(
+        reference_rows=report.reference_rows,
+        current_rows=report.current_rows,
+        drifted_columns_count=report.drifted_columns_count,
+        column_drifts={k: v.model_dump() for k, v in report.column_drifts.items()},
+        missing_columns=report.missing_columns,
+        new_columns=report.new_columns,
+        feature_importances=feature_importances,
+    )
+
+
+class DriftHistoryEntry(BaseModel):
+    id: int
+    job_id: str
+    dataset_name: Optional[str] = None
+    reference_rows: Optional[int] = None
+    current_rows: Optional[int] = None
+    drifted_columns_count: Optional[int] = None
+    total_columns: Optional[int] = None
+    summary: Optional[Dict[str, Any]] = None
+    created_at: Optional[str] = None
+
+
+@router.get("/drift/history/{job_id}", response_model=List[DriftHistoryEntry])
+async def get_drift_history(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> List[DriftHistoryEntry]:
+    """Return all drift check results for a given job, newest first."""
+    stmt = (
+        select(DriftCheckResult)
+        .where(DriftCheckResult.job_id == job_id)
+        .order_by(DriftCheckResult.created_at.desc())  # type: ignore[union-attr]
+    )
+    result = await db.execute(stmt)
+    rows = result.scalars().all()
+    return [
+        DriftHistoryEntry(
+            id=cast(int, r.id),
+            job_id=cast(str, r.job_id),
+            dataset_name=cast(Optional[str], r.dataset_name),
+            reference_rows=cast(Optional[int], r.reference_rows),
+            current_rows=cast(Optional[int], r.current_rows),
+            drifted_columns_count=cast(Optional[int], r.drifted_columns_count),
+            total_columns=cast(Optional[int], r.total_columns),
+            summary=cast(Optional[Dict[str, Any]], r.summary),
+            created_at=r.created_at.isoformat() if r.created_at else None,
+        )
+        for r in rows
+    ]
+
+
+class DriftStatusSummary(BaseModel):
+    has_drift: bool
+    drifted_jobs: int
+    latest_check: Optional[str] = None
+
+
+@router.get("/drift/status", response_model=DriftStatusSummary)
+async def get_drift_status(
+    db: AsyncSession = Depends(get_db),
+) -> DriftStatusSummary:
+    """Return a lightweight summary of whether any recent drift was detected."""
+    # Get the latest check per job, check if any have drifted columns
+    stmt = (
+        select(DriftCheckResult)
+        .order_by(DriftCheckResult.created_at.desc())  # type: ignore[union-attr]
+        .limit(50)
+    )
+    result = await db.execute(stmt)
+    rows = result.scalars().all()
+    if not rows:
+        return DriftStatusSummary(has_drift=False, drifted_jobs=0)
+
+    # Deduplicate: keep only the latest check per job_id
+    seen_jobs: set[str] = set()
+    drifted_count = 0
+    latest_check: Optional[str] = None
+    for r in rows:
+        job_id = cast(str, r.job_id)
+        if job_id in seen_jobs:
+            continue
+        seen_jobs.add(job_id)
+        if latest_check is None and r.created_at:
+            latest_check = r.created_at.isoformat()
+        if cast(int, r.drifted_columns_count or 0) > 0:
+            drifted_count += 1
+
+    return DriftStatusSummary(
+        has_drift=drifted_count > 0,
+        drifted_jobs=drifted_count,
+        latest_check=latest_check,
+    )
