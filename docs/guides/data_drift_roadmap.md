@@ -6,28 +6,14 @@ Ideas for future iterations of the Data Drift Analysis page, ordered by estimate
 
 ## High Impact
 
-### 1. Drift History & Timeline
-Store each drift calculation result in the database and show a time-series chart of drift scores per column. Lets you answer: *"Is drift getting worse week over week?"*
-
-- Save `DriftReport` snapshots with timestamps to a new `DriftHistory` table.
-- Timeline chart (Recharts line chart) on the drift page showing PSI / Wasserstein over time.
-- Filter by column, date range, and job.
-
-### 2. Feature Importance × Drift Cross-Reference
-Cross-reference drifted columns with the model's feature importances to highlight **high-risk drifts** — columns that drifted AND are top predictors.
-
-- Read feature importances from the trained model artifact (`.coef_`, `.feature_importances_`).
-- Add a "Risk" column to the drift table: `High` if drifted + top-10 feature, `Low` otherwise.
-- Sort by risk by default.
-
-### 3. Auto-Scheduled Drift Checks
+### 4. Auto-Scheduled Drift Checks
 Periodic Celery task that automatically runs drift calculation against the latest production data upload.
 
 - New "Schedule" option per job (daily / weekly / manual).
 - Celery beat task picks up scheduled jobs, runs `DriftCalculator`, stores results in `DriftHistory`.
 - Pairs with Drift History for continuous monitoring.
 
-### 4. Multi-File / Batch Comparison
+### 5. Multi-File / Batch Comparison
 Upload multiple production CSV files and compare drift trends across data batches in one view.
 
 - Batch upload UI (drag-and-drop multiple files).
@@ -38,36 +24,38 @@ Upload multiple production CSV files and compare drift trends across data batche
 
 ## Medium Impact
 
-### 5. Export Drift Report
-Download the full drift analysis as PDF or CSV for sharing with stakeholders.
+*All medium impact items completed in v0.2.0:*
 
-- PDF: Use html-to-canvas or a server-side template (WeasyPrint / ReportLab).
-- CSV: Column-level metrics table export.
-- Add a "Download Report" button next to the "Run Analysis" button.
+### ~~6. Dropdown Metric Overflow~~ ✅
+Truncate or show only the primary metric in dropdown items and display the full metric set in the metadata bar only.
 
-### 6. Custom Drift Thresholds
-Let users configure per-column PSI / KS / Wasserstein thresholds instead of using global defaults.
+### ~~7. Empty State Guidance~~ ✅
+Show a helpful placeholder ("Select a model and upload data to compare") when no job is selected and no report exists.
 
-- Threshold config stored in `job_metadata` JSON.
-- Settings panel or inline editing on the drift results table.
-- Re-evaluate drift status on threshold change without re-uploading data.
+### ~~8. Export Drift Report~~ ✅
+Download the full drift analysis as CSV. Export button in the filter bar serializes all columns, metrics, and risk levels.
 
-### 7. Alert Badges on Sidebar
-Show a warning badge on the "Data Drift" navigation item if the most recent drift check found significant drift.
+### ~~9. Custom Drift Thresholds~~ ✅
+Collapsible threshold settings panel (PSI, KS p-value, Wasserstein, KL Divergence) with numeric inputs and reset-to-defaults. Thresholds are passed to the backend `DriftCalculator`.
 
-- Store latest drift status per job in DB (or in-memory cache).
-- Badge component on sidebar nav: red dot if any high-drift columns, green if all stable.
-- Clears once the user views the drift page.
+### ~~10. Alert Badges on Sidebar~~ ✅
+Red dot badge on the "Data Drift" nav item when the most recent drift check found significant drift. Lightweight `GET /monitoring/drift/status` endpoint.
 
 ---
 
 ## Nice-to-Have
 
-### 8. Categorical Drift Detection
+### 11. Categorical Drift Detection
 Expand drift metrics to handle categorical features (chi-square test, Jensen-Shannon divergence, category frequency comparison).
 
-### 9. Drift Explanation / Root Cause Hints
-Use SHAP or simple heuristics to suggest *why* a column drifted (e.g., "mean shifted from 45.2 → 52.8, likely a seasonal effect").
+### 12. Drift Explanation / Root Cause Hints
+Use SHAP or simple heuristics to suggest *why* a column drifted. Planned approach: lightweight stats comparison (mean, std, min, max, skewness) for reference vs current in the expanded row detail — no SHAP dependency.
 
-### 10. Inline Data Preview
+### 13. Inline Data Preview
 Show a mini data preview (first 5 rows) of both reference and current data side-by-side when a column is expanded.
+
+### ~~14. Per-Column Historical Sparklines~~ ✅
+Tiny inline SVG sparklines in each table row showing that column's PSI trend over past drift checks. Color-coded (green/amber/red) based on latest value.
+
+### ~~15. Threshold Customization Sliders~~ ✅
+Client-side threshold re-evaluation via `useMemo` — changing thresholds instantly re-classifies drift status (drifted/stable) without re-uploading data. Summary cards, filter counts, and export all reflect the updated thresholds.

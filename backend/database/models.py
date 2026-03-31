@@ -358,6 +358,23 @@ class EDAReport(Base, TimestampMixin):
         }
 
 
+class DriftCheckResult(Base):
+    """Stores the result of each drift analysis run for history tracking."""
+
+    __tablename__ = "drift_check_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(String(64), nullable=False, index=True)
+    dataset_name = Column(String(255), nullable=True)
+    reference_rows = Column(Integer, nullable=True)
+    current_rows = Column(Integer, nullable=True)
+    drifted_columns_count = Column(Integer, nullable=True)
+    total_columns = Column(Integer, nullable=True)
+    summary = Column(JSON, nullable=True)
+    column_drifts = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+
 # Unused tables removed: DataIngestionJob, SystemLog
 # These tables were not used anywhere in the application and caused schema differences
 
