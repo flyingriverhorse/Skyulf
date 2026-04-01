@@ -195,6 +195,7 @@ class PipelineEngine:
         start_time = datetime.now()
         self.executed_transformers = []  # Reset for new run
         self._node_configs = {n.node_id: n for n in config.nodes}
+        self._topo_order = {n.node_id: i for i, n in enumerate(config.nodes)}
 
         pipeline_result = PipelineExecutionResult(
             pipeline_id=config.pipeline_id,
@@ -292,13 +293,115 @@ class PipelineEngine:
             raise ValueError(f"Node {node.node_id} requires input at index {index}")
 
         input_node_id = node.inputs[index]
-        # In a real graph, we'd look up the artifact ID produced by that node.
-        # For now, we assume the artifact ID is the node ID (simple convention)
-        # OR we look at self._results if we want to be dynamic.
-
-        # Let's use the artifact store directly.
-        # We assume the previous node saved an artifact with its node_id.
         return self.artifact_store.load(input_node_id)
+
+    def _resolve_all_inputs(self, node: NodeConfig) -> List[Any]:
+        """Load artifacts from ALL upstream nodes, ordered by topology."""
+        if not node.inputs:
+            raise ValueError(f"Node {node.node_id} has no inputs")
+        sorted_ids = sorted(
+            node.inputs,
+            key=lambda nid: self._topo_order.get(nid, 0),
+        )
+        return [self.artifact_store.load(nid) for nid in sorted_ids]
+
+    def _to_dataframe(self, artifact: Any, target_col: str = "") -> pd.DataFrame:
+        """Normalize an artifact to a DataFrame for merging."""
+        if isinstance(artifact, pd.DataFrame):
+            return artifact
+        if isinstance(artifact, SplitDataset):
+            train = artifact.train
+            if isinstance(train, pd.DataFrame):
+                return train
+            if isinstance(train, tuple) and len(train) >= 1:
+                X = train[0]
+                if isinstance(X, pd.DataFrame):
+                    df = X.copy()
+                    if len(train) == 2 and target_col:
+                        df[target_col] = train[1]
+                    return df
+        if isinstance(artifact, tuple) and len(artifact) >= 1:
+            first = artifact[0]
+            if isinstance(first, pd.DataFrame):
+                df = first.copy()
+                if len(artifact) == 2 and target_col:
+                    df[target_col] = artifact[1]
+                return df
+        raise TypeError(
+            f"Cannot convert artifact of type {type(artifact).__name__} to DataFrame. "
+            "Only DataFrame, SplitDataset, and (X, y) tuples are supported."
+        )
+
+    def _merge_inputs(self, node: NodeConfig, target_col: str = "") -> Any:
+        """Resolve and merge all upstream inputs for a multi-input node."""
+        artifacts = self._resolve_all_inputs(node)
+        if len(artifacts) == 1:
+            return artifacts[0]
+
+        self.log(f"Node {node.node_id} has {len(artifacts)} inputs — merging")
+
+        # Check if any input is a model (common wiring mistake)
+        for art in artifacts:
+            if hasattr(art, "predict") or hasattr(art, "fit"):
+                raise ValueError(
+                    f"Node {node.node_id} received a Model object among its inputs. "
+                    "Check your pipeline connections."
+                )
+
+        # Normalize to DataFrames
+        dataframes = [self._to_dataframe(a, target_col) for a in artifacts]
+
+        row_counts = [len(df) for df in dataframes]
+        col_sets = [set(df.columns) for df in dataframes]
+
+        same_rows = all(rc == row_counts[0] for rc in row_counts)
+
+        if same_rows:
+            # Column-wise merge (parallel preprocessing branches)
+            # Drop duplicate columns from later frames to avoid ambiguity
+            seen_cols: set[str] = set(dataframes[0].columns)
+            deduped: List[pd.DataFrame] = [dataframes[0]]
+            for df in dataframes[1:]:
+                new_cols = [c for c in df.columns if c not in seen_cols]
+                if not new_cols:
+                    self.log(
+                        f"Skipping duplicate input — all columns already present"
+                    )
+                    continue
+                deduped.append(df[new_cols])
+                seen_cols.update(new_cols)
+
+            merged = pd.concat(deduped, axis=1)
+            self.log(
+                f"Column-wise merge: {' + '.join(str(s) for s in [df.shape for df in deduped])} "
+                f"→ {merged.shape}"
+            )
+        else:
+            # Row-wise merge (data augmentation / sub-sampling branches)
+            # All frames must share the same columns
+            common_cols = col_sets[0]
+            for cs in col_sets[1:]:
+                common_cols = common_cols & cs
+            if not common_cols:
+                raise ValueError(
+                    f"Cannot row-merge inputs: no common columns. "
+                    f"Column sets: {[sorted(cs) for cs in col_sets]}"
+                )
+            if common_cols != col_sets[0]:
+                diff = col_sets[0] - common_cols
+                self.log(f"Row-merge: dropping non-shared columns {sorted(diff)}")
+            merged = pd.concat(
+                [df[sorted(common_cols)] for df in dataframes],
+                axis=0,
+                ignore_index=True,
+            )
+            self.log(
+                f"Row-wise merge: {' + '.join(str(rc) for rc in row_counts)} rows → {len(merged)} rows"
+            )
+
+        # If the original single input was a SplitDataset, re-wrap isn't needed here —
+        # the training method handles DataFrame → SplitDataset conversion already.
+        return merged
 
     def _resolve_feature_engineer_artifact_key(self, node: NodeConfig) -> str | None:
         if not node.inputs:
@@ -576,10 +679,14 @@ class PipelineEngine:
         self, node: NodeConfig, job_id: str = "unknown"
     ) -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset (from Feature Engineering) or DataFrame
-        # Wait, FeatureEngineer returns SplitDataset if split=True, or DataFrame if not.
-        # Modeling expects SplitDataset usually.
+        # Supports multiple inputs — merges them before training.
 
-        data = self._resolve_input(node)
+        target_col = node.params["target_column"]
+
+        if len(node.inputs) > 1:
+            data = self._merge_inputs(node, target_col)
+        else:
+            data = self._resolve_input(node)
 
         # Safety check: Ensure data is not a model artifact
         if hasattr(data, "predict") or hasattr(data, "fit"):
@@ -760,9 +867,14 @@ class PipelineEngine:
     def _run_advanced_tuning(  # noqa: C901
         self, node: NodeConfig, job_id: str = "unknown"
     ) -> tuple[str, Dict[str, Any]]:
-        # Input: SplitDataset
-        data = self._resolve_input(node)
+        # Input: SplitDataset — supports multiple inputs via merge.
         target_col = node.params["target_column"]
+
+        if len(node.inputs) > 1:
+            data = self._merge_inputs(node, target_col)
+        else:
+            data = self._resolve_input(node)
+
         algorithm = node.params.get("algorithm") or node.params.get("model_type")
         if not algorithm:
             raise ValueError("Missing 'algorithm' or 'model_type' in node parameters")
