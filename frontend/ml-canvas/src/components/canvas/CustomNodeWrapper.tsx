@@ -12,8 +12,8 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
   
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult: NodeExecutionResult | undefined = executionResult?.node_results?.[id];
-  const incomingEdgeCount = useGraphStore(
-    (state) => state.edges.filter((e) => e.target === id).length
+  const incomingSourceCount = useGraphStore(
+    (state) => new Set(state.edges.filter((e) => e.target === id).map((e) => e.source)).size
   );
 
   const onDelete = (evt: React.MouseEvent) => {
@@ -49,10 +49,10 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <div className="text-sm font-bold">{definition.label}</div>
-            {incomingEdgeCount > 1 && (
+            {incomingSourceCount > 1 && (
               <span className="flex items-center gap-0.5 text-[10px] bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded-full font-medium">
                 <Merge size={10} />
-                {incomingEdgeCount}
+                {incomingSourceCount}
               </span>
             )}
             {nodeResult && (
