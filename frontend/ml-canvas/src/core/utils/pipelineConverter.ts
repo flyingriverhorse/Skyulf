@@ -257,9 +257,65 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       outgoingEdges.forEach(e => queue.push(e.target));
     }
 
+    // Prune dead-end branches: reverse-walk from terminal/seed nodes,
+    // keep only ancestors. When no explicit terminals exist, infer from
+    // graph depth — deepest leaf nodes become implicit seeds.
+    const terminalTypes = new Set([
+      BackendStepType.BASIC_TRAINING,
+      BackendStepType.ADVANCED_TUNING,
+      'data_preview',
+    ]);
+    let seeds = sortedNodes.filter(n => terminalTypes.has(n.step_type));
+
+    // No explicit terminals → infer seeds from graph depth
+    if (seeds.length === 0 && sortedNodes.length > 1) {
+      // Compute depth of each node from dataset
+      const nodeDepth = new Map<string, number>();
+      for (const node of sortedNodes) {
+        const parentDepths = node.inputs
+          .map(id => nodeDepth.get(id))
+          .filter((d): d is number => d !== undefined);
+        nodeDepth.set(
+          node.node_id,
+          parentDepths.length > 0 ? Math.max(...parentDepths) + 1 : 0
+        );
+      }
+
+      // Leaf nodes = not consumed as input by any other node
+      const consumed = new Set<string>();
+      for (const node of sortedNodes) {
+        for (const id of node.inputs) consumed.add(id);
+      }
+      const leaves = sortedNodes.filter(n => !consumed.has(n.node_id));
+
+      // Among multiple leaves, keep only the deepest as seeds
+      if (leaves.length > 1) {
+        const maxDepth = Math.max(...leaves.map(n => nodeDepth.get(n.node_id) ?? 0));
+        seeds = leaves.filter(n => (nodeDepth.get(n.node_id) ?? 0) === maxDepth);
+      }
+    }
+
+    let prunedNodes = sortedNodes;
+    if (seeds.length > 0) {
+      const reachable = new Set<string>();
+      const reverseQueue: string[] = seeds.map(n => n.node_id);
+      while (reverseQueue.length > 0) {
+        const nid = reverseQueue.shift()!;
+        if (reachable.has(nid)) continue;
+        reachable.add(nid);
+        const cfg = sortedNodes.find(n => n.node_id === nid);
+        if (cfg?.inputs) {
+          for (const inputId of cfg.inputs) {
+            reverseQueue.push(inputId);
+          }
+        }
+      }
+      prunedNodes = sortedNodes.filter(n => reachable.has(n.node_id));
+    }
+
     return {
       pipeline_id: `preview_${uuidv4()}`,
-      nodes: sortedNodes,
+      nodes: prunedNodes,
       metadata: { dataset_source_id: datasetId }
     };
 };
