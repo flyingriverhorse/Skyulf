@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
 import { registry } from '../../core/registry/NodeRegistry';
-import { AlertCircle, X, CheckCircle2, XCircle } from 'lucide-react';
+import { AlertCircle, X, CheckCircle2, XCircle, Merge } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import type { NodeExecutionResult } from '../../core/api/client';
 
@@ -12,6 +12,9 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
   
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult: NodeExecutionResult | undefined = executionResult?.node_results?.[id];
+  const incomingEdgeCount = useGraphStore(
+    (state) => state.edges.filter((e) => e.target === id).length
+  );
 
   const onDelete = (evt: React.MouseEvent) => {
     evt.stopPropagation();
@@ -46,6 +49,12 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <div className="text-sm font-bold">{definition.label}</div>
+            {incomingEdgeCount > 1 && (
+              <span className="flex items-center gap-0.5 text-[10px] bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded-full font-medium">
+                <Merge size={10} />
+                {incomingEdgeCount}
+              </span>
+            )}
             {nodeResult && (
               <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border ${
                 nodeResult.status === 'success' 

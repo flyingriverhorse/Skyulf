@@ -57,16 +57,26 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
 
   onConnect: (connection: Connection) => {
-    // Validation: Check for X/Y Split usage without prior Train/Test Split
     const nodes = get().nodes;
     const edges = get().edges;
     const sourceNode = nodes.find((n) => n.id === connection.source);
     const targetNode = nodes.find((n) => n.id === connection.target);
 
     if (sourceNode && targetNode) {
-      const sourceType = sourceNode.data.definitionType;
-      
-      // If connecting FROM an X/Y Split
+      const sourceType = sourceNode.data.definitionType as string;
+      const targetType = targetNode.data.definitionType as string;
+
+      // Block: connecting a training/tuning output into another training/tuning node
+      const modelTypes = ['basic_training', 'advanced_tuning'];
+      if (modelTypes.includes(sourceType) && modelTypes.includes(targetType)) {
+        alert(
+          'Invalid connection: You cannot connect a model output to another training node.\n\n' +
+          'Training nodes expect data (DataFrame), not a trained model.'
+        );
+        return;
+      }
+
+      // Warn: X/Y Split without prior Train-Test Split
       if (sourceType === 'feature_target_split') {
         // Check if there is a Train/Test Split upstream OR if we are connecting TO one
         let hasTrainTestSplit = targetNode.data.definitionType === 'TrainTestSplitter';
