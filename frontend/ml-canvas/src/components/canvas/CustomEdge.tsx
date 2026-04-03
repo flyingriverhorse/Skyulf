@@ -18,6 +18,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   targetPosition,
   style = {},
   markerEnd,
+  data,
 }) => {
   const { deleteElements } = useReactFlow();
   const [edgePath, labelX, labelY] = getSmoothStepPath({
@@ -29,6 +30,20 @@ export const CustomEdge: React.FC<EdgeProps> = ({
     targetPosition,
     borderRadius: 24,
   });
+
+  const branchColor = (data as Record<string, unknown>)?.branchColor as string | undefined;
+  const branchLabel = (data as Record<string, unknown>)?.branchLabel as string | undefined;
+  const branchShared = (data as Record<string, unknown>)?.branchShared as boolean | undefined;
+  const edgeStyle = branchColor
+    ? {
+        ...style,
+        stroke: branchColor,
+        strokeDasharray: branchShared ? '6 4' : undefined,  // dashed = feeds multiple experiments
+        filter: undefined,
+        strokeWidth: 2,
+        opacity: branchShared ? 0.7 : 1,
+      }
+    : { ...style, strokeWidth: 2 };
 
   const onEdgeClick = (evt: React.MouseEvent) => {
     evt.stopPropagation();
@@ -46,10 +61,32 @@ export const CustomEdge: React.FC<EdgeProps> = ({
       <BaseEdge 
         path={edgePath} 
         markerEnd={markerEnd} 
-        style={{ ...style, strokeWidth: 2 }} 
+        style={edgeStyle} 
         className="react-flow__edge-path"
       />
       <EdgeLabelRenderer>
+        {branchLabel && branchColor && (
+          <div
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -100%) translate(${labelX}px,${labelY - 16}px)`,
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: '0.02em',
+              color: branchColor,
+              backgroundColor: 'hsl(var(--background) / 0.9)',
+              border: `1px solid ${branchColor}50`,
+              borderRadius: 6,
+              padding: '2px 8px',
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+              lineHeight: '16px',
+              boxShadow: `0 0 6px ${branchColor}30`,
+            }}
+          >
+            {branchLabel}
+          </div>
+        )}
         <div
           style={{
             position: 'absolute',

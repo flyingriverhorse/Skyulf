@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Play, Save, Loader2, FolderOpen, History } from 'lucide-react';
+import { Play, Save, Loader2, FolderOpen, History, Rocket } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { runPipelinePreview, savePipeline, fetchPipeline } from '../../core/api/client';
 import { convertGraphToPipelineConfig } from '../../core/utils/pipelineConverter';
+import { jobsApi } from '../../core/api/jobs';
+
+const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
 
 export const Toolbar: React.FC = () => {
   const nodes = useGraphStore((state) => state.nodes);
@@ -17,6 +20,29 @@ export const Toolbar: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRunningAll, setIsRunningAll] = useState(false);
+
+  const hasMultipleBranches = useMemo(() => {
+    const trainingNodes = nodes.filter(
+      n => TRAINING_TYPES.has(n.data.definitionType as string) && edges.some(e => e.target === n.id)
+    );
+    if (trainingNodes.length < 2) return false;
+
+    // Check that at least two training nodes are on separate branches
+    // by comparing their immediate parent sets
+    const parentSets = trainingNodes.map(tn =>
+      new Set(edges.filter(e => e.target === tn.id).map(e => e.source))
+    );
+    // If any two training nodes have completely different parents, they're separate
+    for (let i = 0; i < parentSets.length; i++) {
+      for (let j = i + 1; j < parentSets.length; j++) {
+        const overlap = [...parentSets[i]].some(p => parentSets[j].has(p));
+        if (!overlap) return true;
+      }
+    }
+    // Even with shared parents, 2+ connected training nodes = separate branches
+    return trainingNodes.length >= 2;
+  }, [nodes, edges]);
 
   const getPipelinePayload = () => ({
     nodes: nodes.map(n => ({
@@ -98,6 +124,33 @@ export const Toolbar: React.FC = () => {
     }
   };
 
+  const handleRunAll = async () => {
+    const datasetNode = nodes.find(n => n.data.definitionType === 'dataset_node');
+    const datasetId = datasetNode?.data.datasetId as string;
+
+    if (!datasetId) {
+      alert('No dataset node found!');
+      return;
+    }
+
+    setIsRunningAll(true);
+    try {
+      const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
+      const response = await jobsApi.runPipeline({
+        ...pipelineConfig,
+        job_type: 'basic_training',
+      });
+      const count = response.job_ids?.length || 1;
+      alert(`${count} experiment${count > 1 ? 's' : ''} queued!`);
+      toggleDrawer();
+    } catch (error) {
+      console.error('Run All failed:', error);
+      alert('Failed to run experiments. Check console for details.');
+    } finally {
+      setIsRunningAll(false);
+    }
+  };
+
   const handleRun = async () => {
     // Find dataset node
     const datasetNode = nodes.find(n => n.data.definitionType === 'dataset_node');
@@ -150,6 +203,16 @@ export const Toolbar: React.FC = () => {
         {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         <span className="text-sm font-medium">{isSaving ? 'Saving...' : 'Save'}</span>
       </button>
+      {hasMultipleBranches && (
+        <button
+          onClick={() => { void handleRunAll(); }}
+          disabled={isRunningAll || isRunning}
+          className="flex items-center gap-2 px-4 py-2 text-white bg-amber-600 rounded-md shadow-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
+        >
+          {isRunningAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
+          <span className="text-sm font-medium">{isRunningAll ? 'Queuing...' : 'Run All Experiments'}</span>
+        </button>
+      )}
       <button 
         onClick={() => { void handleRun(); }}
         disabled={isRunning}

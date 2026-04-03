@@ -9,6 +9,37 @@ const formatMetricValue = (key: string, value: number): string => {
   return value.toFixed(4);
 };
 
+/** Renders feature_importances from result.metrics or result directly as a sorted bar table. */
+const FeatureImportancesSection: React.FC<{ result: Record<string, unknown> }> = ({ result }) => {
+  const metrics = result.metrics as Record<string, unknown> | undefined;
+  const raw = (metrics?.feature_importances ?? result.feature_importances) as Record<string, number> | undefined;
+  if (!raw || typeof raw !== 'object') return null;
+
+  const sorted = Object.entries(raw).sort(([, a], [, b]) => b - a).slice(0, 5);
+  if (sorted.length === 0) return null;
+  const maxVal = sorted[0][1] || 1;
+
+  return (
+    <div className="space-y-2">
+      <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Feature Importances</h4>
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 max-h-64 overflow-y-auto">
+        {sorted.map(([feature, importance]) => (
+          <div key={feature} className="flex items-center gap-2 py-1">
+            <span className="text-xs text-gray-600 dark:text-gray-300 w-32 truncate shrink-0" title={feature}>{feature}</span>
+            <div className="flex-1 h-4 bg-gray-100 dark:bg-gray-700 rounded overflow-hidden">
+              <div
+                className="h-full bg-blue-500 dark:bg-blue-400 rounded"
+                style={{ width: `${(importance / maxVal) * 100}%` }}
+              />
+            </div>
+            <span className="text-xs font-mono text-gray-500 dark:text-gray-400 w-14 text-right shrink-0">{importance.toFixed(4)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const JobsDrawer: React.FC = () => {
   const { 
     isDrawerOpen, 
@@ -75,7 +106,7 @@ export const JobsDrawer: React.FC = () => {
                     }`}
                     onClick={() => setTab('advanced_tuning')}
                 >
-                    Model Optimization
+                    Advanced Training
                 </button>
                 <button
                     className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -104,7 +135,7 @@ export const JobsDrawer: React.FC = () => {
                 <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50/30 dark:bg-gray-900/30">
                 {filteredJobs.length === 0 ? (
                     <div className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">
-                    No {activeTab === 'advanced_tuning' ? 'optimization' : 'training'} jobs found.
+                    No {activeTab === 'advanced_tuning' ? 'advanced training' : 'training'} jobs found.
                     </div>
                 ) : (
                     <>
@@ -302,15 +333,20 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                 </div>
                                 
                                 {job.job_type === 'basic_training' && !!(job.result as Record<string, unknown>).metrics && (
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                        {Object.entries((job.result as Record<string, unknown>).metrics as Record<string, unknown>).map(([k, v]) => (
-                                            <div key={k} className={`p-3 border rounded-lg ${k.startsWith('cv_') ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
-                                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">{k.replace(/_/g, ' ')}</div>
-                                                <div className={`font-mono font-medium ${k.startsWith('cv_') ? 'text-purple-600 dark:text-purple-400' : 'text-blue-600 dark:text-blue-400'}`}>
-                                                    {typeof v === 'number' ? formatMetricValue(k, v) : String(v)}
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                            {Object.entries((job.result as Record<string, unknown>).metrics as Record<string, unknown>)
+                                                .filter(([, v]) => typeof v === 'number' || typeof v === 'string')
+                                                .map(([k, v]) => (
+                                                <div key={k} className={`p-3 border rounded-lg ${k.startsWith('cv_') ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">{k.replace(/_/g, ' ')}</div>
+                                                    <div className={`font-mono font-medium ${k.startsWith('cv_') ? 'text-purple-600 dark:text-purple-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                                                        {typeof v === 'number' ? formatMetricValue(k, v) : String(v)}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
+                                        <FeatureImportancesSection result={job.result as Record<string, unknown>} />
                                     </div>
                                 )}
 
@@ -391,7 +427,7 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                                 <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Evaluation Metrics</h4>
                                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                                     {Object.entries((job.result as Record<string, unknown>).metrics as Record<string, unknown>)
-                                                        .filter(([k]) => !['best_score', 'best_params', 'trials'].includes(k))
+                                                        .filter(([k, v]) => !['best_score', 'best_params', 'trials'].includes(k) && (typeof v === 'number' || typeof v === 'string'))
                                                         .map(([k, v]) => (
                                                         <div key={k} className={`p-3 border rounded-lg ${k.startsWith('cv_') ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
                                                             <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">{k.replace(/_/g, ' ')}</div>
@@ -403,6 +439,8 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                                 </div>
                                             </div>
                                         )}
+
+                            <FeatureImportancesSection result={job.result as Record<string, unknown>} />
                                         
                                         {/* Best Params */}
                                         {!!(job.result as Record<string, unknown>).best_params && (

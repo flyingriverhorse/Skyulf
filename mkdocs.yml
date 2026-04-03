@@ -47,6 +47,7 @@ nav:
     - Getting Started: guides/getting_started.md
     - Platform Setup: guides/platform_setup.md
     - Platform Walkthrough: guides/platform_walkthrough.md
+    - Multi-Path Pipelines: guides/multi_path_pipelines.md
     - FAQ & Comparison: guides/faq.md
     - Recipes: guides/recipes.md
     - Skyulf vs. YData vs. Sweetviz: guides/profiling_comparison.md

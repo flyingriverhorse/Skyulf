@@ -1,9 +1,11 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
 import { registry } from '../../core/registry/NodeRegistry';
-import { AlertCircle, X, CheckCircle2, XCircle, Merge } from 'lucide-react';
+import { AlertCircle, X, CheckCircle2, XCircle, Merge, GitFork } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import type { NodeExecutionResult } from '../../core/api/client';
+
+const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
 
 export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
   const definitionType = data.definitionType as string;
@@ -16,6 +18,10 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
     (state) => new Set(state.edges.filter((e) => e.target === id).map((e) => e.source)).size,
     (a, b) => a === b
   );
+
+  // Parallel badge only on training/tuning nodes when user explicitly chose it
+  const isTrainingNode = TRAINING_TYPES.has(definitionType);
+  const isParallel = isTrainingNode && data.execution_mode === 'parallel';
 
   const onDelete = (evt: React.MouseEvent) => {
     evt.stopPropagation();
@@ -52,10 +58,18 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
             <div className="text-sm font-bold">{definition.label}</div>
             {incomingSourceCount > 1 && (
               <span
-                className="flex items-center gap-0.5 text-[10px] bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded-full font-medium"
-                title={`Merge: combining data from ${incomingSourceCount} upstream sources`}
+                className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                  isParallel
+                    ? 'bg-amber-500/15 text-amber-500'
+                    : 'bg-blue-500/15 text-blue-400'
+                }`}
+                title={
+                  isParallel
+                    ? `Parallel: ${incomingSourceCount} branches will run as separate experiments`
+                    : `Merge: combining data from ${incomingSourceCount} upstream sources`
+                }
               >
-                <Merge size={10} />
+                {isParallel ? <GitFork size={10} /> : <Merge size={10} />}
                 {incomingSourceCount}
               </span>
             )}

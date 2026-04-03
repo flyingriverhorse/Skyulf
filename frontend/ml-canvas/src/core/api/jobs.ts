@@ -39,6 +39,7 @@ export interface RunPipelineResponse {
   message: string;
   pipeline_id: string;
   job_id: string;
+  job_ids: string[];  // All job IDs when parallel branches are detected
 }
 
 export const jobsApi = {

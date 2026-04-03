@@ -278,6 +278,7 @@ class RunPipelineResponse(BaseModel):
     message: str
     pipeline_id: str
     job_id: str
+    job_ids: List[str] = []  # All jobs when parallel branches are detected
 
 
 @router.post("/run", response_model=RunPipelineResponse)
@@ -288,69 +289,130 @@ async def run_pipeline(  # noqa: C901
 ):
     """
     Submit a pipeline for asynchronous execution via Celery or BackgroundTasks.
+
+    When the graph contains multiple training nodes or a training node with
+    ``execution_mode == "parallel"``, the pipeline is automatically partitioned
+    into independent sub-pipelines. Each sub-pipeline gets its own job and
+    runs concurrently. The response includes all ``job_ids``.
     """
-    # Extract details for Job creation
+    from backend.ml_pipeline.execution.graph_utils import partition_parallel_pipeline
+
     pipeline_id = config.pipeline_id
-    target_node_id = config.target_node_id
-
-    # Find target node to get model type if possible
-    model_type = "unknown"
-    dataset_id = "unknown"
-
-    # Simple heuristic: find the last node if target not specified
-    if not target_node_id and config.nodes:
-        target_node_id = config.nodes[-1].node_id
-
-    # Try to find model type from target node params
-    for node in config.nodes:
-        if node.node_id == target_node_id:
-            if node.step_type == "trainer" or node.step_type == StepType.BASIC_TRAINING:
-                model_type = node.params.get("model_type", "unknown")
-            elif node.step_type == StepType.ADVANCED_TUNING:
-                # For tuning nodes, model_type might be in params directly or inside tuning_config?
-                # Usually it's 'algorithm' or 'model_type' in params
-                model_type = node.params.get("algorithm") or node.params.get(
-                    "model_type", "unknown"
-                )
-            elif node.step_type == "data_preview":
-                model_type = "preview"
-
-        # Try to find dataset_id from data_loader node
-        if node.step_type == StepType.DATA_LOADER:
-            dataset_id = node.params.get("dataset_id", "unknown")
 
     # --- Path Resolution Logic ---
     ingestion_service = DataIngestionService(db)
     resolved_s3_options = await resolve_pipeline_nodes(config.nodes, ingestion_service)
     # -----------------------------
 
-    # Create Job in DB
-    job_id = await JobManager.create_job(
-        session=db,
+    # Convert API models to internal dataclasses for partitioning
+    internal_nodes = [
+        NodeConfig(
+            node_id=n.node_id,
+            step_type=n.step_type,
+            params=n.params,
+            inputs=n.inputs,
+        )
+        for n in config.nodes
+    ]
+    internal_config = PipelineConfig(
         pipeline_id=pipeline_id,
-        node_id=target_node_id or "unknown",
-        job_type=cast(Literal["basic_training", "advanced_tuning", "preview"], config.job_type),
-        dataset_id=dataset_id,
-        model_type=model_type,
-        graph=config.model_dump(),
+        nodes=internal_nodes,
+        metadata=config.metadata,
     )
 
-    # Trigger Task
-    settings = get_settings()
-    
-    # Pass resolved options to the task so it can init S3Catalog if needed
-    job_payload = config.model_dump()
-    if resolved_s3_options:
-        job_payload["storage_options"] = resolved_s3_options
+    sub_pipelines = partition_parallel_pipeline(internal_config)
 
-    if settings.USE_CELERY:
-        run_pipeline_task.delay(job_id, job_payload)
-    else:
-        # Run in background thread if Celery is disabled
-        background_tasks.add_task(run_pipeline_task, job_id, job_payload)
+    # When a specific target node was requested and the partitioner split
+    # by multiple terminals, only run the branch containing that node.
+    # This ensures clicking Train on node A doesn't also execute node B.
+    if config.target_node_id and len(sub_pipelines) > 1:
+        filtered = [
+            sub for sub in sub_pipelines
+            if any(n.node_id == config.target_node_id for n in sub.nodes)
+        ]
+        if filtered:
+            sub_pipelines = filtered
+
+    # Detect dataset_id from the first DATA_LOADER node
+    dataset_id = "unknown"
+    for node in config.nodes:
+        if node.step_type == StepType.DATA_LOADER:
+            dataset_id = node.params.get("dataset_id", "unknown")
+            break
+
+    settings = get_settings()
+    all_job_ids: List[str] = []
+
+    for sub in sub_pipelines:
+        # Identify the terminal node for this sub-pipeline
+        target_node_id = config.target_node_id
+        terminal_types = {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING, "data_preview"}
+        for n in reversed(sub.nodes):
+            if n.step_type in terminal_types:
+                target_node_id = n.node_id
+                break
+        if not target_node_id and sub.nodes:
+            target_node_id = sub.nodes[-1].node_id
+
+        # Determine model type and job type from the terminal node
+        model_type = "unknown"
+        job_type = config.job_type or StepType.BASIC_TRAINING
+        for n in sub.nodes:
+            if n.node_id == target_node_id:
+                if n.step_type == StepType.BASIC_TRAINING:
+                    model_type = n.params.get("model_type", n.params.get("algorithm", "unknown"))
+                    job_type = StepType.BASIC_TRAINING
+                elif n.step_type == StepType.ADVANCED_TUNING:
+                    model_type = n.params.get("algorithm", n.params.get("model_type", "unknown"))
+                    job_type = StepType.ADVANCED_TUNING
+                elif n.step_type == "data_preview":
+                    model_type = "preview"
+                    job_type = "preview"
+                break
+
+        # Create Job in DB
+        job_id = await JobManager.create_job(
+            session=db,
+            pipeline_id=sub.pipeline_id,
+            node_id=target_node_id or "unknown",
+            job_type=cast(Literal["basic_training", "advanced_tuning", "preview"], job_type),
+            dataset_id=dataset_id,
+            model_type=model_type,
+            graph=config.model_dump(),
+        )
+        all_job_ids.append(job_id)
+
+        # Build payload for this sub-pipeline
+        sub_payload = {
+            "pipeline_id": sub.pipeline_id,
+            "nodes": [
+                {"node_id": n.node_id, "step_type": n.step_type,
+                 "params": n.params, "inputs": n.inputs}
+                for n in sub.nodes
+            ],
+            "metadata": sub.metadata,
+        }
+        if resolved_s3_options:
+            sub_payload["storage_options"] = resolved_s3_options
+
+        # Trigger task
+        if settings.USE_CELERY:
+            run_pipeline_task.delay(job_id, sub_payload)
+        else:
+            background_tasks.add_task(run_pipeline_task, job_id, sub_payload)
+
+    is_parallel = len(all_job_ids) > 1
+    message = (
+        f"Parallel execution started: {len(all_job_ids)} branches"
+        if is_parallel
+        else "Pipeline execution started"
+    )
 
     return RunPipelineResponse(
-        message="Pipeline execution started", pipeline_id=pipeline_id, job_id=job_id
+        message=message,
+        pipeline_id=pipeline_id,
+        job_id=all_job_ids[0],
+        job_ids=all_job_ids,
     )
 
 

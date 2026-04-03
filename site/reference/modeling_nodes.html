@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -537,6 +537,34 @@
     
   
     Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Path Pipelines
   
 
     
@@ -1599,6 +1627,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Common config shape">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#execution_mode-v040" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        execution_mode (v0.4.0+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2905,10 +2950,32 @@
 <p><code>SkyulfPipeline</code> expects a modeling block like:</p>
 <pre><code class="language-python">{
   &quot;type&quot;: &quot;logistic_regression&quot;,
-  &quot;node_id&quot;: &quot;model_node&quot;,  # optional
-  &quot;params&quot;: { ... }          # optional; estimator hyperparameters
+  &quot;node_id&quot;: &quot;model_node&quot;,       # optional
+  &quot;execution_mode&quot;: &quot;merge&quot;,     # optional; &quot;merge&quot; (default) or &quot;parallel&quot;
+  &quot;params&quot;: { ... }              # optional; estimator hyperparameters
 }
 </code></pre>
+<h3 id="execution_mode-v040">execution_mode <em>(v0.4.0+)</em></h3>
+<p>When a training node has 2+ incoming connections:</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"merge"</code> (default)</td>
+<td>Combine all upstream DataFrames into one before training</td>
+</tr>
+<tr>
+<td><code>"parallel"</code></td>
+<td>Each incoming branch runs as a separate job</td>
+</tr>
+</tbody>
+</table>
+<p>This field is set via the Merge/Parallel toggle on training nodes in the canvas UI.</p>
 <p>The sklearn wrapper supports both:</p>
 <ul>
 <li>Nested params (preferred): <code>{ "params": {"C": 1.0} }</code></li>

@@ -5,7 +5,7 @@ import { StepType } from '../../../core/constants/stepTypes';
 
 export const AdvancedTuningNode = createModelingNode({
   type: StepType.ADVANCED_TUNING,
-  label: 'Advanced Tuning and Training',
+  label: 'Advanced Training',
   description: 'Automatically optimize model performance.',
   icon: Sliders,
   settings: AdvancedTuningSettings,

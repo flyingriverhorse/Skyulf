@@ -110,11 +110,23 @@ Dataset → TrainTestSplitter → Imputer → Encoder → Scaler → Model
 
 > **Tip:** Always place `TrainTestSplitter` early to prevent data leakage. Skyulf's Calculator/Applier pattern ensures preprocessing statistics are learned only from the training split.
 
+### Multi-path pipelines *(v0.3.0+)*
+
+You can build pipelines with **multiple branches**:
+
+- **Merge branches** — Route data through different preprocessing paths (e.g., Scaling + Encoding), then connect both into a single training node. The node displays a **⊕ Merge** badge showing how many inputs are being combined.
+- **Parallel experiments** — Connect the dataset to multiple separate training nodes (e.g., RandomForest and XGBoost). Each runs as an independent experiment.
+- **Copy-paste nodes** — Select nodes and press **Ctrl+C / Ctrl+V** to duplicate them with their internal edges.
+
+> **Note:** Model-to-model connections are blocked. See the [Multi-Path Pipelines guide](multi_path_pipelines.md) for details.
+
 ---
 
 ## Step 4: Execute the pipeline
 
-**From the canvas:** Click the **Run** / **Execute** button.
+**From the canvas:** Click the **Run Preview** button to preview the pipeline, or use **Train** on an individual training node.
+
+### Single training node
 
 The frontend converts your visual graph into a pipeline config and sends it to the backend:
 
@@ -122,11 +134,21 @@ The frontend converts your visual graph into a pipeline config and sends it to t
 POST /api/pipeline/run
 ```
 
-The backend:
+The backend validates the config, queues the job in Celery, and returns a `job_id`.
 
-1. Validates the config.
-2. Queues the job in Celery.
-3. Returns a `job_id`.
+### Multiple training nodes *(v0.4.0+)*
+
+When your canvas has 2+ training nodes on separate branches:
+
+- **Individual Train buttons** — Each node's Train button runs only that branch (using `target_node_id` filtering).
+- **Run All Experiments** — A 🚀 **Run All Experiments** button appears in the toolbar if two separate branches connected to two separate training nodes. Clicking it queues all branches at once, returning `job_ids` for each.
+
+### Merge/Parallel toggle *(v0.4.0+)*
+
+Training nodes with 2+ incoming connections show a **Merge / Parallel** toggle:
+
+- **Merge**: Combines upstream data before training.
+- **Parallel**: Each incoming branch becomes a separate experiment job.
 
 **Monitoring progress:**
 
