@@ -100,7 +100,10 @@ class TestFileSystemCatalogTraversal:
         assert os.path.basename(path) == "secret.csv"
 
     def test_absolute_path_with_traversal_blocked(self, catalog):
-        evil = "/base/../etc/passwd"
+        import os
+        evil = os.path.abspath("/base/") + "/../etc/passwd"
+        # Ensure path separator consistency for the OS
+        evil = evil.replace("/", os.sep)
         with pytest.raises(PermissionError, match="contains traversal segments"):
             catalog._get_path(evil)
 

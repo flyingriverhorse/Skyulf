@@ -13,7 +13,8 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult: NodeExecutionResult | undefined = executionResult?.node_results?.[id];
   const incomingSourceCount = useGraphStore(
-    (state) => new Set(state.edges.filter((e) => e.target === id).map((e) => e.source)).size
+    (state) => new Set(state.edges.filter((e) => e.target === id).map((e) => e.source)).size,
+    (a, b) => a === b
   );
 
   const onDelete = (evt: React.MouseEvent) => {
@@ -50,7 +51,10 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
           <div className="flex items-center gap-2">
             <div className="text-sm font-bold">{definition.label}</div>
             {incomingSourceCount > 1 && (
-              <span className="flex items-center gap-0.5 text-[10px] bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded-full font-medium">
+              <span
+                className="flex items-center gap-0.5 text-[10px] bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded-full font-medium"
+                title={`Merge: combining data from ${incomingSourceCount} upstream sources`}
+              >
                 <Merge size={10} />
                 {incomingSourceCount}
               </span>
