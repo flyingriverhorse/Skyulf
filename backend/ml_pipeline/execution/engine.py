@@ -338,18 +338,29 @@ class PipelineEngine:
         if len(artifacts) == 1:
             return artifacts[0]
 
-        self.log(f"Node {node.node_id} has {len(artifacts)} inputs — merging")
+        self.log(f"Node {node.node_id}: merging {len(artifacts)} inputs")
 
         # Check if any input is a model (common wiring mistake)
-        for art in artifacts:
-            if hasattr(art, "predict") or hasattr(art, "fit"):
+        for input_id, art in zip(node.inputs, artifacts):
+            if hasattr(art, "predict") or (
+                hasattr(art, "fit") and not hasattr(art, "transform")
+            ):
                 raise ValueError(
-                    f"Node {node.node_id} received a Model object among its inputs. "
-                    "Check your pipeline connections."
+                    f"Node {node.node_id}: input from '{input_id}' is a Model object "
+                    f"(type: {type(art).__name__}). Training nodes expect data, not models. "
+                    f"Did you connect a training/tuning output directly?"
                 )
 
         # Normalize to DataFrames
         dataframes = [self._to_dataframe(a, target_col) for a in artifacts]
+
+        # Guard against empty DataFrames
+        for i, df in enumerate(dataframes):
+            if df.empty:
+                raise ValueError(
+                    f"Node {node.node_id}: input #{i} produced an empty DataFrame "
+                    f"(0 rows). Check upstream preprocessing branches."
+                )
 
         row_counts = [len(df) for df in dataframes]
         col_sets = [set(df.columns) for df in dataframes]
