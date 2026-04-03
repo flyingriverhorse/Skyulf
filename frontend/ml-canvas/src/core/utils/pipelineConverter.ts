@@ -215,13 +215,15 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               cv_type: node.data.cv_type,
               cv_shuffle: node.data.cv_shuffle,
               cv_random_state: node.data.cv_random_state,
-              cv_time_column: node.data.cv_time_column
+              cv_time_column: node.data.cv_time_column,
+              execution_mode: node.data.execution_mode
           };
       } else if (node.data.definitionType === 'hyperparameter_tuning' || node.data.definitionType === BackendStepType.ADVANCED_TUNING) {
           stepType = BackendStepType.ADVANCED_TUNING;
           params = {
               target_column: node.data.target_column,
               algorithm: node.data.model_type,
+              execution_mode: node.data.execution_mode,
               tuning_config: {
                   strategy: node.data.search_strategy,                    strategy_params: node.data.strategy_params,
                     metric: node.data.metric,

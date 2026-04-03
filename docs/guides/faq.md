@@ -119,3 +119,18 @@ Skyulf auto-detects whether your data is Polars or Pandas. Simple operations (sc
 ### Is there an API for programmatic access?
 
 Yes. The backend exposes a REST API with endpoints for data upload, pipeline execution, model deployment, and inference. See [Platform Walkthrough](platform_walkthrough.md).
+
+### How do I run multiple experiments in parallel? *(v0.4.0+)*
+
+Connect 2+ training nodes to your dataset (each with its own preprocessing path). A **Run All Experiments** button appears in the toolbar — clicking it queues all branches at once and returns separate `job_ids` for each. You can also click **Train** on an individual node to run just that branch.
+
+### What's the difference between Merge and Parallel?
+
+- **Merge:** Combines data from multiple upstream branches into a single DataFrame before training. Use when you have parallel preprocessing paths feeding one model.
+- **Parallel:** Each incoming branch becomes a separate experiment job. Use when you want independent experiments.
+
+Training nodes with 2+ inputs show a toggle to switch between modes. See the [Multi-Path Pipelines guide](multi_path_pipelines.md).
+
+### How do I copy-paste nodes on the canvas? *(v0.4.0+)*
+
+Select one or more nodes, press **Ctrl+C** (Cmd+C on Mac) to copy, then **Ctrl+V** (Cmd+V on Mac) to paste. Nodes are pasted with a position offset. Internal edges between selected nodes are preserved.

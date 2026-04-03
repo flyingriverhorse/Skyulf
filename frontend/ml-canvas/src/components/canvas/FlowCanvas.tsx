@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { 
   ReactFlow, 
   Background, 
@@ -11,6 +11,8 @@ import '@xyflow/react/dist/style.css';
 
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
+import { useClipboard } from '../../core/hooks/useClipboard';
+import { useBranchColors } from '../../core/hooks/useBranchColors';
 import { CustomNodeWrapper } from './CustomNodeWrapper';
 import { CustomEdge } from './CustomEdge';
 
@@ -48,6 +50,26 @@ const FlowCanvasContent: React.FC = () => {
 
   const { isResultsPanelExpanded } = useViewStore();
 
+  useClipboard();
+
+  const branchColorMap = useBranchColors(nodes, edges);
+  const coloredEdges = useMemo(() => {
+    if (branchColorMap.size === 0) return edges;
+    return edges.map(edge => {
+      const info = branchColorMap.get(edge.id);
+      if (info === undefined) return edge; // not part of any branch
+      return {
+        ...edge,
+        data: {
+          ...edge.data,
+          branchColor: info.color,
+          branchLabel: info.label,
+          branchShared: info.shared,
+        },
+      };
+    });
+  }, [edges, branchColorMap]);
+
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -82,7 +104,7 @@ const FlowCanvasContent: React.FC = () => {
     >
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={coloredEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}

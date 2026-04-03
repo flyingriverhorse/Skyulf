@@ -48,7 +48,7 @@ export const ExperimentsPage: React.FC = () => {
   const [isTuningExpanded, setIsTuningExpanded] = useState(true);
 
   // View state
-  const [activeView, setActiveView] = useState<'charts' | 'table' | 'evaluation'>('charts');
+  const [activeView, setActiveView] = useState<'charts' | 'table' | 'evaluation' | 'importance'>('charts');
   const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
   const [isEvalLoading, setIsEvalLoading] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
@@ -299,6 +299,15 @@ export const ExperimentsPage: React.FC = () => {
 
   // const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00C49F'];
 
+  // Feature Importances across selected jobs
+  const featureImportancesByJob = selectedJobs.map(job => {
+    const result = (job.result ?? {}) as Record<string, unknown>;
+    const metrics = result.metrics as Record<string, unknown> | undefined;
+    const raw = (metrics?.feature_importances ?? result.feature_importances) as Record<string, number> | undefined;
+    return { jobId: job.job_id, modelType: job.model_type ?? 'unknown', importances: raw ?? null };
+  });
+  const hasFeatureImportances = featureImportancesByJob.some(j => j.importances !== null);
+
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
       {/* Header */}
@@ -324,7 +333,7 @@ export const ExperimentsPage: React.FC = () => {
              onChange={(e) => { setFilterType(e.target.value as 'all' | 'basic_training' | 'advanced_tuning'); }}
            >
              <option value="all">All Experiments</option>
-             <option value="advanced_tuning">Model Optimization</option>
+             <option value="advanced_tuning">Advanced Training</option>
              <option value="basic_training">Standard Training</option>
            </select>
         </div>
@@ -465,6 +474,18 @@ export const ExperimentsPage: React.FC = () => {
                   >
                       Model Evaluation
                   </button>
+                  {hasFeatureImportances && (
+                  <button
+                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                          activeView === 'importance'
+                              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                              : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                      }`}
+                      onClick={() => { setActiveView('importance'); }}
+                  >
+                      Feature Importance
+                  </button>
+                  )}
               </div>
 
               {/* Charts View */}
@@ -1116,6 +1137,90 @@ export const ExperimentsPage: React.FC = () => {
                         </div>
                         </div>
                     )}
+                </div>
+              )}
+
+              {/* Feature Importance View */}
+              {activeView === 'importance' && hasFeatureImportances && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">Feature Importance Comparison</h3>
+                  {(() => {
+                    // Collect all unique features across selected jobs
+                    const allFeatures = new Set<string>();
+                    featureImportancesByJob.forEach(j => {
+                      if (j.importances) Object.keys(j.importances).forEach(f => allFeatures.add(f));
+                    });
+
+                    // Build chart data: each feature as a row, each job as a bar
+                    const jobsWithData = featureImportancesByJob.filter(j => j.importances !== null);
+                    if (jobsWithData.length === 0) return null;
+
+                    // Rank features by average importance (descending), take top 15
+                    const featureAvg = Array.from(allFeatures).map(f => {
+                      let sum = 0;
+                      let count = 0;
+                      jobsWithData.forEach(j => {
+                        const val = j.importances?.[f];
+                        if (val !== undefined) { sum += val; count++; }
+                      });
+                      return { feature: f, avg: count > 0 ? sum / count : 0 };
+                    });
+                    featureAvg.sort((a, b) => b.avg - a.avg);
+                    const topFeatures = featureAvg.slice(0, 15).map(f => f.feature);
+
+                    const chartData = topFeatures.map(feature => {
+                      const row: Record<string, string | number> = { feature };
+                      jobsWithData.forEach(j => {
+                        const shortId = j.jobId.slice(0, 8);
+                        const label = j.modelType !== 'unknown' ? `${j.modelType} (${shortId})` : shortId;
+                        row[label] = j.importances?.[feature] ?? 0;
+                      });
+                      return row;
+                    });
+
+                    const barColors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00C49F', '#ff6b6b', '#4ecdc4'];
+                    const barKeys = jobsWithData.map((j, _i) => {
+                      const shortId = j.jobId.slice(0, 8);
+                      return j.modelType !== 'unknown' ? `${j.modelType} (${shortId})` : shortId;
+                    });
+
+                    return (
+                      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 relative group" id="feature-importance-chart">
+                        <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
+                          <button
+                            onClick={() => void handleDownload('feature-importance-chart', 'feature_importance_comparison')}
+                            disabled={downloadingChart === 'feature-importance-chart'}
+                            className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"
+                            title="Download Graph"
+                          >
+                            {downloadingChart === 'feature-importance-chart' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === 'feature-importance-chart' ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                        <div className="h-[500px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, bottom: 5, left: 120 }}>
+                              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                              <XAxis type="number" tick={{ fontSize: 12 }} />
+                              <YAxis type="category" dataKey="feature" tick={{ fontSize: 11 }} width={110} />
+                              <Tooltip
+                                contentStyle={{ backgroundColor: 'rgba(0,0,0,0.85)', border: 'none', borderRadius: '8px', color: '#fff' }}
+                                formatter={(value: number) => value.toFixed(4)}
+                              />
+                              <Legend />
+                              {barKeys.map((key, i) => (
+                                <Bar key={key} dataKey={key} fill={barColors[i % barColors.length]} radius={[0, 4, 4, 0]} />
+                              ))}
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                        {topFeatures.length < allFeatures.size && (
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
+                            Showing top {topFeatures.length} of {allFeatures.size} features
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 

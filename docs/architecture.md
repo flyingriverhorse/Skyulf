@@ -81,3 +81,37 @@ If you split first (or provide a `SplitDataset`), calculators should learn only 
 This prevents leakage of statistics from test/validation.
 
 See the User Guide section "SplitDataset & Leakage" for recommended patterns.
+
+## Multi-Path Execution & Merge
+
+*New in v0.3.0*
+
+Training nodes can receive inputs from **multiple upstream branches**. The engine collects all inputs via `_resolve_all_inputs()` and combines them using `_merge_inputs()`:
+
+- **Column-wise concat** when row counts match (parallel preprocessing paths).
+- **Row-wise concat** when column schemas match (data augmentation).
+
+Inputs are merged in topological order. Duplicate columns are deduplicated. Dead-end branches (nodes not on a path to any terminal) are pruned from execution.
+
+```
+Dataset → Scaling   ──┐
+                      ├──→ Training Node (merge)
+Dataset → Encoding  ──┘
+```
+
+## Parallel Experiment Execution
+
+*New in v0.4.0*
+
+When a canvas has multiple training/tuning nodes, `partition_parallel_pipeline()` splits the graph into independent sub-pipelines:
+
+1. **Multiple terminals** — Each training node gets its own sub-pipeline via BFS ancestry tracing (`_collect_ancestors()`).
+2. **Single terminal, parallel mode** — When `execution_mode=parallel`, each incoming branch becomes a separate job.
+
+The API returns `job_ids: List[str]` — one per branch. Shared prefix nodes (e.g., dataset) are included in each sub-pipeline. When `target_node_id` is set, only the branch containing that node executes.
+
+```
+Dataset → Scaling → RandomForest (Train)   → Job 1
+    │
+    └──→ Encoding → XGBoost (Train)         → Job 2
+```

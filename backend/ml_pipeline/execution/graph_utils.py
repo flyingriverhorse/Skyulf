@@ -1,4 +1,140 @@
+import copy
+import logging
 from typing import Any, Dict, List, Optional, Tuple, cast
+
+from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
+
+logger = logging.getLogger(__name__)
+
+TERMINAL_STEP_TYPES = {"basic_training", "advanced_tuning"}
+
+
+def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
+    """Split a pipeline into independent sub-pipelines for parallel execution.
+
+    Returns a list of PipelineConfig objects.  When the graph contains only a
+    single execution branch the list has exactly one element (the original
+    config, unchanged).
+
+    Two scenarios trigger partitioning:
+
+    1. **Multiple terminal (training/tuning) nodes** on the canvas — each
+       terminal becomes its own sub-pipeline.
+    2. **Single terminal with ``execution_mode == "parallel"``** in its params —
+       each incoming branch is treated as a separate experiment sharing the
+       same model configuration.
+    """
+    node_map: Dict[str, NodeConfig] = {n.node_id: n for n in config.nodes}
+
+    # Identify terminal nodes
+    terminals = [
+        n for n in config.nodes if n.step_type in TERMINAL_STEP_TYPES
+    ]
+
+    if not terminals:
+        return [config]
+
+    # --- Case 2: single terminal with parallel mode ---
+    if len(terminals) == 1:
+        term = terminals[0]
+        if term.params.get("execution_mode") != "parallel" or len(term.inputs) <= 1:
+            return [config]
+
+        # Each input to the terminal is a separate experiment branch
+        sub_configs: List[PipelineConfig] = []
+        for idx, branch_root_id in enumerate(term.inputs):
+            ancestors = _collect_ancestors(branch_root_id, node_map)
+            # Build a copy of the terminal node with only this branch's input
+            term_copy = NodeConfig(
+                node_id=term.node_id,
+                step_type=term.step_type,
+                params={k: v for k, v in term.params.items() if k != "execution_mode"},
+                inputs=[branch_root_id],
+            )
+            branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
+            branch_nodes.append(term_copy)
+            sub_configs.append(
+                PipelineConfig(
+                    pipeline_id=f"{config.pipeline_id}__branch_{idx}",
+                    nodes=branch_nodes,
+                    metadata={**config.metadata, "branch_index": idx,
+                              "parent_pipeline_id": config.pipeline_id},
+                )
+            )
+        return sub_configs
+
+    # --- Case 1: multiple terminal nodes ---
+    sub_configs = []
+    for idx, term in enumerate(terminals):
+        # Check if this terminal also needs per-input splitting (parallel mode)
+        if (
+            term.params.get("execution_mode") == "parallel"
+            and len(term.inputs) > 1
+        ):
+            for sub_idx, branch_root_id in enumerate(term.inputs):
+                ancestors = _collect_ancestors(branch_root_id, node_map)
+                term_copy = NodeConfig(
+                    node_id=term.node_id,
+                    step_type=term.step_type,
+                    params={k: v for k, v in term.params.items()
+                            if k != "execution_mode"},
+                    inputs=[branch_root_id],
+                )
+                branch_nodes = [
+                    node_map[nid] for nid in ancestors if nid in node_map
+                ]
+                branch_nodes.append(term_copy)
+                sub_configs.append(
+                    PipelineConfig(
+                        pipeline_id=(
+                            f"{config.pipeline_id}__branch_{idx}_{sub_idx}"
+                        ),
+                        nodes=branch_nodes,
+                        metadata={
+                            **config.metadata,
+                            "branch_index": idx,
+                            "sub_branch_index": sub_idx,
+                            "parent_pipeline_id": config.pipeline_id,
+                        },
+                    )
+                )
+        else:
+            ancestors = _collect_ancestors(term.node_id, node_map)
+            branch_nodes = [
+                node_map[nid] for nid in ancestors if nid in node_map
+            ]
+            sub_configs.append(
+                PipelineConfig(
+                    pipeline_id=f"{config.pipeline_id}__branch_{idx}",
+                    nodes=branch_nodes,
+                    metadata={
+                        **config.metadata,
+                        "branch_index": idx,
+                        "parent_pipeline_id": config.pipeline_id,
+                    },
+                )
+            )
+    return sub_configs
+
+
+def _collect_ancestors(node_id: str, node_map: Dict[str, NodeConfig]) -> List[str]:
+    """BFS backwards to collect all ancestor node IDs in topological order."""
+    visited: set[str] = set()
+    queue = [node_id]
+    result: List[str] = []
+
+    while queue:
+        nid = queue.pop(0)
+        if nid in visited or nid not in node_map:
+            continue
+        visited.add(nid)
+        result.append(nid)
+        for parent_id in node_map[nid].inputs:
+            queue.append(parent_id)
+
+    # Reverse for topological order (parents first)
+    result.reverse()
+    return result
 
 
 def _get_strategy_from_params(params: Dict[str, Any]) -> Optional[str]:

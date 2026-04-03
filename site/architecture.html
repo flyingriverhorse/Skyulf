@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -560,6 +560,34 @@
   
   
     <li class="md-nav__item">
+      <a href="guides/multi_path_pipelines.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Path Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="guides/faq.html" class="md-nav__link">
         
   
@@ -763,6 +791,28 @@
     <span class="md-ellipsis">
       
         Avoiding Data Leakage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-path-execution-merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Path Execution &amp; Merge
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parallel-experiment-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parallel Experiment Execution
       
     </span>
   </a>
@@ -2740,6 +2790,30 @@
 <p>If you split first (or provide a <code>SplitDataset</code>), calculators should learn only on the train split.
 This prevents leakage of statistics from test/validation.</p>
 <p>See the User Guide section "SplitDataset &amp; Leakage" for recommended patterns.</p>
+<h2 id="multi-path-execution-merge">Multi-Path Execution &amp; Merge</h2>
+<p><em>New in v0.3.0</em></p>
+<p>Training nodes can receive inputs from <strong>multiple upstream branches</strong>. The engine collects all inputs via <code>_resolve_all_inputs()</code> and combines them using <code>_merge_inputs()</code>:</p>
+<ul>
+<li><strong>Column-wise concat</strong> when row counts match (parallel preprocessing paths).</li>
+<li><strong>Row-wise concat</strong> when column schemas match (data augmentation).</li>
+</ul>
+<p>Inputs are merged in topological order. Duplicate columns are deduplicated. Dead-end branches (nodes not on a path to any terminal) are pruned from execution.</p>
+<pre><code>Dataset → Scaling   ──┐
+                      ├──→ Training Node (merge)
+Dataset → Encoding  ──┘
+</code></pre>
+<h2 id="parallel-experiment-execution">Parallel Experiment Execution</h2>
+<p><em>New in v0.4.0</em></p>
+<p>When a canvas has multiple training/tuning nodes, <code>partition_parallel_pipeline()</code> splits the graph into independent sub-pipelines:</p>
+<ol>
+<li><strong>Multiple terminals</strong> — Each training node gets its own sub-pipeline via BFS ancestry tracing (<code>_collect_ancestors()</code>).</li>
+<li><strong>Single terminal, parallel mode</strong> — When <code>execution_mode=parallel</code>, each incoming branch becomes a separate job.</li>
+</ol>
+<p>The API returns <code>job_ids: List[str]</code> — one per branch. Shared prefix nodes (e.g., dataset) are included in each sub-pipeline. When <code>target_node_id</code> is set, only the branch containing that node executes.</p>
+<pre><code>Dataset → Scaling → RandomForest (Train)   → Job 1
+    │
+    └──→ Encoding → XGBoost (Train)         → Job 2
+</code></pre>
 
 
 

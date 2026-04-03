@@ -10,18 +10,26 @@ Each major/minor series has its own file in the [`changelog/`](changelog/) folde
 
 | Series | File | Status | Description |
 |--------|------|--------|-------------|
-| **0.1.x** | [changelog/0.1.x.md](changelog/0.1.x.md) | Stable | Foundation through Theme-Aware Charts (v0.1.0 — v0.1.19) |
-| **0.3.x** | [changelog/0.3.x.md](changelog/0.3.x.md) | Active | Multi-Path Canvas Execution (v0.3.0+) |
+| **0.4.x** | [changelog/0.4.x.md](changelog/0.4.x.md) | Active | Parallel Experiment Execution (v0.4.0+) |
+| **0.3.x** | [changelog/0.3.x.md](changelog/0.3.x.md) | Stable | Multi-Path Canvas Execution (v0.3.0 — v0.3.1) |
 | **0.2.x** | [changelog/0.2.x.md](changelog/0.2.x.md) | Stable | Data Drift Redesign & Monitoring (v0.2.0) |
+| **0.1.x** | [changelog/0.1.x.md](changelog/0.1.x.md) | Stable | Foundation through Theme-Aware Charts (v0.1.0 — v0.1.19) |
 
 ---
 
 ## Version Summary
 
+### 0.4.x — Parallel Experiments
+
+| Version | Codename | Highlights |
+|---------|----------|------------|
+| v0.4.0 | Parallel Experiment Execution | Pipeline partitioning, multi-job API, Merge/Parallel toggle, Run All Experiments, copy-paste nodes, 11 new tests |
+
 ### 0.3.x — Multi-Path Canvas
 
 | Version | Codename | Highlights |
 |---------|----------|------------|
+| v0.3.1 | Multi-Path Hardening | Empty DataFrame guard, merge badge tooltip, render performance, unique source count |
 | v0.3.0 | Multi-Path Canvas Execution | Multi-input merge for training nodes, merge indicator badges, connection validation |
 
 ### 0.2.x — Data Drift & Monitoring

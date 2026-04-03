@@ -9,10 +9,22 @@ This page documents modeling configuration for `SkyulfPipeline`.
 ```python
 {
   "type": "logistic_regression",
-  "node_id": "model_node",  # optional
-  "params": { ... }          # optional; estimator hyperparameters
+  "node_id": "model_node",       # optional
+  "execution_mode": "merge",     # optional; "merge" (default) or "parallel"
+  "params": { ... }              # optional; estimator hyperparameters
 }
 ```
+
+### execution_mode *(v0.4.0+)*
+
+When a training node has 2+ incoming connections:
+
+| Value | Behavior |
+|---|---|
+| `"merge"` (default) | Combine all upstream DataFrames into one before training |
+| `"parallel"` | Each incoming branch runs as a separate job |
+
+This field is set via the Merge/Parallel toggle on training nodes in the canvas UI.
 
 The sklearn wrapper supports both:
 

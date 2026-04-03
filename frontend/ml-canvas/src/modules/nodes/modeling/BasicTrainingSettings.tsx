@@ -24,6 +24,7 @@ export interface ModelTrainingConfig {
   cv_shuffle: boolean;
   cv_random_state: number;
   cv_time_column?: string;
+  execution_mode?: 'merge' | 'parallel';
 }
 
 interface HyperparameterDef {
@@ -409,12 +410,17 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
     if (!nodeId) return;
     try {
         const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
-        await jobsApi.runPipeline({
+        const response = await jobsApi.runPipeline({
             ...pipelineConfig,
             target_node_id: nodeId,
             job_type: StepType.BASIC_TRAINING
         });
-        alert("Training job submitted successfully!");
+        const jobCount = response.job_ids?.length || 1;
+        if (jobCount > 1) {
+            alert(`Parallel execution started! ${jobCount} branches submitted.`);
+        } else {
+            alert("Training job submitted successfully!");
+        }
         setTab('basic_training');
         toggleJobDrawer(true);
     } catch (error) {
@@ -817,6 +823,37 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
 
       {/* Footer */}
       <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
+        {/* Parallel Execution Toggle — only visible when multiple inputs feed this node */}
+        {nodeId && new Set(edges.filter(e => e.target === nodeId).map(e => e.source)).size > 1 && (
+          <div className="w-full max-w-xs flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Multi-Input Mode</span>
+              <Tooltip text="Merge combines all inputs into one dataset. Parallel runs each input as a separate experiment." />
+            </div>
+            <div className="flex rounded-md overflow-hidden border border-slate-300 dark:border-slate-600 text-[11px] font-medium">
+              <button
+                onClick={() => onChange({ ...config, execution_mode: 'merge' })}
+                className={`px-2.5 py-1 transition-colors ${
+                  (config.execution_mode || 'merge') === 'merge'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600'
+                }`}
+              >
+                Merge
+              </button>
+              <button
+                onClick={() => onChange({ ...config, execution_mode: 'parallel' })}
+                className={`px-2.5 py-1 transition-colors ${
+                  config.execution_mode === 'parallel'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600'
+                }`}
+              >
+                Parallel
+              </button>
+            </div>
+          </div>
+        )}
         <button
           onClick={() => { void handleTrain(); }}
           className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 text-white rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"

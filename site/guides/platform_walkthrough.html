@@ -14,14 +14,14 @@
         <link rel="prev" href="platform_setup.html">
       
       
-        <link rel="next" href="faq.html">
+        <link rel="next" href="multi_path_pipelines.html">
       
       
         
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -669,6 +669,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#multi-path-pipelines-v030" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-path pipelines (v0.3.0+)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -682,6 +693,45 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Step 4: Execute the pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-training-node" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single training node
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multiple-training-nodes-v040" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple training nodes (v0.4.0+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mergeparallel-toggle-v040" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge/Parallel toggle (v0.4.0+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -755,6 +805,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="multi_path_pipelines.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Path Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2893,18 +2971,36 @@ skyulf-core (ML engine)
 <blockquote>
 <p><strong>Tip:</strong> Always place <code>TrainTestSplitter</code> early to prevent data leakage. Skyulf's Calculator/Applier pattern ensures preprocessing statistics are learned only from the training split.</p>
 </blockquote>
+<h3 id="multi-path-pipelines-v030">Multi-path pipelines <em>(v0.3.0+)</em></h3>
+<p>You can build pipelines with <strong>multiple branches</strong>:</p>
+<ul>
+<li><strong>Merge branches</strong> — Route data through different preprocessing paths (e.g., Scaling + Encoding), then connect both into a single training node. The node displays a <strong>⊕ Merge</strong> badge showing how many inputs are being combined.</li>
+<li><strong>Parallel experiments</strong> — Connect the dataset to multiple separate training nodes (e.g., RandomForest and XGBoost). Each runs as an independent experiment.</li>
+<li><strong>Copy-paste nodes</strong> — Select nodes and press <strong>Ctrl+C / Ctrl+V</strong> to duplicate them with their internal edges.</li>
+</ul>
+<blockquote>
+<p><strong>Note:</strong> Model-to-model connections are blocked. See the <a href="multi_path_pipelines.html">Multi-Path Pipelines guide</a> for details.</p>
+</blockquote>
 <hr />
 <h2 id="step-4-execute-the-pipeline">Step 4: Execute the pipeline</h2>
-<p><strong>From the canvas:</strong> Click the <strong>Run</strong> / <strong>Execute</strong> button.</p>
+<p><strong>From the canvas:</strong> Click the <strong>Run Preview</strong> button to preview the pipeline, or use <strong>Train</strong> on an individual training node.</p>
+<h3 id="single-training-node">Single training node</h3>
 <p>The frontend converts your visual graph into a pipeline config and sends it to the backend:</p>
 <pre><code>POST /api/pipeline/run
 </code></pre>
-<p>The backend:</p>
-<ol>
-<li>Validates the config.</li>
-<li>Queues the job in Celery.</li>
-<li>Returns a <code>job_id</code>.</li>
-</ol>
+<p>The backend validates the config, queues the job in Celery, and returns a <code>job_id</code>.</p>
+<h3 id="multiple-training-nodes-v040">Multiple training nodes <em>(v0.4.0+)</em></h3>
+<p>When your canvas has 2+ training nodes on separate branches:</p>
+<ul>
+<li><strong>Individual Train buttons</strong> — Each node's Train button runs only that branch (using <code>target_node_id</code> filtering).</li>
+<li><strong>Run All Experiments</strong> — A 🚀 <strong>Run All Experiments</strong> button appears in the toolbar if two separate branches connected to two separate training nodes. Clicking it queues all branches at once, returning <code>job_ids</code> for each.</li>
+</ul>
+<h3 id="mergeparallel-toggle-v040">Merge/Parallel toggle <em>(v0.4.0+)</em></h3>
+<p>Training nodes with 2+ incoming connections show a <strong>Merge / Parallel</strong> toggle:</p>
+<ul>
+<li><strong>Merge</strong>: Combines upstream data before training.</li>
+<li><strong>Parallel</strong>: Each incoming branch becomes a separate experiment job.</li>
+</ul>
 <p><strong>Monitoring progress:</strong></p>
 <ul>
 <li>The <strong>Jobs</strong> page (<code>/jobs</code>) shows all running and completed jobs.</li>
