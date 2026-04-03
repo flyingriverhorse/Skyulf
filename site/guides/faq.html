@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/guides/faq.html">
       
       
-        <link rel="prev" href="platform_walkthrough.html">
+        <link rel="prev" href="multi_path_pipelines.html">
       
       
         <link rel="next" href="recipes.html">
@@ -557,6 +557,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="multi_path_pipelines.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Path Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -835,6 +863,39 @@
     <span class="md-ellipsis">
       
         Is there an API for programmatic access?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-do-i-run-multiple-experiments-in-parallel-v040" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I run multiple experiments in parallel? (v0.4.0+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#whats-the-difference-between-merge-and-parallel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's the difference between Merge and Parallel?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-do-i-copy-paste-nodes-on-the-canvas-v040" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I copy-paste nodes on the canvas? (v0.4.0+)
       
     </span>
   </a>
@@ -3037,6 +3098,16 @@
 <p>Skyulf auto-detects whether your data is Polars or Pandas. Simple operations (scaling, imputation) run natively in Polars for speed. Complex operations (feature selection, some sklearn-backed nodes) temporarily bridge to Pandas/NumPy via Apache Arrow (near zero-copy). See <a href="engine_mechanics.html">Engine Mechanics</a>.</p>
 <h3 id="is-there-an-api-for-programmatic-access">Is there an API for programmatic access?</h3>
 <p>Yes. The backend exposes a REST API with endpoints for data upload, pipeline execution, model deployment, and inference. See <a href="platform_walkthrough.html">Platform Walkthrough</a>.</p>
+<h3 id="how-do-i-run-multiple-experiments-in-parallel-v040">How do I run multiple experiments in parallel? <em>(v0.4.0+)</em></h3>
+<p>Connect 2+ training nodes to your dataset (each with its own preprocessing path). A <strong>Run All Experiments</strong> button appears in the toolbar — clicking it queues all branches at once and returns separate <code>job_ids</code> for each. You can also click <strong>Train</strong> on an individual node to run just that branch.</p>
+<h3 id="whats-the-difference-between-merge-and-parallel">What's the difference between Merge and Parallel?</h3>
+<ul>
+<li><strong>Merge:</strong> Combines data from multiple upstream branches into a single DataFrame before training. Use when you have parallel preprocessing paths feeding one model.</li>
+<li><strong>Parallel:</strong> Each incoming branch becomes a separate experiment job. Use when you want independent experiments.</li>
+</ul>
+<p>Training nodes with 2+ inputs show a toggle to switch between modes. See the <a href="multi_path_pipelines.html">Multi-Path Pipelines guide</a>.</p>
+<h3 id="how-do-i-copy-paste-nodes-on-the-canvas-v040">How do I copy-paste nodes on the canvas? <em>(v0.4.0+)</em></h3>
+<p>Select one or more nodes, press <strong>Ctrl+C</strong> (Cmd+C on Mac) to copy, then <strong>Ctrl+V</strong> (Cmd+V on Mac) to paste. Nodes are pasted with a position offset. Internal edges between selected nodes are preserved.</p>
 
 
 

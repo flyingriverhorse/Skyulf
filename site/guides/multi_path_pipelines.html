@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/examples/quickstart.html">
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/guides/multi_path_pipelines.html">
       
       
-        <link rel="prev" href="../guides/engine_mechanics.html">
+        <link rel="prev" href="platform_walkthrough.html">
       
       
-        <link rel="next" href="leakage_proof.html">
+        <link rel="next" href="faq.html">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Quickstart - Skyulf</title>
+        <title>Multi-Path Pipelines - Skyulf</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#quickstart-guide" class="md-skip">
+        <a href="#multi-path-pipelines" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Quickstart
+              Multi-Path Pipelines
             
           </span>
         </div>
@@ -240,11 +240,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../guides/getting_started.html" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="getting_started.html" class="md-tabs__link">
           
   
   
@@ -260,13 +262,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="quickstart.html" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../examples/quickstart.html" class="md-tabs__link">
           
   
   
@@ -416,28 +416,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
             
   
   
@@ -455,7 +458,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -473,7 +476,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/getting_started.html" class="md-nav__link">
+      <a href="getting_started.html" class="md-nav__link">
         
   
   
@@ -501,7 +504,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/platform_setup.html" class="md-nav__link">
+      <a href="platform_setup.html" class="md-nav__link">
         
   
   
@@ -529,7 +532,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+      <a href="platform_walkthrough.html" class="md-nav__link">
         
   
   
@@ -554,10 +557,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Path Pipelines
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="multi_path_pipelines.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -573,6 +603,170 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#merge-combining-multiple-branches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge: Combining Multiple Branches
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Merge: Combining Multiple Branches">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#merge-strategy-auto-detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge Strategy (Auto-Detected)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#merge-badge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge Badge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#connection-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection Validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#common-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parallel-running-separate-experiments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parallel: Running Separate Experiments
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parallel: Running Separate Experiments">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-all-experiments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run All Experiments
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mergeparallel-toggle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge/Parallel Toggle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keyboard-shortcuts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keyboard Shortcuts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-partitioning-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Partitioning (Backend)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -585,7 +779,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/faq.html" class="md-nav__link">
+      <a href="faq.html" class="md-nav__link">
         
   
   
@@ -613,7 +807,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/recipes.html" class="md-nav__link">
+      <a href="recipes.html" class="md-nav__link">
         
   
   
@@ -641,7 +835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/profiling_comparison.html" class="md-nav__link">
+      <a href="profiling_comparison.html" class="md-nav__link">
         
   
   
@@ -753,7 +947,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/adding_new_engine.html" class="md-nav__link">
+      <a href="adding_new_engine.html" class="md-nav__link">
         
   
   
@@ -781,7 +975,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+      <a href="engine_mechanics.html" class="md-nav__link">
         
   
   
@@ -813,31 +1007,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
@@ -855,7 +1046,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -870,37 +1061,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Quickstart
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="quickstart.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../examples/quickstart.html" class="md-nav__link">
         
   
   
@@ -916,92 +1080,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#1-setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Setup
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#2-create-dummy-data" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Create Dummy Data
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-define-pipeline-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Define Pipeline Configuration
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-run-pipeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Run Pipeline
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#5-save-and-load" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Save and Load
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#6-whats-next" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. What's next?
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1014,7 +1092,7 @@
   
   
     <li class="md-nav__item">
-      <a href="leakage_proof.html" class="md-nav__link">
+      <a href="../examples/leakage_proof.html" class="md-nav__link">
         
   
   
@@ -2697,162 +2775,121 @@
   
 
 
-<h1 id="quickstart-guide">Quickstart Guide</h1>
-<p>This guide demonstrates how to create a simple end-to-end pipeline using Skyulf Core — from data creation to training, saving, and loading.</p>
-<h2 id="1-setup">1. Setup</h2>
-<p>First, import the necessary modules.</p>
-<pre><code class="language-python">import numpy as np
-import pandas as pd
-from skyulf import SkyulfPipeline
+<h1 id="multi-path-pipelines">Multi-Path Pipelines</h1>
+<p>Skyulf supports building pipelines with <strong>multiple branches</strong> that merge into a single training node or fan out into separate experiments. This guide covers both patterns.</p>
+<hr />
+<h2 id="merge-combining-multiple-branches">Merge: Combining Multiple Branches</h2>
+<p>When a training node has 2+ incoming edges, Skyulf <strong>automatically merges</strong> the upstream DataFrames before training.</p>
+<h3 id="how-it-works">How It Works</h3>
+<pre><code>Dataset → Scaling    ──┐
+                       ├──→ Training Node (⊕ Merge)
+Dataset → Encoding   ──┘
 </code></pre>
-<blockquote>
-<p><strong>Tip:</strong> You can also use <code>from skyulf.pipeline import SkyulfPipeline</code>.</p>
-</blockquote>
-<h2 id="2-create-dummy-data">2. Create Dummy Data</h2>
-<p>We'll create a synthetic dataset with some missing values and categorical features.</p>
-<pre><code class="language-python">def create_dummy_data(n: int = 200) -&gt; pd.DataFrame:
-    np.random.seed(42)
-    df = pd.DataFrame({
-        'age': np.random.randint(18, 80, n),
-        'income': np.random.normal(50000, 15000, n),
-        'city': np.random.choice(['New York', 'London', 'Paris'], n),
-        'is_customer': np.random.choice([0, 1], n),
-    })
-    # Introduce missing values
-    df.loc[0:10, 'income'] = np.nan
-    return df
-
-data = create_dummy_data()
-print(data.head())
-</code></pre>
-<p><strong>Output:</strong></p>
-<pre><code class="language-text">   age        income      city  is_customer
-0   56           NaN     Paris            0
-1   69           NaN  New York            1
-2   46           NaN     Paris            0
-3   32           NaN     Paris            0
-4   60           NaN  New York            0
-</code></pre>
-<h2 id="3-define-pipeline-configuration">3. Define Pipeline Configuration</h2>
-<p>Skyulf pipelines are defined using a JSON-compatible dictionary. This makes them easy to serialize and store.</p>
-<pre><code class="language-python">config = {
-    'preprocessing': [
-        # 1. Split Data into Train/Test
-        {
-            'name': 'split_data',
-            'transformer': 'TrainTestSplitter',
-            'params': {
-                'test_size': 0.2,
-                'target_column': 'is_customer',
-            },
-        },
-        # 2. Impute Missing Income
-        {
-            'name': 'impute_income',
-            'transformer': 'SimpleImputer',
-            'params': {
-                'columns': ['income'],
-                'strategy': 'mean',
-            },
-        },
-        # 3. Encode City (Categorical)
-        {
-            'name': 'encode_city',
-            'transformer': 'OneHotEncoder',
-            'params': {'columns': ['city']},
-        },
-        # 4. Scale Numeric Features
-        {
-            'name': 'scale_features',
-            'transformer': 'StandardScaler',
-            'params': {'columns': ['age', 'income']},
-        },
-    ],
-    'modeling': {
-        'type': 'random_forest_classifier',
-        'params': {'n_estimators': 50, 'max_depth': 5},
-    },
-}
-</code></pre>
-<h2 id="4-run-pipeline">4. Run Pipeline</h2>
-<p>Initialize and fit the pipeline.</p>
-<pre><code class="language-python">pipeline = SkyulfPipeline(config)
-metrics = pipeline.fit(data, target_column='is_customer')
-print(metrics)
-</code></pre>
-<p><strong>Output:</strong></p>
-<pre><code class="language-text">{
-    'preprocessing': {...},
-    'modeling': {
-        'accuracy': 0.85,
-        'f1_score': 0.82,
-        ...
-    }
-}
-</code></pre>
-<h2 id="5-save-and-load">5. Save and Load</h2>
-<p>Pipelines can be saved to disk and reloaded for inference.</p>
-<pre><code class="language-python">import os
-
-artifact_path = 'my_model.pkl'
-pipeline.save(artifact_path)
-
-# Load back
-loaded = SkyulfPipeline.load(artifact_path)
-
-# Predict on new data
-new_data = pd.DataFrame({
-    'age': [25, 40],
-    'income': [60000, np.nan],
-    'city': ['London', 'Paris'],
-})
-
-predictions = loaded.predict(new_data)
-print(predictions)
-
-# Cleanup
-if os.path.exists(artifact_path):
-    os.remove(artifact_path)
-</code></pre>
-<p><strong>Output:</strong></p>
-<pre><code class="language-text">0    0
-1    1
-dtype: int64
-</code></pre>
-<h2 id="6-whats-next">6. What's next?</h2>
+<p>The training node collects <strong>all</strong> upstream branch outputs via <code>_resolve_all_inputs()</code> and combines them using <code>_merge_inputs()</code>.</p>
+<h3 id="merge-strategy-auto-detected">Merge Strategy (Auto-Detected)</h3>
 <table>
 <thead>
 <tr>
-<th>Goal</th>
-<th>Page</th>
+<th>Condition</th>
+<th>Strategy</th>
+<th>Example</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Add train/test splits for proper evaluation</td>
-<td><a href="../user_guide/pipeline_quickstart.html">Pipeline Quickstart</a></td>
+<td>Same row count, different columns</td>
+<td><strong>Column-wise concat</strong></td>
+<td>Parallel preprocessing branches</td>
 </tr>
 <tr>
-<td>Hyperparameter tuning (grid, Optuna, halving)</td>
-<td><a href="../user_guide/hyperparameter_tuning.html">Hyperparameter Tuning</a></td>
+<td>Same columns, different rows</td>
+<td><strong>Row-wise concat</strong></td>
+<td>Data augmentation</td>
 </tr>
 <tr>
-<td>All 20 supported models</td>
-<td><a href="../user_guide/configuration.html">Configuration</a></td>
-</tr>
-<tr>
-<td>Full platform walkthrough (UI + API)</td>
-<td><a href="../guides/platform_walkthrough.html">Platform Walkthrough</a></td>
-</tr>
-<tr>
-<td>Troubleshooting</td>
-<td><a href="../user_guide/troubleshooting.html">Troubleshooting</a></td>
+<td>No common columns, different shapes</td>
+<td><strong>Error</strong></td>
+<td>Incompatible inputs</td>
 </tr>
 </tbody>
 </table>
-<blockquote>
-<p><strong>Note:</strong> This example includes a <code>TrainTestSplitter</code> to demonstrate best practice. In production, always split first to prevent <a href="../user_guide/splitdataset_and_leakage.html">data leakage</a>.</p>
-</blockquote>
+<ul>
+<li>Duplicate columns are automatically deduplicated after merging.</li>
+<li>Inputs are merged in deterministic <strong>topological order</strong> based on the pipeline graph.</li>
+</ul>
+<h3 id="merge-badge">Merge Badge</h3>
+<p>Nodes with 2+ incoming edges display a blue <strong>⊕ Merge</strong> badge in the header showing the input count. Hover over it for a tooltip: <em>"Merge: combining data from N upstream sources"</em>.</p>
+<h3 id="connection-validation">Connection Validation</h3>
+<p>Model-to-model connections (e.g., training → training) are <strong>blocked</strong> with an alert. Training nodes accept inputs from preprocessing nodes only.</p>
+<h3 id="common-errors">Common Errors</h3>
+<table>
+<thead>
+<tr>
+<th>Error</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"Empty DataFrame from upstream branch"</td>
+<td>A preprocessing branch produced no rows</td>
+<td>Check filters/cleaning nodes upstream</td>
+</tr>
+<tr>
+<td>"No common columns"</td>
+<td>Branches have incompatible schemas</td>
+<td>Ensure branches produce compatible columns</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="parallel-running-separate-experiments">Parallel: Running Separate Experiments</h2>
+<p>When you have 2+ training nodes on the canvas connected to <strong>separate branches</strong>, each one runs as an independent experiment.</p>
+<h3 id="how-it-works_1">How It Works</h3>
+<pre><code>Dataset → Scaling → Random Forest (Train)
+    │
+    └──→ Encoding → XGBoost (Train)
+</code></pre>
+<p>Each training node has its own <strong>Train</strong> button. Clicking it runs <strong>only that branch</strong> — the backend uses <code>target_node_id</code> filtering to isolate the sub-pipeline.</p>
+<h3 id="run-all-experiments">Run All Experiments</h3>
+<p>When 2+ training nodes are connected on separate branches, a <strong>"Run All Experiments"</strong> button (🚀 Rocket icon) appears in the toolbar. Clicking it queues <strong>all branches</strong> at once, returning a list of <code>job_ids</code>.</p>
+<h3 id="mergeparallel-toggle">Merge/Parallel Toggle</h3>
+<p>Training nodes with 2+ incoming connections show a <strong>Merge / Parallel</strong> toggle:</p>
+<ul>
+<li><strong>Merge</strong> (default): Combines upstream data before training.</li>
+<li><strong>Parallel</strong>: Treats each incoming branch as a separate experiment and creates independent jobs.</li>
+</ul>
+<p>The toggle is <strong>user-controlled</strong> — you decide based on your intent. The choice is stored as <code>execution_mode</code> on the node and passed to the backend during execution.</p>
+<hr />
+<h2 id="keyboard-shortcuts">Keyboard Shortcuts</h2>
+<table>
+<thead>
+<tr>
+<th>Shortcut</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Ctrl+C</strong> (Cmd+C on Mac)</td>
+<td>Copy selected nodes and their internal edges</td>
+</tr>
+<tr>
+<td><strong>Ctrl+V</strong> (Cmd+V on Mac)</td>
+<td>Paste copied nodes with a position offset</td>
+</tr>
+</tbody>
+</table>
+<p>Supports multi-select. Each paste increments the offset so nodes don't stack.</p>
+<hr />
+<h2 id="pipeline-partitioning-backend">Pipeline Partitioning (Backend)</h2>
+<p>The backend function <code>partition_parallel_pipeline()</code> in <code>graph_utils.py</code> handles splitting:</p>
+<ol>
+<li><strong>Multiple terminals</strong>: If the graph has 2+ training/tuning nodes, each gets its own sub-pipeline via BFS ancestor tracing (<code>_collect_ancestors()</code>).</li>
+<li><strong>Single terminal with parallel mode</strong>: If one training node has <code>execution_mode=parallel</code>, each incoming branch becomes a separate sub-pipeline.</li>
+</ol>
+<p>Shared prefix nodes (e.g., a dataset node used by both branches) are duplicated into each sub-pipeline so they can execute independently.</p>
 
 
 
