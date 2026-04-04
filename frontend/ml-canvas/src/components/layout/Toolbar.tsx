@@ -15,7 +15,7 @@ export const Toolbar: React.FC = () => {
   const setExecutionResult = useGraphStore((state) => state.setExecutionResult);
   const setGraph = useGraphStore((state) => state.setGraph);
   
-  const { toggleDrawer } = useJobStore();
+  const { toggleDrawer, setActiveParallelRun, startPolling } = useJobStore();
   
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -141,6 +141,10 @@ export const Toolbar: React.FC = () => {
         job_type: 'basic_training',
       });
       const count = response.job_ids?.length || 1;
+      if (response.job_ids?.length > 1) {
+        setActiveParallelRun({ jobIds: response.job_ids, startedAt: new Date().toISOString() });
+        startPolling();
+      }
       alert(`${count} experiment${count > 1 ? 's' : ''} queued!`);
       toggleDrawer();
     } catch (error) {

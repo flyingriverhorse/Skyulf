@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { jobsApi, JobInfo, RunPipelineRequest } from '../api/jobs';
 
+interface ActiveParallelRun {
+  jobIds: string[];
+  startedAt: string;
+  completedAt?: string;
+}
+
 interface JobState {
   jobs: JobInfo[];
   isLoading: boolean;
@@ -8,6 +14,7 @@ interface JobState {
   activeTab: 'basic_training' | 'advanced_tuning';
   hasMore: boolean;
   skip: number;
+  activeParallelRun: ActiveParallelRun | null;
   
   // Actions
   fetchJobs: () => Promise<void>;
@@ -16,6 +23,7 @@ interface JobState {
   cancelJob: (jobId: string) => Promise<void>;
   toggleDrawer: (isOpen?: boolean) => void;
   setTab: (tab: 'basic_training' | 'advanced_tuning') => void;
+  setActiveParallelRun: (run: ActiveParallelRun | null) => void;
   
   // Polling
   startPolling: () => void;
@@ -27,15 +35,16 @@ const POLLING_INTERVAL = 3000;
 const PAGE_SIZE = 50;
 
 export const useJobStore = create<JobState>((set, get) => {
-  let pollingInterval: NodeJS.Timeout | null = null;
+  let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
   return {
     jobs: [],
     isLoading: false,
     isDrawerOpen: false,
-    activeTab: 'basic_training',
+    activeTab: 'advanced_tuning',
     hasMore: true,
     skip: 0,
+    activeParallelRun: null,
 
     fetchJobs: async () => {
       set({ isLoading: true, skip: 0 });
@@ -116,6 +125,8 @@ export const useJobStore = create<JobState>((set, get) => {
 
     setTab: (tab) => set({ activeTab: tab }),
 
+    setActiveParallelRun: (run) => set({ activeParallelRun: run }),
+
     startPolling: () => {
       if (pollingInterval) return;
       
@@ -137,6 +148,26 @@ export const useJobStore = create<JobState>((set, get) => {
           const hasActive = latestJobs.some(j => j.status === 'running' || j.status === 'queued');
           if (!hasActive && !get().isDrawerOpen) {
             get().stopPolling();
+          }
+
+          // Auto-clear parallel run when all tracked jobs are terminal
+          const parallelRun = get().activeParallelRun;
+          if (parallelRun) {
+            const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
+            const allDone = parallelRun.jobIds.every(id => {
+              const j = latestJobs.find(job => job.job_id === id);
+              return j && TERMINAL.has(j.status);
+            });
+            if (allDone) {
+              if (!parallelRun.completedAt) {
+                // Mark completion time, keep banner visible
+                set({ activeParallelRun: { ...parallelRun, completedAt: new Date().toISOString() } });
+              } else {
+                // Clear after 5s linger
+                const elapsed = Date.now() - new Date(parallelRun.completedAt).getTime();
+                if (elapsed >= 5000) set({ activeParallelRun: null });
+              }
+            }
           }
         } catch (error) {
           console.error('Polling error:', error);
