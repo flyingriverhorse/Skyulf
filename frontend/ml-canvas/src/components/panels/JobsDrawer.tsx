@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
-import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown, Zap, CheckCircle2 } from 'lucide-react';
+import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown, Zap, CheckCircle2, Search, Filter } from 'lucide-react';
 import { JobInfo, jobsApi } from '../../core/api/jobs';
 import { useEscapeKey } from '../../core/hooks/useEscapeKey';
 
@@ -55,12 +55,33 @@ export const JobsDrawer: React.FC = () => {
   } = useJobStore();
 
   const [selectedJob, setSelectedJob] = useState<JobInfo | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [modelFilter, setModelFilter] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   useEscapeKey(toggleDrawer, isDrawerOpen);
 
   if (!isDrawerOpen) return null;
 
-  const filteredJobs = jobs.filter(job => job.job_type === activeTab);
+  const tabJobs = jobs.filter(job => job.job_type === activeTab);
+  
+  // Derive unique model types and statuses from current tab's jobs
+  const modelTypes = [...new Set(tabJobs.map(j => j.model_type).filter(Boolean))] as string[];
+  const statuses = [...new Set(tabJobs.map(j => j.status))];
+
+  const filteredJobs = tabJobs.filter(job => {
+    if (statusFilter !== 'all' && job.status !== statusFilter) return false;
+    if (modelFilter !== 'all' && job.model_type !== modelFilter) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matchesId = job.job_id.toLowerCase().includes(q);
+      const matchesDataset = (job.dataset_name || job.dataset_id || '').toLowerCase().includes(q);
+      const matchesModel = (job.model_type || '').toLowerCase().includes(q);
+      if (!matchesId && !matchesDataset && !matchesModel) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex justify-center items-center">
@@ -165,6 +186,76 @@ export const JobsDrawer: React.FC = () => {
                 </button>
                 </div>
 
+                {/* Filter Bar */}
+                <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none z-10" />
+                      <input
+                        type="text"
+                        placeholder="Search by job ID, dataset, or model..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-700 dark:text-gray-200 placeholder-gray-400"
+                      />
+                    </div>
+                    <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border transition-colors ${
+                        showFilters || statusFilter !== 'all' || modelFilter !== 'all'
+                          ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400'
+                          : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      <Filter className="w-3.5 h-3.5" />
+                      Filters
+                      {(statusFilter !== 'all' || modelFilter !== 'all') && (
+                        <span className="w-4 h-4 flex items-center justify-center bg-blue-500 text-white rounded-full text-[10px] font-bold">
+                          {(statusFilter !== 'all' ? 1 : 0) + (modelFilter !== 'all' ? 1 : 0)}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                  {showFilters && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</label>
+                        <select
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          className="text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="all">All</option>
+                          {statuses.map(s => (
+                            <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model</label>
+                        <select
+                          value={modelFilter}
+                          onChange={(e) => setModelFilter(e.target.value)}
+                          className="text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="all">All</option>
+                          {modelTypes.map(m => (
+                            <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {(statusFilter !== 'all' || modelFilter !== 'all') && (
+                        <button
+                          onClick={() => { setStatusFilter('all'); setModelFilter('all'); }}
+                          className="text-[10px] text-blue-500 hover:underline"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* List Header */}
                 <div className="grid grid-cols-12 gap-4 px-6 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
                     <div className="col-span-2">Status</div>
@@ -180,7 +271,10 @@ export const JobsDrawer: React.FC = () => {
                 <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50/30 dark:bg-gray-900/30">
                 {filteredJobs.length === 0 ? (
                     <div className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">
-                    No {activeTab === 'advanced_tuning' ? 'advanced training' : 'training'} jobs found.
+                    {searchQuery || statusFilter !== 'all' || modelFilter !== 'all'
+                      ? 'No jobs match the current filters.'
+                      : `No ${activeTab === 'advanced_tuning' ? 'advanced training' : 'training'} jobs found.`
+                    }
                     </div>
                 ) : (
                     <>
@@ -219,7 +313,7 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
 
     // Poll for updates if running
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let interval: ReturnType<typeof setInterval>;
         
         const fetchDetails = async () => {
             try {
