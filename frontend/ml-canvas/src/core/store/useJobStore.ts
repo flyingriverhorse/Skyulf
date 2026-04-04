@@ -24,6 +24,8 @@ interface JobState {
   toggleDrawer: (isOpen?: boolean) => void;
   setTab: (tab: 'basic_training' | 'advanced_tuning') => void;
   setActiveParallelRun: (run: ActiveParallelRun | null) => void;
+  promoteJob: (jobId: string) => Promise<void>;
+  unpromoteJob: (jobId: string) => Promise<void>;
   
   // Polling
   startPolling: () => void;
@@ -126,6 +128,16 @@ export const useJobStore = create<JobState>((set, get) => {
     setTab: (tab) => set({ activeTab: tab }),
 
     setActiveParallelRun: (run) => set({ activeParallelRun: run }),
+
+    promoteJob: async (jobId: string) => {
+      await jobsApi.promoteJob(jobId);
+      set({ jobs: get().jobs.map(j => j.job_id === jobId ? { ...j, promoted_at: new Date().toISOString() } : j) });
+    },
+
+    unpromoteJob: async (jobId: string) => {
+      await jobsApi.unpromoteJob(jobId);
+      set({ jobs: get().jobs.map(j => j.job_id === jobId ? { ...j, promoted_at: null } : j) });
+    },
 
     startPolling: () => {
       if (pollingInterval) return;

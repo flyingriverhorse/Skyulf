@@ -28,6 +28,7 @@ export interface JobInfo {
   target_column?: string;
   dropped_columns?: string[];
   version?: number;
+  promoted_at?: string | null;
 }
 
 export interface RunPipelineRequest extends PipelineConfigModel {
@@ -128,5 +129,13 @@ export const jobsApi = {
   getTuningHistory: async (modelType: string): Promise<JobInfo[]> => {
     const response = await apiClient.get<JobInfo[]>(`/pipeline/jobs/tuning/history/${modelType}`);
     return response.data;
+  },
+
+  promoteJob: async (jobId: string): Promise<void> => {
+    await apiClient.post(`/pipeline/jobs/${jobId}/promote`);
+  },
+
+  unpromoteJob: async (jobId: string): Promise<void> => {
+    await apiClient.delete(`/pipeline/jobs/${jobId}/promote`);
   }
 };
