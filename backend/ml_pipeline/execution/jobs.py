@@ -6,9 +6,11 @@ Handles persistence of Training and Tuning jobs to the database.
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from backend.database.models import BasicTrainingJob, AdvancedTuningJob
 from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline.execution.basic_training_manager import BasicTrainingManager
 from backend.ml_pipeline.execution.advanced_tuning_manager import AdvancedTuningManager
@@ -158,3 +160,31 @@ class JobManager:
         return await AdvancedTuningManager.get_tuning_jobs_for_model(
             session, model_type, limit
         )
+
+    @staticmethod
+    async def promote_job(session: AsyncSession, job_id: str) -> bool:
+        """Marks a completed job as promoted (winner)."""
+        for model_cls in (BasicTrainingJob, AdvancedTuningJob):
+            stmt = select(model_cls).where(model_cls.id == job_id)
+            result = await session.execute(stmt)
+            job = result.scalar_one_or_none()
+            if job:
+                if job.status != "completed":
+                    return False
+                job.promoted_at = datetime.now()  # type: ignore[assignment]
+                await session.commit()
+                return True
+        return False
+
+    @staticmethod
+    async def unpromote_job(session: AsyncSession, job_id: str) -> bool:
+        """Removes promotion from a job."""
+        for model_cls in (BasicTrainingJob, AdvancedTuningJob):
+            stmt = select(model_cls).where(model_cls.id == job_id)
+            result = await session.execute(stmt)
+            job = result.scalar_one_or_none()
+            if job:
+                job.promoted_at = None  # type: ignore[assignment]
+                await session.commit()
+                return True
+        return False

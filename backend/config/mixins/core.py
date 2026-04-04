@@ -5,7 +5,7 @@ class CoreMixin:
     """App identity and server configuration."""
 
     APP_NAME: str = "Skyulf"
-    APP_VERSION: str = "0.4.1"
+    APP_VERSION: str = "0.5.0"
     APP_SUMMARY: str = (
         "Skyulf MLops service surface for data, experimentation, and automation."
     )

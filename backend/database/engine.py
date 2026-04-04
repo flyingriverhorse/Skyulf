@@ -178,7 +178,53 @@ async def create_tables() -> None:
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    # Run lightweight migrations for columns added after initial schema
+    await _run_migrations()
+
     logger.info("✅ Database tables created/updated")
+
+
+async def _run_migrations() -> None:
+    """Apply incremental schema migrations for columns added after initial table creation.
+
+    ``Base.metadata.create_all`` only creates *new* tables — it never ALTERs
+    existing ones.  When a column is added to a model, append an entry to the
+    ``_MIGRATIONS`` list below so that existing databases are patched on the
+    next startup.
+
+    Each statement is executed inside its own try/except so that:
+    * Fresh databases (column already exists via create_all) skip silently.
+    * Repeated startups are idempotent.
+
+    HOW TO ADD A FUTURE MIGRATION:
+        1. Add the column to the SQLAlchemy model as usual.
+        2. Append one tuple per table to ``_MIGRATIONS``:
+           ("0.X.Y", "ALTER TABLE <table> ADD COLUMN <col> <TYPE>")
+        3. Restart — done.
+    """
+    if not async_engine:
+        return
+
+    from sqlalchemy import text
+
+    _MIGRATIONS: list[tuple[str, str]] = [
+        # v0.5.0 — Promote Winner
+        ("0.5.0", "ALTER TABLE basic_training_jobs ADD COLUMN promoted_at DATETIME"),
+        ("0.5.0", "ALTER TABLE advanced_tuning_jobs ADD COLUMN promoted_at DATETIME"),
+    ]
+
+    applied = 0
+    async with async_engine.begin() as conn:
+        for version, ddl in _MIGRATIONS:
+            try:
+                await conn.execute(text(ddl))
+                applied += 1
+                logger.info("Migration [%s] applied: %s", version, ddl)
+            except Exception:
+                pass  # Column already exists
+
+    if applied:
+        logger.info("✅ %d migration(s) applied", applied)
 
 
 async def health_check() -> bool:

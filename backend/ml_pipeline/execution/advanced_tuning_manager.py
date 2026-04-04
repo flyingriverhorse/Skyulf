@@ -111,6 +111,7 @@ class AdvancedTuningManager:
             logs=type_cast(Optional[List[str]], job.logs),
             graph=type_cast(Dict[str, Any], job.graph),
             config=type_cast(Optional[Dict[str, Any]], node_params),
+            promoted_at=type_cast(Optional[datetime], job.promoted_at),
         )
 
     @staticmethod

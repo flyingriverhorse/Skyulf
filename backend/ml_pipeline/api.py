@@ -812,6 +812,27 @@ async def cancel_job(job_id: str, session: AsyncSession = Depends(get_async_sess
     return {"message": "Job cancelled successfully"}
 
 
+@router.post("/jobs/{job_id}/promote")
+async def promote_job(job_id: str, session: AsyncSession = Depends(get_async_session)):
+    """Marks a completed job as the promoted winner."""
+    success = await JobManager.promote_job(session, job_id)
+    if not success:
+        raise HTTPException(
+            status_code=400,
+            detail="Job could not be promoted (must be completed and exist)",
+        )
+    return {"message": "Job promoted successfully"}
+
+
+@router.delete("/jobs/{job_id}/promote")
+async def unpromote_job(job_id: str, session: AsyncSession = Depends(get_async_session)):
+    """Removes promotion from a job."""
+    success = await JobManager.unpromote_job(session, job_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"message": "Job unPromoted successfully"}
+
+
 @router.get("/jobs/{job_id}/evaluation")
 async def get_job_evaluation(  # noqa: C901
     job_id: str, session: AsyncSession = Depends(get_async_session)

@@ -106,6 +106,7 @@ class BasicTrainingManager:
             dropped_columns=dropped_columns,
             logs=t_cast(Optional[List[str]], job.logs),
             graph=type_cast(Dict[str, Any], job.graph),
+            promoted_at=t_cast(Optional[datetime], job.promoted_at),
         )
 
     @staticmethod

@@ -42,6 +42,7 @@ class JobInfo(BaseModel):
     version: Optional[int] = None
     graph: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
+    promoted_at: Optional[datetime] = None
 
 
 from backend.ml_pipeline.constants import StepType

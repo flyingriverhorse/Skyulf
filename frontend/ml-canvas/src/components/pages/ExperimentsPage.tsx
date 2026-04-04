@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ScatterChart, Scatter, LineChart, Line, ReferenceLine
 } from 'recharts';
-import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, RefreshCw, Download, Loader2, Check } from 'lucide-react';
+import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, RefreshCw, Download, Loader2, Check, Trophy } from 'lucide-react';
 import { LoadingState, ErrorState } from '../shared';
 import { toPng } from 'html-to-image';
 import { deploymentApi } from '../../core/api/deployment';
@@ -27,7 +27,7 @@ interface EvaluationData {
 }
 
 export const ExperimentsPage: React.FC = () => {
-  const { jobs, fetchJobs, hasMore, loadMoreJobs, isLoading } = useJobStore();
+  const { jobs, fetchJobs, hasMore, loadMoreJobs, isLoading, promoteJob, unpromoteJob } = useJobStore();
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
   const [filterType, setFilterType] = useState<'all' | 'basic_training' | 'advanced_tuning'>('all');
   const [datasets, setDatasets] = useState<{id: string, name: string}[]>([]);
@@ -87,6 +87,20 @@ export const ExperimentsPage: React.FC = () => {
       alert('Model deployed successfully!');
     } catch (err) {
       alert('Failed to deploy model');
+      console.error(err);
+    }
+  };
+
+  const handlePromote = async (e: React.MouseEvent, job: typeof jobs[0]) => {
+    e.stopPropagation();
+    try {
+      if (job.promoted_at) {
+        await unpromoteJob(job.job_id);
+      } else {
+        await promoteJob(job.job_id);
+      }
+    } catch (err) {
+      alert('Failed to update promotion status');
       console.error(err);
     }
   };
@@ -222,6 +236,11 @@ export const ExperimentsPage: React.FC = () => {
     const datasetMatch = selectedDatasetId === 'all' || job.dataset_id === selectedDatasetId;
     const statusMatch = job.status === 'completed';
     return typeMatch && datasetMatch && statusMatch;
+  }).sort((a, b) => {
+    // Promoted jobs float to top
+    if (a.promoted_at && !b.promoted_at) return -1;
+    if (!a.promoted_at && b.promoted_at) return 1;
+    return 0;
   });
 
   const selectedJobs = jobs.filter(job => selectedJobIds.includes(job.job_id));
@@ -383,6 +402,18 @@ export const ExperimentsPage: React.FC = () => {
                   </span>
                   <div className="flex items-center gap-2">
                     {job.status === 'completed' && (job.job_type === 'basic_training' || job.job_type === 'advanced_tuning') && (
+                      <>
+                        <button 
+                            onClick={(e) => { void handlePromote(e, job); }}
+                            className={`p-1 rounded transition-colors ${
+                              job.promoted_at 
+                                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' 
+                                : 'hover:bg-amber-100 dark:hover:bg-amber-900/20 text-gray-400 dark:text-gray-500'
+                            }`}
+                            title={job.promoted_at ? "Unpromote" : "Promote as Winner"}
+                        >
+                            <Trophy className="w-3 h-3" />
+                        </button>
                         <button 
                             onClick={(e) => { void handleDeploy(e, job.job_id); }}
                             className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900 rounded text-blue-600 dark:text-blue-400"
@@ -390,6 +421,7 @@ export const ExperimentsPage: React.FC = () => {
                         >
                             <Rocket className="w-3 h-3" />
                         </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -399,6 +431,11 @@ export const ExperimentsPage: React.FC = () => {
                       <span className="ml-1 text-gray-400">
                           ({job.search_strategy || (job.config as { tuning?: { strategy?: string } }).tuning?.strategy})
                       </span>
+                  )}
+                  {job.promoted_at && (
+                    <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-semibold">
+                      <Trophy className="w-2.5 h-2.5" /> Winner
+                    </span>
                   )}
                 </div>
                 <div className="flex justify-between items-center text-[10px] text-gray-400">
@@ -610,7 +647,14 @@ export const ExperimentsPage: React.FC = () => {
                         <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">Model Type</td>
                         {selectedJobs.map(job => (
                           <td key={job.job_id} className="px-4 py-2 text-gray-500 dark:text-gray-400">
-                            {job.model_type}
+                            <div className="flex items-center gap-1.5">
+                              {job.model_type}
+                              {job.promoted_at && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-semibold">
+                                  <Trophy className="w-2.5 h-2.5" /> Winner
+                                </span>
+                              )}
+                            </div>
                           </td>
                         ))}
                       </tr>
