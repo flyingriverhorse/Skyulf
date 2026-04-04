@@ -276,7 +276,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
   const [isLoadingDefs, setIsLoadingDefs] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_model_training'));
   
-  const { toggleDrawer: toggleJobDrawer, setTab } = useJobStore();
+  const { toggleDrawer: toggleJobDrawer, setTab, setActiveParallelRun, startPolling } = useJobStore();
   const upstreamData = useUpstreamData(nodeId || '');
   
   // Recursive search for datasetId
@@ -417,6 +417,8 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
         });
         const jobCount = response.job_ids?.length || 1;
         if (jobCount > 1) {
+            setActiveParallelRun({ jobIds: response.job_ids, startedAt: new Date().toISOString() });
+            startPolling();
             alert(`Parallel execution started! ${jobCount} branches submitted.`);
         } else {
             alert("Training job submitted successfully!");

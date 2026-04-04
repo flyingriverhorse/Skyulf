@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
-import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown } from 'lucide-react';
+import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown, Zap, CheckCircle2 } from 'lucide-react';
 import { JobInfo, jobsApi } from '../../core/api/jobs';
 import { useEscapeKey } from '../../core/hooks/useEscapeKey';
 
@@ -50,7 +50,8 @@ export const JobsDrawer: React.FC = () => {
     setTab,
     fetchJobs,
     hasMore,
-    loadMoreJobs
+    loadMoreJobs,
+    activeParallelRun
   } = useJobStore();
 
   const [selectedJob, setSelectedJob] = useState<JobInfo | null>(null);
@@ -95,6 +96,50 @@ export const JobsDrawer: React.FC = () => {
                     </button>
                 </div>
                 </div>
+
+                {/* Parallel Run Progress Banner */}
+                {activeParallelRun && (() => {
+                  const total = activeParallelRun.jobIds.length;
+                  const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
+                  const doneCount = activeParallelRun.jobIds.filter(id => {
+                    const j = jobs.find(job => job.job_id === id);
+                    return j && TERMINAL.has(j.status);
+                  }).length;
+                  const pct = Math.round((doneCount / total) * 100);
+                  const isDone = doneCount === total;
+                  return (
+                    <div className={`px-4 py-2.5 border-b flex items-center gap-3 ${
+                      isDone
+                        ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700/50'
+                        : 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700/50'
+                    }`}>
+                      {isDone
+                        ? <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0" />
+                        : <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      }
+                      <span className={`text-sm font-medium ${
+                        isDone
+                          ? 'text-green-800 dark:text-green-200'
+                          : 'text-amber-800 dark:text-amber-200'
+                      }`}>
+                        {isDone ? 'All branches complete!' : `Parallel Run: ${doneCount}/${total} branches complete`}
+                      </span>
+                      <div className={`flex-1 h-2 rounded-full overflow-hidden ${
+                        isDone ? 'bg-green-200 dark:bg-green-800' : 'bg-amber-200 dark:bg-amber-800'
+                      }`}>
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isDone ? 'bg-green-500 dark:bg-green-400' : 'bg-amber-500 dark:bg-amber-400'
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className={`text-xs font-mono shrink-0 ${
+                        isDone ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'
+                      }`}>{pct}%</span>
+                    </div>
+                  );
+                })()}
 
                 {/* Tabs */}
                 <div className="flex border-b border-gray-200 dark:border-gray-700">
