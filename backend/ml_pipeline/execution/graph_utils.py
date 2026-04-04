@@ -64,14 +64,19 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
         return sub_configs
 
     # --- Case 1: multiple terminal nodes ---
+    # When a terminal has multiple inputs, always split it into per-input
+    # sub-branches so each path is a separate experiment. This avoids the
+    # confusing "2 terminals but 3 logical paths" scenario.
     sub_configs = []
-    for idx, term in enumerate(terminals):
-        # Check if this terminal also needs per-input splitting (parallel mode)
-        if (
+    global_branch = 0
+    for term in terminals:
+        is_parallel = (
             term.params.get("execution_mode") == "parallel"
             and len(term.inputs) > 1
-        ):
-            for sub_idx, branch_root_id in enumerate(term.inputs):
+        )
+        if is_parallel:
+            # Parallel mode: each input becomes its own experiment branch
+            for branch_root_id in term.inputs:
                 ancestors = _collect_ancestors(branch_root_id, node_map)
                 term_copy = NodeConfig(
                     node_id=term.node_id,
@@ -87,33 +92,35 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
                 sub_configs.append(
                     PipelineConfig(
                         pipeline_id=(
-                            f"{config.pipeline_id}__branch_{idx}_{sub_idx}"
+                            f"{config.pipeline_id}__branch_{global_branch}"
                         ),
                         nodes=branch_nodes,
                         metadata={
                             **config.metadata,
-                            "branch_index": idx,
-                            "sub_branch_index": sub_idx,
+                            "branch_index": global_branch,
                             "parent_pipeline_id": config.pipeline_id,
                         },
                     )
                 )
+                global_branch += 1
         else:
+            # Merge mode (default) or single input: one branch per terminal
             ancestors = _collect_ancestors(term.node_id, node_map)
             branch_nodes = [
                 node_map[nid] for nid in ancestors if nid in node_map
             ]
             sub_configs.append(
                 PipelineConfig(
-                    pipeline_id=f"{config.pipeline_id}__branch_{idx}",
+                    pipeline_id=f"{config.pipeline_id}__branch_{global_branch}",
                     nodes=branch_nodes,
                     metadata={
                         **config.metadata,
-                        "branch_index": idx,
+                        "branch_index": global_branch,
                         "parent_pipeline_id": config.pipeline_id,
                     },
                 )
             )
+            global_branch += 1
     return sub_configs
 
 

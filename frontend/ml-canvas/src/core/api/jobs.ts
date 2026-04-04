@@ -29,6 +29,10 @@ export interface JobInfo {
   dropped_columns?: string[];
   version?: number;
   promoted_at?: string | null;
+
+  // Parallel branch metadata
+  branch_index?: number | null;
+  parent_pipeline_id?: string | null;
 }
 
 export interface RunPipelineRequest extends PipelineConfigModel {
