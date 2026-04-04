@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Literal, Optional, Union, cast
 
 import pandas as pd
@@ -342,6 +343,7 @@ async def run_pipeline(  # noqa: C901
 
     settings = get_settings()
     all_job_ids: List[str] = []
+    task_payloads: List[tuple] = []
 
     for sub in sub_pipelines:
         # Identify the terminal node for this sub-pipeline
@@ -399,7 +401,20 @@ async def run_pipeline(  # noqa: C901
         if settings.USE_CELERY:
             run_pipeline_task.delay(job_id, sub_payload)
         else:
-            background_tasks.add_task(run_pipeline_task, job_id, sub_payload)
+            task_payloads.append((job_id, sub_payload))
+
+    # Non-Celery: run branches concurrently via ThreadPoolExecutor
+    if not settings.USE_CELERY and task_payloads:
+        if len(task_payloads) == 1:
+            background_tasks.add_task(run_pipeline_task, *task_payloads[0])
+        else:
+            def _run_branches_concurrently(payloads: List[tuple]) -> None:
+                with ThreadPoolExecutor(max_workers=len(payloads)) as pool:
+                    futures = [pool.submit(run_pipeline_task, jid, pl) for jid, pl in payloads]
+                    for f in futures:
+                        f.result()  # propagate exceptions per-branch via logging
+
+            background_tasks.add_task(_run_branches_concurrently, task_payloads)
 
     is_parallel = len(all_job_ids) > 1
     message = (

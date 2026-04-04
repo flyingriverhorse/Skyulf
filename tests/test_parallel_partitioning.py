@@ -275,8 +275,8 @@ class TestParallelMode:
             assert "execution_mode" not in train_node.params
 
     def test_multi_terminal_no_parallel_stays_flat(self):
-        """Two training nodes, neither has parallel mode. Should produce
-        exactly 2 sub-pipelines (no further splitting)."""
+        """Two training nodes, neither has parallel mode. Multi-input terminal
+        stays as one branch (merge mode). Should produce exactly 2 sub-pipelines."""
         nodes = [
             _make_node("ds", "data_loader"),
             _make_node("a", inputs=["ds"]),
