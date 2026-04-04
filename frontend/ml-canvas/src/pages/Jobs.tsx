@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { 
   Activity, CheckCircle, XCircle, Clock, Search, 
-  RefreshCw, Database, BarChart2, Cpu
+  RefreshCw, Database, BarChart2, Cpu, Filter
 } from 'lucide-react';
 import { jobsApi, JobInfo } from '../core/api/jobs';
 import { LoadingState, EmptyState } from '../components/shared';
@@ -13,6 +13,8 @@ export const JobsPage: React.FC = () => {
   const [jobs, setJobs] = useState<JobInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
   const [skip, setSkip] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const LIMIT = 20;
@@ -95,6 +97,7 @@ export const JobsPage: React.FC = () => {
   };
 
   const filteredJobs = jobs.filter(job => {
+    if (statusFilter !== 'all' && job.status.toLowerCase() !== statusFilter) return false;
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       return (
@@ -105,6 +108,8 @@ export const JobsPage: React.FC = () => {
     }
     return true;
   });
+
+  const activeFilterCount = (statusFilter !== 'all' ? 1 : 0);
 
   const getDuration = (start: string | null, end: string | null) => {
     if (!start || !end) return '-';
@@ -149,17 +154,57 @@ export const JobsPage: React.FC = () => {
           <TabButton active={activeTab === 'ingestion'} onClick={() => setActiveTab('ingestion')} icon={<Database size={16} />} label="Ingestion" />
         </div>
         
-        <div className="relative w-full md:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-          <input 
-            type="text" 
-            placeholder="Search jobs..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-slate-100"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative w-full md:w-56">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" size={16} />
+            <input 
+              type="text" 
+              placeholder="Search jobs..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-8 pr-4 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-slate-100"
+            />
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-md border transition-colors ${
+              showFilters || statusFilter !== 'all'
+                ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300'
+                : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Filter size={14} />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-0.5 w-5 h-5 flex items-center justify-center rounded-full bg-indigo-600 text-white text-xs">{activeFilterCount}</span>
+            )}
+          </button>
+          {(searchTerm || statusFilter !== 'all') && (
+            <button
+              onClick={() => { setSearchTerm(''); setStatusFilter('all'); }}
+              className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap"
+            >
+              Clear all
+            </button>
+          )}
         </div>
       </div>
+
+      {showFilters && (
+        <div className="flex items-center gap-4 px-4 py-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+          <label className="text-xs text-slate-500 dark:text-slate-400 font-medium">Status</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-2.5 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          >
+            <option value="all">All statuses</option>
+            {[...new Set(jobs.map(j => j.status.toLowerCase()))].sort().map(s => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Jobs Table */}
       <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">

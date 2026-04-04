@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { DatasetService } from '../core/api/datasets';
 import { Dataset } from '../core/types/api';
 import { FileUpload } from '../modules/nodes/data/FileUpload';
-import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2, XCircle, BarChart2, Download } from 'lucide-react';
+import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2, XCircle, BarChart2, Download, Search, Filter } from 'lucide-react';
 import { formatBytes } from '../core/utils/format';
 import { DatasetPreviewModal } from '../components/data/DatasetPreviewModal';
 import { AddSourceModal } from '../components/data/AddSourceModal';
@@ -21,12 +21,27 @@ export const DataSources: React.FC = () => {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [previewDataset, setPreviewDataset] = useState<Dataset | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterFormat, setFilterFormat] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   const filteredDatasets = datasets.filter(d => {
     const status = d.source_metadata?.ingestion_status?.status || 'completed';
-    if (filterStatus === 'all') return true;
-    return status === filterStatus;
+    if (filterStatus !== 'all' && status !== filterStatus) return false;
+    if (filterType !== 'all' && d.type !== filterType) return false;
+    if (filterFormat !== 'all' && (d.format || 'csv') !== filterFormat) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matchesName = d.name.toLowerCase().includes(q);
+      const matchesId = (d.source_id || d.id).toLowerCase().includes(q);
+      const matchesFormat = (d.format || 'csv').toLowerCase().includes(q);
+      if (!matchesName && !matchesId && !matchesFormat) return false;
+    }
+    return true;
   });
+
+  const activeFilterCount = (filterType !== 'all' ? 1 : 0) + (filterFormat !== 'all' ? 1 : 0);
 
   const fetchDatasets = async () => {
     // Don't set loading to true on subsequent polls to avoid flickering
@@ -191,20 +206,88 @@ export const DataSources: React.FC = () => {
         </div>
       )}
 
-      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-        {['all', 'completed', 'processing', 'failed', 'cancelled'].map(status => (
+      <div className="flex flex-col gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" />
+            <input
+              type="text"
+              placeholder="Search datasets..."
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); }}
+              className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
           <button
-            key={status}
-            onClick={() => { setFilterStatus(status); }}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
-              filterStatus === status 
-                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
-                : 'bg-white dark:bg-slate-800 text-slate-600 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+            onClick={() => { setShowFilters(!showFilters); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border transition-colors ${
+              showFilters || filterType !== 'all'
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
             }`}
           >
-            {status.charAt(0).toUpperCase() + status.slice(1)}
+            <Filter size={14} />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-1 w-5 h-5 flex items-center justify-center rounded-full bg-blue-600 text-white text-xs">{activeFilterCount}</span>
+            )}
           </button>
-        ))}
+          {(searchQuery || filterStatus !== 'all' || filterType !== 'all' || filterFormat !== 'all') && (
+            <button
+              onClick={() => { setSearchQuery(''); setFilterStatus('all'); setFilterType('all'); setFilterFormat('all'); }}
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+
+        {showFilters && (
+          <div className="flex items-center gap-4 pl-1">
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-500 dark:text-slate-400 font-medium">Type</label>
+              <select
+                value={filterType}
+                onChange={e => { setFilterType(e.target.value); }}
+                className="px-2 py-1 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="all">All types</option>
+                {[...new Set(datasets.map(d => d.type))].map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-500 dark:text-slate-400 font-medium">Format</label>
+              <select
+                value={filterFormat}
+                onChange={e => { setFilterFormat(e.target.value); }}
+                className="px-2 py-1 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="all">All formats</option>
+                {[...new Set(datasets.map(d => d.format || 'csv'))].map(f => (
+                  <option key={f} value={f}>{f.toUpperCase()}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {['all', 'completed', 'processing', 'failed', 'cancelled'].map(status => (
+            <button
+              key={status}
+              onClick={() => { setFilterStatus(status); }}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
+                filterStatus === status 
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
+                  : 'bg-white dark:bg-slate-800 text-slate-600 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+              }`}
+            >
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
@@ -237,7 +320,7 @@ export const DataSources: React.FC = () => {
                         description="Upload a dataset to get started with your analysis."
                       />
                     ) : (
-                      <EmptyState title="No datasets match the selected filter" />
+                      <EmptyState title="No datasets match your search or filters" />
                     )}
                   </td>
                 </tr>
