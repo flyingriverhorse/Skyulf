@@ -38,3 +38,4 @@ class TuningResult:
     best_score: float
     n_trials: int
     trials: List[Dict[str, Any]]  # List of {params, score}
+    scoring_metric: Optional[str] = None  # Actual sklearn metric used (e.g. "f1_weighted")

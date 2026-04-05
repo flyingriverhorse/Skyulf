@@ -9,6 +9,16 @@ import { LoadingState, ErrorState } from '../shared';
 import { toPng } from 'html-to-image';
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
+import { formatMetricName } from '../../core/utils/format';
+
+/** Extract the resolved scoring metric from a job's result (top-level or nested in metrics). */
+function getJobScoringMetric(job: { result?: Record<string, unknown> | null }): string | undefined {
+  const r = job.result;
+  if (r?.scoring_metric) return r.scoring_metric as string;
+  const m = r?.metrics as Record<string, unknown> | undefined;
+  if (m?.scoring_metric) return m.scoring_metric as string;
+  return undefined;
+}
 
 /** Extract a short 8-char run ID from a pipeline_id, stripping the "preview_" prefix
  *  and any "__branch_N" suffix so all experiments from the same batch share the same ID. */
@@ -602,7 +612,11 @@ export const ExperimentsPage: React.FC = () => {
 
                             return (
                               <tr key={key} className="border-b border-purple-100 dark:border-purple-800/50">
-                                <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">{key}</td>
+                                <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">
+                                  {key === 'best_score'
+                                    ? `Best Score (${formatMetricName(getJobScoringMetric(groupJobs[0])) || 'CV'})`
+                                    : key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                </td>
                                 {groupJobs.map(j => {
                                   const m = (j.metrics || j.result?.metrics || {}) as Record<string, number>;
                                   const val = m[key];
@@ -782,7 +796,11 @@ export const ExperimentsPage: React.FC = () => {
                       </tr>
                       {isMetricsExpanded && metricKeys.map(metricKey => (
                         <tr key={metricKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                          <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{metricKey}</td>
+                          <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">
+                            {metricKey === 'best_score'
+                              ? `Best Score (${formatMetricName(getJobScoringMetric(selectedJobs[0])) || 'CV'})`
+                              : metricKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                          </td>
                           {selectedJobs.map(job => {
                              const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
                              const val = m[metricKey];

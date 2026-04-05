@@ -8,6 +8,7 @@ import { jobsApi, JobInfo } from '../../../core/api/jobs';
 import { RegistryItem, registryApi } from '../../../core/api/registry';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { formatMetricName } from '../../../core/utils/format';
 import { useElementSize } from '../../../core/hooks/useElementSize';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
@@ -299,7 +300,9 @@ const BestParamsModal: React.FC<{
                                         <div className="flex items-center gap-3 mt-1">
                                             {typeof job.result?.best_score === 'number' && (
                                                 <div className="flex items-center gap-1">
-                                                    <span className="text-xs font-medium text-gray-500">Score:</span>
+                                                    <span className="text-xs font-medium text-gray-500">
+                                                        {formatMetricName((job.result as Record<string, unknown>).scoring_metric as string) || 'Score'}:
+                                                    </span>
                                                     <span className="text-sm font-bold text-green-600 dark:text-green-400">
                                                         {job.result.best_score.toFixed(4)}
                                                     </span>

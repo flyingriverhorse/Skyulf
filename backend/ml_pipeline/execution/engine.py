@@ -974,6 +974,9 @@ class PipelineEngine:
                 "best_score": tuning_result.best_score,
                 "best_params": tuning_result.best_params,
                 "trials": tuning_result.trials,
+                "scoring_metric": tuning_result.scoring_metric
+                or tuning_params.get("tuning_config", {}).get("metric")
+                or tuning_params.get("metric"),
             }
         else:
             metrics = {}
