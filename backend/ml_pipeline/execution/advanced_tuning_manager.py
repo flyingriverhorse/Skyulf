@@ -97,6 +97,9 @@ class AdvancedTuningManager:
             result={
                 "best_params": job.best_params,
                 "best_score": job.best_score,
+                "scoring_metric": type_cast(Optional[str], job.scoring) or (
+                    node_params.get("tuning_config", {}).get("metric") if node_params else None
+                ),
                 "metrics": metrics,
             },
             # Ensure metrics are in result too
@@ -141,6 +144,8 @@ class AdvancedTuningManager:
             job.best_score = result["best_score"]
         if "artifact_uri" in result:
             job.artifact_uri = result["artifact_uri"]
+        if "scoring_metric" in result and result["scoring_metric"]:
+            job.scoring = result["scoring_metric"]
 
         job.metrics = result  # type: ignore
 

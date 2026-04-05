@@ -3,10 +3,20 @@ import { useJobStore } from '../../core/store/useJobStore';
 import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown, Zap, CheckCircle2, Search, Filter } from 'lucide-react';
 import { JobInfo, jobsApi } from '../../core/api/jobs';
 import { useEscapeKey } from '../../core/hooks/useEscapeKey';
+import { formatMetricName } from '../../core/utils/format';
 
 const formatMetricValue = (key: string, value: number): string => {
   if (key.endsWith('_std')) return value.toFixed(6);
   return value.toFixed(4);
+};
+
+/** Extract the scoring metric name from a job's result or config. */
+const getScoringMetric = (job: JobInfo): string | undefined => {
+  const result = job.result as Record<string, unknown> | undefined;
+  if (result?.scoring_metric) return result.scoring_metric as string;
+  const config = job.config as Record<string, unknown> | undefined;
+  const tuning = config?.tuning_config as Record<string, unknown> | undefined;
+  return tuning?.metric as string | undefined;
 };
 
 /** Renders feature_importances from result.metrics or result directly as a sorted bar table. */
@@ -61,6 +71,11 @@ export const JobsDrawer: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   useEscapeKey(toggleDrawer, isDrawerOpen);
+
+  // Reset to list view whenever the drawer re-opens
+  useEffect(() => {
+    if (isDrawerOpen) setSelectedJob(null);
+  }, [isDrawerOpen]);
 
   if (!isDrawerOpen) return null;
 
@@ -263,8 +278,7 @@ export const JobsDrawer: React.FC = () => {
                     <div className="col-span-3">Job ID</div>
                     <div className="col-span-2">Started</div>
                     <div className="col-span-1">Duration</div>
-                    <div className="col-span-1">Ready</div>
-                    <div className="col-span-1">Result</div>
+                    <div className="col-span-2">Score</div>
                 </div>
 
                 {/* List */}
@@ -553,7 +567,9 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                         {/* Best Score */}
                                         {(job.result as Record<string, unknown>).best_score !== undefined && (
                                             <div className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg w-fit">
-                                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Best Score</div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                    Best Score{getScoringMetric(job) ? ` (${formatMetricName(getScoringMetric(job))})` : ''}
+                                                </div>
                                                 <div className="font-mono font-bold text-lg text-purple-600 dark:text-purple-400">
                                                     {Number((job.result as Record<string, unknown>).best_score).toFixed(4)}
                                                 </div>
@@ -691,42 +707,33 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
         {getDuration(job.start_time, job.end_time)}
       </div>
 
-      {/* Model Ready */}
-      <div className="col-span-1">
-        {job.status === 'completed' && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full flex items-center gap-1 border border-green-200 dark:border-green-800 w-fit">
-                <CheckCircle className="w-3 h-3" />
-            </span>
-        )}
-      </div>
-
-      {/* Result / Error */}
-      <div className="col-span-1">
+      {/* Score */}
+      <div className="col-span-2 flex items-center gap-2">
         {job.error ? (
-            <span className="text-red-600 dark:text-red-400 text-xs truncate block" title={job.error}>
+            <span className="text-red-600 dark:text-red-400 text-xs truncate" title={job.error}>
                 Error
             </span>
-                ) : job.status === 'completed' && job.result ? (
-                         job.job_type === 'basic_training' && !!(job.result as { metrics?: Record<string, unknown> }).metrics ? (
+        ) : job.status === 'completed' && job.result ? (
+            job.job_type === 'basic_training' && !!(job.result as { metrics?: Record<string, unknown> }).metrics ? (
                <div className="flex flex-wrap gap-1">
-                                 {Object.entries((job.result as { metrics: Record<string, unknown> }).metrics).slice(0, 1).map(([k, v]) => (
-                   <span key={k} className="text-[10px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 truncate max-w-full">
+                 {Object.entries((job.result as { metrics: Record<string, unknown> }).metrics).slice(0, 1).map(([k, v]) => (
+                   <span key={k} className="text-[10px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
                      {k}: {Number(v).toFixed(3)}
                    </span>
                  ))}
                </div>
-             ) : job.job_type === 'advanced_tuning' ? (
+            ) : job.job_type === 'advanced_tuning' ? (
                <div className="flex flex-wrap gap-1">
-                                     {(job.result as { best_score?: number }).best_score !== undefined && (
-                       <span className="text-[10px] bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 truncate">
-                                                     Score: {Number((job.result as { best_score?: number }).best_score).toFixed(4)}
-                       </span>
-                   )}
-                                     {!(job.result as Record<string, unknown>).best_score && !!(job.result as Record<string, unknown>).best_params && (
-                       <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate">Params found</span>
-                   )}
+                 {(job.result as { best_score?: number }).best_score !== undefined && (
+                   <span className="text-[10px] bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                     {formatMetricName(getScoringMetric(job)) || 'Score'}: {Number((job.result as { best_score?: number }).best_score).toFixed(4)}
+                   </span>
+                 )}
+                 {!(job.result as Record<string, unknown>).best_score && !!(job.result as Record<string, unknown>).best_params && (
+                   <span className="text-[10px] text-gray-500 dark:text-gray-400">Params found</span>
+                 )}
                </div>
-             ) : <span className="text-gray-400 text-xs">-</span>
+            ) : <span className="text-gray-400 text-xs">-</span>
         ) : (
             <span className="text-gray-400 text-xs">-</span>
         )}
