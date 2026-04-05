@@ -15,7 +15,7 @@ from backend.ml_pipeline.execution.graph_utils import (
 )
 from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
-from backend.ml_pipeline.execution.utils import resolve_dataset_name, get_dataset_map
+from backend.ml_pipeline.execution.utils import resolve_dataset_name, get_dataset_map, parse_branch_info
 
 
 class AdvancedTuningManager:
@@ -97,6 +97,9 @@ class AdvancedTuningManager:
             result={
                 "best_params": job.best_params,
                 "best_score": job.best_score,
+                "scoring_metric": type_cast(Optional[str], job.scoring) or (
+                    node_params.get("tuning_config", {}).get("metric") if node_params else None
+                ),
                 "metrics": metrics,
             },
             # Ensure metrics are in result too
@@ -111,6 +114,9 @@ class AdvancedTuningManager:
             logs=type_cast(Optional[List[str]], job.logs),
             graph=type_cast(Dict[str, Any], job.graph),
             config=type_cast(Optional[Dict[str, Any]], node_params),
+            promoted_at=type_cast(Optional[datetime], job.promoted_at),
+            parent_pipeline_id=parse_branch_info(type_cast(str, job.pipeline_id))[0],
+            branch_index=parse_branch_info(type_cast(str, job.pipeline_id))[1],
         )
 
     @staticmethod
@@ -138,6 +144,8 @@ class AdvancedTuningManager:
             job.best_score = result["best_score"]
         if "artifact_uri" in result:
             job.artifact_uri = result["artifact_uri"]
+        if "scoring_metric" in result and result["scoring_metric"]:
+            job.scoring = result["scoring_metric"]
 
         job.metrics = result  # type: ignore
 

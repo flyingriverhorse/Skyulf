@@ -284,7 +284,7 @@ export const DataDriftPage: React.FC = () => {
                             <div className="absolute z-50 left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md shadow-lg overflow-hidden">
                                 <div className="p-2 border-b border-gray-100 dark:border-slate-700">
                                     <div className="relative">
-                                        <Search className="absolute left-2.5 top-2 text-gray-400" size={14} />
+                                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" size={14} />
                                         <input
                                             type="text"
                                             autoFocus

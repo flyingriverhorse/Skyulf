@@ -78,7 +78,7 @@ const ColumnSelector: React.FC<{
     <div className="space-y-2 border rounded p-2 bg-background">
       <div className="flex gap-2 items-center">
         <div className="relative flex-1">
-           <Search className="absolute left-2 top-1.5 w-3 h-3 text-muted-foreground" />
+           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none z-10" />
            <input 
              className="w-full pl-7 pr-2 py-1 text-xs border rounded bg-background" 
              placeholder="Search columns..." 

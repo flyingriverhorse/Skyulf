@@ -1,5 +1,7 @@
 import copy
 import logging
+import uuid
+from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
@@ -7,6 +9,68 @@ from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
 logger = logging.getLogger(__name__)
 
 TERMINAL_STEP_TYPES = {"basic_training", "advanced_tuning"}
+
+
+def _split_connected_components(config: PipelineConfig) -> List[PipelineConfig]:
+    """Split a pipeline into one PipelineConfig per connected subgraph.
+
+    Disconnected parts of the canvas (e.g. two datasets with no shared nodes)
+    become separate experiment groups, each with its own pipeline_id.
+    Returns a single-element list when the graph is fully connected.
+    """
+    node_map: Dict[str, NodeConfig] = {n.node_id: n for n in config.nodes}
+    if not node_map:
+        return [config]
+
+    # Build undirected adjacency
+    adj: Dict[str, set[str]] = defaultdict(set)
+    for node in config.nodes:
+        for parent_id in node.inputs:
+            if parent_id in node_map:
+                adj[node.node_id].add(parent_id)
+                adj[parent_id].add(node.node_id)
+
+    # BFS to find connected components
+    visited: set[str] = set()
+    components: List[List[str]] = []
+    for nid in node_map:
+        if nid in visited:
+            continue
+        component: List[str] = []
+        queue = [nid]
+        while queue:
+            cur = queue.pop(0)
+            if cur in visited:
+                continue
+            visited.add(cur)
+            component.append(cur)
+            for neighbor in adj[cur]:
+                if neighbor not in visited:
+                    queue.append(neighbor)
+        components.append(component)
+
+    if len(components) <= 1:
+        return [config]
+
+    # Each component gets its own pipeline_id
+    results: List[PipelineConfig] = []
+    for component_ids in components:
+        id_set = set(component_ids)
+        comp_nodes = [node_map[nid] for nid in component_ids]
+        # Preserve original ID for first component, generate new for rest
+        comp_pipeline_id = (
+            config.pipeline_id if not results
+            else f"preview_{uuid.uuid4().hex[:12]}"
+        )
+        results.append(
+            PipelineConfig(
+                pipeline_id=comp_pipeline_id,
+                nodes=comp_nodes,
+                metadata={**config.metadata},
+            )
+        )
+
+    return results
 
 
 def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
@@ -64,14 +128,19 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
         return sub_configs
 
     # --- Case 1: multiple terminal nodes ---
+    # When a terminal has multiple inputs, always split it into per-input
+    # sub-branches so each path is a separate experiment. This avoids the
+    # confusing "2 terminals but 3 logical paths" scenario.
     sub_configs = []
-    for idx, term in enumerate(terminals):
-        # Check if this terminal also needs per-input splitting (parallel mode)
-        if (
+    global_branch = 0
+    for term in terminals:
+        is_parallel = (
             term.params.get("execution_mode") == "parallel"
             and len(term.inputs) > 1
-        ):
-            for sub_idx, branch_root_id in enumerate(term.inputs):
+        )
+        if is_parallel:
+            # Parallel mode: each input becomes its own experiment branch
+            for branch_root_id in term.inputs:
                 ancestors = _collect_ancestors(branch_root_id, node_map)
                 term_copy = NodeConfig(
                     node_id=term.node_id,
@@ -87,33 +156,35 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
                 sub_configs.append(
                     PipelineConfig(
                         pipeline_id=(
-                            f"{config.pipeline_id}__branch_{idx}_{sub_idx}"
+                            f"{config.pipeline_id}__branch_{global_branch}"
                         ),
                         nodes=branch_nodes,
                         metadata={
                             **config.metadata,
-                            "branch_index": idx,
-                            "sub_branch_index": sub_idx,
+                            "branch_index": global_branch,
                             "parent_pipeline_id": config.pipeline_id,
                         },
                     )
                 )
+                global_branch += 1
         else:
+            # Merge mode (default) or single input: one branch per terminal
             ancestors = _collect_ancestors(term.node_id, node_map)
             branch_nodes = [
                 node_map[nid] for nid in ancestors if nid in node_map
             ]
             sub_configs.append(
                 PipelineConfig(
-                    pipeline_id=f"{config.pipeline_id}__branch_{idx}",
+                    pipeline_id=f"{config.pipeline_id}__branch_{global_branch}",
                     nodes=branch_nodes,
                     metadata={
                         **config.metadata,
-                        "branch_index": idx,
+                        "branch_index": global_branch,
                         "parent_pipeline_id": config.pipeline_id,
                     },
                 )
             )
+            global_branch += 1
     return sub_configs
 
 

@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Literal, Optional, Union, cast
 
 import pandas as pd
@@ -295,7 +296,10 @@ async def run_pipeline(  # noqa: C901
     into independent sub-pipelines. Each sub-pipeline gets its own job and
     runs concurrently. The response includes all ``job_ids``.
     """
-    from backend.ml_pipeline.execution.graph_utils import partition_parallel_pipeline
+    from backend.ml_pipeline.execution.graph_utils import (
+        partition_parallel_pipeline,
+        _split_connected_components,
+    )
 
     pipeline_id = config.pipeline_id
 
@@ -320,7 +324,12 @@ async def run_pipeline(  # noqa: C901
         metadata=config.metadata,
     )
 
-    sub_pipelines = partition_parallel_pipeline(internal_config)
+    # Split disconnected subgraphs into separate experiment groups first,
+    # then partition each group for parallel branches.
+    components = _split_connected_components(internal_config)
+    sub_pipelines: list[PipelineConfig] = []
+    for comp in components:
+        sub_pipelines.extend(partition_parallel_pipeline(comp))
 
     # When a specific target node was requested and the partitioner split
     # by multiple terminals, only run the branch containing that node.
@@ -342,6 +351,7 @@ async def run_pipeline(  # noqa: C901
 
     settings = get_settings()
     all_job_ids: List[str] = []
+    task_payloads: List[tuple] = []
 
     for sub in sub_pipelines:
         # Identify the terminal node for this sub-pipeline
@@ -399,7 +409,20 @@ async def run_pipeline(  # noqa: C901
         if settings.USE_CELERY:
             run_pipeline_task.delay(job_id, sub_payload)
         else:
-            background_tasks.add_task(run_pipeline_task, job_id, sub_payload)
+            task_payloads.append((job_id, sub_payload))
+
+    # Non-Celery: run branches concurrently via ThreadPoolExecutor
+    if not settings.USE_CELERY and task_payloads:
+        if len(task_payloads) == 1:
+            background_tasks.add_task(run_pipeline_task, *task_payloads[0])
+        else:
+            def _run_branches_concurrently(payloads: List[tuple]) -> None:
+                with ThreadPoolExecutor(max_workers=len(payloads)) as pool:
+                    futures = [pool.submit(run_pipeline_task, jid, pl) for jid, pl in payloads]
+                    for f in futures:
+                        f.result()  # propagate exceptions per-branch via logging
+
+            background_tasks.add_task(_run_branches_concurrently, task_payloads)
 
     is_parallel = len(all_job_ids) > 1
     message = (
@@ -810,6 +833,27 @@ async def cancel_job(job_id: str, session: AsyncSession = Depends(get_async_sess
             detail="Job could not be cancelled (maybe it's already finished or doesn't exist)",
         )
     return {"message": "Job cancelled successfully"}
+
+
+@router.post("/jobs/{job_id}/promote")
+async def promote_job(job_id: str, session: AsyncSession = Depends(get_async_session)):
+    """Marks a completed job as the promoted winner."""
+    success = await JobManager.promote_job(session, job_id)
+    if not success:
+        raise HTTPException(
+            status_code=400,
+            detail="Job could not be promoted (must be completed and exist)",
+        )
+    return {"message": "Job promoted successfully"}
+
+
+@router.delete("/jobs/{job_id}/promote")
+async def unpromote_job(job_id: str, session: AsyncSession = Depends(get_async_session)):
+    """Removes promotion from a job."""
+    success = await JobManager.unpromote_job(session, job_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"message": "Job unPromoted successfully"}
 
 
 @router.get("/jobs/{job_id}/evaluation")

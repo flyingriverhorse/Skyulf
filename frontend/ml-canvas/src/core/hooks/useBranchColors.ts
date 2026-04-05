@@ -33,11 +33,14 @@ export interface BranchEdgeInfo {
 
 /**
  * Assigns branch colors to edges based on which training/tuning terminal
- * they belong to. Shared edges (belonging to multiple branches)
- * return null (keep default gradient).
+ * they belong to. When a terminal has multiple inputs each input path is
+ * treated as a separate branch (mirroring backend partition logic).
  *
- * The branch label is only attached to the **last edge** entering the
- * terminal node — not every edge in the branch.
+ * Shared edges (belonging to multiple branches) get the first branch's
+ * color + the `shared` flag.
+ *
+ * The branch label is only attached to the edge entering the terminal
+ * node — not every edge in the branch.
  */
 export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, BranchEdgeInfo> {
   return useMemo(() => {
@@ -48,10 +51,7 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
       n => TRAINING_TYPES.has(n.data.definitionType as string) && edges.some(e => e.target === n.id)
     );
 
-    // Need 2+ terminals for branch coloring to matter
-    if (terminals.length < 2) return colorMap;
-
-    const colors = generateBranchColors(terminals.length);
+    if (terminals.length === 0) return colorMap;
 
     // Build adjacency: target → source edges (for BFS backwards)
     const incomingMap = new Map<string, Edge[]>();
@@ -61,38 +61,79 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
       incomingMap.set(edge.target, list);
     }
 
+    // Build branches: one per terminal by default (merge mode).
+    // Only split a multi-input terminal into per-input branches when the
+    // node is explicitly set to execution_mode === 'parallel'.
+    interface BranchDef { terminal: Node; inputEdge: Edge | null }
+    const branches: BranchDef[] = [];
+    for (const terminal of terminals) {
+      const terminalIncoming = incomingMap.get(terminal.id) || [];
+      if (terminalIncoming.length === 0) continue;
+      const isParallel = terminal.data.execution_mode === 'parallel';
+      if (isParallel && terminalIncoming.length > 1) {
+        // Parallel mode: each input path is a separate experiment branch
+        for (const edge of terminalIncoming) {
+          branches.push({ terminal, inputEdge: edge });
+        }
+      } else {
+        // Merge mode (default): all inputs funnel into one branch
+        branches.push({ terminal, inputEdge: null });
+      }
+    }
+
+    // Need 2+ branches for coloring to matter
+    if (branches.length < 2) return colorMap;
+
+    const colors = generateBranchColors(branches.length);
+
     // Collect the terminal-entering edge ids so we can tag them with labels
     const terminalEdgeIds = new Set<string>();
 
-    // For each terminal, BFS backwards to collect all ancestor edges
+    // For each branch, BFS backwards to collect ancestor edges
     const branchEdgeSets: Set<string>[] = [];
     const branchLabels: string[] = [];
-    for (let i = 0; i < terminals.length; i++) {
-      const terminal = terminals[i];
+    for (let i = 0; i < branches.length; i++) {
+      const { terminal, inputEdge } = branches[i];
       const modelType = terminal.data.model_type as string | undefined;
       const modelName = modelType ? prettifyModelType(modelType) : '';
-      const label = modelName ? `Branch ${i + 1} · ${modelName}` : `Branch ${i + 1}`;
+      const pathLetter = String.fromCharCode(65 + i); // A, B, C...
+      const label = modelName ? `Path ${pathLetter} · ${modelName}` : `Path ${pathLetter}`;
       branchLabels.push(label);
-
-      // Mark only the first edge entering this terminal for the label
-      const terminalIncoming = incomingMap.get(terminal.id) || [];
-      if (terminalIncoming.length > 0) {
-        terminalEdgeIds.add(terminalIncoming[0].id);
-      }
 
       const visited = new Set<string>();
       const branchEdges = new Set<string>();
-      const queue = [terminal.id];
 
-      while (queue.length > 0) {
-        const nodeId = queue.shift()!;
-        if (visited.has(nodeId)) continue;
-        visited.add(nodeId);
-
-        const incoming = incomingMap.get(nodeId) || [];
-        for (const edge of incoming) {
-          branchEdges.add(edge.id);
-          queue.push(edge.source);
+      if (inputEdge) {
+        // Parallel branch: BFS from one specific input edge
+        terminalEdgeIds.add(inputEdge.id);
+        branchEdges.add(inputEdge.id);
+        const queue = [inputEdge.source];
+        while (queue.length > 0) {
+          const nodeId = queue.shift()!;
+          if (visited.has(nodeId)) continue;
+          visited.add(nodeId);
+          const incoming = incomingMap.get(nodeId) || [];
+          for (const edge of incoming) {
+            branchEdges.add(edge.id);
+            queue.push(edge.source);
+          }
+        }
+      } else {
+        // Merge branch: BFS from the terminal node (all its inputs)
+        const terminalIncoming = incomingMap.get(terminal.id) || [];
+        if (terminalIncoming.length > 0) {
+          terminalEdgeIds.add(terminalIncoming[0].id);
+        }
+        const queue = [terminal.id];
+        while (queue.length > 0) {
+          const nodeId = queue.shift()!;
+          if (visited.has(nodeId)) continue;
+          visited.add(nodeId);
+          const incoming = incomingMap.get(nodeId) || [];
+          for (const edge of incoming) {
+            branchEdges.add(edge.id);
+            queue.push(edge.source);
+          }
         }
       }
       branchEdgeSets.push(branchEdges);

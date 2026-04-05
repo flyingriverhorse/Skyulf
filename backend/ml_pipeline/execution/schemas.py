@@ -42,6 +42,11 @@ class JobInfo(BaseModel):
     version: Optional[int] = None
     graph: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
+    promoted_at: Optional[datetime] = None
+
+    # Parallel branch metadata
+    branch_index: Optional[int] = None
+    parent_pipeline_id: Optional[str] = None
 
 
 from backend.ml_pipeline.constants import StepType

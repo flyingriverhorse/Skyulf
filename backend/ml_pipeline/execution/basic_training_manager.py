@@ -13,7 +13,7 @@ from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
 
 
-from backend.ml_pipeline.execution.utils import resolve_dataset_name, get_dataset_map
+from backend.ml_pipeline.execution.utils import resolve_dataset_name, get_dataset_map, parse_branch_info
 
 class BasicTrainingManager:
     @staticmethod
@@ -106,6 +106,9 @@ class BasicTrainingManager:
             dropped_columns=dropped_columns,
             logs=t_cast(Optional[List[str]], job.logs),
             graph=type_cast(Dict[str, Any], job.graph),
+            promoted_at=t_cast(Optional[datetime], job.promoted_at),
+            parent_pipeline_id=parse_branch_info(t_cast(str, job.pipeline_id))[0],
+            branch_index=parse_branch_info(t_cast(str, job.pipeline_id))[1],
         )
 
     @staticmethod

@@ -49,7 +49,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
              {/* Toolbar */}
              <div className="flex items-center gap-4 bg-card p-2 rounded-lg border">
                 <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
                     <Input 
                         placeholder="Search variables..." 
                         className="pl-8 h-9" 
