@@ -296,7 +296,10 @@ async def run_pipeline(  # noqa: C901
     into independent sub-pipelines. Each sub-pipeline gets its own job and
     runs concurrently. The response includes all ``job_ids``.
     """
-    from backend.ml_pipeline.execution.graph_utils import partition_parallel_pipeline
+    from backend.ml_pipeline.execution.graph_utils import (
+        partition_parallel_pipeline,
+        _split_connected_components,
+    )
 
     pipeline_id = config.pipeline_id
 
@@ -321,7 +324,12 @@ async def run_pipeline(  # noqa: C901
         metadata=config.metadata,
     )
 
-    sub_pipelines = partition_parallel_pipeline(internal_config)
+    # Split disconnected subgraphs into separate experiment groups first,
+    # then partition each group for parallel branches.
+    components = _split_connected_components(internal_config)
+    sub_pipelines: list[PipelineConfig] = []
+    for comp in components:
+        sub_pipelines.extend(partition_parallel_pipeline(comp))
 
     # When a specific target node was requested and the partitioner split
     # by multiple terminals, only run the branch containing that node.
