@@ -1,12 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
-import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown } from 'lucide-react';
+import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown, Zap, CheckCircle2, Search, Filter } from 'lucide-react';
 import { JobInfo, jobsApi } from '../../core/api/jobs';
 import { useEscapeKey } from '../../core/hooks/useEscapeKey';
+import { formatMetricName } from '../../core/utils/format';
 
 const formatMetricValue = (key: string, value: number): string => {
   if (key.endsWith('_std')) return value.toFixed(6);
   return value.toFixed(4);
+};
+
+/** Extract the scoring metric name from a job's result or config. */
+const getScoringMetric = (job: JobInfo): string | undefined => {
+  const result = job.result as Record<string, unknown> | undefined;
+  if (result?.scoring_metric) return result.scoring_metric as string;
+  const config = job.config as Record<string, unknown> | undefined;
+  const tuning = config?.tuning_config as Record<string, unknown> | undefined;
+  return tuning?.metric as string | undefined;
 };
 
 /** Renders feature_importances from result.metrics or result directly as a sorted bar table. */
@@ -50,16 +60,43 @@ export const JobsDrawer: React.FC = () => {
     setTab,
     fetchJobs,
     hasMore,
-    loadMoreJobs
+    loadMoreJobs,
+    activeParallelRun
   } = useJobStore();
 
   const [selectedJob, setSelectedJob] = useState<JobInfo | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [modelFilter, setModelFilter] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   useEscapeKey(toggleDrawer, isDrawerOpen);
 
+  // Reset to list view whenever the drawer re-opens
+  useEffect(() => {
+    if (isDrawerOpen) setSelectedJob(null);
+  }, [isDrawerOpen]);
+
   if (!isDrawerOpen) return null;
 
-  const filteredJobs = jobs.filter(job => job.job_type === activeTab);
+  const tabJobs = jobs.filter(job => job.job_type === activeTab);
+  
+  // Derive unique model types and statuses from current tab's jobs
+  const modelTypes = [...new Set(tabJobs.map(j => j.model_type).filter(Boolean))] as string[];
+  const statuses = [...new Set(tabJobs.map(j => j.status))];
+
+  const filteredJobs = tabJobs.filter(job => {
+    if (statusFilter !== 'all' && job.status !== statusFilter) return false;
+    if (modelFilter !== 'all' && job.model_type !== modelFilter) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matchesId = job.job_id.toLowerCase().includes(q);
+      const matchesDataset = (job.dataset_name || job.dataset_id || '').toLowerCase().includes(q);
+      const matchesModel = (job.model_type || '').toLowerCase().includes(q);
+      if (!matchesId && !matchesDataset && !matchesModel) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex justify-center items-center">
@@ -96,6 +133,50 @@ export const JobsDrawer: React.FC = () => {
                 </div>
                 </div>
 
+                {/* Parallel Run Progress Banner */}
+                {activeParallelRun && (() => {
+                  const total = activeParallelRun.jobIds.length;
+                  const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
+                  const doneCount = activeParallelRun.jobIds.filter(id => {
+                    const j = jobs.find(job => job.job_id === id);
+                    return j && TERMINAL.has(j.status);
+                  }).length;
+                  const pct = Math.round((doneCount / total) * 100);
+                  const isDone = doneCount === total;
+                  return (
+                    <div className={`px-4 py-2.5 border-b flex items-center gap-3 ${
+                      isDone
+                        ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700/50'
+                        : 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700/50'
+                    }`}>
+                      {isDone
+                        ? <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0" />
+                        : <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      }
+                      <span className={`text-sm font-medium ${
+                        isDone
+                          ? 'text-green-800 dark:text-green-200'
+                          : 'text-amber-800 dark:text-amber-200'
+                      }`}>
+                        {isDone ? 'All branches complete!' : `Parallel Run: ${doneCount}/${total} branches complete`}
+                      </span>
+                      <div className={`flex-1 h-2 rounded-full overflow-hidden ${
+                        isDone ? 'bg-green-200 dark:bg-green-800' : 'bg-amber-200 dark:bg-amber-800'
+                      }`}>
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isDone ? 'bg-green-500 dark:bg-green-400' : 'bg-amber-500 dark:bg-amber-400'
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className={`text-xs font-mono shrink-0 ${
+                        isDone ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'
+                      }`}>{pct}%</span>
+                    </div>
+                  );
+                })()}
+
                 {/* Tabs */}
                 <div className="flex border-b border-gray-200 dark:border-gray-700">
                 <button
@@ -120,6 +201,76 @@ export const JobsDrawer: React.FC = () => {
                 </button>
                 </div>
 
+                {/* Filter Bar */}
+                <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none z-10" />
+                      <input
+                        type="text"
+                        placeholder="Search by job ID, dataset, or model..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-700 dark:text-gray-200 placeholder-gray-400"
+                      />
+                    </div>
+                    <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border transition-colors ${
+                        showFilters || statusFilter !== 'all' || modelFilter !== 'all'
+                          ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400'
+                          : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      <Filter className="w-3.5 h-3.5" />
+                      Filters
+                      {(statusFilter !== 'all' || modelFilter !== 'all') && (
+                        <span className="w-4 h-4 flex items-center justify-center bg-blue-500 text-white rounded-full text-[10px] font-bold">
+                          {(statusFilter !== 'all' ? 1 : 0) + (modelFilter !== 'all' ? 1 : 0)}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                  {showFilters && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</label>
+                        <select
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          className="text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="all">All</option>
+                          {statuses.map(s => (
+                            <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model</label>
+                        <select
+                          value={modelFilter}
+                          onChange={(e) => setModelFilter(e.target.value)}
+                          className="text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="all">All</option>
+                          {modelTypes.map(m => (
+                            <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {(statusFilter !== 'all' || modelFilter !== 'all') && (
+                        <button
+                          onClick={() => { setStatusFilter('all'); setModelFilter('all'); }}
+                          className="text-[10px] text-blue-500 hover:underline"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* List Header */}
                 <div className="grid grid-cols-12 gap-4 px-6 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
                     <div className="col-span-2">Status</div>
@@ -127,15 +278,17 @@ export const JobsDrawer: React.FC = () => {
                     <div className="col-span-3">Job ID</div>
                     <div className="col-span-2">Started</div>
                     <div className="col-span-1">Duration</div>
-                    <div className="col-span-1">Ready</div>
-                    <div className="col-span-1">Result</div>
+                    <div className="col-span-2">Score</div>
                 </div>
 
                 {/* List */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50/30 dark:bg-gray-900/30">
                 {filteredJobs.length === 0 ? (
                     <div className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">
-                    No {activeTab === 'advanced_tuning' ? 'advanced training' : 'training'} jobs found.
+                    {searchQuery || statusFilter !== 'all' || modelFilter !== 'all'
+                      ? 'No jobs match the current filters.'
+                      : `No ${activeTab === 'advanced_tuning' ? 'advanced training' : 'training'} jobs found.`
+                    }
                     </div>
                 ) : (
                     <>
@@ -174,7 +327,7 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
 
     // Poll for updates if running
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let interval: ReturnType<typeof setInterval>;
         
         const fetchDetails = async () => {
             try {
@@ -414,7 +567,9 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                         {/* Best Score */}
                                         {(job.result as Record<string, unknown>).best_score !== undefined && (
                                             <div className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg w-fit">
-                                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Best Score</div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                    Best Score{getScoringMetric(job) ? ` (${formatMetricName(getScoringMetric(job))})` : ''}
+                                                </div>
                                                 <div className="font-mono font-bold text-lg text-purple-600 dark:text-purple-400">
                                                     {Number((job.result as Record<string, unknown>).best_score).toFixed(4)}
                                                 </div>
@@ -552,42 +707,33 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
         {getDuration(job.start_time, job.end_time)}
       </div>
 
-      {/* Model Ready */}
-      <div className="col-span-1">
-        {job.status === 'completed' && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full flex items-center gap-1 border border-green-200 dark:border-green-800 w-fit">
-                <CheckCircle className="w-3 h-3" />
-            </span>
-        )}
-      </div>
-
-      {/* Result / Error */}
-      <div className="col-span-1">
+      {/* Score */}
+      <div className="col-span-2 flex items-center gap-2">
         {job.error ? (
-            <span className="text-red-600 dark:text-red-400 text-xs truncate block" title={job.error}>
+            <span className="text-red-600 dark:text-red-400 text-xs truncate" title={job.error}>
                 Error
             </span>
-                ) : job.status === 'completed' && job.result ? (
-                         job.job_type === 'basic_training' && !!(job.result as { metrics?: Record<string, unknown> }).metrics ? (
+        ) : job.status === 'completed' && job.result ? (
+            job.job_type === 'basic_training' && !!(job.result as { metrics?: Record<string, unknown> }).metrics ? (
                <div className="flex flex-wrap gap-1">
-                                 {Object.entries((job.result as { metrics: Record<string, unknown> }).metrics).slice(0, 1).map(([k, v]) => (
-                   <span key={k} className="text-[10px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 truncate max-w-full">
+                 {Object.entries((job.result as { metrics: Record<string, unknown> }).metrics).slice(0, 1).map(([k, v]) => (
+                   <span key={k} className="text-[10px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
                      {k}: {Number(v).toFixed(3)}
                    </span>
                  ))}
                </div>
-             ) : job.job_type === 'advanced_tuning' ? (
+            ) : job.job_type === 'advanced_tuning' ? (
                <div className="flex flex-wrap gap-1">
-                                     {(job.result as { best_score?: number }).best_score !== undefined && (
-                       <span className="text-[10px] bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 truncate">
-                                                     Score: {Number((job.result as { best_score?: number }).best_score).toFixed(4)}
-                       </span>
-                   )}
-                                     {!(job.result as Record<string, unknown>).best_score && !!(job.result as Record<string, unknown>).best_params && (
-                       <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate">Params found</span>
-                   )}
+                 {(job.result as { best_score?: number }).best_score !== undefined && (
+                   <span className="text-[10px] bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                     {formatMetricName(getScoringMetric(job)) || 'Score'}: {Number((job.result as { best_score?: number }).best_score).toFixed(4)}
+                   </span>
+                 )}
+                 {!(job.result as Record<string, unknown>).best_score && !!(job.result as Record<string, unknown>).best_params && (
+                   <span className="text-[10px] text-gray-500 dark:text-gray-400">Params found</span>
+                 )}
                </div>
-             ) : <span className="text-gray-400 text-xs">-</span>
+            ) : <span className="text-gray-400 text-xs">-</span>
         ) : (
             <span className="text-gray-400 text-xs">-</span>
         )}

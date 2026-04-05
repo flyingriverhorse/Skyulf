@@ -215,6 +215,7 @@ class MLJob(Base, TimestampMixin):
     logs = Column(JSON, nullable=True)
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
+    promoted_at = Column(DateTime, nullable=True)
 
     def to_dict_base(self) -> dict:
         """Convert common model fields to dictionary."""
@@ -235,6 +236,7 @@ class MLJob(Base, TimestampMixin):
             "logs": self.logs,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+            "promoted_at": self.promoted_at.isoformat() if self.promoted_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

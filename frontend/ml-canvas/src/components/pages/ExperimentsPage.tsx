@@ -4,11 +4,30 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ScatterChart, Scatter, LineChart, Line, ReferenceLine
 } from 'recharts';
-import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, RefreshCw, Download, Loader2, Check } from 'lucide-react';
+import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, RefreshCw, Download, Loader2, Check, Trophy, GitBranch } from 'lucide-react';
 import { LoadingState, ErrorState } from '../shared';
 import { toPng } from 'html-to-image';
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
+import { formatMetricName } from '../../core/utils/format';
+
+/** Extract the resolved scoring metric from a job's result (top-level or nested in metrics). */
+function getJobScoringMetric(job: { result?: Record<string, unknown> | null }): string | undefined {
+  const r = job.result;
+  if (r?.scoring_metric) return r.scoring_metric as string;
+  const m = r?.metrics as Record<string, unknown> | undefined;
+  if (m?.scoring_metric) return m.scoring_metric as string;
+  return undefined;
+}
+
+/** Extract a short 8-char run ID from a pipeline_id, stripping the "preview_" prefix
+ *  and any "__branch_N" suffix so all experiments from the same batch share the same ID. */
+function shortRunId(job: { pipeline_id: string; parent_pipeline_id?: string | null }): string {
+  const raw = job.parent_pipeline_id || job.pipeline_id;
+  // Strip "preview_" prefix and any "__branch_*" suffix
+  const clean = raw.replace(/^preview_/, '').replace(/__branch_.*$/, '');
+  return clean.slice(0, 8);
+}
 
 interface EvaluationSplit {
   y_true: (string | number)[];
@@ -27,7 +46,7 @@ interface EvaluationData {
 }
 
 export const ExperimentsPage: React.FC = () => {
-  const { jobs, fetchJobs, hasMore, loadMoreJobs, isLoading } = useJobStore();
+  const { jobs, fetchJobs, hasMore, loadMoreJobs, isLoading, promoteJob, unpromoteJob } = useJobStore();
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
   const [filterType, setFilterType] = useState<'all' | 'basic_training' | 'advanced_tuning'>('all');
   const [datasets, setDatasets] = useState<{id: string, name: string}[]>([]);
@@ -87,6 +106,20 @@ export const ExperimentsPage: React.FC = () => {
       alert('Model deployed successfully!');
     } catch (err) {
       alert('Failed to deploy model');
+      console.error(err);
+    }
+  };
+
+  const handlePromote = async (e: React.MouseEvent, job: typeof jobs[0]) => {
+    e.stopPropagation();
+    try {
+      if (job.promoted_at) {
+        await unpromoteJob(job.job_id);
+      } else {
+        await promoteJob(job.job_id);
+      }
+    } catch (err) {
+      alert('Failed to update promotion status');
       console.error(err);
     }
   };
@@ -222,6 +255,11 @@ export const ExperimentsPage: React.FC = () => {
     const datasetMatch = selectedDatasetId === 'all' || job.dataset_id === selectedDatasetId;
     const statusMatch = job.status === 'completed';
     return typeMatch && datasetMatch && statusMatch;
+  }).sort((a, b) => {
+    // Promoted jobs float to top
+    if (a.promoted_at && !b.promoted_at) return -1;
+    if (!a.promoted_at && b.promoted_at) return 1;
+    return 0;
   });
 
   const selectedJobs = jobs.filter(job => selectedJobIds.includes(job.job_id));
@@ -239,7 +277,7 @@ export const ExperimentsPage: React.FC = () => {
     // Use top-level metrics field which is normalized for both types (training & tuning)
     const metrics = job.metrics || job.result?.metrics || {};
     return {
-      name: job.job_id,
+      name: shortRunId(job),
       ...metrics
     };
   });
@@ -368,7 +406,7 @@ export const ExperimentsPage: React.FC = () => {
                 className={`border-b border-gray-100 dark:border-gray-700 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${
                   selectedJobIds.includes(job.job_id) ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500' : 'border-l-4 border-l-transparent'
                 } ${isSidebarCollapsed ? 'p-2 flex justify-center' : 'p-3'}`}
-                title={isSidebarCollapsed ? `#${job.version} - ${job.job_id}` : undefined}
+                title={isSidebarCollapsed ? `${shortRunId(job)} · ${job.model_type}` : undefined}
               >
                 {isSidebarCollapsed ? (
                     <div className={`w-2 h-2 rounded-full ${
@@ -379,10 +417,22 @@ export const ExperimentsPage: React.FC = () => {
                   <>
                 <div className="flex justify-between items-start mb-1">
                   <span className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-300 break-all">
-                    #{job.version} - {job.job_id}
+                    {shortRunId(job)}
                   </span>
                   <div className="flex items-center gap-2">
                     {job.status === 'completed' && (job.job_type === 'basic_training' || job.job_type === 'advanced_tuning') && (
+                      <>
+                        <button 
+                            onClick={(e) => { void handlePromote(e, job); }}
+                            className={`p-1 rounded transition-colors ${
+                              job.promoted_at 
+                                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' 
+                                : 'hover:bg-amber-100 dark:hover:bg-amber-900/20 text-gray-400 dark:text-gray-500'
+                            }`}
+                            title={job.promoted_at ? "Unpromote" : "Promote as Winner"}
+                        >
+                            <Trophy className="w-3 h-3" />
+                        </button>
                         <button 
                             onClick={(e) => { void handleDeploy(e, job.job_id); }}
                             className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900 rounded text-blue-600 dark:text-blue-400"
@@ -390,6 +440,7 @@ export const ExperimentsPage: React.FC = () => {
                         >
                             <Rocket className="w-3 h-3" />
                         </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -399,6 +450,16 @@ export const ExperimentsPage: React.FC = () => {
                       <span className="ml-1 text-gray-400">
                           ({job.search_strategy || (job.config as { tuning?: { strategy?: string } }).tuning?.strategy})
                       </span>
+                  )}
+                  {job.branch_index != null && (
+                    <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-[10px] font-semibold">
+                      <GitBranch className="w-2.5 h-2.5" /> path {String.fromCharCode(65 + (job.branch_index ?? 0))}
+                    </span>
+                  )}
+                  {job.promoted_at && (
+                    <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-semibold">
+                      <Trophy className="w-2.5 h-2.5" /> Winner
+                    </span>
                   )}
                 </div>
                 <div className="flex justify-between items-center text-[10px] text-gray-400">
@@ -487,6 +548,103 @@ export const ExperimentsPage: React.FC = () => {
                   </button>
                   )}
               </div>
+
+              {/* Branch Comparison Card — shown when selected jobs share a parallel run */}
+              {(() => {
+                const branchJobs = selectedJobs.filter(j => j.parent_pipeline_id != null);
+                // Group by parent_pipeline_id
+                const groups = new Map<string, typeof selectedJobs>();
+                branchJobs.forEach(j => {
+                  const key = j.parent_pipeline_id!;
+                  if (!groups.has(key)) groups.set(key, []);
+                  groups.get(key)!.push(j);
+                });
+                // Only show groups with 2+ branches
+                const multiGroups = Array.from(groups.entries()).filter(([, jobs]) => jobs.length >= 2);
+                if (multiGroups.length === 0) return null;
+
+                // Collect all metric keys across branch jobs
+                const allBranchMetricKeys = Array.from(new Set(
+                  branchJobs.flatMap(j => {
+                    const m = (j.metrics || j.result?.metrics || {}) as Record<string, unknown>;
+                    return Object.keys(m).filter(k => typeof m[k] === 'number');
+                  })
+                )).filter(k => k.startsWith('test_') || k === 'best_score').sort();
+
+                return multiGroups.map(([parentId, groupJobs]) => (
+                  <div key={parentId} className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/10 dark:to-blue-900/10 rounded-lg border border-purple-200 dark:border-purple-800 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <GitBranch className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      <h3 className="text-sm font-semibold text-purple-800 dark:text-purple-300">
+                        Parallel Run Comparison
+                      </h3>
+                      <span className="text-xs text-purple-500 dark:text-purple-400 font-mono">
+                        {groupJobs.length} paths · run {parentId.replace(/^preview_/, '').replace(/__branch_.*$/, '').slice(0, 8)}
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead>
+                          <tr className="border-b border-purple-200 dark:border-purple-700">
+                            <th className="px-3 py-1.5 text-gray-600 dark:text-gray-400 font-medium">Metric</th>
+                            {groupJobs.sort((a, b) => (a.branch_index ?? 0) - (b.branch_index ?? 0)).map(j => (
+                              <th key={j.job_id} className="px-3 py-1.5 font-medium text-gray-700 dark:text-gray-300">
+                                <div className="flex items-center gap-1">
+                                  <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: `hsl(${(j.branch_index ?? 0) * 120}, 70%, 50%)` }} />
+                                  Path {String.fromCharCode(65 + (j.branch_index ?? 0))} · {j.model_type}
+                                  {j.promoted_at && <Trophy className="w-3 h-3 text-amber-500 ml-1" />}
+                                </div>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allBranchMetricKeys.map(key => {
+                            // Find best value for highlighting
+                            const values = groupJobs.map(j => {
+                              const m = (j.metrics || j.result?.metrics || {}) as Record<string, number>;
+                              return m[key];
+                            });
+                            const isLowerBetter = key.includes('loss') || key.includes('error') || key.includes('mse') || key.includes('mae');
+                            const bestVal = isLowerBetter
+                              ? Math.min(...values.filter(v => v != null))
+                              : Math.max(...values.filter(v => v != null));
+
+                            return (
+                              <tr key={key} className="border-b border-purple-100 dark:border-purple-800/50">
+                                <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">
+                                  {key === 'best_score'
+                                    ? `Best Score (${formatMetricName(getJobScoringMetric(groupJobs[0])) || 'CV'})`
+                                    : key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                </td>
+                                {groupJobs.map(j => {
+                                  const m = (j.metrics || j.result?.metrics || {}) as Record<string, number>;
+                                  const val = m[key];
+                                  const isBest = val != null && val === bestVal;
+                                  return (
+                                    <td key={j.job_id} className={`px-3 py-1.5 font-mono ${isBest ? 'text-green-600 dark:text-green-400 font-bold' : 'text-gray-600 dark:text-gray-300'}`}>
+                                      {val != null ? val.toFixed(4) : '-'}
+                                      {isBest && ' ★'}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                          <tr className="border-b border-purple-100 dark:border-purple-800/50">
+                            <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">Duration</td>
+                            {groupJobs.map(j => (
+                              <td key={j.job_id} className="px-3 py-1.5 font-mono text-gray-600 dark:text-gray-300">
+                                {getDuration(j.start_time, j.end_time)}
+                              </td>
+                            ))}
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ));
+              })()}
 
               {/* Charts View */}
               {activeView === 'charts' && (
@@ -599,7 +757,7 @@ export const ExperimentsPage: React.FC = () => {
                         <th className="px-4 py-2">Parameter / Metric</th>
                         {selectedJobs.map(job => (
                           <th key={job.job_id} className="px-4 py-2 font-mono break-all min-w-[100px]">
-                            {job.job_id}
+                            {shortRunId(job)}
                           </th>
                         ))}
                       </tr>
@@ -610,7 +768,19 @@ export const ExperimentsPage: React.FC = () => {
                         <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">Model Type</td>
                         {selectedJobs.map(job => (
                           <td key={job.job_id} className="px-4 py-2 text-gray-500 dark:text-gray-400">
-                            {job.model_type}
+                            <div className="flex items-center gap-1.5">
+                              {job.model_type}
+                              {job.branch_index != null && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-[10px] font-semibold">
+                                  <GitBranch className="w-2.5 h-2.5" /> Path {String.fromCharCode(65 + (job.branch_index ?? 0))}
+                                </span>
+                              )}
+                              {job.promoted_at && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-semibold">
+                                  <Trophy className="w-2.5 h-2.5" /> Winner
+                                </span>
+                              )}
+                            </div>
                           </td>
                         ))}
                       </tr>
@@ -626,7 +796,11 @@ export const ExperimentsPage: React.FC = () => {
                       </tr>
                       {isMetricsExpanded && metricKeys.map(metricKey => (
                         <tr key={metricKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                          <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{metricKey}</td>
+                          <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">
+                            {metricKey === 'best_score'
+                              ? `Best Score (${formatMetricName(getJobScoringMetric(selectedJobs[0])) || 'CV'})`
+                              : metricKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                          </td>
                           {selectedJobs.map(job => {
                              const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
                              const val = m[metricKey];

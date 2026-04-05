@@ -1,7 +1,24 @@
-from typing import Optional, Dict
+import re
+from typing import Optional, Dict, Tuple
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database.models import DataSource
+
+
+_BRANCH_RE = re.compile(r"^(.+?)__branch_(\d+)(?:_(\d+))?$")
+
+
+def parse_branch_info(pipeline_id: str) -> Tuple[Optional[str], Optional[int]]:
+    """Extract (parent_pipeline_id, branch_index) from a branch pipeline_id.
+
+    Returns (None, None) for non-branch pipelines.
+    """
+    m = _BRANCH_RE.match(pipeline_id)
+    if not m:
+        return None, None
+    parent = m.group(1)
+    idx = int(m.group(2))
+    return parent, idx
 
 async def resolve_dataset_name(session: AsyncSession, dataset_source_id: Optional[str]) -> Optional[str]:
     """

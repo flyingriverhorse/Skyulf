@@ -8,11 +8,12 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
     const visited = new Set<string>();
     const queue: string[] = [];
 
-    const startNode = nodes.find(n => n.data.definitionType === 'dataset_node');
-    const datasetId = startNode?.data.datasetId as string;
+    // Collect ALL dataset nodes so disconnected subgraphs are included
+    const datasetNodes = nodes.filter(n => n.data.definitionType === 'dataset_node');
+    const datasetId = datasetNodes[0]?.data.datasetId as string;
 
-    if (startNode) {
-      queue.push(startNode.id);
+    for (const ds of datasetNodes) {
+      queue.push(ds.id);
     }
 
     while (queue.length > 0) {

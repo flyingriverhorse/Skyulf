@@ -455,6 +455,7 @@ class TuningCalculator(BaseModelCalculator):
                 best_score=best_score,
                 n_trials=total_candidates,
                 trials=trials,
+                scoring_metric=metric,
             )
 
         elif config.strategy in ["halving_grid", "halving_random"]:
@@ -653,6 +654,7 @@ class TuningCalculator(BaseModelCalculator):
             best_score=best_score,
             n_trials=len(trials),
             trials=trials,
+            scoring_metric=metric,
         )
 
 

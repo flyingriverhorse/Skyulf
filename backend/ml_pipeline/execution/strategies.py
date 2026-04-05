@@ -95,6 +95,8 @@ class AdvancedTuningStrategy(JobStrategy):
                 job.best_score = job.metrics["best_score"]
             if "trials" in job.metrics:
                 job.results = job.metrics["trials"]
+            if job.metrics.get("scoring_metric"):
+                job.scoring = job.metrics["scoring_metric"]
 
 
 class JobStrategyFactory:

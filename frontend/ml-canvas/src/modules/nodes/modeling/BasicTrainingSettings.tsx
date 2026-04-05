@@ -8,6 +8,7 @@ import { RegistryItem, registryApi } from '../../../core/api/registry';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useElementSize } from '../../../core/hooks/useElementSize';
+import { formatMetricName } from '../../../core/utils/format';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
@@ -177,7 +178,9 @@ const BestParamsModal: React.FC<{
                                         <div className="flex items-center gap-3 mt-1">
                                             {typeof job.result?.best_score === 'number' && (
                                                 <div className="flex items-center gap-1">
-                                                    <span className="text-xs font-medium text-gray-500">Score:</span>
+                                                    <span className="text-xs font-medium text-gray-500">
+                                                        {formatMetricName((job.result as Record<string, unknown>).scoring_metric as string) || 'Score'}:
+                                                    </span>
                                                     <span className="text-sm font-bold text-green-600 dark:text-green-400">
                                                         {job.result.best_score.toFixed(4)}
                                                     </span>
@@ -276,7 +279,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
   const [isLoadingDefs, setIsLoadingDefs] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_model_training'));
   
-  const { toggleDrawer: toggleJobDrawer, setTab } = useJobStore();
+  const { toggleDrawer: toggleJobDrawer, setTab, setActiveParallelRun, startPolling } = useJobStore();
   const upstreamData = useUpstreamData(nodeId || '');
   
   // Recursive search for datasetId
@@ -417,6 +420,8 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
         });
         const jobCount = response.job_ids?.length || 1;
         if (jobCount > 1) {
+            setActiveParallelRun({ jobIds: response.job_ids, startedAt: new Date().toISOString() });
+            startPolling();
             alert(`Parallel execution started! ${jobCount} branches submitted.`);
         } else {
             alert("Training job submitted successfully!");

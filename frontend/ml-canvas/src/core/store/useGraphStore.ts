@@ -78,7 +78,6 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
       // Warn: X/Y Split without prior Train-Test Split
       if (sourceType === 'feature_target_split') {
-        // Check if there is a Train/Test Split upstream OR if we are connecting TO one
         let hasTrainTestSplit = targetNode.data.definitionType === 'TrainTestSplitter';
         
         if (!hasTrainTestSplit) {
@@ -96,7 +95,6 @@ export const useGraphStore = create<GraphState>((set, get) => ({
               break;
             }
 
-            // Find parents
             const parentEdges = edges.filter((e) => e.target === currentId);
             for (const edge of parentEdges) {
               queue.push(edge.source);
@@ -105,12 +103,28 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         }
 
         if (!hasTrainTestSplit) {
-          alert(
-            'Warning: You are using an X/Y Split without a prior Train-Test Split.\n\n' +
-            'Any processing or modeling done on this data will use 100% of the dataset (Data Leakage).\n\n' +
-            'Recommended: Add a "Train-Test Split" node BEFORE the "Feature-Target Split" node.'
+          const proceed = confirm(
+            'Warning: X/Y Split without a prior Train-Test Split.\n\n' +
+            'This means 100% of data will be used (possible data leakage).\n\n' +
+            'Click OK to connect anyway, or Cancel to abort.'
           );
+          if (!proceed) return;
         }
+      }
+
+      // Warn: multi-input on a training/tuning node — explain merge vs parallel
+      const existingInputs = edges.filter(e => e.target === connection.target);
+      if (existingInputs.length >= 1 && modelTypes.includes(targetType)) {
+        const inputCount = existingInputs.length + 1;
+        const proceed = confirm(
+          `This training node will receive ${inputCount} inputs.\n\n` +
+          'You have two options:\n' +
+          '  • MERGE (default): Inputs are auto-merged into one dataset before training.\n' +
+          '  • PARALLEL: Each input runs as a separate experiment.\n' +
+          '    → To use parallel mode, connect each path to its OWN training node.\n\n' +
+          'Click OK to connect (merge mode), or Cancel to abort.'
+        );
+        if (!proceed) return;
       }
     }
 

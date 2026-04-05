@@ -8,6 +8,7 @@ import { jobsApi, JobInfo } from '../../../core/api/jobs';
 import { RegistryItem, registryApi } from '../../../core/api/registry';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { formatMetricName } from '../../../core/utils/format';
 import { useElementSize } from '../../../core/hooks/useElementSize';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
@@ -299,7 +300,9 @@ const BestParamsModal: React.FC<{
                                         <div className="flex items-center gap-3 mt-1">
                                             {typeof job.result?.best_score === 'number' && (
                                                 <div className="flex items-center gap-1">
-                                                    <span className="text-xs font-medium text-gray-500">Score:</span>
+                                                    <span className="text-xs font-medium text-gray-500">
+                                                        {formatMetricName((job.result as Record<string, unknown>).scoring_metric as string) || 'Score'}:
+                                                    </span>
                                                     <span className="text-sm font-bold text-green-600 dark:text-green-400">
                                                         {job.result.best_score.toFixed(4)}
                                                     </span>
@@ -337,7 +340,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
   const isWide = width > 450;
 
   // --- Upstream Data Logic ---
-  const { toggleDrawer, setTab } = useJobStore();
+  const { toggleDrawer, setTab, setActiveParallelRun, startPolling } = useJobStore();
   const upstreamData = useUpstreamData(nodeId || '');
   const nodes = useGraphStore((state) => state.nodes);
   const edges = useGraphStore((state) => state.edges);
@@ -468,9 +471,11 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         });
         const jobCount = response.job_ids?.length ?? 1;
         if (jobCount > 1) {
+            setActiveParallelRun({ jobIds: response.job_ids, startedAt: new Date().toISOString() });
+            startPolling();
             alert(`Parallel execution started! ${jobCount} branches submitted.`);
         } else {
-            alert("Tuning job submitted successfully!");
+            alert("Training job submitted successfully!");
         }
         setTab('advanced_tuning');
         toggleDrawer(true);
@@ -902,7 +907,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
           style={{ background: 'var(--main-gradient)' }}
         >
           <Play className="w-4 h-4 fill-current" />
-          <span className="text-sm font-semibold">Start Train-Optimization</span>
+          <span className="text-sm font-semibold">Start Advanced Training</span>
         </button>
 
         <button 
