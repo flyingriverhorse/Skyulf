@@ -16,9 +16,7 @@ def mock_session():
 
 @pytest.fixture
 def mock_data_source():
-    ds = DataSource(
-        id=1, type="file", config={"file_path": "/tmp/test.csv"}, source_metadata={}
-    )
+    ds = DataSource(id=1, type="file", config={"file_path": "/tmp/test.csv"}, source_metadata={})
     return ds
 
 
@@ -30,9 +28,7 @@ def test_ingest_file_task(
 ):
     # Setup mocks
     mock_get_session.return_value = mock_session
-    mock_session.query.return_value.filter.return_value.first.return_value = (
-        mock_data_source
-    )
+    mock_session.query.return_value.filter.return_value.first.return_value = mock_data_source
 
     mock_connector = AsyncMock()
     mock_connector_cls.return_value = mock_connector
@@ -67,9 +63,7 @@ def test_ingest_file_task(
 @patch("backend.data_ingestion.tasks.get_db_session")
 @patch("backend.data_ingestion.tasks.DatabaseConnector")
 @patch("backend.data_ingestion.tasks.DataProfiler")
-def test_ingest_sql_task(
-    mock_profiler, mock_connector_cls, mock_get_session, mock_session
-):
+def test_ingest_sql_task(mock_profiler, mock_connector_cls, mock_get_session, mock_session):
     # Setup SQL DataSource
     ds = DataSource(
         id=2,
@@ -95,9 +89,7 @@ def test_ingest_sql_task(
     ingest_data_task(2)
 
     # Verify
-    mock_connector_cls.assert_called_with(
-        "sqlite:///:memory:", table_name="users", query=None
-    )
+    mock_connector_cls.assert_called_with("sqlite:///:memory:", table_name="users", query=None)
     mock_connector.connect.assert_called_once()
     assert ds.test_status == "success"
 
@@ -105,9 +97,7 @@ def test_ingest_sql_task(
 @patch("backend.data_ingestion.tasks.get_db_session")
 @patch("backend.data_ingestion.tasks.ApiConnector")
 @patch("backend.data_ingestion.tasks.DataProfiler")
-def test_ingest_api_task(
-    mock_profiler, mock_connector_cls, mock_get_session, mock_session
-):
+def test_ingest_api_task(mock_profiler, mock_connector_cls, mock_get_session, mock_session):
     # Setup API DataSource
     ds = DataSource(
         id=3,

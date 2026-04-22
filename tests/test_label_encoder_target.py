@@ -56,9 +56,7 @@ def test_label_encoder_on_target_after_split():
     X_train_new, y_train_new = train_transformed
 
     # Verify y_train is encoded (should be integers)
-    assert pd.api.types.is_integer_dtype(y_train_new) or pd.api.types.is_float_dtype(
-        y_train_new
-    )
+    assert pd.api.types.is_integer_dtype(y_train_new) or pd.api.types.is_float_dtype(y_train_new)
     assert set(y_train_new.unique()).issubset({0, 1})
 
     # Get the mapping from the encoder
@@ -86,9 +84,7 @@ def test_label_encoder_on_target_after_split():
     X_test_new, y_test_new = test_transformed
 
     # Verify y_test is encoded
-    assert pd.api.types.is_integer_dtype(y_test_new) or pd.api.types.is_float_dtype(
-        y_test_new
-    )
+    assert pd.api.types.is_integer_dtype(y_test_new) or pd.api.types.is_float_dtype(y_test_new)
     assert set(y_test_new.unique()).issubset({0, 1})
 
     # Check consistency on Test

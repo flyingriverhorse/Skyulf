@@ -19,6 +19,16 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
     (a, b) => a === b
   );
 
+  // Has this node received an active sibling-fan-in advisory with real
+  // overlap (i.e. last-wins overwrite is happening)? If so, color the
+  // merge badge amber so the canvas itself flags the risk.
+  const mergeWarningSeverity: 'risk' | 'safe' | null = (() => {
+    const warnings = executionResult?.merge_warnings ?? [];
+    const w = warnings.find((mw) => mw.node_id === id);
+    if (!w) return null;
+    return (w.overlap_columns?.length ?? 0) > 0 ? 'risk' : 'safe';
+  })();
+
   // Parallel badge only on training/tuning nodes when user explicitly chose it
   const isTrainingNode = TRAINING_TYPES.has(definitionType);
   const isParallel = isTrainingNode && data.execution_mode === 'parallel';
@@ -61,11 +71,15 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
                 className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                   isParallel
                     ? 'bg-amber-500/15 text-amber-500'
+                    : mergeWarningSeverity === 'risk'
+                    ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/40'
                     : 'bg-blue-500/15 text-blue-400'
                 }`}
                 title={
                   isParallel
                     ? `Parallel: ${incomingSourceCount} branches will run as separate experiments`
+                    : mergeWarningSeverity === 'risk'
+                    ? `Merge with overlap: ${incomingSourceCount} branches share columns — last input overwrites earlier ones. See Results panel banner for details.`
                     : `Merge: combining data from ${incomingSourceCount} upstream sources`
                 }
               >

@@ -11,8 +11,17 @@ class FilesMixin:
     UPLOAD_DIR: str = "uploads/data"
     MAX_UPLOAD_SIZE: int = 1024 * 1024 * 1024  # 1 GB
     ALLOWED_EXTENSIONS: List[str] = [
-        ".csv", ".xlsx", ".xls", ".parquet", ".json",
-        ".txt", ".pkl", ".pickle", ".feather", ".h5", ".hdf5",
+        ".csv",
+        ".xlsx",
+        ".xls",
+        ".parquet",
+        ".json",
+        ".txt",
+        ".pkl",
+        ".pickle",
+        ".feather",
+        ".h5",
+        ".hdf5",
     ]
     TRAINING_ARTIFACT_DIR: str = "uploads/models"
     TEMP_DIR: str = "temp/processing"

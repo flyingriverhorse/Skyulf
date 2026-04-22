@@ -33,9 +33,7 @@ async def list_models(
 
 
 @router.get("/models/{model_type}/versions", response_model=List[ModelVersion])
-async def get_model_versions(
-    model_type: str, session: AsyncSession = Depends(get_async_session)
-):
+async def get_model_versions(model_type: str, session: AsyncSession = Depends(get_async_session)):
     """
     Get all versions for a specific model type.
     """
@@ -43,9 +41,7 @@ async def get_model_versions(
 
 
 @router.get("/artifacts/{job_id}", response_model=ArtifactListResponse)
-async def list_job_artifacts(
-    job_id: str, session: AsyncSession = Depends(get_async_session)
-):
+async def list_job_artifacts(job_id: str, session: AsyncSession = Depends(get_async_session)):
     """
     List artifacts for a specific job.
     """

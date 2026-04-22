@@ -64,6 +64,65 @@ pip install skyulf-core[tuning]
 
 ---
 
+## "X merges N parallel branches…" (merge advisory banner)
+
+You see an amber banner in the Results panel like:
+
+> *Drop Missing Columns merges 2 parallel branches: TransformationNode + MissingIndicator. 6 overlapping columns take values from MissingIndicator; unique columns from the others are kept as-is. For sequential application, chain them instead.*
+
+### What it means
+
+A node has **two or more incoming edges** that trace back to a common ancestor (sibling fan-in). The engine merges them with two rules:
+
+1. **Union of columns** — any column unique to one branch is kept as-is.
+2. **Last-wins on overlap** — for columns present in two or more branches, the **last input** in the node's input list overwrites the earlier ones. Earlier branches' modifications to those columns are silently dropped.
+
+### Why it's usually a bug
+
+If both branches modify the same columns (e.g. `TransformationNode` rescales `SepalLengthCm` and `MissingIndicator` outputs the original `SepalLengthCm` plus `*_missing` flags), only the last branch's values survive. You lose the work the other branch did.
+
+### How to entirely fix it
+
+**Chain the nodes instead of fanning them out.** Instead of:
+
+```
+Dataset ──> TransformationNode ──┐
+        ──> MissingIndicator ────┴──> DropMissingColumns
+```
+
+wire:
+
+```
+Dataset ──> TransformationNode ──> MissingIndicator ──> DropMissingColumns
+```
+
+Now `MissingIndicator` reads `TransformationNode`'s output, adds `*_missing` flags on top, and passes the combined frame downstream. No fan-in, no warning, all changes preserved.
+
+In the canvas:
+
+1. Delete the `Dataset → MissingIndicator` edge.
+2. Drag a new edge from `TransformationNode` → `MissingIndicator`.
+3. Re-run preview — the banner will disappear.
+
+### When fan-in is fine
+
+- **Disjoint columns** — branches output non-overlapping columns. The banner says *"No column overlap — all columns from all branches are kept."* You can ignore it.
+- **Redundant edge** (e.g. `Splitter → Scaler` plus a direct `Splitter → Encoder` while `Scaler → Encoder` also exists) — the engine detects this and **suppresses the warning entirely** because the descendant supersedes the ancestor under last-wins.
+
+### What the engine guarantees
+
+| Pattern | Behavior |
+|---|---|
+| Linear chain `A → B → C` | No warning, full data flow |
+| Redundant ancestor edge | Suppressed silently |
+| Disjoint-column fan-in | Advisory only, all columns kept |
+| **Overlapping-column fan-in** | **Last input wins — chain instead** |
+| Cycles | Engine rejects |
+
+**Rule of thumb:** if two branches touch the same columns, chain them; if they touch different columns, fanning in is fine.
+
+---
+
 ## Target column not found after encoding
 
 If your target column is categorical and you apply `OneHotEncoder` with `drop_original=True`, the target column may be dropped or expanded.

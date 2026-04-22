@@ -124,9 +124,7 @@ class SkyulfPipeline:
                     calculator = TuningCalculator(base_calc)
                     applier = TuningApplier(base_applier)
                 else:
-                    raise ValueError(
-                        f"Unknown base model type for tuner: {base_model_type}"
-                    )
+                    raise ValueError(f"Unknown base model type for tuner: {base_model_type}")
 
         if calculator is None or applier is None:
             raise ValueError(f"Unknown model type: {model_type}")
@@ -169,9 +167,7 @@ class SkyulfPipeline:
                 # If preprocessing didn't split, we wrap it.
                 engine = get_engine(transformed_data)
                 empty_df = engine.create_dataframe({})
-                dataset = SplitDataset(
-                    train=transformed_data, test=empty_df, validation=None
-                )
+                dataset = SplitDataset(train=transformed_data, test=empty_df, validation=None)
 
             # Fit the model
             # Note: fit_predict updates self.model_estimator.model in-memory

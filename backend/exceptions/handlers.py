@@ -25,14 +25,10 @@ async def not_found_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
-async def unauthorized_exception_handler(
-    request: Request, exc: Exception
-) -> JSONResponse:
+async def unauthorized_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle 401 Unauthorized and 403 Forbidden errors."""
     status_code = getattr(exc, "status_code", 401)
-    error_msg = (
-        "Could not validate credentials" if status_code == 401 else "Access forbidden"
-    )
+    error_msg = "Could not validate credentials" if status_code == 401 else "Access forbidden"
 
     return JSONResponse(
         status_code=status_code,
@@ -45,9 +41,7 @@ async def unauthorized_exception_handler(
     )
 
 
-async def validation_exception_handler(
-    request: Request, exc: Exception
-) -> JSONResponse:
+async def validation_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle 422 Validation errors."""
     return JSONResponse(
         status_code=422,
@@ -60,9 +54,7 @@ async def validation_exception_handler(
     )
 
 
-async def method_not_allowed_exception_handler(
-    request: Request, exc: Exception
-) -> JSONResponse:
+async def method_not_allowed_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle 405 Method Not Allowed errors."""
     return JSONResponse(
         status_code=405,

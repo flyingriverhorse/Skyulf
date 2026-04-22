@@ -46,15 +46,19 @@ class StatefulTransformer:
         self.node_id = node_id
         self.apply_on_test = apply_on_test
         self.apply_on_validation = apply_on_validation
-        self.params: Dict[str, Any] = (
-            {}
-        )  # Store params in memory instead of ArtifactStore
+        self.params: Dict[str, Any] = {}  # Store params in memory instead of ArtifactStore
 
     def fit_transform(
-        self, dataset: Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple], config: Dict[str, Any]
+        self,
+        dataset: Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple],
+        config: Dict[str, Any],
     ) -> Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple]:
         # Check for DataFrame-like (Pandas, Polars, Wrapper)
-        if hasattr(dataset, "shape") and hasattr(dataset, "columns") and not isinstance(dataset, tuple):
+        if (
+            hasattr(dataset, "shape")
+            and hasattr(dataset, "columns")
+            and not isinstance(dataset, tuple)
+        ):
             # Fit on the whole dataframe (be careful about leakage!)
             self.params = self.calculator.fit(dataset, config)
             return self.applier.apply(dataset, self.params)

@@ -51,6 +51,7 @@ class JobInfo(BaseModel):
 
 from backend.ml_pipeline.constants import StepType
 
+
 @dataclass
 class NodeConfig:
     """Configuration for a single pipeline node."""
@@ -91,3 +92,4 @@ class PipelineExecutionResult:
     node_results: Dict[str, NodeExecutionResult] = field(default_factory=dict)
     start_time: datetime = field(default_factory=datetime.now)
     end_time: Optional[datetime] = None
+    merge_warnings: List[Dict[str, Any]] = field(default_factory=list)

@@ -157,9 +157,7 @@ def test_run_pipeline_task_resolves_dataset_id(mock_get_db_session, mock_engine_
 
     # Setup DataSource Mock
     mock_ds = MagicMock()
-    mock_ds.to_dict.return_value = {
-        "config": {"file_path": "uploads/data/resolved_path.csv"}
-    }
+    mock_ds.to_dict.return_value = {"config": {"file_path": "uploads/data/resolved_path.csv"}}
 
     def query_side_effect(model):
         query_mock = MagicMock()
@@ -208,7 +206,7 @@ def test_run_pipeline_task_resolves_dataset_id(mock_get_db_session, mock_engine_
     # And we are mocking PipelineEngine, so engine.run() is a mock.
     # So SmartCatalog.load() is NEVER CALLED in this test!
     # So we don't need to patch extract_file_path_from_source for this test anymore.
-    
+
     # Run Task
     run_pipeline_task(MOCK_JOB_ID, config_with_numeric_id)
 
@@ -219,12 +217,13 @@ def test_run_pipeline_task_resolves_dataset_id(mock_get_db_session, mock_engine_
 
     # The node in the passed config should have the ORIGINAL ID "28"
     assert passed_config.nodes[0].params["dataset_id"] == "28"
-    
+
     # Verify SmartCatalog was used
     # We can check the catalog passed to PipelineEngine constructor
     init_call_args = mock_engine_class.call_args
     passed_catalog = init_call_args[1]["catalog"]
-    
+
     # It should be a SmartCatalog instance
     from backend.data.catalog import SmartCatalog
+
     assert isinstance(passed_catalog, SmartCatalog)

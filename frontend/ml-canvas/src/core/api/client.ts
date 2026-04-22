@@ -66,12 +66,36 @@ export interface NodeExecutionResult {
 
 export type PreviewDataRows = Array<Record<string, unknown>>;
 export type PreviewData = PreviewDataRows | Record<string, PreviewDataRows>;
+/** Per-branch preview keyed by branch label (e.g. "Path A · Random Forest"). */
+export type BranchPreviews = Record<string, PreviewData>;
+/** Per-branch node IDs that ran in that branch. */
+export type BranchNodeIds = Record<string, string[]>;
+
+/** Engine-emitted advisory for a downstream node whose inputs share an
+ * ancestor (column-union + last-wins merge semantics applied). */
+export interface MergeWarning {
+  node_id: string;
+  kind: string;
+  inputs: string[];
+  common_ancestors: string[];
+  /** Columns present in 2+ inputs (subject to last-wins overwrite). */
+  overlap_columns?: string[];
+  /** ID of the input whose values won on overlap (always the last one). */
+  winner_input?: string;
+  message: string;
+}
 
 export interface PreviewResponse {
   pipeline_id: string;
   status: string;
   node_results: Record<string, NodeExecutionResult>;
   preview_data: PreviewData | null;
+  /** Set when the pipeline ran multiple parallel branches. */
+  branch_previews?: BranchPreviews | null;
+  /** Per-branch list of node IDs (used to filter the applied-steps pills). */
+  branch_node_ids?: BranchNodeIds | null;
+  /** Advisories surfaced when the engine had to merge sibling fan-in inputs. */
+  merge_warnings?: MergeWarning[];
   recommendations: Recommendation[];
 }
 

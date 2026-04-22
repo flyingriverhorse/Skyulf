@@ -42,6 +42,15 @@ class SplitApplier(BaseApplier):
             X, y = df
             return splitter.split_xy(X, y)
 
+        # If a target column is configured and present in the DataFrame, split
+        # features from target first so downstream nodes see real (X, y)
+        # tuples — not the placeholder (df, None) shape that gets silently
+        # collapsed back to a DataFrame by transformers.
+        if target_col and hasattr(df, "columns") and target_col in df.columns:
+            X = df.drop(columns=[target_col])
+            y = df[target_col]
+            return splitter.split_xy(X, y)
+
         return splitter.split(df)
 
 
@@ -52,7 +61,14 @@ class SplitApplier(BaseApplier):
     name="Train/Test Split",
     category="Data Operations",
     description="Split the dataset into training and testing sets.",
-    params={"test_size": 0.2, "validation_size": 0.0, "random_state": 42, "shuffle": True, "stratify": False, "target_column": "target"}
+    params={
+        "test_size": 0.2,
+        "validation_size": 0.0,
+        "random_state": 42,
+        "shuffle": True,
+        "stratify": False,
+        "target_column": "target",
+    },
 )
 class SplitCalculator(BaseCalculator):
     def fit(
@@ -81,7 +97,9 @@ class DataSplitter:
         self.shuffle = shuffle
         self.stratify_col = stratify_col
 
-    def split_xy(self, X: Union[pd.DataFrame, SkyulfDataFrame], y: Union[pd.Series, Any]) -> SplitDataset:
+    def split_xy(
+        self, X: Union[pd.DataFrame, SkyulfDataFrame], y: Union[pd.Series, Any]
+    ) -> SplitDataset:
         """
         Splits X and y arrays.
         """
@@ -102,7 +120,7 @@ class DataSplitter:
             # Check value counts
             class_counts = y_pd.value_counts()
             min_count = class_counts.min()
-                
+
             if min_count < 2:
                 logger.warning(
                     f"Stratified split requested but the least populated class has only {min_count} "
@@ -128,7 +146,7 @@ class DataSplitter:
             if stratify_val is not None:
                 class_counts_val = y_train_val.value_counts()
                 min_count_val = class_counts_val.min()
-                    
+
                 if min_count_val < 2:
                     logger.warning(
                         "Stratified validation split requested but the least populated class has only "
@@ -151,24 +169,25 @@ class DataSplitter:
         # Convert back to Polars if needed
         if is_polars:
             import polars as pl
-            
+
             def to_pl(df_or_series):
-                if df_or_series is None: return None
-                if isinstance(df_or_series, pd.DataFrame): return pl.from_pandas(df_or_series)
-                if isinstance(df_or_series, pd.Series): return pl.from_pandas(df_or_series)
+                if df_or_series is None:
+                    return None
+                if isinstance(df_or_series, pd.DataFrame):
+                    return pl.from_pandas(df_or_series)
+                if isinstance(df_or_series, pd.Series):
+                    return pl.from_pandas(df_or_series)
                 return df_or_series
 
             X_train = to_pl(X_train)
             y_train = to_pl(y_train)
             X_test = to_pl(X_test)
             y_test = to_pl(y_test)
-            
+
             if validation:
                 validation = (to_pl(validation[0]), to_pl(validation[1]))
 
-        return SplitDataset(
-            train=(X_train, y_train), test=(X_test, y_test), validation=validation
-        )
+        return SplitDataset(train=(X_train, y_train), test=(X_test, y_test), validation=validation)
 
     def split(self, df: Union[pd.DataFrame, SkyulfDataFrame]) -> SplitDataset:
         """
@@ -182,7 +201,7 @@ class DataSplitter:
             df_pd = df.to_pandas()
         else:
             df_pd = df
-        
+
         stratify = None
         if self.stratify_col and self.stratify_col in df_pd.columns:
             stratify = df_pd[self.stratify_col]
@@ -231,15 +250,16 @@ class DataSplitter:
         # Convert back to Polars if needed
         if is_polars:
             import polars as pl
+
             train = pl.from_pandas(train)
             test = pl.from_pandas(test)
             if validation is not None:
                 validation = pl.from_pandas(validation)
 
         return SplitDataset(
-            train=(train, None),
-            test=(test, None),
-            validation=(validation, None) if validation is not None else None
+            train=train,
+            test=test,
+            validation=validation,
         )
 
 
@@ -251,9 +271,7 @@ class FeatureTargetSplitApplier(BaseApplier):
     ) -> Union[Tuple[pd.DataFrame, pd.Series], SplitDataset]:
         target_col = params.get("target_column")
         if not target_col:
-            raise ValueError(
-                "Target column must be specified for FeatureTargetSplitter"
-            )
+            raise ValueError("Target column must be specified for FeatureTargetSplitter")
 
         def split_one(data: Union[pd.DataFrame, SkyulfDataFrame, Any]) -> Tuple[Any, Any]:
             engine = get_engine(data)
@@ -262,10 +280,11 @@ class FeatureTargetSplitApplier(BaseApplier):
                 if target_col not in data_pl.columns:
                     raise ValueError(f"Target column '{target_col}' not found in dataset")
                 import polars as pl
+
                 y = data_pl.select(pl.col(target_col)).to_series()
                 X = data_pl.drop([target_col])
                 return X, y
-            
+
             # Pandas
             if target_col not in data.columns:
                 raise ValueError(f"Target column '{target_col}' not found in dataset")
@@ -309,7 +328,7 @@ class FeatureTargetSplitApplier(BaseApplier):
     name="Feature/Target Split",
     category="Data Operations",
     description="Split the dataset into features (X) and target (y).",
-    params={"target_column": "target"}
+    params={"target_column": "target"},
 )
 class FeatureTargetSplitCalculator(BaseCalculator):
     def fit(

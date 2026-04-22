@@ -59,9 +59,7 @@ def test_complex_pipeline_flow(complex_data, artifact_store):
     # 1. Cast ID to int
     cast_calc = CastingCalculator()
     cast_app = CastingApplier()
-    cast_node = StatefulTransformer(
-        cast_calc, cast_app, artifact_store, "node_1_casting"
-    )
+    cast_node = StatefulTransformer(cast_calc, cast_app, artifact_store, "node_1_casting")
 
     # 3. Impute Missing Values (Category -> Mode, Value -> Mean)
     impute_calc = SimpleImputerCalculator()
@@ -81,16 +79,12 @@ def test_complex_pipeline_flow(complex_data, artifact_store):
     # 5. Drop Constant Features
     sel_calc = VarianceThresholdCalculator()
     sel_app = VarianceThresholdApplier()
-    sel_node = StatefulTransformer(
-        sel_calc, sel_app, artifact_store, "node_6_selection"
-    )
+    sel_node = StatefulTransformer(sel_calc, sel_app, artifact_store, "node_6_selection")
 
     # 6. Scale Value
     scale_calc = StandardScalerCalculator()
     scale_app = StandardScalerApplier()
-    scale_node = StatefulTransformer(
-        scale_calc, scale_app, artifact_store, "node_7_scaling"
-    )
+    scale_node = StatefulTransformer(scale_calc, scale_app, artifact_store, "node_7_scaling")
 
     # --- Execution ---
 
@@ -100,9 +94,7 @@ def test_complex_pipeline_flow(complex_data, artifact_store):
     assert pd.api.types.is_integer_dtype(ds.train["id"])
 
     # Step 3: Impute
-    ds = impute_node_cat.fit_transform(
-        ds, {"columns": ["category"], "strategy": "most_frequent"}
-    )
+    ds = impute_node_cat.fit_transform(ds, {"columns": ["category"], "strategy": "most_frequent"})
     assert not ds.train["category"].isna().any()
 
     ds = impute_node_val.fit_transform(ds, {"columns": ["value"], "strategy": "mean"})

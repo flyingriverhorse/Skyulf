@@ -40,38 +40,38 @@ class IQRApplier(BaseApplier):
             import polars as pl
 
             X_pl: Any = X
-            
+
             mask = pl.lit(True)
-            
+
             for col, bound in bounds.items():
                 if col not in X_pl.columns:
                     continue
-                
+
                 lower = bound["lower"]
                 upper = bound["upper"]
-                
+
                 # Keep values within bounds or Null
                 col_mask = (pl.col(col) >= lower) & (pl.col(col) <= upper)
                 col_mask = col_mask | pl.col(col).is_null()
-                
+
                 mask = mask & col_mask
-            
+
             # Evaluate mask to get a boolean Series for filtering both X and y
             mask_series = X_pl.select(mask.alias("mask")).get_column("mask")
             X_filtered = X_pl.filter(mask_series)
-            
+
             y_filtered = None
             if y is not None:
                 if isinstance(y, (pl.Series, pl.DataFrame)):
                     y_filtered = y.filter(mask_series)
                 else:
                     y_filtered = y
-                
+
             return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
 
         # Pandas Path
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
-        
+
         # Determine index from the converted or original DF
         mask = pd.Series(True, index=X_pd.index)
 
@@ -106,7 +106,7 @@ class IQRApplier(BaseApplier):
     name="IQR Outlier Removal",
     category="Preprocessing",
     description="Remove outliers using Interquartile Range.",
-    params={"factor": 1.5, "columns": []}
+    params={"factor": 1.5, "columns": []},
 )
 class IQRCalculator(BaseCalculator):
     def fit(
@@ -115,10 +115,10 @@ class IQRCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
-        
+
         engine = get_engine(X)
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
-            
+
         # Config: {'multiplier': 1.5, 'columns': [...]}
         multiplier = config.get("multiplier", 1.5)
 
@@ -173,39 +173,39 @@ class ZScoreApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
-            
+
             X_pl: Any = X
             mask = pl.lit(True)
-            
+
             for col, stat in stats.items():
                 if col not in X_pl.columns:
                     continue
-                
+
                 mean = stat["mean"]
                 std = stat["std"]
-                
+
                 if std == 0:
                     continue
-                
+
                 # z_score = (col - mean) / std
                 # abs(z) <= threshold
-                
+
                 z_score = (pl.col(col) - mean) / std
                 col_mask = z_score.abs() <= threshold
                 col_mask = col_mask | pl.col(col).is_null()
-                
+
                 mask = mask & col_mask
-            
+
             mask_series = X_pl.select(mask.alias("mask")).get_column("mask")
             X_filtered = X_pl.filter(mask_series)
-            
+
             y_filtered = None
             if y is not None:
                 if isinstance(y, (pl.Series, pl.DataFrame)):
                     y_filtered = y.filter(mask_series)
                 else:
                     y_filtered = y
-                
+
             return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
 
         # Pandas Path
@@ -247,7 +247,7 @@ class ZScoreApplier(BaseApplier):
     name="Z-Score Outlier Removal",
     category="Preprocessing",
     description="Remove outliers using Z-Score.",
-    params={"threshold": 3.0, "columns": []}
+    params={"threshold": 3.0, "columns": []},
 )
 class ZScoreCalculator(BaseCalculator):
     def fit(
@@ -311,20 +311,20 @@ class WinsorizeApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
-            
+
             X_pl: Any = X
             exprs = []
             for col, bound in bounds.items():
                 if col not in X_pl.columns:
                     continue
-                
+
                 lower = bound["lower"]
                 upper = bound["upper"]
-                
+
                 # Clip
                 # Ensure we cast to float if bounds are float to avoid truncation
                 exprs.append(pl.col(col).cast(pl.Float64).clip(lower, upper).alias(col))
-            
+
             X_out = X_pl.with_columns(exprs)
             return pack_pipeline_output(X_out, y, is_tuple)
 
@@ -352,7 +352,7 @@ class WinsorizeApplier(BaseApplier):
     name="Winsorization",
     category="Preprocessing",
     description="Limit extreme values in the data.",
-    params={"limits": [0.05, 0.05], "columns": []}
+    params={"limits": [0.05, 0.05], "columns": []},
 )
 class WinsorizeCalculator(BaseCalculator):
     def fit(
@@ -414,36 +414,36 @@ class ManualBoundsApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
-            
+
             X_pl: Any = X
             mask = pl.lit(True)
-            
+
             for col, bound in bounds.items():
                 if col not in X_pl.columns:
                     continue
-                
+
                 lower = bound.get("lower")
                 upper = bound.get("upper")
-                
+
                 col_mask = pl.lit(True)
                 if lower is not None:
                     col_mask = col_mask & (pl.col(col) >= lower)
                 if upper is not None:
                     col_mask = col_mask & (pl.col(col) <= upper)
-                
+
                 col_mask = col_mask | pl.col(col).is_null()
                 mask = mask & col_mask
-            
+
             mask_series = X_pl.select(mask.alias("mask")).get_column("mask")
             X_filtered = X_pl.filter(mask_series)
-            
+
             y_filtered = None
             if y is not None:
                 if isinstance(y, (pl.Series, pl.DataFrame)):
                     y_filtered = y.filter(mask_series)
                 else:
                     y_filtered = y
-                
+
             return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
 
         # Pandas Path
@@ -484,7 +484,7 @@ class ManualBoundsApplier(BaseApplier):
     name="Manual Bounds",
     category="Preprocessing",
     description="Filter outliers by manually specifying lower and upper bounds for columns.",
-    params={"bounds": {}}
+    params={"bounds": {}},
 )
 class ManualBoundsCalculator(BaseCalculator):
     def fit(
@@ -524,7 +524,7 @@ class EllipticEnvelopeApplier(BaseApplier):
                     y_pd = y.to_pandas()
                 else:
                     y_pd = y
-            
+
             # We will use X_pd for logic
         else:
             # Standard Pandas path
@@ -533,7 +533,7 @@ class EllipticEnvelopeApplier(BaseApplier):
             y_pd = y
 
         X_pd_any: Any = X_pd
-        
+
         mask = pd.Series(True, index=X_pd_any.index)
 
         for col, model in models.items():
@@ -555,9 +555,7 @@ class EllipticEnvelopeApplier(BaseApplier):
                 is_inlier = preds == 1
 
                 # Create mask for this column
-                col_mask = pd.Series(
-                    False, index=X_pd_any.index
-                )  # Default to outlier? Or inlier?
+                col_mask = pd.Series(False, index=X_pd_any.index)  # Default to outlier? Or inlier?
                 # Usually we keep inliers. So default to False (outlier) unless proven inlier.
                 # But we also keep NaNs usually? Or drop them?
                 # Let's say we keep NaNs (handled by other steps)
@@ -577,12 +575,18 @@ class EllipticEnvelopeApplier(BaseApplier):
             # If we started with Polars, we might want to convert back.
             if engine.name == "polars":
                 import polars as pl
-                return pack_pipeline_output(pl.from_pandas(X_filtered), pl.from_pandas(y_filtered) if y_filtered is not None else None, is_tuple)
-            
+
+                return pack_pipeline_output(
+                    pl.from_pandas(X_filtered),
+                    pl.from_pandas(y_filtered) if y_filtered is not None else None,
+                    is_tuple,
+                )
+
             return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
 
         if engine.name == "polars":
             import polars as pl
+
             return pack_pipeline_output(pl.from_pandas(X_filtered), y, is_tuple)
 
         return pack_pipeline_output(X_filtered, y, is_tuple)
@@ -594,7 +598,7 @@ class EllipticEnvelopeApplier(BaseApplier):
     name="Elliptic Envelope",
     category="Preprocessing",
     description="Detect outliers in a Gaussian distributed dataset.",
-    params={"contamination": 0.01, "columns": []}
+    params={"contamination": 0.01, "columns": []},
 )
 class EllipticEnvelopeCalculator(BaseCalculator):
     def fit(

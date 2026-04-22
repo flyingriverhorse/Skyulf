@@ -3,15 +3,15 @@ import os
 from typing import List
 
 # Setup path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../skyulf-core')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../skyulf-core")))
 
 # Import backend registry
 from backend.ml_pipeline.node_definitions import NodeRegistry, RegistryItem, StepType
 
 # Fetch static nodes by creating a temporary access to the list inside get_all_nodes
 # Since get_all_nodes instantiates the list inside the function, we have to copy-paste or inspect it.
-# However, we can reconstruct the static list by temporarily disabling SKYULF_AVAILABLE in the module 
+# However, we can reconstruct the static list by temporarily disabling SKYULF_AVAILABLE in the module
 # or just manually inspecting.
 
 # Actually, get_all_nodes returns (static - dynamic) + dynamic.
@@ -28,19 +28,52 @@ print(f"Dynamic IDs: {sorted(list(dynamic_ids))}")
 # to verify exactly which ones can be deleted.
 static_ids = [
     StepType.DATA_LOADER,
-    "TrainTestSplitter", "feature_target_split",
-    "SimpleImputer", "KNNImputer", "IterativeImputer",
-    "OneHotEncoder", "OrdinalEncoder", "LabelEncoder", "TargetEncoder", "HashEncoder",
-    "StandardScaler", "MinMaxScaler", "RobustScaler", "MaxAbsScaler",
-    "IQR", "ZScore", "Winsorize",
-    "PowerTransformer", "SimpleTransformation", "GeneralBinning", "CustomBinning", "KBinsDiscretizer",
-    "VarianceThreshold", "CorrelationThreshold", "UnivariateSelection", "ModelBasedSelection", "feature_selection",
-    "Casting", "PolynomialFeatures", "FeatureGenerationNode",
-    "Oversampling", "Undersampling",
-    "DatasetProfile", "DataSnapshot",
-    "TextCleaning", "ValueReplacement", "AliasReplacement", "InvalidValueReplacement",
-    "Deduplicate", "DropMissingColumns", "DropMissingRows", "MissingIndicator",
-    "logistic_regression", "random_forest_classifier", "ridge_regression", "random_forest_regressor"
+    "TrainTestSplitter",
+    "feature_target_split",
+    "SimpleImputer",
+    "KNNImputer",
+    "IterativeImputer",
+    "OneHotEncoder",
+    "OrdinalEncoder",
+    "LabelEncoder",
+    "TargetEncoder",
+    "HashEncoder",
+    "StandardScaler",
+    "MinMaxScaler",
+    "RobustScaler",
+    "MaxAbsScaler",
+    "IQR",
+    "ZScore",
+    "Winsorize",
+    "PowerTransformer",
+    "SimpleTransformation",
+    "GeneralBinning",
+    "CustomBinning",
+    "KBinsDiscretizer",
+    "VarianceThreshold",
+    "CorrelationThreshold",
+    "UnivariateSelection",
+    "ModelBasedSelection",
+    "feature_selection",
+    "Casting",
+    "PolynomialFeatures",
+    "FeatureGenerationNode",
+    "Oversampling",
+    "Undersampling",
+    "DatasetProfile",
+    "DataSnapshot",
+    "TextCleaning",
+    "ValueReplacement",
+    "AliasReplacement",
+    "InvalidValueReplacement",
+    "Deduplicate",
+    "DropMissingColumns",
+    "DropMissingRows",
+    "MissingIndicator",
+    "logistic_regression",
+    "random_forest_classifier",
+    "ridge_regression",
+    "random_forest_regressor",
 ]
 
 redundant = []

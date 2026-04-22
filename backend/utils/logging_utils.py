@@ -107,6 +107,7 @@ def setup_universal_logging(
     except (OSError, IOError) as e:
         # Fallback if file logging fails — use stderr since logging may not be ready
         import sys
+
         print(f"Warning: Could not setup file logging to {log_file}: {e}", file=sys.stderr)
 
     # Console handler with cleaner output for development
@@ -125,9 +126,7 @@ def setup_universal_logging(
         console_formatter = logging.Formatter("%(levelname)s: %(message)s")
         console_handler.setFormatter(console_formatter)
 
-    console_handler.setLevel(
-        getattr(logging, console_log_level.upper(), logging.WARNING)
-    )
+    console_handler.setLevel(getattr(logging, console_log_level.upper(), logging.WARNING))
     root_logger.addHandler(console_handler)
 
     # === NOISE REDUCTION ===
@@ -136,5 +135,3 @@ def setup_universal_logging(
     logging.getLogger("aiosqlite").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("watchfiles").setLevel(logging.WARNING)
-
-

@@ -30,9 +30,7 @@ class TimestampMixin:
     """Mixin to add created_at and updated_at timestamps to models."""
 
     created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime, default=func.now(), onupdate=func.now(), nullable=False
-    )
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class User(Base, TimestampMixin):
@@ -112,9 +110,7 @@ class DataSource(Base, TimestampMixin):
     )  # 'success', 'failed', 'untested'
 
     # User who created this source
-    created_by = Column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )  # Foreign key to users.id
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # Foreign key to users.id
 
     # Relationship to User model
     creator = relationship("User", back_populates="data_sources")
@@ -254,10 +250,12 @@ class BasicTrainingJob(MLJob):
 
     def to_dict(self) -> dict:
         data = self.to_dict_base()
-        data.update({
-            "version": self.version,
-            "hyperparameters": self.hyperparameters,
-        })
+        data.update(
+            {
+                "version": self.version,
+                "hyperparameters": self.hyperparameters,
+            }
+        )
         return data
 
 
@@ -282,19 +280,21 @@ class AdvancedTuningJob(MLJob):
 
     def to_dict(self) -> dict:
         data = self.to_dict_base()
-        data.update({
-            "run_number": self.run_number,
-            "search_strategy": self.search_strategy,
-            "search_space": self.search_space,
-            "baseline_hyperparameters": self.baseline_hyperparameters,
-            "n_iterations": self.n_iterations,
-            "scoring": self.scoring,
-            "random_state": self.random_state,
-            "cross_validation": self.cross_validation,
-            "results": self.results,
-            "best_params": self.best_params,
-            "best_score": self.best_score,
-        })
+        data.update(
+            {
+                "run_number": self.run_number,
+                "search_strategy": self.search_strategy,
+                "search_space": self.search_space,
+                "baseline_hyperparameters": self.baseline_hyperparameters,
+                "n_iterations": self.n_iterations,
+                "scoring": self.scoring,
+                "random_state": self.random_state,
+                "cross_validation": self.cross_validation,
+                "results": self.results,
+                "best_params": self.best_params,
+                "best_score": self.best_score,
+            }
+        )
         return data
 
 
@@ -331,17 +331,18 @@ class EDAReport(Base, TimestampMixin):
     """
     Stores the results of EDA analysis for a dataset.
     """
+
     __tablename__ = "eda_reports"
 
     id = Column(Integer, primary_key=True, index=True)
     data_source_id = Column(Integer, ForeignKey("data_sources.id"), nullable=False, index=True)
-    status = Column(String(20), default="PENDING", nullable=False) # PENDING, COMPLETED, FAILED
+    status = Column(String(20), default="PENDING", nullable=False)  # PENDING, COMPLETED, FAILED
     config = Column(JSON, nullable=False, default={})
     profile_data = Column(JSON, nullable=True)
     error_message = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     test_status = Column(String(20), default="untested", nullable=False)
-    
+
     # Relationship
     data_source = relationship("DataSource", backref="eda_reports")
 

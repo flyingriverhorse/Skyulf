@@ -27,4 +27,3 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 def get_config() -> Settings:
     """Configuration dependency."""
     return get_settings()
-

@@ -28,7 +28,7 @@ def apply_dual_engine(
     Args:
         df: Input data (DataFrame or Tuple).
         params: Configuration parameters.
-        polars_func: Function to execute if engine is Polars. 
+        polars_func: Function to execute if engine is Polars.
                      Signature: (X, y, params) -> (X_out, y_out)
         pandas_func: Function to execute if engine is Pandas.
                      Signature: (X, y, params) -> (X_out, y_out)
@@ -55,7 +55,7 @@ def apply_dual_engine(
             X_pd = X.to_pandas()
         else:
             X_pd = X
-            
+
         try:
             X_out, y_out = pandas_func(X_pd, y, params)
         except Exception as e:

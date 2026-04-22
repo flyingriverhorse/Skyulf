@@ -31,11 +31,7 @@ class JobService:
             return job
 
         # 2. Try AdvancedTuningJob
-        job = (
-            session.query(AdvancedTuningJob)
-            .filter(AdvancedTuningJob.id == job_id)
-            .first()
-        )
+        job = session.query(AdvancedTuningJob).filter(AdvancedTuningJob.id == job_id).first()
         return job
 
     @staticmethod
@@ -60,10 +56,8 @@ class JobService:
             return job
 
         # 2. Try AdvancedTuningJob
-        stmt_tune = select(AdvancedTuningJob).where(
-            AdvancedTuningJob.id == job_id
-        )
+        stmt_tune = select(AdvancedTuningJob).where(AdvancedTuningJob.id == job_id)
         result_tune = await session.execute(stmt_tune)
         job = result_tune.scalar_one_or_none()
-        
+
         return job

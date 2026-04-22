@@ -32,21 +32,27 @@ async def insert_data_source(settings: Settings, row: Dict[str, Any]) -> Dict[st
             if "id" in row:
                 # Use SQLAlchemy Core for SELECT
                 tbl_select = table(TABLE, column("id"))
-                stmt_select: Any = select(literal_column("*")).select_from(tbl_select).where(column("id") == row["id"])
+                stmt_select: Any = (
+                    select(literal_column("*"))
+                    .select_from(tbl_select)
+                    .where(column("id") == row["id"])
+                )
                 result = await session.execute(stmt_select)
                 fetched = result.fetchone()
                 if fetched:
                     return dict(fetched._mapping)
 
             # If no ID provided, get by last_insert_rowid for SQLite
-            rid_result = await session.execute(
-                sa_text("SELECT last_insert_rowid() AS rid")
-            )
+            rid_result = await session.execute(sa_text("SELECT last_insert_rowid() AS rid"))
             rid = rid_result.scalar()
             if rid:
                 # Use SQLAlchemy Core for SELECT by rowid
                 tbl_select = table(TABLE, column("rowid"))
-                stmt_select = select(literal_column("*")).select_from(tbl_select).where(column("rowid") == rid)
+                stmt_select = (
+                    select(literal_column("*"))
+                    .select_from(tbl_select)
+                    .where(column("rowid") == rid)
+                )
                 result = await session.execute(stmt_select)
                 fetched = result.fetchone()
                 if fetched:
@@ -100,7 +106,10 @@ async def update_data_source(
     async with async_session_or_connection(settings) as session:
         try:
             # Use SQLAlchemy Core for UPDATE
-            tbl = table(TABLE, *[column(c) for c in update_data.keys()] + [column(c) for c in filter_dict.keys()])
+            tbl = table(
+                TABLE,
+                *[column(c) for c in update_data.keys()] + [column(c) for c in filter_dict.keys()],
+            )
 
             stmt = update(tbl).values(**update_data)
 
@@ -172,9 +181,12 @@ async def select_data_source_by_file_hash(
         try:
             # Use SQLAlchemy Core with json_extract
             tbl = table(TABLE)
-            stmt: Any = select(literal_column("*")).select_from(tbl).where(
-                func.json_extract(column("config"), "$.file_hash") == file_hash
-            ).limit(1)
+            stmt: Any = (
+                select(literal_column("*"))
+                .select_from(tbl)
+                .where(func.json_extract(column("config"), "$.file_hash") == file_hash)
+                .limit(1)
+            )
 
             result = await session.execute(stmt)
             row = result.fetchone()

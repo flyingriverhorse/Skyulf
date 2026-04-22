@@ -15,7 +15,11 @@ from backend.ml_pipeline.execution.graph_utils import (
 )
 from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
-from backend.ml_pipeline.execution.utils import resolve_dataset_name, get_dataset_map, parse_branch_info
+from backend.ml_pipeline.execution.utils import (
+    resolve_dataset_name,
+    get_dataset_map,
+    parse_branch_info,
+)
 
 
 class AdvancedTuningManager:
@@ -58,9 +62,7 @@ class AdvancedTuningManager:
         return job_id
 
     @staticmethod
-    def map_tuning_job_to_info(
-        job: AdvancedTuningJob, dataset_name: Optional[str]
-    ) -> JobInfo:
+    def map_tuning_job_to_info(job: AdvancedTuningJob, dataset_name: Optional[str]) -> JobInfo:
         # Extract details from graph
         (
             node_params,
@@ -78,9 +80,7 @@ class AdvancedTuningManager:
 
         # Use stored metrics if available, otherwise fallback to best_score
         metrics = (
-            job.metrics
-            if job.metrics
-            else ({"score": job.best_score} if job.best_score else None)
+            job.metrics if job.metrics else ({"score": job.best_score} if job.best_score else None)
         )
 
         return JobInfo(
@@ -97,9 +97,8 @@ class AdvancedTuningManager:
             result={
                 "best_params": job.best_params,
                 "best_score": job.best_score,
-                "scoring_metric": type_cast(Optional[str], job.scoring) or (
-                    node_params.get("tuning_config", {}).get("metric") if node_params else None
-                ),
+                "scoring_metric": type_cast(Optional[str], job.scoring)
+                or (node_params.get("tuning_config", {}).get("metric") if node_params else None),
                 "metrics": metrics,
             },
             # Ensure metrics are in result too
@@ -122,9 +121,7 @@ class AdvancedTuningManager:
     @staticmethod
     async def cancel_tuning_job(session: AsyncSession, job_id: str) -> bool:
         """Cancels a tuning job if it is running or queued."""
-        stmt = select(AdvancedTuningJob).where(
-            AdvancedTuningJob.id == job_id
-        )
+        stmt = select(AdvancedTuningJob).where(AdvancedTuningJob.id == job_id)
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
 
@@ -159,11 +156,7 @@ class AdvancedTuningManager:
         logs: Optional[List[str]] = None,
     ) -> bool:
         """Updates tuning job status (Sync). Returns True if job found and updated."""
-        job = (
-            session.query(AdvancedTuningJob)
-            .filter(AdvancedTuningJob.id == job_id)
-            .first()
-        )
+        job = session.query(AdvancedTuningJob).filter(AdvancedTuningJob.id == job_id).first()
         if not job:
             return False
 
@@ -190,13 +183,9 @@ class AdvancedTuningManager:
         return True
 
     @staticmethod
-    async def get_tuning_job(
-        session: AsyncSession, job_id: str
-    ) -> Optional[JobInfo]:
+    async def get_tuning_job(session: AsyncSession, job_id: str) -> Optional[JobInfo]:
         """Retrieves a tuning job by ID."""
-        stmt = select(AdvancedTuningJob).where(
-            AdvancedTuningJob.id == job_id
-        )
+        stmt = select(AdvancedTuningJob).where(AdvancedTuningJob.id == job_id)
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
 
@@ -229,13 +218,13 @@ class AdvancedTuningManager:
         for job in tune_rows:
             ds_id = str(job.dataset_source_id) if job.dataset_source_id else None
             ds_name = ds_map.get(ds_id) if ds_id else None
-            
+
             # Fallback
             if not ds_name and ds_id:
-                 ds_name = f"Dataset {ds_id}"
+                ds_name = f"Dataset {ds_id}"
 
             jobs.append(AdvancedTuningManager.map_tuning_job_to_info(job, ds_name))
-            
+
         return jobs
 
     @staticmethod
@@ -285,7 +274,4 @@ class AdvancedTuningManager:
         )
         jobs = result.scalars().all()
 
-        return [
-            AdvancedTuningManager.map_tuning_job_to_info(job, None)
-            for job in jobs
-        ]
+        return [AdvancedTuningManager.map_tuning_job_to_info(job, None) for job in jobs]

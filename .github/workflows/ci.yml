@@ -61,12 +61,13 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=22 --max-line-length=120 --statistics
 
-      - name: Type check (mypy)
+      - name: Format check (black)
         run: |
-          python -m mypy -p backend
-          python -m mypy -p skyulf
-          python -m mypy skyulf-core/tests
-          python -m mypy run_fastapi.py run_skyulf.py celery_worker.py
+          black --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py
+
+      - name: Type check (ty)
+        run: |
+          ty check backend tests skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py
 
       - name: Run tests
         run: pytest -q -s --maxfail=1 --disable-warnings --cov --cov-branch --cov-report=term-missing --cov-report=xml

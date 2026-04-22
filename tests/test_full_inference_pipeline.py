@@ -66,11 +66,7 @@ def test_full_inference_pipeline():
     nodes = []
 
     # Node 1: Loader
-    nodes.append(
-        NodeConfig(
-            node_id="loader", step_type="data_loader", params={"path": data_path}
-        )
-    )
+    nodes.append(NodeConfig(node_id="loader", step_type="data_loader", params={"path": data_path}))
 
     # Node 2: Value Replacement (Cleaning)
     # Replace 'SF' with 'San Francisco'

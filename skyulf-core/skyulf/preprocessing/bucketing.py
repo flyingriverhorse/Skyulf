@@ -39,9 +39,7 @@ class BaseBinningApplier(BaseApplier):
 
         output_suffix = params.get("output_suffix", "_binned")
         drop_original = params.get("drop_original", False)
-        label_format = params.get(
-            "label_format", "ordinal"
-        )  # ordinal, range, bin_index
+        label_format = params.get("label_format", "ordinal")  # ordinal, range, bin_index
         missing_strategy = params.get("missing_strategy", "keep")  # keep, label
         missing_label = params.get("missing_label", "Missing")
         include_lowest = params.get("include_lowest", True)
@@ -51,6 +49,7 @@ class BaseBinningApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
 
             exprs = []
@@ -59,7 +58,7 @@ class BaseBinningApplier(BaseApplier):
             for col, edges in bin_edges_map.items():
                 if col not in X_pl.columns:
                     continue
-                
+
                 if drop_original:
                     cols_to_drop.append(col)
 
@@ -76,17 +75,14 @@ class BaseBinningApplier(BaseApplier):
                 # Polars cut
                 # breaks are the internal cut points
                 breaks = sorted_edges[1:-1]
-                
+
                 # Polars cut
                 cut_expr = pl.col(col).cut(
-                    breaks=breaks,
-                    labels=labels,
-                    left_closed=False, # (a, b]
-                    include_breaks=False
+                    breaks=breaks, labels=labels, left_closed=False, include_breaks=False  # (a, b]
                 )
-                
+
                 target_col_name = f"{col}{output_suffix}"
-                
+
                 if label_format in ["ordinal", "bin_index"] and not labels:
                     # We want integer indices.
                     # Polars cut returns Categorical. Cast to UInt32 gives the physical index.
@@ -98,7 +94,7 @@ class BaseBinningApplier(BaseApplier):
             X_out = X_pl.with_columns(exprs)
             if drop_original:
                 X_out = X_out.drop(cols_to_drop)
-            
+
             return pack_pipeline_output(X_out, y, is_tuple)
 
         # Pandas Path
@@ -144,15 +140,11 @@ class BaseBinningApplier(BaseApplier):
                     # If categorical (range or custom labels), add category
                     if isinstance(binned_series.dtype, pd.CategoricalDtype):
                         if missing_label not in binned_series.cat.categories:
-                            binned_series = binned_series.cat.add_categories(
-                                [missing_label]
-                            )
+                            binned_series = binned_series.cat.add_categories([missing_label])
                         binned_series = binned_series.fillna(missing_label)
                     else:
                         # If numeric (ordinal/bin_index), we convert to object/str to support "Missing" label
-                        binned_series = binned_series.astype(object).fillna(
-                            missing_label
-                        )
+                        binned_series = binned_series.astype(object).fillna(missing_label)
 
                 # Format ranges if needed
                 if label_format == "range" and labels is None:
@@ -180,12 +172,8 @@ class BaseBinningApplier(BaseApplier):
                                 return f"({l_val}, {r_val}]"
 
                         # We need to map the categories themselves
-                        new_categories = [
-                            format_interval(c) for c in binned_series.cat.categories
-                        ]
-                        binned_series = binned_series.cat.rename_categories(
-                            new_categories
-                        )
+                        new_categories = [format_interval(c) for c in binned_series.cat.categories]
+                        binned_series = binned_series.cat.rename_categories(new_categories)
                         binned_series = binned_series.astype(str)
                     else:
                         binned_series = binned_series.astype(str)
@@ -220,7 +208,7 @@ class GeneralBinningApplier(BaseBinningApplier):
     name="General Binning",
     category="Preprocessing",
     description="Bin continuous data into intervals.",
-    params={"n_bins": 5, "strategy": "uniform", "columns": []}
+    params={"n_bins": 5, "strategy": "uniform", "columns": []},
 )
 class GeneralBinningCalculator(BaseCalculator):
     """
@@ -231,7 +219,7 @@ class GeneralBinningCalculator(BaseCalculator):
         self, df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any], config: Dict[str, Any]
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
-        
+
         # Ensure X is pandas for fitting logic
         engine = get_engine(X)
         if engine.name == "polars":
@@ -274,9 +262,7 @@ class GeneralBinningCalculator(BaseCalculator):
                 elif strategy == "equal_frequency":
                     n_bins = override.get("equal_frequency_bins", q_bins_global)
                     duplicates = override.get("duplicates", duplicates_global)
-                    _, edges = pd.qcut(
-                        series, q=n_bins, retbins=True, duplicates=duplicates
-                    )
+                    _, edges = pd.qcut(series, q=n_bins, retbins=True, duplicates=duplicates)
                     # Clamp first edge to min if it was extended
                     if len(edges) > 0 and edges[0] < series.min():
                         edges[0] = series.min()
@@ -284,7 +270,9 @@ class GeneralBinningCalculator(BaseCalculator):
                 elif strategy == "kmeans":
                     n_bins = override.get("n_bins", default_n_bins)
                     est = KBinsDiscretizer(
-                        n_bins=n_bins, strategy="kmeans", encode="ordinal",
+                        n_bins=n_bins,
+                        strategy="kmeans",
+                        encode="ordinal",
                     )
                     est.fit(series.values.reshape(-1, 1))  # type: ignore
                     edges = est.bin_edges_[0]
@@ -361,7 +349,7 @@ class CustomBinningApplier(GeneralBinningApplier):
     name="Custom Binning",
     category="Preprocessing",
     description="Bin data using custom edges.",
-    params={"bins": [], "columns": []}
+    params={"bins": [], "columns": []},
 )
 class CustomBinningCalculator(BaseCalculator):
     """
@@ -375,7 +363,7 @@ class CustomBinningCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
-        
+
         # Ensure X is pandas for fitting logic
         engine = get_engine(X)
         if engine.name == "polars":
@@ -414,7 +402,7 @@ class KBinsDiscretizerApplier(GeneralBinningApplier):
     name="K-Bins Discretizer",
     category="Preprocessing",
     description="Bin continuous data into intervals using sklearn KBinsDiscretizer.",
-    params={"n_bins": 5, "encode": "ordinal", "strategy": "quantile", "columns": []}
+    params={"n_bins": 5, "encode": "ordinal", "strategy": "quantile", "columns": []},
 )
 class KBinsDiscretizerCalculator(GeneralBinningCalculator):
     """

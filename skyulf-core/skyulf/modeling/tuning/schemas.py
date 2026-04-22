@@ -8,15 +8,11 @@ from typing import Any, Dict, List, Literal, Optional
 class TuningConfig:
     """Configuration for hyperparameter tuning."""
 
-    strategy: Literal["grid", "random", "optuna", "halving_grid", "halving_random"] = (
-        "random"
-    )
+    strategy: Literal["grid", "random", "optuna", "halving_grid", "halving_random"] = "random"
     metric: str = "accuracy"  # or 'mse', 'f1', etc.
     n_trials: int = 10
     timeout: Optional[int] = None  # Seconds
-    search_space: Dict[str, List[Any]] = field(
-        default_factory=dict
-    )  # e.g. {"C": [0.1, 1.0, 10.0]}
+    search_space: Dict[str, List[Any]] = field(default_factory=dict)  # e.g. {"C": [0.1, 1.0, 10.0]}
     strategy_params: Dict[str, Any] = field(
         default_factory=dict
     )  # e.g. {"factor": 3, "sampler": "tpe"}

@@ -10,6 +10,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
+
 try:
     from xgboost import XGBClassifier
 
@@ -66,7 +67,7 @@ class RandomForestClassifierApplier(SklearnApplier):
     name="Random Forest Classifier",
     category="Modeling",
     description="Ensemble of decision trees.",
-    params={"n_estimators": 50, "max_depth": 10, "min_samples_split": 5}
+    params={"n_estimators": 50, "max_depth": 10, "min_samples_split": 5},
 )
 class RandomForestClassifierCalculator(SklearnCalculator):
     """Random Forest Classifier Calculator."""
@@ -189,9 +190,7 @@ class GradientBoostingClassifierApplier(SklearnApplier):
     pass
 
 
-@NodeRegistry.register(
-    "gradient_boosting_classifier", GradientBoostingClassifierApplier
-)
+@NodeRegistry.register("gradient_boosting_classifier", GradientBoostingClassifierApplier)
 @node_meta(
     id="gradient_boosting_classifier",
     name="Gradient Boosting Classifier",
@@ -247,11 +246,11 @@ class AdaBoostClassifierCalculator(SklearnCalculator):
 
 # --- XGBoost ---
 if XGBOOST_AVAILABLE:
+
     class XGBClassifierApplier(SklearnApplier):
         """XGBoost Classifier Applier."""
 
         pass
-
 
     @NodeRegistry.register("xgboost_classifier", XGBClassifierApplier)
     @node_meta(

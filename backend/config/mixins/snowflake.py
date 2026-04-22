@@ -21,15 +21,22 @@ class SnowflakeMixin:
         if not self.FEATURE_SNOWFLAKE:  # type: ignore[attr-defined]
             return True
         config_names = [
-            "SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD",
-            "SNOWFLAKE_WAREHOUSE", "SNOWFLAKE_DATABASE",
+            "SNOWFLAKE_ACCOUNT",
+            "SNOWFLAKE_USER",
+            "SNOWFLAKE_PASSWORD",
+            "SNOWFLAKE_WAREHOUSE",
+            "SNOWFLAKE_DATABASE",
         ]
         values = [
-            self.SNOWFLAKE_ACCOUNT, self.SNOWFLAKE_USER, self.SNOWFLAKE_PASSWORD,  # type: ignore[attr-defined]
-            self.SNOWFLAKE_WAREHOUSE, self.SNOWFLAKE_DATABASE,  # type: ignore[attr-defined]
+            self.SNOWFLAKE_ACCOUNT,
+            self.SNOWFLAKE_USER,
+            self.SNOWFLAKE_PASSWORD,  # type: ignore[attr-defined]
+            self.SNOWFLAKE_WAREHOUSE,
+            self.SNOWFLAKE_DATABASE,  # type: ignore[attr-defined]
         ]
         missing = [
-            name for name, val in zip(config_names, values)
+            name
+            for name, val in zip(config_names, values)
             if not val or val in ("x", "your-account", "your-user")
         ]
         if missing:

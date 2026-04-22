@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Play, Save, Loader2, FolderOpen, History, Rocket } from 'lucide-react';
+import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2 } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { runPipelinePreview, savePipeline, fetchPipeline } from '../../core/api/client';
 import { convertGraphToPipelineConfig } from '../../core/utils/pipelineConverter';
+import { autoLayoutGraph } from '../../core/utils/autoLayout';
 import { jobsApi } from '../../core/api/jobs';
 
 const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
@@ -206,6 +207,19 @@ export const Toolbar: React.FC = () => {
       >
         {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         <span className="text-sm font-medium">{isSaving ? 'Saving...' : 'Save'}</span>
+      </button>
+      <button
+        onClick={() => {
+          // Tidy up multi-branch canvases via dagre topological layout.
+          const { nodes: laidOut, edges: keptEdges } = autoLayoutGraph(nodes, edges);
+          setGraph(laidOut, keptEdges);
+        }}
+        disabled={isRunning || nodes.length === 0}
+        title="Auto-arrange nodes left-to-right by data flow"
+        className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+      >
+        <Wand2 className="w-4 h-4" />
+        <span className="text-sm font-medium">Tidy</span>
       </button>
       {hasMultipleBranches && (
         <button

@@ -84,20 +84,23 @@ class SklearnCalculator(BaseModelCalculator):
         # 2. Instantiate Model
         # Filter params to only include those accepted by the model_class constructor
         import inspect
+
         sig = inspect.signature(self.model_class)
         valid_params = {k: v for k, v in params.items() if k in sig.parameters}
-        
+
         # Log dropped params if any (for debugging)
         dropped = set(params.keys()) - set(valid_params.keys())
         if dropped:
-            logger.warning(f"Dropped parameters not supported by {self.model_class.__name__}: {dropped}")
+            logger.warning(
+                f"Dropped parameters not supported by {self.model_class.__name__}: {dropped}"
+            )
 
         model = self.model_class(**valid_params)
 
         # 3. Fit
         # Convert to Numpy using Bridge (handles Polars/Pandas/Wrappers)
         X_np, y_np = SklearnBridge.to_sklearn((X, y))
-        
+
         model.fit(X_np, y_np)
 
         return model
@@ -105,23 +108,23 @@ class SklearnCalculator(BaseModelCalculator):
 
 class SklearnApplier(BaseModelApplier):
     """Base applier for Scikit-Learn models."""
-    
+
     def predict(self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any) -> Any:
         # Convert to Numpy
         X_np, _ = SklearnBridge.to_sklearn(df)
-        
+
         preds = model_artifact.predict(X_np)
-        
+
         # Return as Pandas Series for consistency
         # If input was Pandas, try to preserve index
         index = None
         if hasattr(df, "index"):
             index = df.index
         elif hasattr(df, "to_pandas"):
-             # If it's a wrapper or Polars, we might lose index unless we convert
-             # For now, default index is acceptable for predictions
-             pass
-             
+            # If it's a wrapper or Polars, we might lose index unless we convert
+            # For now, default index is acceptable for predictions
+            pass
+
         return pd.Series(preds, index=index)
 
     def predict_proba(
@@ -129,18 +132,18 @@ class SklearnApplier(BaseModelApplier):
     ) -> Optional[Any]:
         if not hasattr(model_artifact, "predict_proba"):
             return None
-            
+
         X_np, _ = SklearnBridge.to_sklearn(df)
         probs = model_artifact.predict_proba(X_np)
-        
+
         # Return as DataFrame
         index = None
         if hasattr(df, "index"):
             index = df.index
-            
+
         # Column names usually 0, 1, etc. or classes_
         columns = None
         if hasattr(model_artifact, "classes_"):
             columns = model_artifact.classes_
-            
+
         return pd.DataFrame(probs, index=index, columns=columns)

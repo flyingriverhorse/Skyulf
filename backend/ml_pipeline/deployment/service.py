@@ -30,9 +30,7 @@ def _maybe_decode_predictions(
     the Feature/Target Split).
     """
 
-    target_encoder = extract_target_label_encoder(
-        feature_engineer, target_column=target_column
-    )
+    target_encoder = extract_target_label_encoder(feature_engineer, target_column=target_column)
     if target_encoder is None:
         return predictions
 
@@ -105,9 +103,7 @@ class DeploymentService:
                 # The artifact is likely named {job_id}.joblib inside it.
                 # We construct the full path to the file so predict() can parse it correctly.
                 final_uri = os.path.join(artifact_uri, f"{job_id}.joblib")
-            elif not artifact_uri.endswith(".joblib") and not artifact_uri.endswith(
-                ".pkl"
-            ):
+            elif not artifact_uri.endswith(".joblib") and not artifact_uri.endswith(".pkl"):
                 # Not a directory, and no extension. Assume it's a node_id or job_id.
                 # Construct the abstract URI for exports/models
                 final_uri = f"{pipeline_id}/{job_id}"
@@ -130,11 +126,7 @@ class DeploymentService:
 
     @staticmethod
     async def get_active_deployment(session: AsyncSession) -> Optional[Deployment]:
-        stmt = (
-            select(Deployment)
-            .where(Deployment.is_active)
-            .order_by(Deployment.created_at.desc())
-        )
+        stmt = select(Deployment).where(Deployment.is_active).order_by(Deployment.created_at.desc())
         result = await session.execute(stmt)
         return result.scalars().first()
 
@@ -143,12 +135,7 @@ class DeploymentService:
         session: AsyncSession, limit: int = 50, skip: int = 0
     ) -> Sequence[Deployment]:
         """Lists deployment history."""
-        stmt = (
-            select(Deployment)
-            .order_by(Deployment.created_at.desc())
-            .limit(limit)
-            .offset(skip)
-        )
+        stmt = select(Deployment).order_by(Deployment.created_at.desc()).limit(limit).offset(skip)
         result = await session.execute(stmt)
         return result.scalars().all()
 
@@ -171,11 +158,11 @@ class DeploymentService:
         try:
             from backend.ml_pipeline.artifacts.factory import ArtifactFactory
             from backend.ml_pipeline.services.job_service import JobService
-            
+
             uri = deployment.artifact_uri
             store_uri = ""
             artifact_key = ""
-            
+
             if uri.startswith("s3://"):
                 if uri.endswith(".joblib"):
                     store_uri = uri.rsplit("/", 1)[0]
@@ -219,9 +206,7 @@ class DeploymentService:
 
         except Exception as e:
             logger.error(f"Failed to load artifact: {e}")
-            raise ValueError(
-                f"Could not load model artifact: {deployment.artifact_uri}"
-            )
+            raise ValueError(f"Could not load model artifact: {deployment.artifact_uri}")
 
         # Handle tuple artifact (model, metadata/tuning_result) from TunerCalculator
         if isinstance(artifact, tuple) and len(artifact) >= 1:
@@ -233,30 +218,28 @@ class DeploymentService:
 
         # 4. Predict
         # Check for new SDK format: {"feature_engineer": ..., "model": ...}
-        if (
-            isinstance(artifact, dict)
-            and "feature_engineer" in artifact
-            and "model" in artifact
-        ):
+        if isinstance(artifact, dict) and "feature_engineer" in artifact and "model" in artifact:
             feature_engineer = artifact["feature_engineer"]
             estimator = artifact["model"]
 
             # Clean Data
             target_col = artifact.get("target_column")
             dropped_cols = artifact.get("dropped_columns", [])
-            
+
             if target_col and target_col in df.columns:
                 logger.info(f"Dropping target column '{target_col}' from inference data")
                 df = df.drop(columns=[target_col])
-                
+
             if dropped_cols:
                 # Ensure dropped_cols is a list of strings
                 if isinstance(dropped_cols, str):
                     dropped_cols = [dropped_cols]
-                
+
                 existing_dropped = [c for c in dropped_cols if c in df.columns]
                 if existing_dropped:
-                    logger.info(f"Dropping explicitly dropped columns {existing_dropped} from inference data")
+                    logger.info(
+                        f"Dropping explicitly dropped columns {existing_dropped} from inference data"
+                    )
                     df = df.drop(columns=existing_dropped)
 
             # Handle tuple estimator inside dict (e.g. from TunerCalculator)
@@ -296,9 +279,7 @@ class DeploymentService:
                     model_cols = artifact.feature_names_in_.tolist()
                     missing_in_df = set(model_cols) - set(df.columns)
                     if missing_in_df:
-                        logger.warning(
-                            f"Missing columns in input DataFrame: {missing_in_df}"
-                        )
+                        logger.warning(f"Missing columns in input DataFrame: {missing_in_df}")
                         for c in missing_in_df:
                             df[c] = 0
                     # Reorder columns to match model
@@ -314,7 +295,9 @@ class DeploymentService:
             )
 
     @staticmethod
-    async def get_deployment_details(session: AsyncSession, deployment: Deployment) -> Dict[str, Any]:
+    async def get_deployment_details(
+        session: AsyncSession, deployment: Deployment
+    ) -> Dict[str, Any]:
         """
         Returns deployment info enriched with input/output schema from the artifact.
         """
@@ -332,7 +315,7 @@ class DeploymentService:
                 parts = artifact_uri.replace("s3://", "").split("/")
                 bucket_name = parts[0]
                 key = "/".join(parts[1:])
-                
+
                 settings = get_settings()
                 storage_options = {
                     "key": settings.AWS_ACCESS_KEY_ID,
@@ -342,7 +325,7 @@ class DeploymentService:
                 }
                 # Filter None values
                 storage_options = {k: v for k, v in storage_options.items() if v is not None}
-                
+
                 store = S3ArtifactStore(bucket_name=bucket_name, storage_options=storage_options)
                 artifact = store.load(key)
 
@@ -362,16 +345,14 @@ class DeploymentService:
                     if len(parts) == 2:
                         pipeline_id = parts[0]
                         node_id = parts[1]
-                        base_path = os.path.join(
-                            os.getcwd(), "exports", "models", pipeline_id
-                        )
+                        base_path = os.path.join(os.getcwd(), "exports", "models", pipeline_id)
                     else:
                         base_path = os.path.dirname(artifact_uri)
                         node_id = os.path.basename(artifact_uri)
                 else:
                     base_path = os.path.dirname(artifact_uri)
                     node_id = os.path.basename(artifact_uri)
-                
+
                 store = LocalArtifactStore(base_path)
                 if store.exists(node_id):
                     artifact = store.load(node_id)
@@ -394,7 +375,7 @@ class DeploymentService:
 
                 # Extract Schema
                 input_features = []
-                
+
                 # Check dict format
                 if isinstance(artifact, dict) and "feature_engineer" in artifact:
                     fe = artifact["feature_engineer"]
@@ -409,26 +390,30 @@ class DeploymentService:
                             transformer = first_step[1]
                             if hasattr(transformer, "feature_names_in_"):
                                 input_features = transformer.feature_names_in_
-                    
+
                     # If still empty, try model
                     if not input_features and "model" in artifact:
                         model = artifact["model"]
-                        if isinstance(model, tuple): model = model[0]
+                        if isinstance(model, tuple):
+                            model = model[0]
                         if hasattr(model, "feature_names_in_"):
                             input_features = model.feature_names_in_
 
                 # Check direct model
                 elif hasattr(artifact, "feature_names_in_"):
                     input_features = artifact.feature_names_in_
-                
+
                 if hasattr(input_features, "tolist"):
                     input_features = input_features.tolist()
-                
+
                 if input_features:
-                    info["input_schema"] = [{"name": str(f), "type": "unknown"} for f in input_features]
+                    info["input_schema"] = [
+                        {"name": str(f), "type": "unknown"} for f in input_features
+                    ]
 
             # Extract Target Column from Job Graph
             from backend.ml_pipeline.execution.jobs import JobManager
+
             job = await JobManager.get_job(session, str(deployment.job_id))
             if job and job.graph:
                 nodes = job.graph.get("nodes", [])

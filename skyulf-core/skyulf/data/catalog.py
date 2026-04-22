@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional, Union
 import pandas as pd
 from ..engines import SkyulfDataFrame
 
+
 class DataCatalog(ABC):
     """
     Abstract interface for data access.
@@ -13,7 +14,7 @@ class DataCatalog(ABC):
     def load(self, dataset_id: str, **kwargs) -> Union[pd.DataFrame, SkyulfDataFrame]:
         """
         Load a dataset by its identifier.
-        
+
         Args:
             dataset_id: Unique identifier for the dataset (e.g., filename, table name).
             **kwargs: Additional arguments (e.g., version, sample_size).
@@ -24,7 +25,7 @@ class DataCatalog(ABC):
     def save(self, dataset_id: str, data: Union[pd.DataFrame, SkyulfDataFrame], **kwargs) -> None:
         """
         Save a dataset.
-        
+
         Args:
             dataset_id: Unique identifier for the destination.
             data: The pandas/polars DataFrame to save.

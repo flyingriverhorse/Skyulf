@@ -9,6 +9,7 @@ from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 
 logger = logging.getLogger(__name__)
 
+
 class ArtifactFactory:
     """
     Factory for creating ArtifactStore instances based on configuration and context.
@@ -30,16 +31,18 @@ class ArtifactFactory:
             return LocalArtifactStore(base_path=artifact_uri)
 
     @staticmethod
-    def create_store_for_job(job_id: str, is_s3_source: bool = False, artifact_path_name: Optional[str] = None) -> Tuple[ArtifactStore, str]:
+    def create_store_for_job(
+        job_id: str, is_s3_source: bool = False, artifact_path_name: Optional[str] = None
+    ) -> Tuple[ArtifactStore, str]:
         """
         Determines the correct storage location for a new job based on:
         1. The data source type (S3 vs Local)
         2. Configuration settings (UPLOAD_TO_S3_FOR_LOCAL_FILES, SAVE_S3_ARTIFACTS_LOCALLY)
-        
+
         Args:
             job_id: The unique identifier of the job.
             is_s3_source: Whether the input data comes from S3.
-            artifact_path_name: Optional custom name for the artifact folder/prefix. 
+            artifact_path_name: Optional custom name for the artifact folder/prefix.
                                 Defaults to job_id if not provided.
 
         Returns:
@@ -47,10 +50,10 @@ class ArtifactFactory:
         """
         settings = get_settings()
         s3_bucket = settings.S3_ARTIFACT_BUCKET
-        
+
         use_s3 = False
         folder_name = artifact_path_name or job_id
-        
+
         if s3_bucket:
             if is_s3_source:
                 # Default is S3, but user can force local storage via config
@@ -59,14 +62,12 @@ class ArtifactFactory:
             elif settings.UPLOAD_TO_S3_FOR_LOCAL_FILES:
                 # Local source, but user wants to upload to S3
                 use_s3 = True
-        
+
         if use_s3 and s3_bucket:
             # Create S3 Store
             storage_options = ArtifactFactory._get_s3_options(settings)
             store = S3ArtifactStore(
-                bucket_name=s3_bucket, 
-                prefix=folder_name, 
-                storage_options=storage_options
+                bucket_name=s3_bucket, prefix=folder_name, storage_options=storage_options
             )
             base_uri = f"s3://{s3_bucket}/{folder_name}"
             return store, base_uri
@@ -84,15 +85,11 @@ class ArtifactFactory:
         parts = artifact_uri.replace("s3://", "").split("/", 1)
         bucket = parts[0]
         prefix = parts[1] if len(parts) > 1 else ""
-        
+
         settings = get_settings()
         storage_options = ArtifactFactory._get_s3_options(settings)
-        
-        return S3ArtifactStore(
-            bucket_name=bucket, 
-            prefix=prefix, 
-            storage_options=storage_options
-        )
+
+        return S3ArtifactStore(bucket_name=bucket, prefix=prefix, storage_options=storage_options)
 
     @staticmethod
     def _get_s3_options(settings) -> dict:
@@ -106,9 +103,9 @@ class ArtifactFactory:
             options["region_name"] = settings.AWS_DEFAULT_REGION
         if settings.AWS_ENDPOINT_URL:
             options["endpoint_url"] = settings.AWS_ENDPOINT_URL
-            
+
         # Also support 'key', 'secret', 'region' keys for s3fs compatibility if needed,
-        # but S3ArtifactStore should handle the mapping. 
+        # but S3ArtifactStore should handle the mapping.
         # Based on previous fixes, S3ArtifactStore expects 'region_name' in storage_options.
-        
+
         return options

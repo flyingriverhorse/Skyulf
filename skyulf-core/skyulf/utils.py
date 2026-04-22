@@ -60,9 +60,7 @@ def unpack_pipeline_input(
 
 
 def pack_pipeline_output(
-    X: Union[pd.DataFrame, SkyulfDataFrame], 
-    y: Optional[Any], 
-    was_tuple: bool
+    X: Union[pd.DataFrame, SkyulfDataFrame], y: Optional[Any], was_tuple: bool
 ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]]:
     """
     Packs output back into a tuple if the input was a tuple and y is present.
@@ -74,11 +72,11 @@ def pack_pipeline_output(
     if y is not None:
         # Re-attach y to X
         engine = get_engine(X)
-        
+
         if getattr(engine, "name", "") == "polars":
             # Polars specific concat
             import polars as pl
-            
+
             y_series = y
             if not isinstance(y, (pl.Series, pl.DataFrame)):
                 # Try to convert y to Series
@@ -86,11 +84,11 @@ def pack_pipeline_output(
                     y_series = pl.Series(y)
                 except Exception:
                     pass  # Let it fail or handle otherwise
-            
+
             # Helper to get raw df
             raw_df = X
             is_wrapped = False
-            
+
             if isinstance(X, pl.DataFrame):
                 raw_df = X
                 is_wrapped = False
@@ -107,22 +105,22 @@ def pack_pipeline_output(
                 result = raw_df.hstack(y_series.get_columns())
             else:
                 result = raw_df.hstack(y_series)
-                
+
             if is_wrapped:
                 return engine.wrap(result)
             return result
 
         # Default to Pandas behavior (convert if needed or assume Pandas)
         if hasattr(X, "to_pandas"):
-             X_pd = X.to_pandas()
+            X_pd = X.to_pandas()
         else:
-             X_pd = X
-             
+            X_pd = X
+
         if hasattr(y, "to_pandas"):
-             y_pd = y.to_pandas()
+            y_pd = y.to_pandas()
         else:
-             y_pd = y
-             
+            y_pd = y
+
         # Ensure indices align (they should if coming from same operation)
         return pd.concat([X_pd, y_pd], axis=1)
 
@@ -167,41 +165,54 @@ def detect_numeric_columns(
         exclude_constant: If True, excludes columns with 0 or 1 unique value.
     """
     engine = get_engine(frame)
-    
+
     # Polars Path
     if engine.name == "polars":
         import polars as pl
-        
+
         detected: List[str] = []
-        
+
         # Select numeric columns first
         numeric_cols = [
-            c for c, t in zip(frame.columns, frame.dtypes)
-            if t in [pl.Float32, pl.Float64, pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64]
+            c
+            for c, t in zip(frame.columns, frame.dtypes)
+            if t
+            in [
+                pl.Float32,
+                pl.Float64,
+                pl.Int8,
+                pl.Int16,
+                pl.Int32,
+                pl.Int64,
+                pl.UInt8,
+                pl.UInt16,
+                pl.UInt32,
+                pl.UInt64,
+            ]
         ]
-        
+
         for col in numeric_cols:
             series = frame[col]
-            
+
             # 1. Exclude explicit booleans (already filtered by type check above mostly, but good to be safe)
             if series.dtype == pl.Boolean:
                 continue
-                
+
             # 2. Check for validity (non-nulls)
             valid = series.drop_nulls()
             if valid.is_empty():
                 continue
-                
+
             # 3. Exclude 0/1 columns (Binary)
             if exclude_binary and _is_binary_numeric(valid):
                 continue
-                
+
             # 4. Exclude constant columns
             if exclude_constant and valid.n_unique() < 2:
                 continue
-                
+
             detected.append(col)
-            
+
         return detected
 
     # Pandas Path
@@ -209,7 +220,7 @@ def detect_numeric_columns(
     if not isinstance(frame, pd.DataFrame):
         if hasattr(frame, "to_pandas"):
             frame = frame.to_pandas()
-            
+
     detected: List[str] = []
     seen: Set[str] = set()
 
@@ -227,7 +238,7 @@ def detect_numeric_columns(
         # 2. Strict Numeric Check (Align with Polars behavior)
         if not pd.api.types.is_numeric_dtype(dtype):
             continue
-            
+
         valid = series.dropna()
 
         if valid.empty:
@@ -250,7 +261,9 @@ def detect_numeric_columns(
 def resolve_columns(
     df: Union[pd.DataFrame, SkyulfDataFrame],
     config: Dict[str, Any],
-    default_selection_func: Optional[Callable[[Union[pd.DataFrame, SkyulfDataFrame]], List[str]]] = None,
+    default_selection_func: Optional[
+        Callable[[Union[pd.DataFrame, SkyulfDataFrame]], List[str]]
+    ] = None,
     target_column_key: str = "target_column",
 ) -> List[str]:
     """

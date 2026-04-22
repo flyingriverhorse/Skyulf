@@ -62,9 +62,7 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             Optional[ModelType]: Model instance or None
         """
-        result = await self.session.execute(
-            select(self.model).where(self.model.id == record_id)
-        )
+        result = await self.session.execute(select(self.model).where(self.model.id == record_id))
         return result.scalar_one_or_none()
 
     async def get_multi(
@@ -143,9 +141,7 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             bool: True if deleted, False if not found
         """
-        result = await self.session.execute(
-            delete(self.model).where(self.model.id == record_id)
-        )
+        result = await self.session.execute(delete(self.model).where(self.model.id == record_id))
 
         cursor = cast(CursorResult[Any], result)
         affected = cursor.rowcount or 0
@@ -202,9 +198,7 @@ class UserRepository(BaseRepository[User]):
 
     async def get_by_username(self, username: str) -> Optional[User]:
         """Get user by username."""
-        result = await self.session.execute(
-            select(User).where(User.username == username)
-        )
+        result = await self.session.execute(select(User).where(User.username == username))
         return result.scalar_one_or_none()
 
     async def get_by_email(self, email: str) -> Optional[User]:
@@ -214,9 +208,7 @@ class UserRepository(BaseRepository[User]):
 
     async def get_active_users(self) -> List[User]:
         """Get all active users."""
-        result = await self.session.execute(
-            select(User).where(User.is_active.is_(True))
-        )
+        result = await self.session.execute(select(User).where(User.is_active.is_(True)))
         return list(result.scalars().all())
 
     async def update_last_login(self, user_id: int) -> bool:
@@ -243,9 +235,7 @@ class DataSourceRepository(BaseRepository[DataSource]):
 
     async def get_by_name(self, name: str) -> Optional[DataSource]:
         """Get data source by name."""
-        result = await self.session.execute(
-            select(DataSource).where(DataSource.name == name)
-        )
+        result = await self.session.execute(select(DataSource).where(DataSource.name == name))
         return result.scalar_one_or_none()
 
     async def get_by_type(self, source_type: str) -> List[DataSource]:

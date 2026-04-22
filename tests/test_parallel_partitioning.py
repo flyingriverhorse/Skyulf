@@ -10,9 +10,12 @@ from backend.ml_pipeline.execution.graph_utils import (
 )
 
 
-def _make_node(node_id: str, step_type: str = "StandardScaler",
-               inputs: list[str] | None = None,
-               params: dict | None = None) -> NodeConfig:
+def _make_node(
+    node_id: str,
+    step_type: str = "StandardScaler",
+    inputs: list[str] | None = None,
+    params: dict | None = None,
+) -> NodeConfig:
     return NodeConfig(
         node_id=node_id,
         step_type=step_type,
@@ -62,8 +65,7 @@ class TestNoPartition:
         nodes = [
             _make_node("ds", "data_loader"),
             _make_node("scale", inputs=["ds"]),
-            _make_node("train", "basic_training", inputs=["scale"],
-                       params={"target_column": "y"}),
+            _make_node("train", "basic_training", inputs=["scale"], params={"target_column": "y"}),
         ]
         config = _make_config(nodes)
         result = partition_parallel_pipeline(config)
@@ -84,8 +86,12 @@ class TestNoPartition:
         """Parallel mode with only 1 input → nothing to split."""
         nodes = [
             _make_node("ds", "data_loader"),
-            _make_node("train", "basic_training", inputs=["ds"],
-                       params={"execution_mode": "parallel", "target_column": "y"}),
+            _make_node(
+                "train",
+                "basic_training",
+                inputs=["ds"],
+                params={"execution_mode": "parallel", "target_column": "y"},
+            ),
         ]
         config = _make_config(nodes)
         result = partition_parallel_pipeline(config)
@@ -102,10 +108,18 @@ class TestMultipleTerminals:
             _make_node("ds", "data_loader"),
             _make_node("scale", inputs=["ds"]),
             _make_node("encode", inputs=["ds"]),
-            _make_node("trainA", "basic_training", inputs=["scale"],
-                       params={"target_column": "y", "model_type": "rf"}),
-            _make_node("trainB", "basic_training", inputs=["encode"],
-                       params={"target_column": "y", "model_type": "xgb"}),
+            _make_node(
+                "trainA",
+                "basic_training",
+                inputs=["scale"],
+                params={"target_column": "y", "model_type": "rf"},
+            ),
+            _make_node(
+                "trainB",
+                "basic_training",
+                inputs=["encode"],
+                params={"target_column": "y", "model_type": "xgb"},
+            ),
         ]
         config = _make_config(nodes)
         result = partition_parallel_pipeline(config)
@@ -127,10 +141,8 @@ class TestMultipleTerminals:
             _make_node("clean", inputs=["ds"]),
             _make_node("scale", inputs=["clean"]),
             _make_node("pca", inputs=["clean"]),
-            _make_node("trainA", "basic_training", inputs=["scale"],
-                       params={"target_column": "y"}),
-            _make_node("trainB", "advanced_tuning", inputs=["pca"],
-                       params={"target_column": "y"}),
+            _make_node("trainA", "basic_training", inputs=["scale"], params={"target_column": "y"}),
+            _make_node("trainB", "advanced_tuning", inputs=["pca"], params={"target_column": "y"}),
         ]
         config = _make_config(nodes)
         result = partition_parallel_pipeline(config)
@@ -145,10 +157,8 @@ class TestMultipleTerminals:
     def test_pipeline_ids_include_branch_index(self):
         nodes = [
             _make_node("ds", "data_loader"),
-            _make_node("trainA", "basic_training", inputs=["ds"],
-                       params={"target_column": "y"}),
-            _make_node("trainB", "basic_training", inputs=["ds"],
-                       params={"target_column": "y"}),
+            _make_node("trainA", "basic_training", inputs=["ds"], params={"target_column": "y"}),
+            _make_node("trainB", "basic_training", inputs=["ds"], params={"target_column": "y"}),
         ]
         config = _make_config(nodes, pipeline_id="my_pipe")
         result = partition_parallel_pipeline(config)
@@ -166,8 +176,12 @@ class TestParallelMode:
             _make_node("ds", "data_loader"),
             _make_node("branchA", inputs=["ds"]),
             _make_node("branchB", inputs=["ds"]),
-            _make_node("train", "basic_training", inputs=["branchA", "branchB"],
-                       params={"execution_mode": "parallel", "target_column": "y"}),
+            _make_node(
+                "train",
+                "basic_training",
+                inputs=["branchA", "branchB"],
+                params={"execution_mode": "parallel", "target_column": "y"},
+            ),
         ]
         config = _make_config(nodes)
         result = partition_parallel_pipeline(config)
@@ -202,8 +216,12 @@ class TestParallelMode:
             _make_node("splitB", inputs=["impB"]),
             _make_node("encB", inputs=["splitB"]),
             # Training
-            _make_node("train", "basic_training", inputs=["scaleA", "encB"],
-                       params={"execution_mode": "parallel", "target_column": "y"}),
+            _make_node(
+                "train",
+                "basic_training",
+                inputs=["scaleA", "encB"],
+                params={"execution_mode": "parallel", "target_column": "y"},
+            ),
         ]
         config = _make_config(nodes)
         result = partition_parallel_pipeline(config)
@@ -221,8 +239,12 @@ class TestParallelMode:
             _make_node("ds", "data_loader"),
             _make_node("a", inputs=["ds"]),
             _make_node("b", inputs=["ds"]),
-            _make_node("train", "basic_training", inputs=["a", "b"],
-                       params={"execution_mode": "parallel", "target_column": "y"}),
+            _make_node(
+                "train",
+                "basic_training",
+                inputs=["a", "b"],
+                params={"execution_mode": "parallel", "target_column": "y"},
+            ),
         ]
         config = _make_config(nodes, pipeline_id="parent_123")
         result = partition_parallel_pipeline(config)
@@ -240,12 +262,16 @@ class TestParallelMode:
             _make_node("pca", inputs=["scaler"]),
             _make_node("encoder", inputs=["scaler"]),
             # Normal training node — gets 1 sub-pipeline
-            _make_node("train_rf", "basic_training", inputs=["pca"],
-                       params={"model_type": "random_forest"}),
+            _make_node(
+                "train_rf", "basic_training", inputs=["pca"], params={"model_type": "random_forest"}
+            ),
             # Parallel training node with 2 inputs — gets 2 sub-pipelines
-            _make_node("train_xgb", "advanced_tuning", inputs=["pca", "encoder"],
-                       params={"model_type": "xgboost",
-                               "execution_mode": "parallel"}),
+            _make_node(
+                "train_xgb",
+                "advanced_tuning",
+                inputs=["pca", "encoder"],
+                params={"model_type": "xgboost", "execution_mode": "parallel"},
+            ),
         ]
         config = _make_config(nodes, pipeline_id="hybrid_test")
         result = partition_parallel_pipeline(config)
@@ -253,15 +279,11 @@ class TestParallelMode:
         assert len(result) == 3
 
         # First sub-pipeline: normal train_rf with its ancestors
-        rf_subs = [s for s in result if any(
-            n.node_id == "train_rf" for n in s.nodes
-        )]
+        rf_subs = [s for s in result if any(n.node_id == "train_rf" for n in s.nodes)]
         assert len(rf_subs) == 1
 
         # Two sub-pipelines for train_xgb (one per input)
-        xgb_subs = [s for s in result if any(
-            n.node_id == "train_xgb" for n in s.nodes
-        )]
+        xgb_subs = [s for s in result if any(n.node_id == "train_xgb" for n in s.nodes)]
         assert len(xgb_subs) == 2
 
         # Each xgb sub should have only 1 input on the terminal node
@@ -282,10 +304,8 @@ class TestParallelMode:
             _make_node("ds", "data_loader"),
             _make_node("a", inputs=["ds"]),
             _make_node("b", inputs=["ds"]),
-            _make_node("train1", "basic_training", inputs=["a", "b"],
-                       params={"model_type": "rf"}),
-            _make_node("train2", "basic_training", inputs=["b"],
-                       params={"model_type": "xgb"}),
+            _make_node("train1", "basic_training", inputs=["a", "b"], params={"model_type": "rf"}),
+            _make_node("train2", "basic_training", inputs=["b"], params={"model_type": "xgb"}),
         ]
         config = _make_config(nodes)
         result = partition_parallel_pipeline(config)
@@ -301,10 +321,8 @@ class TestConnectedComponents:
         nodes = [
             _make_node("ds", "data_loader"),
             _make_node("scale", inputs=["ds"]),
-            _make_node("trainA", "basic_training", inputs=["scale"],
-                       params={"target_column": "y"}),
-            _make_node("trainB", "basic_training", inputs=["scale"],
-                       params={"target_column": "y"}),
+            _make_node("trainA", "basic_training", inputs=["scale"], params={"target_column": "y"}),
+            _make_node("trainB", "basic_training", inputs=["scale"], params={"target_column": "y"}),
         ]
         config = _make_config(nodes, pipeline_id="single_group")
         result = _split_connected_components(config)
@@ -317,13 +335,13 @@ class TestConnectedComponents:
             # Subgraph 1: Dataset A → Training 1
             _make_node("dsA", "data_loader"),
             _make_node("scaleA", inputs=["dsA"]),
-            _make_node("trainA", "basic_training", inputs=["scaleA"],
-                       params={"target_column": "y"}),
+            _make_node(
+                "trainA", "basic_training", inputs=["scaleA"], params={"target_column": "y"}
+            ),
             # Subgraph 2: Dataset B → Training 2 (no connection to A)
             _make_node("dsB", "data_loader"),
             _make_node("encB", inputs=["dsB"]),
-            _make_node("trainB", "basic_training", inputs=["encB"],
-                       params={"target_column": "y"}),
+            _make_node("trainB", "basic_training", inputs=["encB"], params={"target_column": "y"}),
         ]
         config = _make_config(nodes, pipeline_id="original")
         result = _split_connected_components(config)
@@ -347,14 +365,11 @@ class TestConnectedComponents:
             # Connected subgraph: Dataset A → two training nodes
             _make_node("dsA", "data_loader"),
             _make_node("scale", inputs=["dsA"]),
-            _make_node("train1", "basic_training", inputs=["scale"],
-                       params={"target_column": "y"}),
-            _make_node("train2", "basic_training", inputs=["scale"],
-                       params={"target_column": "y"}),
+            _make_node("train1", "basic_training", inputs=["scale"], params={"target_column": "y"}),
+            _make_node("train2", "basic_training", inputs=["scale"], params={"target_column": "y"}),
             # Isolated subgraph: Dataset B → Training 3
             _make_node("dsB", "data_loader"),
-            _make_node("train3", "basic_training", inputs=["dsB"],
-                       params={"target_column": "y"}),
+            _make_node("train3", "basic_training", inputs=["dsB"], params={"target_column": "y"}),
         ]
         config = _make_config(nodes)
         result = _split_connected_components(config)
@@ -372,12 +387,15 @@ class TestConnectedComponents:
             _make_node("dsA", "data_loader"),
             _make_node("brA1", inputs=["dsA"]),
             _make_node("brA2", inputs=["dsA"]),
-            _make_node("trainA", "basic_training", inputs=["brA1", "brA2"],
-                       params={"execution_mode": "parallel", "target_column": "y"}),
+            _make_node(
+                "trainA",
+                "basic_training",
+                inputs=["brA1", "brA2"],
+                params={"execution_mode": "parallel", "target_column": "y"},
+            ),
             # Subgraph 2: Dataset B → single training
             _make_node("dsB", "data_loader"),
-            _make_node("trainB", "basic_training", inputs=["dsB"],
-                       params={"target_column": "y"}),
+            _make_node("trainB", "basic_training", inputs=["dsB"], params={"target_column": "y"}),
         ]
         config = _make_config(nodes, pipeline_id="e2e_test")
 
@@ -406,4 +424,3 @@ class TestConnectedComponents:
         config = _make_config([], pipeline_id="empty")
         result = _split_connected_components(config)
         assert len(result) == 1
-

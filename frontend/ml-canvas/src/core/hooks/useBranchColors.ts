@@ -4,7 +4,7 @@ import type { Node, Edge } from '@xyflow/react';
 const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
 
 /** Generate n evenly-spaced, high-saturation HSL colors with a golden-angle offset for variety. */
-function generateBranchColors(count: number): string[] {
+export function generateBranchColors(count: number): string[] {
   const colors: string[] = [];
   const goldenAngle = 137.508; // degrees — maximises hue separation
   for (let i = 0; i < count; i++) {
