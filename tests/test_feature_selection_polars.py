@@ -1,8 +1,10 @@
 import pytest
 import numpy as np
 import pandas as pd
+
 try:
     import polars as pl
+
     HAS_POLARS = True
 except ImportError:
     HAS_POLARS = False
@@ -12,17 +14,16 @@ from skyulf.preprocessing.feature_selection import (
     FeatureSelectionCalculator,
 )
 
+
 @pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
 def test_variance_threshold_polars():
     calc = FeatureSelectionCalculator()
     applier = FeatureSelectionApplier()
 
     # Create Polars DataFrame
-    df = pl.DataFrame({
-        "A": [1, 2, 3, 4, 5],
-        "B": [1, 1, 1, 1, 1], # Constant
-        "target": [10, 20, 30, 40, 50]
-    })
+    df = pl.DataFrame(
+        {"A": [1, 2, 3, 4, 5], "B": [1, 1, 1, 1, 1], "target": [10, 20, 30, 40, 50]}  # Constant
+    )
 
     # Threshold 0 drops constant
     config = {"method": "variance_threshold", "threshold": 0.0}
@@ -33,6 +34,7 @@ def test_variance_threshold_polars():
     assert "A" in res.columns
     assert "target" in res.columns
     assert isinstance(res, pl.DataFrame)
+
 
 @pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
 def test_univariate_k_best_regression_polars():

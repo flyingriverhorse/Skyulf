@@ -29,9 +29,7 @@ async def list_sources(
     # KNOWN-GAP: Auth not implemented yet — all sources are visible.
     # TODO(auth): Replace None with real user ID from auth dependency.
     sources = await service.list_sources(user_id=None, limit=limit, skip=skip)
-    return DataSourceListResponse(
-        sources=[DataSourceRead.model_validate(s) for s in sources]
-    )
+    return DataSourceListResponse(sources=[DataSourceRead.model_validate(s) for s in sources])
 
 
 @sources_router.get("/sources/usable", response_model=DataSourceListResponse)
@@ -42,15 +40,11 @@ async def list_usable_sources(
     List only successfully ingested data sources.
     """
     sources = await service.list_usable_sources(user_id=None)
-    return DataSourceListResponse(
-        sources=[DataSourceRead.model_validate(s) for s in sources]
-    )
+    return DataSourceListResponse(sources=[DataSourceRead.model_validate(s) for s in sources])
 
 
 @sources_router.get("/sources/{source_id}", response_model=DataSourceResponse)
-async def get_source(
-    source_id: str, service: DataIngestionService = Depends(get_data_service)
-):
+async def get_source(source_id: str, service: DataIngestionService = Depends(get_data_service)):
     """
     Get a specific data source.
     """
@@ -60,9 +54,7 @@ async def get_source(
     return DataSourceResponse(source=source)
 
 
-@sources_router.get(
-    "/sources/{source_id}/sample", response_model=DataSourceSampleResponse
-)
+@sources_router.get("/sources/{source_id}/sample", response_model=DataSourceSampleResponse)
 async def get_source_sample(
     source_id: str,
     limit: int = 5,
@@ -76,9 +68,7 @@ async def get_source_sample(
 
 
 @sources_router.delete("/sources/{source_id}")
-async def delete_source(
-    source_id: str, service: DataIngestionService = Depends(get_data_service)
-):
+async def delete_source(source_id: str, service: DataIngestionService = Depends(get_data_service)):
     """
     Delete a data source.
     """
@@ -161,9 +151,7 @@ async def upload_file(
 
 
 @router.get("/{source_id}/status", response_model=IngestionStatus)
-async def get_status(
-    source_id: int, service: DataIngestionService = Depends(get_data_service)
-):
+async def get_status(source_id: int, service: DataIngestionService = Depends(get_data_service)):
     """
     Get the status of an ingestion job.
     """

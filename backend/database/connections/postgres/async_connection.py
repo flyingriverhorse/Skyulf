@@ -64,9 +64,7 @@ def build_async_database_url_from_env() -> str:
 
     # If required components are missing, fallback to async SQLite for local dev
     if not any([user, password, host, dbname]):
-        logger.warning(
-            "No DB connection info found in environment; using async SQLite fallback."
-        )
+        logger.warning("No DB connection info found in environment; using async SQLite fallback.")
         return "sqlite+aiosqlite:///mlops_postgres_fallback.db"
 
     # Use asyncpg dialect for PostgreSQL async
@@ -82,9 +80,7 @@ def build_async_database_url_from_env() -> str:
 
     # Optional SSL mode and extra params
     sslmode = os.environ.get("DB_SSLMODE")  # e.g. require, verify-full
-    extra = os.environ.get(
-        "DB_EXTRA_PARAMS"
-    )  # e.g. application_name=mlops&connect_timeout=10
+    extra = os.environ.get("DB_EXTRA_PARAMS")  # e.g. application_name=mlops&connect_timeout=10
 
     query_parts = []
     if sslmode:

@@ -53,21 +53,13 @@ def get_db_type_from_url(database_url: str) -> str:
     Returns:
         str: Database type identifier
     """
-    if database_url.startswith("postgresql://") or database_url.startswith(
-        "postgresql+asyncpg://"
-    ):
+    if database_url.startswith("postgresql://") or database_url.startswith("postgresql+asyncpg://"):
         return DatabaseType.POSTGRES
-    elif database_url.startswith("sqlite://") or database_url.startswith(
-        "sqlite+aiosqlite://"
-    ):
+    elif database_url.startswith("sqlite://") or database_url.startswith("sqlite+aiosqlite://"):
         return DatabaseType.SQLITE
-    elif database_url.startswith("mysql://") or database_url.startswith(
-        "mysql+aiomysql://"
-    ):
+    elif database_url.startswith("mysql://") or database_url.startswith("mysql+aiomysql://"):
         return DatabaseType.MYSQL
-    elif database_url.startswith("mongodb://") or database_url.startswith(
-        "mongodb+srv://"
-    ):
+    elif database_url.startswith("mongodb://") or database_url.startswith("mongodb+srv://"):
         return DatabaseType.MONGODB
     elif "snowflake" in database_url.lower():
         return DatabaseType.SNOWFLAKE
@@ -205,9 +197,7 @@ async def async_session_or_connection(  # noqa: C901
         try:
             import snowflake.connector  # type: ignore
         except ImportError:
-            raise RuntimeError(
-                "snowflake-connector-python package required for Snowflake support"
-            )
+            raise RuntimeError("snowflake-connector-python package required for Snowflake support")
 
         # Create connection in thread pool since Snowflake is sync-only
         executor = ThreadPoolExecutor(max_workers=1)
@@ -222,9 +212,7 @@ async def async_session_or_connection(  # noqa: C901
                 warehouse=cfg.get("snowflake_warehouse"),
             )
 
-        conn = await asyncio.get_event_loop().run_in_executor(
-            executor, create_snowflake_connection
-        )
+        conn = await asyncio.get_event_loop().run_in_executor(executor, create_snowflake_connection)
 
         try:
             # Wrap connection with async interface

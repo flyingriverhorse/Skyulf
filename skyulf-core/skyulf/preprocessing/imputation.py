@@ -46,6 +46,7 @@ class SimpleImputerApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
 
             exprs = []
@@ -62,7 +63,7 @@ class SimpleImputerApplier(BaseApplier):
             # This logic assumes "restore" means adding them if they are completely missing from input X but were present during fit?
             # Or is it just adding constant value cols?
             # The original code iterated cols and checked if col not in X.columns.
-            
+
             for col in cols:
                 if col not in X_pl.columns and col in fill_values:
                     val = fill_values[col]
@@ -96,7 +97,7 @@ class SimpleImputerApplier(BaseApplier):
     name="Simple Imputer",
     category="Preprocessing",
     description="Imputes missing values using mean, median, or constant.",
-    params={"strategy": "mean", "fill_value": None, "columns": []}
+    params={"strategy": "mean", "fill_value": None, "columns": []},
 )
 class SimpleImputerCalculator(BaseCalculator):
     def fit(
@@ -119,7 +120,9 @@ class SimpleImputerCalculator(BaseCalculator):
         detect_func = (
             detect_numeric_columns
             if strategy in ["mean", "median"]
-            else (lambda d: d.columns.tolist())  # Explicit type ignored for lambda can be tricky, but logic holds
+            else (
+                lambda d: d.columns.tolist()
+            )  # Explicit type ignored for lambda can be tricky, but logic holds
         )
 
         cols = resolve_columns(X, config, detect_func)
@@ -130,6 +133,7 @@ class SimpleImputerCalculator(BaseCalculator):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
 
             fill_values = {}
@@ -139,16 +143,12 @@ class SimpleImputerCalculator(BaseCalculator):
                     fill_values[col] = fill_value if fill_value is not None else 0
 
             elif strategy == "mean":
-                stats = X_pl.select([pl.col(c).mean() for c in cols]).to_dict(
-                    as_series=False
-                )
+                stats = X_pl.select([pl.col(c).mean() for c in cols]).to_dict(as_series=False)
                 for col in cols:
                     fill_values[col] = stats[col][0]
 
             elif strategy == "median":
-                stats = X_pl.select([pl.col(c).median() for c in cols]).to_dict(
-                    as_series=False
-                )
+                stats = X_pl.select([pl.col(c).median() for c in cols]).to_dict(as_series=False)
                 for col in cols:
                     fill_values[col] = stats[col][0]
 
@@ -233,6 +233,7 @@ class KNNImputerApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
 
             try:
@@ -243,9 +244,7 @@ class KNNImputerApplier(BaseApplier):
                     X_transformed = X_transformed.values
 
                 # Update columns
-                new_cols = [
-                    pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)
-                ]
+                new_cols = [pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)]
                 X_out = X_pl.with_columns(new_cols)
                 return pack_pipeline_output(X_out, y, is_tuple)
 
@@ -271,7 +270,7 @@ class KNNImputerApplier(BaseApplier):
                 X_input = X_subset.values
             else:
                 X_input = X_subset
-                
+
             X_transformed = imputer.transform(X_input)
 
             # Update DataFrame
@@ -291,7 +290,7 @@ class KNNImputerApplier(BaseApplier):
     name="KNN Imputer",
     category="Preprocessing",
     description="Impute missing values using k-Nearest Neighbors.",
-    params={"n_neighbors": 5, "weights": "uniform", "columns": []}
+    params={"n_neighbors": 5, "weights": "uniform", "columns": []},
 )
 class KNNImputerCalculator(BaseCalculator):
     def fit(
@@ -316,7 +315,7 @@ class KNNImputerCalculator(BaseCalculator):
         # WARNING: This is not JSON serializable. We need pickle for this.
 
         imputer = KNNImputer(n_neighbors=n_neighbors, weights=weights)
-        
+
         # Use Bridge for fitting
         if engine.name == "polars":
             # Polars Path
@@ -327,7 +326,7 @@ class KNNImputerCalculator(BaseCalculator):
             X_subset = X[cols]
 
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
-        
+
         imputer.fit(X_np)
 
         return {
@@ -361,6 +360,7 @@ class IterativeImputerApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
 
             try:
@@ -370,9 +370,7 @@ class IterativeImputerApplier(BaseApplier):
                 if hasattr(X_transformed, "values"):
                     X_transformed = X_transformed.values
 
-                new_cols = [
-                    pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)
-                ]
+                new_cols = [pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)]
                 X_out = X_pl.with_columns(new_cols)
                 return pack_pipeline_output(X_out, y, is_tuple)
             except Exception as e:
@@ -384,13 +382,13 @@ class IterativeImputerApplier(BaseApplier):
 
         try:
             X_subset = X_out[cols].copy()
-            
+
             # Fix for "X has feature names..." warning
             if hasattr(X_subset, "values"):
                 X_input = X_subset.values
             else:
                 X_input = X_subset
-                
+
             X_transformed = imputer.transform(X_input)
             X_out[cols] = X_transformed
         except Exception as e:
@@ -406,7 +404,7 @@ class IterativeImputerApplier(BaseApplier):
     name="Iterative Imputer (MICE)",
     category="Preprocessing",
     description="Multivariate imputation using chained equations.",
-    params={"max_iter": 10, "random_state": 0, "estimator": "bayesian_ridge", "columns": []}
+    params={"max_iter": 10, "random_state": 0, "estimator": "bayesian_ridge", "columns": []},
 )
 class IterativeImputerCalculator(BaseCalculator):
     def fit(
@@ -437,10 +435,8 @@ class IterativeImputerCalculator(BaseCalculator):
         else:
             estimator = BayesianRidge()
 
-        imputer = IterativeImputer(
-            estimator=estimator, max_iter=max_iter, random_state=0
-        )
-        
+        imputer = IterativeImputer(estimator=estimator, max_iter=max_iter, random_state=0)
+
         # Use Bridge for fitting
         if engine.name == "polars":
             # Polars Path
@@ -451,7 +447,7 @@ class IterativeImputerCalculator(BaseCalculator):
             X_subset = X[cols]
 
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
-        
+
         imputer.fit(X_np)
 
         return {

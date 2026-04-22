@@ -58,15 +58,11 @@ class EvaluationService:
         if not artifact_store.exists(key):
             # Fallback: Check if the job failed or is still running
             if job.status not in ["completed", "succeeded"]:
-                raise ValueError(
-                    f"Job is {job.status}, evaluation data not available yet."
-                )
+                raise ValueError(f"Job is {job.status}, evaluation data not available yet.")
 
             # Debug info
             path = artifact_store._get_path(key)
-            raise FileNotFoundError(
-                f"Evaluation data artifact not found. Key: {key}, Path: {path}"
-            )
+            raise FileNotFoundError(f"Evaluation data artifact not found. Key: {key}, Path: {path}")
 
         try:
             data = artifact_store.load(key)
@@ -108,9 +104,8 @@ class EvaluationService:
                                         )
 
                                     y_proba = split_data.get("y_proba")
-                                    if (
-                                        isinstance(y_proba, dict)
-                                        and isinstance(y_proba.get("classes"), list)
+                                    if isinstance(y_proba, dict) and isinstance(
+                                        y_proba.get("classes"), list
                                     ):
                                         # Preserve original classes (often numeric) but also attach decoded labels.
                                         y_proba["labels"] = decode_int_like(

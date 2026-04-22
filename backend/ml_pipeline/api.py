@@ -84,29 +84,19 @@ class DataProfiler:
                 "missing_ratio": float(df[col].isnull().mean()),
                 "unique_count": int(df[col].nunique()),
                 "min_value": (
-                    float(cast(Union[float, int], df[col].min()))
-                    if is_numeric
-                    else None
+                    float(cast(Union[float, int], df[col].min())) if is_numeric else None
                 ),
                 "max_value": (
-                    float(cast(Union[float, int], df[col].max()))
-                    if is_numeric
-                    else None
+                    float(cast(Union[float, int], df[col].max())) if is_numeric else None
                 ),
                 "mean_value": (
-                    float(cast(Union[float, int], df[col].mean()))
-                    if is_numeric
-                    else None
+                    float(cast(Union[float, int], df[col].mean())) if is_numeric else None
                 ),
                 "std_value": (
-                    float(cast(Union[float, int], df[col].std()))
-                    if is_numeric
-                    else None
+                    float(cast(Union[float, int], df[col].std())) if is_numeric else None
                 ),
                 "skewness": (
-                    float(cast(Union[float, int], df[col].skew()))
-                    if is_numeric
-                    else None
+                    float(cast(Union[float, int], df[col].skew())) if is_numeric else None
                 ),
             }
         return AnalysisProfile(
@@ -122,9 +112,7 @@ class AdvisorEngine:
         recs = []
 
         # 1. Imputation
-        missing_cols = [
-            col for col, stats in profile.columns.items() if stats["missing_count"] > 0
-        ]
+        missing_cols = [col for col, stats in profile.columns.items() if stats["missing_count"] > 0]
         if missing_cols:
             recs.append(
                 Recommendation(
@@ -150,9 +138,7 @@ class AdvisorEngine:
             )
 
         high_missing_cols = [
-            col
-            for col, stats in profile.columns.items()
-            if stats["missing_ratio"] > 0.5
+            col for col, stats in profile.columns.items() if stats["missing_ratio"] > 0.5
         ]
         if high_missing_cols:
             recs.append(
@@ -189,16 +175,10 @@ class AdvisorEngine:
         # If max is > mean + 3*std or min < mean - 3*std
         outlier_cols = []
         for col, stats in profile.columns.items():
-            if (
-                stats["column_type"] == "numeric"
-                and stats["std_value"]
-                and stats["std_value"] > 0
-            ):
+            if stats["column_type"] == "numeric" and stats["std_value"] and stats["std_value"] > 0:
                 mean = stats["mean_value"]
                 std = stats["std_value"]
-                if (stats["max_value"] > mean + 3 * std) or (
-                    stats["min_value"] < mean - 3 * std
-                ):
+                if (stats["max_value"] > mean + 3 * std) or (stats["min_value"] < mean - 3 * std):
                     outlier_cols.append(col)
 
         if outlier_cols:
@@ -272,7 +252,9 @@ class PipelineConfigModel(BaseModel):
     nodes: List[NodeConfigModel]
     metadata: Dict[str, Any] = {}
     target_node_id: Optional[str] = None
-    job_type: Optional[str] = StepType.BASIC_TRAINING  # "basic_training", "advanced_tuning", or "preview"
+    job_type: Optional[str] = (
+        StepType.BASIC_TRAINING
+    )  # "basic_training", "advanced_tuning", or "preview"
 
 
 class RunPipelineResponse(BaseModel):
@@ -336,7 +318,8 @@ async def run_pipeline(  # noqa: C901
     # This ensures clicking Train on node A doesn't also execute node B.
     if config.target_node_id and len(sub_pipelines) > 1:
         filtered = [
-            sub for sub in sub_pipelines
+            sub
+            for sub in sub_pipelines
             if any(n.node_id == config.target_node_id for n in sub.nodes)
         ]
         if filtered:
@@ -396,8 +379,12 @@ async def run_pipeline(  # noqa: C901
         sub_payload = {
             "pipeline_id": sub.pipeline_id,
             "nodes": [
-                {"node_id": n.node_id, "step_type": n.step_type,
-                 "params": n.params, "inputs": n.inputs}
+                {
+                    "node_id": n.node_id,
+                    "step_type": n.step_type,
+                    "params": n.params,
+                    "inputs": n.inputs,
+                }
                 for n in sub.nodes
             ],
             "metadata": sub.metadata,
@@ -416,6 +403,7 @@ async def run_pipeline(  # noqa: C901
         if len(task_payloads) == 1:
             background_tasks.add_task(run_pipeline_task, *task_payloads[0])
         else:
+
             def _run_branches_concurrently(payloads: List[tuple]) -> None:
                 with ThreadPoolExecutor(max_workers=len(payloads)) as pool:
                     futures = [pool.submit(run_pipeline_task, jid, pl) for jid, pl in payloads]
@@ -445,7 +433,41 @@ class PreviewResponse(BaseModel):
     node_results: Dict[str, Any]
     # We return the preview data for the last node (or specific nodes)
     preview_data: Optional[Union[List[Dict[str, Any]], Dict[str, Any]]] = None
+    # When the pipeline has multiple branches (parallel execution), per-branch
+    # preview keyed by branch label (e.g. "Path A · Random Forest").
+    # Each value matches the shape of preview_data above.
+    branch_previews: Optional[Dict[str, Any]] = None
+    # Per-branch list of node IDs that ran in that branch. Used by the
+    # frontend to show only the relevant "applied steps" pills per tab.
+    branch_node_ids: Optional[Dict[str, List[str]]] = None
     recommendations: List[Recommendation] = []
+    # Advisory messages from the engine about merge semantics applied during
+    # this preview (e.g. sibling fan-in detected). Empty list when nothing
+    # noteworthy happened.
+    merge_warnings: List[Dict[str, Any]] = []
+
+
+def _prettify_model_type(model_type: str) -> str:
+    """Convert snake_case model id to readable name (mirror frontend useBranchColors)."""
+    if not model_type:
+        return ""
+    cleaned = model_type
+    for suffix in ("_classifier", "_regressor"):
+        if cleaned.endswith(suffix):
+            cleaned = cleaned[: -len(suffix)]
+            break
+    return " ".join(w.capitalize() for w in cleaned.split("_"))
+
+
+def _branch_label(index: int, sub_config: PipelineConfig) -> str:
+    """Build a 'Path A · Model' label for a branch sub-pipeline."""
+    letter = chr(ord("A") + index)
+    model_type = ""
+    for n in sub_config.nodes:
+        if n.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
+            model_type = n.params.get("model_type") or n.params.get("algorithm") or ""
+    pretty = _prettify_model_type(str(model_type))
+    return f"Path {letter} · {pretty}" if pretty else f"Path {letter}"
 
 
 class SavedPipelineModel(BaseModel):
@@ -511,15 +533,11 @@ async def save_pipeline(
         return {"status": "success", "id": dataset_id, "storage": "database"}
     except Exception as e:
         await session.rollback()
-        raise HTTPException(
-            status_code=500, detail=f"Failed to save pipeline: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to save pipeline: {str(e)}")
 
 
 @router.get("/load/{dataset_id}")
-async def load_pipeline(
-    dataset_id: str, session: AsyncSession = Depends(get_async_session)
-):
+async def load_pipeline(dataset_id: str, session: AsyncSession = Depends(get_async_session)):
     """Loads the pipeline configuration (supports DB or JSON based on config)."""
     settings = get_settings()
 
@@ -552,9 +570,7 @@ async def load_pipeline(
 
         return pipeline.to_dict()
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to load pipeline: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to load pipeline: {str(e)}")
 
 
 @router.post("/preview", response_model=PreviewResponse)
@@ -572,7 +588,7 @@ async def preview_pipeline(  # noqa: C901
     # 1. Create Temporary Artifact Store
     temp_dir = tempfile.mkdtemp(prefix="skyulf_preview_")
     artifact_store = LocalArtifactStore(temp_dir)
-    
+
     # Resolve paths and credentials for Preview (Async)
     ingestion_service = DataIngestionService(session)
     resolved_s3_options = await resolve_pipeline_nodes(config.nodes, ingestion_service)
@@ -615,189 +631,234 @@ async def preview_pipeline(  # noqa: C901
         )
 
         # 3. Run Engine
-        
+
         # IMPORTANT: Pass session to create_catalog_from_options so SmartCatalog can resolve IDs
         # But session here is AsyncSession, SmartCatalog expects Sync Session (usually)
         # However, SmartCatalog uses self.session.query() which is sync-style ORM usage.
         # If we pass AsyncSession, query() won't work.
         # We need a sync session for SmartCatalog.
-        
+
         if db_engine.sync_session_factory is None:
             raise HTTPException(status_code=500, detail="Database not initialized")
-            
+
         sync_session = db_engine.sync_session_factory()
-        
+
+        # Partition the pipeline for preview. We want one preview tab per
+        # logical experiment, mirroring "Run All Experiments". Strategy:
+        #   1. Use partition_parallel_pipeline() — gives one sub per
+        #      (training_node × input_branch) combination. This handles the
+        #      case where one data node feeds multiple training nodes.
+        #   2. If no training nodes exist, fall back to partition_for_preview()
+        #      which splits by data leaves so parallel preprocessing chains
+        #      still get separate tabs.
+        # Either way, training/tuning nodes are stripped before execution
+        # because preview never fits models.
+        from backend.ml_pipeline.execution.graph_utils import (
+            partition_for_preview,
+            partition_parallel_pipeline,
+        )
+
+        training_types = {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}
+        has_training = any(n.step_type in training_types for n in nodes)
+
+        if has_training:
+            training_subs = partition_parallel_pipeline(pipeline_config)
+
+            def _strip(sub: PipelineConfig) -> PipelineConfig:
+                stripped = [n for n in sub.nodes if n.step_type not in training_types]
+                return PipelineConfig(
+                    pipeline_id=sub.pipeline_id,
+                    nodes=stripped,
+                    metadata=sub.metadata,
+                )
+
+            paired_subs = [(orig, _strip(orig)) for orig in training_subs]
+        else:
+            preview_subs = partition_for_preview(pipeline_config)
+            # No training → no separate label source; reuse the runnable sub.
+            paired_subs = [(sub, sub) for sub in preview_subs]
+
         try:
-            catalog = create_catalog_from_options(resolved_s3_options, config.nodes, session=sync_session)
+            catalog = create_catalog_from_options(
+                resolved_s3_options, config.nodes, session=sync_session
+            )
             engine = PipelineEngine(artifact_store, catalog=catalog)
-            result = engine.run(pipeline_config)
+            # Single shared artifact store across branches deduplicates work
+            # for ancestor nodes that appear in multiple sub-pipelines.
+            sub_results = [(orig, runnable, engine.run(runnable)) for orig, runnable in paired_subs]
         finally:
             sync_session.close()
 
-        # 4. Extract Preview Data & Generate Recommendations
-        preview_data = {}
-        recommendations = []
+        # ---- Preview extraction helpers ----
 
-        if result.status == "success" and config.nodes:
-            # Determine which node's output to preview
-            target_node = config.nodes[-1]
-            target_node_id = target_node.node_id
+        def to_records(df):
+            if isinstance(df, pd.DataFrame):
+                return json.loads(df.head(50).to_json(orient="records"))
+            if isinstance(df, pd.Series):
+                return json.loads(df.to_frame().head(50).to_json(orient="records"))
+            try:
+                import polars as pl
 
-            # If the last node is a modeling node, we can't preview the model object as data.
-            # Instead, we preview the input data that went into the model.
-            if target_node.step_type in [StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING]:
-                if target_node.inputs:
-                    # Use the input node's output
-                    target_node_id = target_node.inputs[0]
-                    logger.info(
-                        f"Last node is {target_node.step_type}, previewing input node {target_node_id} instead"
-                    )
+                if isinstance(df, pl.DataFrame):
+                    return json.loads(df.head(50).to_pandas().to_json(orient="records"))
+                if isinstance(df, pl.Series):
+                    return json.loads(df.head(50).to_pandas().to_frame().to_json(orient="records"))
+            except ImportError:
+                pass
+            return []
 
-            if artifact_store.exists(target_node_id):
-                artifact = artifact_store.load(target_node_id)
+        def process_xy(xy_tuple, prefix):
+            X, y = xy_tuple
+            return {f"{prefix}_X": to_records(X), f"{prefix}_y": to_records(y)}
 
-                # Debug logging
-                logger.debug(
-                    f"Loaded artifact for node {target_node_id}. Type: {type(artifact)}"
-                )
-                if isinstance(artifact, SplitDataset):
-                    logger.debug(f"SplitDataset Train Type: {type(artifact.train)}")
+        def to_pandas_safe(df):
+            if isinstance(df, pd.DataFrame):
+                return df
+            try:
+                import polars as pl
 
-                df_for_analysis = None
+                if isinstance(df, pl.DataFrame):
+                    return df.to_pandas()
+            except ImportError:
+                pass
+            return None
 
-                # Helper to convert DataFrame/Series (Pandas or Polars) to records list
-                def to_records(df):
-                    if isinstance(df, pd.DataFrame):
-                        return json.loads(df.head(50).to_json(orient="records"))
-                    if isinstance(df, pd.Series):
-                        return json.loads(df.to_frame().head(50).to_json(orient="records"))
-                    
-                    try:
-                        import polars as pl
-                        if isinstance(df, pl.DataFrame):
-                            return json.loads(df.head(50).to_pandas().to_json(orient="records"))
-                        if isinstance(df, pl.Series):
-                            return json.loads(df.head(50).to_pandas().to_frame().to_json(orient="records"))
-                    except ImportError:
-                        pass
-                    return []
+        def pick_target_node_id(node_list) -> Optional[str]:
+            """Pick the last data-bearing node to preview.
 
-                # Helper to process (X, y) tuple
-                def process_xy(xy_tuple, prefix):
-                    X, y = xy_tuple
-                    return {
-                        f"{prefix}_X": to_records(X),
-                        f"{prefix}_y": to_records(y),
-                    }
-                
-                # Helper to ensure df_for_analysis is Pandas
-                def to_pandas_safe(df):
-                    if isinstance(df, pd.DataFrame):
-                        return df
-                    try:
-                        import polars as pl
-                        if isinstance(df, pl.DataFrame):
-                            return df.to_pandas()
-                    except ImportError:
-                        pass
-                    return None
+            Training/tuning nodes are stripped before execution, so the last
+            node in a runnable sub-pipeline is already the right preview
+            target. Falls back to the input of a training node for callers
+            that pass an unstripped node list.
+            """
+            if not node_list:
+                return None
+            target = node_list[-1]
+            target_id = target.node_id
+            if target.step_type in [
+                StepType.BASIC_TRAINING,
+                StepType.ADVANCED_TUNING,
+            ]:
+                if target.inputs:
+                    target_id = target.inputs[0]
+            return target_id
 
-                # Handle different artifact types
-                # Check for Polars DataFrame
-                is_polars = False
-                try:
-                    import polars as pl
-                    if isinstance(artifact, pl.DataFrame):
-                        is_polars = True
-                except ImportError:
-                    pass
+        def extract_preview(target_node_id: Optional[str]):
+            """Return (preview_data, df_for_analysis) for a single artifact."""
+            preview_data: Any = {}
+            df_for_analysis = None
+            if not target_node_id or not artifact_store.exists(target_node_id):
+                return preview_data, df_for_analysis
 
-                if is_polars:
-                    logger.debug("Handling Polars DataFrame artifact")
-                    preview_data = to_records(artifact)
-                    df_for_analysis = to_pandas_safe(artifact)
+            artifact = artifact_store.load(target_node_id)
+            logger.debug(f"Loaded artifact for node {target_node_id}. Type: {type(artifact)}")
 
-                elif isinstance(artifact, pd.DataFrame):
-                    logger.debug("Handling DataFrame artifact")
-                    preview_data = json.loads(
-                        artifact.head(50).to_json(orient="records")
-                    )
-                    df_for_analysis = artifact
-                elif isinstance(artifact, SplitDataset):
-                    logger.debug("Handling SplitDataset artifact")
-                    preview_data = {}
+            is_polars = False
+            try:
+                import polars as pl
 
-                    # Handle Train
-                    if isinstance(artifact.train, tuple):
-                        logger.debug("Train is tuple")
-                        preview_data.update(process_xy(artifact.train, "train"))
-                        df_for_analysis = to_pandas_safe(artifact.train[0])
+                if isinstance(artifact, pl.DataFrame):
+                    is_polars = True
+            except ImportError:
+                pass
+
+            if is_polars:
+                preview_data = to_records(artifact)
+                df_for_analysis = to_pandas_safe(artifact)
+            elif isinstance(artifact, pd.DataFrame):
+                preview_data = json.loads(artifact.head(50).to_json(orient="records"))
+                df_for_analysis = artifact
+            elif isinstance(artifact, SplitDataset):
+                preview_data = {}
+                if isinstance(artifact.train, tuple):
+                    preview_data.update(process_xy(artifact.train, "train"))
+                    df_for_analysis = to_pandas_safe(artifact.train[0])
+                else:
+                    preview_data["train"] = to_records(artifact.train)
+                    df_for_analysis = to_pandas_safe(artifact.train)
+                if isinstance(artifact.test, tuple):
+                    preview_data.update(process_xy(artifact.test, "test"))
+                else:
+                    preview_data["test"] = to_records(artifact.test)
+                if artifact.validation is not None:
+                    if isinstance(artifact.validation, tuple):
+                        preview_data.update(process_xy(artifact.validation, "validation"))
                     else:
-                        logger.debug("Train is DataFrame")
-                        preview_data["train"] = to_records(artifact.train)
-                        df_for_analysis = to_pandas_safe(artifact.train)
+                        preview_data["validation"] = to_records(artifact.validation)
+            elif isinstance(artifact, tuple) and len(artifact) == 2:
+                X, y = artifact
+                preview_data = {"X": to_records(X), "y": to_records(y)}
+                df_for_analysis = to_pandas_safe(X)
+            elif (
+                isinstance(artifact, dict)
+                and "train" in artifact
+                and isinstance(artifact["train"], tuple)
+            ):
+                preview_data = {}
+                preview_data.update(process_xy(artifact["train"], "train"))
+                df_for_analysis = to_pandas_safe(artifact["train"][0])
+                if "test" in artifact:
+                    preview_data.update(process_xy(artifact["test"], "test"))
+                if "validation" in artifact:
+                    preview_data.update(process_xy(artifact["validation"], "validation"))
 
-                    # Handle Test
-                    if isinstance(artifact.test, tuple):
-                        preview_data.update(process_xy(artifact.test, "test"))
-                    else:
-                        preview_data["test"] = to_records(artifact.test)
+            return preview_data, df_for_analysis
 
-                    # Handle Validation
-                    if artifact.validation is not None:
-                        if isinstance(artifact.validation, tuple):
-                            preview_data.update(
-                                process_xy(artifact.validation, "validation")
-                            )
-                        else:
-                            preview_data["validation"] = to_records(artifact.validation)
+        # 4. Aggregate per-branch previews
+        preview_data: Any = {}
+        branch_previews: Optional[Dict[str, Any]] = None
+        branch_node_ids: Optional[Dict[str, List[str]]] = None
+        recommendations: List[Recommendation] = []
+        combined_node_results: Dict[str, Any] = {}
+        # Aggregate status: failed > running > success
+        agg_status = "success"
+        first_pdf = None
 
-                elif isinstance(artifact, tuple) and len(artifact) == 2:
-                    logger.debug("Handling Tuple artifact")
-                    # Assume (X, y) from FeatureTargetSplitter
-                    X, y = artifact
-                    preview_data = {}
+        is_multi = len(sub_results) > 1
+        if is_multi:
+            branch_previews = {}
+            branch_node_ids = {}
 
-                    preview_data["X"] = to_records(X)
-                    preview_data["y"] = to_records(y)
+        for idx, (orig_sub, runnable_sub, sub_result) in enumerate(sub_results):
+            for k, v in sub_result.node_results.items():
+                combined_node_results[k] = v.__dict__
+            if sub_result.status != "success":
+                agg_status = sub_result.status
+            if sub_result.status == "success" and runnable_sub.nodes:
+                target_id = pick_target_node_id(runnable_sub.nodes)
+                pdata, pdf = extract_preview(target_id)
+                if idx == 0:
+                    preview_data = pdata
+                    first_pdf = pdf
+                if is_multi and branch_previews is not None and branch_node_ids is not None:
+                    # Label uses the ORIGINAL sub (training node included) so
+                    # the model name shows up in the tab.
+                    label = _branch_label(idx, orig_sub)
+                    branch_previews[label] = pdata
+                    branch_node_ids[label] = [n.node_id for n in runnable_sub.nodes]
 
-                    df_for_analysis = to_pandas_safe(X)
-                elif (
-                    isinstance(artifact, dict)
-                    and "train" in artifact
-                    and isinstance(artifact["train"], tuple)
-                ):
-                    # Handle FeatureTargetSplitter result on SplitDataset OR TrainTestSplitter result on (X, y)
-                    # Both result in {'train': (X, y), 'test': (X, y)}
-                    preview_data = {}
-
-                    if "train" in artifact:
-                        preview_data.update(process_xy(artifact["train"], "train"))
-                        df_for_analysis = to_pandas_safe(artifact["train"][0])  # X_train
-
-                    if "test" in artifact:
-                        preview_data.update(process_xy(artifact["test"], "test"))
-
-                    if "validation" in artifact:
-                        preview_data.update(
-                            process_xy(artifact["validation"], "validation")
-                        )
-
-                # Generate Recommendations
-                if df_for_analysis is not None:
-                    try:
-                        profile = DataProfiler.generate_profile(df_for_analysis)
-                        advisor = AdvisorEngine()
-                        recommendations = advisor.analyze(profile)
-                    except Exception as e:
-                        logger.warning("Error generating recommendations: %s", e)
+        # 5. Recommendations from first branch's data only (avoid heavy work).
+        if first_pdf is not None:
+            try:
+                profile = DataProfiler.generate_profile(first_pdf)
+                advisor = AdvisorEngine()
+                recommendations = advisor.analyze(profile)
+            except Exception as e:
+                logger.warning("Error generating recommendations: %s", e)
 
         return PreviewResponse(
-            pipeline_id=result.pipeline_id,
-            status=result.status,
-            node_results={k: v.__dict__ for k, v in result.node_results.items()},
+            pipeline_id=pipeline_config.pipeline_id,
+            status=agg_status,
+            node_results=combined_node_results,
             preview_data=preview_data,
+            branch_previews=branch_previews,
+            branch_node_ids=branch_node_ids,
             recommendations=recommendations,
+            merge_warnings=[
+                w
+                for _orig, _runnable, res in sub_results
+                for w in getattr(res, "merge_warnings", [])
+            ],
         )
 
     except Exception as e:
@@ -809,9 +870,7 @@ async def preview_pipeline(  # noqa: C901
 
 
 @router.get("/jobs/{job_id}", response_model=JobInfo)
-async def get_job_status(
-    job_id: str, session: AsyncSession = Depends(get_async_session)
-):
+async def get_job_status(job_id: str, session: AsyncSession = Depends(get_async_session)):
     """
     Returns the status of a background job.
     """
@@ -889,9 +948,7 @@ async def list_jobs(
 
 
 @router.get("/jobs/tuning/latest/{node_id}", response_model=Optional[JobInfo])
-async def get_latest_tuning_job(
-    node_id: str, session: AsyncSession = Depends(get_async_session)
-):
+async def get_latest_tuning_job(node_id: str, session: AsyncSession = Depends(get_async_session)):
     """
     Retrieves the latest completed tuning job for a specific node.
     """
@@ -957,9 +1014,7 @@ def get_node_registry():
 
 
 @router.get("/datasets/{dataset_id}/schema", response_model=AnalysisProfile)
-async def get_dataset_schema(
-    dataset_id: int, session: AsyncSession = Depends(get_async_session)
-):
+async def get_dataset_schema(dataset_id: int, session: AsyncSession = Depends(get_async_session)):
     """
     Returns the schema (columns, types, stats) of a dataset.
     Uses the DataProfiler.
@@ -981,9 +1036,7 @@ async def get_dataset_schema(
                 col_type = "unknown"
                 if any(x in dtype for x in ["Int", "Float", "Decimal"]):
                     col_type = "numeric"
-                elif any(
-                    x in dtype for x in ["Utf8", "String", "Categorical", "Object"]
-                ):
+                elif any(x in dtype for x in ["Utf8", "String", "Categorical", "Object"]):
                     col_type = "categorical"
                 elif "Date" in dtype or "Time" in dtype:
                     col_type = "datetime"
@@ -1037,9 +1090,7 @@ async def get_dataset_schema(
         return profile
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to profile dataset: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to profile dataset: {str(e)}")
 
 
 @router.get("/hyperparameters/{model_type}")

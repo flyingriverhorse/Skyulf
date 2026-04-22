@@ -43,7 +43,7 @@ async def get_active_deployment(session: AsyncSession = Depends(get_async_sessio
     deployment = await DeploymentService.get_active_deployment(session)
     if not deployment:
         raise HTTPException(status_code=404, detail="No active deployment found")
-    
+
     # Enrich with schema
     return await DeploymentService.get_deployment_details(session, deployment)
 
@@ -69,9 +69,7 @@ async def deactivate_deployment(session: AsyncSession = Depends(get_async_sessio
 
 
 @router.post("/predict", response_model=PredictionResponse)
-async def predict(
-    request: PredictionRequest, session: AsyncSession = Depends(get_async_session)
-):
+async def predict(request: PredictionRequest, session: AsyncSession = Depends(get_async_session)):
     """
     Makes predictions using the active model.
     """

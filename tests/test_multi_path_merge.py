@@ -13,6 +13,7 @@ from skyulf.data.dataset import SplitDataset
 
 class _FakeModel:
     """Module-level fake model for pickle compatibility."""
+
     def predict(self, X):
         pass
 
@@ -34,18 +35,21 @@ def engine(artifact_store, catalog):
 
 @pytest.fixture
 def sample_csv(tmp_path):
-    df = pd.DataFrame({
-        "f1": [1, 2, 3, 4, 5, 6] * 10,
-        "f2": [10, 20, 30, 40, 50, 60] * 10,
-        "cat": ["a", "b", "a", "b", "a", "b"] * 10,
-        "target": [0, 0, 0, 1, 1, 1] * 10,
-    })
+    df = pd.DataFrame(
+        {
+            "f1": [1, 2, 3, 4, 5, 6] * 10,
+            "f2": [10, 20, 30, 40, 50, 60] * 10,
+            "cat": ["a", "b", "a", "b", "a", "b"] * 10,
+            "target": [0, 0, 0, 1, 1, 1] * 10,
+        }
+    )
     path = tmp_path / "data.csv"
     df.to_csv(path, index=False)
     return str(path)
 
 
 # --- Unit Tests: _to_dataframe ---
+
 
 class TestToDataframe:
     def test_from_dataframe(self, engine):
@@ -83,6 +87,7 @@ class TestToDataframe:
 
 
 # --- Unit Tests: _resolve_all_inputs ---
+
 
 class TestResolveAllInputs:
     def test_single_input(self, engine, artifact_store):
@@ -131,6 +136,7 @@ class TestResolveAllInputs:
 
 
 # --- Unit Tests: _merge_inputs ---
+
 
 class TestMergeInputs:
     def test_single_input_passthrough(self, engine, artifact_store):
@@ -279,6 +285,7 @@ class TestMergeInputs:
 
 # --- Integration Test: Full Pipeline with Multi-Input Training ---
 
+
 class TestMultiPathPipeline:
     def test_forked_pipeline_basic_training(self, sample_csv, tmp_path):
         """
@@ -293,11 +300,13 @@ class TestMultiPathPipeline:
 
         # Build a simpler pipeline: two numeric transforms → training
         # This avoids the issue of raw string columns surviving merge.
-        df = pd.DataFrame({
-            "f1": [1, 2, 3, 4, 5, 6] * 10,
-            "f2": [10, 20, 30, 40, 50, 60] * 10,
-            "target": [0, 0, 0, 1, 1, 1] * 10,
-        })
+        df = pd.DataFrame(
+            {
+                "f1": [1, 2, 3, 4, 5, 6] * 10,
+                "f2": [10, 20, 30, 40, 50, 60] * 10,
+                "target": [0, 0, 0, 1, 1, 1] * 10,
+            }
+        )
         csv_path = tmp_path / "numeric_data.csv"
         df.to_csv(csv_path, index=False)
 
@@ -351,11 +360,13 @@ class TestMultiPathPipeline:
         artifact_store = LocalArtifactStore(str(tmp_path / "artifacts"))
         catalog = FileSystemCatalog()
 
-        df = pd.DataFrame({
-            "f1": [1, 2, 3, 4, 5, 6] * 10,
-            "f2": [10, 20, 30, 40, 50, 60] * 10,
-            "target": [0, 0, 0, 1, 1, 1] * 10,
-        })
+        df = pd.DataFrame(
+            {
+                "f1": [1, 2, 3, 4, 5, 6] * 10,
+                "f2": [10, 20, 30, 40, 50, 60] * 10,
+                "target": [0, 0, 0, 1, 1, 1] * 10,
+            }
+        )
         csv_path = tmp_path / "numeric_data.csv"
         df.to_csv(csv_path, index=False)
 

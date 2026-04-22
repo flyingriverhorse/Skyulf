@@ -46,9 +46,7 @@ def test_simple_imputer_constant():
 
 
 def test_knn_imputer():
-    df = pd.DataFrame(
-        {"A": [1, 2, np.nan, 4, 5], "B": [1, 2, 3, 4, 5], "C": [1, 2, 3, 4, 5]}
-    )
+    df = pd.DataFrame({"A": [1, 2, np.nan, 4, 5], "B": [1, 2, 3, 4, 5], "C": [1, 2, 3, 4, 5]})
 
     config = {"n_neighbors": 2, "columns": ["A", "B", "C"]}
 
@@ -67,9 +65,7 @@ def test_knn_imputer():
 
 
 def test_iterative_imputer():
-    df = pd.DataFrame(
-        {"A": [1, 2, np.nan, 4, 5], "B": [1, 2, 3, 4, 5], "C": [1, 2, 3, 4, 5]}
-    )
+    df = pd.DataFrame({"A": [1, 2, np.nan, 4, 5], "B": [1, 2, 3, 4, 5], "C": [1, 2, 3, 4, 5]})
 
     config = {"max_iter": 5, "estimator": "bayesian_ridge", "columns": ["A", "B", "C"]}
 

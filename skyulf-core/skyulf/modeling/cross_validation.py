@@ -99,7 +99,7 @@ def perform_cross_validation(
     if cv_type == "time_series_split" and isinstance(X, pd.DataFrame):
         X, y = _sort_by_time(X, y, time_column, log_callback, logger)
 
-    # Handle nested CV separately 
+    # Handle nested CV separately
     if cv_type == "nested_cv":
         return _perform_nested_cv(
             calculator=calculator,
@@ -118,9 +118,7 @@ def perform_cross_validation(
     if cv_type == "time_series_split":
         splitter = TimeSeriesSplit(n_splits=n_folds)
     elif cv_type == "shuffle_split":
-        splitter = ShuffleSplit(
-            n_splits=n_folds, test_size=0.2, random_state=random_state
-        )
+        splitter = ShuffleSplit(n_splits=n_folds, test_size=0.2, random_state=random_state)
     elif cv_type == "stratified_k_fold" and problem_type == "classification":
         splitter = StratifiedKFold(
             n_splits=n_folds,
@@ -152,7 +150,7 @@ def perform_cross_validation(
         # We slice the original X/y to preserve their type (Pandas/Polars) for the calculator
         # Polars supports slicing with numpy arrays via __getitem__
         # Pandas supports slicing via iloc
-        
+
         if hasattr(X, "iloc"):
             X_train_fold = X.iloc[train_idx]
             X_val_fold = X.iloc[val_idx]
@@ -160,7 +158,7 @@ def perform_cross_validation(
             # Polars or other
             X_train_fold = X[train_idx]
             X_val_fold = X[val_idx]
-            
+
         if hasattr(y, "iloc"):
             y_train_fold = y.iloc[train_idx]
             y_val_fold = y.iloc[val_idx]
@@ -174,13 +172,9 @@ def perform_cross_validation(
 
         # Evaluate
         if problem_type == "classification":
-            metrics = calculate_classification_metrics(
-                model_artifact, X_val_fold, y_val_fold
-            )
+            metrics = calculate_classification_metrics(model_artifact, X_val_fold, y_val_fold)
         else:
-            metrics = calculate_regression_metrics(
-                model_artifact, X_val_fold, y_val_fold
-            )
+            metrics = calculate_regression_metrics(model_artifact, X_val_fold, y_val_fold)
 
         if log_callback:
             # Log a key metric for the fold
@@ -278,9 +272,7 @@ def _build_splitter(
     if cv_type == "time_series_split":
         return TimeSeriesSplit(n_splits=n_folds)
     elif cv_type == "shuffle_split":
-        return ShuffleSplit(
-            n_splits=n_folds, test_size=0.2, random_state=random_state
-        )
+        return ShuffleSplit(n_splits=n_folds, test_size=0.2, random_state=random_state)
     elif cv_type == "stratified_k_fold" and problem_type == "classification":
         return StratifiedKFold(
             n_splits=n_folds,
@@ -322,9 +314,7 @@ def _perform_nested_cv(
     inner_folds = min(3, n_folds - 1) if n_folds > 2 else 2
 
     if log_callback:
-        log_callback(
-            f"Starting Nested CV (Outer: {n_folds} folds, Inner: {inner_folds} folds)"
-        )
+        log_callback(f"Starting Nested CV (Outer: {n_folds} folds, Inner: {inner_folds} folds)")
 
     # Build outer splitter — use stratified for classification, KFold for regression
     if problem_type == "classification":
@@ -387,13 +377,9 @@ def _perform_nested_cv(
             )
 
         # Inner CV: train on inner folds, collect inner scores for diagnostics
-        X_train_arr, y_train_arr = SklearnBridge.to_sklearn(
-            (X_train_fold, y_train_fold)
-        )
+        X_train_arr, y_train_arr = SklearnBridge.to_sklearn((X_train_fold, y_train_fold))
         inner_scores: List[float] = []
-        for inner_train_idx, inner_val_idx in inner_splitter.split(
-            X_train_arr, y_train_arr
-        ):
+        for inner_train_idx, inner_val_idx in inner_splitter.split(X_train_arr, y_train_arr):
             if hasattr(X_train_fold, "iloc"):
                 X_inner_train = X_train_fold.iloc[inner_train_idx]
                 X_inner_val = X_train_fold.iloc[inner_val_idx]
@@ -430,13 +416,9 @@ def _perform_nested_cv(
         model_artifact = calculator.fit(X_train_fold, y_train_fold, config)
 
         if problem_type == "classification":
-            metrics = calculate_classification_metrics(
-                model_artifact, X_val_fold, y_val_fold
-            )
+            metrics = calculate_classification_metrics(model_artifact, X_val_fold, y_val_fold)
         else:
-            metrics = calculate_regression_metrics(
-                model_artifact, X_val_fold, y_val_fold
-            )
+            metrics = calculate_regression_metrics(model_artifact, X_val_fold, y_val_fold)
 
         if log_callback:
             key_metric = "accuracy" if problem_type == "classification" else "r2"

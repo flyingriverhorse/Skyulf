@@ -46,17 +46,18 @@ class StandardScalerApplier(BaseApplier):
 
         # Check Engine
         engine = get_engine(X)
-        
+
         if engine.name == "polars":
             import polars as pl
+
             # Polars Native Implementation
-            
+
             X_pl: Any = X
 
             mean_arr = np.array(mean)
             scale_arr = np.array(scale)
             col_indices = [cols.index(c) for c in valid_cols]
-            
+
             exprs = []
             for idx, col_name in zip(col_indices, valid_cols):
                 e = pl.col(col_name)
@@ -67,16 +68,16 @@ class StandardScalerApplier(BaseApplier):
                     s = s if s != 0 else 1.0
                     e = e / s
                 exprs.append(e)
-            
+
             # Apply transformations
             X_out = X_pl.with_columns(exprs)
-            
+
             return pack_pipeline_output(X_out, y, is_tuple)
 
         # Pandas/Numpy Implementation (Legacy)
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
         X_out = X_pd.copy()
-        
+
         mean_arr = np.array(mean)
         scale_arr = np.array(scale)
         col_indices = [cols.index(c) for c in valid_cols]
@@ -99,7 +100,7 @@ class StandardScalerApplier(BaseApplier):
     name="Standard Scaler",
     category="Preprocessing",
     description="Standardize features by removing the mean and scaling to unit variance.",
-    params={"columns": [], "with_mean": True, "with_std": True}
+    params={"columns": [], "with_mean": True, "with_std": True},
 )
 class StandardScalerCalculator(BaseCalculator):
     def fit(
@@ -113,7 +114,7 @@ class StandardScalerCalculator(BaseCalculator):
         # Config: {'with_mean': True, 'with_std': True, 'columns': [...]}
         with_mean = config.get("with_mean", True)
         with_std = config.get("with_std", True)
-        
+
         # Casting for strict type checking
         if engine.name == "polars":
             X_pl: Any = X
@@ -129,10 +130,10 @@ class StandardScalerCalculator(BaseCalculator):
             X_subset = X_pd[cols]
 
         scaler = StandardScaler(with_mean=with_mean, with_std=with_std)
-        
+
         # Use Bridge for fitting
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
-        
+
         scaler.fit(X_np)
 
         return {
@@ -169,16 +170,14 @@ class MinMaxScalerApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
-            
+
             X_pl: Any = X
 
             exprs = []
             for i, col_name in enumerate(cols):
                 if col_name in valid_cols:
                     # X * scale + min
-                    exprs.append(
-                        (pl.col(col_name) * scale[i] + min_val[i]).alias(col_name)
-                    )
+                    exprs.append((pl.col(col_name) * scale[i] + min_val[i]).alias(col_name))
 
             X_out = X_pl.with_columns(exprs)
             return pack_pipeline_output(X_out, y, is_tuple)
@@ -186,7 +185,7 @@ class MinMaxScalerApplier(BaseApplier):
         # Pandas Path
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
         X_out = X_pd.copy()
-        
+
         min_arr = np.array(min_val)
         scale_arr = np.array(scale)
         col_indices = [cols.index(c) for c in valid_cols]
@@ -203,7 +202,7 @@ class MinMaxScalerApplier(BaseApplier):
     name="Min-Max Scaler",
     category="Preprocessing",
     description="Transform features by scaling each feature to a given range.",
-    params={"feature_range": [0, 1], "columns": []}
+    params={"feature_range": [0, 1], "columns": []},
 )
 class MinMaxScalerCalculator(BaseCalculator):
     def fit(
@@ -231,10 +230,10 @@ class MinMaxScalerCalculator(BaseCalculator):
             X_subset = X_pd[cols]
 
         scaler = MinMaxScaler(feature_range=feature_range)
-        
+
         # Use Bridge for fitting
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
-        
+
         scaler.fit(X_np)
 
         return {
@@ -271,7 +270,7 @@ class RobustScalerApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
-            
+
             X_pl: Any = X
 
             exprs = []
@@ -296,7 +295,7 @@ class RobustScalerApplier(BaseApplier):
         # Pandas Path
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
         X_out = X_pd.copy()
-        
+
         col_indices = [cols.index(c) for c in valid_cols]
         vals = X_out[valid_cols].values
 
@@ -321,7 +320,12 @@ class RobustScalerApplier(BaseApplier):
     name="Robust Scaler",
     category="Preprocessing",
     description="Scale features using statistics that are robust to outliers.",
-    params={"quantile_range": [25.0, 75.0], "with_centering": True, "with_scaling": True, "columns": []}
+    params={
+        "quantile_range": [25.0, 75.0],
+        "with_centering": True,
+        "with_scaling": True,
+        "columns": [],
+    },
 )
 class RobustScalerCalculator(BaseCalculator):
     def fit(
@@ -355,10 +359,10 @@ class RobustScalerCalculator(BaseCalculator):
             with_centering=with_centering,
             with_scaling=with_scaling,
         )
-        
+
         # Use Bridge for fitting
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
-        
+
         scaler.fit(X_np)
 
         return {
@@ -394,7 +398,7 @@ class MaxAbsScalerApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
-            
+
             X_pl: Any = X
 
             exprs = []
@@ -411,7 +415,7 @@ class MaxAbsScalerApplier(BaseApplier):
         # Pandas Path
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
         X_out = X_pd.copy()
-        
+
         scale_arr = np.array(scale)
         col_indices = [cols.index(c) for c in valid_cols]
 
@@ -431,7 +435,7 @@ class MaxAbsScalerApplier(BaseApplier):
     name="MaxAbs Scaler",
     category="Preprocessing",
     description="Scale each feature by its maximum absolute value.",
-    params={"columns": []}
+    params={"columns": []},
 )
 class MaxAbsScalerCalculator(BaseCalculator):
     def fit(
@@ -456,19 +460,15 @@ class MaxAbsScalerCalculator(BaseCalculator):
             X_subset = X_pd[cols]
 
         scaler = MaxAbsScaler()
-        
+
         # Use Bridge for fitting
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
-        
+
         scaler.fit(X_np)
 
         return {
             "type": "maxabs_scaler",
             "scale": scaler.scale_.tolist() if scaler.scale_ is not None else None,
-            "max_abs": (
-                scaler.max_abs_.tolist() if scaler.max_abs_ is not None else None
-            ),
+            "max_abs": (scaler.max_abs_.tolist() if scaler.max_abs_ is not None else None),
             "columns": cols,
         }
-
-

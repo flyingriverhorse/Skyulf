@@ -47,9 +47,7 @@ class DataIngestionService:
         result = await self.session.execute(query)
         return result.scalars().all()
 
-    async def list_usable_sources(
-        self, user_id: Optional[int] = None
-    ) -> Sequence[DataSource]:
+    async def list_usable_sources(self, user_id: Optional[int] = None) -> Sequence[DataSource]:
         """
         List only successfully ingested data sources.
         """
@@ -130,15 +128,13 @@ class DataIngestionService:
 
         return False
 
-    async def get_sample(
-        self, source_id: Union[int, str], limit: int = 5
-    ) -> list[dict]:
+    async def get_sample(self, source_id: Union[int, str], limit: int = 5) -> list[dict]:
         """
         Get a sample of data from the source.
         """
         from backend.data_ingestion.connectors.file import LocalFileConnector
         from backend.data_ingestion.connectors.s3 import S3Connector
-        
+
         source = await self.get_source(source_id)
         if not source:
             raise HTTPException(status_code=404, detail="Source not found")
@@ -146,20 +142,22 @@ class DataIngestionService:
         config: Dict[str, Any] = cast(Dict[str, Any], source.config) or {}
         # Normalize path retrieval: check 'file_path' then 'path'
         file_path = config.get("file_path") or config.get("path")
-        
+
         connector: Union[S3Connector, LocalFileConnector]
 
         # Check for S3 path first, regardless of source type
         if file_path and str(file_path).startswith("s3://"):
             storage_options = config.get("storage_options", {})
-            
+
             # Ensure options are strings for Polars
             # Polars expects 'aws_access_key_id', NOT 'key'
             # So we don't need to remap here, but we need to ensure they are strings
             str_options = {k: str(v) for k, v in storage_options.items() if v is not None}
-            
+
             try:
-                logger.info(f"Fetching S3 sample from {file_path} with options keys: {list(str_options.keys())}")
+                logger.info(
+                    f"Fetching S3 sample from {file_path} with options keys: {list(str_options.keys())}"
+                )
                 connector = S3Connector(file_path, storage_options=str_options)
                 await connector.connect()
                 df = await connector.fetch_data(limit=limit)
@@ -168,10 +166,10 @@ class DataIngestionService:
                 logger.error(f"Failed to get S3 sample: {e}", exc_info=True)
                 # If it's a 403/404 from S3, it might come as ValueError from connector
                 if "403" in str(e) or "404" in str(e):
-                     raise HTTPException(status_code=400, detail="S3 access denied or resource not found")
-                raise HTTPException(
-                    status_code=500, detail="Failed to read S3 data sample"
-                )
+                    raise HTTPException(
+                        status_code=400, detail="S3 access denied or resource not found"
+                    )
+                raise HTTPException(status_code=500, detail="Failed to read S3 data sample")
 
         if source.type in ["file", "csv", "txt"]:
             if not file_path:
@@ -187,34 +185,34 @@ class DataIngestionService:
                 return await self.data_service.get_sample(abs_path, limit=limit)
             except Exception as e:
                 logger.error(f"Failed to get sample: {e}")
-                raise HTTPException(
-                    status_code=500, detail="Failed to read data sample"
-                )
-        
+                raise HTTPException(status_code=500, detail="Failed to read data sample")
+
         elif source.type in ["s3", "parquet"]:
-            # This block might be redundant now if file_path starts with s3://, 
+            # This block might be redundant now if file_path starts with s3://,
             # but kept for cases where type is explicit but path might not be standard s3:// (unlikely)
             # or for parquet files that are local.
-            
+
             storage_options = config.get("storage_options", {})
-            
+
             if not file_path:
                 raise HTTPException(status_code=400, detail="Missing path")
-            
+
             # If it's local parquet
             if not str(file_path).startswith("s3://"):
-                 try:
+                try:
                     abs_path = Path(file_path).absolute()
                     connector = LocalFileConnector(str(abs_path))
                     await connector.connect()
                     df = await connector.fetch_data(limit=limit)
                     return cast(List[Dict[str, Any]], df.to_dicts())
-                 except Exception as e:
-                     logger.exception("Failed to read local parquet: %s", file_path)
-                     raise HTTPException(status_code=500, detail="Failed to read local parquet file")
+                except Exception as e:
+                    logger.exception("Failed to read local parquet: %s", file_path)
+                    raise HTTPException(status_code=500, detail="Failed to read local parquet file")
 
             try:
-                logger.info(f"Fetching S3 sample from {file_path} with options keys: {list(storage_options.keys())}")
+                logger.info(
+                    f"Fetching S3 sample from {file_path} with options keys: {list(storage_options.keys())}"
+                )
                 # Ensure options are strings for Polars
                 str_options = {k: str(v) for k, v in storage_options.items() if v is not None}
                 connector = S3Connector(file_path, storage_options=str_options)
@@ -223,9 +221,7 @@ class DataIngestionService:
                 return df.to_dicts()
             except Exception as e:
                 logger.error(f"Failed to get S3 sample: {e}")
-                raise HTTPException(
-                    status_code=500, detail="Failed to read S3 data sample"
-                )
+                raise HTTPException(status_code=500, detail="Failed to read S3 data sample")
 
         # TODO: Handle other source types (SQL, etc.)
         return []
@@ -356,23 +352,17 @@ class DataIngestionService:
             )
         except Exception as e:
             logger.error(f"Failed to create database source: {e}")
-            raise HTTPException(
-                status_code=500, detail=f"Failed to create source: {str(e)}"
-            )
+            raise HTTPException(status_code=500, detail=f"Failed to create source: {str(e)}")
 
     async def get_ingestion_status(self, source_id: int) -> Dict[str, Any]:
         """
         Get the status of an ingestion job.
         """
-        result = await self.session.execute(
-            select(DataSource).where(DataSource.id == source_id)
-        )
+        result = await self.session.execute(select(DataSource).where(DataSource.id == source_id))
         source = result.scalar_one_or_none()
 
         if not source:
             raise HTTPException(status_code=404, detail="DataSource not found")
 
         metadata: Dict[str, Any] = cast(Dict[str, Any], source.source_metadata) or {}
-        return cast(
-            Dict[str, Any], metadata.get("ingestion_status", {"status": "unknown"})
-        )
+        return cast(Dict[str, Any], metadata.get("ingestion_status", {"status": "unknown"}))

@@ -88,15 +88,11 @@ class JobManager:
     ):
         """Updates job status (Sync - for Background Tasks)."""
         # Try BasicTrainingJob first
-        if BasicTrainingManager.update_status_sync(
-            session, job_id, status, error, result, logs
-        ):
+        if BasicTrainingManager.update_status_sync(session, job_id, status, error, result, logs):
             return
 
         # Then AdvancedTuningJob
-        AdvancedTuningManager.update_status_sync(
-            session, job_id, status, error, result, logs
-        )
+        AdvancedTuningManager.update_status_sync(session, job_id, status, error, result, logs)
 
     @staticmethod
     async def get_job(session: AsyncSession, job_id: str) -> Optional[JobInfo]:
@@ -125,12 +121,8 @@ class JobManager:
             jobs = await AdvancedTuningManager.list_tuning_jobs(session, limit, skip)
         else:
             # Combine both
-            train_jobs = await BasicTrainingManager.list_training_jobs(
-                session, limit + skip, 0
-            )
-            tune_jobs = await AdvancedTuningManager.list_tuning_jobs(
-                session, limit + skip, 0
-            )
+            train_jobs = await BasicTrainingManager.list_training_jobs(session, limit + skip, 0)
+            tune_jobs = await AdvancedTuningManager.list_tuning_jobs(session, limit + skip, 0)
 
             all_jobs = train_jobs + tune_jobs
             # Sort by start_time desc
@@ -157,9 +149,7 @@ class JobManager:
     async def get_tuning_jobs_for_model(
         session: AsyncSession, model_type: str, limit: int = 20
     ) -> List[JobInfo]:
-        return await AdvancedTuningManager.get_tuning_jobs_for_model(
-            session, model_type, limit
-        )
+        return await AdvancedTuningManager.get_tuning_jobs_for_model(session, model_type, limit)
 
     @staticmethod
     async def promote_job(session: AsyncSession, job_id: str) -> bool:

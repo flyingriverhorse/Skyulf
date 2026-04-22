@@ -25,9 +25,7 @@ def get_db_session():
     if settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
         sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
     else:
-        sync_url = settings.DATABASE_URL.replace(
-            "postgresql+asyncpg://", "postgresql+psycopg2://"
-        )
+        sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
 
     engine = create_engine(sync_url)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -44,9 +42,7 @@ def ingest_data_task(source_id: int):
 
     try:
         # 1. Get DataSource
-        data_source = (
-            session.query(DataSource).filter(DataSource.id == source_id).first()
-        )
+        data_source = session.query(DataSource).filter(DataSource.id == source_id).first()
         if not data_source:
             logger.error(f"DataSource {source_id} not found")
             return
@@ -81,9 +77,7 @@ def ingest_data_task(source_id: int):
             if not connection_string:
                 raise ValueError("Missing connection_string in config")
 
-            connector = DatabaseConnector(
-                connection_string, table_name=table_name, query=query
-            )
+            connector = DatabaseConnector(connection_string, table_name=table_name, query=query)
 
         elif data_source.type == "api":
             url = config.get("url")
@@ -102,11 +96,11 @@ def ingest_data_task(source_id: int):
             path = config.get("path")
             if not path:
                 raise ValueError("Missing path in config")
-            
+
             # Optional: Pass credentials if stored in config (be careful with security)
             # For now, assume env vars or IAM roles
             storage_options = config.get("storage_options", {})
-            
+
             connector = S3Connector(path, storage_options=storage_options)
         else:
             raise ValueError(f"Unsupported source type: {data_source.type}")
@@ -136,9 +130,7 @@ def ingest_data_task(source_id: int):
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         # Flatten profile into metadata for easy access
-        metadata["schema"] = {
-            col: stats["type"] for col, stats in profile["columns"].items()
-        }
+        metadata["schema"] = {col: stats["type"] for col, stats in profile["columns"].items()}
         metadata["row_count"] = profile["row_count"]
         metadata["column_count"] = profile["column_count"]
         metadata["profile"] = profile  # Store full profile
@@ -154,9 +146,7 @@ def ingest_data_task(source_id: int):
         logger.error(f"Ingestion failed for source {source_id}: {str(e)}")
         if session:
             # Re-query to ensure session is valid
-            data_source = (
-                session.query(DataSource).filter(DataSource.id == source_id).first()
-            )
+            data_source = session.query(DataSource).filter(DataSource.id == source_id).first()
             if data_source:
                 metadata = dict(data_source.source_metadata or {})
                 metadata["ingestion_status"] = {

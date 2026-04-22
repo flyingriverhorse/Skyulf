@@ -19,13 +19,11 @@ def test_data_splitter_basic(sample_df):
     splitter = DataSplitter(test_size=0.2, random_state=42)
     ds = splitter.split(sample_df)
 
-    # split() returns (DataFrame, None) tuples in SplitDataset
-    train_df, train_y = ds.train
-    test_df, test_y = ds.test
+    # split() now returns plain DataFrames in train/test (no placeholder y).
+    train_df = ds.train
+    test_df = ds.test
     assert len(train_df) == 80
     assert len(test_df) == 20
-    assert train_y is None
-    assert test_y is None
     assert ds.validation is None
 
 
@@ -34,9 +32,9 @@ def test_data_splitter_validation(sample_df):
     ds = splitter.split(sample_df)
 
     # Total 100. Test=20. Val=10. Train=70.
-    test_df, _ = ds.test
-    val_df, _ = ds.validation
-    train_df, _ = ds.train
+    test_df = ds.test
+    val_df = ds.validation
+    train_df = ds.train
     assert len(test_df) == 20
     assert len(val_df) == 10
     assert len(train_df) == 70
@@ -48,6 +46,6 @@ def test_data_splitter_stratify(sample_df):
 
     # Check stratification in test set (should be 50/50 split of A/B roughly)
     # 20 samples total -> 10 A, 10 B
-    test_df, _ = ds.test
+    test_df = ds.test
     assert test_df["target"].value_counts()["A"] == 10
     assert test_df["target"].value_counts()["B"] == 10

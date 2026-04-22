@@ -278,9 +278,7 @@ def test_transformation_recommendations(client):
         box_cox_recs = [r for r in recs if r["rule_id"] == "power_transform_box_cox"]
         if not box_cox_recs:
             # Fallback check if it recommended Yeo-Johnson instead (if min_value check failed or logic differed)
-            yeo_recs = [
-                r for r in recs if r["rule_id"] == "power_transform_yeo_johnson"
-            ]
+            yeo_recs = [r for r in recs if r["rule_id"] == "power_transform_yeo_johnson"]
             assert len(yeo_recs) > 0
             targets = []
             for r in yeo_recs:

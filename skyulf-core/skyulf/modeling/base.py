@@ -36,7 +36,9 @@ class BaseModelCalculator(ABC):
         config: Dict[str, Any],
         progress_callback: Optional[Callable[..., None]] = None,
         log_callback: Optional[Callable[[str], None]] = None,
-        validation_data: Optional[tuple[Union[pd.DataFrame, SkyulfDataFrame], Union[pd.Series, Any]]] = None,
+        validation_data: Optional[
+            tuple[Union[pd.DataFrame, SkyulfDataFrame], Union[pd.Series, Any]]
+        ] = None,
     ) -> Any:
         """
         Trains the model. Returns the model object (serializable).
@@ -46,7 +48,9 @@ class BaseModelCalculator(ABC):
 
 class BaseModelApplier(ABC):
     @abstractmethod
-    def predict(self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any) -> Union[pd.Series, Any]:
+    def predict(
+        self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any
+    ) -> Union[pd.Series, Any]:
         """
         Generates predictions.
         """
@@ -63,17 +67,13 @@ class BaseModelApplier(ABC):
 
 
 class StatefulEstimator:
-    def __init__(
-        self, calculator: BaseModelCalculator, applier: BaseModelApplier, node_id: str
-    ):
+    def __init__(self, calculator: BaseModelCalculator, applier: BaseModelApplier, node_id: str):
         self.calculator = calculator
         self.applier = applier
         self.node_id = node_id
         self.model = None  # In-memory model storage
 
-    def _extract_xy(
-        self, data: Any, target_column: str
-    ) -> tuple[Any, Any]:
+    def _extract_xy(self, data: Any, target_column: str) -> tuple[Any, Any]:
         """Helper to extract X and y from DataFrame or Tuple."""
         if isinstance(data, tuple) and len(data) == 2:
             X, y = data[0], data[1]
@@ -107,11 +107,11 @@ class StatefulEstimator:
                 except TypeError:
                     # Maybe it doesn't support columns= kwarg, try position or list
                     pass
-            
+
             # Simple attribute access fallback
             if hasattr(data, target_column):
-                 return data, getattr(data, target_column)
-                 
+                return data, getattr(data, target_column)
+
         raise ValueError(f"Unexpected data type: {type(data)}")
 
     def cross_validate(
@@ -182,9 +182,7 @@ class StatefulEstimator:
                 if log_callback:
                     log_callback(msg)
 
-                dataset = SplitDataset(
-                    train=dataset, test=pd.DataFrame(), validation=None
-                )
+                dataset = SplitDataset(train=dataset, test=pd.DataFrame(), validation=None)
 
         # 1. Prepare Data
         X_train, y_train = self._extract_xy(dataset.train, target_column)
@@ -228,7 +226,11 @@ class StatefulEstimator:
             if isinstance(dataset.test, tuple):
                 X_test, y_test_split = dataset.test
                 # If y is None, the target may still be in X — drop it
-                if y_test_split is None and hasattr(X_test, "columns") and target_column in X_test.columns:
+                if (
+                    y_test_split is None
+                    and hasattr(X_test, "columns")
+                    and target_column in X_test.columns
+                ):
                     try:
                         X_test = X_test.drop(columns=[target_column])
                     except TypeError:
@@ -249,7 +251,11 @@ class StatefulEstimator:
             if isinstance(dataset.validation, tuple):
                 X_val, y_val_split = dataset.validation
                 # If y is None, the target may still be in X — drop it
-                if y_val_split is None and hasattr(X_val, "columns") and target_column in X_val.columns:
+                if (
+                    y_val_split is None
+                    and hasattr(X_val, "columns")
+                    and target_column in X_val.columns
+                ):
                     try:
                         X_val = X_val.drop(columns=[target_column])
                     except TypeError:
@@ -299,9 +305,7 @@ class StatefulEstimator:
         from .evaluation.regression import evaluate_regression_model
 
         if self.model is None:
-            raise ValueError(
-                "Model has not been trained yet. Call fit_predict() first."
-            )
+            raise ValueError("Model has not been trained yet. Call fit_predict() first.")
 
         problem_type = self.calculator.problem_type
 
@@ -350,9 +354,7 @@ class StatefulEstimator:
 
             split_data = {
                 "y_true": y.tolist() if hasattr(y, "tolist") else list(y),
-                "y_pred": (
-                    y_pred.tolist() if hasattr(y_pred, "tolist") else list(y_pred)
-                ),
+                "y_pred": (y_pred.tolist() if hasattr(y_pred, "tolist") else list(y_pred)),
             }
 
             if y_proba:
@@ -397,14 +399,10 @@ class StatefulEstimator:
             if isinstance(dataset.validation, pd.DataFrame):
                 has_val = not dataset.validation.empty
             elif isinstance(dataset.validation, tuple):
-                has_val = (
-                    len(dataset.validation) == 2 and len(dataset.validation[0]) > 0
-                )
+                has_val = len(dataset.validation) == 2 and len(dataset.validation[0]) > 0
 
             if has_val:
-                splits_payload["validation"] = evaluate_split(
-                    "validation", dataset.validation
-                )
+                splits_payload["validation"] = evaluate_split("validation", dataset.validation)
 
         # Return report object (simplified for now, assuming schema matches)
         return {

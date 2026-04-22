@@ -22,9 +22,14 @@ logger = logging.getLogger(__name__)
 # Encoders that destroy the original column structure (create N new columns).
 # These must NEVER be applied to a target column — it would break downstream
 # Feature/Target Split and model training nodes.
-_COLUMN_DESTROYING_ENCODERS = frozenset([
-    "OneHotEncoder", "DummyEncoder", "HashEncoder", "TargetEncoder",
-])
+_COLUMN_DESTROYING_ENCODERS = frozenset(
+    [
+        "OneHotEncoder",
+        "DummyEncoder",
+        "HashEncoder",
+        "TargetEncoder",
+    ]
+)
 
 # Encoders that map values in-place and preserve the column name.
 _TARGET_SAFE_ENCODERS = frozenset(["LabelEncoder", "OrdinalEncoder"])
@@ -67,10 +72,12 @@ def detect_categorical_columns(df: Any) -> List[str]:
     engine = get_engine(df)
     if engine.name == "polars":
         import polars as pl
+
         # Polars dtypes
         df_pl: Any = df
         return list(
-            c for c, t in zip(df_pl.columns, df_pl.dtypes) 
+            c
+            for c, t in zip(df_pl.columns, df_pl.dtypes)
             if t in [pl.Utf8, pl.Categorical, pl.Object]
         )
     # Pandas
@@ -105,6 +112,7 @@ class OneHotEncoderApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
 
             try:
@@ -161,10 +169,7 @@ class OneHotEncoderApplier(BaseApplier):
                 encoded_array = encoded_array.values
 
             # Create DataFrame from encoded array
-            encoded_df = pd.DataFrame(
-                encoded_array, columns=feature_names, index=X_out.index
-            )
-
+            encoded_df = pd.DataFrame(encoded_array, columns=feature_names, index=X_out.index)
 
             # Concatenate
             X_out = pd.concat([X_out, encoded_df], axis=1)
@@ -188,12 +193,12 @@ class OneHotEncoderApplier(BaseApplier):
     category="Preprocessing",
     description="Encodes categorical features as a one-hot numeric array.",
     params={
-        "handle_unknown": "ignore", 
-        "drop_first": False, 
-        "max_categories": 20, 
+        "handle_unknown": "ignore",
+        "drop_first": False,
+        "max_categories": 20,
         "columns": [],
-        "include_missing": False
-    }
+        "include_missing": False,
+    },
 )
 class OneHotEncoderCalculator(BaseCalculator):
     def fit(
@@ -212,12 +217,8 @@ class OneHotEncoderCalculator(BaseCalculator):
 
         # Config
         drop = "first" if config.get("drop_first", False) else None
-        max_categories = config.get(
-            "max_categories", 20
-        )  # Default limit to prevent explosion
-        handle_unknown = (
-            "ignore" if config.get("handle_unknown", "ignore") == "ignore" else "error"
-        )
+        max_categories = config.get("max_categories", 20)  # Default limit to prevent explosion
+        handle_unknown = "ignore" if config.get("handle_unknown", "ignore") == "ignore" else "error"
         prefix_separator = config.get("prefix_separator", "_")
         drop_original = config.get("drop_original", True)
         include_missing = config.get("include_missing", False)
@@ -244,7 +245,7 @@ class OneHotEncoderCalculator(BaseCalculator):
             sparse_output=False,
             dtype=np.int8,  # Save memory
         )
-        
+
         # Fix for "X has feature names, but OneHotEncoder was fitted without feature names"
         # Since we convert to numpy for fit, we lose feature names.
         # We can explicitly set feature names if available, but it's easier to just fit on numpy
@@ -252,7 +253,7 @@ class OneHotEncoderCalculator(BaseCalculator):
         # However, SklearnBridge might return a DataFrame if configured? No, it returns (data, feature_names).
         # The issue is likely that SklearnBridge returns a Numpy array, so fit sees no names.
         # But in apply (Pandas path), we pass X_subset (DataFrame) directly to transform.
-        
+
         encoder.fit(X_np)
 
         # Check for columns that produced no features
@@ -309,23 +310,19 @@ class OrdinalEncoderApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
 
             try:
                 X_subset = X_pl.select(valid_cols)
                 # Cast to string to match fit behavior
-                X_subset = X_subset.select(
-                    [pl.col(c).cast(pl.Utf8) for c in valid_cols]
-                )
+                X_subset = X_subset.select([pl.col(c).cast(pl.Utf8) for c in valid_cols])
 
                 X_np, _ = SklearnBridge.to_sklearn(X_subset)
                 encoded_array = encoder.transform(X_np)
 
                 # Replace columns
-                new_cols = [
-                    pl.Series(col, encoded_array[:, i])
-                    for i, col in enumerate(valid_cols)
-                ]
+                new_cols = [pl.Series(col, encoded_array[:, i]) for i, col in enumerate(valid_cols)]
                 X_out = X_pl.with_columns(new_cols)
                 return pack_pipeline_output(X_out, y, is_tuple)
             except Exception as e:
@@ -337,13 +334,13 @@ class OrdinalEncoderApplier(BaseApplier):
 
         try:
             X_subset = X_out[valid_cols].astype(str)
-            
+
             # Fix for "X has feature names..." warning
             if hasattr(X_subset, "values"):
                 X_input = X_subset.values
             else:
                 X_input = X_subset
-                
+
             encoded_array = encoder.transform(X_input)
 
             # Replace columns in place
@@ -362,7 +359,7 @@ class OrdinalEncoderApplier(BaseApplier):
     name="Ordinal Encoder",
     category="Preprocessing",
     description="Encodes categorical features as an integer array.",
-    params={"columns": []}
+    params={"columns": []},
 )
 class OrdinalEncoderCalculator(BaseCalculator):
     def fit(
@@ -394,15 +391,16 @@ class OrdinalEncoderCalculator(BaseCalculator):
         # Let's assume standard behavior: NaN is a category or error.
         # We'll convert to string to treat NaN as "nan" category if needed, or let it fail.
         # Safer: Convert to string.
-        
+
         if engine.name == "polars":
-             import polars as pl
-             X_pl: Any = X
-             X_subset = X_pl.select(cols)
-             X_subset = X_subset.select([pl.col(c).cast(pl.Utf8) for c in cols])
-        else: # Pandas
-             X_subset = X[cols]
-             X_subset = X_subset.astype(str)
+            import polars as pl
+
+            X_pl: Any = X
+            X_subset = X_pl.select(cols)
+            X_subset = X_subset.select([pl.col(c).cast(pl.Utf8) for c in cols])
+        else:  # Pandas
+            X_subset = X[cols]
+            X_subset = X_subset.astype(str)
 
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
 
@@ -433,6 +431,7 @@ class LabelEncoderApplier(BaseApplier):
 
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
             X_out = X_pl.clone()
             y_out = y.clone() if y is not None else None
@@ -442,9 +441,15 @@ class LabelEncoderApplier(BaseApplier):
                 for col in cols:
                     if col in X_out.columns and col in encoders:
                         le = encoders[col]
-                        mapping = {str(k): int(v) for k, v in zip(le.classes_, le.transform(le.classes_))}
+                        mapping = {
+                            str(k): int(v) for k, v in zip(le.classes_, le.transform(le.classes_))
+                        }
                         exprs.append(
-                            pl.col(col).cast(pl.Utf8).replace(mapping, default=-1).cast(pl.Int64).alias(col)
+                            pl.col(col)
+                            .cast(pl.Utf8)
+                            .replace(mapping, default=-1)
+                            .cast(pl.Int64)
+                            .alias(col)
                         )
                 if exprs:
                     X_out = X_out.with_columns(exprs)
@@ -488,7 +493,7 @@ class LabelEncoderApplier(BaseApplier):
     name="Label Encoder",
     category="Preprocessing",
     description="Encode target labels with value between 0 and n_classes-1.",
-    params={"columns": []}
+    params={"columns": []},
 )
 class LabelEncoderCalculator(BaseCalculator):
     def fit(
@@ -498,7 +503,7 @@ class LabelEncoderCalculator(BaseCalculator):
     ) -> Dict[str, Any]:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
-        
+
         # Attempt to extract y from X if not provided
         target_col = config.get("target_column")
         if y is None and target_col:
@@ -528,6 +533,7 @@ class LabelEncoderCalculator(BaseCalculator):
                 X_pl_data: Any = X
                 valid_cols = [c for c in cols if c in X_pl_data.columns]
                 import polars as pl
+
                 for col in valid_cols:
                     le = LabelEncoder()
                     # Convert to numpy array of strings
@@ -546,15 +552,15 @@ class LabelEncoderCalculator(BaseCalculator):
 
             # Also check if target is in cols (if y has a name)
             if y is not None:
-                y_name = getattr(y, 'name', None)
+                y_name = getattr(y, "name", None)
                 if y_name and y_name in cols:
                     le = LabelEncoder()
                     # Handle y conversion
-                    if hasattr(y, "to_numpy"): # Polars Series or Pandas Series
-                         y_data = y.to_numpy().astype(str)
+                    if hasattr(y, "to_numpy"):  # Polars Series or Pandas Series
+                        y_data = y.to_numpy().astype(str)
                     else:
-                         y_data = np.array(y).astype(str)
-                         
+                        y_data = np.array(y).astype(str)
+
                     le.fit(y_data)
                     encoders["__target__"] = le
                     classes_count["__target__"] = len(le.classes_)
@@ -565,10 +571,10 @@ class LabelEncoderCalculator(BaseCalculator):
                 le = LabelEncoder()
                 # Handle y conversion
                 if hasattr(y, "to_numpy"):
-                     y_data = y.to_numpy().astype(str)
+                    y_data = y.to_numpy().astype(str)
                 else:
-                     y_data = np.array(y).astype(str)
-                     
+                    y_data = np.array(y).astype(str)
+
                 le.fit(y_data)
                 encoders["__target__"] = le
                 classes_count["__target__"] = len(le.classes_)
@@ -603,6 +609,7 @@ class TargetEncoderApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
 
             try:
@@ -610,10 +617,7 @@ class TargetEncoderApplier(BaseApplier):
                 X_np, _ = SklearnBridge.to_sklearn(X_subset)
                 encoded_array = encoder.transform(X_np)
 
-                new_cols = [
-                    pl.Series(col, encoded_array[:, i])
-                    for i, col in enumerate(valid_cols)
-                ]
+                new_cols = [pl.Series(col, encoded_array[:, i]) for i, col in enumerate(valid_cols)]
                 X_out = X_pl.with_columns(new_cols)
                 return pack_pipeline_output(X_out, y, is_tuple)
             except Exception as e:
@@ -625,13 +629,13 @@ class TargetEncoderApplier(BaseApplier):
 
         try:
             X_subset = X_out[valid_cols]
-            
+
             # Fix for "X has feature names..." warning
             if hasattr(X_subset, "values"):
                 X_input = X_subset.values
             else:
                 X_input = X_subset
-                
+
             encoded_array = encoder.transform(X_input)
             X_out[valid_cols] = encoded_array
         except Exception as e:
@@ -647,7 +651,7 @@ class TargetEncoderApplier(BaseApplier):
     name="Target Encoder",
     category="Preprocessing",
     description="Encode categorical features using target statistics.",
-    params={"smoothing": 10.0, "columns": []}
+    params={"smoothing": 10.0, "columns": []},
 )
 class TargetEncoderCalculator(BaseCalculator):
     def fit(
@@ -683,7 +687,7 @@ class TargetEncoderCalculator(BaseCalculator):
         target_type = config.get("target_type", "auto")
 
         encoder = TargetEncoder(smooth=smooth, target_type=target_type)
-        
+
         # Use Bridge for fitting
         if engine.name == "polars":
             X_pl: Any = X
@@ -692,14 +696,14 @@ class TargetEncoderCalculator(BaseCalculator):
             X_subset = X[cols]
 
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
-        
+
         # Handle y
         y_np = y
         if hasattr(y, "to_numpy"):
             y_np = y.to_numpy()
-        elif hasattr(y, "to_pandas"): # Polars Series
+        elif hasattr(y, "to_pandas"):  # Polars Series
             y_np = y.to_pandas().to_numpy()
-        
+
         encoder.fit(X_np, y_np)
 
         return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}
@@ -727,6 +731,7 @@ class HashEncoderApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
 
             exprs = []
@@ -735,10 +740,8 @@ class HashEncoderApplier(BaseApplier):
                 # Note: Polars hash might differ from Python hash.
                 # For consistency across engines, we might need a custom hash or accept divergence.
                 # Here we use Polars native hash for speed.
-                exprs.append(
-                    (pl.col(col).cast(pl.Utf8).hash() % n_features).alias(col)
-                )
-            
+                exprs.append((pl.col(col).cast(pl.Utf8).hash() % n_features).alias(col))
+
             X_out = X_pl.with_columns(exprs)
             return pack_pipeline_output(X_out, y, is_tuple)
 
@@ -763,7 +766,7 @@ class HashEncoderApplier(BaseApplier):
     name="Hash Encoder",
     category="Preprocessing",
     description="Encode categorical features using hashing.",
-    params={"n_components": 8, "columns": []}
+    params={"n_components": 8, "columns": []},
 )
 class HashEncoderCalculator(BaseCalculator):
     def fit(
@@ -808,20 +811,21 @@ class DummyEncoderApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
-            
+
             X_out = X_pl
-            
+
             for col in valid_cols:
                 known_cats = categories.get(col, [])
-                
+
                 # Create dummies manually for Polars
                 # For each category, create a boolean column (cast to int)
-                
+
                 cats_to_encode = known_cats
                 if drop_first and len(cats_to_encode) > 1:
                     cats_to_encode = cats_to_encode[1:]
-                
+
                 dummy_exprs = []
                 for cat in cats_to_encode:
                     # Column name: col_cat
@@ -829,12 +833,12 @@ class DummyEncoderApplier(BaseApplier):
                     dummy_exprs.append(
                         (pl.col(col).cast(pl.Utf8) == str(cat)).cast(pl.Int8).alias(dummy_name)
                     )
-                
+
                 X_out = X_out.with_columns(dummy_exprs)
-            
+
             # Drop original columns
             X_out = X_out.drop(valid_cols)
-            
+
             return pack_pipeline_output(X_out, y, is_tuple)
 
         # Pandas Path
@@ -850,7 +854,7 @@ class DummyEncoderApplier(BaseApplier):
 
         # Drop original
         X_out = X_out.drop(columns=valid_cols)
-        
+
         # Concatenate dummies
         X_out = pd.concat([X_out, dummies], axis=1)
 
@@ -863,7 +867,7 @@ class DummyEncoderApplier(BaseApplier):
     name="Dummy Encoder",
     category="Preprocessing",
     description="Convert categorical variables into dummy/indicator variables (pandas.get_dummies).",
-    params={"columns": [], "drop_first": False}
+    params={"columns": [], "drop_first": False},
 )
 class DummyEncoderCalculator(BaseCalculator):
     def fit(
@@ -873,15 +877,16 @@ class DummyEncoderCalculator(BaseCalculator):
     ) -> Dict[str, Any]:
         X, y, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
-        
+
         cols = resolve_columns(X, config, detect_categorical_columns)
         cols = _exclude_target_column(cols, config, "DummyEncoder", y)
 
         # We need to know all possible categories to align columns during transform
         categories = {}
-        
+
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
             for col in cols:
                 # Get unique values, sort them, convert to list
@@ -891,13 +896,6 @@ class DummyEncoderCalculator(BaseCalculator):
             # Pandas
             for col in cols:
                 categories[col] = sorted(X[col].dropna().unique().astype(str).tolist())
-                
-        return {
-            "type": "dummy_encoder",
-            "columns": cols,
-            "categories": categories,
-            "drop_first": config.get("drop_first", False),
-        }
 
         return {
             "type": "dummy_encoder",
@@ -906,4 +904,9 @@ class DummyEncoderCalculator(BaseCalculator):
             "drop_first": config.get("drop_first", False),
         }
 
-
+        return {
+            "type": "dummy_encoder",
+            "columns": cols,
+            "categories": categories,
+            "drop_first": config.get("drop_first", False),
+        }

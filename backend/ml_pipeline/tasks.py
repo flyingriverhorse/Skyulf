@@ -30,9 +30,7 @@ def get_db_session():
     if settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
         sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
     else:
-        sync_url = settings.DATABASE_URL.replace(
-            "postgresql+asyncpg://", "postgresql+psycopg2://"
-        )
+        sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
 
     engine = create_engine(sync_url)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -52,9 +50,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
         job, strategy = JobStrategyFactory.find_job(session, job_id)
 
         if not job or not strategy:
-            logger.error(
-                f"Job {job_id} not found in any known job tables"
-            )
+            logger.error(f"Job {job_id} not found in any known job tables")
             return
 
         # Update status to running
@@ -65,7 +61,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
 
         # 2. Setup Artifact Store
         from backend.ml_pipeline.artifacts.factory import ArtifactFactory
-        
+
         # Determine Data Source Type to decide on Artifact Store
         is_s3_source = False
         nodes = pipeline_config_dict.get("nodes", [])
@@ -85,40 +81,44 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
                 if dataset_id and str(dataset_id).startswith("s3://"):
                     is_s3_source = True
                 break
-        
+
         # Construct folder name: dataset_name + time_created + job_id
         dataset_name = "unknown_dataset"
         if job.dataset_source_id:
-             # Try to find by source_id
-             ds = session.query(DataSource).filter(DataSource.source_id == job.dataset_source_id).first()
-             if not ds:
-                 # Try to find by id (if it was stored as string)
-                 try:
-                     ds_id = int(job.dataset_source_id)
-                     ds = session.query(DataSource).filter(DataSource.id == ds_id).first()
-                 except ValueError:
-                     pass
-             
-             if ds:
-                 dataset_name = ds.name
+            # Try to find by source_id
+            ds = (
+                session.query(DataSource)
+                .filter(DataSource.source_id == job.dataset_source_id)
+                .first()
+            )
+            if not ds:
+                # Try to find by id (if it was stored as string)
+                try:
+                    ds_id = int(job.dataset_source_id)
+                    ds = session.query(DataSource).filter(DataSource.id == ds_id).first()
+                except ValueError:
+                    pass
+
+            if ds:
+                dataset_name = ds.name
 
         # Sanitize dataset name
-        dataset_name = re.sub(r'[^a-zA-Z0-9_-]', '_', dataset_name)
-        
+        dataset_name = re.sub(r"[^a-zA-Z0-9_-]", "_", dataset_name)
+
         # Format time
         # Use datetime.now() to ensure we get the local server time (user's time if running locally)
         # instead of potentially UTC time from the database
         time_created = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
         folder_name = f"{dataset_name}_{time_created}_{job_id}"
 
-        artifact_store, base_artifact_uri = ArtifactFactory.create_store_for_job(job_id, is_s3_source, artifact_path_name=folder_name)
-        
+        artifact_store, base_artifact_uri = ArtifactFactory.create_store_for_job(
+            job_id, is_s3_source, artifact_path_name=folder_name
+        )
+
         # Save the URI to the job immediately so we know where to look later
         job.artifact_uri = base_artifact_uri
         session.commit()
-
-
 
         # 3. Reconstruct Pipeline Config
         # Convert dict back to dataclasses
@@ -143,12 +143,12 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
         # 4. Initialize Engine with Progress Callback
         # If storage_options are passed in config (from API resolution), use them to init S3Catalog
         # Otherwise use SmartCatalog for dynamic resolution (Sync only)
-        
+
         storage_options = pipeline_config_dict.get("storage_options")
         from backend.data.catalog import create_catalog_from_options
-        
+
         catalog = create_catalog_from_options(storage_options, nodes, session=session)
-        
+
         job_logs = []
         last_log_update = datetime.now()
 
@@ -171,9 +171,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
                 except Exception as e:
                     logger.warning(f"Failed to update logs: {e}")
 
-        engine = PipelineEngine(
-            artifact_store, catalog=catalog, log_callback=log_callback
-        )
+        engine = PipelineEngine(artifact_store, catalog=catalog, log_callback=log_callback)
 
         # 5. Run Pipeline
         result = engine.run(pipeline_config, job_id=job_id, dataset_name=dataset_name)
@@ -196,11 +194,9 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
             if result.node_results:
                 for node_res in result.node_results.values():
                     if node_res.status == "failed":
-                        error_msg = (
-                            f"Error in node {node_res.node_id}: {node_res.error}"
-                        )
+                        error_msg = f"Error in node {node_res.node_id}: {node_res.error}"
                         break
-            
+
             # Delegate failure handling to strategy
             strategy.handle_failure(job, error_msg)
 

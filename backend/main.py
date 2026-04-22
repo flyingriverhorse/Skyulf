@@ -293,9 +293,20 @@ def _include_routers(app: FastAPI) -> None:
     frontend_index = project_root / "static" / "ml_canvas" / "index.html"
 
     # Paths that should NOT be caught by the SPA fallback
-    _API_PREFIXES = ("/api/", "/data/", "/ml-workflow/", "/health", "/docs", "/redoc", "/openapi.json", "/static/", "/assets/")
+    _API_PREFIXES = (
+        "/api/",
+        "/data/",
+        "/ml-workflow/",
+        "/health",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/static/",
+        "/assets/",
+    )
 
     if frontend_index.exists():
+
         @app.get("/", include_in_schema=False)
         async def root():
             return FileResponse(str(frontend_index))
@@ -305,9 +316,12 @@ def _include_routers(app: FastAPI) -> None:
             """Serve index.html for client-side routes (SPA catch-all)."""
             if any(request.url.path.startswith(prefix) for prefix in _API_PREFIXES):
                 from fastapi import HTTPException
+
                 raise HTTPException(status_code=404, detail="Not Found")
             return FileResponse(str(frontend_index))
+
     else:
+
         @app.get("/", include_in_schema=False)
         async def root():
             return RedirectResponse(url="/docs")
@@ -340,9 +354,7 @@ def _add_exception_handlers(app: FastAPI) -> None:
         """Handle unexpected Python exceptions and convert them to 500 errors."""
         logger.error(f"Unexpected error: {exc}", exc_info=True)
         # Convert to HTTPException for consistent handling
-        http_exc = HTTPException(
-            status_code=500, detail=f"Internal server error: {str(exc)}"
-        )
+        http_exc = HTTPException(status_code=500, detail=f"Internal server error: {str(exc)}")
         return await generic_http_exception_handler(request, http_exc)
 
 

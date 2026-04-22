@@ -22,9 +22,7 @@ class LocalArtifactStore(ArtifactStore):
         resolved = os.path.realpath(os.path.join(self.base_path, safe_key))
         base = os.path.realpath(self.base_path)
         if not resolved.startswith(base + os.sep) and resolved != base:
-            raise PermissionError(
-                f"Access denied: artifact key '{key}' resolves outside the store"
-            )
+            raise PermissionError(f"Access denied: artifact key '{key}' resolves outside the store")
         return resolved
 
     def save(self, key: str, data: Any) -> None:

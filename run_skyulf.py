@@ -41,18 +41,14 @@ def main():
 
     # Log startup information
     logger.info(f"[START] Starting {settings.APP_NAME}")
-    logger.info(
-        f"[ENV] Environment: {'Development' if settings.DEBUG else 'Production'}"
-    )
+    logger.info(f"[ENV] Environment: {'Development' if settings.DEBUG else 'Production'}")
     logger.info(f"[HOST] Host: {settings.HOST}:{settings.PORT}")
 
     # Import uvicorn here to avoid import errors if not installed
     try:
         import uvicorn
     except ImportError:
-        logger.error(
-            "[ERROR] uvicorn not installed. Please run: pip install uvicorn[standard]"
-        )
+        logger.error("[ERROR] uvicorn not installed. Please run: pip install uvicorn[standard]")
         sys.exit(1)
 
     # Development vs Production server configuration

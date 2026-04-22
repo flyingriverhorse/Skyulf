@@ -13,7 +13,12 @@ from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
 
 
-from backend.ml_pipeline.execution.utils import resolve_dataset_name, get_dataset_map, parse_branch_info
+from backend.ml_pipeline.execution.utils import (
+    resolve_dataset_name,
+    get_dataset_map,
+    parse_branch_info,
+)
+
 
 class BasicTrainingManager:
     @staticmethod
@@ -58,9 +63,7 @@ class BasicTrainingManager:
         return job_id
 
     @staticmethod
-    def map_training_job_to_info(
-        job: BasicTrainingJob, dataset_name: Optional[str]
-    ) -> JobInfo:
+    def map_training_job_to_info(job: BasicTrainingJob, dataset_name: Optional[str]) -> JobInfo:
         # Extract details from graph
         (
             hyperparameters,
@@ -69,11 +72,7 @@ class BasicTrainingManager:
         ) = extract_job_details(type_cast(Dict[str, Any], job.graph), type_cast(str, job.node_id))
 
         # Also check job metrics for runtime dropped columns (e.g. from Feature Selection)
-        if (
-            job.metrics
-            and isinstance(job.metrics, dict)
-            and "dropped_columns" in job.metrics
-        ):
+        if job.metrics and isinstance(job.metrics, dict) and "dropped_columns" in job.metrics:
             metrics_dropped = job.metrics["dropped_columns"]
             if isinstance(metrics_dropped, list):
                 dropped_columns.extend(metrics_dropped)
@@ -172,9 +171,7 @@ class BasicTrainingManager:
         return True
 
     @staticmethod
-    async def get_training_job(
-        session: AsyncSession, job_id: str
-    ) -> Optional[JobInfo]:
+    async def get_training_job(session: AsyncSession, job_id: str) -> Optional[JobInfo]:
         """Retrieves a training job by ID."""
         # 1. Fetch Job
         stmt = select(BasicTrainingJob).where(BasicTrainingJob.id == job_id)
@@ -214,11 +211,11 @@ class BasicTrainingManager:
         for job in train_rows:
             ds_id = str(job.dataset_source_id) if job.dataset_source_id else None
             ds_name = ds_map.get(ds_id) if ds_id else None
-            
+
             # Fallback: if name is missing but we have an ID, show "Dataset {id}"
             if not ds_name and ds_id:
-                 ds_name = f"Dataset {ds_id}"
+                ds_name = f"Dataset {ds_id}"
 
             jobs.append(BasicTrainingManager.map_training_job_to_info(job, ds_name))
-            
+
         return jobs

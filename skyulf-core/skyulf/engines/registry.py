@@ -14,9 +14,10 @@ from .protocol import SkyulfDataFrame
 
 logger = logging.getLogger(__name__)
 
+
 class BaseEngine:
     """Abstract base class for all engines."""
-    
+
     name: str = "base"
 
     @classmethod
@@ -44,6 +45,7 @@ class BaseEngine:
         """Create a native dataframe from a dictionary or list."""
         raise NotImplementedError
 
+
 class EngineRegistry:
     _engines: Dict[str, Type[BaseEngine]] = {}
     _active_engine: str = "pandas"  # Default
@@ -65,19 +67,19 @@ class EngineRegistry:
     def resolve(cls, data: Any = None) -> Type[BaseEngine]:
         """
         Auto-detect engine based on input data type.
-        
+
         Args:
             data: The data object (DataFrame) to inspect.
-            
+
         Returns:
             The compatible Engine class.
         """
         if data is None:
             return cls.get(cls._active_engine)
-        
+
         # Check module path to identify the library
         module = type(data).__module__
-        
+
         if "polars" in module:
             return cls.get("polars")
         if "pandas" in module:
@@ -90,9 +92,11 @@ class EngineRegistry:
             # Future proofing
             if "dask" in cls._engines:
                 return cls.get("dask")
-                
+
         # Fallback to default if unknown (or let it fail later)
-        logger.warning(f"Unknown data type {type(data)}, falling back to default engine: {cls._active_engine}")
+        logger.warning(
+            f"Unknown data type {type(data)}, falling back to default engine: {cls._active_engine}"
+        )
         return cls.get(cls._active_engine)
 
     @classmethod
@@ -102,6 +106,7 @@ class EngineRegistry:
         """
         engine = cls.resolve(data)
         return engine.wrap(data)
+
 
 # Global Helper
 def get_engine(data: Any = None) -> Type[BaseEngine]:

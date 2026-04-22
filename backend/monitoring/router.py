@@ -22,6 +22,7 @@ from skyulf.profiling.drift import DriftCalculator, DriftReport
 
 router = APIRouter(prefix="/monitoring", tags=["Monitoring"])
 
+
 class DriftJobOption(BaseModel):
     job_id: str
     dataset_name: str
@@ -34,6 +35,7 @@ class DriftJobOption(BaseModel):
     description: Optional[str] = None
     best_metric: Optional[str] = None
 
+
 @router.get("/jobs", response_model=List[DriftJobOption])
 async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
     """
@@ -42,9 +44,9 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
     """
     settings = get_settings()
     base_path = Path(settings.TRAINING_ARTIFACT_DIR)
-    
+
     jobs: List[DriftJobOption] = []
-    
+
     if not base_path.exists():
         return []
 
@@ -55,9 +57,9 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
         if item_path.is_dir():
             folder_name = item_path.name
             created_at_str = "Unknown"
-            
+
             try:
-                match = re.search(r'(\d{8})_(\d{6})', folder_name)
+                match = re.search(r"(\d{8})_(\d{6})", folder_name)
                 if match:
                     date_part = match.group(1)
                     time_part = match.group(2)
@@ -71,16 +73,18 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
                     filename = file_path.name
                     key = file_path.stem
                     remainder = key[15:]  # len("reference_data_")
-                    parts = remainder.rsplit('_', 1)
+                    parts = remainder.rsplit("_", 1)
                     if len(parts) == 2:
                         dataset_name = parts[0]
                         job_id = parts[1]
-                        found_jobs.append(DriftJobOption(
-                            job_id=job_id,
-                            dataset_name=dataset_name,
-                            filename=filename,
-                            created_at=created_at_str
-                        ))
+                        found_jobs.append(
+                            DriftJobOption(
+                                job_id=job_id,
+                                dataset_name=dataset_name,
+                                filename=filename,
+                                created_at=created_at_str,
+                            )
+                        )
             except Exception:
                 continue
 
@@ -178,8 +182,10 @@ async def update_job_description(
 
     raise HTTPException(status_code=404, detail="Job not found")
 
+
 class EnrichedDriftReport(BaseModel):
     """DriftReport with optional feature importance overlay."""
+
     reference_rows: int
     current_rows: int
     drifted_columns_count: int
@@ -202,7 +208,7 @@ async def calculate_drift(
 ) -> EnrichedDriftReport:
     settings = get_settings()
     base_path = Path(settings.TRAINING_ARTIFACT_DIR)
-    
+
     # 1. Find the job folder
     job_folder = None
     if base_path.exists():
@@ -210,23 +216,23 @@ async def calculate_drift(
             if item_path.is_dir() and item_path.name.endswith(f"_{job_id}"):
                 job_folder = str(item_path)
                 break
-    
+
     if not job_folder:
         # Fallback: try root if not found in subfolders (backward compatibility)
         job_folder = str(base_path)
 
     # Use the job folder (or root) as the artifact store base path
     artifact_store = LocalArtifactStore(base_path=job_folder)
-    
+
     # 2. Find Reference Data
     reference_key = None
     if dataset_name:
         # Sanitize as done in engine.py
-        safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', dataset_name)
+        safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", dataset_name)
         candidate = f"reference_data_{safe_name}_{job_id}"
         if artifact_store.exists(candidate):
             reference_key = candidate
-    
+
     if not reference_key:
         # Search for reference_data_*{job_id}
         artifacts = artifact_store.list_artifacts()
@@ -236,10 +242,10 @@ async def calculate_drift(
             if key.startswith("reference_data_") and key.endswith(job_id):
                 reference_key = key
                 break
-    
+
     if not reference_key:
         raise HTTPException(status_code=404, detail=f"Reference data not found for job {job_id}")
-        
+
     # 3. Load Reference Data
     try:
         ref_data = artifact_store.load(reference_key)
@@ -257,9 +263,9 @@ async def calculate_drift(
     try:
         content = await file.read()
         filename = file.filename.lower()
-        if filename.endswith('.csv'):
+        if filename.endswith(".csv"):
             curr_df = pl.read_csv(io.BytesIO(content))
-        elif filename.endswith('.parquet'):
+        elif filename.endswith(".parquet"):
             curr_df = pl.read_parquet(io.BytesIO(content))
         else:
             # Default to CSV
@@ -308,7 +314,15 @@ async def calculate_drift(
             drifted_columns_count=report.drifted_columns_count,
             total_columns=len(report.column_drifts),
             summary=col_summary,
-            column_drifts=report.model_dump(exclude={"reference_rows", "current_rows", "drifted_columns_count", "missing_columns", "new_columns"}),
+            column_drifts=report.model_dump(
+                exclude={
+                    "reference_rows",
+                    "current_rows",
+                    "drifted_columns_count",
+                    "missing_columns",
+                    "new_columns",
+                }
+            ),
         )
         db.add(check)
         await db.commit()

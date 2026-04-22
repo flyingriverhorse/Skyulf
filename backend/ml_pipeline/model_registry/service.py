@@ -49,14 +49,10 @@ class ModelRegistryService:
 
         # Count total versions (completed jobs)
         train_count = await session.scalar(
-            select(func.count(BasicTrainingJob.id)).where(
-                BasicTrainingJob.status == "completed"
-            )
+            select(func.count(BasicTrainingJob.id)).where(BasicTrainingJob.status == "completed")
         )
         tune_count = await session.scalar(
-            select(func.count(AdvancedTuningJob.id)).where(
-                AdvancedTuningJob.status == "completed"
-            )
+            select(func.count(AdvancedTuningJob.id)).where(AdvancedTuningJob.status == "completed")
         )
 
         # Count active deployments
@@ -193,7 +189,7 @@ class ModelRegistryService:
                 # Fallback: check if ds_id is numeric string and try int key
                 if isinstance(ds_id, str) and ds_id.isdigit():
                     ds_info = ds_map.get(int(ds_id))
-            
+
             if ds_info:
                 ds_name = ds_info["name"]
                 ds_type = ds_info["type"]
@@ -226,9 +222,7 @@ class ModelRegistryService:
         return results[skip : skip + limit]
 
     @staticmethod
-    async def get_model_versions(
-        session: AsyncSession, model_type: str
-    ) -> List[ModelVersion]:
+    async def get_model_versions(session: AsyncSession, model_type: str) -> List[ModelVersion]:
         # Similar to list_models but filtered by model_type
         # ... (implementation reuse or copy)
         # For brevity, just filtered the list_models result for now,
@@ -313,32 +307,30 @@ class ModelRegistryService:
 
         # 1. Get Job Entity
         job = await JobService.get_job_by_id(session, job_id)
-        
+
         if not job:
             raise ValueError(f"Job {job_id} not found")
-        
+
         artifact_uri = str(job.artifact_uri)
         if not artifact_uri:
             return ArtifactListResponse(storage_type="unknown", base_uri="", files=[])
-        
+
         store: Union[S3ArtifactStore, LocalArtifactStore]
 
         # 3. Instantiate the appropriate ArtifactStore
         from backend.ml_pipeline.artifacts.factory import ArtifactFactory
-        
+
         try:
             store = ArtifactFactory.get_artifact_store(artifact_uri)
-            
+
             storage_type = "s3" if artifact_uri.startswith("s3://") else "local"
-            
+
             return ArtifactListResponse(
-                storage_type=storage_type,
-                base_uri=artifact_uri,
-                files=store.list_artifacts()
+                storage_type=storage_type, base_uri=artifact_uri, files=store.list_artifacts()
             )
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to list artifacts: {e}")
             raise e
-

@@ -65,6 +65,4 @@ def test_pipeline_chain():
 
     # Check results
     assert df_train_scaled["age"].mean() < 1e-10  # Should be approx 0 (standardized)
-    assert (
-        df_test_scaled.shape[1] == df_train_scaled.shape[1]
-    )  # Should have same columns
+    assert df_test_scaled.shape[1] == df_train_scaled.shape[1]  # Should have same columns

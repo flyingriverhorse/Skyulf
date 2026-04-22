@@ -49,9 +49,7 @@ class AsyncSQLiteConnectionManager:
             await self._setup_database_optimizations()
 
             self._initialized = True
-            logger.info(
-                f"[OK] Async SQLite manager initialized for {self.database_path}"
-            )
+            logger.info(f"[OK] Async SQLite manager initialized for {self.database_path}")
 
         except Exception as e:
             logger.error(f"Failed to initialize async SQLite manager: {e}")
@@ -60,9 +58,7 @@ class AsyncSQLiteConnectionManager:
     async def _setup_database_optimizations(self):
         """Setup WAL mode and performance optimizations"""
         try:
-            async with aiosqlite.connect(
-                self.database_path, timeout=self.timeout
-            ) as conn:
+            async with aiosqlite.connect(self.database_path, timeout=self.timeout) as conn:
                 # Enable WAL mode (Write-Ahead Logging)
                 await conn.execute("PRAGMA journal_mode=WAL")
 
@@ -70,9 +66,7 @@ class AsyncSQLiteConnectionManager:
                 await conn.execute("PRAGMA synchronous=NORMAL")  # Faster than FULL
                 await conn.execute("PRAGMA cache_size=10000")  # 10MB cache
                 await conn.execute("PRAGMA temp_store=MEMORY")  # Use memory for temp
-                await conn.execute(
-                    "PRAGMA mmap_size=268435456"
-                )  # 256MB memory-mapped I/O
+                await conn.execute("PRAGMA mmap_size=268435456")  # 256MB memory-mapped I/O
 
                 # WAL checkpoint settings
                 await conn.execute("PRAGMA wal_autocheckpoint=1000")  # Every 1000 pages
@@ -132,9 +126,7 @@ class AsyncSQLiteConnectionManager:
             else:
                 cursor = await conn.execute(query)
 
-            columns = (
-                [desc[0] for desc in cursor.description] if cursor.description else []
-            )
+            columns = [desc[0] for desc in cursor.description] if cursor.description else []
             rows = await cursor.fetchall()
             await cursor.close()
 
@@ -299,18 +291,14 @@ class AsyncDatabaseManager:
                 pool_size = getattr(self.settings, "sqlite_pool_size", 10)
                 timeout = getattr(self.settings, "sqlite_timeout", 30)
 
-                self.sqlite_manager = AsyncSQLiteConnectionManager(
-                    sqlite_path, pool_size, timeout
-                )
+                self.sqlite_manager = AsyncSQLiteConnectionManager(sqlite_path, pool_size, timeout)
                 await self.sqlite_manager.initialize()
 
             # Initialize PostgreSQL if configured
             postgres_url = getattr(self.settings, "postgres_url", None)
             if postgres_url:
                 pool_size = getattr(self.settings, "postgres_pool_size", 10)
-                self.postgres_manager = AsyncPostgreSQLConnectionManager(
-                    postgres_url, pool_size
-                )
+                self.postgres_manager = AsyncPostgreSQLConnectionManager(postgres_url, pool_size)
                 await self.postgres_manager.initialize()
 
             self._initialized = True

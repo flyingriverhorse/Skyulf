@@ -1,4 +1,5 @@
 """Tests for path traversal protection in LocalArtifactStore and FileSystemCatalog."""
+
 import os
 import tempfile
 
@@ -6,7 +7,6 @@ import pytest
 
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.data.catalog import FileSystemCatalog
-
 
 # ── LocalArtifactStore ──────────────────────────────────────────────
 
@@ -101,6 +101,7 @@ class TestFileSystemCatalogTraversal:
 
     def test_absolute_path_with_traversal_blocked(self, catalog):
         import os
+
         evil = os.path.abspath("/base/") + "/../etc/passwd"
         # Ensure path separator consistency for the OS
         evil = evil.replace("/", os.sep)

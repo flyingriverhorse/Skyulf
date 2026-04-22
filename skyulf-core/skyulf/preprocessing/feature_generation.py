@@ -61,9 +61,7 @@ def _coerce_float(value: Any) -> Optional[float]:
         return None
 
 
-def _safe_divide(
-    numerator: pd.Series, denominator: pd.Series, epsilon: float
-) -> pd.Series:
+def _safe_divide(numerator: pd.Series, denominator: pd.Series, epsilon: float) -> pd.Series:
     adjusted = denominator.copy()
     adjusted = adjusted.replace({0: epsilon, -0.0: epsilon})
     adjusted = adjusted.fillna(epsilon)
@@ -120,23 +118,24 @@ class PolynomialFeaturesApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
-            
+
             # For PolynomialFeatures, we use the pandas/sklearn implementation via conversion
             # to ensure full compatibility with complex degree/interaction logic.
             X_pd = X_pl.to_pandas()
-            
+
             poly = PolynomialFeatures(
                 degree=degree, interaction_only=interaction_only, include_bias=include_bias
             )
             poly.fit(X_pd[valid_cols])
-            
+
             transformed = poly.transform(X_pd[valid_cols])
             # sklearn may return a DataFrame when transform_output="pandas" is set
             if hasattr(transformed, "values"):
                 transformed = transformed.values
             feature_names = poly.get_feature_names_out(valid_cols)
-            
+
             # Filter logic
             indices_to_keep = []
             for i, p in enumerate(poly.powers_):
@@ -144,24 +143,24 @@ class PolynomialFeaturesApplier(BaseApplier):
                 if deg == 1 and not include_input_features:
                     continue
                 indices_to_keep.append(i)
-                
+
             if not indices_to_keep:
                 return pack_pipeline_output(X, y, is_tuple)
-                
+
             transformed = transformed[:, indices_to_keep]
             feature_names = feature_names[indices_to_keep]
-            
+
             new_names = []
             for name in feature_names:
                 clean_name = name.replace(" ", "_").replace("^", "_pow_")
                 new_names.append(f"{output_prefix}_{clean_name}")
-            
+
             # Create Polars DataFrame
             df_poly = pl.DataFrame(transformed, schema=new_names)
-            
+
             # Horizontal concat
             X_out = pl.concat([X_pl, df_poly], how="horizontal")
-            
+
             return pack_pipeline_output(X_out, y, is_tuple)
 
         # Pandas Path
@@ -221,7 +220,7 @@ class PolynomialFeaturesApplier(BaseApplier):
     name="Polynomial Features",
     category="Feature Engineering",
     description="Generate polynomial and interaction features.",
-    params={"degree": 2, "interaction_only": False, "include_bias": False}
+    params={"degree": 2, "interaction_only": False, "include_bias": False},
 )
 class PolynomialFeaturesCalculator(BaseCalculator):
     def fit(
@@ -297,10 +296,11 @@ class FeatureGenerationApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
+
             X_pl: Any = X
-            
+
             X_out = X_pl
-            
+
             for i, op in enumerate(operations):
                 op_type = op.get("operation_type", "arithmetic")
                 method = op.get("method")
@@ -327,22 +327,24 @@ class FeatureGenerationApplier(BaseApplier):
 
                 try:
                     expr = None
-                    
+
                     if op_type == "arithmetic":
                         valid_inputs = [c for c in input_cols if c in X_out.columns]
                         valid_secondary = [c for c in secondary_cols if c in X_out.columns]
                         all_cols = valid_inputs + valid_secondary
-                        
+
                         if not all_cols and not constants:
                             continue
-                            
+
                         fill_val = fillna if fillna is not None else 0
-                        col_exprs = [pl.col(c).cast(pl.Float64).fill_null(fill_val) for c in all_cols]
+                        col_exprs = [
+                            pl.col(c).cast(pl.Float64).fill_null(fill_val) for c in all_cols
+                        ]
                         const_vals = [float(c) for c in constants]
-                        
+
                         if method == "add":
                             expr = pl.sum_horizontal(col_exprs) + sum(const_vals)
-                            
+
                         elif method == "subtract":
                             if col_exprs:
                                 expr = col_exprs[0]
@@ -350,19 +352,19 @@ class FeatureGenerationApplier(BaseApplier):
                             else:
                                 expr = pl.lit(0.0)
                                 others = []
-                                
+
                             for e in others:
                                 expr = expr - e
                             for c in const_vals:
                                 expr = expr - c
-                                
+
                         elif method == "multiply":
                             expr = pl.lit(1.0)
                             for e in col_exprs:
                                 expr = expr * e
                             for c in const_vals:
                                 expr = expr * c
-                                
+
                         elif method == "divide":
                             if col_exprs:
                                 expr = col_exprs[0]
@@ -373,10 +375,10 @@ class FeatureGenerationApplier(BaseApplier):
                                 const_vals = const_vals[1:]
                             else:
                                 continue
-                                
+
                             def safe_denom(d):
                                 return pl.when(d.abs() < epsilon).then(epsilon).otherwise(d)
-                                
+
                             for e in others:
                                 expr = expr / safe_denom(e)
                             for c in const_vals:
@@ -384,56 +386,82 @@ class FeatureGenerationApplier(BaseApplier):
                                 expr = expr / c_val
 
                     elif op_type == "ratio":
-                        nums = [pl.col(c).cast(pl.Float64).fill_null(0) for c in input_cols if c in X_out.columns]
-                        dens = [pl.col(c).cast(pl.Float64).fill_null(0) for c in secondary_cols if c in X_out.columns]
-                        
+                        nums = [
+                            pl.col(c).cast(pl.Float64).fill_null(0)
+                            for c in input_cols
+                            if c in X_out.columns
+                        ]
+                        dens = [
+                            pl.col(c).cast(pl.Float64).fill_null(0)
+                            for c in secondary_cols
+                            if c in X_out.columns
+                        ]
+
                         if not nums or not dens:
                             continue
-                            
+
                         num_sum = pl.sum_horizontal(nums)
                         den_sum = pl.sum_horizontal(dens)
-                        
-                        expr = num_sum / pl.when(den_sum.abs() < epsilon).then(epsilon).otherwise(den_sum)
+
+                        expr = num_sum / pl.when(den_sum.abs() < epsilon).then(epsilon).otherwise(
+                            den_sum
+                        )
 
                     elif op_type == "similarity":
                         col_a = input_cols[0] if input_cols else None
-                        col_b = secondary_cols[0] if secondary_cols else (input_cols[1] if len(input_cols) > 1 else None)
-                        
+                        col_b = (
+                            secondary_cols[0]
+                            if secondary_cols
+                            else (input_cols[1] if len(input_cols) > 1 else None)
+                        )
+
                         if col_a and col_b and col_a in X_out.columns and col_b in X_out.columns:
+
                             def sim_func(struct_val):
                                 a = struct_val.get("a")
                                 b = struct_val.get("b")
                                 return _compute_similarity_score(a, b, method)
-                                
-                            expr = pl.struct([pl.col(col_a).alias("a"), pl.col(col_b).alias("b")]).map_elements(sim_func, return_dtype=pl.Float64)
+
+                            expr = pl.struct(
+                                [pl.col(col_a).alias("a"), pl.col(col_b).alias("b")]
+                            ).map_elements(sim_func, return_dtype=pl.Float64)
 
                     elif op_type == "datetime_extract":
                         valid_inputs = [c for c in input_cols if c in X_out.columns]
                         features = op.get("datetime_features", [])
-                        
+
                         dt_exprs = []
                         for col in valid_inputs:
                             dtype = X_out.schema[col]
                             base_dt = pl.col(col)
                             if dtype == pl.String:
                                 base_dt = pl.col(col).str.to_datetime(strict=False)
-                            
+
                             for feat in features:
                                 feat_name = f"{col}_{feat}"
                                 val = None
-                                if feat == "year": val = base_dt.dt.year()
-                                elif feat == "month": val = base_dt.dt.month()
-                                elif feat == "day": val = base_dt.dt.day()
-                                elif feat == "hour": val = base_dt.dt.hour()
-                                elif feat == "minute": val = base_dt.dt.minute()
-                                elif feat == "second": val = base_dt.dt.second()
-                                elif feat == "quarter": val = base_dt.dt.quarter()
-                                elif feat == "dayofweek" or feat == "weekday": val = base_dt.dt.weekday() - 1
-                                elif feat == "is_weekend": val = (base_dt.dt.weekday() >= 6).cast(pl.Int64)
-                                
+                                if feat == "year":
+                                    val = base_dt.dt.year()
+                                elif feat == "month":
+                                    val = base_dt.dt.month()
+                                elif feat == "day":
+                                    val = base_dt.dt.day()
+                                elif feat == "hour":
+                                    val = base_dt.dt.hour()
+                                elif feat == "minute":
+                                    val = base_dt.dt.minute()
+                                elif feat == "second":
+                                    val = base_dt.dt.second()
+                                elif feat == "quarter":
+                                    val = base_dt.dt.quarter()
+                                elif feat == "dayofweek" or feat == "weekday":
+                                    val = base_dt.dt.weekday() - 1
+                                elif feat == "is_weekend":
+                                    val = (base_dt.dt.weekday() >= 6).cast(pl.Int64)
+
                                 if val is not None:
                                     dt_exprs.append(val.alias(feat_name))
-                        
+
                         if dt_exprs:
                             X_out = X_out.with_columns(dt_exprs)
                         continue
@@ -445,7 +473,7 @@ class FeatureGenerationApplier(BaseApplier):
 
                 except Exception:
                     pass
-            
+
             return pack_pipeline_output(X_out, y, is_tuple)
 
         # Pandas Path
@@ -591,9 +619,7 @@ class FeatureGenerationApplier(BaseApplier):
                         continue
 
                     result = df_out.apply(
-                        lambda row: _compute_similarity_score(
-                            row[col_a], row[col_b], method
-                        ),
+                        lambda row: _compute_similarity_score(row[col_a], row[col_b], method),
                         axis=1,
                     )
 
@@ -653,7 +679,7 @@ class FeatureGenerationApplier(BaseApplier):
     name="Feature Generation (Math)",
     category="Feature Engineering",
     description="Generate new features using mathematical operations.",
-    params={"operations": []}
+    params={"operations": []},
 )
 class FeatureGenerationCalculator(BaseCalculator):
     def fit(

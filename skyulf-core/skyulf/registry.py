@@ -11,9 +11,7 @@ class NodeRegistry:
     _metadata: Dict[str, NodeMetadataDict] = {}
 
     @classmethod
-    def register(
-        cls, name: str, applier_cls: Type, metadata: Optional[Dict[str, Any]] = None
-    ):
+    def register(cls, name: str, applier_cls: Type, metadata: Optional[Dict[str, Any]] = None):
         """
         Decorator to register a Calculator/Applier pair.
 

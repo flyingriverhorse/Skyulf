@@ -78,9 +78,7 @@ def evaluate_classification_model(
             )
 
             # PR
-            precision, recall, _ = precision_recall_curve(
-                y_test_np, pos_probs, pos_label=pos_label
-            )
+            precision, recall, _ = precision_recall_curve(y_test_np, pos_probs, pos_label=pos_label)
             pr_curves.append(
                 CurveData(
                     name=f"PR (Class {class_names[1]})",
@@ -103,9 +101,7 @@ def evaluate_classification_model(
                 )
 
                 # PR
-                precision, recall, _ = precision_recall_curve(
-                    y_test_bin[:, i], y_prob[:, i]
-                )
+                precision, recall, _ = precision_recall_curve(y_test_bin[:, i], y_prob[:, i])
                 pr_curves.append(
                     CurveData(
                         name=f"PR (Class {class_name})",
@@ -127,9 +123,7 @@ def evaluate_classification_model(
     )
 
 
-def _compute_confusion_matrix(
-    y_true: Any, y_pred: Any, labels: List[str]
-) -> ConfusionMatrixData:
+def _compute_confusion_matrix(y_true: Any, y_pred: Any, labels: List[str]) -> ConfusionMatrixData:
     """Compute confusion matrix data."""
     cm = confusion_matrix(y_true, y_pred, labels=labels)
 

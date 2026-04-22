@@ -52,12 +52,14 @@ def cleanup_resources():
     # --- Celery Cleanup ---
     try:
         from celery import current_app
+
         if current_app:
             print(f"\n[pytest] Closing Celery current_app: {current_app}", file=sys.stderr)
             current_app.close()
 
         try:
             from backend.celery_app import celery_app
+
             print("[pytest] Closing backend.celery_app...", file=sys.stderr)
             celery_app.close()
         except ImportError:
@@ -68,6 +70,7 @@ def cleanup_resources():
     # --- Database Cleanup ---
     try:
         from backend.database.engine import async_engine
+
         if async_engine:
             print("[pytest] Disposing async_engine...", file=sys.stderr)
             try:

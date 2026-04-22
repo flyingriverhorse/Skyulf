@@ -42,7 +42,9 @@ class FeatureEngineer:
         self.steps_config = steps_config
         self.fitted_steps: List[Dict[str, Any]] = []
 
-    def transform(self, data: Union[pd.DataFrame, SkyulfDataFrame]) -> Union[pd.DataFrame, SkyulfDataFrame]:
+    def transform(
+        self, data: Union[pd.DataFrame, SkyulfDataFrame]
+    ) -> Union[pd.DataFrame, SkyulfDataFrame]:
         """
         Apply fitted transformations to new data.
         """
@@ -68,7 +70,9 @@ class FeatureEngineer:
 
         return current_data
 
-    def fit_transform(self, data: Union[pd.DataFrame, SkyulfDataFrame, Any], node_id_prefix="") -> Any:  # noqa: C901
+    def fit_transform(
+        self, data: Union[pd.DataFrame, SkyulfDataFrame, Any], node_id_prefix=""
+    ) -> Any:  # noqa: C901
         """
         Runs the pipeline on data.
         Returns: (transformed_data, metrics_dict)
@@ -83,9 +87,7 @@ class FeatureEngineer:
             params = step.get("params", {})
 
             logger.info(f"Running step {i}: {name} ({transformer_type})")
-            logger.debug(
-                f"FeatureEngineer running step {i}: {name} ({transformer_type})"
-            )
+            logger.debug(f"FeatureEngineer running step {i}: {name} ({transformer_type})")
             logger.debug(f"current_data type: {type(current_data)}")
 
             # Capture metrics before
@@ -179,17 +181,13 @@ class FeatureEngineer:
                         if "p_values" in fitted_params:
                             metrics["p_values"] = fitted_params["p_values"]
                         if "feature_importances" in fitted_params:
-                            metrics["feature_importances"] = fitted_params[
-                                "feature_importances"
-                            ]
+                            metrics["feature_importances"] = fitted_params["feature_importances"]
                         if "variances" in fitted_params:
                             metrics["variances"] = fitted_params["variances"]
                         if "ranking" in fitted_params:
                             metrics["ranking"] = fitted_params["ranking"]
                         if "selected_columns" in fitted_params:
-                            metrics["selected_columns"] = fitted_params[
-                                "selected_columns"
-                            ]
+                            metrics["selected_columns"] = fitted_params["selected_columns"]
 
                     # Scaling Metrics
                     if transformer_type in [
@@ -255,17 +253,13 @@ class FeatureEngineer:
                     # Feature Generation Metrics
                     if transformer_type in ["FeatureMath", "FeatureGenerationNode"]:
                         if "operations" in fitted_params:
-                            metrics["operations_count"] = len(
-                                fitted_params["operations"]
-                            )
+                            metrics["operations_count"] = len(fitted_params["operations"])
                             metrics["operations"] = fitted_params["operations"]
                         # Calculate generated features by comparing columns
                         if isinstance(data_before, (pd.DataFrame, SkyulfDataFrame)) and isinstance(
                             current_data, (pd.DataFrame, SkyulfDataFrame)
                         ):
-                            new_cols = list(
-                                set(current_data.columns) - set(data_before.columns)
-                            )
+                            new_cols = list(set(current_data.columns) - set(data_before.columns))
                             metrics["generated_features"] = new_cols
                         elif isinstance(data_before, SplitDataset) and isinstance(
                             current_data, SplitDataset
@@ -275,8 +269,7 @@ class FeatureEngineer:
                                 data_before.train, (pd.DataFrame, SkyulfDataFrame)
                             ) and isinstance(current_data.train, (pd.DataFrame, SkyulfDataFrame)):
                                 new_cols = list(
-                                    set(current_data.train.columns)
-                                    - set(data_before.train.columns)
+                                    set(current_data.train.columns) - set(data_before.train.columns)
                                 )
                                 metrics["generated_features"] = new_cols
                             elif isinstance(data_before.train, tuple) and isinstance(
@@ -285,12 +278,10 @@ class FeatureEngineer:
                                 # (X, y) tuple
                                 X_before, _ = data_before.train
                                 X_after, _ = current_data.train
-                                if isinstance(X_before, (pd.DataFrame, SkyulfDataFrame)) and isinstance(
-                                    X_after, (pd.DataFrame, SkyulfDataFrame)
-                                ):
-                                    new_cols = list(
-                                        set(X_after.columns) - set(X_before.columns)
-                                    )
+                                if isinstance(
+                                    X_before, (pd.DataFrame, SkyulfDataFrame)
+                                ) and isinstance(X_after, (pd.DataFrame, SkyulfDataFrame)):
+                                    new_cols = list(set(X_after.columns) - set(X_before.columns))
                                     metrics["generated_features"] = new_cols
 
             except Exception as e:
@@ -326,9 +317,7 @@ class FeatureEngineer:
 
                         counts = y_res.value_counts().to_dict()
                         # Convert keys to string to ensure JSON serializability
-                        metrics["class_counts"] = {
-                            str(k): int(v) for k, v in counts.items()
-                        }
+                        metrics["class_counts"] = {str(k): int(v) for k, v in counts.items()}
                         metrics["total_samples"] = int(len(y_res))
                 except Exception as e:
                     logger.warning(f"Failed to calculate resampling metrics: {e}")
@@ -360,9 +349,7 @@ class FeatureEngineer:
                                 d1 = df1.to_pandas() if hasattr(df1, "to_pandas") else df1
                                 d2 = df2.to_pandas() if hasattr(df2, "to_pandas") else df2
 
-                                if isinstance(d1, pd.DataFrame) and isinstance(
-                                    d2, pd.DataFrame
-                                ):
+                                if isinstance(d1, pd.DataFrame) and isinstance(d2, pd.DataFrame):
                                     if d1.shape == d2.shape:
                                         return int(d1.ne(d2).sum().sum())
                                 elif (
@@ -386,57 +373,45 @@ class FeatureEngineer:
                                     y1 = d1[1].to_pandas() if hasattr(d1[1], "to_pandas") else d1[1]
                                     y2 = d2[1].to_pandas() if hasattr(d2[1], "to_pandas") else d2[1]
 
-                                    if isinstance(
-                                        y1, (pd.DataFrame, pd.Series)
-                                    ) and isinstance(y2, (pd.DataFrame, pd.Series)):
+                                    if isinstance(y1, (pd.DataFrame, pd.Series)) and isinstance(
+                                        y2, (pd.DataFrame, pd.Series)
+                                    ):
                                         if y1.shape == y2.shape:
                                             diffs += int(y1.ne(y2).sum().sum())  # type: ignore
                                     return diffs
                                 return 0
 
-                            if isinstance(data_before, (pd.DataFrame, SkyulfDataFrame)) and isinstance(
-                                current_data, (pd.DataFrame, SkyulfDataFrame)
-                            ):
+                            if isinstance(
+                                data_before, (pd.DataFrame, SkyulfDataFrame)
+                            ) and isinstance(current_data, (pd.DataFrame, SkyulfDataFrame)):
                                 clipped_count = count_diffs(data_before, current_data)
                             elif isinstance(data_before, SplitDataset) and isinstance(
                                 current_data, SplitDataset
                             ):
-                                clipped_count += count_diffs(
-                                    data_before.train, current_data.train
-                                )
-                                clipped_count += count_diffs(
-                                    data_before.test, current_data.test
-                                )
+                                clipped_count += count_diffs(data_before.train, current_data.train)
+                                clipped_count += count_diffs(data_before.test, current_data.test)
                                 clipped_count += count_diffs(
                                     data_before.validation, current_data.validation
                                 )
 
                             metrics["values_clipped"] = clipped_count
                         except Exception as e:
-                            logger.warning(
-                                f"Failed to calculate values_clipped for Winsorize: {e}"
-                            )
+                            logger.warning(f"Failed to calculate values_clipped for Winsorize: {e}")
                             pass
 
                 if transformer_type == "MissingIndicator":
                     new_cols_set = cols_after - cols_before
                     metrics["missing_indicators_created"] = len(new_cols_set)
-                    cast(Dict[str, Any], metrics)["missing_indicators_columns"] = list(
-                        new_cols_set
-                    )
+                    cast(Dict[str, Any], metrics)["missing_indicators_columns"] = list(new_cols_set)
 
                 if transformer_type == "DropMissingColumns":
                     dropped_cols_set = cols_before - cols_after
-                    cast(Dict[str, Any], metrics)["dropped_columns"] = list(
-                        dropped_cols_set
-                    )
+                    cast(Dict[str, Any], metrics)["dropped_columns"] = list(dropped_cols_set)
                     metrics["dropped_columns_count"] = len(dropped_cols_set)
 
                 if transformer_type == "feature_selection":
                     dropped_cols_set = cols_before - cols_after
-                    cast(Dict[str, Any], metrics)["dropped_columns"] = list(
-                        dropped_cols_set
-                    )
+                    cast(Dict[str, Any], metrics)["dropped_columns"] = list(dropped_cols_set)
                     metrics["dropped_columns_count"] = len(dropped_cols_set)
 
                 if transformer_type in [
