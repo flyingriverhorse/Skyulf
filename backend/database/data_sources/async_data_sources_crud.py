@@ -134,7 +134,7 @@ async def read(
             rows = await sqlite_q.select_data_sources(settings, filter_dict, one=one)
             row_count = len(rows) if isinstance(rows, list) else 1
             logger.debug("Successfully read %s rows from SQLite (primary)", row_count)
-            return cast(Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], rows)
+            return rows
         except Exception:
             logger.exception("Failed reading data_sources from SQLite (primary database)")
             raise RuntimeError("Failed to read from primary database (SQLite)")
@@ -144,7 +144,7 @@ async def read(
             rows = await pg_q.select_data_sources(settings, filter_dict, one=one)
             row_count = len(rows) if isinstance(rows, list) else 1
             logger.debug("Successfully read %s rows from PostgreSQL (primary)", row_count)
-            return cast(Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], rows)
+            return rows
         except Exception:
             logger.exception("Failed reading data_sources from PostgreSQL (primary database)")
             raise RuntimeError("Failed to read from primary database (PostgreSQL)")
@@ -342,9 +342,16 @@ async def get_database_status(settings: Settings) -> Dict[str, Any]:
     """
     primary_db = get_primary_database(settings)
 
+    sqlite_status: Dict[str, Any] = {
+        "connected": False,
+        "count": 0,
+        "error": None,
+        "path": None,
+    }
+    postgres_status: Dict[str, Any] = {"connected": False, "count": 0, "error": None}
     status: Dict[str, Any] = {
-        "sqlite": {"connected": False, "count": 0, "error": None, "path": None},
-        "postgres": {"connected": False, "count": 0, "error": None},
+        "sqlite": sqlite_status,
+        "postgres": postgres_status,
         "primary": primary_db,
     }
 

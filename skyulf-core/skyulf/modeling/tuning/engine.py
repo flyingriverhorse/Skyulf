@@ -2,7 +2,7 @@
 
 import logging
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # Try importing Optuna with robust fallback for integration packages
 HAS_OPTUNA = False
-OptunaSearchCV = None
+OptunaSearchCV: Any = None
 
 try:
     import optuna
@@ -109,7 +109,7 @@ class TuningCalculator(BaseModelCalculator):
             # Extract valid keys for TuningConfig
             valid_keys = TuningConfig.__annotations__.keys()
             filtered_config = {k: v for k, v in config.items() if k in valid_keys}
-            tuning_config = TuningConfig(**filtered_config)  # type: ignore
+            tuning_config = TuningConfig(**filtered_config)
 
         # Convert data to Numpy for tuning
         X_np, y_np = SklearnBridge.to_sklearn((X, y))
@@ -201,14 +201,18 @@ class TuningCalculator(BaseModelCalculator):
         if not hasattr(self.model_calculator, "model_class"):
             raise ValueError("Tuner currently only supports SklearnCalculator")
 
-        base_estimator = self.model_calculator.model_class(**self.model_calculator.default_params)
+        # `model_class` only on SklearnCalculator; `Any` keeps call sites type-clean.
+        model_class: Any = getattr(self.model_calculator, "model_class")
+
+        base_estimator = model_class(**self.model_calculator.default_params)
 
         # 2. Prepare Splitter
         # If validation data is provided, use PredefinedSplit to train on X and validate on validation_data
         # Otherwise use CV
 
-        X_for_search = X
-        y_for_search = y
+        # `Any` — reassigned to np.concatenate output below; keeps branches type-clean.
+        X_for_search: Any = X
+        y_for_search: Any = y
 
         if validation_data is not None:
             from sklearn.model_selection import PredefinedSplit
@@ -364,42 +368,26 @@ class TuningCalculator(BaseModelCalculator):
                 fold_scores = []
 
                 # Ensure numpy
-                X_arr = (
-                    X_for_search.to_numpy() if hasattr(X_for_search, "to_numpy") else X_for_search
-                )
-                y_arr = (
-                    y_for_search.to_numpy() if hasattr(y_for_search, "to_numpy") else y_for_search
-                )
+                X_any = cast(Any, X_for_search)
+                y_any = cast(Any, y_for_search)
+                X_arr = X_any.to_numpy() if hasattr(X_any, "to_numpy") else X_any
+                y_arr = y_any.to_numpy() if hasattr(y_any, "to_numpy") else y_any
 
                 for fold_idx, (train_idx, val_idx) in enumerate(cv.split(X_arr, y_arr)):
                     # Split
                     X_train_fold = (
-                        X_for_search.iloc[train_idx]
-                        if hasattr(X_for_search, "iloc")
-                        else X_for_search[train_idx]
+                        X_any.iloc[train_idx] if hasattr(X_any, "iloc") else X_any[train_idx]
                     )
                     y_train_fold = (
-                        y_for_search.iloc[train_idx]
-                        if hasattr(y_for_search, "iloc")
-                        else y_for_search[train_idx]
+                        y_any.iloc[train_idx] if hasattr(y_any, "iloc") else y_any[train_idx]
                     )
-                    X_val_fold = (
-                        X_for_search.iloc[val_idx]
-                        if hasattr(X_for_search, "iloc")
-                        else X_for_search[val_idx]
-                    )
-                    y_val_fold = (
-                        y_for_search.iloc[val_idx]
-                        if hasattr(y_for_search, "iloc")
-                        else y_for_search[val_idx]
-                    )
+                    X_val_fold = X_any.iloc[val_idx] if hasattr(X_any, "iloc") else X_any[val_idx]
+                    y_val_fold = y_any.iloc[val_idx] if hasattr(y_any, "iloc") else y_any[val_idx]
 
                     # Instantiate and Fit
                     # Note: We must handle potential errors (e.g. incompatible params)
                     try:
-                        model = self.model_calculator.model_class(
-                            **{**self.model_calculator.default_params, **params}
-                        )
+                        model = model_class(**{**self.model_calculator.default_params, **params})
                         model.fit(X_train_fold, y_train_fold)
 
                         # Score
@@ -553,7 +541,7 @@ class TuningCalculator(BaseModelCalculator):
                 param_distributions=distributions,
                 n_trials=config.n_trials,
                 timeout=config.timeout,
-                cv=cv,  # type: ignore
+                cv=cv,
                 scoring=metric,
                 n_jobs=-1,
                 refit=False,
@@ -566,8 +554,10 @@ class TuningCalculator(BaseModelCalculator):
 
         # 4. Run Search
         # Ensure numpy
-        X_arr = X_for_search.to_numpy() if hasattr(X_for_search, "to_numpy") else X_for_search
-        y_arr = y_for_search.to_numpy() if hasattr(y_for_search, "to_numpy") else y_for_search
+        X_any = cast(Any, X_for_search)
+        y_any = cast(Any, y_for_search)
+        X_arr = X_any.to_numpy() if hasattr(X_any, "to_numpy") else X_any
+        y_arr = y_any.to_numpy() if hasattr(y_any, "to_numpy") else y_any
 
         try:
             with warnings.catch_warnings():
@@ -614,7 +604,7 @@ class TuningCalculator(BaseModelCalculator):
         trials = []
         # Special handling for Optuna
         if config.strategy == "optuna" and hasattr(searcher, "study_"):
-            for trial in searcher.study_.trials:
+            for trial in cast(Any, searcher).study_.trials:
                 # Only include completed trials
                 if trial.state.name == "COMPLETE":
                     trials.append({"params": trial.params, "score": trial.value})
@@ -648,7 +638,11 @@ class TuningApplier(BaseModelApplier):
     def __init__(self, base_applier: BaseModelApplier):
         self.base_applier = base_applier
 
-    def predict(self, df: pd.DataFrame, model_artifact: Any) -> pd.Series:
+    def predict(
+        self,
+        df: Union[pd.DataFrame, SkyulfDataFrame],
+        model_artifact: Any,
+    ) -> Union[pd.Series, Any]:
         # model_artifact is (fitted_model, tuning_result)
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
             model, _ = model_artifact
@@ -656,7 +650,11 @@ class TuningApplier(BaseModelApplier):
         # Fallback if artifact is just the result (legacy)
         return pd.Series(np.nan, index=df.index)
 
-    def predict_proba(self, df: pd.DataFrame, model_artifact: Any) -> Optional[pd.DataFrame]:
+    def predict_proba(
+        self,
+        df: Union[pd.DataFrame, SkyulfDataFrame],
+        model_artifact: Any,
+    ) -> Optional[Union[pd.DataFrame, SkyulfDataFrame]]:
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
             model, _ = model_artifact
             return self.base_applier.predict_proba(df, model)

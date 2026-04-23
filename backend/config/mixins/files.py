@@ -40,7 +40,7 @@ class FilesMixin:
             self.TEMP_DIR,  # type: ignore[attr-defined]
             self.EXPORT_DIR,  # type: ignore[attr-defined]
             self.MODELS_DIR,  # type: ignore[attr-defined]
-            Path(self.LOG_FILE).parent,  # type: ignore[attr-defined]
+            Path(self.LOG_FILE).parent,  # ty: ignore[unresolved-attribute]
             "logs",
             "exports/models",
         ]

@@ -1,5 +1,5 @@
 import polars as pl
-from typing import Dict, Optional
+from typing import Dict, Optional, cast
 from backend.data_ingestion.connectors.base import BaseConnector
 
 
@@ -111,7 +111,7 @@ class S3Connector(BaseConnector):
         if limit:
             lf = lf.limit(limit)
 
-        return lf.collect()
+        return cast(pl.DataFrame, lf.collect())
 
     async def validate(self) -> bool:
         return await self.connect()

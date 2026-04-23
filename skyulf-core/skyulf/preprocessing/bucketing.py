@@ -29,7 +29,7 @@ class BaseBinningApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -274,7 +274,7 @@ class GeneralBinningCalculator(BaseCalculator):
                         strategy="kmeans",
                         encode="ordinal",
                     )
-                    est.fit(series.values.reshape(-1, 1))  # type: ignore
+                    est.fit(series.values.reshape(-1, 1))
                     edges = est.bin_edges_[0]
 
                 elif strategy == "custom":
@@ -316,7 +316,7 @@ class GeneralBinningCalculator(BaseCalculator):
                     if sklearn_strategy == "quantile":
                         kbins_kwargs["quantile_method"] = "averaged_inverted_cdf"
                     est = KBinsDiscretizer(**kbins_kwargs)
-                    est.fit(series.values.reshape(-1, 1))  # type: ignore
+                    est.fit(series.values.reshape(-1, 1))
                     edges = est.bin_edges_[0]
 
                 if edges is not None:

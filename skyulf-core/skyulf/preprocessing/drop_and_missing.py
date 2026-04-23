@@ -16,7 +16,7 @@ class DeduplicateApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -132,7 +132,7 @@ class DropMissingColumnsApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -232,7 +232,7 @@ class DropMissingRowsApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -347,7 +347,7 @@ class MissingIndicatorApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 

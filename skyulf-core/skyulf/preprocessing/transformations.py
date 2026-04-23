@@ -26,7 +26,7 @@ class PowerTransformerApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
         was_polars = engine.name == "polars"
@@ -173,7 +173,7 @@ class SimpleTransformationApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -270,12 +270,12 @@ class SimpleTransformationCalculator(BaseCalculator):
     def fit(
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
-        params: Dict[str, Any],
+        config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'}, ...]}
         return {
             "type": "simple_transformation",
-            "transformations": params.get("transformations", []),
+            "transformations": config.get("transformations", []),
         }
 
 
@@ -287,7 +287,7 @@ class GeneralTransformationApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 

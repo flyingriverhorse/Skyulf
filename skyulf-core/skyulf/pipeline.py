@@ -38,7 +38,7 @@ class SkyulfPipeline:
     2. Modeling (Training/Inference)
     """
 
-    def __init__(self, config: PipelineConfig):
+    def __init__(self, config: Union[PipelineConfig, Dict[str, Any]]):
         """
         Initialize the pipeline.
 
@@ -221,4 +221,4 @@ class SkyulfPipeline:
     def load(cls, path: str) -> "SkyulfPipeline":
         """Load the pipeline from a file."""
         with open(path, "rb") as f:
-            return pickle.load(f)  # type: ignore
+            return pickle.load(f)

@@ -12,8 +12,8 @@ class SkyulfDataFrame(Protocol):
     """
 
     @property
-    def columns(self) -> Sequence[str]:
-        """Return the list of column names."""
+    def columns(self) -> Any:
+        """Column names (pandas `Index` or `List[str]` depending on engine)."""
         ...
 
     @property
@@ -43,24 +43,7 @@ class SkyulfDataFrame(Protocol):
         """
         ...
 
-    # Core Operations
-    def select(self, columns: List[str]) -> "SkyulfDataFrame":
-        """Select a subset of columns."""
-        ...
-
-    def drop(self, columns: List[str]) -> "SkyulfDataFrame":
-        """Drop specified columns."""
-        ...
-
-    def with_column(self, name: str, values: Any) -> "SkyulfDataFrame":
-        """
-        Add or replace a column.
-
-        Args:
-            name: The name of the column.
-            values: The data for the column (list, array, series).
-        """
-        ...
+    # Engine-specific ops (select/drop/with_column) reached via `__getattr__`.
 
     # Bridges
     def to_pandas(self) -> pd.DataFrame:

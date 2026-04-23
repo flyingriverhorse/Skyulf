@@ -41,7 +41,7 @@ from .execution.engine import PipelineEngine
 # from .data.profiler import DataProfiler
 # from .recommendations.schemas import Recommendation, AnalysisProfile
 from .execution.jobs import JobInfo, JobManager
-from .execution.schemas import NodeConfig, PipelineConfig
+from .execution.schemas import NodeConfig, PipelineConfig, coerce_step_type
 
 # from .data.loader import DataLoader
 from .node_definitions import NodeRegistry, RegistryItem
@@ -294,7 +294,7 @@ async def run_pipeline(  # noqa: C901
     internal_nodes = [
         NodeConfig(
             node_id=n.node_id,
-            step_type=n.step_type,
+            step_type=coerce_step_type(n.step_type),
             params=n.params,
             inputs=n.inputs,
         )
@@ -494,7 +494,7 @@ async def save_pipeline(
         file_path = os.path.join(storage_dir, f"{dataset_id}.json")
         try:
             with open(file_path, "w") as f:
-                json.dump(payload.dict(), f, indent=2)
+                json.dump(payload.model_dump(), f, indent=2)
             return {"status": "success", "id": dataset_id, "storage": "json"}
         except Exception as e:
             raise HTTPException(
@@ -612,15 +612,7 @@ async def preview_pipeline(  # noqa: C901
             nodes.append(
                 NodeConfig(
                     node_id=node.node_id,
-                    step_type=cast(
-                        Literal[
-                            "data_loader",
-                            "feature_engineering",
-                            "basic_training",
-                            "advanced_tuning",
-                        ],
-                        node.step_type,
-                    ),
+                    step_type=coerce_step_type(node.step_type),
                     params=params,
                     inputs=node.inputs,
                 )

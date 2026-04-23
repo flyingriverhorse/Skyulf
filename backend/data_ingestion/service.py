@@ -1,10 +1,10 @@
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Union, cast
 
-import aiofiles  # type: ignore
+import aiofiles
 from fastapi import BackgroundTasks, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -120,7 +120,7 @@ class DataIngestionService:
                 "status": "cancelled",
                 "progress": ingestion_status.get("progress", 0.0),
                 "error": "Cancelled by user",
-                "updated_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             cast(Any, source).source_metadata = metadata
             await self.session.commit()
@@ -161,7 +161,7 @@ class DataIngestionService:
                 connector = S3Connector(file_path, storage_options=str_options)
                 await connector.connect()
                 df = await connector.fetch_data(limit=limit)
-                return cast(List[Dict[str, Any]], df.to_dicts())
+                return df.to_dicts()
             except Exception as e:
                 logger.error(f"Failed to get S3 sample: {e}", exc_info=True)
                 # If it's a 403/404 from S3, it might come as ValueError from connector
@@ -204,7 +204,7 @@ class DataIngestionService:
                     connector = LocalFileConnector(str(abs_path))
                     await connector.connect()
                     df = await connector.fetch_data(limit=limit)
-                    return cast(List[Dict[str, Any]], df.to_dicts())
+                    return df.to_dicts()
                 except Exception as e:
                     logger.exception("Failed to read local parquet: %s", file_path)
                     raise HTTPException(status_code=500, detail="Failed to read local parquet file")
@@ -265,7 +265,7 @@ class DataIngestionService:
                     "ingestion_status": {
                         "status": "pending",
                         "progress": 0.0,
-                        "updated_at": datetime.utcnow().isoformat(),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
                     },
                     "original_filename": file.filename,
                     "file_size": file_path.stat().st_size,
@@ -325,7 +325,7 @@ class DataIngestionService:
                     "ingestion_status": {
                         "status": "pending",
                         "progress": 0.0,
-                        "updated_at": datetime.utcnow().isoformat(),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
                     }
                 },
             )

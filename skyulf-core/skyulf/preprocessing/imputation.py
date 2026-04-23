@@ -33,7 +33,7 @@ class SimpleImputerApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -219,7 +219,7 @@ class KNNImputerApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -346,7 +346,7 @@ class IterativeImputerApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 

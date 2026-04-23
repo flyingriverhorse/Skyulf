@@ -261,7 +261,7 @@ class AsyncJSONSafeSerializer:
             "shape": list(df.shape),
             "columns": [str(col) for col in df.columns],
             "memory_usage": int(df.memory_usage(deep=True).sum()),
-            "has_nulls": df.isnull().any().any(),
+            "has_nulls": bool(cast(Any, df.isnull().any()).any()),
             "null_counts": df.isnull().sum().to_dict(),
         }
 
@@ -682,7 +682,7 @@ async def serialize_api_response(
     Returns:
         Standardized API response
     """
-    response = {
+    response: Dict[str, Any] = {
         "success": success,
         "timestamp": datetime.now().isoformat(),
     }

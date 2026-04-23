@@ -47,6 +47,9 @@ class SkyulfPandasWrapper:
     def __setitem__(self, key, value):
         self._df[key] = value
 
+    def __len__(self) -> int:
+        return len(self._df)
+
     # Allow access to underlying dataframe methods for flexibility,
     # but this breaks the protocol abstraction if used.
     def __getattr__(self, name):

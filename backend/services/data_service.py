@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, cast
 
 import pandas as pd
 
@@ -14,6 +14,11 @@ except ImportError:
 from skyulf.engines import SkyulfDataFrame, get_engine
 
 logger = logging.getLogger(__name__)
+
+
+def _collect(lf: "pl.LazyFrame") -> "pl.DataFrame":
+    """Narrow `LazyFrame.collect()` back to `DataFrame` (sync path only)."""
+    return cast("pl.DataFrame", lf.collect())
 
 
 class DataService:
@@ -112,11 +117,11 @@ class DataService:
         if HAS_POLARS:
             try:
                 if path_str.endswith(".parquet"):
-                    return pl.scan_parquet(path_str).limit(limit).collect().to_dicts()
+                    return _collect(pl.scan_parquet(path_str).limit(limit)).to_dicts()
                 elif path_str.endswith(".csv"):
-                    return (
-                        pl.scan_csv(path_str, ignore_errors=True).limit(limit).collect().to_dicts()
-                    )
+                    return _collect(
+                        pl.scan_csv(path_str, ignore_errors=True).limit(limit)
+                    ).to_dicts()
                 elif path_str.endswith(".json"):
                     # JSON scan is experimental/limited, use read
                     return pl.read_json(path_str).head(limit).to_dicts()
@@ -178,7 +183,7 @@ class DataService:
 
                 # Zero-copy convert via Arrow if possible
                 if hasattr(data, "to_arrow"):
-                    pl.from_arrow(data.to_arrow()).write_parquet(path_str)
+                    cast("pl.DataFrame", pl.from_arrow(data.to_arrow())).write_parquet(path_str)
                 elif isinstance(data, pd.DataFrame):
                     pl.from_pandas(data).write_parquet(path_str)
                 else:

@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -17,32 +17,32 @@ def get_data_stats(
     Calculates row count and column set for various data structures.
     Supports DataFrame, (X, y) tuple, and SplitDataset.
     """
-    rows = 0
-    cols = set()
+    rows: int = 0
+    cols: Set[str] = set()
+
+    # Cast to Any so the hasattr-driven duck-typed access below type-checks.
+    payload = cast(Any, data)
 
     # Check for DataFrame-like object (Pandas, Polars, Wrapper)
     if hasattr(data, "shape") and hasattr(data, "columns") and not isinstance(data, tuple):
-        rows = data.shape[0]
-        cols = set(data.columns)
+        rows = int(payload.shape[0])
+        cols = set(payload.columns)
     elif isinstance(data, tuple) and len(data) == 2:
         # Handle (X, y) tuple
-        # Check if first element is DataFrame/Series
-        if hasattr(data[0], "shape"):
-            rows = data[0].shape[0]
-            if hasattr(data[0], "columns"):
-                cols = set(data[0].columns)
+        first = cast(Any, data[0])
+        if hasattr(first, "shape"):
+            rows = int(first.shape[0])
+            if hasattr(first, "columns"):
+                cols = set(first.columns)
     elif isinstance(data, SplitDataset):
         # Sum rows from all splits
-        # Train
         r, c = get_data_stats(data.train)
         rows += r
         cols = c  # Assume columns are same
 
-        # Test
         r, _ = get_data_stats(data.test)
         rows += r
 
-        # Validation
         if data.validation is not None:
             r, _ = get_data_stats(data.validation)
             rows += r
@@ -63,11 +63,15 @@ def unpack_pipeline_input(
 
 
 def pack_pipeline_output(
-    X: Union[pd.DataFrame, SkyulfDataFrame], y: Optional[Any], was_tuple: bool
+    X: Any, y: Optional[Any], was_tuple: bool
 ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]]:
     """
     Packs output back into a tuple if the input was a tuple and y is present.
     Otherwise, if y is present, concatenates it back to X.
+
+    `X` is typed `Any` because callers pass pandas / polars / wrapper /
+    numpy-backed frames interchangeably, and ty can't narrow the exact type
+    through the engine dispatch below.
     """
     if was_tuple and y is None:
         # Caller said the input was a tuple but lost y along the way.

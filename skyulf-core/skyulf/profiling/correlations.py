@@ -1,7 +1,12 @@
 import polars as pl
 import numpy as np
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, cast
 from .schemas import CorrelationMatrix
+
+
+def _collect(lf: pl.LazyFrame) -> pl.DataFrame:
+    """Narrow `LazyFrame.collect()` back to `DataFrame` (sync path only)."""
+    return cast(pl.DataFrame, lf.collect())
 
 
 def calculate_correlations(
@@ -36,7 +41,7 @@ def calculate_correlations(
         if len(numeric_cols) > 20:
             numeric_cols = numeric_cols[:20]
 
-        subset = df.select(numeric_cols).collect()
+        subset = _collect(df.select(numeric_cols))
 
         # Handle constant columns to avoid RuntimeWarning: invalid value encountered in divide
         # Filter out columns with 0 std dev
@@ -44,7 +49,7 @@ def calculate_correlations(
         for col in numeric_cols:
             std_val = subset[col].std()
             # Check for None (all nulls or single value) and 0 variance
-            if std_val is not None and std_val > 1e-9:
+            if std_val is not None and cast(float, std_val) > 1e-9:
                 valid_cols.append(col)
 
         if len(valid_cols) < 2:

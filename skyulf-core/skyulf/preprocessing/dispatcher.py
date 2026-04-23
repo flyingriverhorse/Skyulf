@@ -21,7 +21,7 @@ def apply_dual_engine(
     params: Dict[str, Any],
     polars_func: ApplyFunction,
     pandas_func: ApplyFunction,
-) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+) -> Any:
     """
     Dispatcher to handle boilerplate for dual-engine Appliers.
 

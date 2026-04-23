@@ -1,6 +1,5 @@
 from typing import Any, Dict, Optional, Type
 import logging
-from .types import NodeMetadataDict
 
 logger = logging.getLogger(__name__)
 
@@ -8,7 +7,7 @@ logger = logging.getLogger(__name__)
 class NodeRegistry:
     _calculators: Dict[str, Type] = {}
     _appliers: Dict[str, Type] = {}
-    _metadata: Dict[str, NodeMetadataDict] = {}
+    _metadata: Dict[str, Dict[str, Any]] = {}
 
     @classmethod
     def register(cls, name: str, applier_cls: Type, metadata: Optional[Dict[str, Any]] = None):

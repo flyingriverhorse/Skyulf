@@ -14,7 +14,7 @@ class DatasetProfileApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         # Inspection nodes do not modify data
         return df
 
@@ -95,7 +95,7 @@ class DataSnapshotApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         return df
 
 

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from pydantic import BaseModel
-from typing import Optional, List, Any
+from typing import Optional, List, Any, cast
 
 from backend.dependencies import get_db
 from backend.database.models import EDAReport, DataSource
@@ -92,7 +92,7 @@ async def trigger_analysis(
             config["exclude_cols"] = request.exclude_cols
         if request.filters:
             logger.debug("Applying filters: %s", request.filters)
-            config["filters"] = [f.dict() for f in request.filters]
+            config["filters"] = [f.model_dump() for f in request.filters]
         if request.task_type:
             logger.debug("Setting task_type to %s", request.task_type)
             config["task_type"] = request.task_type
@@ -282,18 +282,19 @@ async def get_decomposition(
                     df = pl.from_pandas(df)
                 except Exception:
                     # Fallback: convert object cols to string to handle mixed types
-                    for col in df.columns:
-                        if df[col].dtype == "object":
-                            df[col] = df[col].astype(str)
-                    df = pl.from_pandas(df)
+                    pdf = cast(Any, df)
+                    for col in pdf.columns:
+                        if pdf[col].dtype == "object":
+                            pdf[col] = pdf[col].astype(str)
+                    df = pl.from_pandas(pdf)
         except Exception as e:
             logger.exception("Failed to load dataset")
             raise HTTPException(status_code=500, detail="Failed to load dataset")
 
         # 5. Run Analysis
-        analyzer = EDAAnalyzer(df)
+        analyzer = EDAAnalyzer(cast(Any, df))
 
-        filters_dict = [f.dict() for f in request.filters] if request.filters else []
+        filters_dict = [f.model_dump() for f in request.filters] if request.filters else []
 
         # Handle empty string split_col from frontend
         split_col_arg = request.split_col

@@ -68,7 +68,7 @@ class AdvancedTuningManager:
             node_params,
             target_column,
             dropped_columns,
-        ) = extract_job_details(type_cast(Dict[str, Any], job.graph), type_cast(str, job.node_id))
+        ) = extract_job_details(type_cast(Dict[str, Any], job.graph), job.node_id)
 
         # Extract hyperparameters (search space)
         # For display in Experiments table, users prefer to see the BEST params found
@@ -84,25 +84,25 @@ class AdvancedTuningManager:
         )
 
         return JobInfo(
-            job_id=type_cast(str, job.id),
-            pipeline_id=type_cast(str, job.pipeline_id),
-            node_id=type_cast(str, job.node_id),
+            job_id=job.id,
+            pipeline_id=job.pipeline_id,
+            node_id=job.node_id,
             dataset_id=type_cast(Optional[str], job.dataset_source_id),
             dataset_name=dataset_name,
-            job_type=StepType.ADVANCED_TUNING,
+            job_type=StepType.ADVANCED_TUNING.value,
             status=JobStatus(job.status),
-            start_time=type_cast(Optional[datetime], job.started_at),
-            end_time=type_cast(Optional[datetime], job.finished_at),
-            error=type_cast(Optional[str], job.error_message),
+            start_time=job.started_at,
+            end_time=job.finished_at,
+            error=job.error_message,
             result={
                 "best_params": job.best_params,
                 "best_score": job.best_score,
-                "scoring_metric": type_cast(Optional[str], job.scoring)
+                "scoring_metric": job.scoring
                 or (node_params.get("tuning_config", {}).get("metric") if node_params else None),
                 "metrics": metrics,
             },
             # Ensure metrics are in result too
-            model_type=type_cast(str, job.model_type),
+            model_type=job.model_type,
             hyperparameters=type_cast(Dict[str, Any], hyperparameters),
             created_at=type_cast(datetime, job.created_at),
             metrics=type_cast(Optional[Dict[str, Any]], metrics),
@@ -112,10 +112,10 @@ class AdvancedTuningManager:
             dropped_columns=dropped_columns,
             logs=type_cast(Optional[List[str]], job.logs),
             graph=type_cast(Dict[str, Any], job.graph),
-            config=type_cast(Optional[Dict[str, Any]], node_params),
-            promoted_at=type_cast(Optional[datetime], job.promoted_at),
-            parent_pipeline_id=parse_branch_info(type_cast(str, job.pipeline_id))[0],
-            branch_index=parse_branch_info(type_cast(str, job.pipeline_id))[1],
+            config=node_params,
+            promoted_at=job.promoted_at,
+            parent_pipeline_id=parse_branch_info(job.pipeline_id)[0],
+            branch_index=parse_branch_info(job.pipeline_id)[1],
         )
 
     @staticmethod
@@ -126,9 +126,9 @@ class AdvancedTuningManager:
         job = result.scalar_one_or_none()
 
         if job and job.status in [JobStatus.QUEUED.value, JobStatus.RUNNING.value]:
-            job.status = JobStatus.CANCELLED.value  # type: ignore
-            job.error_message = "Job cancelled by user."  # type: ignore
-            job.finished_at = datetime.now()  # type: ignore
+            job.status = JobStatus.CANCELLED.value
+            job.error_message = "Job cancelled by user."
+            job.finished_at = datetime.now()
             await session.commit()
             return True
         return False
@@ -144,7 +144,7 @@ class AdvancedTuningManager:
         if "scoring_metric" in result and result["scoring_metric"]:
             job.scoring = result["scoring_metric"]
 
-        job.metrics = result  # type: ignore
+        job.metrics = result
 
     @staticmethod
     def update_status_sync(
@@ -161,13 +161,13 @@ class AdvancedTuningManager:
             return False
 
         if status:
-            job.status = status.value  # type: ignore
+            job.status = status.value
         if error:
-            job.error_message = error  # type: ignore
+            job.error_message = error
 
         if logs:
-            current_logs: List[str] = job.logs or []  # type: ignore
-            job.logs = current_logs + logs  # type: ignore
+            current_logs: List[str] = job.logs or []
+            job.logs = current_logs + logs
 
         if result:
             AdvancedTuningManager._update_tuning_result(job, result)
@@ -177,7 +177,7 @@ class AdvancedTuningManager:
             JobStatus.FAILED,
             JobStatus.SUCCEEDED,
         ]:
-            job.finished_at = datetime.now()  # type: ignore
+            job.finished_at = datetime.now()
 
         session.commit()
         return True

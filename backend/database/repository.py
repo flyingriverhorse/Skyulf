@@ -50,7 +50,7 @@ class BaseRepository(Generic[ModelType]):
         await self.session.refresh(db_obj)
 
         logger.debug(f"Created {self.model.__name__} with id {db_obj.id}")
-        return cast(ModelType, db_obj)
+        return db_obj
 
     async def get(self, record_id: int) -> Optional[ModelType]:
         """

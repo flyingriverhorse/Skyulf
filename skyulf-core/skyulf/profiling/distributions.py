@@ -1,7 +1,12 @@
 import polars as pl
-from typing import List, Optional
+from typing import List, Optional, cast
 from .schemas import HistogramBin
 import numpy as np
+
+
+def _collect(lf: pl.LazyFrame) -> pl.DataFrame:
+    """Narrow `LazyFrame.collect()` back to `DataFrame` (sync path only)."""
+    return cast(pl.DataFrame, lf.collect())
 
 
 def calculate_histogram(
@@ -14,9 +19,9 @@ def calculate_histogram(
     # For accurate bins, we need min/max.
     try:
         # print(f"Calculating histogram for {col_name}")
-        stats = df.select(
-            [pl.col(col_name).min().alias("min"), pl.col(col_name).max().alias("max")]
-        ).collect()
+        stats = _collect(
+            df.select([pl.col(col_name).min().alias("min"), pl.col(col_name).max().alias("max")])
+        )
 
         min_val = stats["min"][0]
         max_val = stats["max"][0]
@@ -27,7 +32,7 @@ def calculate_histogram(
         # Create bins using numpy (fastest way to get edges)
         edges = np.linspace(min_val, max_val, bins + 1)
 
-        hist_df = (
+        hist_df = _collect(
             df.select(pl.col(col_name))
             .with_columns(
                 pl.col(col_name)
@@ -36,7 +41,6 @@ def calculate_histogram(
             )
             .group_by("bin")
             .len()
-            .collect()
         )
 
         # Map back to HistogramBin

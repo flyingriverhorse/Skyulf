@@ -43,7 +43,7 @@ def _downsample_indices(length: int, limit: int) -> np.ndarray:
     if length <= limit:
         return np.arange(length, dtype=int)
     indices = np.linspace(0, length - 1, num=limit, dtype=int)
-    return np.unique(indices)  # type: ignore
+    return np.unique(indices)
 
 
 def _align_thresholds(thresholds: np.ndarray, target_size: int) -> np.ndarray:

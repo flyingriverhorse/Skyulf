@@ -52,12 +52,23 @@ class JobInfo(BaseModel):
 from backend.ml_pipeline.constants import StepType
 
 
+def coerce_step_type(value: Any) -> Any:
+    """Coerce to ``StepType`` when possible; otherwise return the raw string."""
+    if isinstance(value, StepType):
+        return value
+    try:
+        return StepType(value)
+    except ValueError:
+        return value
+
+
 @dataclass
 class NodeConfig:
     """Configuration for a single pipeline node."""
 
     node_id: str
-    step_type: StepType
+    # `Any` so transformer kinds bypass strict StepType coercion.
+    step_type: Any
     params: Dict[str, Any] = field(default_factory=dict)
     inputs: List[str] = field(default_factory=list)  # IDs of upstream nodes
 
