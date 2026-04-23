@@ -33,6 +33,12 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
   const isTrainingNode = TRAINING_TYPES.has(definitionType);
   const isParallel = isTrainingNode && data.execution_mode === 'parallel';
 
+  // Only nodes that actually consume upstream data (i.e. declare an input
+  // port) can merge. Dataset/data-loader nodes have no inputs and must not
+  // show a merge badge even if React Flow allowed an edge in.
+  const canMerge = (definition?.inputs?.length ?? 0) > 0;
+  const showMergeBadge = canMerge && incomingSourceCount > 1;
+
   const onDelete = (evt: React.MouseEvent) => {
     evt.stopPropagation();
     deleteElements({ nodes: [{ id }] });
@@ -66,7 +72,7 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <div className="text-sm font-bold">{definition.label}</div>
-            {incomingSourceCount > 1 && (
+            {showMergeBadge && (
               <span
                 className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                   isParallel

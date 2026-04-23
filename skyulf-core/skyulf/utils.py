@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
@@ -5,6 +6,8 @@ import pandas as pd
 
 from .data.dataset import SplitDataset
 from .engines import SkyulfDataFrame, get_engine
+
+logger = logging.getLogger(__name__)
 
 
 def get_data_stats(
@@ -66,6 +69,15 @@ def pack_pipeline_output(
     Packs output back into a tuple if the input was a tuple and y is present.
     Otherwise, if y is present, concatenates it back to X.
     """
+    if was_tuple and y is None:
+        # Caller said the input was a tuple but lost y along the way.
+        # Surface this so wiring/upstream bugs don't silently degrade the
+        # pipeline shape (Bug 9d in merge_system_audit.md).
+        logger.warning(
+            "pack_pipeline_output: was_tuple=True but y is None; tuple shape lost. "
+            "Caller likely fed a (X, None) placeholder upstream."
+        )
+
     if was_tuple and y is not None:
         return (X, y)
 

@@ -252,7 +252,17 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       sortedNodes.push({
         node_id: node.id,
         step_type: stepType,
-        params: params,
+        params: (() => {
+          // Attach per-node merge strategy (last_wins default) so the engine
+          // can switch column-overlap semantics when the user requests it.
+          // Kept under an underscore key to keep it separate from
+          // step-specific params.
+          const strat = (node.data as { merge_strategy?: string })?.merge_strategy;
+          if (strat && strat !== 'last_wins') {
+            return { ...params, _merge_strategy: strat };
+          }
+          return params;
+        })(),
         inputs: inputs
       });
 
