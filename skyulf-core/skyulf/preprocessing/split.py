@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union, cast
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -46,12 +46,13 @@ class SplitApplier(BaseApplier):
         # features from target first so downstream nodes see real (X, y)
         # tuples — not the placeholder (df, None) shape that gets silently
         # collapsed back to a DataFrame by transformers.
-        if target_col and hasattr(df, "columns") and target_col in df.columns:
-            X = df.drop(columns=[target_col])
-            y = df[target_col]
+        if target_col and hasattr(df, "columns") and target_col in list(cast(Any, df).columns):
+            frame = cast(Any, df)
+            X = frame.drop(columns=[target_col])
+            y = frame[target_col]
             return splitter.split_xy(X, y)
 
-        return splitter.split(df)
+        return splitter.split(cast(Any, df))
 
 
 @NodeRegistry.register("Split", SplitApplier)
@@ -118,7 +119,7 @@ class DataSplitter:
 
         if stratify is not None:
             # Check value counts
-            class_counts = y_pd.value_counts()
+            class_counts = cast(Any, y_pd).value_counts()
             min_count = class_counts.min()
 
             if min_count < 2:
@@ -316,7 +317,7 @@ class FeatureTargetSplitApplier(BaseApplier):
             return SplitDataset(train=train, test=test, validation=validation)
 
         if isinstance(df, tuple):
-            return df
+            return cast(Tuple[pd.DataFrame, pd.Series], df)
 
         # Assume DataFrame-like
         return split_one(df)

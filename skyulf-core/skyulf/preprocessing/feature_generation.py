@@ -1,7 +1,7 @@
 import builtins
 import math
 from difflib import SequenceMatcher
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import pandas as pd
 from sklearn.preprocessing import PolynomialFeatures
@@ -13,12 +13,13 @@ from .base import BaseApplier, BaseCalculator
 from ..engines import SkyulfDataFrame, get_engine
 
 # --- Optional Dependencies ---
+fuzz: Any = None
 try:
-    from rapidfuzz import fuzz  # type: ignore
+    from rapidfuzz import fuzz as _fuzz  # type: ignore[import-not-found]
 
+    fuzz = _fuzz
     _HAS_RAPIDFUZZ = True
 except ImportError:
-    fuzz = None
     _HAS_RAPIDFUZZ = False
 
 # --- Constants ---
@@ -99,7 +100,7 @@ class PolynomialFeaturesApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -202,13 +203,13 @@ class PolynomialFeaturesApplier(BaseApplier):
             clean_name = name.replace(" ", "_").replace("^", "_pow_")
             new_names.append(f"{output_prefix}_{clean_name}")
 
-        df_poly = pd.DataFrame(transformed, columns=new_names, index=X.index)
+        df_poly = pd.DataFrame(cast(Any, transformed), columns=cast(Any, new_names), index=X.index)
 
         df_out = X.copy()
         # We no longer need to check include_input_features here as we filtered them above
 
         # Concatenate
-        df_out = pd.concat([df_out, df_poly], axis=1)
+        df_out = pd.concat(cast(Any, [df_out, df_poly]), axis=1)
 
         return pack_pipeline_output(df_out, y, is_tuple)
 
@@ -282,7 +283,7 @@ class FeatureGenerationApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 

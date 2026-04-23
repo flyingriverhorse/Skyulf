@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -32,7 +32,7 @@ class StandardScalerApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
 
         cols = params.get("columns", [])
@@ -136,11 +136,14 @@ class StandardScalerCalculator(BaseCalculator):
 
         scaler.fit(X_np)
 
+        # sklearn stubs widen mean_/var_ to include int|float; cast to keep .tolist().
+        mean_ = cast(Any, scaler.mean_)
+        var_ = cast(Any, scaler.var_)
         return {
             "type": "standard_scaler",
-            "mean": scaler.mean_.tolist() if scaler.mean_ is not None else None,
+            "mean": mean_.tolist() if hasattr(mean_, "tolist") else mean_,
             "scale": scaler.scale_.tolist() if scaler.scale_ is not None else None,
-            "var": scaler.var_.tolist() if scaler.var_ is not None else None,
+            "var": var_.tolist() if hasattr(var_, "tolist") else var_,
             "with_mean": with_mean,
             "with_std": with_std,
             "columns": cols,
@@ -155,7 +158,7 @@ class MinMaxScalerApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -255,7 +258,7 @@ class RobustScalerApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -384,7 +387,7 @@ class MaxAbsScalerApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 

@@ -80,9 +80,7 @@ async def predict(request: PredictionRequest, session: AsyncSession = Depends(ge
 
         predictions = await DeploymentService.predict(session, request.data)
 
-        return PredictionResponse(
-            predictions=predictions, model_version=cast(str, deployment.job_id)
-        )
+        return PredictionResponse(predictions=predictions, model_version=deployment.job_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

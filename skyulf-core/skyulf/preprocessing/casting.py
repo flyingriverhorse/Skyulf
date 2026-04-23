@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -63,8 +63,10 @@ def _coerce_boolean_value(value: Any) -> Optional[bool]:
 
 class CastingApplier(BaseApplier):
     def apply(
-        self, df: SkyulfDataFrame, params: Dict[str, Any]
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+        self,
+        df: Union[pd.DataFrame, SkyulfDataFrame, tuple],
+        params: Dict[str, Any],
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -120,7 +122,7 @@ class CastingApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Pandas Path
-        return self._apply_dataframe(X, params, y, is_tuple)
+        return self._apply_dataframe(cast(pd.DataFrame, X), params, y, is_tuple)
 
     def _apply_dataframe(  # noqa: C901
         self, df: pd.DataFrame, params: Dict[str, Any], y=None, is_tuple=False
@@ -193,7 +195,7 @@ class CastingApplier(BaseApplier):
                 elif dtype_str.startswith("datetime"):
                     # Datetime Family
                     errors = "coerce" if coerce_on_error else "raise"
-                    df_out[col] = pd.to_datetime(series, errors=errors)  # type: ignore
+                    df_out[col] = pd.to_datetime(series, errors=errors)
 
                 else:
                     # String / Category / Other
@@ -205,7 +207,10 @@ class CastingApplier(BaseApplier):
                 # If coercion is on, we might leave it as is or try best effort?
                 pass
 
-        return pack_pipeline_output(df_out, y, is_tuple)
+        return cast(
+            Union[pd.DataFrame, Tuple[pd.DataFrame, Any]],
+            pack_pipeline_output(df_out, y, is_tuple),
+        )
 
 
 @NodeRegistry.register("Casting", CastingApplier)
@@ -217,7 +222,11 @@ class CastingApplier(BaseApplier):
     params={"type_map": {}, "coerce_on_error": True},
 )
 class CastingCalculator(BaseCalculator):
-    def fit(self, df: SkyulfDataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
+    def fit(
+        self,
+        df: Union[pd.DataFrame, SkyulfDataFrame, tuple],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
         # Config: {'columns': ['col1'], 'target_type': 'float'}
         # OR {'column_types': {'col1': 'float', 'col2': 'int'}}
 

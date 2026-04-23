@@ -277,13 +277,13 @@ class EDAVisualizer:
             is_regression = False
             if self.profile.rule_tree.nodes and self.profile.rule_tree.nodes[0].class_name:
                 try:
-                    float(self.profile.rule_tree.nodes[0].class_name)
+                    float(self.profile.rule_tree.nodes[0].class_name or "")
                     # If root has a numeric class name (mean value), it's likely regression
                     # But wait, root is not a leaf, so it might not have class_name set correctly in all implementations
                     # Let's check the first leaf
                     for node in self.profile.rule_tree.nodes:
                         if node.is_leaf:
-                            float(node.class_name)
+                            float(node.class_name or "")
                             is_regression = True
                             break
                 except ValueError:
@@ -310,7 +310,7 @@ class EDAVisualizer:
                 if node.is_leaf:
                     if is_regression:
                         # Regression Leaf
-                        val = float(node.class_name)
+                        val = float(node.class_name or "0")
                         tree.add(f"[green]➜ Value = {val:.2f}[/green] [dim]n={node.samples}[/dim]")
                     else:
                         # Classification Leaf
@@ -362,7 +362,7 @@ class EDAVisualizer:
                     importance = item.get("importance", 0.0)
                     bar_len = int(importance * 20)
                     bar = "█" * bar_len
-                    fi_table.add_row(feature, f"{importance:.4f}", bar)
+                    fi_table.add_row(str(feature), f"{importance:.4f}", bar)
 
                 console.print(fi_table)
 
@@ -466,9 +466,10 @@ class EDAVisualizer:
         plt.figure(figsize=(5 * n_cols, 4))
         for i, (name, col) in enumerate(display_cols):
             plt.subplot(1, n_cols, i + 1)
-            widths = [b.end - b.start for b in col.histogram]
-            centers = [(b.start + b.end) / 2 for b in col.histogram]
-            counts = [b.count for b in col.histogram]
+            histogram = col.histogram or []
+            widths = [b.end - b.start for b in histogram]
+            centers = [(b.start + b.end) / 2 for b in histogram]
+            counts = [b.count for b in histogram]
 
             plt.bar(
                 centers,
@@ -618,11 +619,11 @@ class EDAVisualizer:
         labels = [p.label for p in self.profile.pca_data]
 
         try:
-            c_values = [float(l) for l in labels]
+            c_values = [float(l) for l in labels if l is not None]
         except (ValueError, TypeError):
             unique_labels = list(set([l for l in labels if l is not None]))
             label_map = {l: i for i, l in enumerate(unique_labels)}
-            c_values = [label_map.get(l, -1) for l in labels]
+            c_values = [label_map.get(l, -1) for l in labels if l is not None]
 
         plt.figure(figsize=(8, 6))
         scatter = plt.scatter(x, y, c=c_values, cmap="viridis", alpha=0.8)
@@ -650,7 +651,7 @@ class EDAVisualizer:
             except (ValueError, TypeError):
                 unique_labels = list(set([l for l in labels if l is not None]))
                 label_map = {l: i for i, l in enumerate(unique_labels)}
-                c_values = [label_map.get(l, -1) for l in labels]
+                c_values = [label_map.get(l, -1) if l is not None else -1 for l in labels]
 
         plt.figure(figsize=(10, 6))
         scatter = plt.scatter(lons, lats, c=c_values, cmap="viridis", alpha=0.6, s=10)

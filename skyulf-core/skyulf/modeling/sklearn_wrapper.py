@@ -22,7 +22,8 @@ class SklearnCalculator(BaseModelCalculator):
         default_params: Dict[str, Any],
         problem_type: str,
     ):
-        self.model_class = model_class
+        # `Any` because sklearn stubs make BaseEstimator subclasses appear non-callable.
+        self.model_class: Any = model_class
         self._default_params = default_params
         self._problem_type = problem_type
 

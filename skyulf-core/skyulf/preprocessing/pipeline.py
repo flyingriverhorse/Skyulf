@@ -1,7 +1,7 @@
 """Feature Engineering Pipeline Orchestrator."""
 
 import logging
-from typing import Any, Dict, List, Union, cast
+from typing import Any, Dict, List, Sequence, Union, cast
 
 import pandas as pd
 
@@ -38,7 +38,11 @@ class FeatureEngineer:
     Orchestrates a sequence of feature engineering steps.
     """
 
-    def __init__(self, steps_config: List[PreprocessingStepConfig]):
+    def __init__(
+        self,
+        steps_config: Sequence[Union[PreprocessingStepConfig, Dict[str, Any]]],
+    ):
+        # `Sequence` (covariant) accepts list[dict] or list[PreprocessingStepConfig].
         self.steps_config = steps_config
         self.fitted_steps: List[Dict[str, Any]] = []
 
@@ -377,7 +381,7 @@ class FeatureEngineer:
                                         y2, (pd.DataFrame, pd.Series)
                                     ):
                                         if y1.shape == y2.shape:
-                                            diffs += int(y1.ne(y2).sum().sum())  # type: ignore
+                                            diffs += int(y1.ne(y2).sum().sum())
                                     return diffs
                                 return 0
 
@@ -402,16 +406,16 @@ class FeatureEngineer:
                 if transformer_type == "MissingIndicator":
                     new_cols_set = cols_after - cols_before
                     metrics["missing_indicators_created"] = len(new_cols_set)
-                    cast(Dict[str, Any], metrics)["missing_indicators_columns"] = list(new_cols_set)
+                    metrics["missing_indicators_columns"] = list(new_cols_set)
 
                 if transformer_type == "DropMissingColumns":
                     dropped_cols_set = cols_before - cols_after
-                    cast(Dict[str, Any], metrics)["dropped_columns"] = list(dropped_cols_set)
+                    metrics["dropped_columns"] = list(dropped_cols_set)
                     metrics["dropped_columns_count"] = len(dropped_cols_set)
 
                 if transformer_type == "feature_selection":
                     dropped_cols_set = cols_before - cols_after
-                    cast(Dict[str, Any], metrics)["dropped_columns"] = list(dropped_cols_set)
+                    metrics["dropped_columns"] = list(dropped_cols_set)
                     metrics["dropped_columns_count"] = len(dropped_cols_set)
 
                 if transformer_type in [

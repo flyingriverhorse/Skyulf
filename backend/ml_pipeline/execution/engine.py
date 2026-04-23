@@ -388,8 +388,7 @@ class PipelineEngine:
         strat = cfg.params.get("_merge_strategy", "last_wins")
         if strat not in ("last_wins", "first_wins"):
             self.log(
-                f"Node {node_id}: unknown merge strategy '{strat}', "
-                "falling back to 'last_wins'."
+                f"Node {node_id}: unknown merge strategy '{strat}', " "falling back to 'last_wins'."
             )
             return "last_wins"
         return strat
@@ -659,7 +658,7 @@ class PipelineEngine:
             return SplitDataset(
                 train=cast(Any, merged_train),
                 test=cast(Any, merged_test),
-                validation=cast(Any, merged_val),
+                validation=merged_val,
             )
 
         # Fallback: flatten everything to a single DataFrame.
@@ -1327,10 +1326,11 @@ class PipelineEngine:
                 metrics["n_rows"] = len(data)
                 metrics["n_features"] = len(data.columns) - 1
             elif hasattr(data, "train") and hasattr(data.train, "shape"):
-                metrics["n_rows"] = data.train.shape[0]
-                metrics["n_features"] = data.train.shape[1] - 1
+                train_frame = cast(Any, data.train)
+                metrics["n_rows"] = train_frame.shape[0]
+                metrics["n_features"] = train_frame.shape[1] - 1
             elif isinstance(data, tuple) and len(data) >= 1:
-                first = data[0]
+                first = cast(Any, data[0])
                 if hasattr(first, "shape"):
                     metrics["n_rows"] = first.shape[0]
                     metrics["n_features"] = first.shape[1] - 1

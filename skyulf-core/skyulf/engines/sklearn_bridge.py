@@ -1,4 +1,4 @@
-from typing import Any, Tuple, Union
+from typing import Any, Optional, Tuple, Union
 import numpy as np
 from .registry import get_engine
 from .protocol import SkyulfDataFrame
@@ -34,10 +34,11 @@ class SklearnBridge:
             X = X_data
 
         X_numpy = SklearnBridge._convert_single(X)
+        assert X_numpy is not None  # X is not None at this point
         return X_numpy, y
 
     @staticmethod
-    def _convert_single(data: Any) -> np.ndarray:
+    def _convert_single(data: Any) -> Optional[np.ndarray]:
         if data is None:
             return None
 

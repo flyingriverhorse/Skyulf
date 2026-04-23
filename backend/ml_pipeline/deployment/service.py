@@ -404,7 +404,7 @@ class DeploymentService:
                     input_features = artifact.feature_names_in_
 
                 if hasattr(input_features, "tolist"):
-                    input_features = input_features.tolist()
+                    input_features = cast(Any, input_features).tolist()
 
                 if input_features:
                     info["input_schema"] = [

@@ -1,7 +1,7 @@
 import os
 import logging
 import tempfile
-from typing import Optional, Any
+from typing import Optional, Any, cast
 import pandas as pd
 from sqlalchemy.orm import Session
 from skyulf.data.catalog import DataCatalog
@@ -261,7 +261,7 @@ class S3Catalog(DataCatalog):
             logger.error(f"Error loading from S3 {path}: {e}")
             raise e
 
-    def save(self, dataset_id: str, data: pd.DataFrame, **kwargs) -> None:
+    def save(self, dataset_id: str, data: Any, **kwargs) -> None:
         path = self._get_s3_path(dataset_id)
         logger.info(f"Saving to S3: {path}")
 
@@ -383,9 +383,9 @@ class SmartCatalog(DataCatalog):
                 kwargs.update(options)
 
         catalog = self._get_catalog_for_path(resolved_id)
-        return catalog.load(resolved_id, **kwargs)
+        return cast(pd.DataFrame, catalog.load(resolved_id, **kwargs))
 
-    def save(self, dataset_id: str, data: pd.DataFrame, **kwargs) -> None:
+    def save(self, dataset_id: str, data: Any, **kwargs) -> None:
         # We generally don't resolve IDs for saving (usually saving to new artifacts)
         # But if we wanted to overwrite a dataset by ID, we could.
         resolved_id, options = self._resolve_id(dataset_id)

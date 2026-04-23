@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, cast
 
 import pandas as pd
 
@@ -23,11 +23,15 @@ class BaseCalculator(ABC):
 
 class BaseApplier(ABC):
     @abstractmethod
-    def apply(
-        self, df: Union[pd.DataFrame, SkyulfDataFrame, tuple], params: Dict[str, Any]
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, tuple, SplitDataset]:
+    def apply(self, df: Union[pd.DataFrame, SkyulfDataFrame, tuple], params: Dict[str, Any]) -> Any:
         """
         Applies the transformation using fitted parameters.
+
+        The return type is intentionally `Any` because the concrete shape
+        depends on the input: passing a `DataFrame` returns a `DataFrame`;
+        passing an `(X, y)` tuple returns a tuple; splitters return
+        `SplitDataset`. Encoding every case as a union forces callers to
+        defensively narrow on every use, which is worse than `Any` here.
         """
         pass
 
@@ -60,8 +64,10 @@ class StatefulTransformer:
             and not isinstance(dataset, tuple)
         ):
             # Fit on the whole dataframe (be careful about leakage!)
-            self.params = self.calculator.fit(dataset, config)
-            return self.applier.apply(dataset, self.params)
+            # ty can't narrow a Union through hasattr — cast once for both calls.
+            frame = cast(Any, dataset)
+            self.params = self.calculator.fit(frame, config)
+            return self.applier.apply(frame, self.params)
 
         # If dataset is a tuple (e.g. from FeatureTargetSplitter), pass it through.
         # This allows nodes like TrainTestSplitter to accept (X, y) tuples.

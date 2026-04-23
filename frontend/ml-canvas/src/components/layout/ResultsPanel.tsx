@@ -82,6 +82,24 @@ export const ResultsPanel: React.FC = () => {
     }
   }, [tabNames, activeTab]);
 
+  // Engine-emitted merge advisories (sibling fan-in etc.) - surfaced so users
+  // immediately see when a downstream node is silently merging parallel
+  // branches that share an ancestor. When a branch tab is active we only
+  // show advisories for nodes that actually ran in that branch, otherwise
+  // the banner would flag warnings for nodes the user can't even see on
+  // the current tab.
+  // NOTE: this useMemo must run on every render (i.e. before any early
+  // return below) to preserve React's hook call order.
+  const allMergeWarnings = executionResult?.merge_warnings ?? [];
+  const branchNodeIdsMemo = executionResult?.branch_node_ids;
+  const mergeWarnings = useMemo(() => {
+    if (!activeBranch || !branchNodeIdsMemo || !branchNodeIdsMemo[activeBranch]) {
+      return allMergeWarnings;
+    }
+    const branchNodes = new Set(branchNodeIdsMemo[activeBranch]);
+    return allMergeWarnings.filter((w) => branchNodes.has(w.node_id));
+  }, [allMergeWarnings, activeBranch, branchNodeIdsMemo]);
+
   if (!executionResult) return null;
 
   const currentRows = (activeTab && datasets[activeTab]) ? datasets[activeTab] : [];
@@ -93,21 +111,6 @@ export const ResultsPanel: React.FC = () => {
   const applied_steps = (branchNodeIds && activeBranch && branchNodeIds[activeBranch])
     ? branchNodeIds[activeBranch]
     : allNodeIds;
-
-  // Engine-emitted merge advisories (sibling fan-in etc.) - surfaced so users
-  // immediately see when a downstream node is silently merging parallel
-  // branches that share an ancestor. When a branch tab is active we only
-  // show advisories for nodes that actually ran in that branch, otherwise
-  // the banner would flag warnings for nodes the user can't even see on
-  // the current tab.
-  const allMergeWarnings = executionResult.merge_warnings ?? [];
-  const mergeWarnings = React.useMemo(() => {
-    if (!activeBranch || !branchNodeIds || !branchNodeIds[activeBranch]) {
-      return allMergeWarnings;
-    }
-    const branchNodes = new Set(branchNodeIds[activeBranch]);
-    return allMergeWarnings.filter((w) => branchNodes.has(w.node_id));
-  }, [allMergeWarnings, activeBranch, branchNodeIds]);
 
   // Check for errors
   const nodeResults = executionResult.node_results || {};

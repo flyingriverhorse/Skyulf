@@ -52,6 +52,12 @@ class SkyulfPolarsWrapper:
     def __getitem__(self, key):
         return self._df[key]
 
+    def __setitem__(self, key, value):
+        self._df[key] = value
+
+    def __len__(self) -> int:
+        return self._df.height
+
     def __getattr__(self, name):
         return getattr(self._df, name)
 

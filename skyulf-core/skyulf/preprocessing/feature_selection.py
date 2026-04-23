@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -94,7 +94,7 @@ class VarianceThresholdApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -187,7 +187,7 @@ class CorrelationThresholdApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -264,7 +264,7 @@ class UnivariateSelectionApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -445,7 +445,7 @@ class UnivariateSelectionCalculator(BaseCalculator):
 
         if hasattr(selector, "pvalues_"):
             # Handle potential NaN in pvalues
-            safe_pvalues = np.nan_to_num(selector.pvalues_, nan=1.0)
+            safe_pvalues = np.nan_to_num(cast(Any, selector.pvalues_), nan=1.0)
             pvalues = dict(zip(cols, safe_pvalues.tolist()))
 
         return {
@@ -467,7 +467,7 @@ class ModelBasedSelectionApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -646,7 +646,7 @@ class FeatureSelectionApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         # The params returned by the specific calculator will have a "type" field
         # corresponding to the specific calculator's return value.
         type_name = params.get("type")
@@ -662,7 +662,7 @@ class FeatureSelectionApplier(BaseApplier):
             applier = ModelBasedSelectionApplier()
 
         if applier:
-            return applier.apply(df, params)  # type: ignore
+            return applier.apply(df, params)
         return pack_pipeline_output(*unpack_pipeline_input(df))
 
 

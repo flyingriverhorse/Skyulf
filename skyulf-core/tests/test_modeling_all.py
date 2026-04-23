@@ -4,6 +4,8 @@ Tests each model: instantiate → fit → predict → verify metrics.
 Covers classification (9 models) and regression (11 models).
 """
 
+from typing import cast, Any
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -27,7 +29,7 @@ def classification_dataset() -> SplitDataset:
         n_redundant=1,
         random_state=42,
     )
-    df = pd.DataFrame(X, columns=[f"f{i}" for i in range(5)])
+    df = pd.DataFrame(cast(Any, X), columns=cast(Any, [f"f{i}" for i in range(5)]))
     df["target"] = y
     return SplitDataset(train=df.iloc[:160], test=df.iloc[160:], validation=None)
 
@@ -42,7 +44,7 @@ def regression_dataset() -> SplitDataset:
         noise=0.1,
         random_state=42,
     )
-    df = pd.DataFrame(X, columns=[f"f{i}" for i in range(5)])
+    df = pd.DataFrame(cast(Any, X), columns=cast(Any, [f"f{i}" for i in range(5)]))
     df["target"] = y
     return SplitDataset(train=df.iloc[:160], test=df.iloc[160:], validation=None)
 

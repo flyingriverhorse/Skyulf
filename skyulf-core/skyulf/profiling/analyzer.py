@@ -1,8 +1,14 @@
 import polars as pl
 import numpy as np
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, cast
 from datetime import datetime
 import re
+
+
+def _collect(lf: pl.LazyFrame) -> pl.DataFrame:
+    """Narrow `LazyFrame.collect()` back to `DataFrame` (sync path only)."""
+    return cast(pl.DataFrame, lf.collect())
+
 
 from .schemas import (
     DatasetProfile,
@@ -47,7 +53,8 @@ try:
     from sklearn.impute import SimpleImputer
     from sklearn.ensemble import IsolationForest
     from sklearn.cluster import KMeans
-    from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, _tree
+    from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+    from sklearn.tree import _tree  # ty: ignore[unresolved-import]
 
     SKLEARN_AVAILABLE = True
 except ImportError:
@@ -231,7 +238,7 @@ class EDAAnalyzer:
                     elif op == "in" and isinstance(val, list):
                         self.df = self.df.filter(pl.col(col).is_in(val))
 
-                    active_filters.append(Filter(column=col, operator=op, value=val))
+                    active_filters.append(Filter(column=str(col), operator=str(op), value=val))
 
             # Re-initialize lazy df and stats after filtering
             self.lazy_df = self.df.lazy()
@@ -272,7 +279,7 @@ class EDAAnalyzer:
         total_cells = self.row_count * len(self.columns)
         missing_pct = (missing_cells / total_cells) * 100 if total_cells > 0 else 0.0
 
-        duplicate_rows = self.df.is_duplicated().sum()
+        duplicate_rows = int(self.df.is_duplicated().sum())
         memory_usage = self.df.estimated_size("mb")
 
         # 2. Column Analysis
@@ -585,7 +592,7 @@ class EDAAnalyzer:
                     ]
 
                     # Filter significant deviations (> 50%)
-                    explanation = [e for e in explanation if e["diff_pct"] > 50]
+                    explanation = [e for e in explanation if cast(float, e["diff_pct"]) > 50]
 
                     # Sort explanation by deviation
                     explanation.sort(key=lambda x: x["diff_pct"], reverse=True)
@@ -693,7 +700,7 @@ class EDAAnalyzer:
             return ClusteringAnalysis(
                 method="KMeans",
                 n_clusters=n_clusters,
-                inertia=float(kmeans.inertia_),
+                inertia=float(cast(Any, kmeans.inertia_)),
                 clusters=clusters_stats,
                 points=points,
             )
@@ -884,7 +891,7 @@ class EDAAnalyzer:
             # We can't easily check "if valid" in lazy mode without collecting.
             # Let's collect stats.
 
-            stats = (
+            stats = _collect(
                 geo_df.select(
                     [
                         pl.col("lat").min().alias("min_lat"),
@@ -895,9 +902,7 @@ class EDAAnalyzer:
                         pl.col("lon").mean().alias("mean_lon"),
                     ]
                 )
-                .collect()
-                .row(0)
-            )
+            ).row(0)
 
             # If stats are null (e.g. all cast failed), return None
             if stats[0] is None or stats[3] is None:
@@ -915,10 +920,8 @@ class EDAAnalyzer:
             if target_col and target_col in self.columns:
                 cols_to_fetch.append(pl.col(target_col).alias("target"))
 
-            sample_df = (
-                self.lazy_df.select(cols_to_fetch)
-                .collect()
-                .sample(n=sample_size, with_replacement=False, seed=42)
+            sample_df = _collect(self.lazy_df.select(cols_to_fetch)).sample(
+                n=sample_size, with_replacement=False, seed=42
             )
 
             points = []
@@ -987,8 +990,8 @@ class EDAAnalyzer:
             ts_df = self.lazy_df.sort(date_col)
 
             # Determine ideal interval
-            min_date = self.df[date_col].min()
-            max_date = self.df[date_col].max()
+            min_date = cast(Any, self.df[date_col].min())
+            max_date = cast(Any, self.df[date_col].max())
 
             # Select top 3 numeric columns + target to track
             cols_to_track = numeric_cols[:3]
@@ -997,10 +1000,8 @@ class EDAAnalyzer:
 
             # For small datasets, don't resample, just use raw data
             if self.row_count < 1000:
-                trend_df = (
-                    ts_df.select([pl.col(date_col).alias("date"), *cols_to_track])
-                    .drop_nulls()
-                    .collect()
+                trend_df = _collect(
+                    ts_df.select([pl.col(date_col).alias("date"), *cols_to_track]).drop_nulls()
                 )
 
                 # Convert to list of points
@@ -1034,19 +1035,15 @@ class EDAAnalyzer:
 
                 if not cols_to_track:
                     # Just track count
-                    trend_df = (
+                    trend_df = _collect(
                         ts_df.group_by_dynamic(date_col, every=interval)
                         .agg(pl.count().alias("count"))
                         .sort(date_col)
-                        .collect()
                     )
                 else:
                     aggs = [pl.col(c).mean().alias(c) for c in cols_to_track]
-                    trend_df = (
-                        ts_df.group_by_dynamic(date_col, every=interval)
-                        .agg(aggs)
-                        .sort(date_col)
-                        .collect()
+                    trend_df = _collect(
+                        ts_df.group_by_dynamic(date_col, every=interval).agg(aggs).sort(date_col)
                     )
 
                 # Convert to list of points
@@ -1074,7 +1071,7 @@ class EDAAnalyzer:
                     pl.col(target_metric).mean().alias("count")
                 )  # Alias as count for frontend compatibility, but it's mean
 
-            dow_df = (
+            dow_df = _collect(
                 self.lazy_df.with_columns(
                     pl.col(date_col).dt.weekday().alias("dow_idx"),
                     pl.col(date_col).dt.strftime("%a").alias("dow_name"),
@@ -1082,7 +1079,6 @@ class EDAAnalyzer:
                 .group_by(["dow_idx", "dow_name"])
                 .agg(agg_expr)
                 .sort("dow_idx")
-                .collect()
             )
 
             dow_stats = [
@@ -1091,7 +1087,7 @@ class EDAAnalyzer:
             ]
 
             # 3. Seasonality (Month of Year)
-            moy_df = (
+            moy_df = _collect(
                 self.lazy_df.with_columns(
                     pl.col(date_col).dt.month().alias("month_idx"),
                     pl.col(date_col).dt.strftime("%b").alias("month_name"),
@@ -1099,7 +1095,6 @@ class EDAAnalyzer:
                 .group_by(["month_idx", "month_name"])
                 .agg(agg_expr)
                 .sort("month_idx")
-                .collect()
             )
 
             moy_stats = [
@@ -1405,9 +1400,8 @@ class EDAAnalyzer:
                 # Ensure value_col is numeric (cast if necessary)
                 # Sometimes value_col might be inferred as string if it has mixed types
 
-                stats_df = (
-                    self.lazy_df.group_by(group_col)
-                    .agg(
+                stats_df = _collect(
+                    self.lazy_df.group_by(group_col).agg(
                         [
                             pl.col(value_col).cast(pl.Float64, strict=False).min().alias("min"),
                             pl.col(value_col)
@@ -1425,7 +1419,6 @@ class EDAAnalyzer:
                             pl.col(value_col).cast(pl.Float64, strict=False).max().alias("max"),
                         ]
                     )
-                    .collect()
                 )
 
                 category_plots = []
@@ -1456,11 +1449,10 @@ class EDAAnalyzer:
                     try:
                         # Fetch data for ANOVA
                         # We need lists of values for each group
-                        anova_data = (
+                        anova_data = _collect(
                             self.lazy_df.select([pl.col(group_col), pl.col(value_col)])
                             .group_by(group_col)
                             .agg(pl.col(value_col))
-                            .collect()
                         )
 
                         groups_data = []
@@ -1566,7 +1558,7 @@ class EDAAnalyzer:
 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", RuntimeWarning)
-                result = self.lazy_df.select(exprs).collect()
+                result = _collect(self.lazy_df.select(exprs))
 
             corrs = {}
             for col in features:
@@ -1657,8 +1649,12 @@ class EDAAnalyzer:
                     lower_bound = profile.numeric_stats.q25 - 1.5 * iqr
                     upper_bound = profile.numeric_stats.q75 + 1.5 * iqr
                     if (
-                        profile.numeric_stats.min < lower_bound
-                        or profile.numeric_stats.max > upper_bound
+                        profile.numeric_stats.min is not None
+                        and profile.numeric_stats.max is not None
+                        and (
+                            profile.numeric_stats.min < lower_bound
+                            or profile.numeric_stats.max > upper_bound
+                        )
                     ):
                         alerts.append(
                             Alert(
@@ -2044,22 +2040,24 @@ class EDAAnalyzer:
 
     def _analyze_numeric(self, col: str) -> NumericStats:
         # Use lazy stats
-        stats = self.lazy_df.select(
-            [
-                pl.col(col).mean().alias("mean"),
-                pl.col(col).median().alias("median"),
-                pl.col(col).std().alias("std"),
-                pl.col(col).var().alias("variance"),
-                pl.col(col).min().alias("min"),
-                pl.col(col).max().alias("max"),
-                pl.col(col).quantile(0.25).alias("q25"),
-                pl.col(col).quantile(0.75).alias("q75"),
-                pl.col(col).skew().alias("skew"),
-                pl.col(col).kurtosis().alias("kurt"),
-                (pl.col(col) == 0).sum().alias("zeros"),
-                (pl.col(col) < 0).sum().alias("negatives"),
-            ]
-        ).collect()
+        stats = _collect(
+            self.lazy_df.select(
+                [
+                    pl.col(col).mean().alias("mean"),
+                    pl.col(col).median().alias("median"),
+                    pl.col(col).std().alias("std"),
+                    pl.col(col).var().alias("variance"),
+                    pl.col(col).min().alias("min"),
+                    pl.col(col).max().alias("max"),
+                    pl.col(col).quantile(0.25).alias("q25"),
+                    pl.col(col).quantile(0.75).alias("q75"),
+                    pl.col(col).skew().alias("skew"),
+                    pl.col(col).kurtosis().alias("kurt"),
+                    (pl.col(col) == 0).sum().alias("zeros"),
+                    (pl.col(col) < 0).sum().alias("negatives"),
+                ]
+            )
+        )
 
         row = stats.row(0, named=True)
         return NumericStats(
@@ -2091,14 +2089,12 @@ class EDAAnalyzer:
         # Or count rows where col is not in top_k? No, that's not right.
         # Correct way: group by col, count, filter count < 5, count rows
         try:
-            rare_count = (
+            rare_count = _collect(
                 self.lazy_df.group_by(col)
                 .agg(pl.len().alias("cnt"))
                 .filter(pl.col("cnt") < 5)
                 .select(pl.len())
-                .collect()
-                .item()
-            )
+            ).item()
         except Exception:
             rare_count = 0
 
@@ -2107,9 +2103,9 @@ class EDAAnalyzer:
         )
 
     def _analyze_date(self, col: str) -> DateStats:
-        stats = self.lazy_df.select(
-            [pl.col(col).min().alias("min"), pl.col(col).max().alias("max")]
-        ).collect()
+        stats = _collect(
+            self.lazy_df.select([pl.col(col).min().alias("min"), pl.col(col).max().alias("max")])
+        )
 
         min_date = stats["min"][0]
         max_date = stats["max"][0]
@@ -2123,13 +2119,15 @@ class EDAAnalyzer:
 
     def _analyze_text(self, col: str) -> TextStats:
         # Length stats
-        stats = self.lazy_df.select(
-            [
-                pl.col(col).str.len_bytes().mean().alias("avg_len"),
-                pl.col(col).str.len_bytes().min().alias("min_len"),
-                pl.col(col).str.len_bytes().max().alias("max_len"),
-            ]
-        ).collect()
+        stats = _collect(
+            self.lazy_df.select(
+                [
+                    pl.col(col).str.len_bytes().mean().alias("avg_len"),
+                    pl.col(col).str.len_bytes().min().alias("min_len"),
+                    pl.col(col).str.len_bytes().max().alias("max_len"),
+                ]
+            )
+        )
 
         # Most common words (simple tokenization by space)
         common_words = []
@@ -2257,7 +2255,7 @@ class EDAAnalyzer:
             elif op == "<=":
                 filtered_df = filtered_df.filter(col_expr <= val)
             elif op == "in":
-                filtered_df = filtered_df.filter(col_expr.is_in(val))
+                filtered_df = filtered_df.filter(col_expr.is_in(cast(Any, val)))
 
         # 2. Calculate Measure
         # If split_col is None, return global aggregate

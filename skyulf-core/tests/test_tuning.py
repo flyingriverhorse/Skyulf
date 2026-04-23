@@ -1,5 +1,7 @@
 """Tests for hyperparameter tuning."""
 
+from typing import Any, cast
+
 from skyulf.modeling.classification import LogisticRegressionCalculator
 from skyulf.modeling.tuning.schemas import TuningConfig
 from skyulf.modeling.tuning.engine import TuningCalculator
@@ -21,8 +23,11 @@ def test_tuner_grid_search(sample_classification_data):
         cv_folds=3,
     )
 
+    _cfg = cast(Any, config)
     result_tuple = tuner.fit(
-        X, y, config=config.to_dict() if hasattr(config, "to_dict") else config.__dict__
+        X,
+        y,
+        config=(_cfg.to_dict() if hasattr(_cfg, "to_dict") else _cfg.__dict__),
     )
 
     # Unpack tuple (model, tuning_result)

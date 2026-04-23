@@ -106,7 +106,7 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
     for job in found_jobs:
         db_row = db_jobs.get(job.job_id)
         if db_row:
-            job.model_type = cast(str, db_row.model_type)
+            job.model_type = db_row.model_type
 
             # Extract target column from graph
             try:
@@ -262,7 +262,7 @@ async def calculate_drift(
     # 3. Load Current Data
     try:
         content = await file.read()
-        filename = file.filename.lower()
+        filename = (file.filename or "").lower()
         if filename.endswith(".csv"):
             curr_df = pl.read_csv(io.BytesIO(content))
         elif filename.endswith(".parquet"):
@@ -382,13 +382,13 @@ async def get_drift_history(
     rows = result.scalars().all()
     return [
         DriftHistoryEntry(
-            id=cast(int, r.id),
-            job_id=cast(str, r.job_id),
-            dataset_name=cast(Optional[str], r.dataset_name),
-            reference_rows=cast(Optional[int], r.reference_rows),
-            current_rows=cast(Optional[int], r.current_rows),
-            drifted_columns_count=cast(Optional[int], r.drifted_columns_count),
-            total_columns=cast(Optional[int], r.total_columns),
+            id=r.id,
+            job_id=r.job_id,
+            dataset_name=r.dataset_name,
+            reference_rows=r.reference_rows,
+            current_rows=r.current_rows,
+            drifted_columns_count=r.drifted_columns_count,
+            total_columns=r.total_columns,
             summary=cast(Optional[Dict[str, Any]], r.summary),
             created_at=r.created_at.isoformat() if r.created_at else None,
         )
@@ -423,7 +423,7 @@ async def get_drift_status(
     drifted_count = 0
     latest_check: Optional[str] = None
     for r in rows:
-        job_id = cast(str, r.job_id)
+        job_id = r.job_id
         if job_id in seen_jobs:
             continue
         seen_jobs.add(job_id)

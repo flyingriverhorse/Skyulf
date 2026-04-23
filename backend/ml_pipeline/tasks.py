@@ -165,6 +165,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
             # Update logs in DB every 2 seconds to avoid locking
             if (datetime.now() - last_log_update).total_seconds() > 2:
                 try:
+                    assert job is not None  # narrowing lost in closure
                     job.logs = list(job_logs)
                     session.commit()
                     last_log_update = datetime.now()

@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union, cast
 
 import pandas as pd
 
@@ -182,7 +182,9 @@ class StatefulEstimator:
                 if log_callback:
                     log_callback(msg)
 
-                dataset = SplitDataset(train=dataset, test=pd.DataFrame(), validation=None)
+                dataset = SplitDataset(
+                    train=cast(Any, dataset), test=pd.DataFrame(), validation=None
+                )
 
         # 1. Prepare Data
         X_train, y_train = self._extract_xy(dataset.train, target_column)
@@ -312,7 +314,7 @@ class StatefulEstimator:
         splits_payload = {}
 
         # Container for raw predictions
-        evaluation_data = {
+        evaluation_data: Dict[str, Any] = {
             "job_id": job_id,
             "node_id": self.node_id,
             "problem_type": problem_type,
