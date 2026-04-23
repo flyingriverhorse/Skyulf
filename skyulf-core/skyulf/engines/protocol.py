@@ -21,6 +21,28 @@ class SkyulfDataFrame(Protocol):
         """Return the shape of the dataframe (rows, cols)."""
         ...
 
+    # Item access (column or row selection)
+    def __getitem__(self, key: Any) -> Any:
+        """Column or row selection. Returns a Series, scalar, or DataFrame."""
+        ...
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        """Column or row assignment."""
+        ...
+
+    def __len__(self) -> int:
+        """Return the number of rows."""
+        ...
+
+    def __getattr__(self, name: str) -> Any:
+        """
+        Allow engine-specific attribute access (e.g. pandas `.loc`, `.iloc`,
+        `.select_dtypes`, polars `.with_columns`, `.is_empty`). Concrete
+        engine adapters expose these natively; the Protocol stays minimal
+        but transparent to the type checker.
+        """
+        ...
+
     # Core Operations
     def select(self, columns: List[str]) -> "SkyulfDataFrame":
         """Select a subset of columns."""

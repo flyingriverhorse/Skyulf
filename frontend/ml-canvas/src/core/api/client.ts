@@ -72,16 +72,23 @@ export type BranchPreviews = Record<string, PreviewData>;
 export type BranchNodeIds = Record<string, string[]>;
 
 /** Engine-emitted advisory for a downstream node whose inputs share an
- * ancestor (column-union + last-wins merge semantics applied). */
+ * ancestor (column-union + last-wins merge semantics applied), or whose
+ * row-wise merge had to drop non-shared columns. */
 export interface MergeWarning {
   node_id: string;
   kind: string;
-  inputs: string[];
-  common_ancestors: string[];
+  inputs?: string[];
+  common_ancestors?: string[];
   /** Columns present in 2+ inputs (subject to last-wins overwrite). */
   overlap_columns?: string[];
   /** ID of the input whose values won on overlap (always the last one). */
   winner_input?: string;
+  /** Row-wise merge: split label ("train" / "test" / "rows"). */
+  part?: string;
+  /** Row-wise merge: columns present in some inputs but not all. */
+  dropped_columns?: string[];
+  /** Row-wise merge: columns kept (intersection). */
+  kept_columns?: string[];
   message: string;
 }
 

@@ -1,4 +1,4 @@
-"""Pipeline Execution Engine."""
+﻿"""Pipeline Execution Engine."""
 
 import json
 import logging
@@ -60,6 +60,10 @@ class PipelineEngine:
         )  # Track fitted transformers for inference pipeline
         self._results: Dict[str, NodeExecutionResult] = {}
         self._node_configs: Dict[str, NodeConfig] = {}
+        # Engine-emitted advisories surfaced via PipelineExecutionResult.
+        # Initialized here (not just in run()) so direct callers of
+        # _merge_inputs / _merge_frames in tests don't hit AttributeError.
+        self.merge_warnings: List[Dict[str, Any]] = []
 
     def _pipeline_has_training_node(self) -> bool:
         """Checks if the current pipeline workflow includes a model training step."""
@@ -98,7 +102,7 @@ class PipelineEngine:
                 importances = actual_model.feature_importances_
             elif hasattr(actual_model, "coef_"):
                 coef = actual_model.coef_
-                # For multi-class, coef_ is 2D — take mean of absolute values
+                # For multi-class, coef_ is 2D â€” take mean of absolute values
                 if hasattr(coef, "ndim") and coef.ndim > 1:
                     importances = abs(coef).mean(axis=0)
                 else:
@@ -371,6 +375,25 @@ class PipelineEngine:
             "Only DataFrame, SplitDataset, and (X, y) tuples are supported."
         )
 
+    def _get_merge_strategy(self, node_id: str) -> str:
+        """Resolve per-node merge strategy from node params.
+
+        Recognised values: ``last_wins`` (default), ``first_wins``. Anything
+        else falls back to ``last_wins`` with a warning so a typo in the
+        canvas config can't silently change semantics.
+        """
+        cfg = self._node_configs.get(node_id)
+        if cfg is None:
+            return "last_wins"
+        strat = cfg.params.get("_merge_strategy", "last_wins")
+        if strat not in ("last_wins", "first_wins"):
+            self.log(
+                f"Node {node_id}: unknown merge strategy '{strat}', "
+                "falling back to 'last_wins'."
+            )
+            return "last_wins"
+        return strat
+
     def _merge_frames(
         self,
         frames: List[pd.DataFrame],
@@ -381,6 +404,14 @@ class PipelineEngine:
 
         ``part_label`` is only used in log messages (``"train"``, ``"test"``...)
         to make multi-split merges easier to follow in job logs.
+
+        Column-overlap behaviour is governed by the per-node merge strategy
+        (see :meth:`_get_merge_strategy`):
+
+        * ``last_wins`` (default) â€” later inputs overwrite earlier ones on
+          shared columns. Matches topological "downstream wins".
+        * ``first_wins`` â€” earlier inputs are kept; later inputs only add
+          new columns. Useful when an upstream branch is the source of truth.
         """
         if not frames:
             return pd.DataFrame()
@@ -394,16 +425,17 @@ class PipelineEngine:
         row_counts = [len(df) for df in frames]
         col_sets = [set(df.columns) for df in frames]
         same_rows = all(rc == row_counts[0] for rc in row_counts)
+        strategy = self._get_merge_strategy(node_id)
 
         if same_rows:
-            # Last-wins on duplicate columns: later inputs (topologically
-            # downstream) take precedence so a Splitter -> Scaler -> Encoder
-            # chain actually feeds the encoder the SCALED columns instead of
-            # silently dropping the scaler's output as a "duplicate".
+            # Iterate frames in the order dictated by the strategy. The dict
+            # update semantics give us "later writes win", so iterating
+            # forward yields last_wins and reversed yields first_wins.
+            iter_frames = frames if strategy == "last_wins" else list(reversed(frames))
             result_cols: Dict[str, pd.Series] = {}
             overwrites: List[str] = []
             new_only: List[str] = []
-            for df in frames:
+            for df in iter_frames:
                 df_aligned = df.reset_index(drop=True)
                 for col in df.columns:
                     if col in result_cols:
@@ -416,7 +448,7 @@ class PipelineEngine:
             if overwrites:
                 self.log(
                     f"{prefix}: column-wise merge {shape_log} -> {merged.shape} "
-                    f"(last-wins overwrote {sorted(set(overwrites))})"
+                    f"({strategy} overwrote {sorted(set(overwrites))})"
                 )
             else:
                 self.log(f"{prefix}: column-wise merge {shape_log} -> {merged.shape}")
@@ -427,12 +459,28 @@ class PipelineEngine:
             common_cols = common_cols & cs
         if not common_cols:
             raise ValueError(
-                f"{prefix}: cannot row-merge inputs — no common columns. "
+                f"{prefix}: cannot row-merge inputs â€” no common columns. "
                 f"Column sets: {[sorted(cs) for cs in col_sets]}"
             )
         if any(common_cols != cs for cs in col_sets):
             extras = sorted(set().union(*col_sets) - common_cols)
             self.log(f"{prefix}: row-merge dropping non-shared columns {extras}")
+            # Surface dropped columns to the UI so users see what was lost
+            # instead of having to dig through job logs.
+            self.merge_warnings.append(
+                {
+                    "node_id": node_id,
+                    "kind": "row_concat_drop",
+                    "part": part_label or "rows",
+                    "dropped_columns": extras,
+                    "kept_columns": sorted(common_cols),
+                    "message": (
+                        f"Node '{node_id}': row-wise merge kept only the {len(common_cols)} "
+                        f"shared columns; {len(extras)} column(s) present in some inputs but "
+                        f"not all were dropped: {extras}."
+                    ),
+                }
+            )
         merged = pd.concat(
             [df[sorted(common_cols)] for df in frames],
             axis=0,
@@ -440,7 +488,7 @@ class PipelineEngine:
         )
         self.log(
             f"{prefix}: row-wise merge "
-            f"{' + '.join(str(rc) for rc in row_counts)} rows → {len(merged)} rows"
+            f"{' + '.join(str(rc) for rc in row_counts)} rows â†’ {len(merged)} rows"
         )
         return merged
 
@@ -449,10 +497,10 @@ class PipelineEngine:
 
         Behaviour:
 
-        * Single input → returned as-is (preserves DataFrame / SplitDataset).
-        * All inputs are :class:`SplitDataset` → merge ``train`` / ``test`` /
+        * Single input â†’ returned as-is (preserves DataFrame / SplitDataset).
+        * All inputs are :class:`SplitDataset` â†’ merge ``train`` / ``test`` /
           ``validation`` independently and return a new ``SplitDataset``.
-        * Mixed or all-DataFrame inputs → flatten to DataFrames and merge.
+        * Mixed or all-DataFrame inputs â†’ flatten to DataFrames and merge.
           A warning is logged when SplitDatasets are flattened so the loss of
           held-out splits is visible in job logs.
         """
@@ -464,8 +512,8 @@ class PipelineEngine:
 
         # Sibling fan-in detection: warn only when inputs are TRUE siblings
         # (no input is itself an ancestor of another). The "ancestor + its
-        # descendant" pattern (e.g. Splitter + Splitter→Scaler both feeding
-        # Encoder) is a redundant edge — the descendant supersedes the
+        # descendant" pattern (e.g. Splitter + Splitterâ†’Scaler both feeding
+        # Encoder) is a redundant edge â€” the descendant supersedes the
         # ancestor under last-wins, so the merge is harmless and we don't
         # warn. We DO warn when two genuinely independent siblings off a
         # shared ancestor get fanned in (the "Path A" UX trap), because the
@@ -511,7 +559,8 @@ class PipelineEngine:
                     if cnt > 1:
                         overlap.append(c)
 
-                winner_id = unique_inputs[-1]
+                strategy = self._get_merge_strategy(node.node_id)
+                winner_id = unique_inputs[-1] if strategy == "last_wins" else unique_inputs[0]
                 advisory = {
                     "node_id": node.node_id,
                     "kind": "sibling_fan_in",
@@ -519,11 +568,12 @@ class PipelineEngine:
                     "common_ancestors": sorted(shared),
                     "overlap_columns": sorted(overlap),
                     "winner_input": winner_id,
+                    "strategy": strategy,
                     "message": (
                         f"Node '{node.node_id}' merges {len(unique_inputs)} sibling "
                         f"branches that share ancestor(s) {sorted(shared)}. "
                         f"Columns are unioned; on overlap ({len(overlap)} column(s)) "
-                        f"the last input '{winner_id}' wins. If you wanted sequential "
+                        f"the {strategy} input '{winner_id}' wins. If you wanted sequential "
                         "application, chain the transformers linearly instead."
                     ),
                 }
@@ -563,13 +613,13 @@ class PipelineEngine:
                 """Merge one SplitDataset slot (train/test/validation) across branches.
 
                 Preserves ``(X, y)`` tuple shape when every branch produced a
-                tuple — this keeps downstream X/y tabs and training contracts
+                tuple â€” this keeps downstream X/y tabs and training contracts
                 intact. Falls back to flat-DataFrame merging otherwise.
                 """
                 non_empty = [p for p in parts if p is not None]
                 if not non_empty:
                     return None
-                # All branches produced (X, y) tuples → merge X columns,
+                # All branches produced (X, y) tuples â†’ merge X columns,
                 # keep y from the first branch (all branches descend from the
                 # same Splitter, so y is identical).
                 if all(isinstance(p, tuple) and len(p) == 2 for p in non_empty):
@@ -582,7 +632,7 @@ class PipelineEngine:
                         return None
                     merged_x = self._merge_frames(x_frames, node.node_id, part_label)
                     return (merged_x, non_empty[0][1])
-                # Mixed or pure DataFrame parts → flatten and merge as frames.
+                # Mixed or pure DataFrame parts â†’ flatten and merge as frames.
                 frames = [
                     df
                     for df in (self._coerce_to_frame(p, target_col) for p in non_empty)
@@ -615,7 +665,7 @@ class PipelineEngine:
         # Fallback: flatten everything to a single DataFrame.
         if any(isinstance(a, SplitDataset) for a in artifacts):
             self.log(
-                f"Node {node.node_id}: mixed SplitDataset/DataFrame inputs — "
+                f"Node {node.node_id}: mixed SplitDataset/DataFrame inputs â€” "
                 "merging on train portions only; held-out splits are dropped."
             )
 
@@ -921,7 +971,7 @@ class PipelineEngine:
         self, node: NodeConfig, job_id: str = "unknown"
     ) -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset (from Feature Engineering) or DataFrame
-        # Supports multiple inputs — merges them before training.
+        # Supports multiple inputs â€” merges them before training.
 
         target_col = node.params["target_column"]
 
@@ -1096,7 +1146,7 @@ class PipelineEngine:
     def _run_advanced_tuning(  # noqa: C901
         self, node: NodeConfig, job_id: str = "unknown"
     ) -> tuple[str, Dict[str, Any]]:
-        # Input: SplitDataset — supports multiple inputs via merge.
+        # Input: SplitDataset â€” supports multiple inputs via merge.
         target_col = node.params["target_column"]
 
         data = self._get_input(node, target_col)

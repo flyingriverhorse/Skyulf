@@ -94,10 +94,20 @@ export const ResultsPanel: React.FC = () => {
     ? branchNodeIds[activeBranch]
     : allNodeIds;
 
-  // Engine-emitted merge advisories (sibling fan-in etc.) — surfaced so users
+  // Engine-emitted merge advisories (sibling fan-in etc.) - surfaced so users
   // immediately see when a downstream node is silently merging parallel
-  // branches that share an ancestor.
-  const mergeWarnings = executionResult.merge_warnings ?? [];
+  // branches that share an ancestor. When a branch tab is active we only
+  // show advisories for nodes that actually ran in that branch, otherwise
+  // the banner would flag warnings for nodes the user can't even see on
+  // the current tab.
+  const allMergeWarnings = executionResult.merge_warnings ?? [];
+  const mergeWarnings = React.useMemo(() => {
+    if (!activeBranch || !branchNodeIds || !branchNodeIds[activeBranch]) {
+      return allMergeWarnings;
+    }
+    const branchNodes = new Set(branchNodeIds[activeBranch]);
+    return allMergeWarnings.filter((w) => branchNodes.has(w.node_id));
+  }, [allMergeWarnings, activeBranch, branchNodeIds]);
 
   // Check for errors
   const nodeResults = executionResult.node_results || {};
@@ -229,12 +239,36 @@ export const ResultsPanel: React.FC = () => {
               {mergeWarningsOpen && (
                 <div className="px-2 pb-2 space-y-1.5">
                   {mergeWarnings.map((w, idx) => {
-                    const inputLabels = w.inputs.map((i) => nodeLabelMap[i] ?? i);
+                    // Row-wise merge dropped non-shared columns: render a
+                    // simpler advisory (no inputs / overlap to show).
+                    if (w.kind === 'row_concat_drop') {
+                      const dropped = w.dropped_columns ?? [];
+                      return (
+                        <div key={idx} className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 pl-5">
+                          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <span className="font-medium">
+                              {nodeLabelMap[w.node_id] ?? w.node_id}
+                            </span>{' '}
+                            row-wise merge{w.part ? ` (${w.part})` : ''} dropped{' '}
+                            {dropped.length} non-shared column
+                            {dropped.length === 1 ? '' : 's'}:{' '}
+                            <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">
+                              {dropped.slice(0, 6).join(', ')}
+                              {dropped.length > 6 ? `, +${dropped.length - 6} more` : ''}
+                            </span>
+                            . Only columns present in every input are kept when row counts differ.
+                          </div>
+                        </div>
+                      );
+                    }
+                    const inputs = w.inputs ?? [];
+                    const inputLabels = inputs.map((i) => nodeLabelMap[i] ?? i);
                     const winner = w.winner_input
                       ? (nodeLabelMap[w.winner_input] ?? w.winner_input)
                       : inputLabels[inputLabels.length - 1];
                     const overlap = w.overlap_columns ?? [];
-                    const canAutoChain = overlap.length > 0 && w.inputs.length >= 2;
+                    const canAutoChain = overlap.length > 0 && inputs.length >= 2;
                     return (
                       <div key={idx} className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 pl-5">
                         <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
@@ -242,7 +276,7 @@ export const ResultsPanel: React.FC = () => {
                           <span className="font-medium">
                             {nodeLabelMap[w.node_id] ?? w.node_id}
                           </span>{' '}
-                          merges {w.inputs.length} parallel branches:{' '}
+                          merges {inputs.length} parallel branches:{' '}
                           {inputLabels.map((label, i) => (
                             <span key={i}>
                               <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">
@@ -281,7 +315,7 @@ export const ResultsPanel: React.FC = () => {
                                     `Rewire as a linear chain?\n\n${chainStr}\n\nUse Ctrl+Z to undo.`
                                   );
                                   if (!ok) return;
-                                  const success = chainSiblings(w.node_id, w.inputs);
+                                  const success = chainSiblings(w.node_id, inputs);
                                   if (!success) {
                                     window.alert('Auto-chain failed. Re-run preview and try again.');
                                   }

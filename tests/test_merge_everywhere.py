@@ -457,6 +457,40 @@ class TestTrainingMerge:
         assert artifact_store.exists("training")
 
 
+class TestMergeStrategyOverride:
+    """``_merge_strategy`` in node params switches column-overlap semantics."""
+
+    def _merge(self, engine, frames, strategy):
+        node_id = "merge_node"
+        engine._node_configs = {
+            node_id: NodeConfig(
+                node_id=node_id,
+                step_type="StandardScaler",
+                inputs=[f"in_{i}" for i in range(len(frames))],
+                params={"_merge_strategy": strategy} if strategy else {},
+            )
+        }
+        return engine._merge_frames(frames, node_id)
+
+    def test_last_wins_is_default(self, engine):
+        a = pd.DataFrame({"x": [1, 2, 3]})
+        b = pd.DataFrame({"x": [10, 20, 30]})
+        out = self._merge(engine, [a, b], strategy=None)
+        assert list(out["x"]) == [10, 20, 30], "default must be last_wins"
+
+    def test_first_wins_keeps_earlier_input(self, engine):
+        a = pd.DataFrame({"x": [1, 2, 3]})
+        b = pd.DataFrame({"x": [10, 20, 30]})
+        out = self._merge(engine, [a, b], strategy="first_wins")
+        assert list(out["x"]) == [1, 2, 3], "first_wins must keep the earlier input"
+
+    def test_unknown_strategy_falls_back_to_last_wins(self, engine):
+        a = pd.DataFrame({"x": [1]})
+        b = pd.DataFrame({"x": [99]})
+        out = self._merge(engine, [a, b], strategy="nonsense")
+        assert list(out["x"]) == [99]
+
+
 # --- helpers ---------------------------------------------------------------
 
 

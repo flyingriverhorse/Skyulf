@@ -139,6 +139,20 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           'Click OK to connect (merge mode), or Cancel to abort.'
         );
         if (!proceed) return;
+      } else if (existingInputs.length >= 1 && !modelTypes.includes(targetType)) {
+        // Pre-flight lint for non-training nodes (audit issue #7).
+        // Direction-A means non-training nodes also auto-merge fan-in via
+        // column union + last-wins. Surface that contract before the user
+        // wires it so silent column overwrites aren't a surprise at run time.
+        const inputCount = existingInputs.length + 1;
+        const proceed = confirm(
+          `This node will receive ${inputCount} inputs.\n\n` +
+          'Inputs are auto-merged via column union with LAST-WINS on overlap ' +
+          '(the last connected input overwrites earlier ones on shared columns).\n\n' +
+          'For sequential transformations, chain the nodes linearly instead.\n\n' +
+          'Click OK to connect (merge), or Cancel to abort.'
+        );
+        if (!proceed) return;
       }
     }
 
