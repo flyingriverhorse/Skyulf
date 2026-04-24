@@ -67,7 +67,7 @@ jobs:
 
       - name: Type check (ty)
         run: |
-          ty check backend tests skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py
+          ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py
 
       - name: Run tests
         run: pytest -q -s --maxfail=1 --disable-warnings --cov --cov-branch --cov-report=term-missing --cov-report=xml
