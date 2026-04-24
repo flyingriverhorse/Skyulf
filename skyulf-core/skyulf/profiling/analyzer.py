@@ -74,7 +74,9 @@ except ImportError:
     STATSMODELS_AVAILABLE = False
 
 try:
-    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer  # ty: ignore[unresolved-import]
+    from vaderSentiment.vaderSentiment import (
+        SentimentIntensityAnalyzer,
+    )  # ty: ignore[unresolved-import]
 
     VADER_AVAILABLE = True
 except ImportError:
