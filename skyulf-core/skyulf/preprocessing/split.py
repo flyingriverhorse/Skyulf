@@ -109,7 +109,7 @@ class DataSplitter:
 
         if is_polars:
             # Convert to Pandas to preserve schema/metadata during split
-            X_any: Any = X
+            X_any = cast(Any, X)
             X_pd = X_any.to_pandas()
             y_pd = y.to_pandas() if y is not None else None
         else:
@@ -200,7 +200,7 @@ class DataSplitter:
 
         if is_polars:
             # Convert to Pandas to preserve schema/metadata during split
-            df_any: Any = df
+            df_any = cast(Any, df)
             df_pd = df_any.to_pandas()
         else:
             df_pd = df
