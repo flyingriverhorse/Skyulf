@@ -1,7 +1,6 @@
 import sys
 import os
 import pandas as pd
-import pytest
 
 # Add local skyulf-core to path
 sys.path.append(os.path.join(os.getcwd(), "skyulf-core"))

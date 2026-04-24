@@ -14,7 +14,6 @@ from ..utils import (
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
 from ..engines import SkyulfDataFrame, get_engine
-from ..engines.sklearn_bridge import SklearnBridge
 
 # --- Base Binning Applier ---
 

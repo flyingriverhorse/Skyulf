@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Tuple, Union, Optional
+from typing import Tuple, Optional
 
 from backend.config import get_settings
 from backend.ml_pipeline.artifacts.store import ArtifactStore

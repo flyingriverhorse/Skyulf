@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Type
+from typing import Dict, Optional, Type
 from datetime import datetime
 from sqlalchemy.orm import Session
 
@@ -17,7 +17,6 @@ class JobStrategy(ABC):
     @abstractmethod
     def get_job_model(self) -> Type[MLJob]:
         """Returns the SQLAlchemy model class for this job type."""
-        pass
 
     def get_job(self, session: Session, job_id: str) -> Optional[MLJob]:
         """Fetches the job from the database."""
@@ -26,7 +25,6 @@ class JobStrategy(ABC):
     @abstractmethod
     def get_initial_log(self, job: MLJob) -> str:
         """Returns the initial log message for the job."""
-        pass
 
     def handle_success(self, job: MLJob, result: PipelineExecutionResult) -> None:
         """

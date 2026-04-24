@@ -3,11 +3,11 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from typing import cast as type_cast
 
-from sqlalchemy import String, cast, or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from backend.database.models import DataSource, AdvancedTuningJob
+from backend.database.models import AdvancedTuningJob
 from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.execution.graph_utils import (
     determine_search_strategy,

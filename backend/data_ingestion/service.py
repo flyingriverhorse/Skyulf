@@ -2,7 +2,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Union, cast
+from typing import Any, Dict, Optional, Sequence, Union, cast
 
 import aiofiles
 from fastapi import BackgroundTasks, HTTPException, UploadFile
@@ -10,8 +10,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
-from backend.data_ingestion.connectors.file import LocalFileConnector
-from backend.data_ingestion.connectors.s3 import S3Connector
 from backend.data_ingestion.schemas.ingestion import (
     DataSourceCreate,
     IngestionJobResponse,
@@ -205,7 +203,7 @@ class DataIngestionService:
                     await connector.connect()
                     df = await connector.fetch_data(limit=limit)
                     return df.to_dicts()
-                except Exception as e:
+                except Exception:
                     logger.exception("Failed to read local parquet: %s", file_path)
                     raise HTTPException(status_code=500, detail="Failed to read local parquet file")
 

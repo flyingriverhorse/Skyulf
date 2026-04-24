@@ -11,7 +11,6 @@ from sklearn.model_selection import (
     ShuffleSplit,
     StratifiedKFold,
     TimeSeriesSplit,
-    cross_val_score,
 )
 
 from ..engines import SkyulfDataFrame

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, AsyncMock
 from backend.ml_pipeline.execution.utils import resolve_dataset_name, get_dataset_map
 
 

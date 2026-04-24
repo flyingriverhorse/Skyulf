@@ -1,4 +1,3 @@
-import pytest
 import polars as pl
 import numpy as np
 from skyulf.profiling.drift import DriftCalculator

@@ -110,7 +110,7 @@ class VarianceThresholdApplier(BaseApplier):
 
         if cols_to_drop_list and drop_columns:
             if engine.name == "polars":
-                import polars as pl
+                pass
 
                 X_pl: Any = X
                 X = X_pl.drop(cols_to_drop_list)
@@ -200,7 +200,7 @@ class CorrelationThresholdApplier(BaseApplier):
 
         if drop_columns:
             if engine.name == "polars":
-                import polars as pl
+                pass
 
                 X_pl: Any = X
                 X = X_pl.drop(cols_to_drop)
@@ -279,7 +279,7 @@ class UnivariateSelectionApplier(BaseApplier):
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
         if cols_to_drop_list and drop_columns:
             if engine.name == "polars":
-                import polars as pl
+                pass
 
                 X_pl: Any = X
                 X = X_pl.drop(cols_to_drop_list)
@@ -315,7 +315,7 @@ class UnivariateSelectionCalculator(BaseCalculator):
                 )
                 return {}
             if engine.name == "polars":
-                import polars as pl
+                pass
 
                 y = X.select(target_col).to_series().to_pandas()
             else:
@@ -482,7 +482,7 @@ class ModelBasedSelectionApplier(BaseApplier):
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
         if cols_to_drop_list and drop_columns:
             if engine.name == "polars":
-                import polars as pl
+                pass
 
                 X_pl: Any = X
                 X = X_pl.drop(cols_to_drop_list)
@@ -518,7 +518,7 @@ class ModelBasedSelectionCalculator(BaseCalculator):
                 )
                 return {}
             if engine.name == "polars":
-                import polars as pl
+                pass
 
                 y = X.select(target_col).to_series().to_pandas()
             else:

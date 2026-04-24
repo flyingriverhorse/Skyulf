@@ -181,7 +181,6 @@ class OneHotEncoderApplier(BaseApplier):
         except Exception as e:
             logger.error(f"OneHot Encoding failed: {e}")
             # If encoding fails (e.g. new categories with handle_unknown='error'), we might just return original
-            pass
 
         return pack_pipeline_output(X_out, y, is_tuple)
 
@@ -348,7 +347,6 @@ class OrdinalEncoderApplier(BaseApplier):
 
         except Exception as e:
             logger.error(f"Ordinal Encoding failed: {e}")
-            pass
 
         return pack_pipeline_output(X_out, y, is_tuple)
 
@@ -640,7 +638,6 @@ class TargetEncoderApplier(BaseApplier):
             X_out[valid_cols] = encoded_array
         except Exception as e:
             logger.error(f"Target Encoding failed: {e}")
-            pass
 
         return pack_pipeline_output(X_out, y, is_tuple)
 

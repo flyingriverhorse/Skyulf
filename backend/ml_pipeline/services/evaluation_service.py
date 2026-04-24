@@ -7,7 +7,7 @@ for training and tuning jobs.
 
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -1,7 +1,6 @@
 import unittest
 import polars as pl
 import numpy as np
-import pandas as pd
 from skyulf.preprocessing.transformations import (
     SimpleTransformationCalculator,
     SimpleTransformationApplier,

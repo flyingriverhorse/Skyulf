@@ -1,4 +1,3 @@
-import pytest
 from backend.data_ingestion.connectors.s3 import S3Connector
 
 

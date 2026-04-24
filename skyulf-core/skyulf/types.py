@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union, TypedDict
+from typing import Any, Dict, List, TypedDict
 
 
 class PreprocessingStepConfig(TypedDict, total=False):

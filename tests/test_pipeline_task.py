@@ -1,10 +1,9 @@
 import uuid
-from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.database.models import AdvancedTuningJob, BasicTrainingJob, DataSource
+from backend.database.models import AdvancedTuningJob, BasicTrainingJob
 from backend.ml_pipeline.execution.schemas import (
     NodeExecutionResult,
     PipelineExecutionResult,

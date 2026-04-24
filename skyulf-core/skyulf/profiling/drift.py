@@ -1,6 +1,6 @@
 import polars as pl
 import numpy as np
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Optional, List
 from pydantic import BaseModel
 
 try:
@@ -182,7 +182,8 @@ class DriftCalculator:
 
                 if ks_drift and not psi_drift:
                     suggestions.append(
-                        "Statistical distribution has changed, but population stability is acceptable. Check for outliers."
+                        "Statistical distribution has changed, but population stability "
+                        "is acceptable. Check for outliers."
                     )
 
                 if wd_drift:

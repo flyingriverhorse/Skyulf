@@ -27,8 +27,6 @@ from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 class LogisticRegressionApplier(SklearnApplier):
     """Logistic Regression Applier."""
 
-    pass
-
 
 @NodeRegistry.register("logistic_regression", LogisticRegressionApplier)
 @node_meta(
@@ -57,8 +55,6 @@ class LogisticRegressionCalculator(SklearnCalculator):
 # --- Random Forest Classifier ---
 class RandomForestClassifierApplier(SklearnApplier):
     """Random Forest Classifier Applier."""
-
-    pass
 
 
 @NodeRegistry.register("random_forest_classifier", RandomForestClassifierApplier)
@@ -91,8 +87,6 @@ class RandomForestClassifierCalculator(SklearnCalculator):
 class SVCApplier(SklearnApplier):
     """SVC Applier."""
 
-    pass
-
 
 @NodeRegistry.register("svc", SVCApplier)
 @node_meta(
@@ -124,8 +118,6 @@ class SVCCalculator(SklearnCalculator):
 class KNeighborsClassifierApplier(SklearnApplier):
     """K-Neighbors Classifier Applier."""
 
-    pass
-
 
 @NodeRegistry.register("k_neighbors_classifier", KNeighborsClassifierApplier)
 @node_meta(
@@ -156,8 +148,6 @@ class KNeighborsClassifierCalculator(SklearnCalculator):
 class DecisionTreeClassifierApplier(SklearnApplier):
     """Decision Tree Classifier Applier."""
 
-    pass
-
 
 @NodeRegistry.register("decision_tree_classifier", DecisionTreeClassifierApplier)
 @node_meta(
@@ -187,8 +177,6 @@ class DecisionTreeClassifierCalculator(SklearnCalculator):
 class GradientBoostingClassifierApplier(SklearnApplier):
     """Gradient Boosting Classifier Applier."""
 
-    pass
-
 
 @NodeRegistry.register("gradient_boosting_classifier", GradientBoostingClassifierApplier)
 @node_meta(
@@ -217,8 +205,6 @@ class GradientBoostingClassifierCalculator(SklearnCalculator):
 # --- AdaBoost ---
 class AdaBoostClassifierApplier(SklearnApplier):
     """AdaBoost Classifier Applier."""
-
-    pass
 
 
 @NodeRegistry.register("adaboost_classifier", AdaBoostClassifierApplier)
@@ -250,8 +236,6 @@ if XGBOOST_AVAILABLE:
     class XGBClassifierApplier(SklearnApplier):
         """XGBoost Classifier Applier."""
 
-        pass
-
     @NodeRegistry.register("xgboost_classifier", XGBClassifierApplier)
     @node_meta(
         id="xgboost_classifier",
@@ -282,8 +266,6 @@ if XGBOOST_AVAILABLE:
 # --- Gaussian NB ---
 class GaussianNBApplier(SklearnApplier):
     """Gaussian Naive Bayes Applier."""
-
-    pass
 
 
 @NodeRegistry.register("gaussian_nb", GaussianNBApplier)

@@ -1,5 +1,4 @@
 import os
-import tempfile
 from typing import Any, Optional
 import joblib
 import logging

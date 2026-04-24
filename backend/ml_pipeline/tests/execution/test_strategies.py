@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import MagicMock
 from backend.ml_pipeline.execution.strategies import (
     BasicTrainingStrategy,

@@ -306,7 +306,7 @@ class TextCleaningCalculator(BaseCalculator):
 
 
 class InvalidValueReplacementApplier(BaseApplier):
-    def apply(
+    def apply(  # noqa: C901  # dispatch over many invalid-value strategies
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],

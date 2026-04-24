@@ -83,7 +83,6 @@ from skyulf.preprocessing.imputation import (
     IterativeImputerApplier,
 )
 from skyulf.preprocessing.drop_and_missing import (
-    DeduplicateCalculator,
     DeduplicateApplier,
     DropMissingColumnsCalculator,
     DropMissingColumnsApplier,
@@ -91,7 +90,6 @@ from skyulf.preprocessing.drop_and_missing import (
     MissingIndicatorCalculator,
     MissingIndicatorApplier,
 )
-from skyulf.engines import get_engine
 
 
 @pytest.mark.skipif(not HAS_POLARS, reason="Polars not installed")
