@@ -1,8 +1,7 @@
 import pytest
-import asyncio
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from backend.database.models import DataSource, EDAReport, Base
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from backend.database.models import DataSource, EDAReport
 from backend.main import app
 from backend.config import get_settings
 

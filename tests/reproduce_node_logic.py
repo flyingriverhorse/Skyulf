@@ -1,7 +1,4 @@
-import sys
 import unittest
-import numpy as np
-import pandas as pd
 import polars as pl
 from skyulf.preprocessing.scaling import StandardScalerCalculator, StandardScalerApplier
 from skyulf.preprocessing.outliers import IQRCalculator, IQRApplier
@@ -507,7 +504,6 @@ class TestPreprocessingNodes(unittest.TestCase):
             CorrelationThresholdCalculator,
             CorrelationThresholdApplier,
             UnivariateSelectionCalculator,
-            UnivariateSelectionApplier,
         )
 
         # 1. Variance Threshold
@@ -588,7 +584,7 @@ class TestPreprocessingNodes(unittest.TestCase):
         applier = OversamplingApplier()
 
         try:
-            import imblearn
+            pass
         except ImportError:
             print("Skipping Resampling test: imblearn not installed")
             return

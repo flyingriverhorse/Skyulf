@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional, cast
+from typing import List, Dict, Any, cast
 from fastapi import HTTPException
 from backend.data_ingestion.service import DataIngestionService
 from backend.utils.file_utils import extract_file_path_from_source
@@ -75,6 +75,5 @@ async def resolve_pipeline_nodes(
                 logging.getLogger(__name__).warning(
                     f"Failed to resolve dataset {params.get('dataset_id')}: {e}"
                 )
-                pass
 
     return resolved_s3_options

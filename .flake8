@@ -2,3 +2,12 @@
 max-line-length = 120
 extend-ignore = E203,W503
 exclude = .venv,venv,env,tests,skyulf-core/tests,temp,node_modules,frontend/ml-canvas/node_modules,site,docs/examples/scripts,build,dist
+# E402 in these files is intentional: routers append sys.path or set env vars before importing
+# their dependencies; analyzer.py wraps optional sklearn/scipy/etc imports in try/except blocks.
+per-file-ignores =
+    backend/ml_pipeline/deployment/api.py:E402
+    backend/ml_pipeline/execution/graph_utils.py:E402
+    backend/ml_pipeline/execution/schemas.py:E402
+    backend/ml_pipeline/model_registry/api.py:E402
+    backend/monitoring/router.py:E402
+    skyulf-core/skyulf/profiling/analyzer.py:E402

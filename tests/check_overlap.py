@@ -1,13 +1,12 @@
 import sys
 import os
-from typing import List
 
 # Setup path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../skyulf-core")))
 
 # Import backend registry
-from backend.ml_pipeline.node_definitions import NodeRegistry, RegistryItem, StepType
+from backend.ml_pipeline.node_definitions import NodeRegistry, StepType
 
 # Fetch static nodes by creating a temporary access to the list inside get_all_nodes
 # Since get_all_nodes instantiates the list inside the function, we have to copy-paste or inspect it.

@@ -9,7 +9,7 @@ keeps behavior separate from the generic database CRUD dispatcher.
 # pylint: disable=broad-exception-caught
 
 import logging
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Union
 
 from backend.config import Settings
 

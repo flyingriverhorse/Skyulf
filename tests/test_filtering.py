@@ -1,12 +1,10 @@
 import numpy as np
 import pandas as pd
-import pytest
 from skyulf.preprocessing.drop_and_missing import (
     DeduplicateApplier,
     DeduplicateCalculator,
     DropMissingColumnsApplier,
     DropMissingColumnsCalculator,
-    DropMissingRowsApplier,
     DropMissingRowsCalculator,
 )
 
@@ -30,13 +28,12 @@ def test_drop_missing():
     df = pd.DataFrame({"A": [1, np.nan, 3], "B": [1, 2, 3]})
 
     # Drop rows with any missing
-    calc = DropMissingRowsCalculator()
+    DropMissingRowsCalculator()
     # Assuming 'threshold' logic or similar. If not implemented, we skip.
     # params = calc.fit(df, {'threshold': 0})
 
     # applier = DropMissingRowsApplier()
     # res = applier.apply(df, params)
-    pass
 
 
 def test_deduplicate():

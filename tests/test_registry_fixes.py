@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, patch, AsyncMock
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
 from backend.ml_pipeline.execution.basic_training_manager import BasicTrainingManager
 from backend.data.catalog import SmartCatalog
-from backend.database.models import DataSource, BasicTrainingJob
 
 
 @pytest.mark.asyncio

@@ -287,7 +287,7 @@ async def get_decomposition(
                         if pdf[col].dtype == "object":
                             pdf[col] = pdf[col].astype(str)
                     df = pl.from_pandas(pdf)
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to load dataset")
             raise HTTPException(status_code=500, detail="Failed to load dataset")
 
@@ -311,6 +311,6 @@ async def get_decomposition(
         return result
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Unexpected error in get_decomposition")
         raise HTTPException(status_code=500, detail="Internal server error")

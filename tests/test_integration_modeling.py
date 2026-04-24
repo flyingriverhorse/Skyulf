@@ -11,8 +11,6 @@ from skyulf.modeling.classification import (
     LogisticRegressionCalculator,
 )
 from skyulf.modeling.regression import (
-    RandomForestRegressorApplier,
-    RandomForestRegressorCalculator,
     RidgeRegressionApplier,
     RidgeRegressionCalculator,
 )
@@ -291,6 +289,6 @@ def test_advanced_features(classification_data, artifact_store):
     assert progress_calls[1] == (2, 2)
 
     # 3. Test Feature Columns in Report
-    report = estimator.evaluate(classification_data, "target")
+    estimator.evaluate(classification_data, "target")
     # assert len(report.feature_columns) > 0
     # assert "f1" in report.feature_columns

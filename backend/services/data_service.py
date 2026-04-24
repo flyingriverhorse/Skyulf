@@ -11,7 +11,7 @@ try:
 except ImportError:
     HAS_POLARS = False
 
-from skyulf.engines import SkyulfDataFrame, get_engine
+from skyulf.engines import get_engine
 
 logger = logging.getLogger(__name__)
 

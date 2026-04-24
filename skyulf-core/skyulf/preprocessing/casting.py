@@ -205,7 +205,6 @@ class CastingApplier(BaseApplier):
                 if not coerce_on_error:
                     raise
                 # If coercion is on, we might leave it as is or try best effort?
-                pass
 
         return cast(
             Union[pd.DataFrame, Tuple[pd.DataFrame, Any]],

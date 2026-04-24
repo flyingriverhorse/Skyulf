@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import polars as pl
 from skyulf import SkyulfPipeline
-from skyulf.engines import get_engine
 
 
 def create_large_dataset(n_rows=100_000):

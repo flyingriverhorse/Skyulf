@@ -44,7 +44,6 @@ def calculate_histogram(
         )
 
         # Map back to HistogramBin
-        result = []
 
         counts = {}
         for row in hist_df.iter_rows(named=True):
@@ -56,7 +55,7 @@ def calculate_histogram(
                 bin_idx = int(bin_val)
                 # The count column is named "len" by default in Polars group_by().len()
                 counts[bin_idx] = row.get("len", row.get("count"))
-            except Exception as e:
+            except Exception:
                 # print(f"Error parsing bin: {e}")
                 continue
 

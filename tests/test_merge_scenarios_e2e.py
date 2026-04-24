@@ -18,13 +18,10 @@ Scenarios cover the bug categories in ``temp/merge_system_audit.md``:
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import pandas as pd
-import pytest
 
 from backend.data.catalog import FileSystemCatalog
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore

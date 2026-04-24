@@ -1,4 +1,4 @@
-from typing import Optional, List, Any
+from typing import Optional
 import polars as pl
 from .schemas import DatasetProfile
 
@@ -25,7 +25,24 @@ class EDAVisualizer:
         console = Console()
         console.print(Panel.fit("Skyulf EDA Summary", style="bold blue"))
 
-        # 1. Data Quality
+        # Each section is rendered in its own helper so the dispatcher stays simple
+        # and individual sections can be reused or tested in isolation.
+        self._render_data_quality(console, Table)
+        self._render_numeric_stats(console, Table)
+        self._render_vif(console, Table)
+        self._render_categorical_stats(console, Table)
+        self._render_text_stats(console, Table)
+        self._render_outliers(console, Table)
+        self._render_causal_graph(console, Table)
+        self._render_geospatial(console)
+        self._render_timeseries(console)
+        self._render_target_analysis(console, Table)
+        self._render_rule_tree(console, Table)
+        self._render_pca(console, Table)
+        self._render_clustering(console, Table)
+        self._render_alerts(console)
+
+    def _render_data_quality(self, console, Table):
         console.print("\n[bold]1. Data Quality[/bold]")
         dq_table = Table(show_header=True, header_style="bold magenta")
         dq_table.add_column("Metric")
@@ -40,7 +57,7 @@ class EDAVisualizer:
                 dq_table.add_row("Task Type", self.profile.task_type)
         console.print(dq_table)
 
-        # 2. Numeric Stats
+    def _render_numeric_stats(self, console, Table):
         console.print("\n[bold]2. Numeric Statistics[/bold]")
         stats_table = Table(show_header=True, header_style="bold cyan")
         stats_table.add_column("Column")
@@ -80,29 +97,30 @@ class EDAVisualizer:
         else:
             console.print("[italic]No numeric columns found.[/italic]")
 
-        # 2.1 VIF (Multicollinearity)
-        if self.profile.vif:
-            console.print("\n[bold]2.1 Multicollinearity (VIF)[/bold]")
-            vif_table = Table(show_header=True, header_style="bold red")
-            vif_table.add_column("Feature")
-            vif_table.add_column("VIF Score", justify="right")
-            vif_table.add_column("Status", justify="center")
+    def _render_vif(self, console, Table):
+        if not self.profile.vif:
+            return
+        console.print("\n[bold]2.1 Multicollinearity (VIF)[/bold]")
+        vif_table = Table(show_header=True, header_style="bold red")
+        vif_table.add_column("Feature")
+        vif_table.add_column("VIF Score", justify="right")
+        vif_table.add_column("Status", justify="center")
 
-            # Sort by VIF descending
-            sorted_vif = sorted(self.profile.vif.items(), key=lambda x: x[1], reverse=True)
+        # Sort by VIF descending
+        sorted_vif = sorted(self.profile.vif.items(), key=lambda x: x[1], reverse=True)
 
-            for col, val in sorted_vif:
-                status = "[green]OK[/green]"
-                if val > 10:
-                    status = "[red]Severe[/red]"
-                elif val > 5:
-                    status = "[yellow]High[/yellow]"
+        for col, val in sorted_vif:
+            status = "[green]OK[/green]"
+            if val > 10:
+                status = "[red]Severe[/red]"
+            elif val > 5:
+                status = "[yellow]High[/yellow]"
 
-                vif_table.add_row(col, f"{val:.2f}", status)
+            vif_table.add_row(col, f"{val:.2f}", status)
 
-            console.print(vif_table)
+        console.print(vif_table)
 
-        # 3. Categorical Stats
+    def _render_categorical_stats(self, console, Table):
         console.print("\n[bold]3. Categorical Statistics[/bold]")
         cat_table = Table(show_header=True, header_style="bold yellow")
         cat_table.add_column("Column")
@@ -129,7 +147,7 @@ class EDAVisualizer:
         else:
             console.print("[italic]No categorical columns found.[/italic]")
 
-        # 4. Text Stats
+    def _render_text_stats(self, console, Table):
         console.print("\n[bold]4. Text Statistics[/bold]")
         text_table = Table(show_header=True, header_style="bold white")
         text_table.add_column("Column")
@@ -164,269 +182,259 @@ class EDAVisualizer:
         else:
             console.print("[italic]No text columns found.[/italic]")
 
-        # 5. Outliers
-        if self.profile.outliers:
-            console.print("\n[bold]5. Outlier Detection[/bold]")
-            console.print(
-                f"Detected [red]{self.profile.outliers.total_outliers}[/red] outliers ({self.profile.outliers.outlier_percentage:.2f}%)"
+    def _render_outliers(self, console, Table):
+        if not self.profile.outliers:
+            return
+        console.print("\n[bold]5. Outlier Detection[/bold]")
+        console.print(
+            f"Detected [red]{self.profile.outliers.total_outliers}[/red] outliers "
+            f"({self.profile.outliers.outlier_percentage:.2f}%)"
+        )
+
+        outlier_table = Table(title="Top Anomalies")
+        outlier_table.add_column("Index", justify="right")
+        outlier_table.add_column("Score", justify="right")
+        outlier_table.add_column("Explanation", style="italic")
+
+        for outlier in self.profile.outliers.top_outliers[:3]:
+            explanation = str(outlier.explanation) if outlier.explanation else "-"
+            outlier_table.add_row(str(outlier.index), f"{outlier.score:.4f}", explanation)
+
+        console.print(outlier_table)
+
+    def _render_causal_graph(self, console, Table):
+        if not self.profile.causal_graph:
+            return
+        console.print("\n[bold]6. Causal Discovery[/bold]")
+        console.print(
+            f"Graph: {len(self.profile.causal_graph.nodes)} nodes, "
+            f"{len(self.profile.causal_graph.edges)} edges"
+        )
+
+        edge_table = Table(show_header=False)
+        for edge in self.profile.causal_graph.edges:
+            arrow = "->" if edge.type == "directed" else "--"
+            edge_table.add_row(f"{edge.source} {arrow} {edge.target}")
+        console.print(edge_table)
+
+    def _render_geospatial(self, console):
+        if not self.profile.geospatial:
+            return
+        console.print("\n[bold]7. Geospatial Analysis[/bold]")
+        console.print(
+            f"Detected Lat/Lon: {self.profile.geospatial.lat_col}, "
+            f"{self.profile.geospatial.lon_col}"
+        )
+        console.print(
+            f"Bounds: ({self.profile.geospatial.min_lat:.4f}, "
+            f"{self.profile.geospatial.min_lon:.4f}) to "
+            f"({self.profile.geospatial.max_lat:.4f}, "
+            f"{self.profile.geospatial.max_lon:.4f})"
+        )
+
+    def _render_timeseries(self, console):
+        if not (self.profile.timeseries and self.profile.timeseries.trend):
+            return
+        console.print("\n[bold]8. Time Series Analysis[/bold]")
+        console.print(f"Detected Date Column: {self.profile.timeseries.date_col}")
+
+        min_date = self.profile.timeseries.trend[0].date
+        max_date = self.profile.timeseries.trend[-1].date
+        console.print(f"Range: {min_date} to {max_date}")
+
+        if self.profile.timeseries.seasonality:
+            # Schema exposes day_of_week and month_of_year lists rather than period/strength.
+            console.print("Seasonality Analysis: Available (Day of Week, Month of Year)")
+
+    def _render_target_analysis(self, console, Table):
+        if not self.profile.target_col:
+            return
+        console.print(f"\n[bold]9. Target Analysis (Target: {self.profile.target_col})[/bold]")
+
+        # Numeric Target: Correlations
+        if self.profile.target_correlations:
+            corr_table = Table(
+                show_header=True, header_style="bold green", title="Top Correlations"
             )
+            corr_table.add_column("Feature")
+            corr_table.add_column("Correlation", justify="right")
 
-            outlier_table = Table(title="Top Anomalies")
-            outlier_table.add_column("Index", justify="right")
-            outlier_table.add_column("Score", justify="right")
-            outlier_table.add_column("Explanation", style="italic")
-
-            for outlier in self.profile.outliers.top_outliers[:3]:
-                explanation = str(outlier.explanation) if outlier.explanation else "-"
-                outlier_table.add_row(str(outlier.index), f"{outlier.score:.4f}", explanation)
-
-            console.print(outlier_table)
-
-        # 6. Causal Graph
-        if self.profile.causal_graph:
-            console.print("\n[bold]6. Causal Discovery[/bold]")
-            console.print(
-                f"Graph: {len(self.profile.causal_graph.nodes)} nodes, {len(self.profile.causal_graph.edges)} edges"
+            sorted_corrs = sorted(
+                self.profile.target_correlations.items(),
+                key=lambda x: abs(x[1]),
+                reverse=True,
             )
+            for col, corr in sorted_corrs[:5]:
+                corr_table.add_row(col, f"{corr:.4f}")
+            console.print(corr_table)
 
-            edge_table = Table(show_header=False)
-            for edge in self.profile.causal_graph.edges:
-                arrow = "->" if edge.type == "directed" else "--"
-                edge_table.add_row(f"{edge.source} {arrow} {edge.target}")
-            console.print(edge_table)
-
-        # 7. Geospatial Analysis
-        if self.profile.geospatial:
-            console.print("\n[bold]7. Geospatial Analysis[/bold]")
-            console.print(
-                f"Detected Lat/Lon: {self.profile.geospatial.lat_col}, {self.profile.geospatial.lon_col}"
-            )
-            console.print(
-                f"Bounds: ({self.profile.geospatial.min_lat:.4f}, {self.profile.geospatial.min_lon:.4f}) to ({self.profile.geospatial.max_lat:.4f}, {self.profile.geospatial.max_lon:.4f})"
-            )
-
-        # 8. Time Series Analysis
-        if self.profile.timeseries and self.profile.timeseries.trend:
-            console.print("\n[bold]8. Time Series Analysis[/bold]")
-            console.print(f"Detected Date Column: {self.profile.timeseries.date_col}")
-
-            min_date = self.profile.timeseries.trend[0].date
-            max_date = self.profile.timeseries.trend[-1].date
-            console.print(f"Range: {min_date} to {max_date}")
-
-            if self.profile.timeseries.seasonality:
-                # Seasonality object doesn't have 'period' or 'strength' directly on it based on schema
-                # It has day_of_week and month_of_year lists.
-                # Let's just print that seasonality analysis is available.
-                console.print("Seasonality Analysis: Available (Day of Week, Month of Year)")
-
-        # 9. Target Analysis
-        if self.profile.target_col:
-            console.print(f"\n[bold]9. Target Analysis (Target: {self.profile.target_col})[/bold]")
-
-            # Numeric Target: Correlations
-            if self.profile.target_correlations:
-                corr_table = Table(
-                    show_header=True, header_style="bold green", title="Top Correlations"
+        # Categorical Target: Interactions (ANOVA, boxplot only)
+        if self.profile.target_interactions:
+            interactions = [i for i in self.profile.target_interactions if i.plot_type == "boxplot"]
+            if interactions:
+                int_table = Table(
+                    show_header=True,
+                    header_style="bold green",
+                    title="Top Feature Associations (ANOVA)",
                 )
-                corr_table.add_column("Feature")
-                corr_table.add_column("Correlation", justify="right")
+                int_table.add_column("Feature")
+                int_table.add_column("p-value", justify="right")
+                int_table.add_column("Significance", justify="center")
 
-                # Sort by absolute correlation
-                sorted_corrs = sorted(
-                    self.profile.target_correlations.items(), key=lambda x: abs(x[1]), reverse=True
-                )
-                for col, corr in sorted_corrs[:5]:
-                    corr_table.add_row(col, f"{corr:.4f}")
-                console.print(corr_table)
+                interactions.sort(key=lambda x: x.p_value if x.p_value is not None else 1.0)
 
-            # Categorical Target: Interactions (ANOVA)
-            if self.profile.target_interactions:
-                # Filter for boxplots (which imply categorical target vs numeric feature)
-                interactions = [
-                    i for i in self.profile.target_interactions if i.plot_type == "boxplot"
-                ]
-                if interactions:
-                    int_table = Table(
-                        show_header=True,
-                        header_style="bold green",
-                        title="Top Feature Associations (ANOVA)",
+                for interaction in interactions[:5]:
+                    p_val = interaction.p_value
+                    p_str = f"{p_val:.4e}" if p_val is not None else "N/A"
+                    sig = (
+                        "[green]High[/green]"
+                        if p_val is not None and p_val < 0.05
+                        else "[yellow]Low[/yellow]"
                     )
-                    int_table.add_column("Feature")
-                    int_table.add_column("p-value", justify="right")
-                    int_table.add_column("Significance", justify="center")
+                    int_table.add_row(interaction.feature, p_str, sig)
+                console.print(int_table)
 
-                    # Sort by p-value
-                    interactions.sort(key=lambda x: x.p_value if x.p_value is not None else 1.0)
-
-                    for interaction in interactions[:5]:
-                        p_val = interaction.p_value
-                        p_str = f"{p_val:.4e}" if p_val is not None else "N/A"
-                        sig = (
-                            "[green]High[/green]"
-                            if p_val is not None and p_val < 0.05
-                            else "[yellow]Low[/yellow]"
-                        )
-                        int_table.add_row(interaction.feature, p_str, sig)
-                    console.print(int_table)
-
-        # 10. Decision Tree Rules
-        if self.profile.rule_tree:
-            # Check if regression (accuracy might be R2 or similar, but let's check rules format)
-            # Or check if class_name looks like a number
-            is_regression = False
-            if self.profile.rule_tree.nodes and self.profile.rule_tree.nodes[0].class_name:
+    def _detect_regression_tree(self) -> bool:
+        """Heuristic: a leaf with a numeric class_name implies regression."""
+        if not (self.profile.rule_tree and self.profile.rule_tree.nodes):
+            return False
+        for node in self.profile.rule_tree.nodes:
+            if node.is_leaf:
                 try:
-                    float(self.profile.rule_tree.nodes[0].class_name or "")
-                    # If root has a numeric class name (mean value), it's likely regression
-                    # But wait, root is not a leaf, so it might not have class_name set correctly in all implementations
-                    # Let's check the first leaf
-                    for node in self.profile.rule_tree.nodes:
-                        if node.is_leaf:
-                            float(node.class_name or "")
-                            is_regression = True
-                            break
+                    float(node.class_name or "")
+                    return True
                 except ValueError:
-                    pass
+                    return False
+        return False
 
-            metric_name = "R²" if is_regression else "Accuracy"
-            acc_str = (
-                f"{self.profile.rule_tree.accuracy:.2f}"
-                if is_regression
-                else f"{self.profile.rule_tree.accuracy:.1%}"
-            )
+    def _render_rule_tree(self, console, Table):
+        if not self.profile.rule_tree:
+            return
 
-            console.print(f"\n[bold]10. Decision Tree Rules ({metric_name}: {acc_str})[/bold]")
+        is_regression = self._detect_regression_tree()
+        metric_name = "R²" if is_regression else "Accuracy"
+        acc_str = (
+            f"{self.profile.rule_tree.accuracy:.2f}"
+            if is_regression
+            else f"{self.profile.rule_tree.accuracy:.1%}"
+        )
 
-            from rich.tree import Tree
+        console.print(f"\n[bold]10. Decision Tree Rules ({metric_name}: {acc_str})[/bold]")
 
-            nodes_map = {n.id: n for n in self.profile.rule_tree.nodes}
+        from rich.tree import Tree
 
-            def add_nodes(node_id, tree):
-                node = nodes_map.get(node_id)
-                if not node:
-                    return
+        nodes_map = {n.id: n for n in self.profile.rule_tree.nodes}
 
-                if node.is_leaf:
-                    if is_regression:
-                        # Regression Leaf
-                        val = float(node.class_name or "0")
-                        tree.add(f"[green]➜ Value = {val:.2f}[/green] [dim]n={node.samples}[/dim]")
-                    else:
-                        # Classification Leaf
-                        total = sum(node.value)
-                        conf = (max(node.value) / total * 100) if total > 0 else 0
-                        tree.add(
-                            f"[green]➜ {node.class_name}[/green] ({conf:.1f}%) [dim]n={node.samples}[/dim]"
-                        )
+        def add_nodes(node_id, tree):
+            node = nodes_map.get(node_id)
+            if not node:
+                return
+
+            if node.is_leaf:
+                if is_regression:
+                    val = float(node.class_name or "0")
+                    tree.add(f"[green]➜ Value = {val:.2f}[/green] [dim]n={node.samples}[/dim]")
                 else:
-                    # Left (True)
-                    if len(node.children) > 0:
-                        left_child = nodes_map.get(node.children[0])
-                        if left_child:
-                            branch = tree.add(
-                                f"[blue]{node.feature} <= {node.threshold:.2f}[/blue]"
-                            )
-                            add_nodes(node.children[0], branch)
+                    total = sum(node.value)
+                    conf = (max(node.value) / total * 100) if total > 0 else 0
+                    tree.add(
+                        f"[green]➜ {node.class_name}[/green] ({conf:.1f}%) "
+                        f"[dim]n={node.samples}[/dim]"
+                    )
+                return
 
-                    # Right (False)
-                    if len(node.children) > 1:
-                        right_child = nodes_map.get(node.children[1])
-                        if right_child:
-                            branch = tree.add(
-                                f"[magenta]{node.feature} > {node.threshold:.2f}[/magenta]"
-                            )
-                            add_nodes(node.children[1], branch)
+            # Left (True)
+            if len(node.children) > 0 and nodes_map.get(node.children[0]):
+                branch = tree.add(f"[blue]{node.feature} <= {node.threshold:.2f}[/blue]")
+                add_nodes(node.children[0], branch)
 
-            if 0 in nodes_map:
-                root = Tree("Root")
-                add_nodes(0, root)
-                console.print(root)
+            # Right (False)
+            if len(node.children) > 1 and nodes_map.get(node.children[1]):
+                branch = tree.add(f"[magenta]{node.feature} > {node.threshold:.2f}[/magenta]")
+                add_nodes(node.children[1], branch)
 
-            # Print Text Rules if available
-            if self.profile.rule_tree.rules:
-                console.print("\n[italic]Extracted Rules:[/italic]")
-                for rule in self.profile.rule_tree.rules:
-                    console.print(f"[dim]• {rule}[/dim]")
+        if 0 in nodes_map:
+            root = Tree("Root")
+            add_nodes(0, root)
+            console.print(root)
 
-            # Feature Importance
-            if self.profile.rule_tree.feature_importances:
-                console.print("\n[bold]Feature Importance (Surrogate Model)[/bold]")
-                fi_table = Table(show_header=True, header_style="bold green")
-                fi_table.add_column("Feature")
-                fi_table.add_column("Importance", justify="right")
-                fi_table.add_column("Bar", style="dim")
+        if self.profile.rule_tree.rules:
+            console.print("\n[italic]Extracted Rules:[/italic]")
+            for rule in self.profile.rule_tree.rules:
+                console.print(f"[dim]• {rule}[/dim]")
 
-                for item in self.profile.rule_tree.feature_importances[:10]:  # Top 10
-                    feature = item.get("feature", "Unknown")
-                    importance = item.get("importance", 0.0)
-                    bar_len = int(importance * 20)
-                    bar = "█" * bar_len
-                    fi_table.add_row(str(feature), f"{importance:.4f}", bar)
+        if self.profile.rule_tree.feature_importances:
+            console.print("\n[bold]Feature Importance (Surrogate Model)[/bold]")
+            fi_table = Table(show_header=True, header_style="bold green")
+            fi_table.add_column("Feature")
+            fi_table.add_column("Importance", justify="right")
+            fi_table.add_column("Bar", style="dim")
 
-                console.print(fi_table)
+            for item in self.profile.rule_tree.feature_importances[:10]:
+                feature = item.get("feature", "Unknown")
+                importance = item.get("importance", 0.0)
+                bar_len = int(importance * 20)
+                bar = "█" * bar_len
+                fi_table.add_row(str(feature), f"{importance:.4f}", bar)
 
-        # 11. PCA Structure (Latent Features)
-        if self.profile.pca_components:
-            console.print(f"\n[bold]11. PCA Latent Structure[/bold]")
-            pca_table = Table(show_header=True, header_style="bold magenta")
-            pca_table.add_column("Component")
-            pca_table.add_column("Variance")
-            pca_table.add_column("Top Loading Features")
+            console.print(fi_table)
 
-            for comp in self.profile.pca_components[:3]:
-                feats = []
-                for k, v in comp.top_features.items():
-                    sign = "+" if v > 0 else ""
-                    feats.append(f"{k} ({sign}{v:.2f})")
-                feat_str = ", ".join(feats)
-                pca_table.add_row(comp.component, f"{comp.explained_variance_ratio:.1%}", feat_str)
-            console.print(pca_table)
+    def _render_pca(self, console, Table):
+        if not self.profile.pca_components:
+            return
+        console.print("\n[bold]11. PCA Latent Structure[/bold]")
+        pca_table = Table(show_header=True, header_style="bold magenta")
+        pca_table.add_column("Component")
+        pca_table.add_column("Variance")
+        pca_table.add_column("Top Loading Features")
 
-        # 12. Clustering Analysis
-        if self.profile.clustering:
-            console.print(
-                f"\n[bold]12. Clustering Structure ({self.profile.clustering.method})[/bold]"
+        for comp in self.profile.pca_components[:3]:
+            feats = []
+            for k, v in comp.top_features.items():
+                sign = "+" if v > 0 else ""
+                feats.append(f"{k} ({sign}{v:.2f})")
+            feat_str = ", ".join(feats)
+            pca_table.add_row(comp.component, f"{comp.explained_variance_ratio:.1%}", feat_str)
+        console.print(pca_table)
+
+    def _render_clustering(self, console, Table):
+        if not self.profile.clustering:
+            return
+        console.print(f"\n[bold]12. Clustering Structure ({self.profile.clustering.method})[/bold]")
+        console.print(
+            f"Clusters: {self.profile.clustering.n_clusters} | "
+            f"Inertia: {self.profile.clustering.inertia:.2f}"
+        )
+
+        cluster_table = Table(show_header=True, header_style="bold cyan")
+        cluster_table.add_column("ID", justify="right")
+        cluster_table.add_column("Size", justify="right")
+        cluster_table.add_column("Size %", justify="right")
+        cluster_table.add_column("Key Characteristics (Centroids)", style="italic")
+
+        for cluster in self.profile.clustering.clusters:
+            # Show first 3 features of each centroid; deviation-from-mean ranking
+            # would be richer but requires the full feature distribution.
+            items = list(cluster.center.items())[:3]
+            feature_str = ", ".join([f"{k}={v:.2f}" for k, v in items])
+            if len(cluster.center) > 3:
+                feature_str += "..."
+
+            cluster_table.add_row(
+                str(cluster.cluster_id),
+                str(cluster.size),
+                f"{cluster.percentage:.1f}%",
+                feature_str,
             )
-            console.print(
-                f"Clusters: {self.profile.clustering.n_clusters} | Inertia: {self.profile.clustering.inertia:.2f}"
-            )
+        console.print(cluster_table)
 
-            cluster_table = Table(show_header=True, header_style="bold cyan")
-            cluster_table.add_column("ID", justify="right")
-            cluster_table.add_column("Size", justify="right")
-            cluster_table.add_column("Size %", justify="right")
-            cluster_table.add_column("Key Characteristics (Centroids)", style="italic")
-
-            for cluster in self.profile.clustering.clusters:
-                # Format centroids
-                features = []
-                # Sort by absolute magnitude or variance?
-                # Ideally we show top features that deviate from global mean,
-                # but 'center' here is just the coordinate.
-                # For now, let's just show top 3 features by order (assuming important ones are first or unsorted)
-                # Or show all if few.
-
-                # Let's show up to 3 features
-                items = list(cluster.center.items())[:3]
-                feature_str = ", ".join([f"{k}={v:.2f}" for k, v in items])
-                if len(cluster.center) > 3:
-                    feature_str += "..."
-
-                cluster_table.add_row(
-                    str(cluster.cluster_id),
-                    str(cluster.size),
-                    f"{cluster.percentage:.1f}%",
-                    feature_str,
-                )
-            console.print(cluster_table)
-
-        # 12. Smart Alerts
-        if self.profile.alerts:
-            console.print("\n[bold]12. Smart Alerts[/bold]")
-            for alert in self.profile.alerts:
-                color = "red" if alert.severity == "high" else "yellow"
-                console.print(f"[{color}]• {alert.message}[/{color}]")
+    def _render_alerts(self, console):
+        if not self.profile.alerts:
+            return
+        console.print("\n[bold]12. Smart Alerts[/bold]")
+        for alert in self.profile.alerts:
+            color = "red" if alert.severity == "high" else "yellow"
+            console.print(f"[{color}]• {alert.message}[/{color}]")
 
     def plot(self):
         """Generates and shows all available plots using Matplotlib."""
@@ -619,11 +627,11 @@ class EDAVisualizer:
         labels = [p.label for p in self.profile.pca_data]
 
         try:
-            c_values = [float(l) for l in labels if l is not None]
+            c_values = [float(lbl) for lbl in labels if lbl is not None]
         except (ValueError, TypeError):
-            unique_labels = list(set([l for l in labels if l is not None]))
-            label_map = {l: i for i, l in enumerate(unique_labels)}
-            c_values = [label_map.get(l, -1) for l in labels if l is not None]
+            unique_labels = list({lbl for lbl in labels if lbl is not None})
+            label_map = {lbl: i for i, lbl in enumerate(unique_labels)}
+            c_values = [label_map.get(lbl, -1) for lbl in labels if lbl is not None]
 
         plt.figure(figsize=(8, 6))
         scatter = plt.scatter(x, y, c=c_values, cmap="viridis", alpha=0.8)
@@ -647,11 +655,11 @@ class EDAVisualizer:
         c_values = None
         if any(labels):
             try:
-                c_values = [float(l) if l is not None else -1 for l in labels]
+                c_values = [float(lbl) if lbl is not None else -1 for lbl in labels]
             except (ValueError, TypeError):
-                unique_labels = list(set([l for l in labels if l is not None]))
-                label_map = {l: i for i, l in enumerate(unique_labels)}
-                c_values = [label_map.get(l, -1) if l is not None else -1 for l in labels]
+                unique_labels = list({lbl for lbl in labels if lbl is not None})
+                label_map = {lbl: i for i, lbl in enumerate(unique_labels)}
+                c_values = [label_map.get(lbl, -1) if lbl is not None else -1 for lbl in labels]
 
         plt.figure(figsize=(10, 6))
         scatter = plt.scatter(lons, lats, c=c_values, cmap="viridis", alpha=0.6, s=10)
@@ -697,7 +705,7 @@ class EDAVisualizer:
         for col, values in values_map.items():
             plt.plot(dates, values, label=col)
 
-        plt.title(f"Time Series Trend (Daily Aggregation)")
+        plt.title("Time Series Trend (Daily Aggregation)")
         plt.xlabel(f"Date ({self.profile.timeseries.date_col})")
         plt.ylabel("Value (Mean)")
         plt.legend()
