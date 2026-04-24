@@ -15,7 +15,7 @@ from ..engines import SkyulfDataFrame, get_engine
 # --- Optional Dependencies ---
 fuzz: Any = None
 try:
-    from rapidfuzz import fuzz as _fuzz  # type: ignore[import-not-found]
+    from rapidfuzz import fuzz as _fuzz  # type: ignore[import-not-found]  # ty: ignore[unresolved-import]
 
     fuzz = _fuzz
     _HAS_RAPIDFUZZ = True

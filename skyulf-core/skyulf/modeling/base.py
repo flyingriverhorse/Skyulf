@@ -224,6 +224,7 @@ class StatefulEstimator:
         if not is_test_empty:
             if isinstance(dataset.test, tuple):
                 X_test, y_test_split = dataset.test
+                X_test = cast(Any, X_test)
                 # If y is None, the target may still be in X — drop it
                 if (
                     y_test_split is None
@@ -249,6 +250,7 @@ class StatefulEstimator:
         if dataset.validation is not None:
             if isinstance(dataset.validation, tuple):
                 X_val, y_val_split = dataset.validation
+                X_val = cast(Any, X_val)
                 # If y is None, the target may still be in X — drop it
                 if (
                     y_val_split is None
