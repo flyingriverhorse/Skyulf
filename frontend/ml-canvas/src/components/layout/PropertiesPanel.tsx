@@ -119,10 +119,15 @@ const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }
     edges.filter((e) => e.target === selectedNode.id).map((e) => e.source)
   ).size;
 
+  // Auto-parallel terminals (data_preview) render each input in its own
+  // tab instead of merging columns, so the merge-strategy dropdown is
+  // meaningless for them. Mirror AUTO_PARALLEL_STEP_TYPES in graph_utils.py
+  // and AUTO_PARALLEL_TYPES in useBranchColors.ts.
+  const isAutoParallel = definitionType === 'data_preview';
+
   // Only expose the strategy when the node actually merges: multi-input
-  // node with 2+ distinct upstream sources. Hidden otherwise to avoid
-  // cluttering single-input nodes.
-  if (!canMerge || incomingSourceCount < 2) return null;
+  // node with 2+ distinct upstream sources, and not an auto-parallel terminal.
+  if (!canMerge || incomingSourceCount < 2 || isAutoParallel) return null;
 
   const current = (selectedNode.data as { merge_strategy?: string }).merge_strategy ?? 'last_wins';
 

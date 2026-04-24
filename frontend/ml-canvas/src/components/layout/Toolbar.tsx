@@ -137,7 +137,19 @@ export const Toolbar: React.FC = () => {
 
     setIsRunningAll(true);
     try {
-      const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
+      // Exclude Data Preview nodes from "Run All Experiments" -- preview is
+      // an inspection-only sink and should never be queued as a training
+      // experiment. Backend treats data_preview as a terminal in
+      // partition_parallel_pipeline, so leaving it in would spawn a bogus
+      // "preview" job alongside the real training runs.
+      const previewIds = new Set(
+        nodes.filter(n => n.data.definitionType === 'data_preview').map(n => n.id),
+      );
+      const filteredNodes = nodes.filter(n => !previewIds.has(n.id));
+      const filteredEdges = edges.filter(
+        e => !previewIds.has(e.source) && !previewIds.has(e.target),
+      );
+      const pipelineConfig = convertGraphToPipelineConfig(filteredNodes, filteredEdges);
       const response = await jobsApi.runPipeline({
         ...pipelineConfig,
         job_type: 'basic_training',
