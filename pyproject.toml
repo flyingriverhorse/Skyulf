@@ -132,11 +132,10 @@ extend-exclude = '''
 
 [tool.ty.environment]
 python-version = "3.12"
-python = ".venv"
 extra-paths = ["skyulf-core"]
 
 [tool.ty.src]
-include = ["backend", "tests", "skyulf-core/skyulf", "skyulf-core/tests"]
+include = ["backend", "skyulf-core/skyulf", "skyulf-core/tests"]
 exclude = [
     ".venv",
     "site",
