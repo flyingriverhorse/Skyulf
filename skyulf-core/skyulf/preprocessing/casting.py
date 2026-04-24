@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -63,11 +63,13 @@ def _coerce_boolean_value(value: Any) -> Optional[bool]:
 
 class CastingApplier(BaseApplier):
     def apply(
-        self, df: SkyulfDataFrame, params: Dict[str, Any]
-    ) -> Union[SkyulfDataFrame, Tuple[SkyulfDataFrame, Any]]:
+        self,
+        df: Union[pd.DataFrame, SkyulfDataFrame, tuple],
+        params: Dict[str, Any],
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
-        
+
         type_map = params.get("type_map", {})
         coerce_on_error = params.get("coerce_on_error", True)
 
@@ -77,15 +79,15 @@ class CastingApplier(BaseApplier):
         # Polars Path
         if engine.name == "polars":
             import polars as pl
-            
+
             exprs = []
             for col, target_dtype in type_map.items():
                 if col not in X.columns:
                     continue
-                
+
                 dtype_str = str(target_dtype).lower()
                 pl_dtype = None
-                
+
                 # Map to Polars types
                 if dtype_str in ["float", "float64", "double", "numeric"]:
                     pl_dtype = pl.Float64
@@ -103,7 +105,7 @@ class CastingApplier(BaseApplier):
                     pl_dtype = pl.Categorical
                 elif dtype_str.startswith("datetime") or dtype_str == "date":
                     pl_dtype = pl.Datetime
-                
+
                 if pl_dtype:
                     # Handle coercion if needed (strict=False returns null on error)
                     if coerce_on_error:
@@ -113,14 +115,14 @@ class CastingApplier(BaseApplier):
                 else:
                     # Fallback or unknown type
                     pass
-            
+
             if exprs:
                 X = X.with_columns(exprs)
-            
+
             return pack_pipeline_output(X, y, is_tuple)
 
         # Pandas Path
-        return self._apply_dataframe(X, params, y, is_tuple)
+        return self._apply_dataframe(cast(pd.DataFrame, X), params, y, is_tuple)
 
     def _apply_dataframe(  # noqa: C901
         self, df: pd.DataFrame, params: Dict[str, Any], y=None, is_tuple=False
@@ -142,32 +144,23 @@ class CastingApplier(BaseApplier):
 
                 if dtype_str.startswith("float"):
                     # Float Family
-                    numeric = pd.to_numeric(
-                        series, errors="coerce" if coerce_on_error else "raise"
-                    )
+                    numeric = pd.to_numeric(series, errors="coerce" if coerce_on_error else "raise")
                     df_out[col] = numeric.astype(target_dtype)
-
 
                 elif dtype_str.startswith("int"):
                     # Int Family
-                    numeric = pd.to_numeric(
-                        series, errors="coerce" if coerce_on_error else "raise"
-                    )
+                    numeric = pd.to_numeric(series, errors="coerce" if coerce_on_error else "raise")
 
                     # Check for fractional values
                     if coerce_on_error:
                         # If coercing, we set fractional to NaN
                         valid_mask = numeric.notna()
-                        fractional_mask = valid_mask & ~np.isclose(
-                            numeric, np.round(numeric)
-                        )
+                        fractional_mask = valid_mask & ~np.isclose(numeric, np.round(numeric))
                         if fractional_mask.any():
                             numeric.loc[fractional_mask] = np.nan
                     else:
                         # If not coercing, we raise error on fractional
-                        fractional_mask = numeric.notna() & ~np.isclose(
-                            numeric, np.round(numeric)
-                        )
+                        fractional_mask = numeric.notna() & ~np.isclose(numeric, np.round(numeric))
                         if fractional_mask.any():
                             raise ValueError(
                                 f"Column {col} contains fractional values, cannot cast to integer."
@@ -194,21 +187,15 @@ class CastingApplier(BaseApplier):
                             raise
                         # Robust coercion
                         coerced_values = [
-                            (
-                                pd.NA
-                                if (result := _coerce_boolean_value(val)) is None
-                                else result
-                            )
+                            (pd.NA if (result := _coerce_boolean_value(val)) is None else result)
                             for val in series
                         ]
-                        df_out[col] = pd.Series(
-                            coerced_values, index=series.index, dtype="boolean"
-                        )
+                        df_out[col] = pd.Series(coerced_values, index=series.index, dtype="boolean")
 
                 elif dtype_str.startswith("datetime"):
                     # Datetime Family
                     errors = "coerce" if coerce_on_error else "raise"
-                    df_out[col] = pd.to_datetime(series, errors=errors)  # type: ignore
+                    df_out[col] = pd.to_datetime(series, errors=errors)
 
                 else:
                     # String / Category / Other
@@ -220,7 +207,10 @@ class CastingApplier(BaseApplier):
                 # If coercion is on, we might leave it as is or try best effort?
                 pass
 
-        return pack_pipeline_output(df_out, y, is_tuple)
+        return cast(
+            Union[pd.DataFrame, Tuple[pd.DataFrame, Any]],
+            pack_pipeline_output(df_out, y, is_tuple),
+        )
 
 
 @NodeRegistry.register("Casting", CastingApplier)
@@ -229,20 +219,22 @@ class CastingApplier(BaseApplier):
     name="Type Casting",
     category="Data Operations",
     description="Cast columns to specific data types.",
-    params={"type_map": {}, "coerce_on_error": True}
+    params={"type_map": {}, "coerce_on_error": True},
 )
 class CastingCalculator(BaseCalculator):
     def fit(
-        self, df: SkyulfDataFrame, config: Dict[str, Any]
+        self,
+        df: Union[pd.DataFrame, SkyulfDataFrame, tuple],
+        config: Dict[str, Any],
     ) -> Dict[str, Any]:
         # Config: {'columns': ['col1'], 'target_type': 'float'}
         # OR {'column_types': {'col1': 'float', 'col2': 'int'}}
-        
+
         X, _, _ = unpack_pipeline_input(df)
-        # We don't need to convert to pandas just to check columns, 
+        # We don't need to convert to pandas just to check columns,
         # but let's keep it consistent if we need complex logic.
         # Here we just check columns existence.
-        
+
         target_type = config.get("target_type")
         columns = config.get("columns", [])
         column_types = config.get("column_types", {})

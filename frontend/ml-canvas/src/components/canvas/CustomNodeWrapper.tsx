@@ -19,9 +19,25 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
     (a, b) => a === b
   );
 
+  // Has this node received an active sibling-fan-in advisory with real
+  // overlap (i.e. last-wins overwrite is happening)? If so, color the
+  // merge badge amber so the canvas itself flags the risk.
+  const mergeWarningSeverity: 'risk' | 'safe' | null = (() => {
+    const warnings = executionResult?.merge_warnings ?? [];
+    const w = warnings.find((mw) => mw.node_id === id);
+    if (!w) return null;
+    return (w.overlap_columns?.length ?? 0) > 0 ? 'risk' : 'safe';
+  })();
+
   // Parallel badge only on training/tuning nodes when user explicitly chose it
   const isTrainingNode = TRAINING_TYPES.has(definitionType);
   const isParallel = isTrainingNode && data.execution_mode === 'parallel';
+
+  // Only nodes that actually consume upstream data (i.e. declare an input
+  // port) can merge. Dataset/data-loader nodes have no inputs and must not
+  // show a merge badge even if React Flow allowed an edge in.
+  const canMerge = (definition?.inputs?.length ?? 0) > 0;
+  const showMergeBadge = canMerge && incomingSourceCount > 1;
 
   const onDelete = (evt: React.MouseEvent) => {
     evt.stopPropagation();
@@ -56,16 +72,20 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <div className="text-sm font-bold">{definition.label}</div>
-            {incomingSourceCount > 1 && (
+            {showMergeBadge && (
               <span
                 className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                   isParallel
                     ? 'bg-amber-500/15 text-amber-500'
+                    : mergeWarningSeverity === 'risk'
+                    ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/40'
                     : 'bg-blue-500/15 text-blue-400'
                 }`}
                 title={
                   isParallel
                     ? `Parallel: ${incomingSourceCount} branches will run as separate experiments`
+                    : mergeWarningSeverity === 'risk'
+                    ? `Merge with overlap: ${incomingSourceCount} branches share columns — last input overwrites earlier ones. See Results panel banner for details.`
                     : `Merge: combining data from ${incomingSourceCount} upstream sources`
                 }
               >

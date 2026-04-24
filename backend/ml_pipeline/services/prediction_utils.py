@@ -6,7 +6,7 @@ Used by DeploymentService and EvaluationService.
 """
 
 import logging
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +29,10 @@ def extract_target_label_encoder(
         return None
 
     # Walk backwards so the most recent LabelEncoder wins
-    for step in reversed(fitted_steps):
-        if not isinstance(step, dict):
+    for raw_step in reversed(fitted_steps):
+        if not isinstance(raw_step, dict):
             continue
+        step = cast(Dict[str, Any], raw_step)
         if step.get("type") != "LabelEncoder":
             continue
         artifact = step.get("artifact")
@@ -84,5 +85,7 @@ def decode_int_like(values: List[Any], label_encoder: Any) -> List[Any]:
         decoded = label_encoder.inverse_transform(int_arr)
         return decoded.tolist() if hasattr(decoded, "tolist") else list(decoded)
     except Exception:
-        logging.getLogger(__name__).debug("Label decoding failed, returning raw values", exc_info=True)
+        logging.getLogger(__name__).debug(
+            "Label decoding failed, returning raw values", exc_info=True
+        )
         return values

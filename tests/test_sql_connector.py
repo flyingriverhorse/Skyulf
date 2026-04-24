@@ -1,4 +1,5 @@
 """Tests for SQL connector: validation, pooling, and timeouts."""
+
 import pytest
 
 from backend.data_ingestion.connectors.sql import (
@@ -8,7 +9,6 @@ from backend.data_ingestion.connectors.sql import (
     _validate_table_name,
     get_pooled_engine,
 )
-
 
 # ---------- Table name validation ----------
 

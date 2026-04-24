@@ -60,9 +60,7 @@ def calculate_classification_metrics(
         "recall_weighted": float(
             recall_score(y_arr, predictions, average="weighted", zero_division=0)
         ),
-        "f1_weighted": float(
-            f1_score(y_arr, predictions, average="weighted", zero_division=0)
-        ),
+        "f1_weighted": float(f1_score(y_arr, predictions, average="weighted", zero_division=0)),
     }
 
     # Add unweighted metrics for binary classification
@@ -75,17 +73,13 @@ def calculate_classification_metrics(
             metrics["recall"] = float(
                 recall_score(y_arr, predictions, average="binary", zero_division=0)
             )
-            metrics["f1"] = float(
-                f1_score(y_arr, predictions, average="binary", zero_division=0)
-            )
+            metrics["f1"] = float(f1_score(y_arr, predictions, average="binary", zero_division=0))
     except Exception:
         pass
 
     if geometric_mean_score is not None:
         try:
-            metrics["g_score"] = float(
-                geometric_mean_score(y_arr, predictions, average="weighted")
-            )
+            metrics["g_score"] = float(geometric_mean_score(y_arr, predictions, average="weighted"))
         except Exception:
             pass
 
@@ -97,23 +91,17 @@ def calculate_classification_metrics(
                 try:
                     if class_count == 2:
                         metrics["roc_auc"] = float(roc_auc_score(y_arr, proba[:, 1]))
-                        metrics["pr_auc"] = float(
-                            average_precision_score(y_arr, proba[:, 1])
-                        )
+                        metrics["pr_auc"] = float(average_precision_score(y_arr, proba[:, 1]))
                     else:
                         metrics["roc_auc_weighted"] = float(
-                            roc_auc_score(
-                                y_arr, proba, multi_class="ovr", average="weighted"
-                            )
+                            roc_auc_score(y_arr, proba, multi_class="ovr", average="weighted")
                         )
                         classes = getattr(model, "classes_", None)
                         if classes is None or len(classes) != class_count:
                             classes = np.arange(class_count)
                         y_indicator = label_binarize(y_arr, classes=classes)
                         metrics["pr_auc_weighted"] = float(
-                            average_precision_score(
-                                y_indicator, proba, average="weighted"
-                            )
+                            average_precision_score(y_indicator, proba, average="weighted")
                         )
                 except Exception:
                     pass

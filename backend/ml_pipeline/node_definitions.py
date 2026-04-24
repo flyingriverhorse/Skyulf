@@ -42,10 +42,10 @@ class NodeRegistry:
         items = []
         if SKYULF_AVAILABLE:
             for node_id, metadata in SkyulfRegistry._metadata.items():
-                 # Convert skyulf metadata to RegistryItem
-                 # We assume metadata dict matches the structure or we map fields
-                 # Skyulf meta: id, name, category, description, params
-                 items.append(RegistryItem(**metadata))
+                # Convert skyulf metadata to RegistryItem
+                # We assume metadata dict matches the structure or we map fields
+                # Skyulf meta: id, name, category, description, params
+                items.append(RegistryItem(**metadata))
         return items
 
     @staticmethod
@@ -64,8 +64,8 @@ class NodeRegistry:
         # Merge with dynamic nodes (favoring dynamic if ID exists)
         dynamic_nodes = NodeRegistry.get_dynamic_nodes()
         dynamic_ids = {node.id for node in dynamic_nodes}
-        
+
         # Filter out static nodes that are overwritten by dynamic ones
         final_nodes = [n for n in static_nodes if n.id not in dynamic_ids]
-        
+
         return final_nodes + dynamic_nodes

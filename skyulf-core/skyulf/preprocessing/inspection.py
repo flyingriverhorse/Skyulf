@@ -14,7 +14,7 @@ class DatasetProfileApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         # Inspection nodes do not modify data
         return df
 
@@ -25,7 +25,7 @@ class DatasetProfileApplier(BaseApplier):
     name="Dataset Profile",
     category="Inspection",
     description="Generate a statistical profile of the dataset.",
-    params={}
+    params={},
 )
 class DatasetProfileCalculator(BaseCalculator):
     def fit(
@@ -44,9 +44,7 @@ class DatasetProfileCalculator(BaseCalculator):
 
             profile["rows"] = len(X)
             profile["columns"] = len(X.columns)
-            profile["dtypes"] = {
-                col: str(dtype) for col, dtype in zip(X.columns, X.dtypes)
-            }
+            profile["dtypes"] = {col: str(dtype) for col, dtype in zip(X.columns, X.dtypes)}
             profile["missing"] = {col: X[col].null_count() for col in X.columns}
 
             # Numeric stats
@@ -60,22 +58,22 @@ class DatasetProfileCalculator(BaseCalculator):
                 desc_df = X.select(numeric_cols).describe()
                 # Convert to list of dicts
                 desc_dicts = desc_df.to_dicts()
-                
+
                 stats: dict[str, dict[str, object]] = {}
                 # Initialize stats dicts
                 for col in numeric_cols:
                     stats[col] = {}
-                
+
                 for row in desc_dicts:
                     # Polars < 0.19 uses "describe", newer uses "statistic"
                     metric = row.get("describe") or row.get("statistic")
                     if not metric:
                         continue
-                        
+
                     for col in numeric_cols:
                         if col in row:
                             stats[col][metric] = row[col]
-                            
+
                 profile["numeric_stats"] = stats
         else:
             # Pandas logic
@@ -97,7 +95,7 @@ class DataSnapshotApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         return df
 
 
@@ -107,7 +105,7 @@ class DataSnapshotApplier(BaseApplier):
     name="Data Snapshot",
     category="Inspection",
     description="Take a snapshot of the first N rows of the dataset.",
-    params={"n_rows": 5}
+    params={"n_rows": 5},
 )
 class DataSnapshotCalculator(BaseCalculator):
     def fit(
@@ -119,7 +117,7 @@ class DataSnapshotCalculator(BaseCalculator):
         engine = get_engine(X)
 
         n = config.get("n_rows", 5)
-        
+
         if engine.name == "polars":
             snapshot = X.head(n).to_dicts()
         else:

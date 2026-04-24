@@ -53,22 +53,40 @@ const FlowCanvasContent: React.FC = () => {
   useClipboard();
 
   const branchColorMap = useBranchColors(nodes, edges);
+
+  // Edges that "won" a merge: for every sibling_fan_in advisory, mark the
+  // edge from winner_input -> advisory.node_id so the canvas can highlight
+  // which branch's values survived the last-wins / first-wins tiebreak.
+  const winnerEdgeIds = useMemo(() => {
+    const ids = new Set<string>();
+    const warnings = executionResult?.merge_warnings ?? [];
+    for (const w of warnings) {
+      if (!w.winner_input || !w.node_id) continue;
+      const edge = edges.find(
+        (e) => e.source === w.winner_input && e.target === w.node_id
+      );
+      if (edge) ids.add(edge.id);
+    }
+    return ids;
+  }, [edges, executionResult]);
+
   const coloredEdges = useMemo(() => {
-    if (branchColorMap.size === 0) return edges;
     return edges.map(edge => {
       const info = branchColorMap.get(edge.id);
-      if (info === undefined) return edge; // not part of any branch
+      const isMergeWinner = winnerEdgeIds.has(edge.id);
+      if (info === undefined && !isMergeWinner) return edge;
       return {
         ...edge,
         data: {
           ...edge.data,
-          branchColor: info.color,
-          branchLabel: info.label,
-          branchShared: info.shared,
+          branchColor: info?.color,
+          branchLabel: info?.label,
+          branchShared: info?.shared,
+          isMergeWinner,
         },
       };
     });
-  }, [edges, branchColorMap]);
+  }, [edges, branchColorMap, winnerEdgeIds]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();

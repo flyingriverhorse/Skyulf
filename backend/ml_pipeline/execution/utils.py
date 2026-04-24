@@ -4,7 +4,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database.models import DataSource
 
-
 _BRANCH_RE = re.compile(r"^(.+?)__branch_(\d+)(?:_(\d+))?$")
 
 
@@ -20,7 +19,10 @@ def parse_branch_info(pipeline_id: str) -> Tuple[Optional[str], Optional[int]]:
     idx = int(m.group(2))
     return parent, idx
 
-async def resolve_dataset_name(session: AsyncSession, dataset_source_id: Optional[str]) -> Optional[str]:
+
+async def resolve_dataset_name(
+    session: AsyncSession, dataset_source_id: Optional[str]
+) -> Optional[str]:
     """
     Resolves the dataset name from a dataset_source_id.
     Handles both integer IDs (as strings) and UUIDs.
@@ -31,18 +33,18 @@ async def resolve_dataset_name(session: AsyncSession, dataset_source_id: Optiona
     # Try finding by ID (int) or source_id (UUID)
     is_digit = str(dataset_source_id).isdigit()
     ds_id_val = int(dataset_source_id) if is_digit else -1
-    
+
     ds_stmt = select(DataSource.name).where(
-        (DataSource.source_id == str(dataset_source_id)) | 
-        (DataSource.id == ds_id_val)
+        (DataSource.source_id == str(dataset_source_id)) | (DataSource.id == ds_id_val)
     )
     ds_result = await session.execute(ds_stmt)
     dataset_name = ds_result.scalar_one_or_none()
-    
+
     if not dataset_name:
         dataset_name = f"Dataset {dataset_source_id}"
-        
+
     return dataset_name
+
 
 async def get_dataset_map(session: AsyncSession) -> Dict[str, str]:
     """

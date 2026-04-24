@@ -4,6 +4,7 @@ FastAPI-compatible serialization utilities.
 JSON-safe data conversion utilities with enhanced async support.
 Migrated from Flask sync version with improved type handling.
 """
+
 # pylint: disable=broad-exception-caught
 
 import asyncio
@@ -191,6 +192,7 @@ class AsyncJSONSafeSerializer:
         # Handle Polars
         try:
             import polars as pl
+
             if isinstance(df, pl.DataFrame):
                 if max_rows and df.height > max_rows:
                     df = df.head(max_rows)
@@ -231,9 +233,7 @@ class AsyncJSONSafeSerializer:
         column_result: Dict[str, Any] = {}
         for col in clean_df.columns:
             column_data = clean_df[col].tolist()
-            column_result[str(col)] = await AsyncJSONSafeSerializer.clean_for_json(
-                column_data
-            )
+            column_result[str(col)] = await AsyncJSONSafeSerializer.clean_for_json(column_data)
         return column_result
 
     @staticmethod
@@ -261,7 +261,7 @@ class AsyncJSONSafeSerializer:
             "shape": list(df.shape),
             "columns": [str(col) for col in df.columns],
             "memory_usage": int(df.memory_usage(deep=True).sum()),
-            "has_nulls": df.isnull().any().any(),
+            "has_nulls": bool(cast(Any, df.isnull().any()).any()),
             "null_counts": df.isnull().sum().to_dict(),
         }
 
@@ -317,9 +317,7 @@ class AsyncJSONSafeSerializer:
 
         # Add metadata if requested
         if include_metadata:
-            result["metadata"] = (
-                await AsyncJSONSafeSerializer.serialize_dataframe_metadata(df)
-            )
+            result["metadata"] = await AsyncJSONSafeSerializer.serialize_dataframe_metadata(df)
 
         # Add truncation info
         if max_rows and len(df) > max_rows:
@@ -497,9 +495,7 @@ class JSONSafeSerializer:
             return None
 
     @staticmethod
-    def safe_dict_from_dataframe(
-        df, records_format: bool = True
-    ) -> Union[List[Dict], Dict]:
+    def safe_dict_from_dataframe(df, records_format: bool = True) -> Union[List[Dict], Dict]:
         """Synchronous version of safe_dict_from_dataframe."""
         if df is None or df.empty:
             return [] if records_format else {}
@@ -545,21 +541,14 @@ class DataTypeConverter:
 
             if series.dtype == "object":
                 # Check for dates
-                if (
-                    series.dropna()
-                    .apply(lambda x: isinstance(x, (datetime, date)))
-                    .all()
-                ):
+                if series.dropna().apply(lambda x: isinstance(x, (datetime, date))).all():
                     type_mapping[col_str] = "datetime"
                 # Check for numeric strings
                 elif series.dropna().str.match(r"^-?\d+\.?\d*$").all():
                     type_mapping[col_str] = "numeric_string"
                 # Check for boolean-like strings
                 elif (
-                    series.dropna()
-                    .str.lower()
-                    .isin(["true", "false", "yes", "no", "1", "0"])
-                    .all()
+                    series.dropna().str.lower().isin(["true", "false", "yes", "no", "1", "0"]).all()
                 ):
                     type_mapping[col_str] = "boolean_string"
                 else:
@@ -600,9 +589,7 @@ class DataTypeConverter:
 
             try:
                 if target_type == "integer":
-                    result_df[col] = pd.to_numeric(
-                        result_df[col], errors="coerce"
-                    ).astype("Int64")
+                    result_df[col] = pd.to_numeric(result_df[col], errors="coerce").astype("Int64")
                 elif target_type == "float":
                     result_df[col] = pd.to_numeric(result_df[col], errors="coerce")
                 elif target_type == "datetime":
@@ -671,9 +658,7 @@ class DataTypeConverter:
             columns_report[col_str] = col_report
 
         # Overall quality score
-        report["quality_score"] = (
-            total_quality / len(df.columns) if len(df.columns) > 0 else 0
-        )
+        report["quality_score"] = total_quality / len(df.columns) if len(df.columns) > 0 else 0
 
         return report
 
@@ -697,7 +682,7 @@ async def serialize_api_response(
     Returns:
         Standardized API response
     """
-    response = {
+    response: Dict[str, Any] = {
         "success": success,
         "timestamp": datetime.now().isoformat(),
     }

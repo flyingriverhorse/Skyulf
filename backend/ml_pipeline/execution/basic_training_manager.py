@@ -13,7 +13,12 @@ from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
 
 
-from backend.ml_pipeline.execution.utils import resolve_dataset_name, get_dataset_map, parse_branch_info
+from backend.ml_pipeline.execution.utils import (
+    resolve_dataset_name,
+    get_dataset_map,
+    parse_branch_info,
+)
+
 
 class BasicTrainingManager:
     @staticmethod
@@ -58,22 +63,16 @@ class BasicTrainingManager:
         return job_id
 
     @staticmethod
-    def map_training_job_to_info(
-        job: BasicTrainingJob, dataset_name: Optional[str]
-    ) -> JobInfo:
+    def map_training_job_to_info(job: BasicTrainingJob, dataset_name: Optional[str]) -> JobInfo:
         # Extract details from graph
         (
             hyperparameters,
             target_column,
             dropped_columns,
-        ) = extract_job_details(type_cast(Dict[str, Any], job.graph), type_cast(str, job.node_id))
+        ) = extract_job_details(type_cast(Dict[str, Any], job.graph), job.node_id)
 
         # Also check job metrics for runtime dropped columns (e.g. from Feature Selection)
-        if (
-            job.metrics
-            and isinstance(job.metrics, dict)
-            and "dropped_columns" in job.metrics
-        ):
+        if job.metrics and isinstance(job.metrics, dict) and "dropped_columns" in job.metrics:
             metrics_dropped = job.metrics["dropped_columns"]
             if isinstance(metrics_dropped, list):
                 dropped_columns.extend(metrics_dropped)
@@ -86,18 +85,18 @@ class BasicTrainingManager:
             hyperparameters = type_cast(Optional[Dict[str, Any]], job.hyperparameters)
 
         return JobInfo(
-            job_id=t_cast(str, job.id),
-            pipeline_id=t_cast(str, job.pipeline_id),
-            node_id=t_cast(str, job.node_id),
+            job_id=job.id,
+            pipeline_id=job.pipeline_id,
+            node_id=job.node_id,
             dataset_id=t_cast(Optional[str], job.dataset_source_id),
             dataset_name=dataset_name,
-            job_type=StepType.BASIC_TRAINING,
+            job_type=StepType.BASIC_TRAINING.value,
             status=JobStatus(job.status),
-            start_time=t_cast(Optional[datetime], job.started_at),
-            end_time=t_cast(Optional[datetime], job.finished_at),
-            error=t_cast(Optional[str], job.error_message),
+            start_time=job.started_at,
+            end_time=job.finished_at,
+            error=job.error_message,
             result={"metrics": job.metrics},
-            model_type=t_cast(str, job.model_type),
+            model_type=job.model_type,
             hyperparameters=t_cast(Dict[str, Any], hyperparameters),
             created_at=t_cast(datetime, job.created_at),
             metrics=t_cast(Optional[Dict[str, Any]], job.metrics),
@@ -106,9 +105,9 @@ class BasicTrainingManager:
             dropped_columns=dropped_columns,
             logs=t_cast(Optional[List[str]], job.logs),
             graph=type_cast(Dict[str, Any], job.graph),
-            promoted_at=t_cast(Optional[datetime], job.promoted_at),
-            parent_pipeline_id=parse_branch_info(t_cast(str, job.pipeline_id))[0],
-            branch_index=parse_branch_info(t_cast(str, job.pipeline_id))[1],
+            promoted_at=job.promoted_at,
+            parent_pipeline_id=parse_branch_info(job.pipeline_id)[0],
+            branch_index=parse_branch_info(job.pipeline_id)[1],
         )
 
     @staticmethod
@@ -119,9 +118,9 @@ class BasicTrainingManager:
         job = result.scalar_one_or_none()
 
         if job and job.status in [JobStatus.QUEUED.value, JobStatus.RUNNING.value]:
-            job.status = JobStatus.CANCELLED.value  # type: ignore
-            job.error_message = "Job cancelled by user."  # type: ignore
-            job.finished_at = datetime.now()  # type: ignore
+            job.status = JobStatus.CANCELLED.value
+            job.error_message = "Job cancelled by user."
+            job.finished_at = datetime.now()
             await session.commit()
             return True
         return False
@@ -150,13 +149,13 @@ class BasicTrainingManager:
             return False
 
         if status:
-            job.status = status.value  # type: ignore
+            job.status = status.value
         if error:
-            job.error_message = error  # type: ignore
+            job.error_message = error
 
         if logs:
-            current_logs: List[str] = job.logs or []  # type: ignore
-            job.logs = current_logs + logs  # type: ignore
+            current_logs: List[str] = job.logs or []
+            job.logs = current_logs + logs
 
         if result:
             BasicTrainingManager._update_training_result(job, result)
@@ -166,15 +165,13 @@ class BasicTrainingManager:
             JobStatus.FAILED,
             JobStatus.SUCCEEDED,
         ]:
-            job.finished_at = datetime.now()  # type: ignore
+            job.finished_at = datetime.now()
 
         session.commit()
         return True
 
     @staticmethod
-    async def get_training_job(
-        session: AsyncSession, job_id: str
-    ) -> Optional[JobInfo]:
+    async def get_training_job(session: AsyncSession, job_id: str) -> Optional[JobInfo]:
         """Retrieves a training job by ID."""
         # 1. Fetch Job
         stmt = select(BasicTrainingJob).where(BasicTrainingJob.id == job_id)
@@ -214,11 +211,11 @@ class BasicTrainingManager:
         for job in train_rows:
             ds_id = str(job.dataset_source_id) if job.dataset_source_id else None
             ds_name = ds_map.get(ds_id) if ds_id else None
-            
+
             # Fallback: if name is missing but we have an ID, show "Dataset {id}"
             if not ds_name and ds_id:
-                 ds_name = f"Dataset {ds_id}"
+                ds_name = f"Dataset {ds_id}"
 
             jobs.append(BasicTrainingManager.map_training_job_to_info(job, ds_name))
-            
+
         return jobs

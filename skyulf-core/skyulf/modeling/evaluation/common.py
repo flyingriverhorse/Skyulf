@@ -26,8 +26,7 @@ def _sanitize_structure(value: Any, *, warnings: List[str], context: str) -> Any
         }
     if isinstance(value, (list, tuple)):
         sanitized_items = [
-            _sanitize_structure(item, warnings=warnings, context=context)
-            for item in value
+            _sanitize_structure(item, warnings=warnings, context=context) for item in value
         ]
         return type(value)(sanitized_items)
     if isinstance(value, (float, np.floating, int, np.integer)):
@@ -44,7 +43,7 @@ def _downsample_indices(length: int, limit: int) -> np.ndarray:
     if length <= limit:
         return np.arange(length, dtype=int)
     indices = np.linspace(0, length - 1, num=limit, dtype=int)
-    return np.unique(indices)  # type: ignore
+    return np.unique(indices)
 
 
 def _align_thresholds(thresholds: np.ndarray, target_size: int) -> np.ndarray:
@@ -68,9 +67,7 @@ def sanitize_metrics(metrics: Dict[str, float]) -> Dict[str, float]:
     return {k: v for k, v in sanitized.items() if v is not None}
 
 
-def downsample_curve(
-    x: np.ndarray, y: np.ndarray, limit: int = 1000
-) -> List[CurvePoint]:
+def downsample_curve(x: np.ndarray, y: np.ndarray, limit: int = 1000) -> List[CurvePoint]:
     """Downsample curve points to a reasonable limit."""
     indices = _downsample_indices(len(x), limit)
 

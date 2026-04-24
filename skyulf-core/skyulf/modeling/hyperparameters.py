@@ -210,92 +210,155 @@ RIDGE_REGRESSION_PARAMS = [
 # --- Lasso Regression ---
 LASSO_REGRESSION_PARAMS = [
     HyperparameterField(
-        name="alpha", label="Alpha", type="number", default=1.0, min=0.0001, max=100.0,
-        description="Constant that multiplies the L1 term."
+        name="alpha",
+        label="Alpha",
+        type="number",
+        default=1.0,
+        min=0.0001,
+        max=100.0,
+        description="Constant that multiplies the L1 term.",
     ),
     HyperparameterField(
-        name="selection", label="Selection", type="select", default="cyclic",
+        name="selection",
+        label="Selection",
+        type="select",
+        default="cyclic",
         options=[{"label": "Cyclic", "value": "cyclic"}, {"label": "Random", "value": "random"}],
-        description="If set to 'random', a random coefficient is updated every iteration."
+        description="If set to 'random', a random coefficient is updated every iteration.",
     ),
 ]
 
 # --- ElasticNet Regression ---
 ELASTICNET_REGRESSION_PARAMS = [
     HyperparameterField(
-        name="alpha", label="Alpha", type="number", default=1.0, min=0.0001, max=100.0,
-        description="Constant that multiplies the penalty terms."
+        name="alpha",
+        label="Alpha",
+        type="number",
+        default=1.0,
+        min=0.0001,
+        max=100.0,
+        description="Constant that multiplies the penalty terms.",
     ),
     HyperparameterField(
-        name="l1_ratio", label="L1 Ratio", type="number", default=0.5, min=0.0, max=1.0, step=0.05,
-        description="The ElasticNet mixing parameter (0 <= l1_ratio <= 1)."
+        name="l1_ratio",
+        label="L1 Ratio",
+        type="number",
+        default=0.5,
+        min=0.0,
+        max=1.0,
+        step=0.05,
+        description="The ElasticNet mixing parameter (0 <= l1_ratio <= 1).",
     ),
     HyperparameterField(
-        name="selection", label="Selection", type="select", default="cyclic",
+        name="selection",
+        label="Selection",
+        type="select",
+        default="cyclic",
         options=[{"label": "Cyclic", "value": "cyclic"}, {"label": "Random", "value": "random"}],
-        description="If set to 'random', a random coefficient is updated every iteration."
+        description="If set to 'random', a random coefficient is updated every iteration.",
     ),
 ]
 
 # --- SVM (SVC & SVR) ---
 SVM_PARAMS = [
     HyperparameterField(
-        name="C", label="C (Regularization)", type="number", default=1.0, min=0.01, max=1000.0,
-        description="Regularization parameter. The strength of the regularization is inversely proportional to C."
+        name="C",
+        label="C (Regularization)",
+        type="number",
+        default=1.0,
+        min=0.01,
+        max=1000.0,
+        description="Regularization parameter. The strength of the regularization is inversely proportional to C.",
     ),
     HyperparameterField(
-        name="kernel", label="Kernel", type="select", default="rbf",
+        name="kernel",
+        label="Kernel",
+        type="select",
+        default="rbf",
         options=[
             {"label": "Linear", "value": "linear"},
             {"label": "Poly", "value": "poly"},
             {"label": "RBF", "value": "rbf"},
-            {"label": "Sigmoid", "value": "sigmoid"}
+            {"label": "Sigmoid", "value": "sigmoid"},
         ],
-        description="Specifies the kernel type to be used in the algorithm."
+        description="Specifies the kernel type to be used in the algorithm.",
     ),
     HyperparameterField(
-        name="gamma", label="Gamma", type="select", default="scale",
+        name="gamma",
+        label="Gamma",
+        type="select",
+        default="scale",
         options=[{"label": "Scale", "value": "scale"}, {"label": "Auto", "value": "auto"}],
-        description="Kernel coefficient for 'rbf', 'poly' and 'sigmoid'."
+        description="Kernel coefficient for 'rbf', 'poly' and 'sigmoid'.",
     ),
 ]
 
 # --- K-Neighbors ---
 KNN_PARAMS = [
     HyperparameterField(
-        name="n_neighbors", label="Number of Neighbors", type="number", default=5, min=1, max=50, step=1,
-        description="Number of neighbors to use."
+        name="n_neighbors",
+        label="Number of Neighbors",
+        type="number",
+        default=5,
+        min=1,
+        max=50,
+        step=1,
+        description="Number of neighbors to use.",
     ),
     HyperparameterField(
-        name="weights", label="Weights", type="select", default="uniform",
-        options=[{"label": "Uniform", "value": "uniform"}, {"label": "Distance", "value": "distance"}],
-        description="Weight function used in prediction."
+        name="weights",
+        label="Weights",
+        type="select",
+        default="uniform",
+        options=[
+            {"label": "Uniform", "value": "uniform"},
+            {"label": "Distance", "value": "distance"},
+        ],
+        description="Weight function used in prediction.",
     ),
     HyperparameterField(
-        name="algorithm", label="Algorithm", type="select", default="auto",
+        name="algorithm",
+        label="Algorithm",
+        type="select",
+        default="auto",
         options=[
             {"label": "Auto", "value": "auto"},
             {"label": "Ball Tree", "value": "ball_tree"},
             {"label": "KD Tree", "value": "kd_tree"},
-            {"label": "Brute", "value": "brute"}
+            {"label": "Brute", "value": "brute"},
         ],
-        description="Algorithm used to compute the nearest neighbors."
+        description="Algorithm used to compute the nearest neighbors.",
     ),
 ]
 
 # --- Decision Tree ---
 DECISION_TREE_PARAMS = [
     HyperparameterField(
-        name="max_depth", label="Max Depth", type="number", default=None, min=1, max=100,
-        description="The maximum depth of the tree."
+        name="max_depth",
+        label="Max Depth",
+        type="number",
+        default=None,
+        min=1,
+        max=100,
+        description="The maximum depth of the tree.",
     ),
     HyperparameterField(
-        name="min_samples_split", label="Min Samples Split", type="number", default=2, min=2, max=20,
-        description="The minimum number of samples required to split an internal node."
+        name="min_samples_split",
+        label="Min Samples Split",
+        type="number",
+        default=2,
+        min=2,
+        max=20,
+        description="The minimum number of samples required to split an internal node.",
     ),
     HyperparameterField(
-        name="min_samples_leaf", label="Min Samples Leaf", type="number", default=1, min=1, max=20,
-        description="The minimum number of samples required to be at a leaf node."
+        name="min_samples_leaf",
+        label="Min Samples Leaf",
+        type="number",
+        default=1,
+        min=1,
+        max=20,
+        description="The minimum number of samples required to be at a leaf node.",
     ),
 ]
 DECISION_TREE_CLASSIFIER_PARAMS = DECISION_TREE_PARAMS + [
@@ -331,56 +394,117 @@ DECISION_TREE_REGRESSOR_PARAMS = DECISION_TREE_PARAMS + [
 # --- Gradient Boosting (Sklearn) ---
 GRADIENT_BOOSTING_PARAMS = [
     HyperparameterField(
-        name="n_estimators", label="Number of Trees", type="number", default=100, min=10, max=1000, step=10,
-        description="The number of boosting stages to perform."
+        name="n_estimators",
+        label="Number of Trees",
+        type="number",
+        default=100,
+        min=10,
+        max=1000,
+        step=10,
+        description="The number of boosting stages to perform.",
     ),
     HyperparameterField(
-        name="learning_rate", label="Learning Rate", type="number", default=0.1, min=0.001, max=1.0,
-        description="Shrinks the contribution of each tree by learning_rate."
+        name="learning_rate",
+        label="Learning Rate",
+        type="number",
+        default=0.1,
+        min=0.001,
+        max=1.0,
+        description="Shrinks the contribution of each tree by learning_rate.",
     ),
     HyperparameterField(
-        name="max_depth", label="Max Depth", type="number", default=3, min=1, max=20,
-        description="Maximum depth of the individual regression estimators."
+        name="max_depth",
+        label="Max Depth",
+        type="number",
+        default=3,
+        min=1,
+        max=20,
+        description="Maximum depth of the individual regression estimators.",
     ),
     HyperparameterField(
-        name="subsample", label="Subsample", type="number", default=1.0, min=0.1, max=1.0, step=0.1,
-        description="The fraction of samples to be used for fitting the individual base learners."
+        name="subsample",
+        label="Subsample",
+        type="number",
+        default=1.0,
+        min=0.1,
+        max=1.0,
+        step=0.1,
+        description="The fraction of samples to be used for fitting the individual base learners.",
     ),
 ]
 
 # --- AdaBoost ---
 ADABOOST_PARAMS = [
     HyperparameterField(
-        name="n_estimators", label="Number of Estimators", type="number", default=50, min=10, max=1000, step=10,
-        description="The maximum number of estimators at which boosting is terminated."
+        name="n_estimators",
+        label="Number of Estimators",
+        type="number",
+        default=50,
+        min=10,
+        max=1000,
+        step=10,
+        description="The maximum number of estimators at which boosting is terminated.",
     ),
     HyperparameterField(
-        name="learning_rate", label="Learning Rate", type="number", default=1.0, min=0.001, max=5.0,
-        description="Weight applied to each classifier at each boosting iteration."
+        name="learning_rate",
+        label="Learning Rate",
+        type="number",
+        default=1.0,
+        min=0.001,
+        max=5.0,
+        description="Weight applied to each classifier at each boosting iteration.",
     ),
 ]
 
 # --- XGBoost ---
 XGBOOST_PARAMS = [
     HyperparameterField(
-        name="n_estimators", label="Number of Estimators", type="number", default=100, min=10, max=1000, step=10,
-        description="Number of gradient boosted trees."
+        name="n_estimators",
+        label="Number of Estimators",
+        type="number",
+        default=100,
+        min=10,
+        max=1000,
+        step=10,
+        description="Number of gradient boosted trees.",
     ),
     HyperparameterField(
-        name="max_depth", label="Max Depth", type="number", default=6, min=1, max=20,
-        description="Maximum tree depth for base learners."
+        name="max_depth",
+        label="Max Depth",
+        type="number",
+        default=6,
+        min=1,
+        max=20,
+        description="Maximum tree depth for base learners.",
     ),
     HyperparameterField(
-        name="learning_rate", label="Learning Rate", type="number", default=0.3, min=0.001, max=1.0,
-        description="Boosting learning rate (eta)."
+        name="learning_rate",
+        label="Learning Rate",
+        type="number",
+        default=0.3,
+        min=0.001,
+        max=1.0,
+        description="Boosting learning rate (eta).",
     ),
     HyperparameterField(
-        name="subsample", label="Subsample", type="number", default=1.0, min=0.1, max=1.0, step=0.1,
-        description="Subsample ratio of the training instances."
+        name="subsample",
+        label="Subsample",
+        type="number",
+        default=1.0,
+        min=0.1,
+        max=1.0,
+        step=0.1,
+        description="Subsample ratio of the training instances.",
     ),
     HyperparameterField(
-        name="colsample_bytree", label="Colsample By Tree", type="number", default=1.0, min=0.1, max=1.0, step=0.1,
-        description="Subsample ratio of columns when constructing each tree."
+        name="colsample_bytree",
+        label="Colsample By Tree",
+        type="number",
+        default=1.0,
+        min=0.1,
+        max=1.0,
+        step=0.1,
+        description="Subsample ratio of columns when constructing each tree.",
     ),
 ]
 

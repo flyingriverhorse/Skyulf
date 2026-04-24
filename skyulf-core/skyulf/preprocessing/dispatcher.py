@@ -21,14 +21,14 @@ def apply_dual_engine(
     params: Dict[str, Any],
     polars_func: ApplyFunction,
     pandas_func: ApplyFunction,
-) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+) -> Any:
     """
     Dispatcher to handle boilerplate for dual-engine Appliers.
 
     Args:
         df: Input data (DataFrame or Tuple).
         params: Configuration parameters.
-        polars_func: Function to execute if engine is Polars. 
+        polars_func: Function to execute if engine is Polars.
                      Signature: (X, y, params) -> (X_out, y_out)
         pandas_func: Function to execute if engine is Pandas.
                      Signature: (X, y, params) -> (X_out, y_out)
@@ -55,7 +55,7 @@ def apply_dual_engine(
             X_pd = X.to_pandas()
         else:
             X_pd = X
-            
+
         try:
             X_out, y_out = pandas_func(X_pd, y, params)
         except Exception as e:

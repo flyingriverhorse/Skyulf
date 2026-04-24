@@ -7,6 +7,7 @@ from backend.database.models import MLJob, BasicTrainingJob, AdvancedTuningJob
 from backend.ml_pipeline.execution.schemas import PipelineExecutionResult
 from backend.ml_pipeline.constants import StepType
 
+
 class JobStrategy(ABC):
     """
     Abstract base class for job execution strategies.
@@ -37,9 +38,7 @@ class JobStrategy(ABC):
             last_node_id = list(result.node_results.keys())[-1]
             last_result = result.node_results[last_node_id]
 
-            final_metrics = (
-                last_result.metrics.copy() if last_result.metrics else {}
-            )
+            final_metrics = last_result.metrics.copy() if last_result.metrics else {}
 
             # Collect dropped columns from all nodes
             all_dropped_columns = []
@@ -68,7 +67,7 @@ class BasicTrainingStrategy(JobStrategy):
 
     def get_initial_log(self, job: MLJob) -> str:
         timestamp = datetime.now().strftime("%H:%M:%S")
-        # Cast to BasicTrainingJob to access specific fields if needed, 
+        # Cast to BasicTrainingJob to access specific fields if needed,
         # though 'version' is on the model
         version = getattr(job, "version", "unknown")
         return f"[{timestamp}] Training Job Version: {version}"
@@ -86,7 +85,7 @@ class AdvancedTuningStrategy(JobStrategy):
     def handle_success(self, job: MLJob, result: PipelineExecutionResult) -> None:
         # Call base to set standard metrics
         super().handle_success(job, result)
-        
+
         # Add tuning-specific fields
         if job.metrics:
             if "best_params" in job.metrics:
@@ -112,7 +111,7 @@ class JobStrategyFactory:
         if job_type in cls._strategies:
             return cls._strategies[job_type]
         raise ValueError(f"Unknown job type: {job_type}")
-    
+
     @classmethod
     def get_strategy_by_job(cls, job: MLJob) -> JobStrategy:
         if isinstance(job, BasicTrainingJob):
@@ -123,7 +122,9 @@ class JobStrategyFactory:
             raise ValueError(f"Unknown job type: {type(job)}")
 
     @classmethod
-    def find_job(cls, session: Session, job_id: str) -> tuple[Optional[MLJob], Optional[JobStrategy]]:
+    def find_job(
+        cls, session: Session, job_id: str
+    ) -> tuple[Optional[MLJob], Optional[JobStrategy]]:
         """
         Tries to find the job in all known tables.
         Returns (job, strategy) or (None, None).

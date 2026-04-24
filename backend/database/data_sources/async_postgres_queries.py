@@ -79,7 +79,10 @@ async def update_data_source(
     async with async_session_or_connection(settings) as session:
         try:
             # Use SQLAlchemy Core for UPDATE
-            tbl = table(TABLE, *[column(c) for c in update_data.keys()] + [column(c) for c in filter_dict.keys()])
+            tbl = table(
+                TABLE,
+                *[column(c) for c in update_data.keys()] + [column(c) for c in filter_dict.keys()],
+            )
 
             stmt = update(tbl).values(**update_data)
 

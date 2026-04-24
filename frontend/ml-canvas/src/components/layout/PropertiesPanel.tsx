@@ -2,7 +2,7 @@ import React from 'react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { registry } from '../../core/registry/NodeRegistry';
-import { X, Maximize2, Minimize2, Settings2 } from 'lucide-react';
+import { X, Maximize2, Minimize2, Settings2, Merge } from 'lucide-react';
 import { Node } from '@xyflow/react';
 
 export const PropertiesPanel: React.FC = () => {
@@ -101,8 +101,48 @@ const PropertiesContent: React.FC<{
             onChange={(data: unknown) => updateNodeData(selectedNode.id, data)}
             nodeId={selectedNode.id}
           />
+          <MergeStrategySection selectedNode={selectedNode} />
         </div>
       </div>
+    </div>
+  );
+};
+
+const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }) => {
+  const edges = useGraphStore((state) => state.edges);
+  const updateNodeData = useGraphStore((state) => state.updateNodeData);
+
+  const definitionType = selectedNode.data.definitionType as string;
+  const definition = registry.get(definitionType);
+  const canMerge = (definition?.inputs?.length ?? 0) > 0;
+  const incomingSourceCount = new Set(
+    edges.filter((e) => e.target === selectedNode.id).map((e) => e.source)
+  ).size;
+
+  // Only expose the strategy when the node actually merges: multi-input
+  // node with 2+ distinct upstream sources. Hidden otherwise to avoid
+  // cluttering single-input nodes.
+  if (!canMerge || incomingSourceCount < 2) return null;
+
+  const current = (selectedNode.data as { merge_strategy?: string }).merge_strategy ?? 'last_wins';
+
+  return (
+    <div className="border-t pt-4">
+      <div className="flex items-center gap-2 mb-2">
+        <Merge className="w-4 h-4 text-muted-foreground" />
+        <h3 className="text-sm font-semibold">Merge Strategy</h3>
+      </div>
+      <p className="text-xs text-muted-foreground mb-2">
+        How to resolve columns present in more than one input.
+      </p>
+      <select
+        value={current}
+        onChange={(e) => updateNodeData(selectedNode.id, { merge_strategy: e.target.value })}
+        className="w-full px-2 py-1.5 text-sm bg-background border rounded-md"
+      >
+        <option value="last_wins">Last wins (default) - downstream input overwrites</option>
+        <option value="first_wins">First wins - earlier input kept</option>
+      </select>
     </div>
   );
 };

@@ -101,6 +101,7 @@ skyulf-mlflow/
 
 # === Misc ===
 .tools/
+tests/artifacts/merge_scenarios
 
 #=== Tests ===
 #tests/

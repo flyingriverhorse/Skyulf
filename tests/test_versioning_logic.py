@@ -23,9 +23,7 @@ async def test_unified_versioning():
             delete(BasicTrainingJob).where(BasicTrainingJob.pipeline_id == pipeline_id)
         )
         await session.execute(
-            delete(AdvancedTuningJob).where(
-                AdvancedTuningJob.pipeline_id == pipeline_id
-            )
+            delete(AdvancedTuningJob).where(AdvancedTuningJob.pipeline_id == pipeline_id)
         )
         await session.commit()
 

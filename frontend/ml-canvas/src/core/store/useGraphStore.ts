@@ -30,6 +30,20 @@ interface GraphState {
   updateNodeData: (id: string, data: unknown) => void;
   validateGraph: () => Promise<boolean>;
   setGraph: (nodes: Node[], edges: Edge[]) => void;
+  /**
+   * Rewire a sibling fan-in into a linear chain.
+   *
+   * Given inputs `[A, B, C]` all feeding `consumerId`, this:
+   *  1. Removes edges `A→consumer`, `B→consumer`, `C→consumer`.
+   *  2. Adds edges `A→B`, `B→C`, `C→consumer` (using each node's first
+   *     input handle and source's first output handle).
+   *
+   * No cycle check is needed because the new edges only go between nodes
+   * that previously fed `consumerId` (so they're already topologically
+   * before it). Returns `true` on success, `false` if validation rejects
+   * the change.
+   */
+  chainSiblings: (consumerId: string, orderedInputIds: string[]) => boolean;
 
   // Execution State
   executionResult: PreviewResponse | null;
@@ -125,6 +139,20 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           'Click OK to connect (merge mode), or Cancel to abort.'
         );
         if (!proceed) return;
+      } else if (existingInputs.length >= 1 && !modelTypes.includes(targetType)) {
+        // Pre-flight lint for non-training nodes (audit issue #7).
+        // Direction-A means non-training nodes also auto-merge fan-in via
+        // column union + last-wins. Surface that contract before the user
+        // wires it so silent column overwrites aren't a surprise at run time.
+        const inputCount = existingInputs.length + 1;
+        const proceed = confirm(
+          `This node will receive ${inputCount} inputs.\n\n` +
+          'Inputs are auto-merged via column union with LAST-WINS on overlap ' +
+          '(the last connected input overwrites earlier ones on shared columns).\n\n' +
+          'For sequential transformations, chain the nodes linearly instead.\n\n' +
+          'Click OK to connect (merge), or Cancel to abort.'
+        );
+        if (!proceed) return;
       }
     }
 
@@ -168,6 +196,54 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         return node;
       }),
     });
+  },
+
+  chainSiblings: (consumerId: string, orderedInputIds: string[]) => {
+    const inputs = orderedInputIds.filter(Boolean);
+    if (inputs.length < 2) return false;
+
+    const { edges, nodes } = get();
+    if (!nodes.find((n) => n.id === consumerId)) return false;
+
+    const firstOutputHandle = (nodeId: string): string | undefined => {
+      const node = nodes.find((n) => n.id === nodeId);
+      const def = node && registry.get(node.data.definitionType as string);
+      return def?.outputs?.[0]?.id;
+    };
+    const firstInputHandle = (nodeId: string): string | undefined => {
+      const node = nodes.find((n) => n.id === nodeId);
+      const def = node && registry.get(node.data.definitionType as string);
+      return def?.inputs?.[0]?.id;
+    };
+
+    const links: Array<{ source: string; target: string; sourceHandle?: string; targetHandle?: string }> = [];
+    for (let i = 0; i < inputs.length - 1; i++) {
+      const sh = firstOutputHandle(inputs[i]);
+      const th = firstInputHandle(inputs[i + 1]);
+      if (!sh || !th) return false;
+      links.push({ source: inputs[i], target: inputs[i + 1], sourceHandle: sh, targetHandle: th });
+    }
+    const lastSh = firstOutputHandle(inputs[inputs.length - 1]);
+    const lastTh = firstInputHandle(consumerId);
+    if (!lastSh || !lastTh) return false;
+    links.push({ source: inputs[inputs.length - 1], target: consumerId, sourceHandle: lastSh, targetHandle: lastTh });
+
+    // Keep head sibling's upstream edges; clear incoming on tail siblings
+    // and drop the original fan-in into the consumer.
+    const inputSet = new Set(inputs);
+    const tailSiblings = new Set(inputs.slice(1));
+    let nextEdges = edges.filter((e) => {
+      if (e.target === consumerId && inputSet.has(e.source)) return false;
+      if (tailSiblings.has(e.target)) return false;
+      return true;
+    });
+
+    for (const link of links) {
+      nextEdges = addEdge(link as Connection, nextEdges);
+    }
+
+    set({ edges: nextEdges });
+    return true;
   },
 
   validateGraph: async () => {

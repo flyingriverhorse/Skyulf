@@ -84,9 +84,7 @@ def test_ridge_regression_flow(regression_data, artifact_store):
     estimator = StatefulEstimator(calculator, applier, "ridge_node")
 
     # Fit and Predict
-    predictions = estimator.fit_predict(
-        regression_data, "target", {"alpha": 0.0}
-    )  # alpha=0 is OLS
+    predictions = estimator.fit_predict(regression_data, "target", {"alpha": 0.0})  # alpha=0 is OLS
 
     # Check Model
     assert estimator.model is not None
@@ -205,9 +203,7 @@ def test_hyperparameter_tuning(classification_data, artifact_store):
     assert result.best_score > 0.0
 
     # Ensure best params can be used for training
-    estimator = StatefulEstimator(
-        model_calculator, LogisticRegressionApplier(), "tuned_node"
-    )
+    estimator = StatefulEstimator(model_calculator, LogisticRegressionApplier(), "tuned_node")
     estimator.fit_predict(classification_data, "target", result.best_params)
     assert estimator.model is not None
 
