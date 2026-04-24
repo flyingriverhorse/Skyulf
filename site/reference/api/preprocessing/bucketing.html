@@ -2758,7 +2758,8 @@ Expects 'bin_edges' in params: Dict[str, List[float]] mapping column names to bi
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 22</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 21</span>
+<span class="normal"> 22</span>
 <span class="normal"> 23</span>
 <span class="normal"> 24</span>
 <span class="normal"> 25</span>
@@ -2930,8 +2931,7 @@ Expects 'bin_edges' in params: Dict[str, List[float]] mapping column names to bi
 <span class="normal">191</span>
 <span class="normal">192</span>
 <span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseBinningApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">194</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseBinningApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Base class for applying binning transformations.</span>
 <span class="sd">    Expects &#39;bin_edges&#39; in params: Dict[str, List[float]] mapping column names to bin edges.</span>
@@ -3158,7 +3158,8 @@ Applies specific bin edges to selected columns.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">346</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">345</span>
+<span class="normal">346</span>
 <span class="normal">347</span>
 <span class="normal">348</span>
 <span class="normal">349</span>
@@ -3203,8 +3204,7 @@ Applies specific bin edges to selected columns.</p>
 <span class="normal">388</span>
 <span class="normal">389</span>
 <span class="normal">390</span>
-<span class="normal">391</span>
-<span class="normal">392</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;CustomBinning&quot;</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
+<span class="normal">391</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;CustomBinning&quot;</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;CustomBinning&quot;</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Custom Binning&quot;</span><span class="p">,</span>
@@ -3303,7 +3303,8 @@ Applies specific bin edges to selected columns.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">205</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">204</span>
+<span class="normal">205</span>
 <span class="normal">206</span>
 <span class="normal">207</span>
 <span class="normal">208</span>
@@ -3436,8 +3437,7 @@ Applies specific bin edges to selected columns.</p>
 <span class="normal">335</span>
 <span class="normal">336</span>
 <span class="normal">337</span>
-<span class="normal">338</span>
-<span class="normal">339</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;GeneralBinning&quot;</span><span class="p">,</span> <span class="n">GeneralBinningApplier</span><span class="p">)</span>
+<span class="normal">338</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;GeneralBinning&quot;</span><span class="p">,</span> <span class="n">GeneralBinningApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;GeneralBinning&quot;</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">&quot;General Binning&quot;</span><span class="p">,</span>
@@ -3625,7 +3625,8 @@ Wraps GeneralBinningCalculator with kbins strategy.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">399</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">398</span>
+<span class="normal">399</span>
 <span class="normal">400</span>
 <span class="normal">401</span>
 <span class="normal">402</span>
@@ -3655,8 +3656,7 @@ Wraps GeneralBinningCalculator with kbins strategy.</p>
 <span class="normal">426</span>
 <span class="normal">427</span>
 <span class="normal">428</span>
-<span class="normal">429</span>
-<span class="normal">430</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;KBinsDiscretizer&quot;</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
+<span class="normal">429</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;KBinsDiscretizer&quot;</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;KBinsDiscretizer&quot;</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">&quot;K-Bins Discretizer&quot;</span><span class="p">,</span>
