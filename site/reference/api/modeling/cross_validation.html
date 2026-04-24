@@ -3108,13 +3108,7 @@
 <span class="normal">206</span>
 <span class="normal">207</span>
 <span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
-<span class="normal">212</span>
-<span class="normal">213</span>
-<span class="normal">214</span>
-<span class="normal">215</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">perform_cross_validation</span><span class="p">(</span>
+<span class="normal">209</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">perform_cross_validation</span><span class="p">(</span>
     <span class="n">calculator</span><span class="p">:</span> <span class="n">BaseModelCalculator</span><span class="p">,</span>
     <span class="n">applier</span><span class="p">:</span> <span class="n">BaseModelApplier</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span>
@@ -3160,7 +3154,7 @@
     <span class="k">if</span> <span class="n">cv_type</span> <span class="o">==</span> <span class="s2">&quot;time_series_split&quot;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
         <span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">_sort_by_time</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">time_column</span><span class="p">,</span> <span class="n">log_callback</span><span class="p">,</span> <span class="n">logger</span><span class="p">)</span>
 
-    <span class="c1"># Handle nested CV separately </span>
+    <span class="c1"># Handle nested CV separately</span>
     <span class="k">if</span> <span class="n">cv_type</span> <span class="o">==</span> <span class="s2">&quot;nested_cv&quot;</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">_perform_nested_cv</span><span class="p">(</span>
             <span class="n">calculator</span><span class="o">=</span><span class="n">calculator</span><span class="p">,</span>
@@ -3179,9 +3173,7 @@
     <span class="k">if</span> <span class="n">cv_type</span> <span class="o">==</span> <span class="s2">&quot;time_series_split&quot;</span><span class="p">:</span>
         <span class="n">splitter</span> <span class="o">=</span> <span class="n">TimeSeriesSplit</span><span class="p">(</span><span class="n">n_splits</span><span class="o">=</span><span class="n">n_folds</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">cv_type</span> <span class="o">==</span> <span class="s2">&quot;shuffle_split&quot;</span><span class="p">:</span>
-        <span class="n">splitter</span> <span class="o">=</span> <span class="n">ShuffleSplit</span><span class="p">(</span>
-            <span class="n">n_splits</span><span class="o">=</span><span class="n">n_folds</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span>
-        <span class="p">)</span>
+        <span class="n">splitter</span> <span class="o">=</span> <span class="n">ShuffleSplit</span><span class="p">(</span><span class="n">n_splits</span><span class="o">=</span><span class="n">n_folds</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">cv_type</span> <span class="o">==</span> <span class="s2">&quot;stratified_k_fold&quot;</span> <span class="ow">and</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
         <span class="n">splitter</span> <span class="o">=</span> <span class="n">StratifiedKFold</span><span class="p">(</span>
             <span class="n">n_splits</span><span class="o">=</span><span class="n">n_folds</span><span class="p">,</span>
@@ -3235,13 +3227,9 @@
 
         <span class="c1"># Evaluate</span>
         <span class="k">if</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
-            <span class="n">metrics</span> <span class="o">=</span> <span class="n">calculate_classification_metrics</span><span class="p">(</span>
-                <span class="n">model_artifact</span><span class="p">,</span> <span class="n">X_val_fold</span><span class="p">,</span> <span class="n">y_val_fold</span>
-            <span class="p">)</span>
+            <span class="n">metrics</span> <span class="o">=</span> <span class="n">calculate_classification_metrics</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">,</span> <span class="n">X_val_fold</span><span class="p">,</span> <span class="n">y_val_fold</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">metrics</span> <span class="o">=</span> <span class="n">calculate_regression_metrics</span><span class="p">(</span>
-                <span class="n">model_artifact</span><span class="p">,</span> <span class="n">X_val_fold</span><span class="p">,</span> <span class="n">y_val_fold</span>
-            <span class="p">)</span>
+            <span class="n">metrics</span> <span class="o">=</span> <span class="n">calculate_regression_metrics</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">,</span> <span class="n">X_val_fold</span><span class="p">,</span> <span class="n">y_val_fold</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
             <span class="c1"># Log a key metric for the fold</span>
