@@ -1,7 +1,6 @@
 import sys
 import os
 import io
-import logging
 
 # Force UTF-8 output to handle emoji on Windows
 if sys.stdout.encoding != "utf-8":

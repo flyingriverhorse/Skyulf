@@ -1,5 +1,4 @@
 import pandas as pd
-import pytest
 from skyulf.preprocessing.encoding import LabelEncoderCalculator, LabelEncoderApplier
 from skyulf.preprocessing.split import FeatureTargetSplitApplier, SplitApplier
 from skyulf.data.dataset import SplitDataset

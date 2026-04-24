@@ -16,7 +16,6 @@ class BaseConnector(ABC):
         Establish connection to the data source.
         Returns True if successful, raises Exception otherwise.
         """
-        pass
 
     @abstractmethod
     async def get_schema(self) -> Dict[str, str]:
@@ -24,7 +23,6 @@ class BaseConnector(ABC):
         Discover the schema of the data source.
         Returns a dictionary mapping column names to data types.
         """
-        pass
 
     @abstractmethod
     async def fetch_data(
@@ -40,11 +38,9 @@ class BaseConnector(ABC):
         Returns:
             pl.DataFrame: The fetched data
         """
-        pass
 
     @abstractmethod
     async def validate(self) -> bool:
         """
         Validate the configuration and connection.
         """
-        pass

@@ -1,6 +1,5 @@
 ﻿"""Pipeline Execution Engine."""
 
-import json
 import logging
 import time
 import re
@@ -13,18 +12,6 @@ import pandas as pd
 from skyulf.data.dataset import SplitDataset
 from skyulf.data.catalog import DataCatalog
 from skyulf.modeling.base import StatefulEstimator
-from skyulf.modeling.classification import (
-    LogisticRegressionApplier,
-    LogisticRegressionCalculator,
-    RandomForestClassifierApplier,
-    RandomForestClassifierCalculator,
-)
-from skyulf.modeling.regression import (
-    RandomForestRegressorApplier,
-    RandomForestRegressorCalculator,
-    RidgeRegressionApplier,
-    RidgeRegressionCalculator,
-)
 from skyulf.modeling.tuning.engine import TuningApplier, TuningCalculator
 from skyulf.preprocessing.pipeline import FeatureEngineer
 from skyulf.registry import NodeRegistry
@@ -491,7 +478,7 @@ class PipelineEngine:
         )
         return merged
 
-    def _merge_inputs(self, node: NodeConfig, target_col: str = "") -> Any:
+    def _merge_inputs(self, node: NodeConfig, target_col: str = "") -> Any:  # noqa: C901
         """Resolve and merge all upstream inputs for a multi-input node.
 
         Behaviour:

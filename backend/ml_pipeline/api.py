@@ -853,7 +853,7 @@ async def preview_pipeline(  # noqa: C901
             ],
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Pipeline preview failed")
         raise HTTPException(status_code=500, detail="Pipeline preview failed")
     finally:
@@ -921,7 +921,7 @@ async def get_job_evaluation(  # noqa: C901
         raise HTTPException(status_code=400, detail=str(e))
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to retrieve evaluation for job %s", job_id)
         raise HTTPException(status_code=500, detail="Failed to retrieve evaluation data")
 
@@ -1057,7 +1057,6 @@ async def get_dataset_schema(dataset_id: int, session: AsyncSession = Depends(ge
         except Exception as e:
             logger.warning(f"Failed to parse cached profile for {dataset_id}: {e}")
             # Fallback to loading file
-            pass
 
     try:
         # Resolve path

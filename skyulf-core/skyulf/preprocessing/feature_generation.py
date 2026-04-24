@@ -1,7 +1,7 @@
 import builtins
 import math
 from difflib import SequenceMatcher
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, Optional, Tuple, Union, cast
 
 import pandas as pd
 from sklearn.preprocessing import PolynomialFeatures

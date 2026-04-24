@@ -1,7 +1,6 @@
 import logging
 from typing import Any, Dict, Tuple, Union
 
-import numpy as np
 import pandas as pd
 from sklearn.covariance import EllipticEnvelope
 
@@ -15,7 +14,6 @@ from .base import BaseApplier, BaseCalculator
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ..engines import SkyulfDataFrame, get_engine
-from ..engines.pandas_engine import SkyulfPandasWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +114,7 @@ class IQRCalculator(BaseCalculator):
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
 
-        engine = get_engine(X)
+        get_engine(X)
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
 
         # Config: {'multiplier': 1.5, 'columns': [...]}
@@ -256,7 +254,7 @@ class ZScoreCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
-        engine = get_engine(X)
+        get_engine(X)
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
 
         # Config: {'threshold': 3.0, 'columns': [...]}
@@ -361,7 +359,7 @@ class WinsorizeCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
-        engine = get_engine(X)
+        get_engine(X)
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
 
         # Config: {'lower_percentile': 5.0, 'upper_percentile': 95.0, 'columns': [...]}
@@ -566,7 +564,6 @@ class EllipticEnvelopeApplier(BaseApplier):
                 mask = mask & col_mask
             except Exception as e:
                 logger.warning(f"EllipticEnvelope predict failed for column {col}: {e}")
-                pass
 
         X_filtered = X_pd_any[mask]
 
@@ -607,7 +604,7 @@ class EllipticEnvelopeCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
-        engine = get_engine(X)
+        get_engine(X)
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
 
         # Config: {'contamination': 0.01, 'columns': [...]}
@@ -633,7 +630,6 @@ class EllipticEnvelopeCalculator(BaseCalculator):
             except Exception as e:
                 logger.warning(f"EllipticEnvelope fit failed for column {col}: {e}")
                 warnings.append(f"Column '{col}': {str(e)}")
-                pass
 
         return {
             "type": "elliptic_envelope",

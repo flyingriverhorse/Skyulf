@@ -1,5 +1,4 @@
 import os
-import pytest
 from unittest.mock import MagicMock, patch
 from backend.data.catalog import create_catalog_from_options, S3Catalog, FileSystemCatalog
 

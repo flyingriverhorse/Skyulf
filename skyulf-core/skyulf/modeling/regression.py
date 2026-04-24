@@ -26,8 +26,6 @@ from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 class LinearRegressionApplier(SklearnApplier):
     """Linear Regression Applier."""
 
-    pass
-
 
 @NodeRegistry.register("linear_regression", LinearRegressionApplier)
 @node_meta(
@@ -57,8 +55,6 @@ class LinearRegressionCalculator(SklearnCalculator):
 class RidgeRegressionApplier(SklearnApplier):
     """Ridge Regression Applier."""
 
-    pass
-
 
 @NodeRegistry.register("ridge_regression", RidgeRegressionApplier)
 @node_meta(
@@ -87,8 +83,6 @@ class RidgeRegressionCalculator(SklearnCalculator):
 # --- Random Forest Regressor ---
 class RandomForestRegressorApplier(SklearnApplier):
     """Random Forest Regressor Applier."""
-
-    pass
 
 
 @NodeRegistry.register("random_forest_regressor", RandomForestRegressorApplier)
@@ -121,8 +115,6 @@ class RandomForestRegressorCalculator(SklearnCalculator):
 class LassoRegressionApplier(SklearnApplier):
     """Lasso Regression Applier."""
 
-    pass
-
 
 @NodeRegistry.register("lasso_regression", LassoRegressionApplier)
 @node_meta(
@@ -147,8 +139,6 @@ class LassoRegressionCalculator(SklearnCalculator):
 # --- ElasticNet ---
 class ElasticNetRegressionApplier(SklearnApplier):
     """ElasticNet Regression Applier."""
-
-    pass
 
 
 @NodeRegistry.register("elasticnet_regression", ElasticNetRegressionApplier)
@@ -180,8 +170,6 @@ class ElasticNetRegressionCalculator(SklearnCalculator):
 class SVRApplier(SklearnApplier):
     """SVR Applier."""
 
-    pass
-
 
 @NodeRegistry.register("svr", SVRApplier)
 @node_meta(
@@ -206,8 +194,6 @@ class SVRCalculator(SklearnCalculator):
 # --- K-Neighbors ---
 class KNeighborsRegressorApplier(SklearnApplier):
     """K-Neighbors Regressor Applier."""
-
-    pass
 
 
 @NodeRegistry.register("k_neighbors_regressor", KNeighborsRegressorApplier)
@@ -239,8 +225,6 @@ class KNeighborsRegressorCalculator(SklearnCalculator):
 class DecisionTreeRegressorApplier(SklearnApplier):
     """Decision Tree Regressor Applier."""
 
-    pass
-
 
 @NodeRegistry.register("decision_tree_regressor", DecisionTreeRegressorApplier)
 @node_meta(
@@ -269,8 +253,6 @@ class DecisionTreeRegressorCalculator(SklearnCalculator):
 # --- Gradient Boosting ---
 class GradientBoostingRegressorApplier(SklearnApplier):
     """Gradient Boosting Regressor Applier."""
-
-    pass
 
 
 @NodeRegistry.register("gradient_boosting_regressor", GradientBoostingRegressorApplier)
@@ -301,8 +283,6 @@ class GradientBoostingRegressorCalculator(SklearnCalculator):
 class AdaBoostRegressorApplier(SklearnApplier):
     """AdaBoost Regressor Applier."""
 
-    pass
-
 
 @NodeRegistry.register("adaboost_regressor", AdaBoostRegressorApplier)
 @node_meta(
@@ -332,8 +312,6 @@ if XGBOOST_AVAILABLE:
 
     class XGBRegressorApplier(SklearnApplier):
         """XGBoost Regressor Applier."""
-
-        pass
 
     @NodeRegistry.register("xgboost_regressor", XGBRegressorApplier)
     @node_meta(

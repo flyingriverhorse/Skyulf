@@ -2,11 +2,11 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, cast as t_cast, cast as type_cast
 
-from sqlalchemy import String, cast, or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from backend.database.models import DataSource, BasicTrainingJob
+from backend.database.models import BasicTrainingJob
 from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.execution.graph_utils import extract_job_details
 from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus

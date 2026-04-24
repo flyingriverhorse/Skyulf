@@ -1,7 +1,5 @@
-import os
 from unittest.mock import patch
 
-import joblib
 import pandas as pd
 import pytest
 import pytest_asyncio
@@ -10,7 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from backend.database.models import Base, Deployment, BasicTrainingJob
+from backend.database.models import Base
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.deployment.service import DeploymentService
 

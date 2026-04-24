@@ -1,10 +1,7 @@
 import pandas as pd
-import pytest
 from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.encoding import LabelEncoderApplier, LabelEncoderCalculator
 from skyulf.preprocessing.split import SplitApplier, SplitCalculator
-
-from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
 
 def test_label_encoder_on_target_after_split():
@@ -61,7 +58,7 @@ def test_label_encoder_on_target_after_split():
 
     # Get the mapping from the encoder
     encoder = le_params["encoders"]["__target__"]
-    classes = encoder.classes_
+    encoder.classes_
     # e.g. classes_ might be ['A', 'B'], so A->0, B->1
 
     # Check consistency on Train

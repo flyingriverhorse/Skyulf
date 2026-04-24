@@ -16,12 +16,12 @@ except ImportError:
 
 if SKYULF_AVAILABLE:
     try:
-        import skyulf.preprocessing
+        pass
     except ImportError as exc:
         logger.warning(f"Could not import skyulf preprocessing nodes: {exc}")
 
     try:
-        import skyulf.modeling
+        pass
     except ImportError as exc:
         logger.warning(f"Could not import skyulf modeling nodes: {exc}")
 

@@ -1,4 +1,4 @@
-from typing import Any, List, Protocol, Sequence, Tuple, runtime_checkable
+from typing import Any, Protocol, Tuple, runtime_checkable
 import pandas as pd
 
 

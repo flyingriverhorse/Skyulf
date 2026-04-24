@@ -1,10 +1,7 @@
 import unittest
 import numpy as np
-import pandas as pd
 import polars as pl
 import logging
-import pytest
-from typing import Any
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -47,14 +44,8 @@ from skyulf.preprocessing.encoding import (
     OneHotEncoderApplier,
     OrdinalEncoderCalculator,
     OrdinalEncoderApplier,
-    LabelEncoderCalculator,
-    LabelEncoderApplier,
     TargetEncoderCalculator,
     TargetEncoderApplier,
-    HashEncoderCalculator,
-    HashEncoderApplier,
-    DummyEncoderCalculator,
-    DummyEncoderApplier,
 )
 
 # Feature Generation
@@ -75,8 +66,6 @@ from skyulf.preprocessing.feature_selection import (
     UnivariateSelectionApplier,
     ModelBasedSelectionCalculator,
     ModelBasedSelectionApplier,
-    FeatureSelectionCalculator,
-    FeatureSelectionApplier,
 )
 
 # Imputation
@@ -90,7 +79,7 @@ from skyulf.preprocessing.imputation import (
 )
 
 # Inspection
-from skyulf.preprocessing.inspection import DatasetProfileCalculator, DataSnapshotCalculator
+from skyulf.preprocessing.inspection import DatasetProfileCalculator
 
 # Outliers
 from skyulf.preprocessing.outliers import (
@@ -112,26 +101,18 @@ from skyulf.preprocessing.scaling import (
     StandardScalerApplier,
     MinMaxScalerCalculator,
     MinMaxScalerApplier,
-    RobustScalerCalculator,
-    RobustScalerApplier,
-    MaxAbsScalerCalculator,
-    MaxAbsScalerApplier,
 )
 
 # Resampling
 from skyulf.preprocessing.resampling import (
     OversamplingCalculator,
     OversamplingApplier,
-    UndersamplingCalculator,
-    UndersamplingApplier,
 )
 
 # Transformations
 from skyulf.preprocessing.transformations import (
     SimpleTransformationCalculator,
     SimpleTransformationApplier,
-    GeneralTransformationCalculator,
-    GeneralTransformationApplier,
     PowerTransformerCalculator,
     PowerTransformerApplier,
 )
@@ -169,7 +150,7 @@ class TestPolarsPreprocessingComprehensive(unittest.TestCase):
                 calc_pd = calc_cls()
                 applier_pd = applier_cls()
                 fit_res_pd = calc_pd.fit(df_pd, params)
-                res_pd = applier_pd.apply(df_pd, fit_res_pd)
+                applier_pd.apply(df_pd, fit_res_pd)
                 # print(" OK")
             except Exception as e:
                 print(f"\n    [!] PANDAS FAILURE for {calc_cls.__name__}: {e}")
@@ -187,7 +168,6 @@ class TestPolarsPreprocessingComprehensive(unittest.TestCase):
             {"strategy": "quantile", "n_bins": 2, "columns": ["A_float"]},
         )
         # Usually adds bin info to metadata or suffix
-        pass
 
     def test_casting_nodes(self):
         print("\n--- Casting Nodes ---")
@@ -260,7 +240,6 @@ class TestPolarsPreprocessingComprehensive(unittest.TestCase):
         # Should be floats/ints
         # Check dtype - Polars might allow numeric?
         # Typically ordinal encoder returns float in sklearn
-        pass
 
         # 3. Target Encoder (Needs y)
         # Need to pack y into input
@@ -274,18 +253,17 @@ class TestPolarsPreprocessingComprehensive(unittest.TestCase):
         # But applier only takes X.
         # For TargetEncoder, calc.fit needs y.
         # Let's manually do this one
-        calc = TargetEncoderCalculator()
-        applier = TargetEncoderApplier()
+        TargetEncoderCalculator()
+        TargetEncoderApplier()
 
         X = (
             self.df.select("C_txt").fill_null("Missing").to_pandas()
         )  # Bridge requires pandas usually for TargetEnc?
-        y = self.df.select("E_target").to_pandas()["E_target"]
+        self.df.select("E_target").to_pandas()["E_target"]
 
         # Test helper wrapper adaptation?
         # _apply_calc_applier: fit_res = calc.fit(df, params)
         # If I pass (X, y) tuple, unpacker should work.
-        pass
 
     def test_cleaning_nodes(self):
         print("\n--- Cleaning Nodes ---")
@@ -373,7 +351,7 @@ class TestPolarsPreprocessingComprehensive(unittest.TestCase):
         )
         # Note: Polars variance calculation?
         # fit returned 'drop_columns'
-        dropped = fit_res.get("drop_columns", [])
+        fit_res.get("drop_columns", [])
         # Sometimes constant might not be perfectly 0 var depending on implementation,
         # but threshold 0 usually catches strict constants.
 
@@ -510,7 +488,6 @@ class TestPolarsPreprocessingComprehensive(unittest.TestCase):
         )
         # Should drop finding outliers
         # self.assertTrue(len(res) < len(df_clean)) # Depends on random state and data
-        pass
 
     def test_scaling_nodes(self):
         print("\n--- Scaling Nodes ---")

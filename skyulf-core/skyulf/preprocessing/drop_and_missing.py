@@ -53,7 +53,7 @@ class DeduplicateApplier(BaseApplier):
 
                 # If y is a Series/DataFrame, we can hstack
                 # But we need to know which columns belong to X and which to y
-                x_cols = X_pl.columns
+                X_pl.columns
 
                 # If y is unnamed or has name collision, rename it temporarily?
                 # Or just use index? Polars has no index.
@@ -195,7 +195,7 @@ class DropMissingColumnsCalculator(BaseCalculator):
                 threshold_val = float(threshold)
                 if threshold_val > 0:
                     if engine.name == "polars":
-                        import polars as pl
+                        pass
 
                         X_pl_data: Any = X
                         # Calculate missing percentage for all columns
@@ -410,7 +410,7 @@ class MissingIndicatorCalculator(BaseCalculator):
                 cols = [c for c in explicit_cols if c in X.columns]
         else:
             if engine.name == "polars":
-                import polars as pl
+                pass
 
                 X_pl: Any = X
                 null_counts = X_pl.null_count()

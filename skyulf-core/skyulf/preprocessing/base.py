@@ -18,7 +18,6 @@ class BaseCalculator(ABC):
         Calculates parameters from the training data.
         Returns a dictionary of fitted parameters (serializable).
         """
-        pass
 
 
 class BaseApplier(ABC):
@@ -33,7 +32,6 @@ class BaseApplier(ABC):
         `SplitDataset`. Encoding every case as a union forces callers to
         defensively narrow on every use, which is worse than `Any` here.
         """
-        pass
 
 
 class StatefulTransformer:

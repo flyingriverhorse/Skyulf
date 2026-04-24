@@ -1,7 +1,6 @@
 import polars as pl
 import numpy as np
 from typing import List, Dict, Any, Optional, Tuple, cast
-from datetime import datetime
 import re
 
 
@@ -61,7 +60,7 @@ except ImportError:
     SKLEARN_AVAILABLE = False
 
 try:
-    from scipy.stats import f_oneway, shapiro, kstest, norm
+    from scipy.stats import f_oneway, shapiro, kstest
 
     SCIPY_AVAILABLE = True
 except ImportError:
@@ -69,8 +68,6 @@ except ImportError:
 
 try:
     from statsmodels.tsa.stattools import adfuller
-    from statsmodels.stats.outliers_influence import variance_inflation_factor
-    from statsmodels.tools.tools import add_constant
 
     STATSMODELS_AVAILABLE = True
 except ImportError:
@@ -102,7 +99,7 @@ class EDAAnalyzer:
         self.row_count = self.df.height
         self.columns = self.df.columns
 
-    def _cast_date_columns(self):
+    def _cast_date_columns(self):  # noqa: C901
         """
         Attempts to cast string columns to DateTime if they look like dates.
         """
@@ -201,7 +198,7 @@ class EDAAnalyzer:
                         print(f"Failed to cast column {col} using {best_method_name}: {e}")
                     continue
 
-    def analyze(
+    def analyze(  # noqa: C901  # top-level orchestrator: each stage delegates to a helper
         self,
         target_col: Optional[str] = None,
         exclude_cols: Optional[List[str]] = None,
@@ -387,7 +384,10 @@ class EDAAnalyzer:
                                 Alert(
                                     column=col,
                                     type="Leakage",
-                                    message=f"Column '{col}' is highly correlated ({corr:.2f}) with target '{target_col}'. Possible leakage.",
+                                    message=(
+                                        f"Column '{col}' is highly correlated ({corr:.2f}) "
+                                        f"with target '{target_col}'. Possible leakage."
+                                    ),
                                     severity="warning",
                                 )
                             )
@@ -721,17 +721,13 @@ class EDAAnalyzer:
                 # If target is present (encoded or numeric), select Target + Top 14 correlated features
                 # This avoids filtering out low-variance confounders that are highly predictive
 
-                target_col_name = None
+                pass
                 # Check if any column looks like a target (encoded or original)
                 # We don't have explicit target_col passed here, but we can infer from numeric_cols
                 # Or better, we should pass target_col to this method.
                 # For now, let's assume the last column might be target if it matches known target names
                 # But wait, we can calculate correlation matrix for ALL numeric cols
-
-                # Calculate full correlation matrix
-                corr_matrix = self.df.select(
-                    [pl.corr(col, numeric_cols[0]).alias(col) for col in numeric_cols]
-                )  # This is just one row, we need full matrix.
+                # (full pairwise matrix not yet wired here; fall back to variance / target-corr below)
 
                 # Actually, we can just use variance as fallback if no target info is available easily
                 # But wait, we can check if 'target' or 'target_encoded' is in numeric_cols
@@ -817,8 +813,6 @@ class EDAAnalyzer:
 
                     if end_j == 0 and end_i == 0:
                         continue  # No edge
-
-                    edge_type = "undirected"
 
                     if end_i == -1 and end_j == 1:
                         # i -> j
@@ -951,7 +945,7 @@ class EDAAnalyzer:
             print(f"Error in geospatial analysis: {e}")
             return None
 
-    def _analyze_timeseries(
+    def _analyze_timeseries(  # noqa: C901
         self,
         numeric_cols: List[str],
         target_col: Optional[str] = None,
@@ -1359,7 +1353,10 @@ class EDAAnalyzer:
                                 column=target_col,
                                 action="Resample",
                                 reason="Imbalanced Target",
-                                suggestion=f"Target is imbalanced (Ratio: {ratio:.2f}). Consider SMOTE or Class Weights.",
+                                suggestion=(
+                                    f"Target is imbalanced (Ratio: {ratio:.2f}). "
+                                    "Consider SMOTE or Class Weights."
+                                ),
                             )
                         )
 
@@ -1573,8 +1570,8 @@ class EDAAnalyzer:
             print(f"Error calculating target correlations: {e}")
             return {}
 
-    def _analyze_column(self, col: str) -> Tuple[ColumnProfile, List[Alert]]:
-        dtype = str(self.df[col].dtype)
+    def _analyze_column(self, col: str) -> Tuple[ColumnProfile, List[Alert]]:  # noqa: C901
+        str(self.df[col].dtype)
         alerts = []
 
         # Determine semantic type
@@ -1955,7 +1952,10 @@ class EDAAnalyzer:
                         )
                         total = np.sum(value)
                         confidence = (value[class_idx] / total) * 100 if total > 0 else 0
-                        rule_str = f"IF {current_rule} THEN {class_name} (Confidence: {confidence:.1f}%, Samples: {int(total)})"
+                        rule_str = (
+                            f"IF {current_rule} THEN {class_name} "
+                            f"(Confidence: {confidence:.1f}%, Samples: {int(total)})"
+                        )
 
                     rules_text.append(rule_str)
                     return
@@ -2167,7 +2167,6 @@ class EDAAnalyzer:
         # Simple heuristic check on a sample
         sample = self.df[col].drop_nulls().head(20).to_list()
         email_pattern = r"[^@]+@[^@]+\.[^@]+"
-        phone_pattern = r"^\+?1?\d{9,15}$"  # Very basic
 
         for val in sample:
             val_str = str(val)
@@ -2177,7 +2176,7 @@ class EDAAnalyzer:
 
         return False
 
-    def get_decomposition_split(
+    def get_decomposition_split(  # noqa: C901  # filter dispatch + measure aggregation
         self,
         measure_col: Optional[str],
         measure_agg: str,

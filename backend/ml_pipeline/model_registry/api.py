@@ -49,6 +49,6 @@ async def list_job_artifacts(job_id: str, session: AsyncSession = Depends(get_as
         return await ModelRegistryService.get_job_artifacts(session, job_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to list artifacts for job %s", job_id)
         raise HTTPException(status_code=500, detail="Failed to retrieve job artifacts")
