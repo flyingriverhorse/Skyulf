@@ -70,8 +70,10 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
   
   return (
     <div className={`
-      min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all
-      ${selected ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}
+      min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all duration-150
+      ${selected
+        ? 'border-primary shadow-lg shadow-primary/30 scale-[1.02]'
+        : 'border-border hover:border-primary/50'}
     `}>
       {/* Header */}
       <div className="flex items-center p-3 border-b bg-muted/30 rounded-t-lg relative group">

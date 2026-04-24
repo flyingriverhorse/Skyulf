@@ -1,19 +1,22 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { 
-    Play, Download, Loader2, Settings2, Database, Activity, 
-    BarChart3, X, Check, ChevronRight, ChevronDown, HelpCircle, AlertCircle, RefreshCw, AlertTriangle
+import React, { useEffect, useState, useRef } from 'react';
+import {
+    Play, Download, Loader2, Settings2,
+    BarChart3, X, ChevronRight, ChevronDown, AlertCircle, AlertTriangle
 } from 'lucide-react';
-import { jobsApi, JobInfo } from '../../../core/api/jobs';
+import { jobsApi } from '../../../core/api/jobs';
 import { RegistryItem, registryApi } from '../../../core/api/registry';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useElementSize } from '../../../core/hooks/useElementSize';
-import { formatMetricName } from '../../../core/utils/format';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { getIncomers } from '@xyflow/react';
 import { StepType } from '../../../core/constants/stepTypes';
+import { HelpTooltip } from './components/HelpTooltip';
+import { BestParamsModal } from './components/BestParamsModal';
+import { HyperparameterInput } from './components/HyperparameterInput';
+import type { HyperparameterDef } from './components/types';
 
 export interface ModelTrainingConfig {
   target_column: string;
@@ -28,246 +31,8 @@ export interface ModelTrainingConfig {
   execution_mode?: 'merge' | 'parallel';
 }
 
-interface HyperparameterDef {
-    name: string;
-    label: string;
-    type: 'number' | 'select' | 'boolean';
-    default: unknown;
-    description?: string;
-    options?: { label: string; value: unknown }[];
-    min?: number;
-    max?: number;
-    step?: number;
-}
-
-const Tooltip: React.FC<{ text: string }> = ({ text }) => (
-    <div className="group relative flex items-center">
-        <HelpCircle className="w-3 h-3 text-gray-400 cursor-help" />
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
-            {text}
-            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
-        </div>
-    </div>
-);
-
-const BestParamsModal: React.FC<{ 
-    isOpen: boolean; 
-    onClose: () => void; 
-    modelType: string; 
-    onSelect: (params: unknown) => void;
-    availableModels?: RegistryItem[];
-}> = ({ isOpen, onClose, modelType: initialModelType, onSelect, availableModels = [] }) => {
-    const [currentModelType, setCurrentModelType] = useState(initialModelType);
-    const [jobs, setJobs] = useState<JobInfo[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    // Update currentModelType when initialModelType changes
-    useEffect(() => {
-        if (isOpen) {
-            setCurrentModelType(initialModelType);
-        }
-    }, [isOpen, initialModelType]);
-
-    const fetchJobs = useCallback(() => {
-        if (!currentModelType) return;
-        setIsLoading(true);
-        setError(null);
-        // Use getTuningHistory instead of getTuningJobsForModel
-        jobsApi.getTuningHistory(currentModelType)
-            .then(data => {
-                setJobs(data);
-            })
-            .catch(err => {
-                console.error("Failed to fetch jobs", err);
-                setError("Failed to load history.");
-            })
-            .finally(() => { setIsLoading(false); });
-    }, [currentModelType]);
-
-    useEffect(() => {
-        if (isOpen) {
-            fetchJobs();
-        }
-    }, [isOpen, fetchJobs]);
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 z-[100] flex justify-center items-center p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-2xl max-h-[85vh] bg-white dark:bg-gray-800 shadow-2xl rounded-xl flex flex-col border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in zoom-in duration-200">
-                {/* Header */}
-                <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                            <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div>
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Best Parameters History</h3>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs text-gray-500 dark:text-gray-400">Select parameters for:</span>
-                                <select 
-                                    value={currentModelType}
-                                    onChange={(e) => { setCurrentModelType(e.target.value); }}
-                                    className="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-blue-500 outline-none"
-                                >
-                                    {availableModels.length > 0 ? (
-                                        availableModels.map(model => (
-                                            <option key={model.id} value={model.id}>{model.name}</option>
-                                        ))
-                                    ) : (
-                                        // Fallback if no models passed (should not happen in normal flow)
-                                        <>
-                                            <option value="random_forest_classifier">Random Forest Classifier</option>
-                                            <option value="logistic_regression">Logistic Regression</option>
-                                            <option value="ridge_regression">Ridge Regression</option>
-                                            <option value="random_forest_regressor">Random Forest Regressor</option>
-                                        </>
-                                    )}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={fetchJobs}
-                            className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 transition-colors"
-                            title="Refresh"
-                        >
-                            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                        </button>
-                        <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 transition-colors">
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-                
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/30 dark:bg-gray-900/30">
-                    {isLoading ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                            <Loader2 className="w-8 h-8 animate-spin mb-2 text-blue-500" />
-                            <p className="text-sm">Loading history...</p>
-                        </div>
-                    ) : error ? (
-                        <div className="text-center py-12 text-red-500 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-900/20">
-                            <AlertCircle className="w-8 h-8 mx-auto mb-2" />
-                            <p className="text-sm">{error}</p>
-                            <button onClick={fetchJobs} className="mt-2 text-xs underline hover:text-red-600">Try Again</button>
-                        </div>
-                    ) : jobs.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
-                            <Database className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">No completed optimization jobs found.</p>
-                            <p className="text-xs opacity-70 mt-1">Run an optimization job to see results here.</p>
-                        </div>
-                    ) : (
-                        jobs.map(job => (
-                            <div key={job.job_id} className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 transition-all">
-                                <div className="flex justify-between items-start mb-3">
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-gray-600 dark:text-gray-300">
-                                                #{job.job_id.slice(0, 8)}
-                                            </span>
-                                            <span className="text-xs text-gray-400">
-                                                {job.end_time ? new Date(job.end_time).toLocaleString() : 'Unknown Date'}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-3 mt-1">
-                                            {typeof job.result?.best_score === 'number' && (
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-xs font-medium text-gray-500">
-                                                        {formatMetricName((job.result as Record<string, unknown>).scoring_metric as string) || 'Score'}:
-                                                    </span>
-                                                    <span className="text-sm font-bold text-green-600 dark:text-green-400">
-                                                        {job.result.best_score.toFixed(4)}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full flex items-center gap-1">
-                                                <Check className="w-3 h-3" /> Model Ready
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <button 
-                                        onClick={() => {
-                                            if (job.result?.best_params) {
-                                                onSelect({
-                                                    params: job.result.best_params,
-                                                    modelType: currentModelType
-                                                });
-                                                onClose();
-                                            }
-                                        }}
-                                        className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors flex items-center gap-1 shadow-sm shadow-blue-500/20"
-                                    >
-                                        <Check className="w-3 h-3" />
-                                        Apply
-                                    </button>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const HyperparameterInput: React.FC<{
-    value: unknown;
-    type: string;
-    onChange: (value: unknown) => void;
-    step?: number;
-    min?: number;
-    max?: number;
-}> = ({ value, type, onChange, step, min, max }) => {
-    const [localValue, setLocalValue] = useState<string>('');
-
-    useEffect(() => {
-        setLocalValue(value === null ? 'None' : value?.toString() ?? '');
-    }, [value]);
-
-    const handleBlur = () => {
-        const trimmed = localValue.trim();
-        
-        if (trimmed.toLowerCase() === 'none') {
-            onChange(null);
-            return;
-        }
-
-        if (type === 'number') {
-            if (trimmed === '') return;
-            const num = Number(trimmed);
-            if (!isNaN(num)) {
-                onChange(num);
-            } else {
-                // Revert if invalid
-                setLocalValue(value === null ? 'None' : value?.toString() ?? '');
-            }
-        } else if (type === 'boolean') {
-            if (trimmed.toLowerCase() === 'true') onChange(true);
-            else if (trimmed.toLowerCase() === 'false') onChange(false);
-            else setLocalValue(value?.toString() ?? '');
-        } else {
-            onChange(trimmed);
-        }
-    };
-
-    return (
-        <input
-            type="text"
-            value={localValue}
-            onChange={(e) => { setLocalValue(e.target.value); }}
-            onBlur={handleBlur}
-            placeholder={value === null ? 'None' : ''}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-            {...(type === 'number' ? { step, min, max } : {})}
-        />
-    );
-};
+// HyperparameterDef, HelpTooltip, BestParamsModal, and HyperparameterInput
+// were extracted into ./components/* to keep this file focused on the panel.
 
 export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (c: ModelTrainingConfig) => void; nodeId?: string }> = ({
   config,
@@ -630,26 +395,28 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
     </div>
   );
 
-  const HyperparametersSection = () => {
-    const useCustomParams = Object.keys(config.hyperparameters).length > 0;
+  // Defining HyperparametersSection as a nested component caused React to
+  // remount it on every parent render — losing input focus and re-running its
+  // effects. Use a JSX const instead so it shares this component's render tree.
+  const useCustomParams = Object.keys(config.hyperparameters).length > 0;
 
-    const toggleCustomParams = (enabled: boolean) => {
-        if (enabled) {
-            // Initialize with defaults if empty
-            const defaults: Record<string, any> = {};
-            hyperparameters.forEach(p => {
-                defaults[p.name] = p.default;
-            });
-            // Only update if we don't have params already
-            if (Object.keys(config.hyperparameters).length === 0) {
-                onChange({ ...config, hyperparameters: defaults });
-            }
-        } else {
-            onChange({ ...config, hyperparameters: {} });
-        }
-    };
+  const toggleCustomParams = (enabled: boolean) => {
+      if (enabled) {
+          // Initialize with defaults if empty
+          const defaults: Record<string, unknown> = {};
+          hyperparameters.forEach(p => {
+              defaults[p.name] = p.default;
+          });
+          // Only update if we don't have params already
+          if (Object.keys(config.hyperparameters).length === 0) {
+              onChange({ ...config, hyperparameters: defaults });
+          }
+      } else {
+          onChange({ ...config, hyperparameters: {} });
+      }
+  };
 
-    return (
+  const HyperparametersSection = (
     <div className="space-y-4 animate-in fade-in duration-300">
         <div className="flex items-center justify-between">
            <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
@@ -706,7 +473,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
                           <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
                             {param.label}
                           </label>
-                          {param.description && <Tooltip text={param.description} />}
+                          {param.description && <HelpTooltip text={param.description} />}
                       </div>
                       {param.type === 'select' ? (
                         <select
@@ -746,7 +513,6 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
         )}
     </div>
   );
-  };
 
   return (
     <div className="flex flex-col h-full" ref={containerRef}>
@@ -816,49 +582,18 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
         {isWide ? (
             <div className="grid grid-cols-2 gap-6 h-full">
                 <div className="overflow-y-auto pr-2">{ModelConfigSection}</div>
-                <div className="overflow-y-auto pl-2 border-l border-gray-100 dark:border-gray-800"><HyperparametersSection /></div>
+                <div className="overflow-y-auto pl-2 border-l border-gray-100 dark:border-gray-800">{HyperparametersSection}</div>
             </div>
         ) : (
             <>
                 {activeTab === 'model' && ModelConfigSection}
-                {activeTab === 'params' && <HyperparametersSection />}
+                {activeTab === 'params' && HyperparametersSection}
             </>
         )}
       </div>
 
       {/* Footer */}
       <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
-        {/* Parallel Execution Toggle — only visible when multiple inputs feed this node */}
-        {nodeId && new Set(edges.filter(e => e.target === nodeId).map(e => e.source)).size > 1 && (
-          <div className="w-full max-w-xs flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Multi-Input Mode</span>
-              <Tooltip text="Merge combines all inputs into one dataset. Parallel runs each input as a separate experiment." />
-            </div>
-            <div className="flex rounded-md overflow-hidden border border-slate-300 dark:border-slate-600 text-[11px] font-medium">
-              <button
-                onClick={() => onChange({ ...config, execution_mode: 'merge' })}
-                className={`px-2.5 py-1 transition-colors ${
-                  (config.execution_mode || 'merge') === 'merge'
-                    ? 'bg-purple-500 text-white'
-                    : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600'
-                }`}
-              >
-                Merge
-              </button>
-              <button
-                onClick={() => onChange({ ...config, execution_mode: 'parallel' })}
-                className={`px-2.5 py-1 transition-colors ${
-                  config.execution_mode === 'parallel'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600'
-                }`}
-              >
-                Parallel
-              </button>
-            </div>
-          </div>
-        )}
         <button
           onClick={() => { void handleTrain(); }}
           className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 text-white rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"

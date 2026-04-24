@@ -101,8 +101,68 @@ const PropertiesContent: React.FC<{
             onChange={(data: unknown) => updateNodeData(selectedNode.id, data)}
             nodeId={selectedNode.id}
           />
+          <MultiInputModeSection selectedNode={selectedNode} />
           <MergeStrategySection selectedNode={selectedNode} />
         </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Modeling nodes can either merge their multiple upstream inputs into one
+ * dataset or fan out and run each input as a separate experiment. This toggle
+ * lives in the properties panel so it sits right above the related Merge
+ * Strategy dropdown instead of being buried in each settings panel's footer.
+ */
+const MultiInputModeSection: React.FC<{ selectedNode: Node }> = ({ selectedNode }) => {
+  const edges = useGraphStore((state) => state.edges);
+  const updateNodeData = useGraphStore((state) => state.updateNodeData);
+
+  const data = selectedNode.data as { execution_mode?: 'merge' | 'parallel' };
+  const definitionType = selectedNode.data.definitionType as string;
+
+  // Only modeling nodes opt in to this toggle today.
+  const supportsExecutionMode =
+    definitionType === 'basic_training' || definitionType === 'advanced_tuning';
+  const incomingSourceCount = new Set(
+    edges.filter((e) => e.target === selectedNode.id).map((e) => e.source)
+  ).size;
+
+  if (!supportsExecutionMode || incomingSourceCount < 2) return null;
+
+  const current = data.execution_mode ?? 'merge';
+
+  return (
+    <div className="border-t pt-4">
+      <div className="flex items-center gap-2 mb-2">
+        <Settings2 className="w-4 h-4 text-muted-foreground" />
+        <h3 className="text-sm font-semibold">Multi-Input Mode</h3>
+      </div>
+      <p className="text-xs text-muted-foreground mb-2">
+        Merge combines all inputs into one dataset. Parallel runs each input as a separate experiment.
+      </p>
+      <div className="flex rounded-md overflow-hidden border border-slate-300 dark:border-slate-600 text-xs font-medium w-fit">
+        <button
+          onClick={() => updateNodeData(selectedNode.id, { execution_mode: 'merge' })}
+          className={`px-3 py-1.5 transition-colors ${
+            current === 'merge'
+              ? 'bg-purple-500 text-white'
+              : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600'
+          }`}
+        >
+          Merge
+        </button>
+        <button
+          onClick={() => updateNodeData(selectedNode.id, { execution_mode: 'parallel' })}
+          className={`px-3 py-1.5 transition-colors ${
+            current === 'parallel'
+              ? 'bg-blue-500 text-white'
+              : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600'
+          }`}
+        >
+          Parallel
+        </button>
       </div>
     </div>
   );
@@ -125,9 +185,16 @@ const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }
   // and AUTO_PARALLEL_TYPES in useBranchColors.ts.
   const isAutoParallel = definitionType === 'data_preview';
 
+  // Modeling nodes expose an explicit Multi-Input Mode toggle (merge / parallel).
+  // When the user picks "parallel", merging is skipped at runtime, so the
+  // strategy dropdown would be misleading. Hide it in that case.
+  const executionMode = (selectedNode.data as { execution_mode?: string }).execution_mode;
+  const isParallelMode = executionMode === 'parallel';
+
   // Only expose the strategy when the node actually merges: multi-input
-  // node with 2+ distinct upstream sources, and not an auto-parallel terminal.
-  if (!canMerge || incomingSourceCount < 2 || isAutoParallel) return null;
+  // node with 2+ distinct upstream sources, not an auto-parallel terminal,
+  // and not explicitly set to parallel execution.
+  if (!canMerge || incomingSourceCount < 2 || isAutoParallel || isParallelMode) return null;
 
   const current = (selectedNode.data as { merge_strategy?: string }).merge_strategy ?? 'last_wins';
 
