@@ -5,6 +5,7 @@ This module centralizes the logic to write/read/update/delete the
 `data_sources` registry across PostgreSQL and SQLite. It intentionally
 keeps behavior separate from the generic database CRUD dispatcher.
 """
+
 # pylint: disable=broad-exception-caught
 
 import logging
@@ -49,27 +50,21 @@ async def create(settings: Settings, row: Dict[str, Any]) -> Any:  # noqa: C901
             msg = str(e).lower()
             if "unique" in msg or "duplicate" in msg or "constraint" in msg:
                 try:
-                    existing = await sqlite_q.select_data_sources(
-                        settings, {"id": row.get("id")}
-                    )
+                    existing = await sqlite_q.select_data_sources(settings, {"id": row.get("id")})
                     if isinstance(existing, list) and existing:
-                        logger.info(
-                            f"Data source already exists in SQLite: {row.get('id')}"
-                        )
+                        logger.info(f"Data source already exists in SQLite: {row.get('id')}")
                         return existing[0]
                     if isinstance(existing, dict):
-                        logger.info(
-                            f"Data source already exists in SQLite: {row.get('id')}"
-                        )
+                        logger.info(f"Data source already exists in SQLite: {row.get('id')}")
                         return existing
                 except Exception:
                     # Ignore if check fails, try insert
-                    logger.debug("Failed to check for existing data source in SQLite", exc_info=True)
+                    logger.debug(
+                        "Failed to check for existing data source in SQLite", exc_info=True
+                    )
 
             logger.exception("SQLite insert failed for data_sources")
-            raise RuntimeError(
-                "Failed to persist data_sources row to primary database (SQLite)"
-            )
+            raise RuntimeError("Failed to persist data_sources row to primary database (SQLite)")
 
         # Secondary sync to PostgreSQL (best-effort)
         try:
@@ -96,18 +91,12 @@ async def create(settings: Settings, row: Dict[str, Any]) -> Any:  # noqa: C901
             msg = str(e).lower()
             if "unique" in msg or "duplicate" in msg or "constraint" in msg:
                 try:
-                    existing = await pg_q.select_data_sources(
-                        settings, {"id": row.get("id")}
-                    )
+                    existing = await pg_q.select_data_sources(settings, {"id": row.get("id")})
                     if isinstance(existing, list) and existing:
-                        logger.info(
-                            f"Data source already exists in PostgreSQL: {row.get('id')}"
-                        )
+                        logger.info(f"Data source already exists in PostgreSQL: {row.get('id')}")
                         return existing[0]
                     if isinstance(existing, dict):
-                        logger.info(
-                            f"Data source already exists in PostgreSQL: {row.get('id')}"
-                        )
+                        logger.info(f"Data source already exists in PostgreSQL: {row.get('id')}")
                         return existing
                 except Exception:
                     pass
@@ -145,34 +134,26 @@ async def read(
             rows = await sqlite_q.select_data_sources(settings, filter_dict, one=one)
             row_count = len(rows) if isinstance(rows, list) else 1
             logger.debug("Successfully read %s rows from SQLite (primary)", row_count)
-            return cast(Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], rows)
+            return rows
         except Exception:
-            logger.exception(
-                "Failed reading data_sources from SQLite (primary database)"
-            )
+            logger.exception("Failed reading data_sources from SQLite (primary database)")
             raise RuntimeError("Failed to read from primary database (SQLite)")
 
     elif primary_db == "postgres":
         try:
             rows = await pg_q.select_data_sources(settings, filter_dict, one=one)
             row_count = len(rows) if isinstance(rows, list) else 1
-            logger.debug(
-                "Successfully read %s rows from PostgreSQL (primary)", row_count
-            )
-            return cast(Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], rows)
+            logger.debug("Successfully read %s rows from PostgreSQL (primary)", row_count)
+            return rows
         except Exception:
-            logger.exception(
-                "Failed reading data_sources from PostgreSQL (primary database)"
-            )
+            logger.exception("Failed reading data_sources from PostgreSQL (primary database)")
             raise RuntimeError("Failed to read from primary database (PostgreSQL)")
 
     else:
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
 
 
-async def update(
-    settings: Settings, filter_dict: Dict[str, Any], update_data: Dict[str, Any]
-):
+async def update(settings: Settings, filter_dict: Dict[str, Any], update_data: Dict[str, Any]):
     """Update data sources with configurable primary database.
 
     Strategy: Primary database-first approach
@@ -196,12 +177,8 @@ async def update(
     if primary_db == "sqlite":
         # Primary update in SQLite
         try:
-            sqlite_rows = await sqlite_q.update_data_source(
-                settings, filter_dict, update_data
-            )
-            logger.info(
-                f"Successfully updated data source in SQLite (primary): {filter_dict}"
-            )
+            sqlite_rows = await sqlite_q.update_data_source(settings, filter_dict, update_data)
+            logger.info(f"Successfully updated data source in SQLite (primary): {filter_dict}")
         except Exception:
             logger.exception("SQLite update failed for data_sources")
             raise RuntimeError("Failed to update in primary database (SQLite)")
@@ -209,13 +186,9 @@ async def update(
         # Optional PostgreSQL sync (best-effort, non-blocking)
         try:
             await pg_q.update_data_source(settings, filter_dict, update_data)
-            logger.info(
-                f"Successfully synced update to PostgreSQL (secondary): {filter_dict}"
-            )
+            logger.info(f"Successfully synced update to PostgreSQL (secondary): {filter_dict}")
         except Exception:
-            logger.warning(
-                f"Failed to sync update to PostgreSQL (non-critical): {filter_dict}"
-            )
+            logger.warning(f"Failed to sync update to PostgreSQL (non-critical): {filter_dict}")
 
         return sqlite_rows
 
@@ -223,9 +196,7 @@ async def update(
         # Primary update in PostgreSQL
         try:
             pg_rows = await pg_q.update_data_source(settings, filter_dict, update_data)
-            logger.info(
-                f"Successfully updated data source in PostgreSQL (primary): {filter_dict}"
-            )
+            logger.info(f"Successfully updated data source in PostgreSQL (primary): {filter_dict}")
         except Exception:
             logger.exception("PostgreSQL update failed for data_sources")
             raise RuntimeError("Failed to update in primary database (PostgreSQL)")
@@ -268,9 +239,7 @@ async def delete(settings: Settings, filter_dict: Dict[str, Any]):
         # Primary delete from SQLite
         try:
             sqlite_rows = await sqlite_q.delete_data_source(settings, filter_dict)
-            logger.info(
-                f"Successfully deleted data source from SQLite (primary): {filter_dict}"
-            )
+            logger.info(f"Successfully deleted data source from SQLite (primary): {filter_dict}")
         except Exception:
             logger.exception("SQLite delete failed for data_sources")
             raise RuntimeError("Failed to delete from primary database (SQLite)")
@@ -278,13 +247,9 @@ async def delete(settings: Settings, filter_dict: Dict[str, Any]):
         # Optional PostgreSQL sync (best-effort, non-blocking)
         try:
             await pg_q.delete_data_source(settings, filter_dict)
-            logger.info(
-                f"Successfully synced delete to PostgreSQL (secondary): {filter_dict}"
-            )
+            logger.info(f"Successfully synced delete to PostgreSQL (secondary): {filter_dict}")
         except Exception:
-            logger.warning(
-                f"Failed to sync delete to PostgreSQL (non-critical): {filter_dict}"
-            )
+            logger.warning(f"Failed to sync delete to PostgreSQL (non-critical): {filter_dict}")
 
         return sqlite_rows
 
@@ -312,9 +277,7 @@ async def delete(settings: Settings, filter_dict: Dict[str, Any]):
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
 
 
-async def get_by_file_hash(
-    settings: Settings, file_hash: str
-) -> Optional[Dict[str, Any]]:
+async def get_by_file_hash(settings: Settings, file_hash: str) -> Optional[Dict[str, Any]]:
     """Retrieve a data source row by the stored file hash in the JSON config."""
     if not file_hash:
         return None
@@ -332,9 +295,7 @@ async def get_by_file_hash(
         try:
             return await pg_q.select_data_source_by_file_hash(settings, file_hash)
         except Exception:
-            logger.warning(
-                "Secondary PostgreSQL file-hash lookup failed", exc_info=True
-            )
+            logger.warning("Secondary PostgreSQL file-hash lookup failed", exc_info=True)
             return None
 
     elif primary_db == "postgres":
@@ -381,9 +342,16 @@ async def get_database_status(settings: Settings) -> Dict[str, Any]:
     """
     primary_db = get_primary_database(settings)
 
+    sqlite_status: Dict[str, Any] = {
+        "connected": False,
+        "count": 0,
+        "error": None,
+        "path": None,
+    }
+    postgres_status: Dict[str, Any] = {"connected": False, "count": 0, "error": None}
     status: Dict[str, Any] = {
-        "sqlite": {"connected": False, "count": 0, "error": None, "path": None},
-        "postgres": {"connected": False, "count": 0, "error": None},
+        "sqlite": sqlite_status,
+        "postgres": postgres_status,
         "primary": primary_db,
     }
 

@@ -25,9 +25,7 @@ class ApiConnector(BaseConnector):
         self.method = method
         self.headers = headers or {}
         self.params = params or {}
-        self.data_key = (
-            data_key  # Key to extract data from JSON response (e.g. "items" or "data")
-        )
+        self.data_key = data_key  # Key to extract data from JSON response (e.g. "items" or "data")
 
     async def connect(self) -> bool:
         try:
@@ -77,9 +75,7 @@ class ApiConnector(BaseConnector):
                         if self.data_key in data:
                             data = data[self.data_key]
                         else:
-                            raise ValueError(
-                                f"Key '{self.data_key}' not found in response"
-                            )
+                            raise ValueError(f"Key '{self.data_key}' not found in response")
 
                     # Polars can read list of dicts
                     return pl.DataFrame(data)

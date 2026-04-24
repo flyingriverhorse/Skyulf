@@ -63,9 +63,7 @@ def _delete_immediately(path: Path, files_only: bool = True) -> bool:
             return True
         elif path.is_dir():
             if files_only:
-                logger.warning(
-                    f"⚠ DIRECTORY DELETION BLOCKED (files_only=True): {path}"
-                )
+                logger.warning(f"⚠ DIRECTORY DELETION BLOCKED (files_only=True): {path}")
                 return False
             else:
                 logger.warning(f"⚠ DELETING DIRECTORY (files_only=False): {path}")
@@ -144,9 +142,7 @@ def extract_file_path_from_source(source_data: dict) -> Optional[Path]:
     if isinstance(connection_info, dict):
         path_candidates.extend(
             [
-                connection_info.get(
-                    "file_path"
-                ),  # This is the main one for uploaded files
+                connection_info.get("file_path"),  # This is the main one for uploaded files
                 connection_info.get("filepath"),
                 connection_info.get("path"),
                 connection_info.get("upload_path"),
@@ -171,7 +167,7 @@ def extract_file_path_from_source(source_data: dict) -> Optional[Path]:
             if str(candidate).startswith("s3://"):
                 logger.debug(f"Found S3 path: {candidate}")
                 return candidate
-                
+
             path = Path(candidate)
             if path.exists() and path.is_file():  # Only return if it's actually a file
                 logger.debug(f"Found file path: {path}")
@@ -226,9 +222,7 @@ def cleanup_old_files(
         cutoff_date = datetime.now() - timedelta(days=max_age_days)
 
         # Sort files by modification time (newest first)
-        files_by_mtime = sorted(
-            files_only, key=lambda f: f.stat().st_mtime, reverse=True
-        )
+        files_by_mtime = sorted(files_only, key=lambda f: f.stat().st_mtime, reverse=True)
 
         # Remove files older than max_age_days
         for file_path in files_only:
@@ -259,8 +253,7 @@ def cleanup_old_files(
             "status": "success",
             "files_removed": removed_count,
             "removed_files": removed_files,
-            "remaining_files": len([f for f in files_only if f.exists()])
-            - removed_count,
+            "remaining_files": len([f for f in files_only if f.exists()]) - removed_count,
         }
 
     except Exception as e:
@@ -310,9 +303,7 @@ def cleanup_uploads_directory(
         total_removed += result.get("files_removed", 0)
 
     # Also clean up any temporary files
-    temp_result = cleanup_old_files(
-        uploads_dir, max_files=5, max_age_days=1, file_pattern="*.tmp"
-    )
+    temp_result = cleanup_old_files(uploads_dir, max_files=5, max_age_days=1, file_pattern="*.tmp")
     results["temp_files"] = temp_result
     total_removed += temp_result.get("files_removed", 0)
 

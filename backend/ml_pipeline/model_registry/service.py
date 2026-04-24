@@ -49,14 +49,10 @@ class ModelRegistryService:
 
         # Count total versions (completed jobs)
         train_count = await session.scalar(
-            select(func.count(BasicTrainingJob.id)).where(
-                BasicTrainingJob.status == "completed"
-            )
+            select(func.count(BasicTrainingJob.id)).where(BasicTrainingJob.status == "completed")
         )
         tune_count = await session.scalar(
-            select(func.count(AdvancedTuningJob.id)).where(
-                AdvancedTuningJob.status == "completed"
-            )
+            select(func.count(AdvancedTuningJob.id)).where(AdvancedTuningJob.status == "completed")
         )
 
         # Count active deployments
@@ -83,9 +79,7 @@ class ModelRegistryService:
         # Fetch Deployments to mark is_deployed
         deployments_result = await session.execute(select(Deployment))
         deployments = deployments_result.scalars().all()
-        deployed_job_ids = {
-            cast(str, d.job_id): cast(int, d.id) for d in deployments if d.is_active
-        }
+        deployed_job_ids = {d.job_id: d.id for d in deployments if d.is_active}
 
         # Fetch DataSources for names
         data_sources_result = await session.execute(select(DataSource))
@@ -129,19 +123,19 @@ class ModelRegistryService:
 
             grouped[key].append(
                 ModelVersion(
-                    job_id=cast(str, job.id),
-                    pipeline_id=cast(str, job.pipeline_id),
-                    node_id=cast(str, job.node_id),
+                    job_id=job.id,
+                    pipeline_id=job.pipeline_id,
+                    node_id=job.node_id,
                     model_type=m_type,
                     version=cast(str, job.version),
                     source="training",
-                    status=cast(str, job.status),
+                    status=job.status,
                     metrics=cast(Optional[Dict[str, Any]], job.metrics),
                     hyperparameters=cast(Optional[Dict[str, Any]], job.hyperparameters),
                     created_at=cast(Optional[datetime], job.created_at),
-                    artifact_uri=cast(Optional[str], job.artifact_uri),
+                    artifact_uri=job.artifact_uri,
                     is_deployed=job.id in deployed_job_ids,
-                    deployment_id=deployed_job_ids.get(cast(str, job.id)),
+                    deployment_id=deployed_job_ids.get(job.id),
                 )
             )
 
@@ -161,19 +155,19 @@ class ModelRegistryService:
 
             grouped[key].append(
                 ModelVersion(
-                    job_id=cast(str, job.id),
-                    pipeline_id=cast(str, job.pipeline_id),
-                    node_id=cast(str, job.node_id),
+                    job_id=job.id,
+                    pipeline_id=job.pipeline_id,
+                    node_id=job.node_id,
                     model_type=m_type,
-                    version=cast(int, job.run_number),
+                    version=job.run_number,
                     source="tuning",
-                    status=cast(str, job.status),
+                    status=job.status,
                     metrics=metrics,
                     hyperparameters=cast(Optional[Dict[str, Any]], job.best_params),
                     created_at=cast(Optional[datetime], job.created_at),
-                    artifact_uri=cast(Optional[str], job.artifact_uri),
+                    artifact_uri=job.artifact_uri,
                     is_deployed=job.id in deployed_job_ids,
-                    deployment_id=deployed_job_ids.get(cast(str, job.id)),
+                    deployment_id=deployed_job_ids.get(job.id),
                 )
             )
 
@@ -193,7 +187,7 @@ class ModelRegistryService:
                 # Fallback: check if ds_id is numeric string and try int key
                 if isinstance(ds_id, str) and ds_id.isdigit():
                     ds_info = ds_map.get(int(ds_id))
-            
+
             if ds_info:
                 ds_name = ds_info["name"]
                 ds_type = ds_info["type"]
@@ -226,9 +220,7 @@ class ModelRegistryService:
         return results[skip : skip + limit]
 
     @staticmethod
-    async def get_model_versions(
-        session: AsyncSession, model_type: str
-    ) -> List[ModelVersion]:
+    async def get_model_versions(session: AsyncSession, model_type: str) -> List[ModelVersion]:
         # Similar to list_models but filtered by model_type
         # ... (implementation reuse or copy)
         # For brevity, just filtered the list_models result for now,
@@ -237,9 +229,7 @@ class ModelRegistryService:
         # Fetch Deployments
         result = await session.execute(select(Deployment))
         deployments = result.scalars().all()
-        deployed_job_ids = {
-            cast(str, d.job_id): cast(int, d.id) for d in deployments if d.is_active
-        }
+        deployed_job_ids = {d.job_id: d.id for d in deployments if d.is_active}
 
         versions = []
 
@@ -253,19 +243,19 @@ class ModelRegistryService:
         for job in train_jobs.scalars().all():
             versions.append(
                 ModelVersion(
-                    job_id=cast(str, job.id),
-                    pipeline_id=cast(str, job.pipeline_id),
-                    node_id=cast(str, job.node_id),
+                    job_id=job.id,
+                    pipeline_id=job.pipeline_id,
+                    node_id=job.node_id,
                     model_type=model_type,
                     version=cast(str, job.version),
                     source="training",
-                    status=cast(str, job.status),
+                    status=job.status,
                     metrics=cast(Optional[Dict[str, Any]], job.metrics),
                     hyperparameters=cast(Optional[Dict[str, Any]], job.hyperparameters),
                     created_at=cast(Optional[datetime], job.created_at),
-                    artifact_uri=cast(Optional[str], job.artifact_uri),
+                    artifact_uri=job.artifact_uri,
                     is_deployed=job.id in deployed_job_ids,
-                    deployment_id=deployed_job_ids.get(cast(str, job.id)),
+                    deployment_id=deployed_job_ids.get(job.id),
                 )
             )
 
@@ -283,19 +273,19 @@ class ModelRegistryService:
 
             versions.append(
                 ModelVersion(
-                    job_id=cast(str, job.id),
-                    pipeline_id=cast(str, job.pipeline_id),
-                    node_id=cast(str, job.node_id),
+                    job_id=job.id,
+                    pipeline_id=job.pipeline_id,
+                    node_id=job.node_id,
                     model_type=model_type,
-                    version=cast(int, job.run_number),
+                    version=job.run_number,
                     source="tuning",
-                    status=cast(str, job.status),
+                    status=job.status,
                     metrics=metrics,
                     hyperparameters=cast(Optional[Dict[str, Any]], job.best_params),
                     created_at=cast(Optional[datetime], job.created_at),
-                    artifact_uri=cast(Optional[str], job.artifact_uri),
+                    artifact_uri=job.artifact_uri,
                     is_deployed=job.id in deployed_job_ids,
-                    deployment_id=deployed_job_ids.get(cast(str, job.id)),
+                    deployment_id=deployed_job_ids.get(job.id),
                 )
             )
 
@@ -313,32 +303,33 @@ class ModelRegistryService:
 
         # 1. Get Job Entity
         job = await JobService.get_job_by_id(session, job_id)
-        
+
         if not job:
             raise ValueError(f"Job {job_id} not found")
-        
+
         artifact_uri = str(job.artifact_uri)
         if not artifact_uri:
             return ArtifactListResponse(storage_type="unknown", base_uri="", files=[])
-        
+
         store: Union[S3ArtifactStore, LocalArtifactStore]
 
         # 3. Instantiate the appropriate ArtifactStore
         from backend.ml_pipeline.artifacts.factory import ArtifactFactory
-        
+
         try:
-            store = ArtifactFactory.get_artifact_store(artifact_uri)
-            
+            store = cast(
+                Union[S3ArtifactStore, LocalArtifactStore],
+                ArtifactFactory.get_artifact_store(artifact_uri),
+            )
+
             storage_type = "s3" if artifact_uri.startswith("s3://") else "local"
-            
+
             return ArtifactListResponse(
-                storage_type=storage_type,
-                base_uri=artifact_uri,
-                files=store.list_artifacts()
+                storage_type=storage_type, base_uri=artifact_uri, files=store.list_artifacts()
             )
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to list artifacts: {e}")
             raise e
-

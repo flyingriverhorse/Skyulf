@@ -28,7 +28,7 @@ class OversamplingApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
         was_polars = engine.name == "polars"
@@ -39,6 +39,7 @@ class OversamplingApplier(BaseApplier):
             if target_col and target_col in X.columns:
                 if was_polars:
                     import polars as pl
+
                     y = X.select(target_col).to_series()
                     X = X.drop(target_col)
                 else:
@@ -47,10 +48,11 @@ class OversamplingApplier(BaseApplier):
             else:
                 # Cannot resample without target
                 return pack_pipeline_output(X, y, is_tuple)
-        
+
         # Convert to Pandas for imblearn
         if was_polars:
             import polars as pl
+
             X_pd = X.to_pandas()
             y_pd = y.to_pandas() if hasattr(y, "to_pandas") else y
         else:
@@ -143,7 +145,7 @@ class OversamplingApplier(BaseApplier):
     name="Oversampling",
     category="Preprocessing",
     description="Resample dataset to balance classes by oversampling minority class.",
-    params={"method": "smote", "target_column": "target", "sampling_strategy": "auto"}
+    params={"method": "smote", "target_column": "target", "sampling_strategy": "auto"},
 )
 class OversamplingCalculator(BaseCalculator):
     def fit(
@@ -178,7 +180,7 @@ class UndersamplingApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
         was_polars = engine.name == "polars"
@@ -189,6 +191,7 @@ class UndersamplingApplier(BaseApplier):
             if target_col and target_col in X.columns:
                 if was_polars:
                     import polars as pl
+
                     y = X.select(target_col).to_series()
                     X = X.drop(target_col)
                 else:
@@ -201,6 +204,7 @@ class UndersamplingApplier(BaseApplier):
         # Convert to Pandas for imblearn
         if was_polars:
             import polars as pl
+
             X_pd = X.to_pandas()
             y_pd = y.to_pandas() if hasattr(y, "to_pandas") else y
         else:
@@ -265,7 +269,11 @@ class UndersamplingApplier(BaseApplier):
     name="Undersampling",
     category="Preprocessing",
     description="Resample dataset to balance classes by undersampling majority class.",
-    params={"method": "random_under_sampling", "target_column": "target", "sampling_strategy": "auto"}
+    params={
+        "method": "random_under_sampling",
+        "target_column": "target",
+        "sampling_strategy": "auto",
+    },
 )
 class UndersamplingCalculator(BaseCalculator):
     def fit(

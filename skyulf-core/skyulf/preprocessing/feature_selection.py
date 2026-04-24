@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -94,7 +94,7 @@ class VarianceThresholdApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -111,6 +111,7 @@ class VarianceThresholdApplier(BaseApplier):
         if cols_to_drop_list and drop_columns:
             if engine.name == "polars":
                 import polars as pl
+
                 X_pl: Any = X
                 X = X_pl.drop(cols_to_drop_list)
             else:
@@ -124,7 +125,7 @@ class VarianceThresholdApplier(BaseApplier):
     name="Variance Threshold",
     category="Feature Selection",
     description="Remove features with low variance.",
-    params={"threshold": 0.0}
+    params={"threshold": 0.0},
 )
 class VarianceThresholdCalculator(BaseCalculator):
     def fit(
@@ -149,7 +150,7 @@ class VarianceThresholdCalculator(BaseCalculator):
             return {}
 
         selector = VarianceThreshold(threshold=threshold)
-        
+
         # Use Bridge for fitting
         if engine.name == "polars":
             X_pl: Any = X
@@ -158,7 +159,7 @@ class VarianceThresholdCalculator(BaseCalculator):
             X_subset = X[cols]
 
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
-        
+
         selector.fit(X_np)
 
         support = selector.get_support()
@@ -186,7 +187,7 @@ class CorrelationThresholdApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -200,6 +201,7 @@ class CorrelationThresholdApplier(BaseApplier):
         if drop_columns:
             if engine.name == "polars":
                 import polars as pl
+
                 X_pl: Any = X
                 X = X_pl.drop(cols_to_drop)
             else:
@@ -213,7 +215,7 @@ class CorrelationThresholdApplier(BaseApplier):
     name="Correlation Threshold",
     category="Feature Selection",
     description="Remove features highly correlated with others.",
-    params={"threshold": 0.95, "method": "pearson"}
+    params={"threshold": 0.95, "method": "pearson"},
 )
 class CorrelationThresholdCalculator(BaseCalculator):
     def fit(
@@ -223,7 +225,7 @@ class CorrelationThresholdCalculator(BaseCalculator):
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
-        
+
         # Ensure pandas for correlation logic
         if engine.name == "polars":
             X = X.to_pandas()
@@ -262,7 +264,7 @@ class UnivariateSelectionApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -278,6 +280,7 @@ class UnivariateSelectionApplier(BaseApplier):
         if cols_to_drop_list and drop_columns:
             if engine.name == "polars":
                 import polars as pl
+
                 X_pl: Any = X
                 X = X_pl.drop(cols_to_drop_list)
             else:
@@ -291,7 +294,7 @@ class UnivariateSelectionApplier(BaseApplier):
     name="Univariate Selection",
     category="Feature Selection",
     description="Select best features based on univariate statistical tests.",
-    params={"method": "SelectKBest", "score_func": "f_classif", "k": 10}
+    params={"method": "SelectKBest", "score_func": "f_classif", "k": 10},
 )
 class UnivariateSelectionCalculator(BaseCalculator):
     def fit(  # noqa: C901
@@ -313,13 +316,12 @@ class UnivariateSelectionCalculator(BaseCalculator):
                 return {}
             if engine.name == "polars":
                 import polars as pl
+
                 y = X.select(target_col).to_series().to_pandas()
             else:
                 y = X[target_col]
 
-        cols = resolve_columns(
-            X, config, lambda d: detect_numeric_columns(d, exclude_binary=False)
-        )
+        cols = resolve_columns(X, config, lambda d: detect_numeric_columns(d, exclude_binary=False))
 
         # Ensure target is not in candidate columns
         if target_col in cols:
@@ -371,21 +373,19 @@ class UnivariateSelectionCalculator(BaseCalculator):
                 else:
                     param = config.get("alpha", 0.05)
 
-            selector = GenericUnivariateSelect(
-                score_func=score_func, mode=mode, param=param
-            )
+            selector = GenericUnivariateSelect(score_func=score_func, mode=mode, param=param)
 
         if not selector:
             return {}
 
         # Use Bridge for fitting
         if engine.name == "polars":
-             # Cast X for safety
-             X_pl: Any = X
-             X_subset = X_pl.select(cols).fill_null(0)
+            # Cast X for safety
+            X_pl: Any = X
+            X_subset = X_pl.select(cols).fill_null(0)
         else:
-             X_subset = X[cols].fillna(0)
-             
+            X_subset = X[cols].fillna(0)
+
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
 
         # Handle Chi2 negative values
@@ -395,17 +395,18 @@ class UnivariateSelectionCalculator(BaseCalculator):
                 "Applying MinMaxScaler to features for selection."
             )
             from sklearn.preprocessing import MinMaxScaler
+
             X_np = MinMaxScaler().fit_transform(X_np)
 
         # Handle classification target encoding if needed
         y_fit = y
-        
+
         # Convert y to numpy for inspection
         if hasattr(y, "to_numpy"):
-             y_np = y.to_numpy()
+            y_np = y.to_numpy()
         else:
-             y_np = np.array(y)
-             
+            y_np = np.array(y)
+
         if (
             problem_type == "classification"
             and y is not None
@@ -439,14 +440,12 @@ class UnivariateSelectionCalculator(BaseCalculator):
         pvalues = {}
         if hasattr(selector, "scores_"):
             # Handle potential NaN/Inf in scores
-            safe_scores = np.nan_to_num(
-                selector.scores_, nan=0.0, posinf=0.0, neginf=0.0
-            )
+            safe_scores = np.nan_to_num(selector.scores_, nan=0.0, posinf=0.0, neginf=0.0)
             scores = dict(zip(cols, safe_scores.tolist()))
 
         if hasattr(selector, "pvalues_"):
             # Handle potential NaN in pvalues
-            safe_pvalues = np.nan_to_num(selector.pvalues_, nan=1.0)
+            safe_pvalues = np.nan_to_num(cast(Any, selector.pvalues_), nan=1.0)
             pvalues = dict(zip(cols, safe_pvalues.tolist()))
 
         return {
@@ -468,7 +467,7 @@ class ModelBasedSelectionApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
@@ -484,6 +483,7 @@ class ModelBasedSelectionApplier(BaseApplier):
         if cols_to_drop_list and drop_columns:
             if engine.name == "polars":
                 import polars as pl
+
                 X_pl: Any = X
                 X = X_pl.drop(cols_to_drop_list)
             else:
@@ -497,7 +497,7 @@ class ModelBasedSelectionApplier(BaseApplier):
     name="Model-Based Selection",
     category="Feature Selection",
     description="Select features based on importance weights.",
-    params={"estimator": "RandomForest", "threshold": "mean", "max_features": None}
+    params={"estimator": "RandomForest", "threshold": "mean", "max_features": None},
 )
 class ModelBasedSelectionCalculator(BaseCalculator):
     def fit(  # noqa: C901
@@ -519,13 +519,12 @@ class ModelBasedSelectionCalculator(BaseCalculator):
                 return {}
             if engine.name == "polars":
                 import polars as pl
+
                 y = X.select(target_col).to_series().to_pandas()
             else:
                 y = X[target_col]
 
-        cols = resolve_columns(
-            X, config, lambda d: detect_numeric_columns(d, exclude_binary=False)
-        )
+        cols = resolve_columns(X, config, lambda d: detect_numeric_columns(d, exclude_binary=False))
 
         # Ensure target is not in candidate columns
         if target_col in cols:
@@ -550,8 +549,6 @@ class ModelBasedSelectionCalculator(BaseCalculator):
                 f"Could not resolve estimator '{estimator_name}' for problem type '{problem_type}'"
             )
             return {}
-
-
 
         selector = None
         if method == "select_from_model":
@@ -581,22 +578,22 @@ class ModelBasedSelectionCalculator(BaseCalculator):
 
         # Use Bridge for fitting
         if engine.name == "polars":
-             X_pl: Any = X
-             X_subset = X_pl.select(cols).fill_null(0)
+            X_pl: Any = X
+            X_subset = X_pl.select(cols).fill_null(0)
         else:
-             X_subset = X[cols].fillna(0)
-             
+            X_subset = X[cols].fillna(0)
+
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
 
         # Handle classification target encoding if needed
         y_fit = y
-        
+
         # Convert y to numpy for inspection
         if hasattr(y, "to_numpy"):
-             y_np = y.to_numpy()
+            y_np = y.to_numpy()
         else:
-             y_np = np.array(y)
-             
+            y_np = np.array(y)
+
         if (
             problem_type == "classification"
             and y is not None
@@ -624,12 +621,8 @@ class ModelBasedSelectionCalculator(BaseCalculator):
             }
 
         feature_importances = {}
-        if hasattr(selector, "estimator_") and hasattr(
-            selector.estimator_, "feature_importances_"
-        ):
-            feature_importances = dict(
-                zip(cols, selector.estimator_.feature_importances_.tolist())
-            )
+        if hasattr(selector, "estimator_") and hasattr(selector.estimator_, "feature_importances_"):
+            feature_importances = dict(zip(cols, selector.estimator_.feature_importances_.tolist()))
         elif hasattr(selector, "estimator_") and hasattr(selector.estimator_, "coef_"):
             # For linear models, use coef_
             coef = selector.estimator_.coef_
@@ -653,7 +646,7 @@ class FeatureSelectionApplier(BaseApplier):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
-    ) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]]:
+    ) -> Any:
         # The params returned by the specific calculator will have a "type" field
         # corresponding to the specific calculator's return value.
         type_name = params.get("type")
@@ -669,7 +662,7 @@ class FeatureSelectionApplier(BaseApplier):
             applier = ModelBasedSelectionApplier()
 
         if applier:
-            return applier.apply(df, params)  # type: ignore
+            return applier.apply(df, params)
         return pack_pipeline_output(*unpack_pipeline_input(df))
 
 
@@ -679,7 +672,7 @@ class FeatureSelectionApplier(BaseApplier):
     name="Feature Selection (Wrapper)",
     category="Feature Selection",
     description="General wrapper for feature selection strategies.",
-    params={"method": "variance", "threshold": 0.0}
+    params={"method": "variance", "threshold": 0.0},
 )
 class FeatureSelectionCalculator(BaseCalculator):
     def fit(

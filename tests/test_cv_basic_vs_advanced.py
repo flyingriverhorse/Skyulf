@@ -62,14 +62,17 @@ def _make_basic_estimator() -> StatefulEstimator:
 
 
 @pytest.mark.parametrize("cv_type", ["k_fold", "stratified_k_fold", "nested_cv"])
-def test_basic_training_cv(
-    classification_dataset: SplitDataset, cv_type: str
-) -> None:
+def test_basic_training_cv(classification_dataset: SplitDataset, cv_type: str) -> None:
     """Basic training produces cv metrics for all CV types."""
     est = _make_basic_estimator()
     result = est.cross_validate(
-        classification_dataset, "target", {},
-        n_folds=5, cv_type=cv_type, shuffle=True, random_state=42,
+        classification_dataset,
+        "target",
+        {},
+        n_folds=5,
+        cv_type=cv_type,
+        shuffle=True,
+        random_state=42,
     )
 
     agg = result["aggregated_metrics"]
@@ -111,7 +114,9 @@ def test_advanced_tuning_cv_kfold(classification_dataset: SplitDataset) -> None:
     # Run tuning (this uses inner CV to score candidates)
     tuning_est = StatefulEstimator(tuner, tuner_applier, "tuning_node")
     tuning_est.fit_predict(
-        classification_dataset, "target", tuning_config.__dict__,
+        classification_dataset,
+        "target",
+        tuning_config.__dict__,
     )
 
     # Extract best params
@@ -125,8 +130,13 @@ def test_advanced_tuning_cv_kfold(classification_dataset: SplitDataset) -> None:
     # Post-tuning CV (same as engine.py does)
     cv_est = StatefulEstimator(calc, applier, "cv_node")
     result = cv_est.cross_validate(
-        classification_dataset, "target", {"params": best_params},
-        n_folds=3, cv_type="k_fold", shuffle=True, random_state=42,
+        classification_dataset,
+        "target",
+        {"params": best_params},
+        n_folds=3,
+        cv_type="k_fold",
+        shuffle=True,
+        random_state=42,
     )
 
     agg = result["aggregated_metrics"]
@@ -164,7 +174,9 @@ def test_advanced_tuning_nested_cv_uses_standard_fold(
     # Run tuning — inner CV (3 folds) scores each candidate during search
     tuning_est = StatefulEstimator(tuner, tuner_applier, "tuning_node")
     tuning_est.fit_predict(
-        classification_dataset, "target", tuning_config.__dict__,
+        classification_dataset,
+        "target",
+        tuning_config.__dict__,
     )
 
     _, tuning_result = tuning_est.model  # type: ignore[misc]
@@ -177,8 +189,13 @@ def test_advanced_tuning_nested_cv_uses_standard_fold(
 
     cv_est = StatefulEstimator(calc, applier, "cv_node")
     result = cv_est.cross_validate(
-        classification_dataset, "target", {"params": best_params},
-        n_folds=5, cv_type=post_cv_type, shuffle=True, random_state=42,
+        classification_dataset,
+        "target",
+        {"params": best_params},
+        n_folds=5,
+        cv_type=post_cv_type,
+        shuffle=True,
+        random_state=42,
     )
 
     agg = result["aggregated_metrics"]
@@ -186,9 +203,9 @@ def test_advanced_tuning_nested_cv_uses_standard_fold(
 
     # Confirm it ran as stratified_k_fold, NOT nested_cv
     assert result["cv_config"]["cv_type"] == "stratified_k_fold"
-    assert "inner_folds" not in result["cv_config"], (
-        "Should NOT have inner_folds — that means _perform_nested_cv ran"
-    )
+    assert (
+        "inner_folds" not in result["cv_config"]
+    ), "Should NOT have inner_folds — that means _perform_nested_cv ran"
 
 
 def test_basic_vs_advanced_metric_keys_match(
@@ -201,8 +218,13 @@ def test_basic_vs_advanced_metric_keys_match(
     # Basic CV
     basic_est = StatefulEstimator(calc, applier, "basic_node")
     basic_result = basic_est.cross_validate(
-        classification_dataset, "target", {},
-        n_folds=3, cv_type="k_fold", shuffle=True, random_state=42,
+        classification_dataset,
+        "target",
+        {},
+        n_folds=3,
+        cv_type="k_fold",
+        shuffle=True,
+        random_state=42,
     )
 
     # Advanced tuning + post-tuning CV
@@ -218,23 +240,28 @@ def test_basic_vs_advanced_metric_keys_match(
     tuner_applier = TuningApplier(applier)
     tuning_est = StatefulEstimator(tuner, tuner_applier, "tuning_node")
     tuning_est.fit_predict(
-        classification_dataset, "target", tuning_config.__dict__,
+        classification_dataset,
+        "target",
+        tuning_config.__dict__,
     )
     _, tuning_result = tuning_est.model  # type: ignore[misc]
     best_params = tuning_result.best_params
 
     adv_est = StatefulEstimator(calc, applier, "cv_node")
     adv_result = adv_est.cross_validate(
-        classification_dataset, "target", {"params": best_params},
-        n_folds=3, cv_type="k_fold", shuffle=True, random_state=42,
+        classification_dataset,
+        "target",
+        {"params": best_params},
+        n_folds=3,
+        cv_type="k_fold",
+        shuffle=True,
+        random_state=42,
     )
 
     basic_keys = set(basic_result["aggregated_metrics"].keys())
     adv_keys = set(adv_result["aggregated_metrics"].keys())
 
-    assert basic_keys == adv_keys, (
-        f"Metric keys differ: basic={basic_keys}, advanced={adv_keys}"
-    )
+    assert basic_keys == adv_keys, f"Metric keys differ: basic={basic_keys}, advanced={adv_keys}"
 
 
 # -- Regression: nested_cv -> k_fold downgrade --
@@ -263,7 +290,9 @@ def test_regression_nested_cv_uses_k_fold(
     tuner_applier = TuningApplier(applier)
     tuning_est = StatefulEstimator(tuner, tuner_applier, "tuning_node")
     tuning_est.fit_predict(
-        regression_dataset, "target", tuning_config.__dict__,
+        regression_dataset,
+        "target",
+        tuning_config.__dict__,
     )
 
     _, tuning_result = tuning_est.model  # type: ignore[misc]
@@ -277,8 +306,13 @@ def test_regression_nested_cv_uses_k_fold(
 
     cv_est = StatefulEstimator(calc, applier, "cv_node")
     result = cv_est.cross_validate(
-        regression_dataset, "target", {"params": best_params},
-        n_folds=5, cv_type=post_cv_type, shuffle=True, random_state=42,
+        regression_dataset,
+        "target",
+        {"params": best_params},
+        n_folds=5,
+        cv_type=post_cv_type,
+        shuffle=True,
+        random_state=42,
     )
 
     agg = result["aggregated_metrics"]
@@ -310,7 +344,9 @@ def test_classification_nested_cv_uses_stratified(
     tuner_applier = TuningApplier(applier)
     tuning_est = StatefulEstimator(tuner, tuner_applier, "tuning_node")
     tuning_est.fit_predict(
-        classification_dataset, "target", tuning_config.__dict__,
+        classification_dataset,
+        "target",
+        tuning_config.__dict__,
     )
 
     _, tuning_result = tuning_est.model  # type: ignore[misc]
@@ -320,12 +356,19 @@ def test_classification_nested_cv_uses_stratified(
     is_classification = getattr(calc, "problem_type", "") == "classification"
     post_cv_type = "stratified_k_fold" if is_classification else "k_fold"
 
-    assert post_cv_type == "stratified_k_fold", "Classification should downgrade to stratified_k_fold"
+    assert (
+        post_cv_type == "stratified_k_fold"
+    ), "Classification should downgrade to stratified_k_fold"
 
     cv_est = StatefulEstimator(calc, applier, "cv_node")
     result = cv_est.cross_validate(
-        classification_dataset, "target", {"params": best_params},
-        n_folds=5, cv_type=post_cv_type, shuffle=True, random_state=42,
+        classification_dataset,
+        "target",
+        {"params": best_params},
+        n_folds=5,
+        cv_type=post_cv_type,
+        shuffle=True,
+        random_state=42,
     )
 
     agg = result["aggregated_metrics"]

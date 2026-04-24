@@ -86,18 +86,14 @@ def main():
 
     # Log startup information
     logger.info(f"[START] Starting {settings.APP_NAME}")
-    logger.info(
-        f"[ENV] Environment: {'Development' if settings.DEBUG else 'Production'}"
-    )
+    logger.info(f"[ENV] Environment: {'Development' if settings.DEBUG else 'Production'}")
     logger.info(f"[HOST] Host: {settings.HOST}:{settings.PORT}")
 
     # Import uvicorn here to avoid import errors if not installed
     try:
         import uvicorn
     except ImportError:
-        logger.error(
-            "[ERROR] uvicorn not installed. Please run: pip install uvicorn[standard]"
-        )
+        logger.error("[ERROR] uvicorn not installed. Please run: pip install uvicorn[standard]")
         sys.exit(1)
 
     celery_process = None
@@ -112,9 +108,7 @@ def main():
                 logger.error(f"[ERROR] Failed to start Celery worker: {e}")
         else:
             logger.warning("[WARN] Redis not found. Celery worker will NOT be started.")
-            logger.warning(
-                "   To enable background tasks, start Redis: docker-compose up -d redis"
-            )
+            logger.warning("   To enable background tasks, start Redis: docker-compose up -d redis")
 
         # Development server with auto-reload
         logger.info("[DEV] Running in development mode with auto-reload")

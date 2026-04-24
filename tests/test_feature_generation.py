@@ -13,9 +13,7 @@ def test_polynomial_features():
     df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
 
     calc = PolynomialFeaturesCalculator()
-    params = calc.fit(
-        df, {"degree": 2, "interaction_only": False, "columns": ["A", "B"]}
-    )
+    params = calc.fit(df, {"degree": 2, "interaction_only": False, "columns": ["A", "B"]})
 
     applier = PolynomialFeaturesApplier()
     res = applier.apply(df, params)

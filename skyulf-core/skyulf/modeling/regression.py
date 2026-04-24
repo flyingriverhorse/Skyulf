@@ -9,6 +9,7 @@ from sklearn.linear_model import ElasticNet, Lasso, Ridge, LinearRegression
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
 from sklearn.tree import DecisionTreeRegressor
+
 try:
     from xgboost import XGBRegressor
 
@@ -96,7 +97,7 @@ class RandomForestRegressorApplier(SklearnApplier):
     name="Random Forest Regressor",
     category="Modeling",
     description="Ensemble of decision trees for regression.",
-    params={"n_estimators": 50, "max_depth": 10, "min_samples_split": 5}
+    params={"n_estimators": 50, "max_depth": 10, "min_samples_split": 5},
 )
 class RandomForestRegressorCalculator(SklearnCalculator):
     """Random Forest Regressor Calculator."""
@@ -328,11 +329,11 @@ class AdaBoostRegressorCalculator(SklearnCalculator):
 
 # --- XGBoost ---
 if XGBOOST_AVAILABLE:
+
     class XGBRegressorApplier(SklearnApplier):
         """XGBoost Regressor Applier."""
 
         pass
-
 
     @NodeRegistry.register("xgboost_regressor", XGBRegressorApplier)
     @node_meta(

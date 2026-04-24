@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional
 from dataclasses import dataclass, field
 
+
 @dataclass
 class NodeMetadata:
     id: str

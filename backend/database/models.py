@@ -6,12 +6,12 @@ These models are compatible with the existing database schema.
 """
 
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Optional
+from datetime import datetime
+from typing import Any, AsyncIterator, Optional
 
 from sqlalchemy import (
     JSON,
     Boolean,
-    Column,
     DateTime,
     Float,
     ForeignKey,
@@ -20,7 +20,7 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from .engine import Base
@@ -29,8 +29,8 @@ from .engine import Base
 class TimestampMixin:
     """Mixin to add created_at and updated_at timestamps to models."""
 
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), onupdate=func.now(), nullable=False
     )
 
@@ -43,22 +43,22 @@ class User(Base, TimestampMixin):
 
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(80), unique=True, nullable=False, index=True)
-    email = Column(String(120), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    username: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # User profile information
-    full_name = Column(String(200), nullable=True)
+    full_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
     # User status
-    is_active = Column(Boolean, default=True, nullable=False)
-    is_admin = Column(Boolean, default=False, nullable=False)
-    is_verified = Column(Boolean, default=False, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Authentication tracking
-    last_login = Column(DateTime, nullable=True)
-    login_count = Column(Integer, default=0, nullable=False)
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    login_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Relationship to DataSource model
     data_sources = relationship("DataSource", back_populates="creator")
@@ -91,39 +91,40 @@ class DataSource(Base, TimestampMixin):
 
     __tablename__ = "data_sources"
 
-    id = Column(Integer, primary_key=True, index=True)
-    source_id = Column(
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    # UUID string identifier for file naming
+    source_id: Mapped[Optional[str]] = mapped_column(
         String(50), unique=True, nullable=True, index=True
-    )  # UUID string identifier for file naming
-    name = Column(String(100), nullable=False, index=True)
-    type = Column(String(50), nullable=False)  # 'snowflake', 'postgres', 'api', etc.
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    # 'snowflake', 'postgres', 'api', etc.
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
 
     # Connection configuration (stored as JSON)
-    config = Column(JSON, nullable=False)
+    config: Mapped[Any] = mapped_column(JSON, nullable=False)
 
     # Credentials (encrypted in production)
-    credentials = Column(JSON, nullable=True)
+    credentials: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
 
     # Status and metadata
-    is_active = Column(Boolean, default=True, nullable=False)
-    last_tested = Column(DateTime, nullable=True)
-    test_status = Column(
-        String(20), default="untested", nullable=False
-    )  # 'success', 'failed', 'untested'
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_tested: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # 'success', 'failed', 'untested'
+    test_status: Mapped[str] = mapped_column(String(20), default="untested", nullable=False)
 
     # User who created this source
-    created_by = Column(
+    created_by: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
-    )  # Foreign key to users.id
+    )
 
     # Relationship to User model
     creator = relationship("User", back_populates="data_sources")
 
     # Description and documentation
-    description = Column(Text, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Additional source metadata (stored as JSON)
-    source_metadata = Column(JSON, nullable=True)
+    source_metadata: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
 
     def __repr__(self):
         return f"<DataSource {self.name} ({self.type})>"
@@ -171,13 +172,13 @@ class FeatureEngineeringPipeline(Base, TimestampMixin):
 
     __tablename__ = "feature_engineering_pipelines"
 
-    id = Column(Integer, primary_key=True, index=True)
-    dataset_source_id = Column(String(100), nullable=False, index=True)
-    name = Column(String(150), nullable=False, default="Draft pipeline")
-    description = Column(Text, nullable=True)
-    graph = Column(JSON, nullable=False)
-    pipeline_metadata = Column("metadata", JSON, nullable=True)
-    is_active = Column(Boolean, nullable=False, default=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    dataset_source_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(150), nullable=False, default="Draft pipeline")
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    graph: Mapped[Any] = mapped_column(JSON, nullable=False)
+    pipeline_metadata: Mapped[Optional[Any]] = mapped_column("metadata", JSON, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def to_dict(self) -> dict:
         return {
@@ -198,24 +199,26 @@ class MLJob(Base, TimestampMixin):
 
     __abstract__ = True
 
-    id = Column(String(64), primary_key=True, index=True)
-    pipeline_id = Column(String(150), nullable=False, index=True)
-    node_id = Column(String(150), nullable=False, index=True)
-    dataset_source_id = Column(String(100), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
-    status = Column(String(20), nullable=False, default="queued", index=True)
-    model_type = Column(String(100), nullable=False)
-    job_metadata = Column("metadata", JSON, nullable=True)
-    metrics = Column(JSON, nullable=True)
-    graph = Column(JSON, nullable=False)
-    artifact_uri = Column(String(500), nullable=True)
-    error_message = Column(Text, nullable=True)
-    progress = Column(Integer, default=0)
-    current_step = Column(String(100), nullable=True)
-    logs = Column(JSON, nullable=True)
-    started_at = Column(DateTime, nullable=True)
-    finished_at = Column(DateTime, nullable=True)
-    promoted_at = Column(DateTime, nullable=True)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    pipeline_id: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
+    node_id: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
+    dataset_source_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True, index=True
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", index=True)
+    model_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    job_metadata: Mapped[Optional[Any]] = mapped_column("metadata", JSON, nullable=True)
+    metrics: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    graph: Mapped[Any] = mapped_column(JSON, nullable=False)
+    artifact_uri: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    current_step: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    logs: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    promoted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     def to_dict_base(self) -> dict:
         """Convert common model fields to dictionary."""
@@ -247,17 +250,19 @@ class BasicTrainingJob(MLJob):
 
     __tablename__ = "basic_training_jobs"
 
-    version = Column(Integer, nullable=False, default=1)
-    hyperparameters = Column(JSON, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    hyperparameters: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
 
     owner = relationship("User", backref="basic_training_jobs")
 
     def to_dict(self) -> dict:
         data = self.to_dict_base()
-        data.update({
-            "version": self.version,
-            "hyperparameters": self.hyperparameters,
-        })
+        data.update(
+            {
+                "version": self.version,
+                "hyperparameters": self.hyperparameters,
+            }
+        )
         return data
 
 
@@ -266,35 +271,37 @@ class AdvancedTuningJob(MLJob):
 
     __tablename__ = "advanced_tuning_jobs"
 
-    run_number = Column(Integer, nullable=False, default=1)
-    search_strategy = Column(String(20), nullable=False, default="random")
-    search_space = Column(JSON, nullable=True)
-    baseline_hyperparameters = Column(JSON, nullable=True)
-    n_iterations = Column(Integer, nullable=True)
-    scoring = Column(String(100), nullable=True)
-    random_state = Column(Integer, nullable=True)
-    cross_validation = Column(JSON, nullable=True)
-    results = Column(JSON, nullable=True)
-    best_params = Column(JSON, nullable=True)
-    best_score = Column(Float, nullable=True)
+    run_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    search_strategy: Mapped[str] = mapped_column(String(20), nullable=False, default="random")
+    search_space: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    baseline_hyperparameters: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    n_iterations: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    scoring: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    random_state: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    cross_validation: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    results: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    best_params: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    best_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     owner = relationship("User", backref="advanced_tuning_jobs")
 
     def to_dict(self) -> dict:
         data = self.to_dict_base()
-        data.update({
-            "run_number": self.run_number,
-            "search_strategy": self.search_strategy,
-            "search_space": self.search_space,
-            "baseline_hyperparameters": self.baseline_hyperparameters,
-            "n_iterations": self.n_iterations,
-            "scoring": self.scoring,
-            "random_state": self.random_state,
-            "cross_validation": self.cross_validation,
-            "results": self.results,
-            "best_params": self.best_params,
-            "best_score": self.best_score,
-        })
+        data.update(
+            {
+                "run_number": self.run_number,
+                "search_strategy": self.search_strategy,
+                "search_space": self.search_space,
+                "baseline_hyperparameters": self.baseline_hyperparameters,
+                "n_iterations": self.n_iterations,
+                "scoring": self.scoring,
+                "random_state": self.random_state,
+                "cross_validation": self.cross_validation,
+                "results": self.results,
+                "best_params": self.best_params,
+                "best_score": self.best_score,
+            }
+        )
         return data
 
 
@@ -305,14 +312,15 @@ class Deployment(Base, TimestampMixin):
 
     __tablename__ = "deployments"
 
-    id = Column(Integer, primary_key=True, index=True)
-    job_id = Column(
-        String(64), nullable=False, index=True
-    )  # ID of the TrainingJob or HyperparameterTuningJob
-    model_type = Column(String(100), nullable=False)
-    artifact_uri = Column(String(500), nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
-    deployed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    # ID of the TrainingJob or HyperparameterTuningJob
+    job_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    model_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    artifact_uri: Mapped[str] = mapped_column(String(500), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    deployed_by: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
 
     def to_dict(self):
         return {
@@ -331,17 +339,21 @@ class EDAReport(Base, TimestampMixin):
     """
     Stores the results of EDA analysis for a dataset.
     """
+
     __tablename__ = "eda_reports"
 
-    id = Column(Integer, primary_key=True, index=True)
-    data_source_id = Column(Integer, ForeignKey("data_sources.id"), nullable=False, index=True)
-    status = Column(String(20), default="PENDING", nullable=False) # PENDING, COMPLETED, FAILED
-    config = Column(JSON, nullable=False, default={})
-    profile_data = Column(JSON, nullable=True)
-    error_message = Column(Text, nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
-    test_status = Column(String(20), default="untested", nullable=False)
-    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    data_source_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("data_sources.id"), nullable=False, index=True
+    )
+    # PENDING, COMPLETED, FAILED
+    status: Mapped[str] = mapped_column(String(20), default="PENDING", nullable=False)
+    config: Mapped[Any] = mapped_column(JSON, nullable=False, default={})
+    profile_data: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    test_status: Mapped[str] = mapped_column(String(20), default="untested", nullable=False)
+
     # Relationship
     data_source = relationship("DataSource", backref="eda_reports")
 
@@ -365,16 +377,16 @@ class DriftCheckResult(Base):
 
     __tablename__ = "drift_check_results"
 
-    id = Column(Integer, primary_key=True, index=True)
-    job_id = Column(String(64), nullable=False, index=True)
-    dataset_name = Column(String(255), nullable=True)
-    reference_rows = Column(Integer, nullable=True)
-    current_rows = Column(Integer, nullable=True)
-    drifted_columns_count = Column(Integer, nullable=True)
-    total_columns = Column(Integer, nullable=True)
-    summary = Column(JSON, nullable=True)
-    column_drifts = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    job_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    dataset_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    reference_rows: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    current_rows: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    drifted_columns_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    total_columns: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    summary: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    column_drifts: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
 
 
 # Unused tables removed: DataIngestionJob, SystemLog

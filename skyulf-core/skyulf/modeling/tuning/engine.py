@@ -2,7 +2,7 @@
 
 import logging
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # Try importing Optuna with robust fallback for integration packages
 HAS_OPTUNA = False
-OptunaSearchCV = None
+OptunaSearchCV: Any = None
 
 try:
     import optuna
@@ -94,7 +94,9 @@ class TuningCalculator(BaseModelCalculator):
             Callable[[int, int, Optional[float], Optional[Dict]], None]
         ] = None,
         log_callback: Optional[Callable[[str], None]] = None,
-        validation_data: Optional[tuple[Union[pd.DataFrame, SkyulfDataFrame], Union[pd.Series, Any]]] = None,
+        validation_data: Optional[
+            tuple[Union[pd.DataFrame, SkyulfDataFrame], Union[pd.Series, Any]]
+        ] = None,
     ) -> Any:
         """
         Fits the tuner (runs tuning).
@@ -107,7 +109,7 @@ class TuningCalculator(BaseModelCalculator):
             # Extract valid keys for TuningConfig
             valid_keys = TuningConfig.__annotations__.keys()
             filtered_config = {k: v for k, v in config.items() if k in valid_keys}
-            tuning_config = TuningConfig(**filtered_config)  # type: ignore
+            tuning_config = TuningConfig(**filtered_config)
 
         # Convert data to Numpy for tuning
         X_np, y_np = SklearnBridge.to_sklearn((X, y))
@@ -117,13 +119,19 @@ class TuningCalculator(BaseModelCalculator):
         # We catch this early to give a clear message.
         if isinstance(X_np, np.ndarray) and np.issubdtype(X_np.dtype, np.number):
             if np.isnan(X_np).any():
-                raise ValueError("Input features (X) contain NaN values. Please use an 'Imputer' node before this model.")
+                raise ValueError(
+                    "Input features (X) contain NaN values. Please use an 'Imputer' node before this model."
+                )
             if np.isinf(X_np).any():
-                raise ValueError("Input features (X) contain Infinite values. Please scale or clean your data.")
-        
+                raise ValueError(
+                    "Input features (X) contain Infinite values. Please scale or clean your data."
+                )
+
         if isinstance(y_np, np.ndarray) and np.issubdtype(y_np.dtype, np.number):
             if np.isnan(y_np).any():
-                raise ValueError("Target variable (y) contains NaN values. Please drop rows with missing targets or impute them.")
+                raise ValueError(
+                    "Target variable (y) contains NaN values. Please drop rows with missing targets or impute them."
+                )
             if np.isinf(y_np).any():
                 raise ValueError("Target variable (y) contains Infinite values.")
         # ----------------------------------------------
@@ -148,9 +156,7 @@ class TuningCalculator(BaseModelCalculator):
         final_params = {**self.model_calculator.default_params, **best_params}
 
         # Ensure random_state is passed if available in config and not in params
-        if "random_state" not in final_params and hasattr(
-            tuning_config, "random_state"
-        ):
+        if "random_state" not in final_params and hasattr(tuning_config, "random_state"):
             final_params["random_state"] = tuning_config.random_state
 
         if log_callback:
@@ -165,6 +171,7 @@ class TuningCalculator(BaseModelCalculator):
         # Filter params to only include those accepted by the model_class constructor
         # This prevents "unexpected keyword argument 'random_state'" for models like KNN/GaussianNB
         import inspect
+
         sig = inspect.signature(model_cls)
         valid_final_params = {k: v for k, v in final_params.items() if k in sig.parameters}
 
@@ -194,16 +201,18 @@ class TuningCalculator(BaseModelCalculator):
         if not hasattr(self.model_calculator, "model_class"):
             raise ValueError("Tuner currently only supports SklearnCalculator")
 
-        base_estimator = self.model_calculator.model_class(
-            **self.model_calculator.default_params
-        )
+        # `model_class` only on SklearnCalculator; `Any` keeps call sites type-clean.
+        model_class: Any = getattr(self.model_calculator, "model_class")
+
+        base_estimator = model_class(**self.model_calculator.default_params)
 
         # 2. Prepare Splitter
         # If validation data is provided, use PredefinedSplit to train on X and validate on validation_data
         # Otherwise use CV
 
-        X_for_search = X
-        y_for_search = y
+        # `Any` — reassigned to np.concatenate output below; keeps branches type-clean.
+        X_for_search: Any = X
+        y_for_search: Any = y
 
         if validation_data is not None:
             from sklearn.model_selection import PredefinedSplit
@@ -223,9 +232,7 @@ class TuningCalculator(BaseModelCalculator):
         else:
             if not config.cv_enabled:
                 # Single split validation (20% holdout)
-                cv = ShuffleSplit(
-                    n_splits=1, test_size=0.2, random_state=config.random_state
-                )
+                cv = ShuffleSplit(n_splits=1, test_size=0.2, random_state=config.random_state)
             elif config.cv_type == "nested_cv":
                 # Nested CV during tuning: use fewer inner folds for
                 # candidate scoring. The outer evaluation loop runs
@@ -273,9 +280,9 @@ class TuningCalculator(BaseModelCalculator):
 
         # Handle multiclass metrics and map user-friendly names
         metric = config.metric
-        
+
         # --- VALIDATION: Metric Consistency Check ---
-        # The schema defaults metric to "accuracy". If the user is doing Regression but "accuracy" 
+        # The schema defaults metric to "accuracy". If the user is doing Regression but "accuracy"
         # (or another classification metric) is selected, we raise a clear error instead of crashing deeply in sklearn.
         if self.model_calculator.problem_type == "regression":
             if metric in ["accuracy", "f1", "precision", "recall", "roc_auc", "f1_weighted"]:
@@ -315,9 +322,7 @@ class TuningCalculator(BaseModelCalculator):
             if is_multiclass and metric in ["f1", "precision", "recall", "roc_auc"]:
                 metric = f"{metric}_weighted"
                 # roc_auc needs special handling (ovr/ovo) usually, but weighted often works for simple cases
-                if (
-                    config.metric == "roc_auc"
-                ):  # Check original config metric name just in case
+                if config.metric == "roc_auc":  # Check original config metric name just in case
                     metric = "roc_auc_ovr_weighted"
 
         if config.strategy in ["grid", "random"]:
@@ -354,9 +359,7 @@ class TuningCalculator(BaseModelCalculator):
             # 2. Iterate Candidates
             for i, params in enumerate(candidates):
                 if log_callback:
-                    log_callback(
-                        f"Evaluating Candidate {i + 1}/{total_candidates}: {params}"
-                    )
+                    log_callback(f"Evaluating Candidate {i + 1}/{total_candidates}: {params}")
 
                 # Use custom cross-validation loop to enable per-fold logging and progress tracking.
                 # We instantiate the model with the current candidate parameters and evaluate it
@@ -365,46 +368,26 @@ class TuningCalculator(BaseModelCalculator):
                 fold_scores = []
 
                 # Ensure numpy
-                X_arr = (
-                    X_for_search.to_numpy()
-                    if hasattr(X_for_search, "to_numpy")
-                    else X_for_search
-                )
-                y_arr = (
-                    y_for_search.to_numpy()
-                    if hasattr(y_for_search, "to_numpy")
-                    else y_for_search
-                )
+                X_any = cast(Any, X_for_search)
+                y_any = cast(Any, y_for_search)
+                X_arr = X_any.to_numpy() if hasattr(X_any, "to_numpy") else X_any
+                y_arr = y_any.to_numpy() if hasattr(y_any, "to_numpy") else y_any
 
                 for fold_idx, (train_idx, val_idx) in enumerate(cv.split(X_arr, y_arr)):
                     # Split
                     X_train_fold = (
-                        X_for_search.iloc[train_idx]
-                        if hasattr(X_for_search, "iloc")
-                        else X_for_search[train_idx]
+                        X_any.iloc[train_idx] if hasattr(X_any, "iloc") else X_any[train_idx]
                     )
                     y_train_fold = (
-                        y_for_search.iloc[train_idx]
-                        if hasattr(y_for_search, "iloc")
-                        else y_for_search[train_idx]
+                        y_any.iloc[train_idx] if hasattr(y_any, "iloc") else y_any[train_idx]
                     )
-                    X_val_fold = (
-                        X_for_search.iloc[val_idx]
-                        if hasattr(X_for_search, "iloc")
-                        else X_for_search[val_idx]
-                    )
-                    y_val_fold = (
-                        y_for_search.iloc[val_idx]
-                        if hasattr(y_for_search, "iloc")
-                        else y_for_search[val_idx]
-                    )
+                    X_val_fold = X_any.iloc[val_idx] if hasattr(X_any, "iloc") else X_any[val_idx]
+                    y_val_fold = y_any.iloc[val_idx] if hasattr(y_any, "iloc") else y_any[val_idx]
 
                     # Instantiate and Fit
                     # Note: We must handle potential errors (e.g. incompatible params)
                     try:
-                        model = self.model_calculator.model_class(
-                            **{**self.model_calculator.default_params, **params}
-                        )
+                        model = model_class(**{**self.model_calculator.default_params, **params})
                         model.fit(X_train_fold, y_train_fold)
 
                         # Score
@@ -463,10 +446,10 @@ class TuningCalculator(BaseModelCalculator):
             factor = strategy_params.get("factor", 3)
             resource = strategy_params.get("resource", "n_samples")
             min_resources = strategy_params.get("min_resources", "exhaust")
-            
+
             if isinstance(min_resources, str) and min_resources.isdigit():
                 min_resources = int(min_resources)
-            
+
             if config.strategy == "halving_grid":
                 searcher = HalvingGridSearchCV(
                     estimator=base_estimator,
@@ -524,15 +507,13 @@ class TuningCalculator(BaseModelCalculator):
                             f"Optuna Trial {trial.number + 1} finished. Mean CV Score: {score}"
                         )
 
-                    progress_callback(
-                        trial.number + 1, config.n_trials, score, trial.params
-                    )
+                    progress_callback(trial.number + 1, config.n_trials, score, trial.params)
 
                 callbacks.append(_optuna_callback)
 
             # Strategy Parameters logic
             strategy_params = getattr(config, "strategy_params", {})
-            
+
             # Sampler Selection
             sampler_name = strategy_params.get("sampler", "tpe")
             if sampler_name == "random":
@@ -543,7 +524,7 @@ class TuningCalculator(BaseModelCalculator):
                 sampler = optuna.samplers.CmaEsSampler(seed=config.random_state)
             else:
                 sampler = optuna.samplers.TPESampler(seed=config.random_state)
-                
+
             # Pruner Selection
             pruner_name = strategy_params.get("pruner", "median")
             if pruner_name == "hyperband":
@@ -560,7 +541,7 @@ class TuningCalculator(BaseModelCalculator):
                 param_distributions=distributions,
                 n_trials=config.n_trials,
                 timeout=config.timeout,
-                cv=cv,  # type: ignore
+                cv=cv,
                 scoring=metric,
                 n_jobs=-1,
                 refit=False,
@@ -573,16 +554,10 @@ class TuningCalculator(BaseModelCalculator):
 
         # 4. Run Search
         # Ensure numpy
-        X_arr = (
-            X_for_search.to_numpy()
-            if hasattr(X_for_search, "to_numpy")
-            else X_for_search
-        )
-        y_arr = (
-            y_for_search.to_numpy()
-            if hasattr(y_for_search, "to_numpy")
-            else y_for_search
-        )
+        X_any = cast(Any, X_for_search)
+        y_any = cast(Any, y_for_search)
+        X_arr = X_any.to_numpy() if hasattr(X_any, "to_numpy") else X_any
+        y_arr = y_any.to_numpy() if hasattr(y_any, "to_numpy") else y_any
 
         try:
             with warnings.catch_warnings():
@@ -601,11 +576,7 @@ class TuningCalculator(BaseModelCalculator):
                     "Please check your search space and data."
                 ) from e
 
-            if (
-                "n_samples" in error_msg
-                and "resample" in error_msg
-                and "Got 0" in error_msg
-            ):
+            if "n_samples" in error_msg and "resample" in error_msg and "Got 0" in error_msg:
                 raise ValueError(
                     "Hyperparameter tuning with Halving strategy failed because the dataset is too small "
                     "for the configured halving parameters. Please try using 'Random Search' or 'Grid Search' instead, "
@@ -633,7 +604,7 @@ class TuningCalculator(BaseModelCalculator):
         trials = []
         # Special handling for Optuna
         if config.strategy == "optuna" and hasattr(searcher, "study_"):
-            for trial in searcher.study_.trials:
+            for trial in cast(Any, searcher).study_.trials:
                 # Only include completed trials
                 if trial.state.name == "COMPLETE":
                     trials.append({"params": trial.params, "score": trial.value})
@@ -667,7 +638,11 @@ class TuningApplier(BaseModelApplier):
     def __init__(self, base_applier: BaseModelApplier):
         self.base_applier = base_applier
 
-    def predict(self, df: pd.DataFrame, model_artifact: Any) -> pd.Series:
+    def predict(
+        self,
+        df: Union[pd.DataFrame, SkyulfDataFrame],
+        model_artifact: Any,
+    ) -> Union[pd.Series, Any]:
         # model_artifact is (fitted_model, tuning_result)
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
             model, _ = model_artifact
@@ -676,8 +651,10 @@ class TuningApplier(BaseModelApplier):
         return pd.Series(np.nan, index=df.index)
 
     def predict_proba(
-        self, df: pd.DataFrame, model_artifact: Any
-    ) -> Optional[pd.DataFrame]:
+        self,
+        df: Union[pd.DataFrame, SkyulfDataFrame],
+        model_artifact: Any,
+    ) -> Optional[Union[pd.DataFrame, SkyulfDataFrame]]:
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
             model, _ = model_artifact
             return self.base_applier.predict_proba(df, model)

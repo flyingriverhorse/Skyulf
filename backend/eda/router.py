@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from pydantic import BaseModel
-from typing import Optional, List, Any
+from typing import Optional, List, Any, cast
 
 from backend.dependencies import get_db
 from backend.database.models import EDAReport, DataSource
@@ -20,23 +20,22 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/eda", tags=["EDA"])
 
+
 class FilterRequest(BaseModel):
     column: str
     operator: str
     value: Any
 
+
 class AnalyzeRequest(BaseModel):
     target_col: Optional[str] = None
     exclude_cols: Optional[List[str]] = None
     filters: Optional[List[FilterRequest]] = None
-    task_type: Optional[str] = None # "Classification" or "Regression"
+    task_type: Optional[str] = None  # "Classification" or "Regression"
+
 
 @router.get("/jobs/all")
-async def list_all_jobs(
-    limit: int = 50,
-    skip: int = 0,
-    session: AsyncSession = Depends(get_db)
-):
+async def list_all_jobs(limit: int = 50, skip: int = 0, session: AsyncSession = Depends(get_db)):
     """
     Returns a list of all EDA jobs across all datasets.
     """
@@ -49,7 +48,7 @@ async def list_all_jobs(
     )
     result = await session.execute(query)
     rows = result.all()
-    
+
     return [
         {
             "id": r.EDAReport.id,
@@ -59,17 +58,18 @@ async def list_all_jobs(
             "created_at": r.EDAReport.created_at,
             "updated_at": r.EDAReport.updated_at,
             "error": r.EDAReport.error_message,
-            "target_col": r.EDAReport.config.get("target_col") if r.EDAReport.config else None
+            "target_col": r.EDAReport.config.get("target_col") if r.EDAReport.config else None,
         }
         for r in rows
     ]
 
+
 @router.post("/{dataset_id}/analyze")
 async def trigger_analysis(
-    dataset_id: int, 
+    dataset_id: int,
     background_tasks: BackgroundTasks,
     request: Optional[AnalyzeRequest] = None,
-    session: AsyncSession = Depends(get_db)
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Triggers an EDA analysis job for the given dataset.
@@ -80,7 +80,7 @@ async def trigger_analysis(
     ds = await session.get(DataSource, dataset_id)
     if not ds:
         raise HTTPException(status_code=404, detail="Dataset not found")
-        
+
     # Create Report entry
     config = {}
     if request:
@@ -92,71 +92,63 @@ async def trigger_analysis(
             config["exclude_cols"] = request.exclude_cols
         if request.filters:
             logger.debug("Applying filters: %s", request.filters)
-            config["filters"] = [f.dict() for f in request.filters]
+            config["filters"] = [f.model_dump() for f in request.filters]
         if request.task_type:
             logger.debug("Setting task_type to %s", request.task_type)
             config["task_type"] = request.task_type
 
-    report = EDAReport(
-        data_source_id=dataset_id,
-        status="PENDING",
-        config=config
-    )
+    report = EDAReport(data_source_id=dataset_id, status="PENDING", config=config)
     session.add(report)
     await session.commit()
     await session.refresh(report)
-    
+
     # Dispatch
     settings = get_settings()
     if settings.USE_CELERY:
         # Use Celery
         task = generate_profile_celery.delay(report.id)
-        
+
         # Store task_id in config for cancellation
         new_config = dict(report.config) if report.config else {}
         new_config["celery_task_id"] = task.id
         report.config = new_config
-        
+
         session.add(report)
         await session.commit()
     else:
         # Use BackgroundTasks
         background_tasks.add_task(run_eda_background, report.id)
-        
+
     return {"job_id": report.id, "status": "PENDING"}
 
+
 @router.post("/reports/{report_id}/cancel")
-async def cancel_analysis(
-    report_id: int,
-    session: AsyncSession = Depends(get_db)
-):
+async def cancel_analysis(report_id: int, session: AsyncSession = Depends(get_db)):
     """
     Cancels a running analysis job.
     """
     report = await session.get(EDAReport, report_id)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
-        
+
     if report.status not in ["PENDING", "STARTED", "RUNNING"]:
         return {"message": "Job is not running", "status": report.status}
-        
+
     # Revoke Celery task if exists
     if report.config and "celery_task_id" in report.config:
         task_id = report.config["celery_task_id"]
         celery_app.control.revoke(task_id, terminate=True)
-        
+
     report.status = "CANCELLED"
     report.error_message = "Cancelled by user"
     session.add(report)
     await session.commit()
-    
+
     return {"message": "Job cancelled", "status": "CANCELLED"}
 
+
 @router.get("/{dataset_id}/history")
-async def get_report_history(
-    dataset_id: int,
-    session: AsyncSession = Depends(get_db)
-):
+async def get_report_history(dataset_id: int, session: AsyncSession = Depends(get_db)):
     """
     Returns a list of past reports for a dataset.
     """
@@ -168,23 +160,21 @@ async def get_report_history(
     )
     result = await session.execute(query)
     reports = result.all()
-    
+
     return [
         {
             "id": r.id,
             "created_at": r.created_at,
             "status": r.status,
             "target_col": r.config.get("target_col") if r.config else None,
-            "task_type": r.config.get("task_type") if r.config else None
+            "task_type": r.config.get("task_type") if r.config else None,
         }
         for r in reports
     ]
 
+
 @router.get("/{dataset_id}/latest")
-async def get_latest_report(
-    dataset_id: int,
-    session: AsyncSession = Depends(get_db)
-):
+async def get_latest_report(dataset_id: int, session: AsyncSession = Depends(get_db)):
     """
     Returns the most recent report for a dataset, regardless of status.
     """
@@ -196,17 +186,15 @@ async def get_latest_report(
     )
     result = await session.execute(query)
     report = result.scalar_one_or_none()
-    
+
     if not report:
         raise HTTPException(status_code=404, detail="No analysis found for this dataset")
-        
+
     return report.to_dict()
 
+
 @router.get("/reports/{report_id}")
-async def get_report(
-    report_id: int,
-    session: AsyncSession = Depends(get_db)
-):
+async def get_report(report_id: int, session: AsyncSession = Depends(get_db)):
     """
     Get a specific report by ID.
     """
@@ -215,17 +203,17 @@ async def get_report(
         raise HTTPException(status_code=404, detail="Report not found")
     return report.to_dict()
 
+
 class DecompositionRequest(BaseModel):
     measure_col: Optional[str] = None
     measure_agg: str = "count"
     split_col: Optional[str] = None
     filters: Optional[List[FilterRequest]] = None
 
+
 @router.post("/{dataset_id}/decomposition")
 async def get_decomposition(
-    dataset_id: int,
-    request: DecompositionRequest,
-    session: AsyncSession = Depends(get_db)
+    dataset_id: int, request: DecompositionRequest, session: AsyncSession = Depends(get_db)
 ):
     """
     Calculates the breakdown of a measure by a split column for Decomposition Trees.
@@ -241,44 +229,46 @@ async def get_decomposition(
             "config": ds.config or {},
             "connection_info": ds.source_metadata or {},
             "file_path": (ds.config or {}).get("file_path"),
-            "source_id": ds.source_id
+            "source_id": ds.source_id,
         }
         file_path = extract_file_path_from_source(source_data_dict)
-        
+
         if not file_path:
-             # Fallback
-             if ds.source_id and (str(ds.source_id).endswith('.csv') or str(ds.source_id).endswith('.parquet')):
-                 file_path = ds.source_id
-             else:
-                 raise HTTPException(status_code=400, detail="File path not found")
+            # Fallback
+            if ds.source_id and (
+                str(ds.source_id).endswith(".csv") or str(ds.source_id).endswith(".parquet")
+            ):
+                file_path = ds.source_id
+            else:
+                raise HTTPException(status_code=400, detail="File path not found")
 
         # 3. Prepare Storage Options (Simplified from tasks.py)
         storage_options = None
         if file_path and str(file_path).startswith("s3://"):
             creds = ds.credentials or {}
             if not creds:
-                 config_creds = ds.config or {}
-                 creds = {
-                     "aws_access_key_id": config_creds.get("aws_access_key_id"),
-                     "aws_secret_access_key": config_creds.get("aws_secret_access_key"),
-                     "aws_session_token": config_creds.get("aws_session_token"),
-                     "endpoint_url": config_creds.get("endpoint_url")
-                 }
-            
+                config_creds = ds.config or {}
+                creds = {
+                    "aws_access_key_id": config_creds.get("aws_access_key_id"),
+                    "aws_secret_access_key": config_creds.get("aws_secret_access_key"),
+                    "aws_session_token": config_creds.get("aws_session_token"),
+                    "endpoint_url": config_creds.get("endpoint_url"),
+                }
+
             if not creds.get("aws_access_key_id"):
                 settings = get_settings()
                 creds = {
                     "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
                     "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
                     "aws_session_token": settings.AWS_SESSION_TOKEN,
-                    "endpoint_url": None
+                    "endpoint_url": None,
                 }
 
             storage_options = {
                 "key": creds.get("aws_access_key_id") or creds.get("key"),
                 "secret": creds.get("aws_secret_access_key") or creds.get("secret"),
                 "token": creds.get("aws_session_token") or creds.get("token"),
-                "endpoint_url": creds.get("endpoint_url")
+                "endpoint_url": creds.get("endpoint_url"),
             }
             storage_options = {k: v for k, v in storage_options.items() if v is not None}
 
@@ -292,19 +282,20 @@ async def get_decomposition(
                     df = pl.from_pandas(df)
                 except Exception:
                     # Fallback: convert object cols to string to handle mixed types
-                    for col in df.columns:
-                        if df[col].dtype == 'object':
-                            df[col] = df[col].astype(str)
-                    df = pl.from_pandas(df)
+                    pdf = cast(Any, df)
+                    for col in pdf.columns:
+                        if pdf[col].dtype == "object":
+                            pdf[col] = pdf[col].astype(str)
+                    df = pl.from_pandas(pdf)
         except Exception as e:
             logger.exception("Failed to load dataset")
             raise HTTPException(status_code=500, detail="Failed to load dataset")
 
         # 5. Run Analysis
-        analyzer = EDAAnalyzer(df)
-        
-        filters_dict = [f.dict() for f in request.filters] if request.filters else []
-        
+        analyzer = EDAAnalyzer(cast(Any, df))
+
+        filters_dict = [f.model_dump() for f in request.filters] if request.filters else []
+
         # Handle empty string split_col from frontend
         split_col_arg = request.split_col
         if split_col_arg == "":
@@ -314,13 +305,12 @@ async def get_decomposition(
             measure_col=request.measure_col,
             measure_agg=request.measure_agg,
             split_col=split_col_arg,
-            filters=filters_dict
+            filters=filters_dict,
         )
-        
+
         return result
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Unexpected error in get_decomposition")
         raise HTTPException(status_code=500, detail="Internal server error")
-

@@ -20,9 +20,7 @@ def regression_data():
     A = np.linspace(0, 10, n)
     B = np.random.uniform(0, 10, n)  # Independent of A
     C = np.random.normal(0, 10, n)  # High variance noise
-    D = np.random.normal(
-        0, 1, n
-    )  # Standard variance noise (was 0.01, causing RFE scale issues)
+    D = np.random.normal(0, 1, n)  # Standard variance noise (was 0.01, causing RFE scale issues)
 
     # Target depends strongly on A, moderately on B
     target = 2 * A + 1.5 * B + np.random.normal(0, 0.1, n)

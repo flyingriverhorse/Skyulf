@@ -28,10 +28,10 @@ from skyulf.modeling.regression import (
 )
 from skyulf.modeling.tuning import TuningCalculator, TuningConfig
 
-
 # ---------------------------------------------------------------------------
 # Fixtures — larger datasets so multi-fold CV doesn't starve
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def classification_dataset():
@@ -111,9 +111,7 @@ def _assert_cv_result(result: dict, n_folds: int, problem_type: str) -> None:
     assert "aggregated_metrics" in result, "Missing aggregated_metrics key"
     assert "folds" in result, "Missing folds key"
     assert "cv_config" in result, "Missing cv_config key"
-    assert len(result["folds"]) == n_folds, (
-        f"Expected {n_folds} folds, got {len(result['folds'])}"
-    )
+    assert len(result["folds"]) == n_folds, f"Expected {n_folds} folds, got {len(result['folds'])}"
 
     agg = result["aggregated_metrics"]
     assert len(agg) > 0, "No aggregated metrics returned"
@@ -143,14 +141,19 @@ def _assert_cv_result(result: dict, n_folds: int, problem_type: str) -> None:
 # SIMPLE FLOW — Basic Training cross_validate (all 5 CV methods)
 # =========================================================================
 
+
 class TestSimpleCVClassification:
     """Basic Training CV — Classification with all 5 methods."""
 
     def test_k_fold(self, classification_dataset: SplitDataset) -> None:
         est = _make_classification_estimator()
         result = est.cross_validate(
-            classification_dataset, "target", {},
-            n_folds=3, cv_type="k_fold", shuffle=True,
+            classification_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="k_fold",
+            shuffle=True,
         )
         _assert_cv_result(result, n_folds=3, problem_type="classification")
         assert result["cv_config"]["cv_type"] == "k_fold"
@@ -158,8 +161,12 @@ class TestSimpleCVClassification:
     def test_stratified_k_fold(self, classification_dataset: SplitDataset) -> None:
         est = _make_classification_estimator()
         result = est.cross_validate(
-            classification_dataset, "target", {},
-            n_folds=3, cv_type="stratified_k_fold", shuffle=True,
+            classification_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="stratified_k_fold",
+            shuffle=True,
         )
         _assert_cv_result(result, n_folds=3, problem_type="classification")
         assert result["cv_config"]["cv_type"] == "stratified_k_fold"
@@ -167,8 +174,11 @@ class TestSimpleCVClassification:
     def test_shuffle_split(self, classification_dataset: SplitDataset) -> None:
         est = _make_classification_estimator()
         result = est.cross_validate(
-            classification_dataset, "target", {},
-            n_folds=4, cv_type="shuffle_split",
+            classification_dataset,
+            "target",
+            {},
+            n_folds=4,
+            cv_type="shuffle_split",
         )
         _assert_cv_result(result, n_folds=4, problem_type="classification")
         assert result["cv_config"]["cv_type"] == "shuffle_split"
@@ -180,16 +190,19 @@ class TestSimpleCVClassification:
         est = _make_classification_estimator()
         logs: list[str] = []
         result = est.cross_validate(
-            timeseries_classification_dataset, "target", {},
-            n_folds=3, cv_type="time_series_split",
+            timeseries_classification_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="time_series_split",
             log_callback=logs.append,
         )
         _assert_cv_result(result, n_folds=3, problem_type="classification")
         assert result["cv_config"]["cv_type"] == "time_series_split"
         # Should have auto-detected and sorted
-        assert any("auto-detected" in log or "sorted" in log for log in logs), (
-            f"Expected auto-detect log, got: {logs}"
-        )
+        assert any(
+            "auto-detected" in log or "sorted" in log for log in logs
+        ), f"Expected auto-detect log, got: {logs}"
 
     def test_time_series_split_explicit_column(
         self, timeseries_classification_dataset: SplitDataset
@@ -198,21 +211,28 @@ class TestSimpleCVClassification:
         est = _make_classification_estimator()
         logs: list[str] = []
         result = est.cross_validate(
-            timeseries_classification_dataset, "target", {},
-            n_folds=3, cv_type="time_series_split",
+            timeseries_classification_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="time_series_split",
             time_column="date",
             log_callback=logs.append,
         )
         _assert_cv_result(result, n_folds=3, problem_type="classification")
-        assert any("sorted by 'date'" in log for log in logs), (
-            f"Expected sort-by-date log, got: {logs}"
-        )
+        assert any(
+            "sorted by 'date'" in log for log in logs
+        ), f"Expected sort-by-date log, got: {logs}"
 
     def test_nested_cv(self, classification_dataset: SplitDataset) -> None:
         est = _make_classification_estimator()
         result = est.cross_validate(
-            classification_dataset, "target", {},
-            n_folds=3, cv_type="nested_cv", shuffle=True,
+            classification_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="nested_cv",
+            shuffle=True,
         )
         _assert_cv_result(result, n_folds=3, problem_type="classification")
         assert result["cv_config"]["cv_type"] == "nested_cv"
@@ -228,8 +248,12 @@ class TestSimpleCVRegression:
     def test_k_fold(self, regression_dataset: SplitDataset) -> None:
         est = _make_regression_estimator()
         result = est.cross_validate(
-            regression_dataset, "target", {},
-            n_folds=3, cv_type="k_fold", shuffle=True,
+            regression_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="k_fold",
+            shuffle=True,
         )
         _assert_cv_result(result, n_folds=3, problem_type="regression")
 
@@ -237,16 +261,22 @@ class TestSimpleCVRegression:
         """Stratified K-Fold on regression should fall back to regular K-Fold."""
         est = _make_regression_estimator()
         result = est.cross_validate(
-            regression_dataset, "target", {},
-            n_folds=3, cv_type="stratified_k_fold",
+            regression_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="stratified_k_fold",
         )
         _assert_cv_result(result, n_folds=3, problem_type="regression")
 
     def test_shuffle_split(self, regression_dataset: SplitDataset) -> None:
         est = _make_regression_estimator()
         result = est.cross_validate(
-            regression_dataset, "target", {},
-            n_folds=4, cv_type="shuffle_split",
+            regression_dataset,
+            "target",
+            {},
+            n_folds=4,
+            cv_type="shuffle_split",
         )
         _assert_cv_result(result, n_folds=4, problem_type="regression")
 
@@ -256,8 +286,11 @@ class TestSimpleCVRegression:
         est = _make_regression_estimator()
         logs: list[str] = []
         result = est.cross_validate(
-            timeseries_regression_dataset, "target", {},
-            n_folds=3, cv_type="time_series_split",
+            timeseries_regression_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="time_series_split",
             log_callback=logs.append,
         )
         _assert_cv_result(result, n_folds=3, problem_type="regression")
@@ -269,33 +302,42 @@ class TestSimpleCVRegression:
         est = _make_regression_estimator()
         logs: list[str] = []
         result = est.cross_validate(
-            timeseries_regression_dataset, "target", {},
-            n_folds=3, cv_type="time_series_split",
+            timeseries_regression_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="time_series_split",
             time_column="date",
             log_callback=logs.append,
         )
         _assert_cv_result(result, n_folds=3, problem_type="regression")
         assert any("sorted by 'date'" in log for log in logs)
 
-    def test_time_series_split_no_datetime_column(
-        self, regression_dataset: SplitDataset
-    ) -> None:
+    def test_time_series_split_no_datetime_column(self, regression_dataset: SplitDataset) -> None:
         """Time Series Split without any datetime column — should warn and use row order."""
         est = _make_regression_estimator()
         logs: list[str] = []
         result = est.cross_validate(
-            regression_dataset, "target", {},
-            n_folds=3, cv_type="time_series_split",
+            regression_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="time_series_split",
             log_callback=logs.append,
         )
         _assert_cv_result(result, n_folds=3, problem_type="regression")
-        assert any("no datetime column" in log.lower() or "already sorted" in log.lower() for log in logs)
+        assert any(
+            "no datetime column" in log.lower() or "already sorted" in log.lower() for log in logs
+        )
 
     def test_nested_cv(self, regression_dataset: SplitDataset) -> None:
         est = _make_regression_estimator()
         result = est.cross_validate(
-            regression_dataset, "target", {},
-            n_folds=3, cv_type="nested_cv",
+            regression_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="nested_cv",
         )
         _assert_cv_result(result, n_folds=3, problem_type="regression")
         assert result["cv_config"]["cv_type"] == "nested_cv"
@@ -383,7 +425,9 @@ class TestRandomSearchCV:
     """Random Search — verify each CV method works."""
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
-    def test_random_classification(self, classification_dataset: SplitDataset, cv_type: str) -> None:
+    def test_random_classification(
+        self, classification_dataset: SplitDataset, cv_type: str
+    ) -> None:
         _run_tuning_test(classification_dataset, "classification", cv_type, "random")
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
@@ -395,7 +439,9 @@ class TestHalvingGridCV:
     """Halving Grid Search — verify each CV method works."""
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
-    def test_halving_grid_classification(self, classification_dataset: SplitDataset, cv_type: str) -> None:
+    def test_halving_grid_classification(
+        self, classification_dataset: SplitDataset, cv_type: str
+    ) -> None:
         _run_tuning_test(classification_dataset, "classification", cv_type, "halving_grid")
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
@@ -407,11 +453,15 @@ class TestHalvingRandomCV:
     """Halving Random Search — verify each CV method works."""
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
-    def test_halving_random_classification(self, classification_dataset: SplitDataset, cv_type: str) -> None:
+    def test_halving_random_classification(
+        self, classification_dataset: SplitDataset, cv_type: str
+    ) -> None:
         _run_tuning_test(classification_dataset, "classification", cv_type, "halving_random")
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
-    def test_halving_random_regression(self, regression_dataset: SplitDataset, cv_type: str) -> None:
+    def test_halving_random_regression(
+        self, regression_dataset: SplitDataset, cv_type: str
+    ) -> None:
         _run_tuning_test(regression_dataset, "regression", cv_type, "halving_random")
 
 
@@ -419,7 +469,9 @@ class TestOptunaCV:
     """Optuna Search — verify each CV method works."""
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
-    def test_optuna_classification(self, classification_dataset: SplitDataset, cv_type: str) -> None:
+    def test_optuna_classification(
+        self, classification_dataset: SplitDataset, cv_type: str
+    ) -> None:
         try:
             _run_tuning_test(classification_dataset, "classification", cv_type, "optuna")
         except ImportError:
@@ -437,6 +489,7 @@ class TestOptunaCV:
 # EDGE CASES
 # =========================================================================
 
+
 class TestCVEdgeCases:
     """Edge cases and special scenarios."""
 
@@ -449,8 +502,11 @@ class TestCVEdgeCases:
             progress_calls.append((current, total))
 
         est.cross_validate(
-            classification_dataset, "target", {},
-            n_folds=3, cv_type="k_fold",
+            classification_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="k_fold",
             progress_callback=progress_cb,
         )
         assert len(progress_calls) == 3
@@ -460,8 +516,11 @@ class TestCVEdgeCases:
         """With n_folds=3, inner folds should be min(3, 3-1) = 2."""
         est = _make_classification_estimator()
         result = est.cross_validate(
-            classification_dataset, "target", {},
-            n_folds=3, cv_type="nested_cv",
+            classification_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="nested_cv",
         )
         assert result["cv_config"]["inner_folds"] == 2
 
@@ -469,34 +528,45 @@ class TestCVEdgeCases:
         """With n_folds=5, inner folds should be min(3, 5-1) = 3."""
         est = _make_classification_estimator()
         result = est.cross_validate(
-            classification_dataset, "target", {},
-            n_folds=5, cv_type="nested_cv",
+            classification_dataset,
+            "target",
+            {},
+            n_folds=5,
+            cv_type="nested_cv",
         )
         assert result["cv_config"]["inner_folds"] == 3
 
-    def test_time_series_missing_column_warns(
-        self, classification_dataset: SplitDataset
-    ) -> None:
+    def test_time_series_missing_column_warns(self, classification_dataset: SplitDataset) -> None:
         """Specifying a nonexistent time column should warn and use row order."""
         est = _make_classification_estimator()
         logs: list[str] = []
         result = est.cross_validate(
-            classification_dataset, "target", {},
-            n_folds=3, cv_type="time_series_split",
+            classification_dataset,
+            "target",
+            {},
+            n_folds=3,
+            cv_type="time_series_split",
             time_column="nonexistent_column",
             log_callback=logs.append,
         )
         _assert_cv_result(result, n_folds=3, problem_type="classification")
-        assert any("not found" in log for log in logs), (
-            f"Expected 'not found' warning, got: {logs}"
-        )
+        assert any("not found" in log for log in logs), f"Expected 'not found' warning, got: {logs}"
 
     def test_cv_2_folds_minimum(self, classification_dataset: SplitDataset) -> None:
         """Minimum 2 folds should work for all methods."""
         est = _make_classification_estimator()
-        for cv_type in ["k_fold", "stratified_k_fold", "shuffle_split", "time_series_split", "nested_cv"]:
+        for cv_type in [
+            "k_fold",
+            "stratified_k_fold",
+            "shuffle_split",
+            "time_series_split",
+            "nested_cv",
+        ]:
             result = est.cross_validate(
-                classification_dataset, "target", {},
-                n_folds=2, cv_type=cv_type,
+                classification_dataset,
+                "target",
+                {},
+                n_folds=2,
+                cv_type=cv_type,
             )
             _assert_cv_result(result, n_folds=2, problem_type="classification")

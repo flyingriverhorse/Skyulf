@@ -115,3 +115,53 @@ Dataset → Scaling → RandomForest (Train)   → Job 1
     │
     └──→ Encoding → XGBoost (Train)         → Job 2
 ```
+
+## Topological Execution Order (Kahn's Algorithm)
+
+*Hardened in v0.5.1*
+
+Sub-pipelines produced by partitioning must be executed in **topological order** —
+every parent must finish (and write its artifact) before any child reads it.
+Earlier versions used a reversed-BFS in `_collect_ancestors()`, which silently
+produced an incorrect order for diamond-shaped graphs and caused
+`FileNotFoundError: Artifact not found` at run time.
+
+`_collect_ancestors()` now uses **Kahn's algorithm** restricted to the ancestor
+subgraph of the requested node:
+
+1. **Discover** the ancestor set (the node plus everything reachable backwards
+   through `inputs`) via BFS.
+2. **Build in-degree map** counting how many parents each ancestor has *within
+   the subgraph*.
+3. **Pop ready nodes** (in-degree 0) one at a time, append to the result, and
+   decrement the in-degree of each child. Any child whose in-degree drops to 0
+   becomes ready.
+4. **Cycle detection** — if the result is shorter than the discovered set, the
+   subgraph contains a cycle; we log a warning and fall back to discovery
+   order.
+
+> **BFS in one line:** *Breadth-First Search* explores a graph level-by-level using a FIFO queue — visit a node, enqueue its neighbours,repeat. Contrast with DFS which uses a stack and goes deep first. We use BFS in step 1 because we only need the *set* of ancestors (level order is irrelevant); the actual execution order comes from step 3.
+
+### Why the diamond case broke reversed-BFS
+
+```
+Dataset ──► Split ──► Scaler ──► Train
+   │                    ▲
+   └────────────────────┘   (shortcut edge)
+```
+
+Scaler has two parents (`Split` and `Dataset`). Reversed-BFS starting from
+Train enqueues parents in the order it visits children, so for some traversal
+orders Scaler ended up emitted **before** Split. The engine then ran Scaler →
+tried to load Split's artifact → file did not exist.
+
+Kahn's prevents this because Scaler's in-degree (2) cannot reach 0 until both
+Split and Dataset have been emitted.
+
+### Preview-specific partitioning
+
+`partition_for_preview()` (also v0.5.1) reuses `_collect_ancestors()` to split
+a graph by **data leaves** rather than by training terminals. A canvas with
+several parallel preprocessing chains and no training node now renders one
+preview tab per leaf — see `branch_previews` in the `/api/pipeline/preview`
+response and the branch tab bar in `ResultsPanel.tsx`.

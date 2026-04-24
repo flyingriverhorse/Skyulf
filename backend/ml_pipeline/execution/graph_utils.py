@@ -11,6 +11,66 @@ logger = logging.getLogger(__name__)
 TERMINAL_STEP_TYPES = {"basic_training", "advanced_tuning"}
 
 
+def partition_for_preview(config: PipelineConfig) -> List[PipelineConfig]:
+    """Split a pipeline into one sub-pipeline per data leaf, for preview.
+
+    Unlike :func:`partition_parallel_pipeline`, this does NOT require training
+    nodes to detect branches. Training/tuning nodes are stripped, then every
+    remaining node with no downstream consumer is treated as a preview leaf
+    and gets its own sub-pipeline (containing the leaf and all its ancestors).
+
+    This is what powers the multi-tab "Path A / Path B" preview view when the
+    user has multiple parallel preprocessing chains but no training nodes
+    (or a single training node where the standard partitioner would only
+    return one branch).
+
+    Returns a single-element list (the original config minus training nodes)
+    when the graph has only one data leaf.
+    """
+    # Strip training/tuning nodes — preview never fits models.
+    data_nodes = [n for n in config.nodes if n.step_type not in TERMINAL_STEP_TYPES]
+    if not data_nodes:
+        return [config]
+
+    node_map: Dict[str, NodeConfig] = {n.node_id: n for n in data_nodes}
+
+    # A node is a leaf when no other (data) node lists it as an input.
+    has_consumer: set[str] = set()
+    for n in data_nodes:
+        for parent_id in n.inputs:
+            if parent_id in node_map:
+                has_consumer.add(parent_id)
+
+    leaves = [n for n in data_nodes if n.node_id not in has_consumer]
+
+    base = PipelineConfig(
+        pipeline_id=config.pipeline_id,
+        nodes=data_nodes,
+        metadata=config.metadata,
+    )
+
+    if len(leaves) <= 1:
+        return [base]
+
+    sub_configs: List[PipelineConfig] = []
+    for idx, leaf in enumerate(leaves):
+        ancestors = _collect_ancestors(leaf.node_id, node_map)
+        branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
+        sub_configs.append(
+            PipelineConfig(
+                pipeline_id=f"{config.pipeline_id}__preview_{idx}",
+                nodes=branch_nodes,
+                metadata={
+                    **config.metadata,
+                    "preview_branch_index": idx,
+                    "preview_leaf_node_id": leaf.node_id,
+                    "parent_pipeline_id": config.pipeline_id,
+                },
+            )
+        )
+    return sub_configs
+
+
 def _split_connected_components(config: PipelineConfig) -> List[PipelineConfig]:
     """Split a pipeline into one PipelineConfig per connected subgraph.
 
@@ -58,10 +118,7 @@ def _split_connected_components(config: PipelineConfig) -> List[PipelineConfig]:
         id_set = set(component_ids)
         comp_nodes = [node_map[nid] for nid in component_ids]
         # Preserve original ID for first component, generate new for rest
-        comp_pipeline_id = (
-            config.pipeline_id if not results
-            else f"preview_{uuid.uuid4().hex[:12]}"
-        )
+        comp_pipeline_id = config.pipeline_id if not results else f"preview_{uuid.uuid4().hex[:12]}"
         results.append(
             PipelineConfig(
                 pipeline_id=comp_pipeline_id,
@@ -91,9 +148,7 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
     node_map: Dict[str, NodeConfig] = {n.node_id: n for n in config.nodes}
 
     # Identify terminal nodes
-    terminals = [
-        n for n in config.nodes if n.step_type in TERMINAL_STEP_TYPES
-    ]
+    terminals = [n for n in config.nodes if n.step_type in TERMINAL_STEP_TYPES]
 
     if not terminals:
         return [config]
@@ -121,8 +176,11 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
                 PipelineConfig(
                     pipeline_id=f"{config.pipeline_id}__branch_{idx}",
                     nodes=branch_nodes,
-                    metadata={**config.metadata, "branch_index": idx,
-                              "parent_pipeline_id": config.pipeline_id},
+                    metadata={
+                        **config.metadata,
+                        "branch_index": idx,
+                        "parent_pipeline_id": config.pipeline_id,
+                    },
                 )
             )
         return sub_configs
@@ -134,10 +192,7 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
     sub_configs = []
     global_branch = 0
     for term in terminals:
-        is_parallel = (
-            term.params.get("execution_mode") == "parallel"
-            and len(term.inputs) > 1
-        )
+        is_parallel = term.params.get("execution_mode") == "parallel" and len(term.inputs) > 1
         if is_parallel:
             # Parallel mode: each input becomes its own experiment branch
             for branch_root_id in term.inputs:
@@ -145,19 +200,14 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
                 term_copy = NodeConfig(
                     node_id=term.node_id,
                     step_type=term.step_type,
-                    params={k: v for k, v in term.params.items()
-                            if k != "execution_mode"},
+                    params={k: v for k, v in term.params.items() if k != "execution_mode"},
                     inputs=[branch_root_id],
                 )
-                branch_nodes = [
-                    node_map[nid] for nid in ancestors if nid in node_map
-                ]
+                branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
                 branch_nodes.append(term_copy)
                 sub_configs.append(
                     PipelineConfig(
-                        pipeline_id=(
-                            f"{config.pipeline_id}__branch_{global_branch}"
-                        ),
+                        pipeline_id=(f"{config.pipeline_id}__branch_{global_branch}"),
                         nodes=branch_nodes,
                         metadata={
                             **config.metadata,
@@ -170,9 +220,7 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
         else:
             # Merge mode (default) or single input: one branch per terminal
             ancestors = _collect_ancestors(term.node_id, node_map)
-            branch_nodes = [
-                node_map[nid] for nid in ancestors if nid in node_map
-            ]
+            branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
             sub_configs.append(
                 PipelineConfig(
                     pipeline_id=f"{config.pipeline_id}__branch_{global_branch}",
@@ -189,22 +237,82 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
 
 
 def _collect_ancestors(node_id: str, node_map: Dict[str, NodeConfig]) -> List[str]:
-    """BFS backwards to collect all ancestor node IDs in topological order."""
-    visited: set[str] = set()
-    queue = [node_id]
-    result: List[str] = []
+    """Collect a node and all its ancestors in true topological order.
 
+    Algorithm overview
+    ------------------
+    This runs in two passes:
+
+    1. **Discovery (BFS — Breadth-First Search).** BFS is a graph-traversal
+       strategy that explores neighbours level-by-level using a FIFO queue
+       (as opposed to DFS which uses a stack and goes deep first). We BFS
+       *backwards* through the ``inputs`` edges starting from ``node_id`` to
+       collect every ancestor — this gives us the subgraph we care about
+       without visiting unrelated nodes elsewhere on the canvas.
+
+    2. **Ordering (Kahn's algorithm).** Once we have the subgraph we run
+       Kahn's topological sort restricted to those nodes. Kahn's repeatedly
+       emits nodes whose in-degree (number of unprocessed parents) has
+       reached 0, then decrements the in-degree of their children. This
+       guarantees every parent appears before its children in the output —
+       even for diamond-shaped graphs where a node is reachable through
+       multiple paths.
+
+    Why both? BFS alone (the previous implementation, with a final
+    ``list.reverse()``) is *not* a valid topological sort: when a child
+    has multiple parents the visit order can interleave them in a way that
+    places the child before one of its parents. That triggered run-time
+    ``FileNotFoundError: Artifact not found`` errors because the engine
+    tried to load a parent's artifact that hadn't been produced yet.
+    """
+    if node_id not in node_map:
+        return []
+
+    # Pass 1 — BFS backwards from node_id to discover the ancestor subgraph.
+    # We use a simple FIFO queue (list.pop(0)) because the graphs are tiny;
+    # collections.deque would only matter at much larger scale.
+    discovered: set[str] = set()
+    queue = [node_id]
     while queue:
         nid = queue.pop(0)
-        if nid in visited or nid not in node_map:
+        if nid in discovered or nid not in node_map:
             continue
-        visited.add(nid)
-        result.append(nid)
+        discovered.add(nid)
         for parent_id in node_map[nid].inputs:
-            queue.append(parent_id)
+            if parent_id in node_map and parent_id not in discovered:
+                queue.append(parent_id)
 
-    # Reverse for topological order (parents first)
-    result.reverse()
+    # Pass 2 — Kahn's algorithm: build in-degree map for the subgraph.
+    in_degree: Dict[str, int] = {nid: 0 for nid in discovered}
+    children: Dict[str, List[str]] = {nid: [] for nid in discovered}
+    for nid in discovered:
+        for parent_id in node_map[nid].inputs:
+            if parent_id in discovered:
+                in_degree[nid] += 1
+                children[parent_id].append(nid)
+
+    # Pass 2 — repeatedly emit zero-in-degree nodes.
+    result: List[str] = []
+    ready = [nid for nid, deg in in_degree.items() if deg == 0]
+    while ready:
+        nid = ready.pop(0)
+        result.append(nid)
+        for child in children[nid]:
+            in_degree[child] -= 1
+            if in_degree[child] == 0:
+                ready.append(child)
+
+    if len(result) != len(discovered):
+        # Cycle in the ancestor subgraph — cannot topologically sort. Fall
+        # back to BFS discovery order so the caller gets *something*; the
+        # engine will surface a clearer error when execution actually fails.
+        logger.warning(
+            "Cycle detected while collecting ancestors of %s; "
+            "falling back to BFS-reverse order.",
+            node_id,
+        )
+        return list(reversed(list(discovered)))
+
     return result
 
 
@@ -287,14 +395,13 @@ def _parse_node_info(node: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any]]:
         ntype = node.get("type") or node.get("data", {}).get("catalogType") or ""
         # Try config, then parameters, then data itself
         params = (
-            node.get("data", {}).get("config")
-            or node.get("parameters")
-            or node.get("data", {})
+            node.get("data", {}).get("config") or node.get("parameters") or node.get("data", {})
         )
     return nid, ntype, params
 
 
 from backend.ml_pipeline.constants import StepType
+
 
 def _extract_columns(ntype: str, params: Dict[str, Any]) -> List[str]:
     dropped: List[str] = []

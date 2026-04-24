@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Play, Save, Loader2, FolderOpen, History, Rocket } from 'lucide-react';
+import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { runPipelinePreview, savePipeline, fetchPipeline } from '../../core/api/client';
 import { convertGraphToPipelineConfig } from '../../core/utils/pipelineConverter';
+import { autoLayoutGraph } from '../../core/utils/autoLayout';
 import { jobsApi } from '../../core/api/jobs';
 
 const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
@@ -21,6 +22,7 @@ export const Toolbar: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isRunningAll, setIsRunningAll] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
 
   const hasMultipleBranches = useMemo(() => {
     const trainingNodes = nodes.filter(
@@ -184,6 +186,116 @@ export const Toolbar: React.FC = () => {
 
   return (
     <div className="absolute top-4 right-4 z-10 flex gap-2">
+      <button
+        onClick={() => setShowLegend(v => !v)}
+        title="Show node badge legend"
+        className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+      >
+        <HelpCircle className="w-4 h-4" />
+      </button>
+      {showLegend && (
+        <div className="absolute top-12 right-0 mt-2 w-96 p-4 bg-background border rounded-md shadow-lg text-sm max-h-[80vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold">Canvas Legend</h3>
+            <button
+              onClick={() => setShowLegend(false)}
+              className="p-1 rounded hover:bg-accent"
+              aria-label="Close legend"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Node Badges</div>
+          <ul className="space-y-3 mb-4">
+            <li className="flex items-start gap-3">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 text-[10px] font-semibold shrink-0 mt-0.5">
+                <Merge size={10} />2
+              </span>
+              <div>
+                <div className="font-medium">Safe merge</div>
+                <div className="text-xs text-muted-foreground">Multiple inputs combined cleanly (no overlapping columns).</div>
+              </div>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/40 text-[10px] font-semibold shrink-0 mt-0.5">
+                <Merge size={10} />2
+              </span>
+              <div>
+                <div className="font-medium">Risky merge</div>
+                <div className="text-xs text-muted-foreground">Inputs share columns &mdash; one branch wins (overwrite). Check Results banner; tweak strategy in properties.</div>
+              </div>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 text-[10px] font-semibold shrink-0 mt-0.5">
+                <GitFork size={10} />2
+              </span>
+              <div>
+                <div className="font-medium">Parallel experiments</div>
+                <div className="text-xs text-muted-foreground">Training/tuning node runs each upstream branch as a separate experiment (no merge).</div>
+              </div>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-900 shrink-0 mt-0.5">
+                <CheckCircle2 size={10} />
+              </span>
+              <div>
+                <div className="font-medium">Success</div>
+                <div className="text-xs text-muted-foreground">Node ran successfully in the last preview / run.</div>
+              </div>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-900 shrink-0 mt-0.5">
+                <XCircle size={10} />
+              </span>
+              <div>
+                <div className="font-medium">Failed</div>
+                <div className="text-xs text-muted-foreground">Node errored. Click it and open the Results panel for the traceback.</div>
+              </div>
+            </li>
+          </ul>
+
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Edges</div>
+          <ul className="space-y-3">
+            <li className="flex items-start gap-3">
+              <svg width="44" height="12" className="shrink-0 mt-1">
+                <line x1="0" y1="6" x2="44" y2="6" stroke="#6366f1" strokeWidth="3" strokeDasharray="8 6" />
+              </svg>
+              <div>
+                <div className="font-medium">Standard edge</div>
+                <div className="text-xs text-muted-foreground">Animated dashed line in the indigo gradient. Default flow from source to target.</div>
+              </div>
+            </li>
+            <li className="flex items-start gap-3">
+              <svg width="44" height="12" className="shrink-0 mt-1">
+                <line x1="0" y1="6" x2="44" y2="6" stroke="hsl(0, 80%, 65%)" strokeWidth="2" strokeDasharray="8 6" />
+              </svg>
+              <div>
+                <div className="font-medium">Branch-colored edge</div>
+                <div className="text-xs text-muted-foreground">Dashed line in a per-branch HSL color (auto-generated, one hue per training/tuning terminal). Appears once 2+ training nodes form parallel branches.</div>
+              </div>
+            </li>
+            <li className="flex items-start gap-3">
+              <svg width="44" height="12" className="shrink-0 mt-1">
+                <line x1="0" y1="6" x2="44" y2="6" stroke="hsl(0, 80%, 65%)" strokeWidth="2" strokeDasharray="6 4" opacity="0.7" />
+              </svg>
+              <div>
+                <div className="font-medium">Shared branch edge</div>
+                <div className="text-xs text-muted-foreground">Same per-branch color but tighter dashes and faded &mdash; this upstream edge feeds more than one parallel experiment.</div>
+              </div>
+            </li>
+            <li className="flex items-start gap-3">
+              <svg width="44" height="12" className="shrink-0 mt-1">
+                <line x1="0" y1="6" x2="44" y2="6" stroke="#f59e0b" strokeWidth="4" strokeDasharray="8 6" />
+              </svg>
+              <div>
+                <div className="font-medium">Winning merge edge</div>
+                <div className="text-xs text-muted-foreground">After a preview run, the branch whose values survived an overlapping-column merge is rendered thicker in amber with a &quot;WINS MERGE&quot; label.</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      )}
       <button 
         onClick={() => toggleDrawer()}
         className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
@@ -206,6 +318,19 @@ export const Toolbar: React.FC = () => {
       >
         {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         <span className="text-sm font-medium">{isSaving ? 'Saving...' : 'Save'}</span>
+      </button>
+      <button
+        onClick={() => {
+          // Tidy up multi-branch canvases via dagre topological layout.
+          const { nodes: laidOut, edges: keptEdges } = autoLayoutGraph(nodes, edges);
+          setGraph(laidOut, keptEdges);
+        }}
+        disabled={isRunning || nodes.length === 0}
+        title="Auto-arrange nodes left-to-right by data flow"
+        className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+      >
+        <Wand2 className="w-4 h-4" />
+        <span className="text-sm font-medium">Tidy</span>
       </button>
       {hasMultipleBranches && (
         <button

@@ -13,7 +13,6 @@ import logging
 
 from backend.config.base import Settings
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
 _DEV_DEFAULTS: Dict[str, Any] = {
     "DEBUG": True,
@@ -73,7 +72,9 @@ class DevelopmentSettings(Settings):
         super().model_post_init(__context)
         self.configure_pandas()
         self.setup_logging()
-        logging.getLogger(__name__).info("Running in DEVELOPMENT mode with enhanced ML development features")
+        logging.getLogger(__name__).info(
+            "Running in DEVELOPMENT mode with enhanced ML development features"
+        )
 
 
 class ProductionSettings(Settings):
@@ -88,7 +89,9 @@ class ProductionSettings(Settings):
         super().model_post_init(__context)
         self.configure_pandas()
         self.setup_logging()
-        logging.getLogger(__name__).info("Running in PRODUCTION mode with enhanced security and ML capabilities")
+        logging.getLogger(__name__).info(
+            "Running in PRODUCTION mode with enhanced security and ML capabilities"
+        )
 
 
 class TestingSettings(Settings):

@@ -1,10 +1,11 @@
-"""Pipeline Execution Engine."""
+﻿"""Pipeline Execution Engine."""
 
+import json
 import logging
 import time
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import numpy as np
 import pandas as pd
@@ -37,7 +38,6 @@ from .schemas import (
     PipelineExecutionResult,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -60,6 +60,10 @@ class PipelineEngine:
         )  # Track fitted transformers for inference pipeline
         self._results: Dict[str, NodeExecutionResult] = {}
         self._node_configs: Dict[str, NodeConfig] = {}
+        # Engine-emitted advisories surfaced via PipelineExecutionResult.
+        # Initialized here (not just in run()) so direct callers of
+        # _merge_inputs / _merge_frames in tests don't hit AttributeError.
+        self.merge_warnings: List[Dict[str, Any]] = []
 
     def _pipeline_has_training_node(self) -> bool:
         """Checks if the current pipeline workflow includes a model training step."""
@@ -98,22 +102,21 @@ class PipelineEngine:
                 importances = actual_model.feature_importances_
             elif hasattr(actual_model, "coef_"):
                 coef = actual_model.coef_
-                # For multi-class, coef_ is 2D — take mean of absolute values
+                # For multi-class, coef_ is 2D â€” take mean of absolute values
                 if hasattr(coef, "ndim") and coef.ndim > 1:
                     importances = abs(coef).mean(axis=0)
                 else:
                     importances = abs(coef)
 
             if importances is not None and len(importances) == len(feature_names):
-                return {
-                    name: round(float(val), 6)
-                    for name, val in zip(feature_names, importances)
-                }
+                return {name: round(float(val), 6) for name, val in zip(feature_names, importances)}
         except Exception:
             pass
         return None
 
-    def _finalize_training_artifacts(self, data: Any, job_id: str, target_col: str, node_id: str, model_artifact: Any):
+    def _finalize_training_artifacts(
+        self, data: Any, job_id: str, target_col: str, node_id: str, model_artifact: Any
+    ):
         """
         Finalize training by saving standard artifacts:
         1. Reference Data for Drift Detection (if not already present).
@@ -123,12 +126,12 @@ class PipelineEngine:
         # Only overwrite if it doesn't exist (prefer Raw/Splitter data over Scaled/Transformed data)
         # Construct the key manually to check existence
         if job_id and job_id != "unknown":
-             safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', self.dataset_name)
-             key = f"reference_data_{safe_name}_{job_id}"
-             if not self.artifact_store.exists(key):
-                 self._save_reference_data(data, job_id, target_col)
+            safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", self.dataset_name)
+            key = f"reference_data_{safe_name}_{job_id}"
+            if not self.artifact_store.exists(key):
+                self._save_reference_data(data, job_id, target_col)
         else:
-             self._save_reference_data(data, job_id, target_col)
+            self._save_reference_data(data, job_id, target_col)
 
         # Manually save the model artifact
         self.artifact_store.save(node_id, model_artifact)
@@ -146,12 +149,12 @@ class PipelineEngine:
 
         try:
             train_df = None
-            
+
             # 1. Extract Training Data
             if isinstance(data, SplitDataset):
                 raw_train = data.train
             else:
-                raw_train = data # Assume it's the full dataset if not split
+                raw_train = data  # Assume it's the full dataset if not split
 
             # 2. Normalize to DataFrame
             if isinstance(raw_train, pd.DataFrame):
@@ -164,13 +167,13 @@ class PipelineEngine:
                     # Add target column back if y is compatible
                     if isinstance(y, (pd.Series, np.ndarray, list)):
                         train_df[target_col] = y
-            
+
             # 3. Save if valid
             if train_df is not None and not train_df.empty:
                 # Sanitize dataset name
-                safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', self.dataset_name)
+                safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", self.dataset_name)
                 key = f"reference_data_{safe_name}_{job_id}"
-                
+
                 self.log(f"Saving reference training data for drift detection: {key}")
                 self.artifact_store.save(key, train_df)
             else:
@@ -196,7 +199,11 @@ class PipelineEngine:
         self.executed_transformers = []  # Reset for new run
         self._node_configs = {n.node_id: n for n in config.nodes}
         self._topo_order = {n.node_id: i for i, n in enumerate(config.nodes)}
+        # Per-run merge advisories surfaced to API/UI so the user understands
+        # what fan-in semantics were applied (column union, last-wins, etc.).
+        self.merge_warnings: List[Dict[str, Any]] = []
 
+        self._current_pipeline_id = config.pipeline_id
         pipeline_result = PipelineExecutionResult(
             pipeline_id=config.pipeline_id,
             status="success",  # Optimistic default
@@ -222,11 +229,10 @@ class PipelineEngine:
                 break
 
         pipeline_result.end_time = datetime.now()
+        pipeline_result.merge_warnings = list(self.merge_warnings)
         return pipeline_result
 
-    def _execute_node(
-        self, node: NodeConfig, job_id: str = "unknown"
-    ) -> NodeExecutionResult:
+    def _execute_node(self, node: NodeConfig, job_id: str = "unknown") -> NodeExecutionResult:
         """Executes a single node based on its type."""
         self.log(f"Executing node: {node.node_id} ({node.step_type})")
         start_ts = time.time()
@@ -248,13 +254,9 @@ class PipelineEngine:
                 else:
                     output_artifact_id, metrics = self._run_feature_engineering(node)
             elif node.step_type == StepType.BASIC_TRAINING:
-                output_artifact_id, metrics = self._run_basic_training(
-                    node, job_id=job_id
-                )
+                output_artifact_id, metrics = self._run_basic_training(node, job_id=job_id)
             elif node.step_type == StepType.ADVANCED_TUNING:
-                output_artifact_id, metrics = self._run_advanced_tuning(
-                    node, job_id=job_id
-                )
+                output_artifact_id, metrics = self._run_advanced_tuning(node, job_id=job_id)
             elif node.step_type == "data_preview":
                 output_artifact_id, metrics = self._run_data_preview(node)
             else:
@@ -296,123 +298,400 @@ class PipelineEngine:
         return self.artifact_store.load(input_node_id)
 
     def _resolve_all_inputs(self, node: NodeConfig) -> List[Any]:
-        """Load artifacts from ALL upstream nodes, ordered by topology."""
+        """Load artifacts from ALL upstream nodes, ordered by topology.
+
+        Duplicate edges from the same source node (which the frontend can emit
+        when a connection is wired multiple times) are collapsed to a single
+        load to avoid spurious multi-input merging.
+        """
         if not node.inputs:
             raise ValueError(f"Node {node.node_id} has no inputs")
+        deduped_ids: List[str] = []
+        seen: set[str] = set()
+        for nid in node.inputs:
+            if nid in seen:
+                continue
+            seen.add(nid)
+            deduped_ids.append(nid)
         sorted_ids = sorted(
-            node.inputs,
+            deduped_ids,
             key=lambda nid: self._topo_order.get(nid, 0),
         )
         return [self.artifact_store.load(nid) for nid in sorted_ids]
 
+    def _ancestors_of(self, node_id: str) -> set[str]:
+        """Return the set of all ancestor node IDs (transitive parents)."""
+        ancestors: set[str] = set()
+        stack = [node_id]
+        while stack:
+            current = stack.pop()
+            cfg = self._node_configs.get(current)
+            if not cfg or not cfg.inputs:
+                continue
+            for parent in cfg.inputs:
+                if parent in ancestors:
+                    continue
+                ancestors.add(parent)
+                stack.append(parent)
+        return ancestors
+
+    def _coerce_to_frame(self, payload: Any, target_col: str = "") -> Optional[pd.DataFrame]:
+        """Best-effort coercion of a single payload to a DataFrame.
+
+        Returns ``None`` for empty / missing payloads (e.g. an empty test split)
+        so callers can decide whether to skip them.
+        """
+        if payload is None:
+            return None
+        if isinstance(payload, pd.DataFrame):
+            return payload if not payload.empty else None
+        if isinstance(payload, tuple) and len(payload) >= 1:
+            first = payload[0]
+            if isinstance(first, pd.DataFrame):
+                df = first.copy()
+                if len(payload) == 2 and target_col:
+                    df[target_col] = payload[1]
+                return df if not df.empty else None
+        return None
+
     def _to_dataframe(self, artifact: Any, target_col: str = "") -> pd.DataFrame:
-        """Normalize an artifact to a DataFrame for merging."""
+        """Normalize an artifact to a single DataFrame (train portion only).
+
+        Kept for callers that explicitly want a flat frame. Multi-input merging
+        should prefer :meth:`_merge_inputs`, which preserves SplitDataset shape
+        when possible.
+        """
         if isinstance(artifact, pd.DataFrame):
             return artifact
         if isinstance(artifact, SplitDataset):
-            train = artifact.train
-            if isinstance(train, pd.DataFrame):
-                return train
-            if isinstance(train, tuple) and len(train) >= 1:
-                X = train[0]
-                if isinstance(X, pd.DataFrame):
-                    df = X.copy()
-                    if len(train) == 2 and target_col:
-                        df[target_col] = train[1]
-                    return df
-        if isinstance(artifact, tuple) and len(artifact) >= 1:
-            first = artifact[0]
-            if isinstance(first, pd.DataFrame):
-                df = first.copy()
-                if len(artifact) == 2 and target_col:
-                    df[target_col] = artifact[1]
+            df = self._coerce_to_frame(artifact.train, target_col)
+            if df is not None:
                 return df
+        df = self._coerce_to_frame(artifact, target_col)
+        if df is not None:
+            return df
         raise TypeError(
             f"Cannot convert artifact of type {type(artifact).__name__} to DataFrame. "
             "Only DataFrame, SplitDataset, and (X, y) tuples are supported."
         )
 
+    def _get_merge_strategy(self, node_id: str) -> str:
+        """Resolve per-node merge strategy from node params.
+
+        Recognised values: ``last_wins`` (default), ``first_wins``. Anything
+        else falls back to ``last_wins`` with a warning so a typo in the
+        canvas config can't silently change semantics.
+        """
+        cfg = self._node_configs.get(node_id)
+        if cfg is None:
+            return "last_wins"
+        strat = cfg.params.get("_merge_strategy", "last_wins")
+        if strat not in ("last_wins", "first_wins"):
+            self.log(
+                f"Node {node_id}: unknown merge strategy '{strat}', " "falling back to 'last_wins'."
+            )
+            return "last_wins"
+        return strat
+
+    def _merge_frames(
+        self,
+        frames: List[pd.DataFrame],
+        node_id: str,
+        part_label: str = "",
+    ) -> pd.DataFrame:
+        """Concatenate a list of DataFrames column-wise (preferred) or row-wise.
+
+        ``part_label`` is only used in log messages (``"train"``, ``"test"``...)
+        to make multi-split merges easier to follow in job logs.
+
+        Column-overlap behaviour is governed by the per-node merge strategy
+        (see :meth:`_get_merge_strategy`):
+
+        * ``last_wins`` (default) â€” later inputs overwrite earlier ones on
+          shared columns. Matches topological "downstream wins".
+        * ``first_wins`` â€” earlier inputs are kept; later inputs only add
+          new columns. Useful when an upstream branch is the source of truth.
+        """
+        if not frames:
+            return pd.DataFrame()
+        if len(frames) == 1:
+            return frames[0]
+
+        prefix = f"Node {node_id}"
+        if part_label:
+            prefix = f"{prefix} [{part_label}]"
+
+        row_counts = [len(df) for df in frames]
+        col_sets = [set(df.columns) for df in frames]
+        same_rows = all(rc == row_counts[0] for rc in row_counts)
+        strategy = self._get_merge_strategy(node_id)
+
+        if same_rows:
+            # Iterate frames in the order dictated by the strategy. The dict
+            # update semantics give us "later writes win", so iterating
+            # forward yields last_wins and reversed yields first_wins.
+            iter_frames = frames if strategy == "last_wins" else list(reversed(frames))
+            result_cols: Dict[str, pd.Series] = {}
+            overwrites: List[str] = []
+            new_only: List[str] = []
+            for df in iter_frames:
+                df_aligned = df.reset_index(drop=True)
+                for col in df.columns:
+                    if col in result_cols:
+                        overwrites.append(col)
+                    else:
+                        new_only.append(col)
+                    result_cols[col] = df_aligned[col]
+            merged = pd.DataFrame(result_cols)
+            shape_log = " + ".join(str(df.shape) for df in frames)
+            if overwrites:
+                self.log(
+                    f"{prefix}: column-wise merge {shape_log} -> {merged.shape} "
+                    f"({strategy} overwrote {sorted(set(overwrites))})"
+                )
+            else:
+                self.log(f"{prefix}: column-wise merge {shape_log} -> {merged.shape}")
+            return merged
+
+        common_cols = col_sets[0]
+        for cs in col_sets[1:]:
+            common_cols = common_cols & cs
+        if not common_cols:
+            raise ValueError(
+                f"{prefix}: cannot row-merge inputs â€” no common columns. "
+                f"Column sets: {[sorted(cs) for cs in col_sets]}"
+            )
+        if any(common_cols != cs for cs in col_sets):
+            extras = sorted(set().union(*col_sets) - common_cols)
+            self.log(f"{prefix}: row-merge dropping non-shared columns {extras}")
+            # Surface dropped columns to the UI so users see what was lost
+            # instead of having to dig through job logs.
+            self.merge_warnings.append(
+                {
+                    "node_id": node_id,
+                    "kind": "row_concat_drop",
+                    "part": part_label or "rows",
+                    "dropped_columns": extras,
+                    "kept_columns": sorted(common_cols),
+                    "message": (
+                        f"Node '{node_id}': row-wise merge kept only the {len(common_cols)} "
+                        f"shared columns; {len(extras)} column(s) present in some inputs but "
+                        f"not all were dropped: {extras}."
+                    ),
+                }
+            )
+        merged = pd.concat(
+            [df[sorted(common_cols)] for df in frames],
+            axis=0,
+            ignore_index=True,
+        )
+        self.log(
+            f"{prefix}: row-wise merge "
+            f"{' + '.join(str(rc) for rc in row_counts)} rows â†’ {len(merged)} rows"
+        )
+        return merged
+
     def _merge_inputs(self, node: NodeConfig, target_col: str = "") -> Any:
-        """Resolve and merge all upstream inputs for a multi-input node."""
+        """Resolve and merge all upstream inputs for a multi-input node.
+
+        Behaviour:
+
+        * Single input â†’ returned as-is (preserves DataFrame / SplitDataset).
+        * All inputs are :class:`SplitDataset` â†’ merge ``train`` / ``test`` /
+          ``validation`` independently and return a new ``SplitDataset``.
+        * Mixed or all-DataFrame inputs â†’ flatten to DataFrames and merge.
+          A warning is logged when SplitDatasets are flattened so the loss of
+          held-out splits is visible in job logs.
+        """
         artifacts = self._resolve_all_inputs(node)
         if len(artifacts) == 1:
             return artifacts[0]
 
         self.log(f"Node {node.node_id}: merging {len(artifacts)} inputs")
 
-        # Check if any input is a model (common wiring mistake)
+        # Sibling fan-in detection: warn only when inputs are TRUE siblings
+        # (no input is itself an ancestor of another). The "ancestor + its
+        # descendant" pattern (e.g. Splitter + Splitterâ†’Scaler both feeding
+        # Encoder) is a redundant edge â€” the descendant supersedes the
+        # ancestor under last-wins, so the merge is harmless and we don't
+        # warn. We DO warn when two genuinely independent siblings off a
+        # shared ancestor get fanned in (the "Path A" UX trap), because the
+        # user likely meant a sequential chain.
+        unique_inputs = list(dict.fromkeys(node.inputs or []))
+        if len(unique_inputs) > 1:
+            ancestors_per_input = [self._ancestors_of(nid) for nid in unique_inputs]
+            shared = set.intersection(*ancestors_per_input) if ancestors_per_input else set()
+
+            # Skip when any input is an ancestor of another input (redundant edge).
+            redundant_edge = any(
+                other in ancestors_per_input[i]
+                for i, this in enumerate(unique_inputs)
+                for j, other in enumerate(unique_inputs)
+                if i != j
+            )
+
+            if shared and not redundant_edge:
+                # Compute concrete overlap columns + winner per artifact pair so
+                # the UI banner can show "Tx overrides DMC on [Id, SepalLengthCm]"
+                # instead of vague "last-wins on overlap".
+                input_cols: List[List[str]] = []
+                for art in artifacts:
+                    if isinstance(art, pd.DataFrame):
+                        input_cols.append(list(art.columns))
+                    elif isinstance(art, SplitDataset) and isinstance(art.train, pd.DataFrame):
+                        input_cols.append(list(art.train.columns))
+                    elif isinstance(art, SplitDataset) and isinstance(art.train, tuple):
+                        X = art.train[0]
+                        input_cols.append(list(X.columns) if hasattr(X, "columns") else [])
+                    elif isinstance(art, tuple) and len(art) == 2 and hasattr(art[0], "columns"):
+                        input_cols.append(list(art[0].columns))
+                    else:
+                        input_cols.append([])
+
+                # Overlap = columns appearing in 2+ inputs (subject to last-wins).
+                seen: Dict[str, int] = {}
+                overlap: List[str] = []
+                for cols in input_cols:
+                    for c in cols:
+                        seen[c] = seen.get(c, 0) + 1
+                for c, cnt in seen.items():
+                    if cnt > 1:
+                        overlap.append(c)
+
+                strategy = self._get_merge_strategy(node.node_id)
+                winner_id = unique_inputs[-1] if strategy == "last_wins" else unique_inputs[0]
+                advisory = {
+                    "node_id": node.node_id,
+                    "kind": "sibling_fan_in",
+                    "inputs": unique_inputs,
+                    "common_ancestors": sorted(shared),
+                    "overlap_columns": sorted(overlap),
+                    "winner_input": winner_id,
+                    "strategy": strategy,
+                    "message": (
+                        f"Node '{node.node_id}' merges {len(unique_inputs)} sibling "
+                        f"branches that share ancestor(s) {sorted(shared)}. "
+                        f"Columns are unioned; on overlap ({len(overlap)} column(s)) "
+                        f"the {strategy} input '{winner_id}' wins. If you wanted sequential "
+                        "application, chain the transformers linearly instead."
+                    ),
+                }
+                self.merge_warnings.append(advisory)
+                self.log(f"WARN: {advisory['message']}")
+
+        # Reject obvious wiring mistakes (model object plugged into a data input).
         for input_id, art in zip(node.inputs, artifacts):
-            if hasattr(art, "predict") or (
-                hasattr(art, "fit") and not hasattr(art, "transform")
-            ):
+            if hasattr(art, "predict") or (hasattr(art, "fit") and not hasattr(art, "transform")):
                 raise ValueError(
                     f"Node {node.node_id}: input from '{input_id}' is a Model object "
-                    f"(type: {type(art).__name__}). Training nodes expect data, not models. "
+                    f"(type: {type(art).__name__}). Nodes expect data, not models. "
                     f"Did you connect a training/tuning output directly?"
                 )
 
-        # Normalize to DataFrames
-        dataframes = [self._to_dataframe(a, target_col) for a in artifacts]
+        all_splits = all(isinstance(a, SplitDataset) for a in artifacts)
+        all_xy_tuples = all(isinstance(a, tuple) and len(a) == 2 for a in artifacts)
+        if all_xy_tuples:
+            # Preserve (X, y) shape when every input is an (X, y) tuple.
+            # Merge X column-wise; reuse y from the first edge
+            # (duplicate edges to the same source share the same y).
+            x_frames = [a[0] for a in artifacts if isinstance(a[0], pd.DataFrame)]
+            if not x_frames:
+                raise ValueError(
+                    f"Node {node.node_id}: cannot merge (X, y) tuples - "
+                    "X parts are not DataFrames."
+                )
+            merged_x = self._merge_frames(x_frames, node.node_id, "X")
+            return (merged_x, artifacts[0][1])
 
-        # Guard against empty DataFrames
-        for i, df in enumerate(dataframes):
+        if all_splits:
+            split_artifacts: List[SplitDataset] = [
+                a for a in artifacts if isinstance(a, SplitDataset)
+            ]
+
+            def merge_part(part_label: str, parts: List[Any]) -> Any:
+                """Merge one SplitDataset slot (train/test/validation) across branches.
+
+                Preserves ``(X, y)`` tuple shape when every branch produced a
+                tuple â€” this keeps downstream X/y tabs and training contracts
+                intact. Falls back to flat-DataFrame merging otherwise.
+                """
+                non_empty = [p for p in parts if p is not None]
+                if not non_empty:
+                    return None
+                # All branches produced (X, y) tuples â†’ merge X columns,
+                # keep y from the first branch (all branches descend from the
+                # same Splitter, so y is identical).
+                if all(isinstance(p, tuple) and len(p) == 2 for p in non_empty):
+                    x_frames: List[pd.DataFrame] = []
+                    for p in non_empty:
+                        x = p[0]
+                        if isinstance(x, pd.DataFrame) and not x.empty:
+                            x_frames.append(x)
+                    if not x_frames:
+                        return None
+                    merged_x = self._merge_frames(x_frames, node.node_id, part_label)
+                    return (merged_x, non_empty[0][1])
+                # Mixed or pure DataFrame parts â†’ flatten and merge as frames.
+                frames = [
+                    df
+                    for df in (self._coerce_to_frame(p, target_col) for p in non_empty)
+                    if df is not None
+                ]
+                if not frames:
+                    return None
+                return self._merge_frames(frames, node.node_id, part_label)
+
+            merged_train = merge_part("train", [sd.train for sd in split_artifacts])
+            if merged_train is None:
+                raise ValueError(
+                    f"Node {node.node_id}: all upstream SplitDataset inputs "
+                    "have empty train splits."
+                )
+            merged_test = merge_part("test", [sd.test for sd in split_artifacts])
+            merged_val = merge_part("validation", [sd.validation for sd in split_artifacts])
+
+            # Empty test defaults to an empty DataFrame for downstream consumers
+            # that assume `.test` is iterable.
+            if merged_test is None:
+                merged_test = pd.DataFrame()
+
+            return SplitDataset(
+                train=cast(Any, merged_train),
+                test=cast(Any, merged_test),
+                validation=merged_val,
+            )
+
+        # Fallback: flatten everything to a single DataFrame.
+        if any(isinstance(a, SplitDataset) for a in artifacts):
+            self.log(
+                f"Node {node.node_id}: mixed SplitDataset/DataFrame inputs â€” "
+                "merging on train portions only; held-out splits are dropped."
+            )
+
+        dataframes: List[pd.DataFrame] = []
+        for i, art in enumerate(artifacts):
+            df = self._coerce_to_frame(art, target_col)
+            if df is None:
+                df = self._to_dataframe(art, target_col)
             if df.empty:
                 raise ValueError(
                     f"Node {node.node_id}: input #{i} produced an empty DataFrame "
-                    f"(0 rows). Check upstream preprocessing branches."
+                    "(0 rows). Check upstream preprocessing branches."
                 )
+            dataframes.append(df)
 
-        row_counts = [len(df) for df in dataframes]
-        col_sets = [set(df.columns) for df in dataframes]
+        return self._merge_frames(dataframes, node.node_id)
 
-        same_rows = all(rc == row_counts[0] for rc in row_counts)
+    def _get_input(self, node: NodeConfig, target_col: str = "") -> Any:
+        """Resolve a node's data input, merging when more than one edge exists.
 
-        if same_rows:
-            # Column-wise merge (parallel preprocessing branches)
-            # Drop duplicate columns from later frames to avoid ambiguity
-            seen_cols: set[str] = set(dataframes[0].columns)
-            deduped: List[pd.DataFrame] = [dataframes[0]]
-            for df in dataframes[1:]:
-                new_cols = [c for c in df.columns if c not in seen_cols]
-                if not new_cols:
-                    self.log(
-                        f"Skipping duplicate input — all columns already present"
-                    )
-                    continue
-                deduped.append(df[new_cols])
-                seen_cols.update(new_cols)
-
-            merged = pd.concat(deduped, axis=1)
-            self.log(
-                f"Column-wise merge: {' + '.join(str(s) for s in [df.shape for df in deduped])} "
-                f"→ {merged.shape}"
-            )
-        else:
-            # Row-wise merge (data augmentation / sub-sampling branches)
-            # All frames must share the same columns
-            common_cols = col_sets[0]
-            for cs in col_sets[1:]:
-                common_cols = common_cols & cs
-            if not common_cols:
-                raise ValueError(
-                    f"Cannot row-merge inputs: no common columns. "
-                    f"Column sets: {[sorted(cs) for cs in col_sets]}"
-                )
-            if common_cols != col_sets[0]:
-                diff = col_sets[0] - common_cols
-                self.log(f"Row-merge: dropping non-shared columns {sorted(diff)}")
-            merged = pd.concat(
-                [df[sorted(common_cols)] for df in dataframes],
-                axis=0,
-                ignore_index=True,
-            )
-            self.log(
-                f"Row-wise merge: {' + '.join(str(rc) for rc in row_counts)} rows → {len(merged)} rows"
-            )
-
-        # If the original single input was a SplitDataset, re-wrap isn't needed here —
-        # the training method handles DataFrame → SplitDataset conversion already.
-        return merged
+        Duplicate edges to the same source collapse to one input, so a node
+        wired twice to the same upstream behaves like a single-input node.
+        """
+        unique_inputs = list(dict.fromkeys(node.inputs or []))
+        if len(unique_inputs) > 1:
+            return self._merge_inputs(node, target_col)
+        return self._resolve_input(node)
 
     def _resolve_feature_engineer_artifact_key(self, node: NodeConfig) -> str | None:
         if not node.inputs:
@@ -429,9 +708,7 @@ class PipelineEngine:
 
         return None
 
-    def _collect_feature_engineer_artifact_keys(
-        self, node_id: str, visited: set[str]
-    ) -> list[str]:
+    def _collect_feature_engineer_artifact_keys(self, node_id: str, visited: set[str]) -> list[str]:
         if node_id in visited:
             return []
         visited.add(node_id)
@@ -465,7 +742,9 @@ class PipelineEngine:
         visited: set[str] = set()
         artifact_keys: list[str] = []
         for input_node_id in node.inputs:
-            artifact_keys.extend(self._collect_feature_engineer_artifact_keys(input_node_id, visited))
+            artifact_keys.extend(
+                self._collect_feature_engineer_artifact_keys(input_node_id, visited)
+            )
 
         if not artifact_keys:
             return None
@@ -608,7 +887,11 @@ class PipelineEngine:
             self.log(f"Loading sample data from {dataset_id} (limit={limit})")
         else:
             dataset_name = self.catalog.get_dataset_name(dataset_id)
-            log_msg = f"Loading full data from {dataset_name}" if dataset_name else f"Loading full data from {dataset_id}"
+            log_msg = (
+                f"Loading full data from {dataset_name}"
+                if dataset_name
+                else f"Loading full data from {dataset_id}"
+            )
             self.log(log_msg)
 
         # Use the injected catalog
@@ -616,7 +899,9 @@ class PipelineEngine:
             df = self.catalog.load(dataset_id, limit=limit)
         except FileNotFoundError:
             # Try to resolve name for better error message
-            raise FileNotFoundError(f"Dataset {dataset_id} not found. Please check if the file exists.")
+            raise FileNotFoundError(
+                f"Dataset {dataset_id} not found. Please check if the file exists."
+            )
 
         self.log(
             f"Data loaded successfully. Shape: {df.shape} ({len(df)} rows, {len(df.columns)} columns)"
@@ -630,12 +915,12 @@ class PipelineEngine:
             # We'll rely on the fact that target_col is just used to re-assemble if it was a tuple.
             # Since df is a DataFrame, target_col is ignored inside _save_reference_data logic for DF inputs.
             self._save_reference_data(df, job_id, target_col="")
-            
+
         return node.node_id
 
     def _run_feature_engineering(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
-        # Input: DataFrame
-        df = self._resolve_input(node)
+        # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
+        df = self._get_input(node)
 
         # params: {"steps": [...]}
         engineer = FeatureEngineer(node.params.get("steps", []))
@@ -652,9 +937,7 @@ class PipelineEngine:
         self.artifact_store.save(f"{node.node_id}_pipeline", engineer)
 
         if hasattr(processed_df, "shape"):
-            self.log(
-                f"Feature engineering completed. Output shape: {processed_df.shape}"
-            )
+            self.log(f"Feature engineering completed. Output shape: {processed_df.shape}")
         elif isinstance(processed_df, SplitDataset):
             self.log("Feature engineering completed. SplitDataset created.")
 
@@ -664,10 +947,7 @@ class PipelineEngine:
             test_part = processed_df[1] if len(processed_df) > 1 else None
             train_shape = getattr(train_part, "shape", None)
             test_shape = getattr(test_part, "shape", None) if test_part is not None else None
-            self.log(
-                f"Split details - Train: {train_shape}, "
-                f"Test: {test_shape or 'None'}"
-            )
+            self.log(f"Split details - Train: {train_shape}, " f"Test: {test_shape or 'None'}")
 
         self.artifact_store.save(node.node_id, processed_df)
 
@@ -690,14 +970,11 @@ class PipelineEngine:
         self, node: NodeConfig, job_id: str = "unknown"
     ) -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset (from Feature Engineering) or DataFrame
-        # Supports multiple inputs — merges them before training.
+        # Supports multiple inputs â€” merges them before training.
 
         target_col = node.params["target_column"]
 
-        if len(node.inputs) > 1:
-            data = self._merge_inputs(node, target_col)
-        else:
-            data = self._resolve_input(node)
+        data = self._get_input(node, target_col)
 
         # Safety check: Ensure data is not a model artifact
         if hasattr(data, "predict") or hasattr(data, "fit"):
@@ -735,13 +1012,9 @@ class PipelineEngine:
                 elem0 = data[0]
                 if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
                     train_df, test_df = data
-                    cv_data = SplitDataset(
-                        train=train_df, test=test_df, validation=None
-                    )
+                    cv_data = SplitDataset(train=train_df, test=test_df, validation=None)
                 else:
-                    cv_data = SplitDataset(
-                        train=data, test=pd.DataFrame(), validation=None
-                    )
+                    cv_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
 
             cv_results = estimator.cross_validate(
                 cv_data,
@@ -803,9 +1076,7 @@ class PipelineEngine:
             if isinstance(data, pd.DataFrame):
                 from skyulf.data.dataset import SplitDataset
 
-                eval_data = SplitDataset(
-                    train=data, test=pd.DataFrame(), validation=None
-                )
+                eval_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
             elif isinstance(data, tuple):
                 from skyulf.data.dataset import SplitDataset
 
@@ -813,13 +1084,9 @@ class PipelineEngine:
                 elem0 = data[0]
                 if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
                     train_df, test_df = data
-                    eval_data = SplitDataset(
-                        train=train_df, test=test_df, validation=None
-                    )
+                    eval_data = SplitDataset(train=train_df, test=test_df, validation=None)
                 else:
-                    eval_data = SplitDataset(
-                        train=data, test=pd.DataFrame(), validation=None
-                    )
+                    eval_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
 
             report = estimator.evaluate(eval_data, target_col, job_id=job_id)
 
@@ -878,13 +1145,10 @@ class PipelineEngine:
     def _run_advanced_tuning(  # noqa: C901
         self, node: NodeConfig, job_id: str = "unknown"
     ) -> tuple[str, Dict[str, Any]]:
-        # Input: SplitDataset — supports multiple inputs via merge.
+        # Input: SplitDataset â€” supports multiple inputs via merge.
         target_col = node.params["target_column"]
 
-        if len(node.inputs) > 1:
-            data = self._merge_inputs(node, target_col)
-        else:
-            data = self._resolve_input(node)
+        data = self._get_input(node, target_col)
 
         algorithm = node.params.get("algorithm") or node.params.get("model_type")
         if not algorithm:
@@ -1062,10 +1326,11 @@ class PipelineEngine:
                 metrics["n_rows"] = len(data)
                 metrics["n_features"] = len(data.columns) - 1
             elif hasattr(data, "train") and hasattr(data.train, "shape"):
-                metrics["n_rows"] = data.train.shape[0]
-                metrics["n_features"] = data.train.shape[1] - 1
+                train_frame = cast(Any, data.train)
+                metrics["n_rows"] = train_frame.shape[0]
+                metrics["n_features"] = train_frame.shape[1] - 1
             elif isinstance(data, tuple) and len(data) >= 1:
-                first = data[0]
+                first = cast(Any, data[0])
                 if hasattr(first, "shape"):
                     metrics["n_rows"] = first.shape[0]
                     metrics["n_features"] = first.shape[1] - 1
@@ -1074,10 +1339,12 @@ class PipelineEngine:
 
         return node.node_id, metrics
 
-    def _run_transformer(self, node: NodeConfig, job_id: str = "unknown") -> tuple[str, Dict[str, Any]]:
+    def _run_transformer(
+        self, node: NodeConfig, job_id: str = "unknown"
+    ) -> tuple[str, Dict[str, Any]]:
         """Runs a single transformer node as a 1-step feature engineering pipeline."""
-        # Input: DataFrame or SplitDataset
-        data = self._resolve_input(node)
+        # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
+        data = self._get_input(node)
 
         # Wrap the single node as a 1-step feature engineering pipeline
         step_config = {
@@ -1108,7 +1375,11 @@ class PipelineEngine:
         )
 
         # Check if this was a Splitter, if so update Reference Data to be the Train Split
-        if "Splitter" in node.step_type and job_id != "unknown" and self._pipeline_has_training_node():
+        if (
+            "Splitter" in node.step_type
+            and job_id != "unknown"
+            and self._pipeline_has_training_node()
+        ):
             # processed_data is likely a SplitDataset or tuple (train, test)
             # _save_reference_data handles extraction of train part
             self._save_reference_data(processed_data, job_id, target_col="")
@@ -1134,7 +1405,7 @@ class PipelineEngine:
             "ridge": "ridge_regression",
             "randomforestregressor": "random_forest_regressor",
         }
-        
+
         registry_id = alias_map.get(algo, algo)
 
         try:
@@ -1142,15 +1413,15 @@ class PipelineEngine:
             applier_cls = NodeRegistry.get_applier(registry_id)
             return calculator_cls(), applier_cls()
         except ValueError:
-             # Fallback: Raise original error if not found in registry
+            # Fallback: Raise original error if not found in registry
             raise ValueError(f"Unknown algorithm: {algorithm} (Registry ID: {registry_id})")
 
     def _run_data_preview(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
         """
         Generates a detailed preview of the data and pipeline state.
         """
-        # Input: DataFrame or SplitDataset
-        data = self._resolve_input(node)
+        # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
+        data = self._get_input(node)
 
         preview_info: Dict[str, Any] = {
             "timestamp": datetime.now().isoformat(),
@@ -1170,9 +1441,7 @@ class PipelineEngine:
             }
 
         if isinstance(data, SplitDataset):
-            preview_info["operation_mode"] = (
-                "Train: fit_transform | Test/Val: transform"
-            )
+            preview_info["operation_mode"] = "Train: fit_transform | Test/Val: transform"
 
             # Train
             if isinstance(data.train, tuple):
@@ -1185,13 +1454,9 @@ class PipelineEngine:
             if data.test is not None:
                 if isinstance(data.test, tuple):
                     X_test, _ = data.test
-                    preview_info["data_summary"]["test"] = get_df_info(
-                        X_test, "Test (X)"
-                    )
+                    preview_info["data_summary"]["test"] = get_df_info(X_test, "Test (X)")
                 elif isinstance(data.test, pd.DataFrame) and not data.test.empty:
-                    preview_info["data_summary"]["test"] = get_df_info(
-                        data.test, "Test"
-                    )
+                    preview_info["data_summary"]["test"] = get_df_info(data.test, "Test")
 
             # Validation
             if data.validation is not None:

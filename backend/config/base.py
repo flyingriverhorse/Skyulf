@@ -119,6 +119,7 @@ class Settings(
         _logger = logging.getLogger(__name__)
         try:
             import pandas as pd
+
             pd.options.mode.copy_on_write = True
             _logger.info("Pandas configured with optimized settings for ML workflows")
         except ImportError:
