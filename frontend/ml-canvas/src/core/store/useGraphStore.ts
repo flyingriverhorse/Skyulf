@@ -128,7 +128,13 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
       // Warn: multi-input on a training/tuning node — explain merge vs parallel
       const existingInputs = edges.filter(e => e.target === connection.target);
-      if (existingInputs.length >= 1 && modelTypes.includes(targetType)) {
+      // Auto-parallel terminals (data_preview) split each input into its own
+      // tab instead of merging — no warning needed, no merge contract to
+      // confirm. Mirrors AUTO_PARALLEL_STEP_TYPES in backend graph_utils.py.
+      const autoParallelTypes = ['data_preview'];
+      if (autoParallelTypes.includes(targetType)) {
+        // Skip both confirms below; each input becomes its own preview tab.
+      } else if (existingInputs.length >= 1 && modelTypes.includes(targetType)) {
         const inputCount = existingInputs.length + 1;
         const proceed = confirm(
           `This training node will receive ${inputCount} inputs.\n\n` +
