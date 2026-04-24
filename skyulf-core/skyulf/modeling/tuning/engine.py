@@ -40,23 +40,23 @@ except ImportError:
 
 if HAS_OPTUNA:
     try:
-        from optuna.integration import (
+        from optuna.integration import (  # ty: ignore[unresolved-import]
             OptunaSearchCV as _OptunaSearchCV,
-        )  # ty: ignore[unresolved-import]
+        )
 
         OptunaSearchCV = _OptunaSearchCV
     except ImportError:
         try:
-            from optuna.integration.sklearn import (
+            from optuna.integration.sklearn import (  # ty: ignore[unresolved-import]
                 OptunaSearchCV as _OptunaSearchCV,
-            )  # ty: ignore[unresolved-import]
+            )
 
             OptunaSearchCV = _OptunaSearchCV
         except ImportError:
             try:
-                from optuna_integration.sklearn import (
+                from optuna_integration.sklearn import (  # ty: ignore[unresolved-import]
                     OptunaSearchCV as _OptunaSearchCV,
-                )  # ty: ignore[unresolved-import]
+                )
 
                 OptunaSearchCV = _OptunaSearchCV
             except ImportError:
