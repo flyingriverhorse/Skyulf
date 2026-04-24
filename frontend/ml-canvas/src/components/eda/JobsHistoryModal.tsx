@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Hash, AlignLeft, Calendar, Ban } from 'lucide-react';
+import { Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Hash, AlignLeft, Calendar, Ban } from 'lucide-react';
 import { EDAService } from '../../core/api/eda';
-import { useEscapeKey } from '../../core/hooks/useEscapeKey';
+import { ModalShell } from '../shared';
 
 interface JobsHistoryModalProps {
   isOpen: boolean;
@@ -21,10 +21,6 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
     setSelectedJob(null);
     onClose();
   };
-
-  useEscapeKey(handleClose, isOpen);
-
-  if (!isOpen) return null;
 
   const handleCancel = async (e: React.MouseEvent, jobId: number) => {
     e.stopPropagation();
@@ -64,43 +60,50 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="jobs-history-title"
-        className={`bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full flex flex-col transition-all duration-300 ${selectedJob ? 'max-w-5xl h-[90vh]' : 'max-w-2xl max-h-[80vh]'}`}
-      >
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-3">
-            {selectedJob ? (
-              <button 
-                onClick={() => setSelectedJob(null)}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                aria-label="Back to history"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-              </button>
-            ) : (
-              <Clock className="w-5 h-5 text-blue-500" />
-            )}
-            <h2 id="jobs-history-title" className="text-xl font-semibold text-gray-900 dark:text-white">
-              {selectedJob ? `Analysis #${selectedJob.id} Details` : 'Analysis History'}
-            </h2>
-          </div>
-          <button 
-            onClick={handleClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+    <ModalShell
+      isOpen={isOpen}
+      onClose={handleClose}
+      size={selectedJob ? '5xl' : '2xl'}
+      title={
+        <div className="flex items-center gap-3">
+          {selectedJob ? (
+            <button
+              onClick={() => setSelectedJob(null)}
+              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+              aria-label="Back to history"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            </button>
+          ) : (
+            <Clock className="w-5 h-5 text-blue-500" />
+          )}
+          <span className="text-xl font-semibold text-gray-900 dark:text-white">
+            {selectedJob ? `Analysis #${selectedJob.id} Details` : 'Analysis History'}
+          </span>
         </div>
-        
-        <div className="flex-1 overflow-y-auto p-6">
+      }
+      footer={
+        selectedJob ? (
+          <div className="flex justify-end">
+            <button
+              onClick={() => {
+                onSelect(selectedJob);
+                handleClose();
+              }}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              <Play className="w-4 h-4 mr-2" />
+              Load this Report
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center w-full">
+            Select a previous analysis to view details.
+          </p>
+        )
+      }
+    >
+      <div className="p-6">
           {!selectedJob ? (
             history.length === 0 ? (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
@@ -274,27 +277,7 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                 </div>
             </div>
           )}
-        </div>
-        
-        <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-b-xl flex justify-between items-center">
-            {selectedJob ? (
-                <button
-                    onClick={() => {
-                        onSelect(selectedJob);
-                        handleClose();
-                    }}
-                    className="ml-auto flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
-                >
-                    <Play className="w-4 h-4 mr-2" />
-                    Load this Report
-                </button>
-            ) : (
-                <p className="text-sm text-gray-500 dark:text-gray-400 text-center w-full">
-                    Select a previous analysis to view details.
-                </p>
-            )}
-        </div>
       </div>
-    </div>
+    </ModalShell>
   );
 };

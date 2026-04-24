@@ -181,12 +181,22 @@ export const Toolbar: React.FC = () => {
 
     setIsRunning(true);
     setExecutionResult(null); // Clear previous results
-    
+
     try {
-      // Use API
-      const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
+      // Exclude Data Preview nodes from the toolbar's "Run Preview". Data
+      // Preview is an inspection sink with its own "Run Preview" button
+      // inside the node settings panel; including it here would queue a
+      // redundant preview job alongside the pipeline preview.
+      const previewIds = new Set(
+        nodes.filter(n => n.data.definitionType === 'data_preview').map(n => n.id),
+      );
+      const filteredNodes = nodes.filter(n => !previewIds.has(n.id));
+      const filteredEdges = edges.filter(
+        e => !previewIds.has(e.source) && !previewIds.has(e.target),
+      );
+      const pipelineConfig = convertGraphToPipelineConfig(filteredNodes, filteredEdges);
       const result = await runPipelinePreview(pipelineConfig);
-      
+
       setExecutionResult(result);
     } catch (error) {
       console.error('Pipeline failed:', error);

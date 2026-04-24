@@ -89,6 +89,14 @@
   }
 }
 
+@layer components {
+  /* Unified focus ring. Apply to interactive elements that are not the
+     shadcn Button/Input (those already include their own ring styles). */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900;
+  }
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

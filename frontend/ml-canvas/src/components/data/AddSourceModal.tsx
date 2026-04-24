@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { X, Database, Globe, Check, Cloud, ChevronDown, ChevronRight } from 'lucide-react';
+import { Database, Globe, Check, Cloud, ChevronDown, ChevronRight } from 'lucide-react';
 import { DatasetService } from '../../core/api/datasets';
-import { useEscapeKey } from '../../core/hooks/useEscapeKey';
 import { DataSourceCreate } from '../../core/types/api';
+import { ModalShell } from '../shared';
 
 interface AddSourceModalProps {
   isOpen: boolean;
@@ -21,10 +21,6 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
   const [showCredentials, setShowCredentials] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEscapeKey(onClose, isOpen);
-
-  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,24 +71,8 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-source-modal-title"
-        className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[90vh] border border-slate-200 dark:border-slate-700"
-      >
-        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
-          <h3 id="add-source-modal-title" className="font-semibold text-lg text-slate-900 dark:text-slate-100">Add Data Source</h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" aria-label="Close">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="p-4 overflow-y-auto">
+    <ModalShell isOpen={isOpen} onClose={onClose} title="Add Data Source" size="md">
+      <div className="p-4">
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => { setType('database'); }}
@@ -284,7 +264,6 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
             </div>
           </form>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 };

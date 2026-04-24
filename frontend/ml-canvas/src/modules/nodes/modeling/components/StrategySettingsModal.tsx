@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, RotateCcw, HelpCircle } from 'lucide-react';
-import { useEscapeKey } from '../../../../core/hooks/useEscapeKey';
+import { Save, RotateCcw, HelpCircle } from 'lucide-react';
+import { ModalShell } from '../../../../components/shared';
 
 export interface StrategyConfig {
     // Halving
@@ -58,9 +58,7 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, strategy, initialConfig]);
 
-    useEscapeKey(onClose, isOpen);
-
-    if (!isOpen || (!isHalving && !isOptuna)) return null;
+    if (!isHalving && !isOptuna) return null;
 
     const handleSave = () => {
         const finalConfig = { ...config };
@@ -79,33 +77,33 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
     };
 
     return (
-        <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-        >
-            <div
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="strategy-settings-title"
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md w-full border border-gray-200 dark:border-gray-700 flex flex-col max-h-[90vh]"
-            >
-                
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-                    <h2 id="strategy-settings-title" className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {isHalving ? 'Successive Halving Settings' : 'Optuna Settings'}
-                    </h2>
-                    <button 
-                        onClick={onClose}
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-gray-500 transition-colors"
-                        aria-label="Close settings"
+        <ModalShell
+            isOpen={isOpen}
+            onClose={onClose}
+            zIndex="z-[100]"
+            size="md"
+            title={isHalving ? 'Successive Halving Settings' : 'Optuna Settings'}
+            footer={
+                <div className="flex justify-between gap-3">
+                    <button
+                        onClick={handleReset}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
                     >
-                        <X size={20} />
+                        <RotateCcw size={16} />
+                        Reset
+                    </button>
+
+                    <button
+                        onClick={handleSave}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-sm"
+                    >
+                        <Save size={16} />
+                        Apply Settings
                     </button>
                 </div>
-
-                {/* Body */}
-                <div className="p-5 flex-1 overflow-y-auto space-y-4">
+            }
+        >
+            <div className="p-5 space-y-4">
                     {isHalving && (
                         <>
                             <div>
@@ -222,26 +220,6 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
                         </>
                     )}
                 </div>
-
-                {/* Footer */}
-                <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-between bg-gray-50 dark:bg-gray-900 rounded-b-xl gap-3">
-                    <button
-                        onClick={handleReset}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
-                    >
-                        <RotateCcw size={16} />
-                        Reset
-                    </button>
-                    
-                    <button
-                        onClick={handleSave}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-sm"
-                    >
-                        <Save size={16} />
-                        Apply Settings
-                    </button>
-                </div>
-            </div>
-        </div>
+        </ModalShell>
     );
 };
