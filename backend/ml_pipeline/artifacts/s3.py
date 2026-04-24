@@ -41,7 +41,7 @@ class S3ArtifactStore(ArtifactStore):
                 self.storage_options["client_kwargs"]["region_name"] = region
 
         try:
-            import s3fs
+            import s3fs  # ty: ignore[unresolved-import]
 
             self.fs = s3fs.S3FileSystem(**self.storage_options)
         except ImportError:

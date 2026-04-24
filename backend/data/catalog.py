@@ -129,7 +129,7 @@ class S3Catalog(DataCatalog):
 
         # Check for s3fs
         try:
-            import s3fs
+            import s3fs  # ty: ignore[unresolved-import]
 
             # Prepare options for s3fs init
             fs_kwargs = self._prepare_s3fs_options(self.storage_options)
@@ -287,7 +287,7 @@ class S3Catalog(DataCatalog):
 
     def exists(self, dataset_id: str) -> bool:
         # This is a bit expensive, but accurate
-        import s3fs
+        import s3fs  # ty: ignore[unresolved-import]
 
         fs = s3fs.S3FileSystem(**self.storage_options)
         path = self._get_s3_path(dataset_id)

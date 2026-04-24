@@ -72,7 +72,7 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
     cache_status = "healthy"
     if settings.USE_CELERY:
         try:
-            import redis
+            import redis  # ty: ignore[unresolved-import]
 
             r = redis.from_url(settings.CELERY_BROKER_URL, socket_connect_timeout=1)
             r.ping()

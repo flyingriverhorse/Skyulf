@@ -112,7 +112,7 @@ def setup_universal_logging(
 
     # Console handler with cleaner output for development
     try:
-        from rich.logging import RichHandler
+        from rich.logging import RichHandler  # ty: ignore[unresolved-import]
 
         console_handler = RichHandler(
             rich_tracebacks=True,

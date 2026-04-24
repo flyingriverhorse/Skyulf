@@ -52,10 +52,16 @@ def get_data_stats(
 
 def unpack_pipeline_input(
     data: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
-) -> Tuple[Union[pd.DataFrame, SkyulfDataFrame], Optional[Any], bool]:
+) -> Tuple[Any, Optional[Any], bool]:
     """
     Unpacks input which might be a DataFrame or a (X, y) tuple.
     Returns: (X, y, is_tuple)
+
+    `X` is typed `Any` (instead of `pd.DataFrame | SkyulfDataFrame`) because
+    callers branch on the runtime engine (pandas / polars / wrapper) and
+    ty's narrowing on `pd.DataFrame[0]` would otherwise widen X to
+    `Series[Any] | ...`, poisoning every downstream `with_columns` /
+    `to_pandas` call. The runtime contract is unchanged.
     """
     if isinstance(data, tuple):
         return data[0], data[1], True

@@ -40,7 +40,7 @@ class SplitApplier(BaseApplier):
         # Handle (X, y) tuple input
         if isinstance(df, tuple) and len(df) == 2:
             X, y = df
-            return splitter.split_xy(X, y)
+            return splitter.split_xy(cast(Any, X), y)
 
         # If a target column is configured and present in the DataFrame, split
         # features from target first so downstream nodes see real (X, y)
@@ -109,7 +109,8 @@ class DataSplitter:
 
         if is_polars:
             # Convert to Pandas to preserve schema/metadata during split
-            X_pd = X.to_pandas()
+            X_any = cast(Any, X)
+            X_pd = X_any.to_pandas()
             y_pd = y.to_pandas() if y is not None else None
         else:
             X_pd = X
@@ -199,7 +200,8 @@ class DataSplitter:
 
         if is_polars:
             # Convert to Pandas to preserve schema/metadata during split
-            df_pd = df.to_pandas()
+            df_any = cast(Any, df)
+            df_pd = df_any.to_pandas()
         else:
             df_pd = df
 
@@ -277,7 +279,7 @@ class FeatureTargetSplitApplier(BaseApplier):
         def split_one(data: Union[pd.DataFrame, SkyulfDataFrame, Any]) -> Tuple[Any, Any]:
             engine = get_engine(data)
             if engine.name == "polars":
-                data_pl: Any = data
+                data_pl: Any = cast(Any, data)
                 if target_col not in data_pl.columns:
                     raise ValueError(f"Target column '{target_col}' not found in dataset")
                 import polars as pl
