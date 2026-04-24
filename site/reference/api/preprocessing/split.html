@@ -2932,7 +2932,9 @@
 <span class="normal">261</span>
 <span class="normal">262</span>
 <span class="normal">263</span>
-<span class="normal">264</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DataSplitter</span><span class="p">:</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DataSplitter</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Splits a DataFrame into Train, Test, and optionally Validation sets.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -2962,7 +2964,8 @@
 
         <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
             <span class="c1"># Convert to Pandas to preserve schema/metadata during split</span>
-            <span class="n">X_pd</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span>
+            <span class="n">X_any</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span>
+            <span class="n">X_pd</span> <span class="o">=</span> <span class="n">X_any</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span>
             <span class="n">y_pd</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">X_pd</span> <span class="o">=</span> <span class="n">X</span>
@@ -3052,7 +3055,8 @@
 
         <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
             <span class="c1"># Convert to Pandas to preserve schema/metadata during split</span>
-            <span class="n">df_pd</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span>
+            <span class="n">df_any</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">df</span><span class="p">)</span>
+            <span class="n">df_pd</span> <span class="o">=</span> <span class="n">df_any</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">df_pd</span> <span class="o">=</span> <span class="n">df</span>
 
@@ -3147,8 +3151,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/split.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">193</span>
-<span class="normal">194</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">194</span>
 <span class="normal">195</span>
 <span class="normal">196</span>
 <span class="normal">197</span>
@@ -3218,7 +3221,9 @@
 <span class="normal">261</span>
 <span class="normal">262</span>
 <span class="normal">263</span>
-<span class="normal">264</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">split</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">SplitDataset</span><span class="p">:</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">split</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">SplitDataset</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Splits a DataFrame.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -3227,7 +3232,8 @@
 
     <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
         <span class="c1"># Convert to Pandas to preserve schema/metadata during split</span>
-        <span class="n">df_pd</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span>
+        <span class="n">df_any</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">df</span><span class="p">)</span>
+        <span class="n">df_pd</span> <span class="o">=</span> <span class="n">df_any</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">df_pd</span> <span class="o">=</span> <span class="n">df</span>
 
@@ -3402,7 +3408,8 @@
 <span class="normal">188</span>
 <span class="normal">189</span>
 <span class="normal">190</span>
-<span class="normal">191</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">split_xy</span><span class="p">(</span>
+<span class="normal">191</span>
+<span class="normal">192</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">split_xy</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span> <span class="n">y</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SplitDataset</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -3413,7 +3420,8 @@
 
     <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
         <span class="c1"># Convert to Pandas to preserve schema/metadata during split</span>
-        <span class="n">X_pd</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span>
+        <span class="n">X_any</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span>
+        <span class="n">X_pd</span> <span class="o">=</span> <span class="n">X_any</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span>
         <span class="n">y_pd</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">X_pd</span> <span class="o">=</span> <span class="n">X</span>
