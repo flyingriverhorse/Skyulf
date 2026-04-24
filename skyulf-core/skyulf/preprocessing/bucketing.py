@@ -273,7 +273,7 @@ class GeneralBinningCalculator(BaseCalculator):
                         strategy="kmeans",
                         encode="ordinal",
                     )
-                    est.fit(series.values.reshape(-1, 1))
+                    est.fit(np.asarray(series.values).reshape(-1, 1))
                     edges = est.bin_edges_[0]
 
                 elif strategy == "custom":
@@ -315,7 +315,7 @@ class GeneralBinningCalculator(BaseCalculator):
                     if sklearn_strategy == "quantile":
                         kbins_kwargs["quantile_method"] = "averaged_inverted_cdf"
                     est = KBinsDiscretizer(**kbins_kwargs)
-                    est.fit(series.values.reshape(-1, 1))
+                    est.fit(np.asarray(series.values).reshape(-1, 1))
                     edges = est.bin_edges_[0]
 
                 if edges is not None:

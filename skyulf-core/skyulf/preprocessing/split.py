@@ -40,7 +40,7 @@ class SplitApplier(BaseApplier):
         # Handle (X, y) tuple input
         if isinstance(df, tuple) and len(df) == 2:
             X, y = df
-            return splitter.split_xy(X, y)
+            return splitter.split_xy(cast(Any, X), y)
 
         # If a target column is configured and present in the DataFrame, split
         # features from target first so downstream nodes see real (X, y)

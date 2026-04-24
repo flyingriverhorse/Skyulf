@@ -11,7 +11,7 @@ from sklearn.svm import SVR
 from sklearn.tree import DecisionTreeRegressor
 
 try:
-    from xgboost import XGBRegressor
+    from xgboost import XGBRegressor  # ty: ignore[unresolved-import]
 
     XGBOOST_AVAILABLE = True
 except ImportError:

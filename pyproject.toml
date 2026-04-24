@@ -130,6 +130,18 @@ extend-exclude = '''
 # Astral's Rust-based type checker. Replaces mypy in CI.
 # See https://github.com/astral-sh/ty for full option reference.
 
+[tool.ty.rules]
+# Optional dependencies (s3fs, redis, xgboost, optuna, rich, matplotlib,
+# vaderSentiment, causallearn, rapidfuzz) are guarded by try/except
+# ImportError. They're present in some dev environments and missing in CI,
+# so per-line `# ty: ignore[unresolved-import]` ignores would be flagged
+# as unused locally and required in CI. Silence the unused-ignore noise.
+unused-ignore-comment = "ignore"
+# Same reasoning: locally we may pass `cast(Any, x)` against a value ty
+# narrows to `Any`, which is a no-op locally but necessary on other ty
+# versions / when imports differ.
+redundant-cast = "ignore"
+
 [tool.ty.environment]
 python-version = "3.12"
 extra-paths = ["skyulf-core"]

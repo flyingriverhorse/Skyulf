@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -95,7 +95,7 @@ class PowerTransformerApplier(BaseApplier):
             # Fallback?
 
         if was_polars:
-            df_out = pl.from_pandas(df_out)
+            df_out = pl.from_pandas(cast(pd.DataFrame, df_out))
 
         return pack_pipeline_output(df_out, y, is_tuple)
 

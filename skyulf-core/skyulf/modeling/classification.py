@@ -12,7 +12,7 @@ from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
 try:
-    from xgboost import XGBClassifier
+    from xgboost import XGBClassifier  # ty: ignore[unresolved-import]
 
     XGBOOST_AVAILABLE = True
 except ImportError:

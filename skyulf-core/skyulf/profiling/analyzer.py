@@ -74,14 +74,14 @@ except ImportError:
     STATSMODELS_AVAILABLE = False
 
 try:
-    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer  # ty: ignore[unresolved-import]
 
     VADER_AVAILABLE = True
 except ImportError:
     VADER_AVAILABLE = False
 
 try:
-    from causallearn.search.ConstraintBased.PC import pc
+    from causallearn.search.ConstraintBased.PC import pc  # ty: ignore[unresolved-import]
 
     CAUSAL_LEARN_AVAILABLE = True
 except ImportError:
