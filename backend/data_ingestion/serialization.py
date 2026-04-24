@@ -257,7 +257,7 @@ class AsyncJSONSafeSerializer:
             }
 
         # Basic info
-        metadata = {
+        metadata: Dict[str, Any] = {
             "shape": list(df.shape),
             "columns": [str(col) for col in df.columns],
             "memory_usage": int(df.memory_usage(deep=True).sum()),

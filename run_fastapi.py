@@ -65,7 +65,7 @@ def check_redis_availability():
     """Check if Redis is running and accessible."""
     settings = get_settings()
     try:
-        import redis
+        import redis  # ty: ignore[unresolved-import]
 
         # Use a short timeout to avoid hanging
         client = redis.from_url(settings.CELERY_BROKER_URL, socket_connect_timeout=1)

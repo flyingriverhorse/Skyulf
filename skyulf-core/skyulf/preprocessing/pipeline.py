@@ -362,7 +362,7 @@ class FeatureEngineer:
         self, current_data: Any, params: Dict[str, Any], metrics: Dict[str, Any]
     ) -> None:
         try:
-            y_res = self._extract_y_for_resampling(current_data, params)
+            y_res: Any = self._extract_y_for_resampling(current_data, params)
             if y_res is None:
                 return
             if hasattr(y_res, "to_pandas"):
