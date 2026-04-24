@@ -2764,10 +2764,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">632</span>
-<span class="normal">633</span>
-<span class="normal">634</span>
-<span class="normal">635</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">635</span>
 <span class="normal">636</span>
 <span class="normal">637</span>
 <span class="normal">638</span>
@@ -2793,7 +2790,10 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">658</span>
 <span class="normal">659</span>
 <span class="normal">660</span>
-<span class="normal">661</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
+<span class="normal">661</span>
+<span class="normal">662</span>
+<span class="normal">663</span>
+<span class="normal">664</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Applier for TuningCalculator.</span>
 <span class="sd">    Wraps the base model applier to provide predictions using the refitted best model.</span>
@@ -3441,7 +3441,10 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">626</span>
 <span class="normal">627</span>
 <span class="normal">628</span>
-<span class="normal">629</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
+<span class="normal">629</span>
+<span class="normal">630</span>
+<span class="normal">631</span>
+<span class="normal">632</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculator for hyperparameter tuning.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_calculator</span><span class="p">:</span> <span class="n">BaseModelCalculator</span><span class="p">):</span>
@@ -3668,9 +3671,11 @@ Wraps the base model applier to provide predictions using the refitted best mode
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;regression&quot;</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">metric</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;accuracy&quot;</span><span class="p">,</span> <span class="s2">&quot;f1&quot;</span><span class="p">,</span> <span class="s2">&quot;precision&quot;</span><span class="p">,</span> <span class="s2">&quot;recall&quot;</span><span class="p">,</span> <span class="s2">&quot;roc_auc&quot;</span><span class="p">,</span> <span class="s2">&quot;f1_weighted&quot;</span><span class="p">]:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Configuration Error: You selected &#39;</span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">&#39; as the tuning metric, but this is a Regression model. &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Configuration Error: You selected &#39;</span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">&#39; as the tuning metric, &quot;</span>
+                    <span class="s2">&quot;but this is a Regression model. &quot;</span>
                     <span class="s2">&quot;Accuracy/F1/AUC are for Classification only. &quot;</span>
-                    <span class="s2">&quot;Please open &#39;Advanced Settings&#39; on this node and select a regression metric (e.g., R2, RMSE, MAE).&quot;</span>
+                    <span class="s2">&quot;Please open &#39;Advanced Settings&#39; on this node and select a regression metric &quot;</span>
+                    <span class="s2">&quot;(e.g., R2, RMSE, MAE).&quot;</span>
                 <span class="p">)</span>
         <span class="c1"># -----------------------------------------------</span>
 
@@ -3975,8 +3980,9 @@ Wraps the base model applier to provide predictions using the refitted best mode
             <span class="k">if</span> <span class="s2">&quot;No trials are completed yet&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">):</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                     <span class="s2">&quot;Hyperparameter tuning failed: All trials failed. &quot;</span>
-                    <span class="s2">&quot;This often happens if the model produces NaN scores (e.g., due to unscaled data for linear models/SVMs, &quot;</span>
-                    <span class="s2">&quot;exploding gradients, or mismatched parameters). &quot;</span>
+                    <span class="s2">&quot;This often happens if the model produces NaN scores &quot;</span>
+                    <span class="s2">&quot;(e.g., due to unscaled data for linear models/SVMs, exploding gradients, &quot;</span>
+                    <span class="s2">&quot;or mismatched parameters). &quot;</span>
                     <span class="s2">&quot;Try adding a &#39;Scale&#39; node before this model or checking for NaN/Infinity in your data.&quot;</span>
                 <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
             <span class="k">raise</span> <span class="n">e</span>
@@ -4696,7 +4702,10 @@ Adapts the generic fit interface to the specific tune method.</p>
 <span class="normal">626</span>
 <span class="normal">627</span>
 <span class="normal">628</span>
-<span class="normal">629</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
+<span class="normal">629</span>
+<span class="normal">630</span>
+<span class="normal">631</span>
+<span class="normal">632</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -4803,9 +4812,11 @@ Adapts the generic fit interface to the specific tune method.</p>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;regression&quot;</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">metric</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;accuracy&quot;</span><span class="p">,</span> <span class="s2">&quot;f1&quot;</span><span class="p">,</span> <span class="s2">&quot;precision&quot;</span><span class="p">,</span> <span class="s2">&quot;recall&quot;</span><span class="p">,</span> <span class="s2">&quot;roc_auc&quot;</span><span class="p">,</span> <span class="s2">&quot;f1_weighted&quot;</span><span class="p">]:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Configuration Error: You selected &#39;</span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">&#39; as the tuning metric, but this is a Regression model. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Configuration Error: You selected &#39;</span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">&#39; as the tuning metric, &quot;</span>
+                <span class="s2">&quot;but this is a Regression model. &quot;</span>
                 <span class="s2">&quot;Accuracy/F1/AUC are for Classification only. &quot;</span>
-                <span class="s2">&quot;Please open &#39;Advanced Settings&#39; on this node and select a regression metric (e.g., R2, RMSE, MAE).&quot;</span>
+                <span class="s2">&quot;Please open &#39;Advanced Settings&#39; on this node and select a regression metric &quot;</span>
+                <span class="s2">&quot;(e.g., R2, RMSE, MAE).&quot;</span>
             <span class="p">)</span>
     <span class="c1"># -----------------------------------------------</span>
 
@@ -5110,8 +5121,9 @@ Adapts the generic fit interface to the specific tune method.</p>
         <span class="k">if</span> <span class="s2">&quot;No trials are completed yet&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">&quot;Hyperparameter tuning failed: All trials failed. &quot;</span>
-                <span class="s2">&quot;This often happens if the model produces NaN scores (e.g., due to unscaled data for linear models/SVMs, &quot;</span>
-                <span class="s2">&quot;exploding gradients, or mismatched parameters). &quot;</span>
+                <span class="s2">&quot;This often happens if the model produces NaN scores &quot;</span>
+                <span class="s2">&quot;(e.g., due to unscaled data for linear models/SVMs, exploding gradients, &quot;</span>
+                <span class="s2">&quot;or mismatched parameters). &quot;</span>
                 <span class="s2">&quot;Try adding a &#39;Scale&#39; node before this model or checking for NaN/Infinity in your data.&quot;</span>
             <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
         <span class="k">raise</span> <span class="n">e</span>
