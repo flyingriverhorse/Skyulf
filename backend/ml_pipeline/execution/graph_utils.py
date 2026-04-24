@@ -8,6 +8,28 @@ from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
 logger = logging.getLogger(__name__)
 
 TERMINAL_STEP_TYPES = {"basic_training", "advanced_tuning"}
+# Step types that should be treated as terminal sinks when splitting a graph
+# into parallel sub-pipelines for execution. Includes ``data_preview`` so a
+# preview leaf coexisting with a training/tuning terminal gets its own
+# executable sub-pipeline (otherwise it would be dropped because it isn't an
+# ancestor of any training terminal).
+PARTITION_TERMINAL_STEP_TYPES = TERMINAL_STEP_TYPES | {"data_preview"}
+
+# Terminals that auto-parallelize when wired to multiple inputs, even without
+# an explicit ``execution_mode == 'parallel'`` flag. A Data Preview node with
+# two upstream paths almost always means "show me each path side-by-side",
+# not "merge them and show one merged view" -- the latter is rarely useful
+# and was a frequent source of confusion.
+AUTO_PARALLEL_STEP_TYPES = {"data_preview"}
+
+
+def _is_parallel_terminal(term: NodeConfig) -> bool:
+    """Return True when this terminal should split into per-input branches."""
+    if len(term.inputs) <= 1:
+        return False
+    if term.params.get("execution_mode") == "parallel":
+        return True
+    return term.step_type in AUTO_PARALLEL_STEP_TYPES
 
 
 def partition_for_preview(config: PipelineConfig) -> List[PipelineConfig]:
@@ -146,8 +168,8 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
     """
     node_map: Dict[str, NodeConfig] = {n.node_id: n for n in config.nodes}
 
-    # Identify terminal nodes
-    terminals = [n for n in config.nodes if n.step_type in TERMINAL_STEP_TYPES]
+    # Identify terminal nodes (training, tuning, and data_preview leaves).
+    terminals = [n for n in config.nodes if n.step_type in PARTITION_TERMINAL_STEP_TYPES]
 
     if not terminals:
         return [config]
@@ -155,7 +177,7 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
     # --- Case 2: single terminal with parallel mode ---
     if len(terminals) == 1:
         term = terminals[0]
-        if term.params.get("execution_mode") != "parallel" or len(term.inputs) <= 1:
+        if not _is_parallel_terminal(term):
             return [config]
 
         # Each input to the terminal is a separate experiment branch
@@ -191,7 +213,7 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
     sub_configs = []
     global_branch = 0
     for term in terminals:
-        is_parallel = term.params.get("execution_mode") == "parallel" and len(term.inputs) > 1
+        is_parallel = _is_parallel_terminal(term)
         if is_parallel:
             # Parallel mode: each input becomes its own experiment branch
             for branch_root_id in term.inputs:

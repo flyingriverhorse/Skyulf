@@ -6,6 +6,10 @@ import { useGraphStore } from '../../core/store/useGraphStore';
 import type { NodeExecutionResult } from '../../core/api/client';
 
 const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
+// Terminals that auto-split each upstream input into its own parallel
+// branch / preview tab instead of column-merging them. Mirror
+// AUTO_PARALLEL_STEP_TYPES in backend graph_utils.py.
+const AUTO_PARALLEL_TYPES = new Set(['data_preview']);
 
 export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
   const definitionType = data.definitionType as string;
@@ -29,15 +33,20 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
     return (w.overlap_columns?.length ?? 0) > 0 ? 'risk' : 'safe';
   })();
 
-  // Parallel badge only on training/tuning nodes when user explicitly chose it
+  // Parallel badge: training nodes when user explicitly chose parallel mode,
+  // OR auto-parallel terminals (data_preview) wired to 2+ sources.
   const isTrainingNode = TRAINING_TYPES.has(definitionType);
-  const isParallel = isTrainingNode && data.execution_mode === 'parallel';
+  const isAutoParallel = AUTO_PARALLEL_TYPES.has(definitionType);
+  const isParallel =
+    (isTrainingNode && data.execution_mode === 'parallel') ||
+    (isAutoParallel && incomingSourceCount > 1);
 
   // Only nodes that actually consume upstream data (i.e. declare an input
   // port) can merge. Dataset/data-loader nodes have no inputs and must not
-  // show a merge badge even if React Flow allowed an edge in.
-  const canMerge = (definition?.inputs?.length ?? 0) > 0;
-  const showMergeBadge = canMerge && incomingSourceCount > 1;
+  // show a merge badge even if React Flow allowed an edge in. Auto-parallel
+  // terminals show the parallel badge instead of the merge badge.
+  const canMerge = (definition?.inputs?.length ?? 0) > 0 && !isAutoParallel;
+  const showMergeBadge = (canMerge && incomingSourceCount > 1) || isParallel;
 
   const onDelete = (evt: React.MouseEvent) => {
     evt.stopPropagation();

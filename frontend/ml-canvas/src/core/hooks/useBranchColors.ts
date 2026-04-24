@@ -2,6 +2,11 @@ import { useMemo } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 
 const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
+// Terminals that auto-split into per-input branches when wired to 2+ sources,
+// even without an explicit ``execution_mode === 'parallel'`` flag. Mirrors
+// AUTO_PARALLEL_STEP_TYPES in backend graph_utils.py.
+const AUTO_PARALLEL_TYPES = new Set(['data_preview']);
+const TERMINAL_TYPES = new Set([...TRAINING_TYPES, ...AUTO_PARALLEL_TYPES]);
 
 /** Generate n evenly-spaced, high-saturation HSL colors with a golden-angle offset for variety. */
 export function generateBranchColors(count: number): string[] {
@@ -46,9 +51,9 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
   return useMemo(() => {
     const colorMap = new Map<string, BranchEdgeInfo>();
 
-    // Find connected training/tuning nodes
+    // Find connected training/tuning/preview-leaf nodes
     const terminals = nodes.filter(
-      n => TRAINING_TYPES.has(n.data.definitionType as string) && edges.some(e => e.target === n.id)
+      n => TERMINAL_TYPES.has(n.data.definitionType as string) && edges.some(e => e.target === n.id)
     );
 
     if (terminals.length === 0) return colorMap;
@@ -63,21 +68,27 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
 
     // Build branches: one per terminal by default (merge mode).
     // Only split a multi-input terminal into per-input branches when the
-    // node is explicitly set to execution_mode === 'parallel'.
-    interface BranchDef { terminal: Node; inputEdge: Edge | null }
+    // node is explicitly set to execution_mode === 'parallel' or is an
+    // auto-parallel terminal type. Each branch carries its own per-terminal
+    // index so the Path letter restarts at A for every terminal—keeping the
+    // canvas edge labels aligned with the per-terminal tab bars (e.g. the
+    // Data Preview node's tabs always read Path A / Path B / …).
+    interface BranchDef { terminal: Node; inputEdge: Edge | null; localIndex: number }
     const branches: BranchDef[] = [];
     for (const terminal of terminals) {
       const terminalIncoming = incomingMap.get(terminal.id) || [];
       if (terminalIncoming.length === 0) continue;
-      const isParallel = terminal.data.execution_mode === 'parallel';
+      const isAutoParallel = AUTO_PARALLEL_TYPES.has(terminal.data.definitionType as string);
+      const isParallel =
+        terminal.data.execution_mode === 'parallel' || isAutoParallel;
       if (isParallel && terminalIncoming.length > 1) {
         // Parallel mode: each input path is a separate experiment branch
-        for (const edge of terminalIncoming) {
-          branches.push({ terminal, inputEdge: edge });
-        }
+        terminalIncoming.forEach((edge, localIdx) => {
+          branches.push({ terminal, inputEdge: edge, localIndex: localIdx });
+        });
       } else {
         // Merge mode (default): all inputs funnel into one branch
-        branches.push({ terminal, inputEdge: null });
+        branches.push({ terminal, inputEdge: null, localIndex: 0 });
       }
     }
 
@@ -93,11 +104,26 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
     const branchEdgeSets: Set<string>[] = [];
     const branchLabels: string[] = [];
     for (let i = 0; i < branches.length; i++) {
-      const { terminal, inputEdge } = branches[i];
+      const { terminal, inputEdge, localIndex } = branches[i];
       const modelType = terminal.data.model_type as string | undefined;
       const modelName = modelType ? prettifyModelType(modelType) : '';
-      const pathLetter = String.fromCharCode(65 + i); // A, B, C...
-      const label = modelName ? `Path ${pathLetter} · ${modelName}` : `Path ${pathLetter}`;
+      // Per-terminal letter so the label matches the per-terminal tab bar
+      // (Data Preview tabs always start at Path A regardless of how many
+      // other parallel terminals exist on the canvas).
+      const pathLetter = String.fromCharCode(65 + localIndex);
+      // For preview-only branches, suffix the upstream source node label
+      // so users can tell which path each tab corresponds to.
+      let suffix = modelName;
+      if (!suffix && inputEdge) {
+        const sourceNode = nodes.find(n => n.id === inputEdge.source);
+        const data = (sourceNode?.data ?? {}) as Record<string, unknown>;
+        suffix = (data.label as string)
+          || (data.title as string)
+          || (typeof data.definitionType === 'string'
+              ? (data.definitionType as string).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+              : '');
+      }
+      const label = suffix ? `Path ${pathLetter} · ${suffix}` : `Path ${pathLetter}`;
       branchLabels.push(label);
 
       const visited = new Set<string>();
