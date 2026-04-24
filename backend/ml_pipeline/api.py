@@ -460,14 +460,29 @@ def _prettify_model_type(model_type: str) -> str:
 
 
 def _branch_label(index: int, sub_config: PipelineConfig) -> str:
-    """Build a 'Path A · Model' label for a branch sub-pipeline."""
+    """Build a 'Path A · <suffix>' label for a branch sub-pipeline.
+
+    Suffix is the model name for training/tuning branches. For preview-only
+    branches (no model fitted) the suffix is the upstream source node id,
+    so users can tell which incoming path a preview tab corresponds to.
+    """
     letter = chr(ord("A") + index)
     model_type = ""
+    preview_source = ""
     for n in sub_config.nodes:
         if n.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
             model_type = n.params.get("model_type") or n.params.get("algorithm") or ""
+        elif n.step_type == "data_preview" and n.inputs:
+            # Per-input partition: data_preview terminal has exactly one input.
+            preview_source = n.inputs[0]
     pretty = _prettify_model_type(str(model_type))
-    return f"Path {letter} · {pretty}" if pretty else f"Path {letter}"
+    if pretty:
+        return f"Path {letter} · {pretty}"
+    if preview_source:
+        # Strip uuid suffix for readability: "scaler-abcd1234..." -> "scaler"
+        short = preview_source.split("-")[0] if "-" in preview_source else preview_source
+        return f"Path {letter} · {short}"
+    return f"Path {letter}"
 
 
 class SavedPipelineModel(BaseModel):
