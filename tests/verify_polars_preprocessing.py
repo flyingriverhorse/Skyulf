@@ -1,6 +1,4 @@
 import unittest
-import numpy as np
-import pandas as pd
 import polars as pl
 import logging
 
@@ -15,8 +13,6 @@ from skyulf.preprocessing.cleaning import (
     TextCleaningApplier,
     InvalidValueReplacementCalculator,
     InvalidValueReplacementApplier,
-    ValueReplacementCalculator,
-    ValueReplacementApplier,
     AliasReplacementCalculator,
     AliasReplacementApplier,
 )
@@ -52,7 +48,7 @@ class TestPolarsPreprocessingFull(unittest.TestCase):
         try:
             params = {"strategy": "quantile", "n_bins": 2, "columns": ["A_num"]}
             fit_res = calc.fit(self.df, params)
-            res = applier.apply(self.df, fit_res)
+            applier.apply(self.df, fit_res)
 
             # Check for bin_edges instead of bins
             self.assertIn("bin_edges", fit_res)

@@ -60,9 +60,8 @@ class SimpleImputerApplier(BaseApplier):
                     exprs.append(pl.col(col))
 
             # Handle missing columns (restore them)
-            # This logic assumes "restore" means adding them if they are completely missing from input X but were present during fit?
-            # Or is it just adding constant value cols?
-            # The original code iterated cols and checked if col not in X.columns.
+            # Restores columns that were present at fit time but missing in input X,
+            # filling them with their fit-time fill value.
 
             for col in cols:
                 if col not in X_pl.columns and col in fill_values:
@@ -279,7 +278,6 @@ class KNNImputerApplier(BaseApplier):
         except Exception as e:
             logger.error(f"KNN Imputation failed: {e}")
             # Fallback? Or raise?
-            pass
 
         return pack_pipeline_output(X_out, y, is_tuple)
 
@@ -393,7 +391,6 @@ class IterativeImputerApplier(BaseApplier):
             X_out[cols] = X_transformed
         except Exception as e:
             logger.error(f"Iterative Imputation failed: {e}")
-            pass
 
         return pack_pipeline_output(X_out, y, is_tuple)
 

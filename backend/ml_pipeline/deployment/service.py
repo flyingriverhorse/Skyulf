@@ -7,10 +7,9 @@ import sklearn
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.database.models import Deployment, AdvancedTuningJob, BasicTrainingJob
+from backend.database.models import Deployment
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
-from backend.ml_pipeline.execution.jobs import JobManager
 from backend.ml_pipeline.services.job_service import JobService
 from backend.ml_pipeline.services.prediction_utils import extract_target_label_encoder
 from backend.config import get_settings
@@ -157,7 +156,6 @@ class DeploymentService:
         # 2. Load Artifact
         try:
             from backend.ml_pipeline.artifacts.factory import ArtifactFactory
-            from backend.ml_pipeline.services.job_service import JobService
 
             uri = deployment.artifact_uri
             store_uri = ""
@@ -295,7 +293,7 @@ class DeploymentService:
             )
 
     @staticmethod
-    async def get_deployment_details(
+    async def get_deployment_details(  # noqa: C901  # orchestrator: aggregates many optional fields
         session: AsyncSession, deployment: Deployment
     ) -> Dict[str, Any]:
         """

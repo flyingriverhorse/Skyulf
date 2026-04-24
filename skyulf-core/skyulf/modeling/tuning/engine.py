@@ -21,7 +21,7 @@ from sklearn.model_selection import (
 )
 
 from ..base import BaseModelApplier, BaseModelCalculator
-from ...engines import SkyulfDataFrame, get_engine
+from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
 from .schemas import TuningConfig, TuningResult
 
@@ -287,9 +287,11 @@ class TuningCalculator(BaseModelCalculator):
         if self.model_calculator.problem_type == "regression":
             if metric in ["accuracy", "f1", "precision", "recall", "roc_auc", "f1_weighted"]:
                 raise ValueError(
-                    f"Configuration Error: You selected '{metric}' as the tuning metric, but this is a Regression model. "
+                    f"Configuration Error: You selected '{metric}' as the tuning metric, "
+                    "but this is a Regression model. "
                     "Accuracy/F1/AUC are for Classification only. "
-                    "Please open 'Advanced Settings' on this node and select a regression metric (e.g., R2, RMSE, MAE)."
+                    "Please open 'Advanced Settings' on this node and select a regression metric "
+                    "(e.g., R2, RMSE, MAE)."
                 )
         # -----------------------------------------------
 
@@ -594,8 +596,9 @@ class TuningCalculator(BaseModelCalculator):
             if "No trials are completed yet" in str(e):
                 raise ValueError(
                     "Hyperparameter tuning failed: All trials failed. "
-                    "This often happens if the model produces NaN scores (e.g., due to unscaled data for linear models/SVMs, "
-                    "exploding gradients, or mismatched parameters). "
+                    "This often happens if the model produces NaN scores "
+                    "(e.g., due to unscaled data for linear models/SVMs, exploding gradients, "
+                    "or mismatched parameters). "
                     "Try adding a 'Scale' node before this model or checking for NaN/Infinity in your data."
                 ) from e
             raise e

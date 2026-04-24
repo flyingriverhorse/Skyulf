@@ -1,6 +1,5 @@
 import unittest
-from unittest.mock import MagicMock, patch
-from datetime import datetime
+from unittest.mock import MagicMock
 
 from backend.ml_pipeline.execution.strategies import (
     JobStrategyFactory,

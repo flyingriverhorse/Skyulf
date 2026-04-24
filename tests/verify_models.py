@@ -5,7 +5,6 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent / "skyulf-core"))
 
 from skyulf.registry import NodeRegistry
-from skyulf.modeling import classification, regression
 
 
 def verify_models():

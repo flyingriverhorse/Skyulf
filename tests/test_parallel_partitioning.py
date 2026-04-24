@@ -1,7 +1,5 @@
 """Tests for Phase 2 parallel pipeline branch partitioning."""
 
-import pytest
-
 from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
 from backend.ml_pipeline.execution.graph_utils import (
     partition_parallel_pipeline,

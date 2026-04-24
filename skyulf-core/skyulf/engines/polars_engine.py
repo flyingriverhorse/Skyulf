@@ -42,7 +42,7 @@ class SkyulfPolarsWrapper:
         return self._df.to_pandas()
 
     def to_arrow(self) -> Any:
-        import pyarrow as pa
+        pass
 
         return self._df.to_arrow()
 

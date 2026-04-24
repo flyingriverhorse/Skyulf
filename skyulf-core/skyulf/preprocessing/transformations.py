@@ -93,7 +93,6 @@ class PowerTransformerApplier(BaseApplier):
         except Exception as e:
             logger.error(f"PowerTransformer application failed: {e}")
             # Fallback?
-            pass
 
         if was_polars:
             df_out = pl.from_pandas(df_out)

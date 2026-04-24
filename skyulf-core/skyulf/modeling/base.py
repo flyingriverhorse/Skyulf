@@ -21,7 +21,6 @@ class BaseModelCalculator(ABC):
     @abstractmethod
     def problem_type(self) -> str:
         """Returns 'classification' or 'regression'."""
-        pass
 
     @property
     def default_params(self) -> Dict[str, Any]:
@@ -43,7 +42,6 @@ class BaseModelCalculator(ABC):
         """
         Trains the model. Returns the model object (serializable).
         """
-        pass
 
 
 class BaseModelApplier(ABC):
@@ -54,7 +52,6 @@ class BaseModelApplier(ABC):
         """
         Generates predictions.
         """
-        pass
 
     def predict_proba(
         self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any

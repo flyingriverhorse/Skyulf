@@ -20,7 +20,6 @@ def import_submodules(package_name):
             results[full_name] = importlib.import_module(full_name)
         except ImportError as e:
             print(f"Failed to import {full_name}: {e}")
-            pass
     return results
 
 

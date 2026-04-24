@@ -19,8 +19,6 @@ from sklearn.datasets import load_iris
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.layout import Layout
-from rich import print as rprint
 
 from skyulf.profiling.analyzer import EDAAnalyzer
 

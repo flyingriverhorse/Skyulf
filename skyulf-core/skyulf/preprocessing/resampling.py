@@ -51,8 +51,6 @@ class OversamplingApplier(BaseApplier):
 
         # Convert to Pandas for imblearn
         if was_polars:
-            import polars as pl
-
             X_pd = X.to_pandas()
             y_pd = y.to_pandas() if hasattr(y, "to_pandas") else y
         else:
@@ -203,8 +201,6 @@ class UndersamplingApplier(BaseApplier):
 
         # Convert to Pandas for imblearn
         if was_polars:
-            import polars as pl
-
             X_pd = X.to_pandas()
             y_pd = y.to_pandas() if hasattr(y, "to_pandas") else y
         else:

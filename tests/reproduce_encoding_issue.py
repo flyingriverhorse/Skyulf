@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 from skyulf.preprocessing.encoding import LabelEncoderCalculator, LabelEncoderApplier
 
 
@@ -36,7 +35,6 @@ def test_label_encoding_flow():
     if isinstance(result, tuple):
         X_out, y_out = result
     else:
-        X_out = result
         y_out = None
 
     print(f"\nTransformed y:\n{y_out}")

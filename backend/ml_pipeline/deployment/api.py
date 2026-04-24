@@ -1,5 +1,5 @@
 import logging
-from typing import AsyncGenerator, List, cast
+from typing import AsyncGenerator, List
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +30,7 @@ async def deploy_model(job_id: str, session: AsyncSession = Depends(get_async_se
         return await DeploymentService.get_deployment_details(session, deployment)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to deploy model for job %s", job_id)
         raise HTTPException(status_code=500, detail="Failed to deploy model")
 

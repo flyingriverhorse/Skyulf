@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form
 from typing import Optional, List, Dict, Any, cast
@@ -11,14 +10,14 @@ import re
 from datetime import datetime
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 from backend.config import get_settings
 from backend.dependencies import get_db
 from backend.database.models import BasicTrainingJob, AdvancedTuningJob, DriftCheckResult
 from backend.ml_pipeline.execution.graph_utils import extract_job_details
-from skyulf.profiling.drift import DriftCalculator, DriftReport
+from skyulf.profiling.drift import DriftCalculator
 
 router = APIRouter(prefix="/monitoring", tags=["Monitoring"])
 
@@ -37,7 +36,7 @@ class DriftJobOption(BaseModel):
 
 
 @router.get("/jobs", response_model=List[DriftJobOption])
-async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
+async def list_drift_jobs(db: AsyncSession = Depends(get_db)):  # noqa: C901
     """
     List all jobs that have reference data available for drift calculation.
     Scans subdirectories in the artifact folder, enriched with DB metadata.
@@ -196,7 +195,7 @@ class EnrichedDriftReport(BaseModel):
 
 
 @router.post("/drift/calculate", response_model=EnrichedDriftReport)
-async def calculate_drift(
+async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load ref → load curr → compute → persist
     job_id: str = Form(...),
     file: UploadFile = File(...),
     dataset_name: Optional[str] = Form(None),
@@ -255,7 +254,7 @@ async def calculate_drift(
         else:
             # Assume it's already compatible or fail
             ref_df = pl.DataFrame(ref_data)
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to load reference data for job %s", job_id)
         raise HTTPException(status_code=500, detail="Failed to load reference data")
 
@@ -287,7 +286,7 @@ async def calculate_drift(
             custom_thresholds["kl_divergence"] = threshold_kl
         calculator = DriftCalculator(ref_df, curr_df)
         report = calculator.calculate_drift(thresholds=custom_thresholds or None)
-    except Exception as e:
+    except Exception:
         logger.exception("Drift calculation failed for job %s", job_id)
         raise HTTPException(status_code=500, detail="Drift calculation failed")
 

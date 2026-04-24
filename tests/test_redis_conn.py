@@ -1,5 +1,4 @@
 import socket
-import sys
 
 
 def check_port(host, port):
