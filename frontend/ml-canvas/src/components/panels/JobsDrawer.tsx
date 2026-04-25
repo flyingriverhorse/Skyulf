@@ -28,7 +28,7 @@ const FeatureImportancesSection: React.FC<{ result: Record<string, unknown> }> =
 
   const sorted = Object.entries(raw).sort(([, a], [, b]) => b - a).slice(0, 5);
   if (sorted.length === 0) return null;
-  const maxVal = sorted[0][1] || 1;
+  const maxVal = sorted[0]![1] || 1;
 
   return (
     <div className="space-y-2">

@@ -38,7 +38,7 @@ export const Toolbar: React.FC = () => {
     // If any two training nodes have completely different parents, they're separate
     for (let i = 0; i < parentSets.length; i++) {
       for (let j = i + 1; j < parentSets.length; j++) {
-        const overlap = [...parentSets[i]].some(p => parentSets[j].has(p));
+        const overlap = [...parentSets[i]!].some(p => parentSets[j]!.has(p));
         if (!overlap) return true;
       }
     }

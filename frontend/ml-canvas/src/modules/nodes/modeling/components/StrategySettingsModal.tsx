@@ -19,7 +19,7 @@ interface StrategySettingsModalProps {
     onClose: () => void;
     onSave: (config: StrategyConfig) => void;
     strategy: string;
-    initialConfig?: StrategyConfig;
+    initialConfig?: StrategyConfig | undefined;
 }
 
 const Tooltip: React.FC<{ text: string }> = ({ text }) => (

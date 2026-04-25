@@ -13,12 +13,12 @@ interface MathOperation {
   operation_type: 'arithmetic' | 'datetime_extract' | 'ratio' | 'similarity' | 'group_agg';
   method: string;
   input_columns: string[];
-  secondary_columns?: string[]; // For arithmetic (second operand)
-  constants?: number[];
-  output_column?: string;
-  datetime_features?: string[]; // For datetime_extract
+  secondary_columns?: string[] | undefined; // For arithmetic (second operand)
+  constants?: number[] | undefined;
+  output_column?: string | undefined;
+  datetime_features?: string[] | undefined; // For datetime_extract
 
-  isExpanded?: boolean; // UI state
+  isExpanded?: boolean | undefined; // UI state
 }
 
 interface FeatureGenerationConfig {
@@ -176,7 +176,9 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
 
   const updateOperation = (index: number, updates: Partial<MathOperation>) => {
     const newOps = [...(config.operations || [])];
-    newOps[index] = { ...newOps[index], ...updates };
+    const existing = newOps[index];
+    if (!existing) return;
+    newOps[index] = { ...existing, ...updates };
     onChange({ operations: newOps });
   };
 
@@ -189,7 +191,9 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
 
   const toggleExpand = (index: number) => {
     const newOps = [...(config.operations || [])];
-    newOps[index] = { ...newOps[index], isExpanded: !newOps[index].isExpanded };
+    const existing = newOps[index];
+    if (!existing) return;
+    newOps[index] = { ...existing, isExpanded: !existing.isExpanded };
     onChange({ operations: newOps });
   };
 

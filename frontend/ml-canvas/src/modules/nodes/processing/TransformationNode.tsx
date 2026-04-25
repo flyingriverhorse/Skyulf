@@ -11,9 +11,9 @@ interface TransformationRule {
   columns: string[];
   method: 'yeo-johnson' | 'box-cox' | 'log' | 'square_root' | 'cube_root' | 'reciprocal' | 'square' | 'exponential';
   params?: {
-    standardize?: boolean;
-    clip_threshold?: number;
-  };
+    standardize?: boolean | undefined;
+    clip_threshold?: number | undefined;
+  } | undefined;
 }
 
 interface TransformationConfig {
@@ -162,7 +162,9 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
 
   const updateRule = (index: number, updates: Partial<TransformationRule>) => {
     const current = [...transformations];
-    current[index] = { ...current[index], ...updates };
+    const existing = current[index];
+    if (!existing) return;
+    current[index] = { ...existing, ...updates };
     onChange({ transformations: current });
   };
 

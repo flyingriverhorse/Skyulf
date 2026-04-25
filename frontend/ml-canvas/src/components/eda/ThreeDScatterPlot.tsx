@@ -6,11 +6,11 @@ interface ThreeDScatterPlotProps {
   xKey: string;
   yKey: string;
   zKey: string;
-  labelKey?: string;
-  xLabel?: string;
-  yLabel?: string;
-  zLabel?: string;
-  height?: number;
+  labelKey?: string | undefined;
+  xLabel?: string | undefined;
+  yLabel?: string | undefined;
+  zLabel?: string | undefined;
+  height?: number | undefined;
 }
 
 export const ThreeDScatterPlot: React.FC<ThreeDScatterPlotProps> = ({
@@ -38,7 +38,7 @@ export const ThreeDScatterPlot: React.FC<ThreeDScatterPlotProps> = ({
     });
     
     Object.keys(groups).forEach((label) => {
-      const groupData = groups[label];
+      const groupData = groups[label] ?? [];
       traces.push({
         x: groupData.map(d => d[xKey]),
         y: groupData.map(d => d[yKey]),

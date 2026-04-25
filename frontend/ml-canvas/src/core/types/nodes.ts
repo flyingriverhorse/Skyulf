@@ -15,7 +15,7 @@ export interface PortDefinition {
 
 export interface ValidationResult {
   isValid: boolean;
-  message?: string;
+  message?: string | undefined;
 }
 
 export interface NodeSettingsProps<TConfig> {

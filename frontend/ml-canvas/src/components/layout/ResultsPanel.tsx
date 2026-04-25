@@ -58,7 +58,7 @@ export const ResultsPanel: React.FC = () => {
   // Pick default branch when branches change
   React.useEffect(() => {
     if (branchLabels.length > 0 && (!activeBranch || !branchLabels.includes(activeBranch))) {
-      setActiveBranch(branchLabels[0]);
+      setActiveBranch(branchLabels[0] ?? null);
     } else if (branchLabels.length === 0 && activeBranch !== null) {
       setActiveBranch(null);
     }
@@ -79,7 +79,7 @@ export const ResultsPanel: React.FC = () => {
     if (tabNames.length > 0 && (!activeTab || !tabNames.includes(activeTab))) {
       if (tabNames.includes('train')) setActiveTab('train');
       else if (tabNames.includes('X')) setActiveTab('X');
-      else setActiveTab(tabNames[0]);
+      else setActiveTab(tabNames[0] ?? null);
     }
   }, [tabNames, activeTab]);
 

@@ -72,7 +72,7 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
       {/* Visible path */}
       <BaseEdge
         path={edgePath}
-        markerEnd={markerEnd}
+        {...(markerEnd ? { markerEnd } : {})}
         style={{
           ...edgeStyle,
           filter: hovered

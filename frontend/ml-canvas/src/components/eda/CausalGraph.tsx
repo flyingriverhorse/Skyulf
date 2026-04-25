@@ -113,18 +113,27 @@ export const CausalGraph: React.FC<CausalGraphProps> = ({ graph }) => {
             style: getNodeStyle(),
         }));
 
-        const initialEdges: Edge[] = graph.edges.map((e, i) => ({
-            id: `e${i}`,
-            source: sanitizeId(e.source),
-            target: sanitizeId(e.target),
-            animated: true,
-            type: 'default',
-            label: e.type === 'directed' ? 'causes' : (e.type === 'bidirected' ? 'confounded' : 'related'),
-            labelStyle: { fill: document.documentElement.classList.contains('dark') ? '#d1d5db' : '#374151', fontSize: 12 },
-            style: { stroke: getEdgeStrokeColor(e.type), strokeDasharray: e.type === 'directed' ? '0' : '5 5' },
-            markerEnd: e.type === 'directed' ? { type: MarkerType.ArrowClosed, color: getEdgeStrokeColor(e.type) } : undefined,
-            markerStart: e.type === 'bidirected' ? { type: MarkerType.ArrowClosed, color: getEdgeStrokeColor(e.type) } : undefined,
-        }));
+        const initialEdges: Edge[] = graph.edges.map((e, i) => {
+            const stroke = getEdgeStrokeColor(e.type);
+            const endArrow = e.type === 'directed'
+                ? { type: MarkerType.ArrowClosed, color: stroke }
+                : null;
+            const startArrow = e.type === 'bidirected'
+                ? { type: MarkerType.ArrowClosed, color: stroke }
+                : null;
+            return {
+                id: `e${i}`,
+                source: sanitizeId(e.source),
+                target: sanitizeId(e.target),
+                animated: true,
+                type: 'default',
+                label: e.type === 'directed' ? 'causes' : (e.type === 'bidirected' ? 'confounded' : 'related'),
+                labelStyle: { fill: document.documentElement.classList.contains('dark') ? '#d1d5db' : '#374151', fontSize: 12 },
+                style: { stroke, strokeDasharray: e.type === 'directed' ? '0' : '5 5' },
+                ...(endArrow ? { markerEnd: endArrow } : {}),
+                ...(startArrow ? { markerStart: startArrow } : {}),
+            };
+        });
 
         const layouted = getLayoutedElements(initialNodes, initialEdges);
         setNodes(layouted.nodes);
