@@ -126,18 +126,25 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         }
       }
 
-      // Warn: multi-input on a training/tuning node — explain merge vs parallel
+      // Warn: multi-input on a training/tuning node — explain merge vs parallel.
+      // Count UNIQUE source nodes, not edges: multi-output splitters
+      // (train_test_split, feature_target_split) legitimately produce
+      // several edges from the same source (train/test/X/y handles)
+      // into one downstream node, and that's not fan-in — the engine
+      // dedupes by source id, so no merge happens.
       const existingInputs = edges.filter(e => e.target === connection.target);
+      const existingSources = new Set(existingInputs.map(e => e.source));
+      const isNewSource = connection.source != null && !existingSources.has(connection.source);
+      const uniqueSourceCount = existingSources.size + (isNewSource ? 1 : 0);
       // Auto-parallel terminals (data_preview) split each input into its own
       // tab instead of merging — no warning needed, no merge contract to
       // confirm. Mirrors AUTO_PARALLEL_STEP_TYPES in backend graph_utils.py.
       const autoParallelTypes = ['data_preview'];
       if (autoParallelTypes.includes(targetType)) {
         // Skip both confirms below; each input becomes its own preview tab.
-      } else if (existingInputs.length >= 1 && modelTypes.includes(targetType)) {
-        const inputCount = existingInputs.length + 1;
+      } else if (isNewSource && uniqueSourceCount >= 2 && modelTypes.includes(targetType)) {
         const proceed = confirm(
-          `This training node will receive ${inputCount} inputs.\n\n` +
+          `This training node will receive ${uniqueSourceCount} inputs.\n\n` +
           'You have two options:\n' +
           '  • MERGE (default): Inputs are auto-merged into one dataset before training.\n' +
           '  • PARALLEL: Each input runs as a separate experiment.\n' +
@@ -145,14 +152,13 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           'Click OK to connect (merge mode), or Cancel to abort.'
         );
         if (!proceed) return;
-      } else if (existingInputs.length >= 1 && !modelTypes.includes(targetType)) {
+      } else if (isNewSource && uniqueSourceCount >= 2 && !modelTypes.includes(targetType)) {
         // Pre-flight lint for non-training nodes (audit issue #7).
         // Direction-A means non-training nodes also auto-merge fan-in via
         // column union + last-wins. Surface that contract before the user
         // wires it so silent column overwrites aren't a surprise at run time.
-        const inputCount = existingInputs.length + 1;
         const proceed = confirm(
-          `This node will receive ${inputCount} inputs.\n\n` +
+          `This node will receive ${uniqueSourceCount} inputs.\n\n` +
           'Inputs are auto-merged via column union with LAST-WINS on overlap ' +
           '(the last connected input overwrites earlier ones on shared columns).\n\n' +
           'For sequential transformations, chain the nodes linearly instead.\n\n' +
