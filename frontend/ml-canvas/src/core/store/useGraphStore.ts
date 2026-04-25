@@ -31,6 +31,14 @@ interface GraphState {
   // Custom Actions
   addNode: (type: string, position: { x: number, y: number }, initialData?: unknown) => string;
   updateNodeData: (id: string, data: unknown) => void;
+  /**
+   * Clone every currently-selected node with a small position offset
+   * and a fresh id. New clones become the selection (originals are
+   * deselected). Edges between selected nodes are NOT copied — keep
+   * it predictable; users can re-wire if they want a parallel branch.
+   * Returns the count of cloned nodes (0 when nothing is selected).
+   */
+  duplicateSelectedNodes: () => number;
   validateGraph: () => Promise<boolean>;
   setGraph: (nodes: Node[], edges: Edge[]) => void;
   /**
@@ -213,6 +221,25 @@ export const useGraphStore = create<GraphState>()(
         return node;
       }),
     });
+  },
+
+  duplicateSelectedNodes: () => {
+    const current = get().nodes;
+    const selected = current.filter((n) => n.selected);
+    if (selected.length === 0) return 0;
+    const OFFSET = 32;
+    const clones: Node[] = selected.map((src) => ({
+      ...src,
+      id: `${src.data.definitionType as string}-${uuidv4()}`,
+      position: { x: src.position.x + OFFSET, y: src.position.y + OFFSET },
+      selected: true,
+      data: { ...src.data },
+    }));
+    const deselected = current.map((n) =>
+      n.selected ? { ...n, selected: false } : n
+    );
+    set({ nodes: [...deselected, ...clones] });
+    return clones.length;
   },
 
   chainSiblings: (consumerId: string, orderedInputIds: string[]) => {
