@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { 
   ReactFlow, 
   Background, 
@@ -26,7 +26,7 @@ const edgeTypes = {
 
 const FlowCanvasContent: React.FC = () => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
   
   const { 
     nodes, 
@@ -92,6 +92,30 @@ const FlowCanvasContent: React.FC = () => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   }, []);
+
+  // F key → fit view. Lives here (not in the global keyboard hook)
+  // because `fitView` is only available inside ReactFlowProvider.
+  // Skip when typing in form fields so it doesn't fight with text input.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      if (e.key !== 'f' && e.key !== 'F') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        t?.isContentEditable === true
+      ) {
+        return;
+      }
+      e.preventDefault();
+      fitView({ duration: 250, padding: 0.15 });
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [fitView]);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
