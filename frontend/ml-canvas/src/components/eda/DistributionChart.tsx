@@ -3,41 +3,55 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { InfoTooltip } from '../ui/InfoTooltip';
 import { getChartTheme } from './constants';
 import { getTooltipContentStyle } from '../../core/utils/chartUtils';
+import type { ColumnProfile, HistogramBin } from '../../core/types/edaProfile';
+
+/**
+ * Shape produced by the local recharts adapter — kept narrow so the
+ * `onBarClick` consumer can pull `value` for categorical bars and
+ * `rawBin.start` for histogram bars without `any`.
+ */
+export interface DistributionDatum {
+  name: string;
+  fullName: string;
+  count: number;
+  rawBin?: HistogramBin;
+  value?: string | number;
+}
 
 interface DistributionChartProps {
-  profile: any;
-  onBarClick?: (data: any) => void;
+  profile: ColumnProfile;
+  onBarClick?: (data: DistributionDatum) => void;
 }
 
 export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, onBarClick }) => {
   if (!profile) return null;
 
-  let data: any[] = [];
+  let data: DistributionDatum[] = [];
   const type = profile.dtype;
 
   if (type === 'Numeric' && profile.histogram) {
-    data = profile.histogram.map((bin: any) => ({
+    data = profile.histogram.map((bin) => ({
       name: `${Number(bin.start).toFixed(2)}`, // Simplified label for X-axis
       fullName: `${Number(bin.start).toFixed(2)} - ${Number(bin.end).toFixed(2)}`,
       count: bin.count,
       rawBin: bin
     }));
   } else if (type === 'Text' && profile.histogram) {
-    data = profile.histogram.map((bin: any) => ({
-      name: `${Number(bin.start).toFixed(0)}`, 
+    data = profile.histogram.map((bin) => ({
+      name: `${Number(bin.start).toFixed(0)}`,
       fullName: `${Number(bin.start).toFixed(0)} - ${Number(bin.end).toFixed(0)} chars`,
       count: bin.count,
       rawBin: bin
     }));
   } else if (type === 'DateTime' && profile.histogram) {
-    data = profile.histogram.map((bin: any) => ({
-      name: new Date(bin.start).toLocaleDateString(undefined, { month: 'short', year: '2-digit' }), 
+    data = profile.histogram.map((bin) => ({
+      name: new Date(bin.start).toLocaleDateString(undefined, { month: 'short', year: '2-digit' }),
       fullName: `${new Date(bin.start).toLocaleDateString()} - ${new Date(bin.end).toLocaleDateString()}`,
       count: bin.count,
       rawBin: bin
     }));
   } else if (type === 'Categorical' && profile.categorical_stats?.top_k) {
-    data = profile.categorical_stats.top_k.map((item: any) => ({
+    data = profile.categorical_stats.top_k.map((item) => ({
       name: String(item.value).substring(0, 15) + (String(item.value).length > 15 ? '...' : ''),
       fullName: String(item.value),
       count: item.count,
@@ -109,7 +123,7 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, o
           <Bar 
             dataKey="count" 
             radius={[4, 4, 0, 0]} 
-            onClick={(data) => onBarClick && onBarClick(data)}
+            onClick={(d) => onBarClick && onBarClick(d as unknown as DistributionDatum)}
             className={onBarClick ? "cursor-pointer hover:opacity-80" : ""}
           >
             {data.map((_, index) => (

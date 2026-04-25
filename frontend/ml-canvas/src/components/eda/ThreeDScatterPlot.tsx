@@ -1,8 +1,11 @@
 import React from 'react';
 import Plot from 'react-plotly.js';
 
+/** A single point for the 3-D scatter; values are looked up by `xKey/yKey/zKey/labelKey`. */
+export type ScatterPoint = Record<string, string | number | null | undefined>;
+
 interface ThreeDScatterPlotProps {
-  data: any[];
+  data: ScatterPoint[];
   xKey: string;
   yKey: string;
   zKey: string;
@@ -24,25 +27,25 @@ export const ThreeDScatterPlot: React.FC<ThreeDScatterPlotProps> = ({
   zLabel,
   height = 600
 }) => {
-  
-  // Prepare traces
+
+  // Plotly trace shapes are wide unions; we keep them loose intentionally.
   const traces: any[] = [];
-  
+
   if (labelKey) {
     // Group by label
-    const groups: {[key: string]: any[]} = {};
-    data.forEach(d => {
-      const label = d[labelKey] || 'Other';
+    const groups: { [key: string]: ScatterPoint[] } = {};
+    data.forEach((d) => {
+      const label = String(d[labelKey] ?? 'Other');
       if (!groups[label]) groups[label] = [];
-      groups[label].push(d);
+      groups[label]!.push(d);
     });
-    
+
     Object.keys(groups).forEach((label) => {
       const groupData = groups[label] ?? [];
       traces.push({
-        x: groupData.map(d => d[xKey]),
-        y: groupData.map(d => d[yKey]),
-        z: groupData.map(d => d[zKey]),
+        x: groupData.map((d) => d[xKey]),
+        y: groupData.map((d) => d[yKey]),
+        z: groupData.map((d) => d[zKey]),
         mode: 'markers',
         type: 'scatter3d',
         name: label,
@@ -50,7 +53,7 @@ export const ThreeDScatterPlot: React.FC<ThreeDScatterPlotProps> = ({
           size: 3,
           opacity: 0.8
         },
-        hovertemplate: 
+        hovertemplate:
             `<b>${label}</b><br>` +
             `${xLabel || xKey}: %{x}<br>` +
             `${yLabel || yKey}: %{y}<br>` +
@@ -59,9 +62,9 @@ export const ThreeDScatterPlot: React.FC<ThreeDScatterPlotProps> = ({
     });
   } else {
     traces.push({
-      x: data.map(d => d[xKey]),
-      y: data.map(d => d[yKey]),
-      z: data.map(d => d[zKey]),
+      x: data.map((d) => d[xKey]),
+      y: data.map((d) => d[yKey]),
+      z: data.map((d) => d[zKey]),
       mode: 'markers',
       type: 'scatter3d',
       name: 'Data Points',
@@ -70,7 +73,7 @@ export const ThreeDScatterPlot: React.FC<ThreeDScatterPlotProps> = ({
         color: '#8884d8',
         opacity: 0.8
       },
-      hovertemplate: 
+      hovertemplate:
         `${xLabel || xKey}: %{x}<br>` +
         `${yLabel || yKey}: %{y}<br>` +
         `${zLabel || zKey}: %{z}<extra></extra>`

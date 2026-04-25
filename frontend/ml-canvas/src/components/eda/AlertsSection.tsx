@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { clickableProps } from '../../core/utils/a11y';
+import type { EDAAlert } from '../../core/types/edaProfile';
 
 interface AlertsSectionProps {
-    alerts: any[];
+    alerts: EDAAlert[];
 }
 
 export const AlertsSection: React.FC<AlertsSectionProps> = ({ alerts }) => {
@@ -31,7 +32,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ alerts }) => {
             {isExpanded && (
                 <div className="max-h-40 overflow-y-auto pr-2 mt-2 animate-in slide-in-from-top-2 duration-200">
                     <ul className="space-y-1">
-                        {alerts.map((alert: any, i: number) => (
+                        {alerts.map((alert, i) => (
                             <li key={i} className="text-sm text-amber-700 dark:text-amber-300 flex items-start">
                                 <span className="mr-2">•</span>
                                 <span>
