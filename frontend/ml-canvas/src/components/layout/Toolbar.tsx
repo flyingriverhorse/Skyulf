@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard } from 'lucide-react';
+import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle } from 'lucide-react';
 import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { runPipelinePreview, savePipeline, fetchPipeline } from '../../core/api/client';
@@ -357,6 +357,15 @@ export const Toolbar: React.FC = () => {
                 <div>
                   <div className="font-medium">Parallel experiments</div>
                   <div className="text-xs text-muted-foreground">Training/tuning node runs each upstream branch as a separate experiment (no merge).</div>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-red-500/15 text-red-500 ring-1 ring-red-500/40 shrink-0 mt-0.5">
+                  <AlertCircle size={10} />
+                </span>
+                <div>
+                  <div className="font-medium">Configuration issue</div>
+                  <div className="text-xs text-muted-foreground">Node has missing or invalid settings. Hover the badge for the specific message; open the properties panel to fix it.</div>
                 </div>
               </li>
               <li className="flex items-start gap-3">

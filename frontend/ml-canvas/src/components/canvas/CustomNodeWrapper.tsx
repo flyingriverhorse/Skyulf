@@ -48,6 +48,25 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   const canMerge = (definition?.inputs?.length ?? 0) > 0 && !isAutoParallel;
   const showMergeBadge = (canMerge && incomingSourceCount > 1) || isParallel;
 
+  // Inline validation: surface a small red dot in the header when the
+  // node's own `validate(config)` returns invalid, so users see at a
+  // glance which nodes still need configuration. The validator runs
+  // against the node's data (data carries the user config fields plus
+  // some metadata; validators only read the config keys). Wrapped in
+  // try/catch because a buggy validator must not crash the canvas.
+  let validationMessage: string | null = null;
+  if (definition) {
+    try {
+      const result = definition.validate(data as never);
+      if (!result.isValid) {
+        validationMessage = result.message ?? 'Configuration incomplete.';
+      }
+    } catch {
+      // Validator threw — treat as a soft warning, don't block rendering.
+      validationMessage = null;
+    }
+  }
+
   const onDelete = (evt: React.MouseEvent) => {
     evt.stopPropagation();
     deleteElements({ nodes: [{ id }] });
@@ -73,6 +92,8 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
       min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all duration-150
       ${selected
         ? 'border-primary shadow-lg shadow-primary/30 scale-[1.02]'
+        : validationMessage
+        ? 'border-red-500/40 hover:border-red-500/60'
         : 'border-border hover:border-primary/50'}
     `}>
       {/* Header */}
@@ -112,6 +133,15 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
               }`}>
                 {nodeResult.status === 'success' ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
               </div>
+            )}
+            {validationMessage && (
+              <span
+                title={validationMessage}
+                aria-label={`Configuration issue: ${validationMessage}`}
+                className="flex items-center justify-center w-4 h-4 rounded-full bg-red-500/15 text-red-500 ring-1 ring-red-500/40"
+              >
+                <AlertCircle size={10} />
+              </span>
             )}
           </div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
