@@ -8,6 +8,7 @@ import {
   isAutoParallelType,
   supportsExecutionModeToggle,
 } from '../../core/types/executionMode';
+import { getMergeStrategy } from '../../core/types/nodeData';
 import { X, Maximize2, Minimize2, Settings2, Merge } from 'lucide-react';
 import { Node } from '@xyflow/react';
 
@@ -199,7 +200,7 @@ const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }
   // and not explicitly set to parallel execution.
   if (!canMerge || incomingSourceCount < 2 || isAutoParallel || isParallelMode) return null;
 
-  const current = (selectedNode.data as { merge_strategy?: string }).merge_strategy ?? 'last_wins';
+  const current = getMergeStrategy(selectedNode.data);
 
   return (
     <div className="border-t pt-4">
