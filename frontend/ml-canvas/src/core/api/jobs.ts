@@ -72,7 +72,17 @@ export const jobsApi = {
   },
 
   getEDAJobs: async (limit: number = 50): Promise<JobInfo[]> => {
-    const response = await apiClient.get<any[]>('/eda/jobs/all', { params: { limit } });
+    interface RawEDAJob {
+      id: string | number;
+      dataset_id: string | number;
+      dataset_name: string;
+      status: string;
+      created_at: string;
+      updated_at?: string;
+      error?: string | null;
+      target_col?: string;
+    }
+    const response = await apiClient.get<RawEDAJob[]>('/eda/jobs/all', { params: { limit } });
     return response.data.map(job => ({
       job_id: String(job.id),
       pipeline_id: 'eda',
@@ -83,17 +93,25 @@ export const jobsApi = {
       status: job.status.toLowerCase() as JobStatus,
       start_time: job.created_at,
       end_time: job.updated_at || job.created_at,
-      error: job.error,
+      error: job.error ?? null,
       result: null,
       created_at: job.created_at,
-      target_column: job.target_col
+      ...(job.target_col !== undefined ? { target_column: job.target_col } : {})
     }));
   },
 
   getIngestionJobs: async (limit: number = 50, skip: number = 0): Promise<JobInfo[]> => {
     // Use direct axios call to avoid /api prefix since data sources are at /data/api
-    const response = await axios.get<any>('/data/api/sources', { params: { limit, skip } });
-    return response.data.sources.map((source: any) => ({
+    interface RawSource {
+      id: string | number;
+      name: string;
+      type: string;
+      test_status?: string;
+      created_at: string;
+      updated_at?: string;
+    }
+    const response = await axios.get<{ sources: RawSource[] }>('/data/api/sources', { params: { limit, skip } });
+    return response.data.sources.map((source) => ({
       job_id: String(source.id),
       pipeline_id: 'ingestion',
       node_id: 'ingestion',
@@ -102,7 +120,7 @@ export const jobsApi = {
       job_type: 'ingestion',
       status: (source.test_status === 'success' ? 'succeeded' : source.test_status === 'failed' ? 'failed' : 'completed') as JobStatus,
       start_time: source.created_at,
-      end_time: source.updated_at,
+      end_time: source.updated_at ?? null,
       error: null,
       result: null,
       created_at: source.created_at,

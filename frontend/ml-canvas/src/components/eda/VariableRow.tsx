@@ -15,6 +15,7 @@ import { DistributionChart, type DistributionDatum } from './DistributionChart';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { InfoTooltip } from '../ui/InfoTooltip';
+import { toast } from '../../core/toast';
 import type { ColumnProfile } from '../../core/types/edaProfile';
 
 interface VariableRowProps {
@@ -67,6 +68,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
             link.click();
         } catch (error) {
             console.error('Failed to download chart', error);
+            toast.error('Chart download failed', String(error));
         } finally {
             setDlState('done');
             setTimeout(() => setDlState('idle'), 1200);

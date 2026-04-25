@@ -1,9 +1,10 @@
 import React from 'react';
 import { EyeOff, Table } from 'lucide-react';
 import { EmptyState } from '../../shared/EmptyState';
+import type { EDAProfile } from '../../../core/types/edaProfile';
 
 interface SampleDataTabProps {
-    profile: any;
+    profile: EDAProfile;
     excludedCols: string[];
     handleToggleExclude: (colName: string, exclude: boolean) => void;
 }
@@ -48,7 +49,7 @@ export const SampleDataTab: React.FC<SampleDataTabProps> = ({
                     </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {profile.sample_data.slice(0, 50).map((row: any, i: number) => (
+                    {profile.sample_data.slice(0, 50).map((row, i: number) => (
                         <tr key={i}>
                             {visibleColumns.map((key: string, j: number) => (
                                 <td key={j} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">

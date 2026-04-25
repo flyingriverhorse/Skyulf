@@ -152,6 +152,7 @@ export const ExperimentsPage: React.FC = () => {
         link.click();
     } catch (e) {
         console.error('Failed to download image', e);
+        toast.error('Image download failed', String(e));
     } finally {
         setDownloadingChart(null);
         setDoneChart(elementId);

@@ -1,12 +1,18 @@
 import React from 'react';
 import { ScatterChart as ScatterIcon, Download, Box, Info } from 'lucide-react';
 import { InfoTooltip } from '../../ui/InfoTooltip';
-import { ThreeDScatterPlot } from '../ThreeDScatterPlot';
+import { ThreeDScatterPlot, type ScatterPoint } from '../ThreeDScatterPlot';
 import { CanvasScatterPlot } from '../CanvasScatterPlot';
 import { ClusteringTab } from './ClusteringTab';
 
+interface PCAComponent {
+    component: string;
+    explained_variance_ratio: number;
+    top_features?: Record<string, number>;
+}
+
 interface PCATabProps {
-    profile: any;
+    profile: { pca_data?: ScatterPoint[]; pca_components?: PCAComponent[] } & Record<string, unknown>;
     isPCA3D: boolean;
     setIsPCA3D: (value: boolean) => void;
     downloadChart: (elementId: string, filename: string, title?: string, subtitle?: string) => void;
@@ -95,7 +101,7 @@ export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, do
                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {profile.pca_components
                                 .slice(0, isPCA3D ? 3 : 2)
-                                .map((comp: any) => (
+                                .map((comp) => (
                                 <div key={comp.component} className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-md border border-gray-200 dark:border-gray-700">
                                     <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-2 mb-2">
                                         <span className="font-semibold text-gray-800 dark:text-gray-200">{comp.component}</span>
@@ -105,7 +111,7 @@ export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, do
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Top Loadings</p>
-                                        {Object.entries(comp.top_features || {}).map(([feature, weight]: [string, any], idx) => (
+                                        {Object.entries(comp.top_features || {}).map(([feature, weight], idx) => (
                                             <div key={idx} className="flex justify-between text-xs items-center group">
                                                 <span className="text-gray-600 dark:text-gray-400 truncate mr-2 flex-1" title={feature}>
                                                     {feature}

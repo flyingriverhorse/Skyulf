@@ -224,7 +224,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                             <span className="font-semibold">ANOVA Analysis:</span> A p-value &lt; 0.05 (highlighted in green) indicates that the feature varies significantly across the target categories, making it a strong predictor.
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {profile.target_interactions.map((interaction: any, idx: number) => (
+                            {profile.target_interactions.map((interaction: { feature: string; p_value?: number | null; data: Array<{ name: string; stats: { q1: number; q3: number } } & Record<string, unknown>> }, idx: number) => (
                                 <div key={idx} className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-100 dark:border-gray-800 relative group">
                                     <div className="absolute top-2 right-2 opacity-100">
                                         <button
@@ -257,7 +257,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                     <div className="h-64 w-full" id={`interaction-chart-${idx}`}>
                                         <ResponsiveContainer width="100%" height="100%">
                                             <ComposedChart 
-                                                data={interaction.data.map((d: any) => ({
+                                                data={interaction.data.map((d) => ({
                                                     ...d,
                                                     boxBottom: d.stats.q1,
                                                     boxHeight: d.stats.q3 - d.stats.q1

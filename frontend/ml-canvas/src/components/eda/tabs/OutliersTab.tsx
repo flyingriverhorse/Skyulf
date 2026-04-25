@@ -2,9 +2,10 @@ import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { EmptyState } from '../../shared/EmptyState';
+import type { EDAProfile } from '../../../core/types/edaProfile';
 
 interface OutliersTabProps {
-    profile: any;
+    profile: EDAProfile;
 }
 
 export const OutliersTab: React.FC<OutliersTabProps> = ({ profile }) => {
@@ -39,20 +40,20 @@ export const OutliersTab: React.FC<OutliersTabProps> = ({ profile }) => {
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Row Index</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Anomaly Score</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Why is this an outlier?</th>
-                            {profile.outliers.top_outliers[0] && Object.keys(profile.outliers.top_outliers[0].values).slice(0, 5).map(key => (
+                            {profile.outliers.top_outliers[0] && Object.keys(profile.outliers.top_outliers[0].values ?? {}).slice(0, 5).map(key => (
                                 <th key={key} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{key}</th>
                             ))}
                         </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {profile.outliers.top_outliers.map((outlier: any) => (
+                        {profile.outliers.top_outliers.map((outlier) => (
                             <tr key={outlier.index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                 <td className="px-4 py-3 text-sm font-mono text-gray-500">{outlier.index}</td>
-                                <td className="px-4 py-3 text-sm font-mono text-red-600">{outlier.score.toFixed(4)}</td>
+                                <td className="px-4 py-3 text-sm font-mono text-red-600">{outlier.score?.toFixed(4) ?? '—'}</td>
                                 <td className="px-4 py-3 text-sm">
                                     {outlier.explanation ? (
                                         <div className="space-y-1">
-                                            {outlier.explanation.map((exp: any, i: number) => (
+                                            {outlier.explanation.map((exp, i) => (
                                                 <div key={i} className="text-xs">
                                                     <span className="font-semibold text-gray-700 dark:text-gray-300">{exp.feature}:</span>{' '}
                                                     <span className="text-red-600 dark:text-red-400">{exp.value.toFixed(2)}</span>{' '}
@@ -66,7 +67,7 @@ export const OutliersTab: React.FC<OutliersTabProps> = ({ profile }) => {
                                         <span className="text-gray-400 text-xs">No explanation available</span>
                                     )}
                                 </td>
-                                {Object.entries(outlier.values).slice(0, 5).map(([key, val]: any) => (
+                                {Object.entries(outlier.values ?? {}).slice(0, 5).map(([key, val]) => (
                                     <td key={key} className="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">
                                         {typeof val === 'number' ? val.toFixed(2) : String(val)}
                                     </td>

@@ -3,6 +3,7 @@ import { CausalGraph } from '../CausalGraph';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { Network, Download, Loader2, Check } from 'lucide-react';
 import { toPng } from 'html-to-image';
+import { toast } from '../../../core/toast';
 
 interface CausalTabProps {
     profile: any;
@@ -35,7 +36,10 @@ export const CausalTab: React.FC<CausalTabProps> = ({ profile }) => {
                 a.href = dataUrl;
                 a.click();
             })
-            .catch((err) => console.error('Causal graph download failed', err))
+            .catch((err) => {
+                console.error('Causal graph download failed', err);
+                toast.error('Causal graph download failed', String(err));
+            })
             .finally(() => {
                 setDlState('done');
                 setTimeout(() => setDlState('idle'), 1200);

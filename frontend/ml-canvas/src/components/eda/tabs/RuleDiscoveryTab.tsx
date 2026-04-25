@@ -5,8 +5,25 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
 
+interface RuleTreeShape {
+    nodes: Array<{
+        id: number;
+        feature?: string;
+        threshold?: number;
+        impurity: number;
+        samples: number;
+        value: number[];
+        class_name?: string;
+        is_leaf: boolean;
+        children: number[];
+    }>;
+    accuracy?: number;
+    feature_importances?: Array<{ feature: string; importance: number }>;
+    rules?: string[];
+}
+
 interface RuleDiscoveryTabProps {
-    profile: any;
+    profile: { rule_tree?: RuleTreeShape | null } & Record<string, unknown>;
 }
 
 export const RuleDiscoveryTab: React.FC<RuleDiscoveryTabProps> = ({ profile }) => {
@@ -95,7 +112,7 @@ export const RuleDiscoveryTab: React.FC<RuleDiscoveryTabProps> = ({ profile }) =
                                     cursor={{ fill: 'transparent' }}
                                 />
                                 <Bar dataKey="importance" radius={[0, 4, 4, 0]} barSize={20}>
-                                    {ruleTree.feature_importances.slice(0, 10).map((_: any, index: number) => (
+                                    {ruleTree.feature_importances.slice(0, 10).map((_, index: number) => (
                                         <Cell key={`cell-${index}`} fill={`hsl(217, 91%, ${60 - index * 3}%)`} />
                                     ))}
                                 </Bar>
