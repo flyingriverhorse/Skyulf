@@ -3,6 +3,7 @@ import { Loader2, CheckCircle, XCircle, Clock, Ban } from 'lucide-react';
 import { Dataset } from '../../core/types/api';
 import { DatasetService } from '../../core/api/datasets';
 import { ModalShell } from '../shared';
+import { VirtualList } from '../shared/VirtualList';
 
 interface IngestionJobsModalProps {
   isOpen: boolean;
@@ -42,13 +43,18 @@ export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, 
 
   return (
     <ModalShell isOpen={isOpen} onClose={onClose} title="Data Ingestion Jobs" size="3xl">
-      <div className="p-6">
+      <div className="p-6 max-h-[70vh] flex flex-col">
         {jobs.length === 0 ? (
           <div className="text-center text-slate-500 py-8">No ingestion jobs found.</div>
         ) : (
-          <div className="space-y-4">
-            {jobs.map((job) => (
-              <div key={job.id} className="flex items-start gap-4 p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+          <VirtualList
+            items={jobs}
+            getKey={(job) => job.id}
+            estimateSize={108}
+            className="flex-1 overflow-y-auto pr-1"
+            renderItem={(job) => (
+              <div className="pb-4">
+                <div className="flex items-start gap-4 p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
                 <div className="mt-1">
                   {job.status === 'processing' || job.status === 'pending' ? (
                     <Loader2 className="text-blue-500 animate-spin" size={20} />
@@ -95,9 +101,10 @@ export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, 
                     )}
                   </button>
                 )}
+                </div>
               </div>
-            ))}
-          </div>
+            )}
+          />
         )}
       </div>
     </ModalShell>
