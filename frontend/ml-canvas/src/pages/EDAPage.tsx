@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DatasetService } from '../core/api/datasets';
 import { EDAService } from '../core/api/eda';
 import { JobsHistoryModal } from '../components/eda/JobsHistoryModal';
@@ -23,16 +24,19 @@ import { downloadChart } from '../core/utils/chartUtils';
 import { LoadingState, ErrorState } from '../components/shared';
 import { useEDAStore, selectExcludedDirty, type EDAFilter } from '../core/store/useEDAStore';
 
+// React Query keys for the EDA surface — co-located so cache invalidation stays type-safe.
+const edaKeys = {
+  datasets: ['eda', 'datasets'] as const,
+  report: (id: number | null) => ['eda', 'report', id] as const,
+  history: (id: number | null) => ['eda', 'history', id] as const,
+  reportById: (id: number) => ['eda', 'reportById', id] as const,
+};
+
 export const EDAPage: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
 
-  // ── Server state stays local until Phase F #17 introduces React Query ──
-  const [datasets, setDatasets] = useState<any[]>([]);
-  const [report, setReport] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<any[]>([]);
+  // Only UI-toggle state remains local; server data lives in React Query, view state in the slice.
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // ── View + analysis-input state lives in the EDA zustand slice ──
@@ -60,6 +64,75 @@ export const EDAPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── React Query: datasets / latest report / history ──
+  const datasetsQuery = useQuery({
+    queryKey: edaKeys.datasets,
+    queryFn: () => DatasetService.getUsable(),
+  });
+  // Memoize the fallback so dependent effects don't refire on every render.
+  const datasets = useMemo(() => datasetsQuery.data ?? [], [datasetsQuery.data]);
+
+  const reportQuery = useQuery({
+    queryKey: edaKeys.report(selectedDataset ?? null),
+    queryFn: async () => {
+      try {
+        return await EDAService.getLatestReport(selectedDataset!);
+      } catch (err: any) {
+        // 404 simply means "no report yet" — surface as null rather than a hard error.
+        if (err?.response?.status === 404) return null;
+        throw err;
+      }
+    },
+    enabled: selectedDataset != null,
+    // Auto-poll every 3 s while the backend job is PENDING; stop once it completes/fails.
+    refetchInterval: (query) => {
+      const data = query.state.data as any;
+      return data && data.status === 'PENDING' ? 3000 : false;
+    },
+  });
+  const report = reportQuery.data ?? null;
+  const loading = reportQuery.isLoading;
+  const error = reportQuery.isError ? 'Failed to load report' : null;
+
+  const historyQuery = useQuery({
+    queryKey: edaKeys.history(selectedDataset ?? null),
+    queryFn: () => EDAService.getHistory(selectedDataset!) as Promise<any[]>,
+    enabled: selectedDataset != null,
+    // Refresh history alongside the report while a job is in flight.
+    refetchInterval: report?.status === 'PENDING' ? 3000 : false,
+  });
+  const history: any[] = historyQuery.data ?? [];
+
+  // ── Mutations ──
+  const analyzeMutation = useMutation({
+    mutationFn: (params: { excluded: string[]; filters: EDAFilter[] }) =>
+      EDAService.analyze(
+        selectedDataset!,
+        targetCol || undefined,
+        params.excluded,
+        params.filters,
+        taskType || undefined,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: edaKeys.report(selectedDataset ?? null) });
+      queryClient.invalidateQueries({ queryKey: edaKeys.history(selectedDataset ?? null) });
+    },
+  });
+  const analyzing = analyzeMutation.isPending;
+
+  // Default-select the first dataset once the list loads.
+  useEffect(() => {
+    if (!selectedDataset && datasets.length > 0) {
+      setSelectedDataset(Number(datasets[0]!.id));
+    }
+  }, [datasets, selectedDataset, setSelectedDataset]);
+
+  // Wipe per-dataset slice fields whenever the user switches datasets.
+  useEffect(() => {
+    useEDAStore.getState().resetForDataset();
+  }, [selectedDataset]);
+
+  // Strip excluded columns from the profile for the UI without mutating the cached payload.
   const profileForUi = useMemo(() => {
     const rawProfile = report?.profile_data;
     if (!rawProfile) return null;
@@ -81,106 +154,21 @@ export const EDAPage: React.FC = () => {
     };
   }, [report?.profile_data, excludedColsDraft]);
 
-  useEffect(() => {
-    loadDatasets();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (selectedDataset) {
-      setReport(null); // Clear previous report to show loader
-      // Wipe per-dataset slice fields in one shot.
-      useEDAStore.getState().resetForDataset();
-      loadReport(selectedDataset);
-      loadHistory(selectedDataset);
-    } else {
-      setReport(null);
-      setHistory([]);
-      useEDAStore.getState().resetForDataset();
-    }
-  }, [selectedDataset]);
-
-  // Poll for status if pending
-  useEffect(() => {
-    let interval: any;
-    if (report && report.status === 'PENDING') {
-      interval = setInterval(() => {
-        if (selectedDataset) {
-            loadReport(selectedDataset, true);
-            loadHistory(selectedDataset);
-        }
-      }, 3000);
-    }
-    return () => clearInterval(interval);
-  }, [report, selectedDataset]);
-
-  const loadDatasets = async () => {
-    try {
-      const data = await DatasetService.getUsable();
-      setDatasets(data);
-      if (data.length > 0 && !selectedDataset) {
-        setSelectedDataset(Number(data[0]!.id));
-      }
-    } catch (err) {
-      console.error("Failed to load datasets", err);
-    }
-  };
-
-  const loadHistory = async (id: number) => {
-    try {
-        const data = await EDAService.getHistory(id);
-        setHistory(data);
-    } catch (err) {
-        console.error("Failed to load history", err);
-    }
-  };
-
-  const loadReport = async (id: number, silent = false) => {
-    if (!silent) setLoading(true);
-    setError(null);
-    try {
-      const data = await EDAService.getLatestReport(id);
-      setReport(data);
-    } catch (err: any) {
-      if (err.response && err.response.status === 404) {
-        setReport(null); // No report yet
-      } else {
-        // Only show error if not silent (polling)
-        if (!silent) setError("Failed to load report");
-      }
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
-
-  const loadSpecificReport = async (reportId: number) => {
-    setLoading(true);
-    try {
-        const data = await EDAService.getReport(reportId);
-        setReport(data);
-    } catch (err) {
-        setError("Failed to load report");
-    } finally {
-        setLoading(false);
-    }
-  };
-
-  const runAnalysis = async (overrideExcluded?: string[] | any, overrideFilters?: any[]) => {
+  const runAnalysis = (overrideExcluded?: string[] | any, overrideFilters?: any[]) => {
+    if (!selectedDataset) return;
     const actualExcluded = Array.isArray(overrideExcluded) ? overrideExcluded : excludedColsApplied;
     const actualFilters = Array.isArray(overrideFilters) ? overrideFilters : filters;
+    analyzeMutation.mutate({ excluded: actualExcluded, filters: actualFilters });
+  };
 
+  // Load a non-latest report into the latest-cache slot so the existing UI renders it.
+  const loadSpecificReport = async (reportId: number) => {
     if (!selectedDataset) return;
-    setAnalyzing(true);
-    try {
-      await EDAService.analyze(selectedDataset, targetCol || undefined, actualExcluded, actualFilters, taskType || undefined);
-      // Reload immediately to get the PENDING state
-      loadReport(selectedDataset);
-      loadHistory(selectedDataset);
-    } catch (err) {
-      setError("Failed to start analysis");
-    } finally {
-      setAnalyzing(false);
-    }
+    const data = await queryClient.fetchQuery({
+      queryKey: edaKeys.reportById(reportId),
+      queryFn: () => EDAService.getReport(reportId),
+    });
+    queryClient.setQueryData(edaKeys.report(selectedDataset), data);
   };
 
   const handleAddFilter = (column: string, value: any, operator: string = '==') => {
@@ -233,7 +221,7 @@ export const EDAPage: React.FC = () => {
       return (
         <ErrorState
           error={error}
-          onRetry={() => selectedDataset && loadReport(selectedDataset)}
+          onRetry={() => reportQuery.refetch()}
         />
       );
     }
@@ -602,12 +590,16 @@ export const EDAPage: React.FC = () => {
         isOpen={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
         history={history}
-        onRefresh={() => selectedDataset && loadHistory(selectedDataset)}
+        onRefresh={() =>
+          queryClient.invalidateQueries({ queryKey: edaKeys.history(selectedDataset ?? null) })
+        }
         onFetchReport={async (id) => {
             return await EDAService.getReport(id);
         }}
         onSelect={(selectedReport) => {
-            setReport(selectedReport);
+            if (selectedDataset) {
+              queryClient.setQueryData(edaKeys.report(selectedDataset), selectedReport);
+            }
           const serverExcluded = Array.isArray(selectedReport.profile_data?.excluded_columns)
             ? selectedReport.profile_data.excluded_columns
             : [];
