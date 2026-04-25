@@ -11,12 +11,11 @@ const Boom: React.FC<{ throwNow: boolean; msg?: string }> = ({ throwNow, msg = '
 describe('ErrorBoundary', () => {
   // React logs caught errors to console.error in dev; silence to keep
   // test output clean.
-  let errSpy: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
-    errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
   afterEach(() => {
-    errSpy.mockRestore();
+    vi.restoreAllMocks();
   });
 
   it('renders children normally when nothing throws', () => {
