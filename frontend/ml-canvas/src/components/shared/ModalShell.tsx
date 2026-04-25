@@ -1,7 +1,32 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl' | 'full';
+
+// Selector covers every standard interactive element plus anything
+// the author opted in via `tabindex` (excluding tabindex="-1"). We
+// filter `disabled`, `hidden`, and zero-size elements at runtime.
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+  '[contenteditable="true"]',
+].join(',');
+
+function getFocusable(root: HTMLElement): HTMLElement[] {
+  const nodes = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+  return nodes.filter((el) => {
+    if (el.hasAttribute('disabled')) return false;
+    if (el.getAttribute('aria-hidden') === 'true') return false;
+    // Skip elements rendered offscreen / display:none.
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return false;
+    return true;
+  });
+}
 
 const sizeClass: Record<ModalSize, string> = {
   sm: 'max-w-sm',
@@ -69,6 +94,70 @@ export const ModalShell: React.FC<ModalShellProps> = ({
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, dismissOnEscape, onClose]);
 
+  // Focus management: when the modal opens we (1) remember which
+  // element previously held focus, (2) move focus into the dialog so
+  // screen readers and keyboard users land inside it, and (3) trap
+  // Tab/Shift+Tab so focus cannot escape the modal while it's open.
+  // On close we restore focus to wherever the user came from. This is
+  // a lightweight in-tree implementation; we deliberately avoid the
+  // ~3 kB `focus-trap-react` dep since our needs are modest.
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    previouslyFocusedRef.current = (document.activeElement as HTMLElement | null) ?? null;
+    // Defer one frame so the dialog content is mounted/measurable.
+    const raf = window.requestAnimationFrame(() => {
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const first = getFocusable(dialog)[0];
+      if (first) first.focus();
+      else dialog.focus();
+    });
+    return () => {
+      window.cancelAnimationFrame(raf);
+      const prev = previouslyFocusedRef.current;
+      // Only restore if the previously-focused element is still in
+      // the document and focusable; otherwise let the browser pick.
+      if (prev && document.contains(prev)) {
+        try {
+          prev.focus();
+        } catch {
+          // Ignore: element may have become un-focusable mid-flight.
+        }
+      }
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusables = getFocusable(dialog);
+      if (focusables.length === 0) {
+        // Nothing focusable inside — keep focus on the dialog itself.
+        e.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && (active === first || !dialog.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !dialog.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const titleId = ariaLabelledBy ?? (typeof title === 'string' ? `modal-title-${title.replace(/\s+/g, '-').toLowerCase()}` : undefined);
@@ -82,10 +171,12 @@ export const ModalShell: React.FC<ModalShellProps> = ({
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full ${sizeClass[size]} max-h-[85vh] flex flex-col border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-200 ${className ?? ''}`}
+        tabIndex={-1}
+        className={`bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full ${sizeClass[size]} max-h-[85vh] flex flex-col border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-200 outline-none ${className ?? ''}`}
       >
         {(title || !hideCloseButton || headerExtra) && (
           <div className="flex items-center justify-between gap-3 p-6 border-b border-slate-200 dark:border-slate-700">
