@@ -5,12 +5,13 @@ import {
     Box 
 } from 'lucide-react';
 import { InfoTooltip } from '../../ui/InfoTooltip';
-import { ThreeDScatterPlot } from '../ThreeDScatterPlot';
+import { ThreeDScatterPlot, type ScatterPoint } from '../ThreeDScatterPlot';
 import { CanvasScatterPlot } from '../CanvasScatterPlot';
 import { EmptyState } from '../../shared/EmptyState';
+import type { EDAProfile, ColumnProfile } from '../../../core/types/edaProfile';
 
 interface BivariateTabProps {
-    profile: any;
+    profile: EDAProfile;
     downloadChart: (id: string, filename: string, title: string, subtitle?: string) => void;
     scatterX: string;
     setScatterX: (value: string) => void;
@@ -68,9 +69,9 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                         className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
                         <option value="">Select Variable</option>
-                        {Object.values(profile.columns)
-                            .filter((c: any) => c.dtype === 'Numeric')
-                            .map((c: any) => (
+                        {(Object.values(profile.columns) as ColumnProfile[])
+                            .filter((c) => c.dtype === 'Numeric')
+                            .map((c) => (
                                 <option key={c.name} value={c.name}>{c.name}</option>
                             ))
                         }
@@ -84,9 +85,9 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                         className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
                         <option value="">Select Variable</option>
-                        {Object.values(profile.columns)
-                            .filter((c: any) => c.dtype === 'Numeric')
-                            .map((c: any) => (
+                        {(Object.values(profile.columns) as ColumnProfile[])
+                            .filter((c) => c.dtype === 'Numeric')
+                            .map((c) => (
                                 <option key={c.name} value={c.name}>{c.name}</option>
                             ))
                         }
@@ -102,9 +103,9 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                             className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                         >
                             <option value="">Select Variable</option>
-                            {Object.values(profile.columns)
-                                .filter((c: any) => c.dtype === 'Numeric')
-                                .map((c: any) => (
+                            {(Object.values(profile.columns) as ColumnProfile[])
+                                .filter((c) => c.dtype === 'Numeric')
+                                .map((c) => (
                                     <option key={c.name} value={c.name}>{c.name}</option>
                                 ))
                             }
@@ -120,8 +121,8 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                         className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
                         <option value="">None</option>
-                        {Object.values(profile.columns)
-                            .map((c: any) => (
+                        {(Object.values(profile.columns) as ColumnProfile[])
+                            .map((c) => (
                                 <option key={c.name} value={c.name}>{c.name}</option>
                             ))
                         }
@@ -145,7 +146,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
             {scatterX && scatterY ? (
                 is3D && scatterZ ? (
                     <ThreeDScatterPlot 
-                        data={profile.sample_data} 
+                        data={(profile.sample_data ?? []) as ScatterPoint[]} 
                         xKey={scatterX} 
                         yKey={scatterY} 
                         zKey={scatterZ}
@@ -156,7 +157,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                     />
                 ) : (
                     <CanvasScatterPlot 
-                        data={profile.sample_data} 
+                        data={(profile.sample_data ?? []) as ScatterPoint[]} 
                         xKey={scatterX} 
                         yKey={scatterY} 
                         labelKey={scatterColor || undefined}

@@ -833,8 +833,8 @@ export const ExperimentsPage: React.FC = () => {
                       </tr>
                       {/* Extract actual model hyperparameters: best_params for advanced, nested hyperparameters for basic */}
                       {isParamsExpanded && (() => {
-                        const getModelParams = (job: any): Record<string, any> => {
-                          const hp = job.hyperparameters as Record<string, any> | undefined;
+                        const getModelParams = (job: { job_type?: string; hyperparameters?: unknown }): Record<string, unknown> => {
+                          const hp = job.hyperparameters as Record<string, unknown> | undefined;
                           if (!hp) return {};
                           if (job.job_type === 'advanced_tuning') {
                             // For advanced tuning, hyperparameters IS the best_params (or search_space) directly
@@ -843,7 +843,7 @@ export const ExperimentsPage: React.FC = () => {
                           // Basic training: extract the nested 'hyperparameters' dict (actual model params)
                           const nested = hp.hyperparameters;
                           if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
-                            return nested as Record<string, any>;
+                            return nested as Record<string, unknown>;
                           }
                           return {};
                         };
@@ -891,14 +891,14 @@ export const ExperimentsPage: React.FC = () => {
                               {selectedJobs.map(job => {
                                 // Resolve config: for advanced tuning use job.config or graph node params,
                                 // for basic training use job.hyperparameters (which contains full node params)
-                                let cfg: Record<string, any> | null = null;
+                                let cfg: Record<string, unknown> | null = null;
                                 if (job.job_type === 'advanced_tuning') {
-                                  const nodeParams = (job.config as Record<string, any>) || 
-                                    (job.graph?.nodes as any[])?.find((n: any) => n.node_id === job.node_id)?.params;
+                                  const nodeParams = (job.config as Record<string, unknown>) ||
+                                    (job.graph?.nodes as Array<{ node_id: string; params?: Record<string, unknown> }> | undefined)?.find((n) => n.node_id === job.node_id)?.params;
                                   cfg = nodeParams || null;
                                 } else {
-                                  cfg = (job.hyperparameters as Record<string, any>) || 
-                                    (job.graph?.nodes as any[])?.find((n: any) => n.node_id === job.node_id)?.params || null;
+                                  cfg = (job.hyperparameters as Record<string, unknown>) ||
+                                    (job.graph?.nodes as Array<{ node_id: string; params?: Record<string, unknown> }> | undefined)?.find((n) => n.node_id === job.node_id)?.params || null;
                                 }
 
                                 if (!cfg) {
@@ -906,20 +906,23 @@ export const ExperimentsPage: React.FC = () => {
                                 }
 
                                 // For advanced tuning, CV params are inside tuning_config
-                                const tuningConfig = cfg.tuning_config as Record<string, any> | undefined;
-                                const cvSource = job.job_type === 'advanced_tuning' && tuningConfig ? tuningConfig : cfg;
+                                const tuningConfig = cfg.tuning_config as Record<string, unknown> | undefined;
+                                const cvSource = (job.job_type === 'advanced_tuning' && tuningConfig ? tuningConfig : cfg) as Record<string, unknown>;
+                                // Local helper: coerce unknown-typed config field to a renderable scalar.
+                                const str = (v: unknown, fallback: string | number = '-'): string | number =>
+                                  v === undefined || v === null || v === '' ? fallback : (typeof v === 'number' ? v : String(v));
 
                                 let value: string | number = '-';
-                                if (field === 'Target Column') value = cfg.target_column || job.target_column || '-';
+                                if (field === 'Target Column') value = str(cfg.target_column ?? job.target_column);
                                 if (field === 'CV Enabled') value = cvSource.cv_enabled ? 'Yes' : 'No';
-                                if (field === 'CV Method') value = cvSource.cv_enabled ? (cvSource.cv_type || 'Unknown') : '-';
-                                if (field === 'CV Folds') value = cvSource.cv_enabled ? (cvSource.cv_folds ?? '-') : '-';
+                                if (field === 'CV Method') value = cvSource.cv_enabled ? str(cvSource.cv_type, 'Unknown') : '-';
+                                if (field === 'CV Folds') value = cvSource.cv_enabled ? str(cvSource.cv_folds) : '-';
                                 if (field === 'CV Shuffle') value = cvSource.cv_enabled ? (cvSource.cv_shuffle ? 'Yes' : 'No') : '-';
-                                if (field === 'CV Random State') value = cvSource.cv_enabled ? (cvSource.cv_random_state ?? '-') : '-';
-                                if (field === 'Strategy') value = tuningConfig?.strategy || tuningConfig?.search_strategy || '-';
-                                if (field === 'Strategy Params') value = tuningConfig?.strategy_params && Object.keys(tuningConfig.strategy_params).length > 0 ? JSON.stringify(tuningConfig.strategy_params) : '-';
-                                if (field === 'Metric') value = tuningConfig?.metric || '-';
-                                if (field === 'Trials') value = tuningConfig?.n_trials || '-';
+                                if (field === 'CV Random State') value = cvSource.cv_enabled ? str(cvSource.cv_random_state) : '-';
+                                if (field === 'Strategy') value = str(tuningConfig?.strategy ?? tuningConfig?.search_strategy);
+                                if (field === 'Strategy Params') value = tuningConfig?.strategy_params && Object.keys(tuningConfig.strategy_params as Record<string, unknown>).length > 0 ? JSON.stringify(tuningConfig.strategy_params) : '-';
+                                if (field === 'Metric') value = str(tuningConfig?.metric);
+                                if (field === 'Trials') value = str(tuningConfig?.n_trials);
 
                                 return (
                                   <td key={job.job_id} className="px-4 py-1.5 font-mono text-gray-600 dark:text-gray-300 capitalize">

@@ -7,17 +7,22 @@ import { clickableProps } from '../../core/utils/a11y';
 import { toast } from '../../core/toast';
 import type { EDAProfile, ColumnProfile } from '../../core/types/edaProfile';
 
+// Local view-model that accepts both EDAHistoryEntry rows and full EDAReport
+// payloads returned by `onFetchReport`. Fields are intentionally permissive
+// (most optional) so either source flows through without coercion.
 interface EdaHistoryJob {
   id: number;
-  status: string;
-  created_at: string;
+  status?: string;
+  created_at?: string;
   updated_at?: string;
   error?: string | null;
+  error_message?: string | null;
   dataset_name?: string;
   target_col?: string;
   description?: string;
   task_type?: string;
   profile_data?: EDAProfile;
+  [extra: string]: unknown;
 }
 
 interface JobsHistoryModalProps {
@@ -156,10 +161,10 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                       <div>
                         <div className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-2">
                           Analysis #{job.id}
-                          <StatusBadge status={job.status} />
+                          <StatusBadge status={job.status ?? 'unknown'} />
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(job.created_at).toLocaleString()}
+                          {job.created_at ? new Date(job.created_at).toLocaleString() : '—'}
                         </div>
                         {job.target_col && (
                             <div className="text-xs text-gray-400 mt-1 flex items-center gap-1">

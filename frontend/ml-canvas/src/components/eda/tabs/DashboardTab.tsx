@@ -5,31 +5,34 @@ import { Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recha
 import { FileText, Database, AlertTriangle, EyeOff, Eye } from 'lucide-react';
 import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
 import { COLORS } from '../constants';
+import type { EDAProfile, ColumnProfile } from '../../../core/types/edaProfile';
 
 interface DashboardTabProps {
-    profile: any;
+    profile: EDAProfile;
     onToggleExclude?: (column: string, exclude: boolean) => void;
     excludedCols?: string[];
 }
+
+interface MissingRow { name: string; value: number }
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExclude, excludedCols = [] }) => {
     
     const dataTypeData = useMemo(() => {
         if (!profile?.columns) return [];
         const counts: Record<string, number> = {};
-        Object.values(profile.columns).forEach((col: any) => {
-            counts[col.dtype] = (counts[col.dtype] || 0) + 1;
+        (Object.values(profile.columns) as ColumnProfile[]).forEach((col) => {
+            counts[String(col.dtype)] = (counts[String(col.dtype)] || 0) + 1;
         });
         return Object.entries(counts).map(([name, value]) => ({ name, value }));
     }, [profile]);
 
-    const missingData = useMemo(() => {
+    const missingData = useMemo<MissingRow[]>(() => {
         if (!profile?.columns) return [];
-        return Object.values(profile.columns)
-            .filter((col: any) => col.missing_percentage > 0)
-            .sort((a: any, b: any) => b.missing_percentage - a.missing_percentage)
+        return (Object.values(profile.columns) as ColumnProfile[])
+            .filter((col) => col.missing_percentage > 0)
+            .sort((a, b) => b.missing_percentage - a.missing_percentage)
             .slice(0, 20)
-            .map((col: any) => ({
+            .map((col) => ({
                 name: col.name,
                 value: col.missing_percentage
             }));
@@ -80,7 +83,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExc
                     </h3>
                     {missingData.length > 0 ? (
                         <div className="h-64 overflow-y-auto pr-2 space-y-3">
-                            {missingData.map((item: any, index: number) => {
+                            {missingData.map((item, index: number) => {
                                 const isExcluded = excludedCols.includes(item.name);
                                 return (
                                     <div key={index} className="flex items-center gap-3 text-sm group">
@@ -125,7 +128,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExc
                 </div>
             </div>
 
-            <AlertsSection alerts={profile.alerts} />
+            <AlertsSection alerts={profile.alerts ?? []} />
         </div>
     );
 };

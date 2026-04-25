@@ -1,8 +1,12 @@
 import { NodeDefinition } from '../types/nodes';
 
+// Heterogeneous registry: each entry has its own TConfig, so we use `unknown`
+// as the storage shape and let `register<TConfig>` accept the typed signature.
+type AnyNodeDefinition = NodeDefinition<unknown>;
+
 class NodeRegistry {
   private static instance: NodeRegistry;
-  private nodes: Map<string, NodeDefinition<any>> = new Map();
+  private nodes: Map<string, AnyNodeDefinition> = new Map();
 
   private constructor() {}
 
@@ -17,23 +21,20 @@ class NodeRegistry {
     if (this.nodes.has(definition.type)) {
       console.warn(`Node type "${definition.type}" is already registered. Overwriting.`);
     }
-    this.nodes.set(definition.type, definition as NodeDefinition<any>);
+    this.nodes.set(definition.type, definition as unknown as AnyNodeDefinition);
   }
 
-  public get(type: string): NodeDefinition<any> | undefined {
+  public get(type: string): AnyNodeDefinition | undefined {
     return this.nodes.get(type);
   }
 
-  public getAll(): NodeDefinition<any>[] {
+  public getAll(): AnyNodeDefinition[] {
     return Array.from(this.nodes.values());
   }
 
-  public getByCategory(): Record<string, NodeDefinition<any>[]> {
-    const grouped: Record<string, NodeDefinition<any>[]> = {};
+  public getByCategory(): Record<string, AnyNodeDefinition[]> {
+    const grouped: Record<string, AnyNodeDefinition[]> = {};
     this.nodes.forEach((node) => {
-      // node.category is a string, so it can be used as a key.
-      // If it's undefined, it will be "undefined" string key.
-      // Assuming category is always present based on type definition.
       const bucket = grouped[node.category] ?? [];
       bucket.push(node);
       grouped[node.category] = bucket;

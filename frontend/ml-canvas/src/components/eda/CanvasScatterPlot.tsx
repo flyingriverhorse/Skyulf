@@ -10,17 +10,32 @@ import {
 } from 'chart.js';
 import { Scatter } from 'react-chartjs-2';
 import { COLORS, getChartTheme } from './constants';
+import type { ScatterPoint } from './ThreeDScatterPlot';
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
 
 interface CanvasScatterPlotProps {
-  data: any[];
+  data: ScatterPoint[];
   xKey: string;
   yKey: string;
   labelKey?: string | undefined; // For coloring by group
   xLabel?: string | undefined;
   yLabel?: string | undefined;
   height?: number | undefined;
+}
+
+interface ChartPoint {
+  x: number;
+  y: number;
+  raw: ScatterPoint;
+}
+
+interface ChartDataset {
+  label: string;
+  data: ChartPoint[];
+  backgroundColor: string;
+  pointRadius: number;
+  pointHoverRadius: number;
 }
 
 export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({ 
@@ -34,22 +49,22 @@ export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({
 }) => {
   
   // Prepare datasets
-  const datasets: any[] = [];
+  const datasets: ChartDataset[] = [];
   
   if (labelKey) {
     // Group by label
-    const groups: {[key: string]: any[]} = {};
-    data.forEach(d => {
-      const label = d[labelKey] || 'Other';
+    const groups: { [key: string]: ChartPoint[] } = {};
+    data.forEach((d) => {
+      const label = String(d[labelKey] ?? 'Other');
       if (!groups[label]) groups[label] = [];
-      groups[label].push({ x: d[xKey], y: d[yKey], raw: d });
+      groups[label].push({ x: Number(d[xKey]), y: Number(d[yKey]), raw: d });
     });
     
     Object.keys(groups).forEach((label, idx) => {
       datasets.push({
         label: label,
-        data: groups[label],
-        backgroundColor: COLORS[idx % COLORS.length],
+        data: groups[label]!,
+        backgroundColor: COLORS[idx % COLORS.length]!,
         pointRadius: 3,
         pointHoverRadius: 5
       });
@@ -58,7 +73,7 @@ export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({
     // Single dataset
     datasets.push({
       label: 'Data Points',
-      data: data.map(d => ({ x: d[xKey], y: d[yKey], raw: d })),
+      data: data.map((d) => ({ x: Number(d[xKey]), y: Number(d[yKey]), raw: d })),
       backgroundColor: '#8884d8',
       pointRadius: 3,
       pointHoverRadius: 5

@@ -23,22 +23,26 @@ import {
     PanelLeftOpen,
 } from 'lucide-react';
 
+import type { EDAProfile } from '../../core/types/edaProfile';
+
+type FilterValue = string | number | boolean | Array<string | number>;
+
 interface FilterItem {
     column: string;
     operator: string;
-    value: any;
+    value: FilterValue;
 }
 
 interface EDASidebarProps {
     activeTab: string;
     setActiveTab: (tab: string) => void;
-    profile: any;
+    profile: EDAProfile;
     filters: FilterItem[];
     columns: string[];
     excludedCols: string[];
     excludedDirty: boolean;
     analyzing: boolean;
-    onAddFilter: (column: string, value: any, operator: string) => void;
+    onAddFilter: (column: string, value: FilterValue, operator: string) => void;
     onRemoveFilter: (index: number) => void;
     onClearFilters: () => void;
     onToggleExclude: (column: string, exclude: boolean) => void;

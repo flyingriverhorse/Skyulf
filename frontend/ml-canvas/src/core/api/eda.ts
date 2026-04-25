@@ -1,11 +1,35 @@
 import axios from 'axios';
+import type { EDAProfile } from '../types/edaProfile';
 
 const API_BASE = '/api/eda';
 
 export interface Filter {
     column: string;
     operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'in';
-    value: any;
+    value: string | number | boolean | Array<string | number>;
+}
+
+export interface EDAReport {
+    id?: number;
+    status?: 'PENDING' | 'COMPLETED' | 'FAILED' | string;
+    profile_data?: EDAProfile & {
+        target_col?: string;
+        excluded_columns?: string[];
+        task_type?: string;
+    };
+    created_at?: string;
+    error?: string | null;
+    error_message?: string | null;
+    [extra: string]: unknown;
+}
+
+export interface EDAHistoryEntry {
+    id: number;
+    status: string;
+    created_at: string;
+    target_col?: string;
+    description?: string;
+    [extra: string]: unknown;
 }
 
 export const EDAService = {
@@ -19,13 +43,13 @@ export const EDAService = {
     return response.data;
   },
 
-  getLatestReport: async (datasetId: number) => {
-    const response = await axios.get(`${API_BASE}/${datasetId}/latest`);
+  getLatestReport: async (datasetId: number): Promise<EDAReport> => {
+    const response = await axios.get<EDAReport>(`${API_BASE}/${datasetId}/latest`);
     return response.data;
   },
 
-  getReport: async (reportId: number) => {
-    const response = await axios.get(`${API_BASE}/reports/${reportId}`);
+  getReport: async (reportId: number): Promise<EDAReport> => {
+    const response = await axios.get<EDAReport>(`${API_BASE}/reports/${reportId}`);
     return response.data;
   },
 
@@ -34,8 +58,8 @@ export const EDAService = {
     return response.data;
   },
 
-  getHistory: async (datasetId: number) => {
-    const response = await axios.get(`${API_BASE}/${datasetId}/history`);
+  getHistory: async (datasetId: number): Promise<EDAHistoryEntry[]> => {
+    const response = await axios.get<EDAHistoryEntry[]>(`${API_BASE}/${datasetId}/history`);
     return response.data;
   },
 

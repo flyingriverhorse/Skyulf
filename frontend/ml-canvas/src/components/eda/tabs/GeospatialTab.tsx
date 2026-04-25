@@ -6,8 +6,27 @@ import { InfoTooltip } from '../../ui/InfoTooltip';
 import { COLORS } from '../constants';
 import { EmptyState } from '../../shared/EmptyState';
 
+interface GeoPoint {
+    lat: number;
+    lon: number;
+    label?: string | null;
+    [extra: string]: unknown;
+}
+
+interface GeospatialBlock {
+    sample_points?: GeoPoint[];
+    lat_col?: string;
+    lon_col?: string;
+    min_lat: number;
+    min_lon: number;
+    max_lat: number;
+    max_lon: number;
+    centroid_lat?: number;
+    centroid_lon?: number;
+}
+
 interface GeospatialTabProps {
-    profile: any;
+    profile: { geospatial?: GeospatialBlock; target_col?: string } & Record<string, unknown>;
 }
 
 export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
@@ -38,7 +57,7 @@ export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
                         ];
                         
                         // Helper to get color
-                        const uniqueLabels = Array.from(new Set(profile.geospatial.sample_points.map((p: any) => p.label))).filter(Boolean);
+                        const uniqueLabels = Array.from(new Set((profile.geospatial!.sample_points ?? []).map((p) => p.label))).filter(Boolean);
                         const isChaotic = uniqueLabels.length > 20;
                         
                         const getColor = (label: string | null) => {
@@ -58,14 +77,14 @@ export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
                                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                                 />
-                                {profile.geospatial.sample_points.map((point: any, idx: number) => (
+                                {(profile.geospatial!.sample_points ?? []).map((point, idx: number) => (
                                     <CircleMarker 
                                         key={idx} 
                                         center={[point.lat, point.lon]} 
                                         radius={5}
                                         pathOptions={{ 
-                                            color: getColor(point.label), 
-                                            fillColor: getColor(point.label), 
+                                            color: getColor(point.label ?? null), 
+                                            fillColor: getColor(point.label ?? null), 
                                             fillOpacity: 0.7,
                                             weight: 1
                                         }}
@@ -74,7 +93,7 @@ export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
                                             <div className="text-xs">
                                                 <strong>Lat:</strong> {point.lat.toFixed(4)}<br/>
                                                 <strong>Lon:</strong> {point.lon.toFixed(4)}<br/>
-                                                {point.label && <><strong>{profile.target_col}:</strong> {point.label}</>}
+                                                {!!point.label && <><strong>{profile.target_col}:</strong> {point.label}</>}
                                             </div>
                                         </Popup>
                                     </CircleMarker>
@@ -104,7 +123,7 @@ export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
                         <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-red-500"></div>
                             <span className="font-mono text-sm">
-                                {profile.geospatial.centroid_lat.toFixed(4)}, {profile.geospatial.centroid_lon.toFixed(4)}
+                                {profile.geospatial!.centroid_lat?.toFixed(4) ?? '—'}, {profile.geospatial!.centroid_lon?.toFixed(4) ?? '—'}
                             </span>
                         </div>
                     </div>
@@ -114,7 +133,7 @@ export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
                         <div className="text-sm text-blue-700 dark:text-blue-300">
                             <p>
                                 This scatter plot shows the spatial distribution of your data.
-                                {profile.target_col && " Points are colored by the target variable."}
+                                {!!profile.target_col && " Points are colored by the target variable."}
                             </p>
                         </div>
                     </div>
