@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Archive, Box, CheckCircle, ChevronRight, X, Play, Folder, FileText, Cloud, HardDrive } from 'lucide-react';
-import { LoadingState, ErrorState, EmptyState } from '../components/shared';
+import { LoadingState, ErrorState, EmptyState, useConfirm } from '../components/shared';
+import { toast } from '../core/toast';
 import { useEscapeKey } from '../core/hooks/useEscapeKey';
 
 interface ArtifactResponse {
@@ -43,7 +43,7 @@ interface RegistryStats {
 }
 
 export const ModelRegistry: React.FC = () => {
-  const navigate = useNavigate();
+  const confirm = useConfirm();
   const [stats, setStats] = useState<RegistryStats | null>(null);
   const [models, setModels] = useState<ModelRegistryEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -195,8 +195,14 @@ export const ModelRegistry: React.FC = () => {
   }, [page]);
 
   const handleDeploy = async (jobId: string) => {
-    if (!confirm('Are you sure you want to deploy this model version? This will replace the currently active deployment.')) return;
-    
+    const ok = await confirm({
+      title: 'Deploy model version?',
+      message: 'Are you sure you want to deploy this model version? This will replace the currently active deployment.',
+      confirmLabel: 'Deploy',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     try {
       setDeployingId(jobId);
       const res = await fetch(`/api/deployment/deploy/${jobId}`, { method: 'POST' });
@@ -204,25 +210,22 @@ export const ModelRegistry: React.FC = () => {
         const err = await res.json();
         throw new Error(err.detail || 'Deployment failed');
       }
-      
+
       // Refresh data to update UI (reset to page 0)
       setPage(0);
       const updatedModels = await fetchModels(0, true);
-      
+
       // Also update selected model if open
       if (selectedModel && updatedModels) {
-        const updatedModel = updatedModels.find((m: ModelRegistryEntry) => 
+        const updatedModel = updatedModels.find((m: ModelRegistryEntry) =>
           m.model_type === selectedModel.model_type && m.dataset_id === selectedModel.dataset_id
         );
         if (updatedModel) setSelectedModel(updatedModel);
       }
 
-      // Ask to go to inference page
-      if (confirm('Model deployed successfully! Do you want to go to the inference page?')) {
-        navigate('/deployments');
-      }
+      toast.success('Model deployed', 'Open the Deployments page to manage it.');
     } catch (err: unknown) {
-      alert(`Error deploying model: ${(err as Error).message}`);
+      toast.error('Error deploying model', (err as Error).message);
     } finally {
       setDeployingId(null);
     }

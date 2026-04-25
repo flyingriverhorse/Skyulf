@@ -192,14 +192,15 @@ describe('useGraphStore — registry-dependent reducers', () => {
     expect(edges[0]).toMatchObject({ source: a, target: b });
   });
 
-  it('onConnect blocks model→model connections (training output into another training node)', () => {
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+  it('onConnect blocks model→model connections (training output into another training node)', async () => {
+    const toastModule = await import('../toast');
+    const toastSpy = vi.spyOn(toastModule.toast, 'error').mockImplementation(() => {});
     const m1 = useGraphStore.getState().addNode('basic_training', { x: 0, y: 0 });
     const m2 = useGraphStore.getState().addNode('basic_training', { x: 100, y: 0 });
     useGraphStore.getState().onConnect({ source: m1, target: m2, sourceHandle: null, targetHandle: null });
     expect(useGraphStore.getState().edges).toHaveLength(0);
-    expect(alertSpy).toHaveBeenCalledOnce();
-    alertSpy.mockRestore();
+    expect(toastSpy).toHaveBeenCalledOnce();
+    toastSpy.mockRestore();
   });
 });
 

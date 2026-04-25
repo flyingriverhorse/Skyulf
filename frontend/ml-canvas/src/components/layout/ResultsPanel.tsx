@@ -5,6 +5,8 @@ import { ChevronUp, ChevronDown, ChevronRight, Table, Layers, GitBranch, AlertTr
 import type { NodeExecutionResult, PreviewDataRows, PreviewData } from '../../core/api/client';
 import { generateBranchColors } from '../../core/hooks/useBranchColors';
 import { clickableProps } from '../../core/utils/a11y';
+import { useConfirm } from '../shared';
+import { toast } from '../../core/toast';
 
 /** Convert a PreviewData payload into a {tabName -> rows} map. */
 function toDatasetMap(previewData: PreviewData | null | undefined): Record<string, PreviewDataRows> {
@@ -18,6 +20,7 @@ export const ResultsPanel: React.FC = () => {
   const executionResult = useGraphStore((state) => state.executionResult);
   const canvasNodes = useGraphStore((state) => state.nodes);
   const chainSiblings = useGraphStore((state) => state.chainSiblings);
+  const confirm = useConfirm();
   const { isResultsPanelExpanded, setResultsPanelExpanded } = useViewStore();
   const [activeBranch, setActiveBranch] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
@@ -316,14 +319,25 @@ export const ResultsPanel: React.FC = () => {
                                 onClick={() => {
                                   const consumerLabel = nodeLabelMap[w.node_id] ?? w.node_id;
                                   const chainStr = [...inputLabels, consumerLabel].join(' → ');
-                                  const ok = window.confirm(
-                                    `Rewire as a linear chain?\n\n${chainStr}\n\nUse Ctrl+Z to undo.`
-                                  );
-                                  if (!ok) return;
-                                  const success = chainSiblings(w.node_id, inputs);
-                                  if (!success) {
-                                    window.alert('Auto-chain failed. Re-run preview and try again.');
-                                  }
+                                  void (async () => {
+                                    const ok = await confirm({
+                                      title: 'Rewire as a linear chain?',
+                                      message: (
+                                        <span>
+                                          {chainStr}
+                                          <br />
+                                          <br />
+                                          <span className="text-xs text-slate-500">Use Ctrl+Z to undo.</span>
+                                        </span>
+                                      ),
+                                      confirmLabel: 'Rewire',
+                                    });
+                                    if (!ok) return;
+                                    const success = chainSiblings(w.node_id, inputs);
+                                    if (!success) {
+                                      toast.error('Auto-chain failed', 'Re-run preview and try again.');
+                                    }
+                                  })();
                                 }}
                                 className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded border border-amber-400 dark:border-amber-600 bg-amber-100 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-100 transition-colors"
                                 title="Rewire fan-in into a linear chain (no fan-in, no overwrite)"

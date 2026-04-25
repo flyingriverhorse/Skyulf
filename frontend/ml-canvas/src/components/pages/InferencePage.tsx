@@ -3,8 +3,10 @@ import { deploymentApi, DeploymentInfo } from '../../core/api/deployment';
 import { jobsApi } from '../../core/api/jobs';
 import { DatasetService } from '../../core/api/datasets';
 import { Play, AlertCircle, CheckCircle, Box, Power } from 'lucide-react';
+import { useConfirm } from '../shared';
 
 export const InferencePage: React.FC = () => {
+  const confirm = useConfirm();
   const [activeDeployment, setActiveDeployment] = useState<DeploymentInfo | null>(null);
   const [inputData, setInputData] = useState<string>('[\n  {\n    "feature1": 0.5,\n    "feature2": 1.2\n  }\n]');
   const [predictions, setPredictions] = useState<unknown[] | null>(null);
@@ -89,7 +91,13 @@ export const InferencePage: React.FC = () => {
   };
 
   const handleDeactivate = async () => {
-    if (!confirm("Are you sure you want to undeploy the current model?")) return;
+    const ok = await confirm({
+      title: 'Undeploy model?',
+      message: 'Are you sure you want to undeploy the current model?',
+      confirmLabel: 'Undeploy',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await deploymentApi.deactivate();
       setActiveDeployment(null);

@@ -15,6 +15,7 @@ import { useClipboard } from '../../core/hooks/useClipboard';
 import { useBranchColors } from '../../core/hooks/useBranchColors';
 import { CustomNodeWrapper } from './CustomNodeWrapper';
 import { CustomEdge } from './CustomEdge';
+import { useConfirm } from '../shared';
 
 const nodeTypes = {
   custom: CustomNodeWrapper
@@ -49,6 +50,30 @@ const FlowCanvasContent: React.FC = () => {
   );
 
   const { isResultsPanelExpanded } = useViewStore();
+
+  const confirm = useConfirm();
+
+  // Gate Backspace/Delete behind a real confirmation modal. React Flow
+  // calls `onBeforeDelete` synchronously and awaits the returned promise;
+  // resolving `false` cancels the delete. Single-node deletes are still
+  // undoable via Ctrl+Z, but a misclick on a complex pipeline should
+  // not silently wipe state.
+  const onBeforeDelete = useCallback(
+    async ({ nodes: toDelete }: { nodes: typeof nodes; edges: typeof edges }) => {
+      if (toDelete.length === 0) return true;
+      const count = toDelete.length;
+      return confirm({
+        title: count === 1 ? 'Delete node?' : `Delete ${count} nodes?`,
+        message:
+          count === 1
+            ? 'The selected node and any connected edges will be removed. You can undo with Ctrl+Z.'
+            : `${count} nodes and any connected edges will be removed. You can undo with Ctrl+Z.`,
+        confirmLabel: 'Delete',
+        variant: 'danger',
+      });
+    },
+    [confirm],
+  );
 
   useClipboard();
 
@@ -175,6 +200,7 @@ const FlowCanvasContent: React.FC = () => {
         }}
         edgeTypes={edgeTypes}
         deleteKeyCode={['Backspace', 'Delete']}
+        onBeforeDelete={onBeforeDelete}
       >
         <Background />
         <Controls 

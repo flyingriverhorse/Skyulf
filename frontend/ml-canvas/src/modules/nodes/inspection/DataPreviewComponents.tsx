@@ -5,6 +5,7 @@ import { jobsApi, JobInfo } from '../../../core/api/jobs';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { generateBranchColors } from '../../../core/hooks/useBranchColors';
 import { useJobPolling } from '../../../core/hooks/useJobPolling';
+import { toast } from '../../../core/toast';
 
 export interface DataPreviewConfig {
   /** Legacy single-job id (kept for backward compatibility with old saved graphs). */
@@ -134,7 +135,7 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
       onChange({ ...config, lastRunJobId: ids[0], lastRunJobIds: ids });
     } catch (error) {
       console.error('Failed to run preview:', error);
-      alert('Failed to start preview job.');
+      toast.error('Failed to start preview job');
     } finally {
       setIsRunning(false);
     }

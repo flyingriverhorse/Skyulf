@@ -5,7 +5,7 @@ import { Dashboard } from './pages/Dashboard';
 import { DataSources } from './pages/DataSources';
 import { CanvasPage } from './pages/CanvasPage';
 import { JobsPage } from './pages/Jobs';
-import { PageSkeleton } from './components/shared';
+import { PageSkeleton, ErrorBoundary } from './components/shared';
 
 // Heavy pages are code-split. EDA + DataDrift drag in Plotly (~9.7 MB raw).
 // ModelRegistry + Deployments are rarely first-paint routes.
@@ -15,6 +15,15 @@ const ModelRegistry = lazy(() => import('./pages/ModelRegistry').then(m => ({ de
 const DeploymentsPage = lazy(() => import('./components/pages/DeploymentsPage').then(m => ({ default: m.DeploymentsPage })));
 
 const RouteFallback = () => <PageSkeleton />;
+
+// Wrap each lazy route in its own boundary so a crash in EDA doesn't
+// blank the entire app — the user can navigate elsewhere or hit "Try
+// again" without reloading.
+const LazyRoute = ({ children }: { children: React.ReactNode }) => (
+  <ErrorBoundary>
+    <Suspense fallback={<RouteFallback />}>{children}</Suspense>
+  </ErrorBoundary>
+);
 
 function App() {
   return (
@@ -28,34 +37,34 @@ function App() {
           <Route
             path="eda"
             element={
-              <Suspense fallback={<RouteFallback />}>
+              <LazyRoute>
                 <EDAPage />
-              </Suspense>
+              </LazyRoute>
             }
           />
           <Route
             path="drift"
             element={
-              <Suspense fallback={<RouteFallback />}>
+              <LazyRoute>
                 <DataDriftPage />
-              </Suspense>
+              </LazyRoute>
             }
           />
           <Route path="canvas" element={<CanvasPage />} />
           <Route
             path="registry"
             element={
-              <Suspense fallback={<RouteFallback />}>
+              <LazyRoute>
                 <ModelRegistry />
-              </Suspense>
+              </LazyRoute>
             }
           />
           <Route
             path="deployments"
             element={
-              <Suspense fallback={<RouteFallback />}>
+              <LazyRoute>
                 <DeploymentsPage />
-              </Suspense>
+              </LazyRoute>
             }
           />
         </Route>

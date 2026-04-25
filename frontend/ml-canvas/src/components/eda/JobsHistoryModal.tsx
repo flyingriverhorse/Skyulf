@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Hash, AlignLeft, Calendar, Ban } from 'lucide-react';
 import { EDAService } from '../../core/api/eda';
-import { ModalShell } from '../shared';
+import { ModalShell, useConfirm } from '../shared';
 import { StatusBadge } from '../shared/StatusBadge';
 import { clickableProps } from '../../core/utils/a11y';
+import { toast } from '../../core/toast';
 
 interface JobsHistoryModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState<number | null>(null);
+  const confirm = useConfirm();
 
   const handleClose = () => {
     setSelectedJob(null);
@@ -26,17 +28,22 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
 
   const handleCancel = async (e: React.MouseEvent, jobId: number) => {
     e.stopPropagation();
-    if (confirm("Are you sure you want to cancel this analysis?")) {
-        setCancelling(jobId);
-        try {
-            await EDAService.cancelJob(jobId);
-            if (onRefresh) onRefresh();
-        } catch (err) {
-            console.error("Failed to cancel job", err);
-            alert("Failed to cancel job");
-        } finally {
-            setCancelling(null);
-        }
+    const ok = await confirm({
+      title: 'Cancel analysis?',
+      message: 'Are you sure you want to cancel this analysis?',
+      confirmLabel: 'Cancel job',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    setCancelling(jobId);
+    try {
+      await EDAService.cancelJob(jobId);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to cancel job', err);
+      toast.error('Failed to cancel job');
+    } finally {
+      setCancelling(null);
     }
   };
 

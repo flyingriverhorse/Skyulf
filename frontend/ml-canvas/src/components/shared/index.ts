@@ -8,3 +8,7 @@ export type { SkeletonProps } from './Skeleton';
 export { StatusBadge } from './StatusBadge';
 export type { StatusBadgeProps, JobStatus } from './StatusBadge';
 export { VirtualList } from './VirtualList';
+export { ErrorBoundary } from './ErrorBoundary';
+export type { ErrorBoundaryProps } from './ErrorBoundary';
+export { ConfirmProvider, useConfirm } from './ConfirmDialog';
+export type { ConfirmOptions, ConfirmVariant } from './ConfirmDialog';

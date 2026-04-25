@@ -11,6 +11,8 @@ import {
   RUN_PREVIEW_EVENT,
   SHOW_SHORTCUTS_EVENT,
 } from '../../core/hooks/useKeyboardShortcuts';
+import { toast } from '../../core/toast';
+import { useConfirm } from '../shared';
 
 const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
 
@@ -21,6 +23,7 @@ export const Toolbar: React.FC = () => {
   const setGraph = useGraphStore((state) => state.setGraph);
   
   const { toggleDrawer, setActiveParallelRun, startPolling } = useJobStore();
+  const confirm = useConfirm();
 
   // Undo/redo state from the temporal substore (zundo). Keeping these
   // as separate selectors so the toolbar only re-renders when the
@@ -128,7 +131,7 @@ export const Toolbar: React.FC = () => {
     const datasetId = datasetNode?.data.datasetId as string;
 
     if (!datasetId) {
-      alert('No dataset node found! Cannot save pipeline without a dataset context.');
+      toast.error('No dataset node found', 'Cannot save pipeline without a dataset context.');
       return;
     }
 
@@ -139,10 +142,10 @@ export const Toolbar: React.FC = () => {
         description: 'Saved from Canvas',
         graph: getPipelinePayload()
       });
-      alert('Pipeline saved successfully!');
+      toast.success('Pipeline saved');
     } catch (error) {
       console.error('Save failed:', error);
-      alert('Failed to save pipeline.');
+      toast.error('Failed to save pipeline');
     } finally {
       setIsSaving(false);
     }
@@ -153,13 +156,17 @@ export const Toolbar: React.FC = () => {
     const datasetId = datasetNode?.data.datasetId as string;
 
     if (!datasetId) {
-      alert('No dataset node found! Cannot load pipeline without a dataset context.');
+      toast.error('No dataset node found', 'Cannot load pipeline without a dataset context.');
       return;
     }
 
-    if (!confirm('Loading a pipeline will overwrite your current work. Continue?')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Load saved pipeline?',
+      message: 'Loading a pipeline will overwrite your current work. Continue?',
+      confirmLabel: 'Load',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     setIsLoading(true);
     try {
@@ -168,13 +175,13 @@ export const Toolbar: React.FC = () => {
         const graphNodes: Node[] = Array.isArray(pipeline.graph.nodes) ? (pipeline.graph.nodes as Node[]) : [];
         const graphEdges: Edge[] = Array.isArray(pipeline.graph.edges) ? (pipeline.graph.edges as Edge[]) : [];
         setGraph(graphNodes, graphEdges);
-        alert('Pipeline loaded successfully!');
+        toast.success('Pipeline loaded');
       } else {
-        alert('No saved pipeline found for this dataset.');
+        toast.info('No saved pipeline found for this dataset');
       }
     } catch (error) {
       console.error('Load failed:', error);
-      alert('Failed to load pipeline.');
+      toast.error('Failed to load pipeline');
     } finally {
       setIsLoading(false);
     }
@@ -185,7 +192,7 @@ export const Toolbar: React.FC = () => {
     const datasetId = datasetNode?.data.datasetId as string;
 
     if (!datasetId) {
-      alert('No dataset node found!');
+      toast.error('No dataset node found');
       return;
     }
 
@@ -213,11 +220,11 @@ export const Toolbar: React.FC = () => {
         setActiveParallelRun({ jobIds: response.job_ids, startedAt: new Date().toISOString() });
         startPolling();
       }
-      alert(`${count} experiment${count > 1 ? 's' : ''} queued!`);
+      toast.success(`${count} experiment${count > 1 ? 's' : ''} queued`);
       toggleDrawer();
     } catch (error) {
       console.error('Run All failed:', error);
-      alert('Failed to run experiments. Check console for details.');
+      toast.error('Failed to run experiments', 'Check console for details.');
     } finally {
       setIsRunningAll(false);
     }
@@ -229,7 +236,7 @@ export const Toolbar: React.FC = () => {
     const datasetId = datasetNode?.data.datasetId as string;
 
     if (!datasetId) {
-      alert('No dataset node found!');
+      toast.error('No dataset node found');
       return;
     }
 
@@ -254,7 +261,7 @@ export const Toolbar: React.FC = () => {
       setExecutionResult(result);
     } catch (error) {
       console.error('Pipeline failed:', error);
-      alert('Pipeline execution failed. Check console for details.');
+      toast.error('Pipeline execution failed', 'Check console for details.');
     } finally {
       setIsRunning(false);
     }

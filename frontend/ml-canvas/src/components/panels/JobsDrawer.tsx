@@ -8,6 +8,8 @@ import { clickableProps } from '../../core/utils/a11y';
 import { useJobPolling, isTerminalStatus } from '../../core/hooks/useJobPolling';
 import { StatusBadge } from '../shared/StatusBadge';
 import { VirtualList } from '../shared/VirtualList';
+import { useConfirm } from '../shared';
+import { toast } from '../../core/toast';
 
 const formatMetricValue = (key: string, value: number): string => {
   if (key.endsWith('_std')) return value.toFixed(6);
@@ -333,6 +335,7 @@ export const JobsDrawer: React.FC = () => {
 
 const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () => void }> = ({ job: initialJob, onBack, onClose }) => {
     const { cancelJob } = useJobStore();
+    const confirm = useConfirm();
     const [activeTab, setActiveTab] = useState<'overview' | 'logs'>('overview');
     const [isCancelling, setIsCancelling] = useState(false);
     const logsEndRef = useRef<HTMLDivElement>(null);
@@ -355,12 +358,18 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
     }, [job.logs, activeTab]);
 
     const handleCancel = async () => {
-        if (!confirm('Are you sure you want to stop this job?')) return;
+        const ok = await confirm({
+            title: 'Stop job?',
+            message: 'Are you sure you want to stop this job?',
+            confirmLabel: 'Stop',
+            variant: 'danger',
+        });
+        if (!ok) return;
         setIsCancelling(true);
         try {
             await cancelJob(job.job_id);
         } catch (e) {
-            alert('Failed to cancel job');
+            toast.error('Failed to cancel job');
         } finally {
             setIsCancelling(false);
         }
