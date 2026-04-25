@@ -7,3 +7,4 @@ export { Skeleton, PageSkeleton } from './Skeleton';
 export type { SkeletonProps } from './Skeleton';
 export { StatusBadge } from './StatusBadge';
 export type { StatusBadgeProps, JobStatus } from './StatusBadge';
+export { VirtualList } from './VirtualList';

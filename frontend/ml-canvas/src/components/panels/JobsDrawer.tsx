@@ -7,6 +7,7 @@ import { formatMetricName } from '../../core/utils/format';
 import { clickableProps } from '../../core/utils/a11y';
 import { useJobPolling, isTerminalStatus } from '../../core/hooks/useJobPolling';
 import { StatusBadge } from '../shared/StatusBadge';
+import { VirtualList } from '../shared/VirtualList';
 
 const formatMetricValue = (key: string, value: number): string => {
   if (key.endsWith('_std')) return value.toFixed(6);
@@ -285,8 +286,8 @@ export const JobsDrawer: React.FC = () => {
                     <div className="col-span-2">Score</div>
                 </div>
 
-                {/* List */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50/30 dark:bg-gray-900/30">
+                {/* List — virtualized once length crosses the threshold (#15). */}
+                <div className="flex-1 flex flex-col overflow-hidden bg-gray-50/30 dark:bg-gray-900/30">
                 {filteredJobs.length === 0 ? (
                     <div className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">
                     {searchQuery || statusFilter !== 'all' || modelFilter !== 'all'
@@ -296,12 +297,20 @@ export const JobsDrawer: React.FC = () => {
                     </div>
                 ) : (
                     <>
-                        {filteredJobs.map(job => (
-                            <JobRow key={job.job_id} job={job} onClick={() => { setSelectedJob(job); }} />
-                        ))}
+                        <VirtualList
+                            items={filteredJobs}
+                            getKey={(job) => job.job_id}
+                            estimateSize={84}
+                            className="flex-1 overflow-y-auto p-4 space-y-2"
+                            renderItem={(job) => (
+                                <div className="pb-2">
+                                    <JobRow job={job} onClick={() => { setSelectedJob(job); }} />
+                                </div>
+                            )}
+                        />
                         
                         {hasMore && (
-                            <div className="flex justify-center pt-2 pb-4">
+                            <div className="flex-none flex justify-center pt-2 pb-4">
                                 <button 
                                     onClick={() => loadMoreJobs()}
                                     disabled={isLoading}
