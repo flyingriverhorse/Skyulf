@@ -134,33 +134,24 @@ const FlowCanvasContent: React.FC = () => {
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{
           type: 'custom',
-          style: { 
-            stroke: 'url(#edge-gradient)', 
-            strokeWidth: 3,
+          style: {
+            // Solid indigo stroke with the React Flow CSS dash animation
+            // (`animated: true`). The previous default referenced an SVG
+            // `<linearGradient id="edge-gradient">` which collapsed to an
+            // invisible stroke on some near-collinear paths once the glow
+            // filter was removed. Solid stroke avoids that without losing
+            // the animated-flow affordance. The real perf killer was the
+            // `feGaussianBlur` glow filter recomputed every frame; the
+            // dash-offset CSS keyframe is cheap.
+            stroke: '#6366f1',
+            strokeWidth: 2,
             strokeDasharray: '8 6',
-            filter: 'url(#glow)'
           },
           animated: true,
         }}
         edgeTypes={edgeTypes}
         deleteKeyCode={['Backspace', 'Delete']}
       >
-        <svg style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0, pointerEvents: 'none' }}>
-          <defs>
-            <linearGradient id="edge-gradient">
-              <stop offset="0%" stopColor="#38bdf8" />
-              <stop offset="50%" stopColor="#6366f1" />
-              <stop offset="100%" stopColor="#a855f7" />
-            </linearGradient>
-            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-              <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
-              </feMerge>
-            </filter>
-          </defs>
-        </svg>
         <Background />
         <Controls 
           position="bottom-left" 

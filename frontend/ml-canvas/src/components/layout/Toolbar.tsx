@@ -281,11 +281,11 @@ export const Toolbar: React.FC = () => {
           <ul className="space-y-3">
             <li className="flex items-start gap-3">
               <svg width="44" height="12" className="shrink-0 mt-1">
-                <line x1="0" y1="6" x2="44" y2="6" stroke="#6366f1" strokeWidth="3" strokeDasharray="8 6" />
+                <line x1="0" y1="6" x2="44" y2="6" stroke="#6366f1" strokeWidth="2" strokeDasharray="8 6" />
               </svg>
               <div>
                 <div className="font-medium">Standard edge</div>
-                <div className="text-xs text-muted-foreground">Animated dashed line in the indigo gradient. Default flow from source to target.</div>
+                <div className="text-xs text-muted-foreground">Animated dashed indigo line. Default flow from source to target.</div>
               </div>
             </li>
             <li className="flex items-start gap-3">
