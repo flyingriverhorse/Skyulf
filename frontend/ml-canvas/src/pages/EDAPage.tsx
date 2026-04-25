@@ -21,36 +21,44 @@ import { DecompositionTab } from '../components/eda/tabs/DecompositionTab';
 import { Loader2, RefreshCw, AlertCircle, BarChart2, List, Play, HelpCircle, Target } from 'lucide-react';
 import { downloadChart } from '../core/utils/chartUtils';
 import { LoadingState, ErrorState } from '../components/shared';
+import { useEDAStore, selectExcludedDirty, type EDAFilter } from '../core/store/useEDAStore';
 
 export const EDAPage: React.FC = () => {
   const [searchParams] = useSearchParams();
+
+  // ── Server state stays local until Phase F #17 introduces React Query ──
   const [datasets, setDatasets] = useState<any[]>([]);
-  const [selectedDataset, setSelectedDataset] = useState<number | null>(() => {
-    const id = searchParams.get('dataset_id');
-    return id ? Number(id) : null;
-  });
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [targetCol, setTargetCol] = useState<string>('');
-  const [taskType, setTaskType] = useState<string>(''); // "Classification" or "Regression" or "" (Auto)
-  const [excludedColsDraft, setExcludedColsDraft] = useState<string[]>([]);
-  const [excludedColsApplied, setExcludedColsApplied] = useState<string[]>([]);
-  const [filters, setFilters] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  
-  // Manual Filter State (Moved to FilterBar)
 
-  // Scatter Plot State
-  const [scatterX, setScatterX] = useState<string>('');
-  const [scatterY, setScatterY] = useState<string>('');
-  const [scatterZ, setScatterZ] = useState<string>('');
-  const [scatterColor, setScatterColor] = useState<string>('');
-  const [is3D, setIs3D] = useState(false);
-  const [isPCA3D, setIsPCA3D] = useState(false);
+  // ── View + analysis-input state lives in the EDA zustand slice ──
+  const activeTab = useEDAStore((s) => s.activeTab);
+  const setActiveTab = useEDAStore((s) => s.setActiveTab);
+  const selectedDataset = useEDAStore((s) => s.selectedDataset);
+  const setSelectedDataset = useEDAStore((s) => s.setSelectedDataset);
+  const targetCol = useEDAStore((s) => s.targetCol);
+  const setTargetCol = useEDAStore((s) => s.setTargetCol);
+  const taskType = useEDAStore((s) => s.taskType);
+  const setTaskType = useEDAStore((s) => s.setTaskType);
+  const excludedColsDraft = useEDAStore((s) => s.excludedColsDraft);
+  const excludedColsApplied = useEDAStore((s) => s.excludedColsApplied);
+  const filters = useEDAStore((s) => s.filters);
+  const scatter = useEDAStore((s) => s.scatter);
+  const setScatter = useEDAStore((s) => s.setScatter);
+  const excludedDirty = useEDAStore(selectExcludedDirty);
+
+  // Seed the dataset id from `?dataset_id=…` once on mount.
+  useEffect(() => {
+    const id = searchParams.get('dataset_id');
+    if (id && useEDAStore.getState().selectedDataset == null) {
+      setSelectedDataset(Number(id));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const profileForUi = useMemo(() => {
     const rawProfile = report?.profile_data;
@@ -81,29 +89,14 @@ export const EDAPage: React.FC = () => {
   useEffect(() => {
     if (selectedDataset) {
       setReport(null); // Clear previous report to show loader
-      setExcludedColsDraft([]); // Reset excluded columns
-      setExcludedColsApplied([]);
-      setFilters([]); // Reset filters
-      setTargetCol(''); // Reset target column
-      setScatterX('');
-      setScatterY('');
-      setScatterZ('');
-      setScatterColor('');
-      setActiveTab('dashboard'); // Reset active tab
+      // Wipe per-dataset slice fields in one shot.
+      useEDAStore.getState().resetForDataset();
       loadReport(selectedDataset);
       loadHistory(selectedDataset);
     } else {
       setReport(null);
       setHistory([]);
-      setExcludedColsDraft([]);
-      setExcludedColsApplied([]);
-      setFilters([]);
-      setTargetCol('');
-      setScatterX('');
-      setScatterY('');
-      setScatterZ('');
-      setScatterColor('');
-      setActiveTab('dashboard');
+      useEDAStore.getState().resetForDataset();
     }
   }, [selectedDataset]);
 
@@ -191,34 +184,26 @@ export const EDAPage: React.FC = () => {
   };
 
   const handleAddFilter = (column: string, value: any, operator: string = '==') => {
-      // Check if filter already exists to avoid duplicates if needed, 
-      // but for now let's allow multiple filters on same col (e.g. range)
-      const newFilter = { column, operator, value };
+      const newFilter: EDAFilter = { column, operator: operator as EDAFilter['operator'], value };
       const newFilters = [...filters, newFilter];
-      setFilters(newFilters);
+      useEDAStore.getState().setFilters(newFilters);
       runAnalysis(undefined, newFilters);
   };
 
   const handleRemoveFilter = (index: number) => {
-      const newFilters = [...filters];
-      newFilters.splice(index, 1);
-      setFilters(newFilters);
+      const newFilters = filters.filter((_, i) => i !== index);
+      useEDAStore.getState().setFilters(newFilters);
       runAnalysis(undefined, newFilters);
   };
 
   const handleToggleExclude = (colName: string, exclude: boolean) => {
-    setExcludedColsDraft((prev) => {
-      if (exclude) {
-        if (prev.includes(colName)) return prev;
-        return [...prev, colName];
-      }
-      return prev.filter((c) => c !== colName);
-    });
+    useEDAStore.getState().toggleExclude(colName, exclude);
   };
 
     const handleApplyExcluded = () => {
-    setExcludedColsApplied(excludedColsDraft);
-    runAnalysis(excludedColsDraft);
+    const draft = useEDAStore.getState().excludedColsDraft;
+    useEDAStore.getState().applyExcluded();
+    runAnalysis(draft);
     };
 
   // Sync target col and excluded cols from report if available
@@ -230,20 +215,11 @@ export const EDAPage: React.FC = () => {
       const serverExcluded = Array.isArray(report.profile_data.excluded_columns)
         ? report.profile_data.excluded_columns
         : [];
-      setExcludedColsApplied(serverExcluded);
-      setExcludedColsDraft(serverExcluded);
+      useEDAStore.getState().setExcludedApplied(serverExcluded);
+      useEDAStore.getState().setExcludedDraft(serverExcluded);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [report?.id]);
-
-    const excludedDirty = (() => {
-    if (excludedColsApplied.length !== excludedColsDraft.length) return true;
-    const appliedSet = new Set(excludedColsApplied);
-    for (const col of excludedColsDraft) {
-      if (!appliedSet.has(col)) return true;
-    }
-    return false;
-    })();
 
   // Helper to find existing report for current target
   const existingReport = targetCol ? history.find(h => h.target_col === targetCol && h.status === 'COMPLETED') : null;
@@ -365,7 +341,7 @@ export const EDAPage: React.FC = () => {
             analyzing={analyzing}
             onAddFilter={handleAddFilter}
             onRemoveFilter={handleRemoveFilter}
-            onClearFilters={() => { setFilters([]); runAnalysis(undefined, []); }}
+            onClearFilters={() => { useEDAStore.getState().clearFilters(); runAnalysis(undefined, []); }}
             onToggleExclude={handleToggleExclude}
             onApplyExcluded={handleApplyExcluded}
         />
@@ -386,8 +362,8 @@ export const EDAPage: React.FC = () => {
             {activeTab === 'pca' && (
                 <PCATab 
                     profile={profile} 
-                    isPCA3D={isPCA3D} 
-                    setIsPCA3D={setIsPCA3D} 
+                    isPCA3D={scatter.isPCA3D} 
+                    setIsPCA3D={(v) => setScatter({ isPCA3D: v })} 
                     downloadChart={downloadChart} 
                 />
             )}
@@ -426,16 +402,16 @@ export const EDAPage: React.FC = () => {
                 <BivariateTab 
                     profile={profile}
                     downloadChart={downloadChart}
-                    scatterX={scatterX}
-                    setScatterX={setScatterX}
-                    scatterY={scatterY}
-                    setScatterY={setScatterY}
-                    scatterZ={scatterZ}
-                    setScatterZ={setScatterZ}
-                    scatterColor={scatterColor}
-                    setScatterColor={setScatterColor}
-                    is3D={is3D}
-                    setIs3D={setIs3D}
+                    scatterX={scatter.x}
+                    setScatterX={(v) => setScatter({ x: v })}
+                    scatterY={scatter.y}
+                    setScatterY={(v) => setScatter({ y: v })}
+                    scatterZ={scatter.z}
+                    setScatterZ={(v) => setScatter({ z: v })}
+                    scatterColor={scatter.color}
+                    setScatterColor={(v) => setScatter({ color: v })}
+                    is3D={scatter.is3D}
+                    setIs3D={(v) => setScatter({ is3D: v })}
                 />
             )}
 
@@ -635,8 +611,8 @@ export const EDAPage: React.FC = () => {
           const serverExcluded = Array.isArray(selectedReport.profile_data?.excluded_columns)
             ? selectedReport.profile_data.excluded_columns
             : [];
-          setExcludedColsApplied(serverExcluded);
-          setExcludedColsDraft(serverExcluded);
+          useEDAStore.getState().setExcludedApplied(serverExcluded);
+          useEDAStore.getState().setExcludedDraft(serverExcluded);
         }}
       />
     </div>
