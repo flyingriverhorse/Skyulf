@@ -74,6 +74,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({
   const titleId = ariaLabelledBy ?? (typeof title === 'string' ? `modal-title-${title.replace(/\s+/g, '-').toLowerCase()}` : undefined);
 
   return (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- backdrop dismiss zone (Escape handler covers keyboard)
     <div
       className={`fixed inset-0 ${zIndex} flex items-center justify-center bg-black/50 backdrop-blur-sm p-4`}
       onClick={(e) => {

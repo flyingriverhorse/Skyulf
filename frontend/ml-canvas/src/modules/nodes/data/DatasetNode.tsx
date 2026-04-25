@@ -60,7 +60,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
     <div className="p-4 space-y-4">
       <div className="space-y-2">
         <div className="flex justify-between items-center">
-          <label className="block text-sm font-medium">Select Dataset</label>
+          <span className="block text-sm font-medium">Select Dataset</span>
           <button 
             onClick={() => { setShowUpload(true); }}
             className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium"

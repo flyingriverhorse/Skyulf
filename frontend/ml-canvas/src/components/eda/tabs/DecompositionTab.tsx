@@ -23,7 +23,7 @@ export const DecompositionTab: React.FC<DecompositionTabProps> = ({ datasetId, c
             {/* Controls */}
             <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 flex gap-4 items-end">
                 <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-500">Analyze</label>
+                    <span className="text-xs font-medium text-slate-500">Analyze</span>
                     <select 
                         value={measureCol} 
                         onChange={(e) => setMeasureCol(e.target.value)}
@@ -38,7 +38,7 @@ export const DecompositionTab: React.FC<DecompositionTabProps> = ({ datasetId, c
 
                 {measureCol !== 'count' && (
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-slate-500">Aggregation</label>
+                        <span className="text-xs font-medium text-slate-500">Aggregation</span>
                         <select 
                             value={measureAgg} 
                             onChange={(e) => setMeasureAgg(e.target.value)}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { BarChart, Bar, ResponsiveContainer } from 'recharts';
 import { AlertTriangle, Hash, Type, Calendar, AlignLeft, EyeOff, Eye } from 'lucide-react';
+import { clickableProps } from '../../core/utils/a11y';
 
 interface VariableCardProps {
   profile: any;
@@ -40,7 +41,7 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, on
           ? 'bg-gray-50 border-gray-200 dark:bg-gray-900 dark:border-gray-800 opacity-75' 
           : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-md'
       }`}
-      onClick={onClick}
+      {...clickableProps(onClick)}
     >
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center gap-2 w-full">

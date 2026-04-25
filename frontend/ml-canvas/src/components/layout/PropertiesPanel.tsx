@@ -58,7 +58,7 @@ const PropertiesContent: React.FC<{
       <div className="p-4">
         <div className="text-destructive flex items-center gap-2">
           <X className="w-4 h-4" />
-          Error: Node definition '{definitionType}' not found.
+          Error: Node definition &apos;{definitionType}&apos; not found.
         </div>
       </div>
     );

@@ -109,7 +109,7 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
           <div className="space-y-3 p-3 border rounded-md bg-muted/5">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <label className="text-sm font-medium text-foreground">Missing Value Threshold</label>
+                <span className="text-sm font-medium text-foreground">Missing Value Threshold</span>
                 <p className="text-[10px] text-muted-foreground">
                   Drop columns with &gt;{config.missing_threshold ?? 0}% missing values
                 </p>
@@ -165,7 +165,7 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
         <div className={`flex flex-col border rounded-md bg-background shadow-sm overflow-hidden ${isWide ? 'min-h-0 flex-1' : 'h-96 shrink-0'}`}>
           <div className="p-3 border-b bg-muted/5 space-y-3 shrink-0">
             <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Explicitly Drop Columns</label>
+                <span className="text-sm font-medium">Explicitly Drop Columns</span>
                 <span className="text-xs text-muted-foreground">
                   {config.columns.length} selected
                 </span>
@@ -213,7 +213,7 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
                 </div>
               ) : (
                 <div className="text-xs text-muted-foreground text-center py-8">
-                  No columns match "{searchTerm}"
+                  No columns match &quot;{searchTerm}&quot;
                 </div>
               )
             ) : (

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Hash, AlignLeft, Calendar, Ban } from 'lucide-react';
 import { EDAService } from '../../core/api/eda';
 import { ModalShell } from '../shared';
+import { clickableProps } from '../../core/utils/a11y';
 
 interface JobsHistoryModalProps {
   isOpen: boolean;
@@ -115,7 +116,7 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                 {history.map((job) => (
                   <div 
                     key={job.id}
-                    onClick={() => handleJobClick(job)}
+                    {...clickableProps(() => handleJobClick(job))}
                     className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-all group"
                   >
                     <div className="flex items-center gap-4">

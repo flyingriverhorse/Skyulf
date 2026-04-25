@@ -9,6 +9,7 @@ import {
     Loader2,
     Check
 } from 'lucide-react';
+import { clickableProps } from '../../core/utils/a11y';
 import { BarChart, Bar, ResponsiveContainer } from 'recharts';
 import { DistributionChart } from './DistributionChart';
 import { Button } from '../ui/button';
@@ -149,7 +150,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
         <div className={`border rounded-lg mb-2 transition-all ${isExpanded ? 'border-primary/50 shadow-md bg-card/50' : 'border-border bg-card'}`}>
             <div 
                 className="flex items-center p-3 hover:bg-accent/50 cursor-pointer rounded-t-lg"
-                onClick={onToggleExpand}
+                {...clickableProps(onToggleExpand)}
             >
                 <div className="mr-2 text-muted-foreground">
                     {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}

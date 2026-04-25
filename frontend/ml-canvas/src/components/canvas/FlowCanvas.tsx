@@ -118,7 +118,8 @@ const FlowCanvasContent: React.FC = () => {
     <div 
       className="w-full h-full outline-none" 
       ref={reactFlowWrapper}
-      tabIndex={0} // Make the container focusable to capture key events
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- canvas wrapper must be focusable to capture keyboard shortcuts
+      tabIndex={0}
     >
       <ReactFlow
         nodes={nodes}

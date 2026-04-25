@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { ArrowLeftRight, Plus, Trash2, Search, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { clickableProps } from '../../../core/utils/a11y';
 
 // --- Types ---
 
@@ -49,7 +50,7 @@ const ColumnSelector: React.FC<{
             return (
               <div
                 key={col}
-                onClick={() => { toggle(col); }}
+                {...clickableProps(() => { toggle(col); })}
                 className={`
                   flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors
                   ${isSelected ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'}
@@ -98,7 +99,7 @@ const CustomPairEditor: React.FC<{
     <div className="space-y-3">
       <div className="flex gap-2 items-end">
         <div className="flex-1 space-y-1">
-          <label className="text-[10px] text-gray-500 uppercase font-semibold">Alias (Old)</label>
+          <span className="text-[10px] text-gray-500 uppercase font-semibold">Alias (Old)</span>
           <input
             className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
             placeholder="e.g. NY"
@@ -107,7 +108,7 @@ const CustomPairEditor: React.FC<{
           />
         </div>
         <div className="flex-1 space-y-1">
-          <label className="text-[10px] text-gray-500 uppercase font-semibold">Canonical (New)</label>
+          <span className="text-[10px] text-gray-500 uppercase font-semibold">Canonical (New)</span>
           <input
             className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
             placeholder="e.g. New York"
@@ -226,9 +227,9 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
           </div>
 
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
               Replacement Mode
-            </label>
+            </span>
             <select
               className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2"
               value={config.mode}
@@ -249,9 +250,9 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
 
           {config.mode === 'custom' && (
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
                 Custom Aliases
-              </label>
+              </span>
               <CustomPairEditor
                 pairs={config.custom_pairs}
                 onChange={(pairs) => onChange({ ...config, custom_pairs: pairs })}

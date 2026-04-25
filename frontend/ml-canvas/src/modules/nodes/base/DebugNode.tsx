@@ -12,7 +12,7 @@ const DebugSettings: React.FC<{ config: DebugConfig; onChange: (c: DebugConfig) 
 }) => {
   return (
     <div className="p-4 space-y-2">
-      <label className="block text-sm font-medium">Debug Message</label>
+      <span className="block text-sm font-medium">Debug Message</span>
       <input
         type="text"
         className="w-full p-2 border rounded"

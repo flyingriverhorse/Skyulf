@@ -60,7 +60,7 @@ const FeatureTargetSplitSettings: React.FC<{ config: FeatureTargetSplitConfig; o
   return (
     <div className="p-4 space-y-4">
       <div className="space-y-2">
-        <label className="text-sm font-medium">Target Column</label>
+        <span className="text-sm font-medium">Target Column</span>
         <select
           className="w-full p-2 border rounded bg-background text-sm"
           value={config.target_column}

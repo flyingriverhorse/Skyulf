@@ -108,9 +108,9 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
                         <>
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Factor
-                                    </label>
+                                    </span>
                                     <Tooltip text="The rate at which candidate combinations are reduced in each iteration. For example, a factor of 3 means only the best 1/3 of candidates survive to the next round." />
                                 </div>
                                 <input
@@ -125,9 +125,9 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
 
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Min Resources
-                                    </label>
+                                    </span>
                                     <Tooltip text="'exhaust' automatically calculates the maximum resources to use. Alternatively, input an integer like 10 or 100 to set the starting budget explicitly." />
                                 </div>
                                 <input
@@ -142,9 +142,9 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
 
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Resource
-                                    </label>
+                                    </span>
                                     <Tooltip text="Determines how resources are limited during fast initial rounds. 'n_samples' limits the amount of training data used, while 'n_estimators' limits the number of trees in ensemble models." />
                                 </div>
                                 <select
@@ -164,9 +164,9 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
                         <>
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Sampler
-                                    </label>
+                                    </span>
                                     <Tooltip text="TPE provides smart Bayesian learning based on past trials. Random is purely blind chance. CMA-ES is advanced evolutionary sampling meant for complex continuous search spaces." />
                                 </div>
                                 <select
@@ -183,9 +183,9 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
 
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Pruner
-                                    </label>
+                                    </span>
                                     <Tooltip text="Median prunes trials worse than the median of previous runs. Hyperband is an aggressively fast early-stopping algorithm. None disables early stopping." />
                                 </div>
                                 <select
@@ -202,9 +202,9 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
 
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Timeout (Seconds)
-                                    </label>
+                                    </span>
                                     <Tooltip text="Set a hard time limit for the entire Optuna study. Regardless of N-Trials, optimization will yield the best found parameters once time is up." />
                                 </div>
                                 <input

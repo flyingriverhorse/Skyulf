@@ -64,6 +64,7 @@ export const BestParamsModal: React.FC<BestParamsModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-[100] flex justify-center items-center p-4">
+            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- backdrop dismiss zone */}
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative w-full max-w-2xl max-h-[85vh] bg-white dark:bg-gray-800 shadow-2xl rounded-xl flex flex-col border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">

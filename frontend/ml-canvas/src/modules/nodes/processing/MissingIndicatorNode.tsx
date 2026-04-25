@@ -56,7 +56,7 @@ const MissingIndicatorSettings: React.FC<{ config: MissingIndicatorConfig; onCha
       )}
 
       <div>
-        <label className="block text-sm font-medium mb-1">Indicator Suffix</label>
+        <span className="block text-sm font-medium mb-1">Indicator Suffix</span>
         <input
           type="text"
           className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
@@ -65,13 +65,13 @@ const MissingIndicatorSettings: React.FC<{ config: MissingIndicatorConfig; onCha
           placeholder="_was_missing"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Suffix added to the new indicator columns (e.g., "Age_was_missing").
+          Suffix added to the new indicator columns (e.g., &quot;Age_was_missing&quot;).
         </p>
       </div>
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium">Target Columns (Optional)</label>
+          <span className="block text-sm font-medium">Target Columns (Optional)</span>
           <span className="text-xs text-muted-foreground">
             {config.columns.length} selected
           </span>
@@ -116,7 +116,7 @@ const MissingIndicatorSettings: React.FC<{ config: MissingIndicatorConfig; onCha
             ))}
             {filteredColumns.length === 0 && (
               <div className="text-xs text-muted-foreground text-center py-2">
-                No columns match "{searchTerm}"
+                No columns match &quot;{searchTerm}&quot;
               </div>
             )}
           </div>
