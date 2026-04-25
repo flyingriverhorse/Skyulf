@@ -96,7 +96,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
     onChange({ ...config, columns: newCols });
   };
 
-  const FeedbackSection = () => (
+  const renderFeedback = () => (
     metrics ? (
       <div className="mt-4 p-3 bg-muted/50 rounded border text-xs">
         <div className="font-medium text-muted-foreground mb-2">Execution Feedback</div>
@@ -298,7 +298,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
           )}
 
           {/* Feedback Section - Only show here if wide */}
-          {isWide && <FeedbackSection />}
+          {isWide && renderFeedback()}
         </div>
 
         {/* Right Column (Column Selection) */}
@@ -357,7 +357,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
         </div>
         
         {/* Feedback Section - Show here if NOT wide (mobile/narrow) */}
-        {!isWide && <FeedbackSection />}
+        {!isWide && renderFeedback()}
       </div>
     </div>
   );
