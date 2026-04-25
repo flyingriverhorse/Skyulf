@@ -101,3 +101,7 @@ jobs:
       - name: Build
         run: npm run build
         working-directory: frontend/ml-canvas
+
+      - name: Bundle size budget
+        run: npm run size-check
+        working-directory: frontend/ml-canvas
