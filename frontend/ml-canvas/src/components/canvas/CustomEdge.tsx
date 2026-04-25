@@ -1,14 +1,16 @@
-import React from 'react';
-import { 
-  BaseEdge, 
-  EdgeLabelRenderer, 
-  EdgeProps, 
+import React, { memo, useState } from 'react';
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  EdgeProps,
+  Position,
   getSmoothStepPath,
-  useReactFlow
+  getStraightPath,
+  useReactFlow,
 } from '@xyflow/react';
 import { X } from 'lucide-react';
 
-export const CustomEdge: React.FC<EdgeProps> = ({
+export const CustomEdge: React.FC<EdgeProps> = memo(({
   id,
   sourceX,
   sourceY,
@@ -18,18 +20,43 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   targetPosition,
   style = {},
   markerEnd,
+  source,
+  target,
   data,
 }) => {
   const { deleteElements } = useReactFlow();
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-    borderRadius: 24,
-  });
+  const [hovered, setHovered] = useState(false);
+
+  // When source and target handles are almost collinear along the handle
+  // axis (e.g. Right -> Left with nearly identical Y), `getSmoothStepPath`
+  // collapses its rounded corners (borderRadius 24) into a degenerate path
+  // that renders as a hairline -- or disappears entirely, leaving only the
+  // floating × delete button. Detect that case and fall back to a straight
+  // path so the connection stays consistently thick and visible.
+  const horizontalAxis =
+    (sourcePosition === Position.Left || sourcePosition === Position.Right) &&
+    (targetPosition === Position.Left || targetPosition === Position.Right);
+  const verticalAxis =
+    (sourcePosition === Position.Top || sourcePosition === Position.Bottom) &&
+    (targetPosition === Position.Top || targetPosition === Position.Bottom);
+  const perpendicularOffset = horizontalAxis
+    ? Math.abs(targetY - sourceY)
+    : verticalAxis
+      ? Math.abs(targetX - sourceX)
+      : Number.POSITIVE_INFINITY;
+  const useStraight = (horizontalAxis || verticalAxis) && perpendicularOffset < 6;
+
+  const [edgePath, labelX, labelY] = useStraight
+    ? getStraightPath({ sourceX, sourceY, targetX, targetY })
+    : getSmoothStepPath({
+        sourceX,
+        sourceY,
+        sourcePosition,
+        targetX,
+        targetY,
+        targetPosition,
+        borderRadius: 16,
+      });
 
   const branchColor = (data as Record<string, unknown>)?.branchColor as string | undefined;
   const branchLabel = (data as Record<string, unknown>)?.branchLabel as string | undefined;
@@ -58,19 +85,46 @@ export const CustomEdge: React.FC<EdgeProps> = ({
 
   return (
     <>
-      {/* Invisible wider path for easier selection */}
-      <BaseEdge 
-        path={edgePath} 
-        style={{ strokeWidth: 20, stroke: 'transparent', cursor: 'pointer' }} 
+      {/* Invisible wider path for hit-testing + hover glow */}
+      <BaseEdge
+        path={edgePath}
+        style={{ strokeWidth: 20, stroke: 'transparent', cursor: 'pointer' }}
+        interactionWidth={20}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       />
       {/* Visible path */}
-      <BaseEdge 
-        path={edgePath} 
-        markerEnd={markerEnd} 
-        style={edgeStyle} 
+      <BaseEdge
+        path={edgePath}
+        {...(markerEnd ? { markerEnd } : {})}
+        style={{
+          ...edgeStyle,
+          filter: hovered
+            ? `drop-shadow(0 0 4px ${branchColor || 'hsl(var(--primary))'})`
+            : edgeStyle.filter,
+        }}
         className="react-flow__edge-path"
       />
       <EdgeLabelRenderer>
+        {hovered && (
+          <div
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -150%) translate(${labelX}px,${labelY}px)`,
+              fontSize: 10,
+              color: 'hsl(var(--foreground))',
+              backgroundColor: 'hsl(var(--background) / 0.95)',
+              border: '1px solid hsl(var(--border))',
+              borderRadius: 4,
+              padding: '2px 6px',
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            }}
+          >
+            {source} → {target}
+          </div>
+        )}
         {isMergeWinner && (
           <div
             style={{
@@ -126,7 +180,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
           className="nodrag nopan"
         >
           <button
-            className="w-5 h-5 bg-background border border-border text-muted-foreground rounded-full flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors shadow-sm"
+            className="w-5 h-5 bg-background border border-border text-muted-foreground rounded-full flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors shadow-sm focus-ring"
             onClick={onEdgeClick}
             title="Remove Connection"
           >
@@ -136,4 +190,5 @@ export const CustomEdge: React.FC<EdgeProps> = ({
       </EdgeLabelRenderer>
     </>
   );
-};
+});
+CustomEdge.displayName = 'CustomEdge';

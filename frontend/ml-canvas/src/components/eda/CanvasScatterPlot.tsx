@@ -17,10 +17,10 @@ interface CanvasScatterPlotProps {
   data: any[];
   xKey: string;
   yKey: string;
-  labelKey?: string; // For coloring by group
-  xLabel?: string;
-  yLabel?: string;
-  height?: number;
+  labelKey?: string | undefined; // For coloring by group
+  xLabel?: string | undefined;
+  yLabel?: string | undefined;
+  height?: number | undefined;
 }
 
 export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({ 

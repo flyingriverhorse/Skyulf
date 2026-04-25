@@ -1,14 +1,13 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { 
-    Play, Loader2, Database, Activity, 
-    Settings2, BarChart3, X, RefreshCw, ChevronRight, ChevronDown,
-    HelpCircle, AlertCircle, AlertTriangle, Check
+import React, { useEffect, useState, useRef } from 'react';
+import {
+    Play, Loader2, Activity,
+    Settings2, BarChart3, X, ChevronRight, ChevronDown,
+    AlertTriangle
 } from 'lucide-react';
-import { jobsApi, JobInfo } from '../../../core/api/jobs';
+import { jobsApi } from '../../../core/api/jobs';
 import { RegistryItem, registryApi } from '../../../core/api/registry';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
-import { formatMetricName } from '../../../core/utils/format';
 import { useElementSize } from '../../../core/hooks/useElementSize';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
@@ -16,6 +15,12 @@ import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConver
 import { getIncomers } from '@xyflow/react';
 import { StepType } from '../../../core/constants/stepTypes';
 import { StrategySettingsModal, StrategyConfig } from './components/StrategySettingsModal';
+import { HelpTooltip } from './components/HelpTooltip';
+import { BestParamsModal } from './components/BestParamsModal';
+import { SearchSpaceInput } from './components/SearchSpaceInput';
+import type { HyperparameterDef } from './components/types';
+import type { ExecutionMode } from '../../../core/types/executionMode';
+import { toast } from '../../../core/toast';
 
 export interface TuningConfig {
   target_column: string;
@@ -32,296 +37,11 @@ export interface TuningConfig {
   cv_random_state: number;
   random_state: number;
   cv_time_column?: string;
-  execution_mode?: 'merge' | 'parallel';
+  execution_mode?: ExecutionMode;
 }
 
-interface HyperparameterDef {
-    name: string;
-    label: string;
-    type: 'number' | 'select' | 'boolean';
-    default: unknown;
-    description?: string;
-    options?: { label: string; value: unknown }[];
-    min?: number;
-    max?: number;
-}
-
-const Tooltip: React.FC<{ text: string }> = ({ text }) => (
-    <div className="group relative flex items-center">
-        <HelpCircle className="w-3 h-3 text-gray-400 cursor-help" />
-        <div className="absolute top-full mt-2 -left-20 hidden group-hover:block w-56 p-2.5 bg-gray-900 text-white text-xs rounded-md shadow-xl z-50">
-            {text}
-            <div className="absolute bottom-full left-20 ml-1.5 border-4 border-transparent border-b-gray-900" />
-        </div>
-    </div>
-);
-
-const SearchSpaceInput: React.FC<{
-    def: HyperparameterDef;
-    value: unknown[];
-    onChange: (values: unknown[]) => void;
-}> = ({ def, value, onChange }) => {
-    const [localValue, setLocalValue] = useState('');
-    const [error, setError] = useState<string | null>(null);
-
-    // Sync local state with props when props change
-    useEffect(() => {
-        setLocalValue(Array.isArray(value) ? value.map(v => v === null ? 'None' : v).join(', ') : '');
-    }, [value]);
-
-    const validateAndParse = (input: string) => {
-        if (!input.trim()) return [];
-        
-        const parts = input.split(',').map(s => s.trim()).filter(s => s !== '');
-        const parsed: unknown[] = [];
-        
-        for (const part of parts) {
-            if (part.toLowerCase() === 'none') {
-                parsed.push(null);
-                continue;
-            }
-
-            if (def.type === 'number') {
-                const num = Number(part);
-                if (isNaN(num)) {
-                    throw new Error(`"${part}" is not a valid number`);
-                }
-                parsed.push(num);
-            } else if (def.type === 'boolean') {
-                const lower = part.toLowerCase();
-                if (lower === 'true') parsed.push(true);
-                else if (lower === 'false') parsed.push(false);
-                else throw new Error(`"${part}" must be true or false`);
-            } else {
-                parsed.push(part);
-            }
-        }
-        return parsed;
-    };
-
-    const handleBlur = () => {
-        try {
-            const parsed = validateAndParse(localValue);
-            setError(null);
-            // Only trigger change if values actually changed to avoid loops
-            if (JSON.stringify(parsed) !== JSON.stringify(value)) {
-                onChange(parsed);
-            }
-        } catch (err: unknown) {
-            setError((err as Error).message);
-        }
-    };
-
-    return (
-        <div className="space-y-1">
-            <div className="flex justify-between items-center">
-                <label className="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
-                    {def.label}
-                    {def.description && <Tooltip text={def.description} />}
-                </label>
-                <span className="text-[10px] text-gray-400 uppercase">{def.type}</span>
-            </div>
-            
-            <div className="relative">
-                <input 
-                    type="text" 
-                    className={`w-full border rounded px-2 py-1.5 text-sm font-mono bg-white dark:bg-gray-900 dark:text-gray-100 outline-none transition-all ${
-                        error 
-                            ? 'border-red-500 focus:ring-2 focus:ring-red-500/20' 
-                            : 'border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500'
-                    }`}
-                    placeholder={def.type === 'select' ? "e.g. lbfgs, liblinear" : "e.g. 10, 50, 100"}
-                    value={localValue}
-                    onChange={(e) => {
-                        setLocalValue(e.target.value);
-                        setError(null); // Clear error while typing
-                    }}
-                    onBlur={handleBlur}
-                />
-                {def.type === 'select' && def.options && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                        {def.options.map(opt => (
-                            <button
-                                key={String(opt.value)}
-                                onClick={() => {
-                                    // Toggle option
-                                    const current = validateAndParse(localValue);
-                                    const exists = current.includes(opt.value);
-                                    const newValue = exists 
-                                        ? current.filter(v => v !== opt.value)
-                                        : [...current, opt.value];
-                                    onChange(newValue);
-                                }}
-                                className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                                    value.includes(opt.value)
-                                        ? 'bg-purple-100 border-purple-200 text-purple-700 dark:bg-purple-900/30 dark:border-purple-800 dark:text-purple-300'
-                                        : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                }`}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
-                    </div>
-                )}
-            </div>
-            {error && (
-                <p className="text-[10px] text-red-500 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    {error}
-                </p>
-            )}
-        </div>
-    );
-};
-
-const BestParamsModal: React.FC<{ 
-    isOpen: boolean; 
-    onClose: () => void; 
-    modelType: string;
-    availableModels?: RegistryItem[];
-}> = ({ isOpen, onClose, modelType: initialModelType, availableModels = [] }) => {
-    const [currentModelType, setCurrentModelType] = useState(initialModelType);
-    const [jobs, setJobs] = useState<JobInfo[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    // Update currentModelType when initialModelType changes (e.g. when opening modal)
-    useEffect(() => {
-        if (isOpen) {
-            setCurrentModelType(initialModelType);
-        }
-    }, [isOpen, initialModelType]);
-
-    const fetchJobs = useCallback(() => {
-        if (!currentModelType) return;
-        setIsLoading(true);
-        setError(null);
-        // Use getTuningHistory instead of getTuningJobsForModel
-        jobsApi.getTuningHistory(currentModelType)
-            .then(data => {
-                setJobs(data);
-            })
-            .catch(err => {
-                console.error("Failed to fetch jobs", err);
-                setError("Failed to load history.");
-            })
-            .finally(() => { setIsLoading(false); });
-    }, [currentModelType]);
-
-    useEffect(() => {
-        if (isOpen) {
-            fetchJobs();
-        }
-    }, [isOpen, fetchJobs]);
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 z-[100] flex justify-center items-center p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-2xl max-h-[85vh] bg-white dark:bg-gray-800 shadow-2xl rounded-xl flex flex-col border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in zoom-in duration-200">
-                {/* Header */}
-                <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                            <Activity className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                        </div>
-                        <div>
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Best Parameters History</h3>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs text-gray-500 dark:text-gray-400">View parameters for:</span>
-                                <select 
-                                    value={currentModelType}
-                                    onChange={(e) => { setCurrentModelType(e.target.value); }}
-                                    className="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-purple-500 outline-none"
-                                >
-                                    {availableModels.length > 0 ? (
-                                        availableModels.map(model => (
-                                            <option key={model.id} value={model.id}>{model.name}</option>
-                                        ))
-                                    ) : (
-                                        <>
-                                            <option value="random_forest_classifier">Random Forest Classifier</option>
-                                            <option value="logistic_regression">Logistic Regression</option>
-                                            <option value="ridge_regression">Ridge Regression</option>
-                                            <option value="random_forest_regressor">Random Forest Regressor</option>
-                                        </>
-                                    )}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={fetchJobs}
-                            className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 transition-colors"
-                            title="Refresh"
-                        >
-                            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                        </button>
-                        <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 transition-colors">
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-                
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/30 dark:bg-gray-900/30">
-                    {isLoading ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                            <Loader2 className="w-8 h-8 animate-spin mb-2 text-purple-500" />
-                            <p className="text-sm">Loading history...</p>
-                        </div>
-                    ) : error ? (
-                        <div className="text-center py-12 text-red-500 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-900/20">
-                            <AlertCircle className="w-8 h-8 mx-auto mb-2" />
-                            <p className="text-sm">{error}</p>
-                            <button onClick={fetchJobs} className="mt-2 text-xs underline hover:text-red-600">Try Again</button>
-                        </div>
-                    ) : jobs.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
-                            <Database className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">No completed optimization jobs found.</p>
-                            <p className="text-xs opacity-70 mt-1">Run an optimization job to see results here.</p>
-                        </div>
-                    ) : (
-                        jobs.map(job => (
-                            <div key={job.job_id} className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:shadow-md hover:border-purple-200 dark:hover:border-purple-800 transition-all">
-                                <div className="flex justify-between items-start mb-3">
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-gray-600 dark:text-gray-300">
-                                                #{job.job_id.slice(0, 8)}
-                                            </span>
-                                            <span className="text-xs text-gray-400">
-                                                {job.end_time ? new Date(job.end_time).toLocaleString() : 'Unknown Date'}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-3 mt-1">
-                                            {typeof job.result?.best_score === 'number' && (
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-xs font-medium text-gray-500">
-                                                        {formatMetricName((job.result as Record<string, unknown>).scoring_metric as string) || 'Score'}:
-                                                    </span>
-                                                    <span className="text-sm font-bold text-green-600 dark:text-green-400">
-                                                        {job.result.best_score.toFixed(4)}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full flex items-center gap-1">
-                                                <Check className="w-3 h-3" /> Model Ready
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
+// HyperparameterDef, HelpTooltip, SearchSpaceInput, and BestParamsModal
+// were extracted into ./components/* to keep this file focused on the panel.
 
 export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfig) => void; nodeId?: string }> = ({
   config,
@@ -473,15 +193,15 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         if (jobCount > 1) {
             setActiveParallelRun({ jobIds: response.job_ids, startedAt: new Date().toISOString() });
             startPolling();
-            alert(`Parallel execution started! ${jobCount} branches submitted.`);
+            toast.success('Parallel execution started', `${jobCount} branches submitted.`);
         } else {
-            alert("Training job submitted successfully!");
+            toast.success('Training job submitted');
         }
         setTab('advanced_tuning');
         toggleDrawer(true);
     } catch (error) {
         console.error("Failed to submit tuning job:", error);
-        alert("Failed to submit tuning job.");
+        toast.error('Failed to submit tuning job');
     }
   };
 
@@ -492,10 +212,10 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         {/* Model & Target */}
         <div className="space-y-4">
             <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Configuration</label>
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Configuration</span>
                 <div className="grid gap-3">
                     <div>
-                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Model Type</label>
+                        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Model Type</span>
                         <div className="relative">
                             <select
                                 value={config.model_type}
@@ -540,7 +260,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                    )}
 
                     <div>
-                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Target Column</label>
+                        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Target Column</span>
                         {availableColumns.length === 0 && (
                             <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-2">
                                 <AlertTriangle className="w-3 h-3" />
@@ -578,15 +298,15 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
 
             {/* Strategy & Metrics */}
             <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tuning Strategy</label>
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tuning Strategy</span>
                 <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2">
                       <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-1.5">
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                                <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">
                                     Search Method
-                                </label>
-                                <Tooltip text={
+                                </span>
+                                <HelpTooltip placement="bottom-left" text={
                                     config.search_strategy === 'optuna' ? 'Optuna uses Bayesian optimization (TPE) to efficiently find optimal hyperparameters with early pruning.' :
                                     config.search_strategy === 'halving_grid' ? 'Successive Halving (Grid) tests all combinations but quickly drops poorly performing candidates to save time.' :
                                     config.search_strategy === 'halving_random' ? 'Successive Halving (Random) tests random combinations but quickly drops poorly performing candidates.' :
@@ -630,7 +350,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                     </div>
                     
                     <div>
-                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Metric</label>
+                        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Metric</span>
                         <select
                             value={config.metric}
                             onChange={(e) => onChange({ ...config, metric: e.target.value })}
@@ -647,7 +367,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Trials</label>
+                        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Trials</span>
                         <input
                             type="number"
                             value={config.n_trials}
@@ -690,7 +410,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                             <div className="space-y-3 pl-6 border-l-2 border-gray-100 dark:border-gray-800">
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-xs text-gray-500 mb-1">Folds</label>
+                                        <span className="block text-xs text-gray-500 mb-1">Folds</span>
                                         <input
                                             type="number"
                                             value={config.cv_folds ?? 5}
@@ -700,7 +420,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs text-gray-500 mb-1">Method</label>
+                                        <span className="block text-xs text-gray-500 mb-1">Method</span>
                                         <select
                                             value={config.cv_type ?? 'k_fold'}
                                             onChange={(e) => onChange({ ...config, cv_type: e.target.value })}
@@ -721,7 +441,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                                             <span>Data must be sorted by time. Select a date column below or ensure your data is pre-sorted.</span>
                                         </div>
                                         <div>
-                                            <label className="block text-xs text-gray-500 mb-1">Time Column (optional)</label>
+                                            <span className="block text-xs text-gray-500 mb-1">Time Column (optional)</span>
                                             <select
                                                 value={config.cv_time_column ?? ''}
                                                 onChange={(e) => onChange({ ...config, cv_time_column: e.target.value })}
@@ -870,37 +590,6 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
 
       {/* Footer */}
       <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
-        {/* Parallel Execution Toggle — only visible when multiple inputs feed this node */}
-        {nodeId && new Set(edges.filter(e => e.target === nodeId).map(e => e.source)).size > 1 && (
-          <div className="w-full max-w-xs flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Multi-Input Mode</span>
-              <Tooltip text="Merge combines all inputs into one dataset. Parallel runs each input as a separate experiment." />
-            </div>
-            <div className="flex rounded-md overflow-hidden border border-slate-300 dark:border-slate-600 text-[11px] font-medium">
-              <button
-                onClick={() => onChange({ ...config, execution_mode: 'merge' })}
-                className={`px-2.5 py-1 transition-colors ${
-                  (config.execution_mode || 'merge') === 'merge'
-                    ? 'bg-purple-500 text-white'
-                    : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600'
-                }`}
-              >
-                Merge
-              </button>
-              <button
-                onClick={() => onChange({ ...config, execution_mode: 'parallel' })}
-                className={`px-2.5 py-1 transition-colors ${
-                  config.execution_mode === 'parallel'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600'
-                }`}
-              >
-                Parallel
-              </button>
-            </div>
-          </div>
-        )}
         <button
           onClick={() => { void handleTune(); }}
           className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 text-white rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
@@ -924,6 +613,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         onClose={() => { setShowParamsModal(false); }}
         modelType={config.model_type}
         availableModels={availableModels}
+        theme="purple"
       />
 
       <StrategySettingsModal

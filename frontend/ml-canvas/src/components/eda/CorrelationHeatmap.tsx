@@ -64,7 +64,7 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({ data }) 
                 {rowCol}
               </div>
               {/* Cells */}
-              {displayValues[i].map((val, j) => (
+              {(displayValues[i] ?? []).map((val, j) => (
                 <div 
                   key={j} 
                   className="h-10 w-full flex items-center justify-center text-[10px] text-gray-900 dark:text-gray-100 rounded-sm cursor-help transition-opacity hover:opacity-80"

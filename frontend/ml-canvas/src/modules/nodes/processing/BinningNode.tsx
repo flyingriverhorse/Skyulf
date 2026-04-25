@@ -110,7 +110,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
         {/* Left Column: Settings */}
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="block text-sm font-medium">Binning Strategy</label>
+            <span className="block text-sm font-medium">Binning Strategy</span>
             <select
               className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
               value={config.strategy}
@@ -131,7 +131,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
 
           {config.strategy !== 'custom' && (
             <div className="space-y-2">
-              <label className="block text-sm font-medium">Number of Bins</label>
+              <span className="block text-sm font-medium">Number of Bins</span>
               <input
                 type="number"
                 min={2}
@@ -145,7 +145,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
 
           {config.strategy === 'custom' && (
              <div className="space-y-2 border rounded p-2 bg-muted/10">
-               <label className="block text-xs font-medium">Custom Edges</label>
+               <span className="block text-xs font-medium">Custom Edges</span>
                {config.columns.length === 0 ? (
                  <div className="text-xs text-muted-foreground">Select columns first.</div>
                ) : (
@@ -168,7 +168,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
           )}
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium">Label Format</label>
+            <span className="block text-sm font-medium">Label Format</span>
             <select
               className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
               value={config.label_format}
@@ -182,7 +182,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
 
           {config.label_format === 'range' && (
             <div className="space-y-2">
-              <label className="block text-sm font-medium">Precision (Decimals)</label>
+              <span className="block text-sm font-medium">Precision (Decimals)</span>
               <input
                 type="number"
                 min={0}
@@ -211,7 +211,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
             
             {!config.drop_original && (
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Output Suffix</label>
+                <span className="text-xs font-medium text-muted-foreground">Output Suffix</span>
                 <input
                   type="text"
                   className="w-full p-1.5 border rounded text-xs"
@@ -226,7 +226,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
 
         {/* Right Column: Column Selection */}
         <div className="space-y-2 flex flex-col h-full min-h-[200px]">
-          <label className="block text-sm font-medium">Target Columns</label>
+          <span className="block text-sm font-medium">Target Columns</span>
           
           <div className="flex gap-2">
             <input 

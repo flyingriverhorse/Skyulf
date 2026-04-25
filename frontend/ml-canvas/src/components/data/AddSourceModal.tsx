@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { X, Database, Globe, Check, Cloud, ChevronDown, ChevronRight } from 'lucide-react';
+import { Database, Globe, Check, Cloud, ChevronDown, ChevronRight } from 'lucide-react';
 import { DatasetService } from '../../core/api/datasets';
-import { useEscapeKey } from '../../core/hooks/useEscapeKey';
 import { DataSourceCreate } from '../../core/types/api';
+import { ModalShell } from '../shared';
 
 interface AddSourceModalProps {
   isOpen: boolean;
@@ -21,10 +21,6 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
   const [showCredentials, setShowCredentials] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEscapeKey(onClose, isOpen);
-
-  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,24 +71,8 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-source-modal-title"
-        className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[90vh] border border-slate-200 dark:border-slate-700"
-      >
-        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
-          <h3 id="add-source-modal-title" className="font-semibold text-lg text-slate-900 dark:text-slate-100">Add Data Source</h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" aria-label="Close">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="p-4 overflow-y-auto">
+    <ModalShell isOpen={isOpen} onClose={onClose} title="Add Data Source" size="md">
+      <div className="p-4">
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => { setType('database'); }}
@@ -128,7 +108,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
 
           <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Name</label>
+              <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Name</span>
               <input
                 type="text"
                 required
@@ -142,7 +122,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
             {type === 'database' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Connection String</label>
+                  <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Connection String</span>
                   <input
                     type="text"
                     required
@@ -153,7 +133,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">SQL Query</label>
+                  <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">SQL Query</span>
                   <textarea
                     required
                     value={query}
@@ -168,7 +148,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
             {type === 's3' && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">S3 Path</label>
+                  <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">S3 Path</span>
                   <input
                     type="text"
                     required
@@ -195,12 +175,12 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                     <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
                       <p className="text-xs text-slate-500 mb-3">
                         If your bucket is private, provide credentials here. They will be stored securely.
-                        Leave blank if using backend's IAM role.
+                        Leave blank if using backend&apos;s IAM role.
                       </p>
                       
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Access Key ID</label>
+                          <span className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Access Key ID</span>
                           <input
                             type="text"
                             name="aws_access_key_id"
@@ -209,7 +189,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Secret Access Key</label>
+                          <span className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Secret Access Key</span>
                           <input
                             type="password"
                             name="aws_secret_access_key"
@@ -218,7 +198,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                           />
                         </div>
                         <div className="col-span-2">
-                          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Region</label>
+                          <span className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Region</span>
                           <input
                             type="text"
                             name="region_name"
@@ -236,7 +216,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
             {type === 'api' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">API URL</label>
+                  <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">API URL</span>
                   <input
                     type="url"
                     required
@@ -247,7 +227,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Method</label>
+                  <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Method</span>
                   <select
                     value={method}
                     onChange={(e) => { setMethod(e.target.value); }}
@@ -284,7 +264,6 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
             </div>
           </form>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 };

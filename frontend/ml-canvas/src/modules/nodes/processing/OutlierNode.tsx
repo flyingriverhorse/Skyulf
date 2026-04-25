@@ -107,7 +107,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
     onChange({ ...config, columns: newCols });
   };
 
-  const FeedbackSection = () => {
+  const renderFeedback = () => {
     if (!nodeResult || !nodeResult.metrics) return null;
     const m = nodeResult.metrics;
     
@@ -236,7 +236,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
     );
   };
 
-  const RecommendationsSection = () => {
+  const renderRecommendations = () => {
     // Combine backend recommendations with runtime feedback
     const runtimeRecommendations: Recommendation[] = [];
     
@@ -319,7 +319,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
         {/* Left Column: Settings */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
           <div>
-            <label className="block text-sm font-medium mb-1">Method</label>
+            <span className="block text-sm font-medium mb-1">Method</span>
             <select
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.method}
@@ -341,7 +341,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
           {/* IQR Params */}
           {config.method === 'iqr' && (
             <div className="space-y-2">
-              <label className="block text-sm font-medium">Multiplier</label>
+              <span className="block text-sm font-medium">Multiplier</span>
               <input
                 type="number"
                 step="0.1"
@@ -356,7 +356,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
           {/* Z-Score Params */}
           {config.method === 'zscore' && (
             <div className="space-y-2">
-              <label className="block text-sm font-medium">Threshold (Sigma)</label>
+              <span className="block text-sm font-medium">Threshold (Sigma)</span>
               <input
                 type="number"
                 step="0.1"
@@ -371,10 +371,10 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
           {/* Winsorize Params */}
           {config.method === 'winsorize' && (
             <div className="space-y-2">
-              <label className="block text-sm font-medium">Percentiles</label>
+              <span className="block text-sm font-medium">Percentiles</span>
               <div className="flex gap-2 items-center">
                 <div className="flex-1">
-                  <label className="text-[10px] text-muted-foreground">Lower</label>
+                  <span className="text-[10px] text-muted-foreground">Lower</span>
                   <input
                     type="number"
                     className="w-full p-2 border rounded bg-background text-sm"
@@ -383,7 +383,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="text-[10px] text-muted-foreground">Upper</label>
+                  <span className="text-[10px] text-muted-foreground">Upper</span>
                   <input
                     type="number"
                     className="w-full p-2 border rounded bg-background text-sm"
@@ -398,7 +398,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
           {/* Elliptic Envelope Params */}
           {config.method === 'elliptic_envelope' && (
             <div className="space-y-2">
-              <label className="block text-sm font-medium">Contamination</label>
+              <span className="block text-sm font-medium">Contamination</span>
               <input
                 type="number"
                 step="0.01"
@@ -415,8 +415,8 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
           {/* Feedback Section (Wide) */}
           {isWide && (
             <>
-                <FeedbackSection />
-                <RecommendationsSection />
+                {renderFeedback()}
+                {renderRecommendations()}
             </>
           )}
         </div>
@@ -468,8 +468,8 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
         {/* Feedback Section (Narrow) */}
         {!isWide && (
             <>
-                <FeedbackSection />
-                <RecommendationsSection />
+                {renderFeedback()}
+                {renderRecommendations()}
             </>
         )}
 

@@ -216,7 +216,27 @@ class PipelineEngine:
                 break
 
         pipeline_result.end_time = datetime.now()
-        pipeline_result.merge_warnings = list(self.merge_warnings)
+        # Dedup advisories: a merge node executed in multiple branches/parts
+        # (e.g. FeatureTargetSplit hit once per parallel branch) re-appends
+        # the same advisory each pass. Collapse on (node_id, kind, inputs,
+        # overlap_columns, dropped_columns, part) so the UI shows one row
+        # per logically distinct merge instead of N copies.
+        seen_keys: set = set()
+        deduped: List[Dict[str, Any]] = []
+        for w in self.merge_warnings:
+            key = (
+                w.get("node_id"),
+                w.get("kind"),
+                tuple(sorted(w.get("inputs") or ())),
+                tuple(w.get("overlap_columns") or ()),
+                tuple(w.get("dropped_columns") or ()),
+                w.get("part"),
+            )
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            deduped.append(w)
+        pipeline_result.merge_warnings = deduped
         return pipeline_result
 
     def _execute_node(self, node: NodeConfig, job_id: str = "unknown") -> NodeExecutionResult:

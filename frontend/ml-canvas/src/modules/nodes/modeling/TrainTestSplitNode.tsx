@@ -90,7 +90,7 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
         {/* Left Column: Split Ratios & Random State */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Test Size (0.0 - 1.0)</label>
+            <span className="text-sm font-medium">Test Size (0.0 - 1.0)</span>
             <input
               type="number"
               step="0.05"
@@ -103,7 +103,7 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Validation Size (0.0 - 1.0)</label>
+            <span className="text-sm font-medium">Validation Size (0.0 - 1.0)</span>
             <input
               type="number"
               step="0.05"
@@ -124,7 +124,7 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Random State</label>
+            <span className="text-sm font-medium">Random State</span>
             <input
               type="number"
               className="w-full p-2 border rounded bg-background text-sm"
@@ -161,7 +161,7 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
           </div>
 
           <div className="space-y-2 pl-6 border-l-2 border-muted">
-            <label className="text-sm font-medium">Target Column</label>
+            <span className="text-sm font-medium">Target Column</span>
             <select
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.target_column ?? ''}

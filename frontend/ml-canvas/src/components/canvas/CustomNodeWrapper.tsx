@@ -1,17 +1,16 @@
-import { memo } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
 import { registry } from '../../core/registry/NodeRegistry';
 import { AlertCircle, X, CheckCircle2, XCircle, Merge, GitFork } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import type { NodeExecutionResult } from '../../core/api/client';
+import {
+  isAutoParallelType,
+  supportsExecutionModeToggle,
+  getExecutionMode,
+} from '../../core/types/executionMode';
 
-const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
-// Terminals that auto-split each upstream input into its own parallel
-// branch / preview tab instead of column-merging them. Mirror
-// AUTO_PARALLEL_STEP_TYPES in backend graph_utils.py.
-const AUTO_PARALLEL_TYPES = new Set(['data_preview']);
-
-export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
+function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   const definitionType = data.definitionType as string;
   const definition = registry.get(definitionType);
   const { deleteElements } = useReactFlow();
@@ -35,10 +34,10 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
 
   // Parallel badge: training nodes when user explicitly chose parallel mode,
   // OR auto-parallel terminals (data_preview) wired to 2+ sources.
-  const isTrainingNode = TRAINING_TYPES.has(definitionType);
-  const isAutoParallel = AUTO_PARALLEL_TYPES.has(definitionType);
+  const isTrainingNode = supportsExecutionModeToggle(definitionType);
+  const isAutoParallel = isAutoParallelType(definitionType);
   const isParallel =
-    (isTrainingNode && data.execution_mode === 'parallel') ||
+    (isTrainingNode && getExecutionMode(data) === 'parallel') ||
     (isAutoParallel && incomingSourceCount > 1);
 
   // Only nodes that actually consume upstream data (i.e. declare an input
@@ -47,6 +46,49 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
   // terminals show the parallel badge instead of the merge badge.
   const canMerge = (definition?.inputs?.length ?? 0) > 0 && !isAutoParallel;
   const showMergeBadge = (canMerge && incomingSourceCount > 1) || isParallel;
+
+  // Inline validation: surface a small red dot in the header when the
+  // node's own `validate(config)` returns invalid, so users see at a
+  // glance which nodes still need configuration. The validator runs
+  // against the node's data (data carries the user config fields plus
+  // some metadata; validators only read the config keys). Wrapped in
+  // try/catch because a buggy validator must not crash the canvas.
+  let validationMessage: string | null = null;
+  if (definition) {
+    try {
+      const result = definition.validate(data as never);
+      if (!result.isValid) {
+        validationMessage = result.message ?? 'Configuration incomplete.';
+      }
+    } catch {
+      // Validator threw — treat as a soft warning, don't block rendering.
+      validationMessage = null;
+    }
+  }
+
+  // One-shot pulse animation: when a node transitions from valid →
+  // invalid, play a 5 s red-ring pulse to draw attention. `isPulsing`
+  // gates the CSS class; we only set it on the false→true edge of
+  // `isInvalid`, never every render, so an already-invalid node
+  // doesn't re-pulse forever. The class auto-clears after 5 s.
+  const wasInvalidRef = useRef<boolean>(false);
+  const [isPulsing, setIsPulsing] = useState<boolean>(false);
+  const isInvalid = validationMessage !== null;
+  useEffect(() => {
+    if (isInvalid && !wasInvalidRef.current) {
+      setIsPulsing(true);
+      // Matches the CSS animation: 3 cycles × 1.6 s = 4.8 s.
+      const t = window.setTimeout(() => setIsPulsing(false), 4800);
+      wasInvalidRef.current = true;
+      return () => window.clearTimeout(t);
+    }
+    if (!isInvalid && wasInvalidRef.current) {
+      // Cleared by the user fixing config — drop the pulse early.
+      wasInvalidRef.current = false;
+      setIsPulsing(false);
+    }
+    return undefined;
+  }, [isInvalid]);
 
   const onDelete = (evt: React.MouseEvent) => {
     evt.stopPropagation();
@@ -70,8 +112,13 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
   
   return (
     <div className={`
-      min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all
-      ${selected ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}
+      min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all duration-150
+      ${selected
+        ? 'border-primary shadow-lg shadow-primary/30 scale-[1.02]'
+        : validationMessage
+        ? 'border-red-500/40 hover:border-red-500/60'
+        : 'border-border hover:border-primary/50'}
+      ${isPulsing ? 'animate-validation-pulse' : ''}
     `}>
       {/* Header */}
       <div className="flex items-center p-3 border-b bg-muted/30 rounded-t-lg relative group">
@@ -110,6 +157,15 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
               }`}>
                 {nodeResult.status === 'success' ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
               </div>
+            )}
+            {validationMessage && (
+              <span
+                title={validationMessage}
+                aria-label={`Configuration issue: ${validationMessage}`}
+                className="flex items-center justify-center w-4 h-4 rounded-full bg-red-500/15 text-red-500 ring-1 ring-red-500/40"
+              >
+                <AlertCircle size={10} />
+              </span>
             )}
           </div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
@@ -171,4 +227,6 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
       ))}
     </div>
   );
-});
+}
+
+export const CustomNodeWrapper = memo(CustomNodeWrapperImpl);

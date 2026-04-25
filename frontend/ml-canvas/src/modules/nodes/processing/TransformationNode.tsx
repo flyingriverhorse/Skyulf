@@ -5,14 +5,15 @@ import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
+import { clickableProps } from '../../../core/utils/a11y';
 
 interface TransformationRule {
   columns: string[];
   method: 'yeo-johnson' | 'box-cox' | 'log' | 'square_root' | 'cube_root' | 'reciprocal' | 'square' | 'exponential';
   params?: {
-    standardize?: boolean;
-    clip_threshold?: number;
-  };
+    standardize?: boolean | undefined;
+    clip_threshold?: number | undefined;
+  } | undefined;
 }
 
 interface TransformationConfig {
@@ -95,7 +96,7 @@ const ColumnSelector: React.FC<{
       </div>
       <div className="max-h-32 overflow-y-auto space-y-1 pt-1">
          {filteredColumns.length === 0 ? (
-            <div className="text-xs text-muted-foreground p-2 text-center">No columns match "{search}"</div>
+            <div className="text-xs text-muted-foreground p-2 text-center">No columns match &quot;{search}&quot;</div>
          ) : (
             filteredColumns.map(col => (
               <label key={col} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-accent/50 p-1 rounded">
@@ -161,7 +162,9 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
 
   const updateRule = (index: number, updates: Partial<TransformationRule>) => {
     const current = [...transformations];
-    current[index] = { ...current[index], ...updates };
+    const existing = current[index];
+    if (!existing) return;
+    current[index] = { ...existing, ...updates };
     onChange({ transformations: current });
   };
 
@@ -192,7 +195,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
   return (
     <div ref={containerRef} className="p-4 space-y-6 h-full overflow-y-auto">
       <div className="flex justify-between items-center">
-        <label className="text-sm font-medium">Transformation Rules</label>
+        <span className="text-sm font-medium">Transformation Rules</span>
         <button
           onClick={addRule}
           className="flex items-center gap-1 text-xs bg-primary text-primary-foreground px-2 py-1 rounded hover:bg-primary/90"
@@ -212,7 +215,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
               {/* Header */}
               <div 
                 className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent/50 transition-colors"
-                onClick={() => { toggleRule(idx); }}
+                {...clickableProps(() => { toggleRule(idx); })}
               >
                 <div className="flex items-center gap-2 overflow-hidden">
                   {isExpanded ? <ChevronDown size={16} className="text-muted-foreground flex-shrink-0" /> : <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />}
@@ -239,7 +242,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                   {/* Left Column: Settings */}
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-2">
-                      <label className="text-xs font-medium text-muted-foreground">Method</label>
+                      <span className="text-xs font-medium text-muted-foreground">Method</span>
                       <select
                         className="w-full p-1.5 border rounded text-xs bg-background font-medium"
                         value={currentType}
@@ -263,6 +266,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                     </div>
 
                     {(rule.method === 'yeo-johnson' || rule.method === 'box-cox') && (
+                      // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- stopPropagation wrapper, child controls handle their own keyboard input
                       <div className="flex items-center gap-2 pt-1" onClick={(e) => { e.stopPropagation(); }}>
                         <input
                           type="checkbox"
@@ -275,8 +279,9 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                     )}
                     
                     {rule.method === 'exponential' && (
+                       // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- stopPropagation wrapper, child controls handle their own keyboard input
                        <div className="flex flex-col gap-1 pt-1" onClick={(e) => { e.stopPropagation(); }}>
-                         <label className="text-xs text-muted-foreground">Clip Threshold:</label>
+                         <span className="text-xs text-muted-foreground">Clip Threshold:</span>
                          <input
                            type="number"
                            className="w-full p-1 border rounded text-xs"
@@ -288,8 +293,9 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                   </div>
 
                   {/* Right Column: Columns */}
+                  {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- stopPropagation wrapper, child controls handle their own keyboard input */}
                   <div className="space-y-1 min-w-0" onClick={(e) => { e.stopPropagation(); }}>
-                    <label className="text-xs font-medium text-muted-foreground">Target Columns</label>
+                    <span className="text-xs font-medium text-muted-foreground">Target Columns</span>
                     <ColumnSelector 
                       allColumns={columns}
                       selectedColumns={rule.columns}
@@ -304,7 +310,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
         
         {transformations.length === 0 && (
           <div className="text-xs text-muted-foreground text-center py-8 border border-dashed rounded bg-muted/20">
-            No transformation rules defined.<br/>Click "Add Rule" to start.
+            No transformation rules defined.<br/>Click &quot;Add Rule&quot; to start.
           </div>
         )}
       </div>

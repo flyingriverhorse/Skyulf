@@ -94,7 +94,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                         {profile.excluded_columns.map((colName: string) => (
                             <VariableRow 
                                 key={colName}
-                                profile={{ name: colName, dtype: 'Excluded', missing_percentage: 0 }}
+                                profile={{ name: colName, dtype: 'Excluded', missing_count: 0, missing_percentage: 0 }}
                                 isExpanded={expandedVars.has(colName)}
                                 onToggleExpand={() => toggleExpand(colName)}
                                 onToggleExclude={handleToggleExclude}

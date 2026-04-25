@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { X, Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Hash, AlignLeft, Calendar, Ban } from 'lucide-react';
+import { Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Hash, AlignLeft, Calendar, Ban } from 'lucide-react';
 import { EDAService } from '../../core/api/eda';
-import { useEscapeKey } from '../../core/hooks/useEscapeKey';
+import { ModalShell, useConfirm } from '../shared';
+import { StatusBadge } from '../shared/StatusBadge';
+import { clickableProps } from '../../core/utils/a11y';
+import { toast } from '../../core/toast';
 
 interface JobsHistoryModalProps {
   isOpen: boolean;
@@ -16,29 +19,31 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState<number | null>(null);
+  const confirm = useConfirm();
 
   const handleClose = () => {
     setSelectedJob(null);
     onClose();
   };
 
-  useEscapeKey(handleClose, isOpen);
-
-  if (!isOpen) return null;
-
   const handleCancel = async (e: React.MouseEvent, jobId: number) => {
     e.stopPropagation();
-    if (confirm("Are you sure you want to cancel this analysis?")) {
-        setCancelling(jobId);
-        try {
-            await EDAService.cancelJob(jobId);
-            if (onRefresh) onRefresh();
-        } catch (err) {
-            console.error("Failed to cancel job", err);
-            alert("Failed to cancel job");
-        } finally {
-            setCancelling(null);
-        }
+    const ok = await confirm({
+      title: 'Cancel analysis?',
+      message: 'Are you sure you want to cancel this analysis?',
+      confirmLabel: 'Cancel job',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    setCancelling(jobId);
+    try {
+      await EDAService.cancelJob(jobId);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to cancel job', err);
+      toast.error('Failed to cancel job');
+    } finally {
+      setCancelling(null);
     }
   };
 
@@ -64,43 +69,50 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="jobs-history-title"
-        className={`bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full flex flex-col transition-all duration-300 ${selectedJob ? 'max-w-5xl h-[90vh]' : 'max-w-2xl max-h-[80vh]'}`}
-      >
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-3">
-            {selectedJob ? (
-              <button 
-                onClick={() => setSelectedJob(null)}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                aria-label="Back to history"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-              </button>
-            ) : (
-              <Clock className="w-5 h-5 text-blue-500" />
-            )}
-            <h2 id="jobs-history-title" className="text-xl font-semibold text-gray-900 dark:text-white">
-              {selectedJob ? `Analysis #${selectedJob.id} Details` : 'Analysis History'}
-            </h2>
-          </div>
-          <button 
-            onClick={handleClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+    <ModalShell
+      isOpen={isOpen}
+      onClose={handleClose}
+      size={selectedJob ? '5xl' : '2xl'}
+      title={
+        <div className="flex items-center gap-3">
+          {selectedJob ? (
+            <button
+              onClick={() => setSelectedJob(null)}
+              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+              aria-label="Back to history"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            </button>
+          ) : (
+            <Clock className="w-5 h-5 text-blue-500" />
+          )}
+          <span className="text-xl font-semibold text-gray-900 dark:text-white">
+            {selectedJob ? `Analysis #${selectedJob.id} Details` : 'Analysis History'}
+          </span>
         </div>
-        
-        <div className="flex-1 overflow-y-auto p-6">
+      }
+      footer={
+        selectedJob ? (
+          <div className="flex justify-end">
+            <button
+              onClick={() => {
+                onSelect(selectedJob);
+                handleClose();
+              }}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              <Play className="w-4 h-4 mr-2" />
+              Load this Report
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center w-full">
+            Select a previous analysis to view details.
+          </p>
+        )
+      }
+    >
+      <div className="p-6">
           {!selectedJob ? (
             history.length === 0 ? (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
@@ -112,7 +124,7 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                 {history.map((job) => (
                   <div 
                     key={job.id}
-                    onClick={() => handleJobClick(job)}
+                    {...clickableProps(() => handleJobClick(job))}
                     className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-all group"
                   >
                     <div className="flex items-center gap-4">
@@ -130,14 +142,7 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                       <div>
                         <div className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-2">
                           Analysis #{job.id}
-                          <span className={`text-xs px-2 py-0.5 rounded-full border ${
-                            job.status === 'COMPLETED' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800' :
-                            job.status === 'FAILED' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800' :
-                            job.status === 'CANCELLED' ? 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700' :
-                            'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800'
-                          }`}>
-                            {job.status}
-                          </span>
+                          <StatusBadge status={job.status} />
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           {new Date(job.created_at).toLocaleString()}
@@ -274,27 +279,7 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                 </div>
             </div>
           )}
-        </div>
-        
-        <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-b-xl flex justify-between items-center">
-            {selectedJob ? (
-                <button
-                    onClick={() => {
-                        onSelect(selectedJob);
-                        handleClose();
-                    }}
-                    className="ml-auto flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
-                >
-                    <Play className="w-4 h-4 mr-2" />
-                    Load this Report
-                </button>
-            ) : (
-                <p className="text-sm text-gray-500 dark:text-gray-400 text-center w-full">
-                    Select a previous analysis to view details.
-                </p>
-            )}
-        </div>
       </div>
-    </div>
+    </ModalShell>
   );
 };

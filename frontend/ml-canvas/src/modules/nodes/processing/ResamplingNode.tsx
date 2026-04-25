@@ -193,7 +193,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
             
             <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Resampling Type</label>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Resampling Type</span>
                 <select 
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.type}
@@ -205,7 +205,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             </div>
 
             <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Method</label>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Method</span>
                 <select 
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.method}
@@ -237,7 +237,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             </div>
 
             <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Target Column</label>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Target Column</span>
                 <div className="relative">
                     <input 
                         type="text"
@@ -261,7 +261,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             </div>
 
             <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sampling Strategy</label>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sampling Strategy</span>
                 <select 
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.sampling_strategy}
@@ -277,7 +277,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             </div>
 
             <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Random State</label>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Random State</span>
                 <input 
                     type="number"
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -296,7 +296,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                 <>
                     {['smote', 'adasyn', 'borderline_smote', 'svm_smote', 'kmeans_smote'].includes(config.method) && (
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">k Neighbors</label>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">k Neighbors</span>
                             <input 
                                 type="number"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -308,7 +308,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     
                     {['borderline_smote', 'svm_smote'].includes(config.method) && (
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">m Neighbors</label>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">m Neighbors</span>
                             <input 
                                 type="number"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -320,7 +320,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
 
                     {config.method === 'borderline_smote' && (
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Kind</label>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Kind</span>
                             <select 
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.kind ?? 'borderline-1'}
@@ -334,7 +334,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
 
                     {config.method === 'svm_smote' && (
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Out Step</label>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Out Step</span>
                             <input 
                                 type="number"
                                 step="0.1"
@@ -348,7 +348,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     {config.method === 'kmeans_smote' && (
                         <>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Cluster Balance Threshold</label>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Cluster Balance Threshold</span>
                                 <input 
                                     type="number"
                                     step="0.1"
@@ -358,7 +358,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Density Exponent</label>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Density Exponent</span>
                                 <input 
                                     type="text"
                                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -374,7 +374,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             {config.type === 'undersampling' && config.method === 'random_under_sampling' && (
                 <div className="flex items-center justify-between p-3 border rounded-md bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
                     <div>
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">Replacement</label>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 block">Replacement</span>
                         <span className="text-xs text-gray-500 dark:text-gray-400">Sample with replacement</span>
                     </div>
                     <input 
@@ -388,7 +388,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
 
             {config.type === 'undersampling' && config.method === 'nearmiss' && (
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Version</label>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Version</span>
                     <select 
                         className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         value={config.version ?? 1}
@@ -404,7 +404,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             {config.type === 'undersampling' && config.method === 'edited_nearest_neighbours' && (
                 <>
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">n Neighbors</label>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">n Neighbors</span>
                         <input 
                             type="number"
                             className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -413,7 +413,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                         />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Selection Kind</label>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selection Kind</span>
                         <select 
                             className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             value={config.kind_sel ?? 'all'}

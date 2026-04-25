@@ -53,7 +53,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
   const handleAdd = () => {
     if (columns.length === 0) return;
     // Default to first available column and float
-    const newCol = columns.find(c => !config.column_types[c]) || columns[0];
+    const newCol = columns.find(c => !config.column_types[c]) ?? columns[0]!;
     onChange({
       ...config,
       column_types: { ...config.column_types, [newCol]: 'float' }
@@ -69,6 +69,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
   const handleUpdateColumn = (oldCol: string, newCol: string) => {
     if (oldCol === newCol) return;
     const type = config.column_types[oldCol];
+    if (type === undefined) return;
     const newTypes = { ...config.column_types };
     Reflect.deleteProperty(newTypes, oldCol);
     newTypes[newCol] = type;
@@ -98,7 +99,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium">Casting Rules</label>
+          <span className="text-sm font-medium">Casting Rules</span>
           <button
             onClick={handleAdd}
             disabled={!datasetId || columns.length === 0}

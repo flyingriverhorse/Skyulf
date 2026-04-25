@@ -153,7 +153,7 @@ export const DatasetService = {
     const blob = await response.blob();
     const disposition = response.headers.get('Content-Disposition') || '';
     const filenameMatch = disposition.match(/filename=(.+)/);
-    const filename = filenameMatch ? filenameMatch[1] : `export.${format}`;
+    const filename = filenameMatch?.[1] ?? `export.${format}`;
 
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -194,9 +194,9 @@ export interface DatasetProfile {
       std: number;
       minimum: number;
       maximum: number;
-    };
+    } | undefined;
     text_summary?: {
       sentiment_distribution?: Record<string, number>;
-    };
+    } | undefined;
   }>;
 }

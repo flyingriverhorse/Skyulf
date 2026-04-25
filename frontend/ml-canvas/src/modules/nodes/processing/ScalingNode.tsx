@@ -70,7 +70,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
     onChange({ ...config, columns: newCols });
   };
 
-  const FeedbackSection = () => {
+  const renderFeedback = () => {
     if (!nodeResult || !nodeResult.metrics) return null;
     const m = nodeResult.metrics;
     const cols = m.columns as string[] | undefined;
@@ -144,7 +144,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
         {/* Left Column: Settings */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
           <div>
-            <label className="block text-sm font-medium mb-1">Scaling Method</label>
+            <span className="block text-sm font-medium mb-1">Scaling Method</span>
             <select
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.method}
@@ -190,7 +190,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
           {/* MinMax Scaler Params */}
           {config.method === 'minmax' && (
             <div className="space-y-2 border-t pt-2">
-              <label className="block text-sm font-medium">Feature Range</label>
+              <span className="block text-sm font-medium">Feature Range</span>
               <div className="flex gap-2 items-center">
                 <input
                   type="number"
@@ -214,7 +214,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
           {/* Robust Scaler Params */}
           {config.method === 'robust' && (
             <div className="space-y-2 border-t pt-2">
-              <label className="block text-sm font-medium">Quantile Range</label>
+              <span className="block text-sm font-medium">Quantile Range</span>
               <div className="flex gap-2 items-center">
                 <input
                   type="number"
@@ -256,7 +256,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
           )}
           
           {/* Feedback Section (Wide) */}
-          {isWide && <FeedbackSection />}
+          {isWide && renderFeedback()}
         </div>
         
         {/* Right Column: Columns */}
@@ -304,7 +304,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
         </div>
 
         {/* Feedback Section (Narrow) */}
-        {!isWide && <FeedbackSection />}
+        {!isWide && renderFeedback()}
 
       </div>
     </div>

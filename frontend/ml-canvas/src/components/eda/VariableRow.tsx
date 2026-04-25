@@ -9,19 +9,21 @@ import {
     Loader2,
     Check
 } from 'lucide-react';
+import { clickableProps } from '../../core/utils/a11y';
 import { BarChart, Bar, ResponsiveContainer } from 'recharts';
-import { DistributionChart } from './DistributionChart';
+import { DistributionChart, type DistributionDatum } from './DistributionChart';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { InfoTooltip } from '../ui/InfoTooltip';
+import type { ColumnProfile } from '../../core/types/edaProfile';
 
 interface VariableRowProps {
-    profile: any;
+    profile: ColumnProfile;
     isExpanded: boolean;
     onToggleExpand: () => void;
     onToggleExclude: (colName: string, exclude: boolean) => void;
     isExcluded: boolean;
-    handleAddFilter: (column: string, value: any, operator: string) => void;
+    handleAddFilter: (column: string, value: string | number, operator: string) => void;
 }
 
 export const VariableRow: React.FC<VariableRowProps> = ({ 
@@ -35,12 +37,13 @@ export const VariableRow: React.FC<VariableRowProps> = ({
     const chartRef = useRef<HTMLDivElement>(null);
     const [dlState, setDlState] = useState<'idle' | 'downloading' | 'done'>('idle');
 
-    // Prepare mini histogram data
-    let miniChartData: any[] = [];
+    // Mini histogram data for the collapsed-row preview.
+    type MiniDatum = { name: string; count: number };
+    let miniChartData: MiniDatum[] = [];
     if (profile.histogram) {
-        miniChartData = profile.histogram.map((b: any) => ({ name: String(b.start), count: b.count }));
+        miniChartData = profile.histogram.map((b) => ({ name: String(b.start), count: b.count }));
     } else if (profile.categorical_stats?.top_k) {
-        miniChartData = profile.categorical_stats.top_k.slice(0, 10).map((k: any) => ({ name: k.value, count: k.count }));
+        miniChartData = profile.categorical_stats.top_k.slice(0, 10).map((k) => ({ name: String(k.value), count: k.count }));
     }
     
     // Fallback for mini chart data if not directly available in standard path
@@ -70,7 +73,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
         }
     };
 
-    const onBarClick = (data: any) => {
+    const onBarClick = (data: DistributionDatum) => {
         if (profile.dtype === 'Categorical' || profile.dtype === 'Boolean') {
              const val = data.value !== undefined ? data.value : data.name; // Fallback to name if value missing
              handleAddFilter(profile.name, val, '==');
@@ -149,7 +152,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
         <div className={`border rounded-lg mb-2 transition-all ${isExpanded ? 'border-primary/50 shadow-md bg-card/50' : 'border-border bg-card'}`}>
             <div 
                 className="flex items-center p-3 hover:bg-accent/50 cursor-pointer rounded-t-lg"
-                onClick={onToggleExpand}
+                {...clickableProps(onToggleExpand)}
             >
                 <div className="mr-2 text-muted-foreground">
                     {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
@@ -331,9 +334,9 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                                                  <div className="my-2 border-t border-dashed" />
                                                  <div className="text-xs font-semibold mb-1">Common Words</div>
                                                  <div className="flex flex-wrap gap-1">
-                                                    {profile.text_stats.common_words.slice(0, 10).map((w: any, idx: number) => (
+                                                    {profile.text_stats.common_words.slice(0, 10).map((w, idx) => (
                                                         <Badge key={idx} variant="secondary" className="text-[10px] h-4">
-                                                            {w.word || w.value} ({w.count})
+                                                            {w.word ?? w.value} ({w.count})
                                                         </Badge>
                                                     ))}
                                                  </div>
@@ -364,7 +367,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                                                 <div className="my-2 border-t border-dashed" />
                                                 <div className="text-xs font-semibold mb-1">Top Categories</div>
                                                 <div className="space-y-1">
-                                                    {profile.categorical_stats.top_k.slice(0, 5).map((item: any, i: number) => (
+                                                    {profile.categorical_stats.top_k.slice(0, 5).map((item, i) => (
                                                         <div key={i} className="flex justify-between text-xs">
                                                             <span className="truncate max-w-[120px]" title={String(item.value)}>{String(item.value)}</span>
                                                             <span className="text-muted-foreground">{item.count}</span>

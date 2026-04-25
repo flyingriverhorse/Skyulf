@@ -2,6 +2,7 @@ import { Node, Edge } from '@xyflow/react';
 import { PipelineConfigModel, NodeConfigModel } from '../api/client';
 import { v4 as uuidv4 } from 'uuid';
 import { StepType as BackendStepType } from '../constants/stepTypes';
+import { getMergeStrategy } from '../types/nodeData';
 
 export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): PipelineConfigModel => {
     const sortedNodes: NodeConfigModel[] = [];
@@ -257,7 +258,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           // can switch column-overlap semantics when the user requests it.
           // Kept under an underscore key to keep it separate from
           // step-specific params.
-          const strat = (node.data as { merge_strategy?: string })?.merge_strategy;
+          const strat = getMergeStrategy(node.data);
           if (strat && strat !== 'last_wins') {
             return { ...params, _merge_strategy: strat };
           }

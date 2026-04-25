@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { 
   ReactFlow, 
   Background, 
@@ -15,6 +15,7 @@ import { useClipboard } from '../../core/hooks/useClipboard';
 import { useBranchColors } from '../../core/hooks/useBranchColors';
 import { CustomNodeWrapper } from './CustomNodeWrapper';
 import { CustomEdge } from './CustomEdge';
+import { useConfirm } from '../shared';
 
 const nodeTypes = {
   custom: CustomNodeWrapper
@@ -26,7 +27,7 @@ const edgeTypes = {
 
 const FlowCanvasContent: React.FC = () => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
   
   const { 
     nodes, 
@@ -49,6 +50,30 @@ const FlowCanvasContent: React.FC = () => {
   );
 
   const { isResultsPanelExpanded } = useViewStore();
+
+  const confirm = useConfirm();
+
+  // Gate Backspace/Delete behind a real confirmation modal. React Flow
+  // calls `onBeforeDelete` synchronously and awaits the returned promise;
+  // resolving `false` cancels the delete. Single-node deletes are still
+  // undoable via Ctrl+Z, but a misclick on a complex pipeline should
+  // not silently wipe state.
+  const onBeforeDelete = useCallback(
+    async ({ nodes: toDelete }: { nodes: typeof nodes; edges: typeof edges }) => {
+      if (toDelete.length === 0) return true;
+      const count = toDelete.length;
+      return confirm({
+        title: count === 1 ? 'Delete node?' : `Delete ${count} nodes?`,
+        message:
+          count === 1
+            ? 'The selected node and any connected edges will be removed. You can undo with Ctrl+Z.'
+            : `${count} nodes and any connected edges will be removed. You can undo with Ctrl+Z.`,
+        confirmLabel: 'Delete',
+        variant: 'danger',
+      });
+    },
+    [confirm],
+  );
 
   useClipboard();
 
@@ -93,6 +118,30 @@ const FlowCanvasContent: React.FC = () => {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
+  // F key → fit view. Lives here (not in the global keyboard hook)
+  // because `fitView` is only available inside ReactFlowProvider.
+  // Skip when typing in form fields so it doesn't fight with text input.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      if (e.key !== 'f' && e.key !== 'F') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        t?.isContentEditable === true
+      ) {
+        return;
+      }
+      e.preventDefault();
+      fitView({ duration: 250, padding: 0.15 });
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [fitView]);
+
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
@@ -118,7 +167,8 @@ const FlowCanvasContent: React.FC = () => {
     <div 
       className="w-full h-full outline-none" 
       ref={reactFlowWrapper}
-      tabIndex={0} // Make the container focusable to capture key events
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- canvas wrapper must be focusable to capture keyboard shortcuts
+      tabIndex={0}
     >
       <ReactFlow
         nodes={nodes}
@@ -133,33 +183,25 @@ const FlowCanvasContent: React.FC = () => {
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{
           type: 'custom',
-          style: { 
-            stroke: 'url(#edge-gradient)', 
-            strokeWidth: 3,
+          style: {
+            // Solid indigo stroke with the React Flow CSS dash animation
+            // (`animated: true`). The previous default referenced an SVG
+            // `<linearGradient id="edge-gradient">` which collapsed to an
+            // invisible stroke on some near-collinear paths once the glow
+            // filter was removed. Solid stroke avoids that without losing
+            // the animated-flow affordance. The real perf killer was the
+            // `feGaussianBlur` glow filter recomputed every frame; the
+            // dash-offset CSS keyframe is cheap.
+            stroke: '#6366f1',
+            strokeWidth: 2,
             strokeDasharray: '8 6',
-            filter: 'url(#glow)'
           },
           animated: true,
         }}
         edgeTypes={edgeTypes}
         deleteKeyCode={['Backspace', 'Delete']}
+        onBeforeDelete={onBeforeDelete}
       >
-        <svg style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0, pointerEvents: 'none' }}>
-          <defs>
-            <linearGradient id="edge-gradient">
-              <stop offset="0%" stopColor="#38bdf8" />
-              <stop offset="50%" stopColor="#6366f1" />
-              <stop offset="100%" stopColor="#a855f7" />
-            </linearGradient>
-            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-              <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
-              </feMerge>
-            </filter>
-          </defs>
-        </svg>
         <Background />
         <Controls 
           position="bottom-left" 

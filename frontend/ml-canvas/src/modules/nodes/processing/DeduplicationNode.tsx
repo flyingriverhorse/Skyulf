@@ -57,7 +57,7 @@ const DeduplicationSettings: React.FC<{ config: DeduplicationConfig; onChange: (
       )}
 
       <div>
-        <label className="block text-sm font-medium mb-1">Keep Strategy</label>
+        <span className="block text-sm font-medium mb-1">Keep Strategy</span>
         <select
           className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
           value={config.keep}
@@ -74,7 +74,7 @@ const DeduplicationSettings: React.FC<{ config: DeduplicationConfig; onChange: (
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium">Subset Columns (Optional)</label>
+          <span className="block text-sm font-medium">Subset Columns (Optional)</span>
           <span className="text-xs text-muted-foreground">
             {config.subset.length} selected
           </span>
@@ -119,7 +119,7 @@ const DeduplicationSettings: React.FC<{ config: DeduplicationConfig; onChange: (
             ))}
             {filteredColumns.length === 0 && (
               <div className="text-xs text-muted-foreground text-center py-2">
-                No columns match "{searchTerm}"
+                No columns match &quot;{searchTerm}&quot;
               </div>
             )}
           </div>
