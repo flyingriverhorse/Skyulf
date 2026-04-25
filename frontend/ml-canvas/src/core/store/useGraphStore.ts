@@ -1,13 +1,16 @@
 import { create } from 'zustand';
-import { 
-  Connection, 
-  Edge, 
-  EdgeChange, 
-  Node, 
-  NodeChange, 
-  addEdge, 
-  OnNodesChange, 
-  OnEdgesChange, 
+import { temporal } from 'zundo';
+import type { TemporalState } from 'zundo';
+import { useStore } from 'zustand';
+import {
+  Connection,
+  Edge,
+  EdgeChange,
+  Node,
+  NodeChange,
+  addEdge,
+  OnNodesChange,
+  OnEdgesChange,
   OnConnect,
   applyNodeChanges,
   applyEdgeChanges,
@@ -50,7 +53,9 @@ interface GraphState {
   setExecutionResult: (result: PreviewResponse | null) => void;
 }
 
-export const useGraphStore = create<GraphState>((set, get) => ({
+export const useGraphStore = create<GraphState>()(
+  temporal(
+    (set, get) => ({
   nodes: [],
   edges: [],
   executionResult: null,
@@ -298,4 +303,47 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
     return true;
   },
-}));
+    }),
+    {
+      // Only track structural graph state for undo/redo. Excluding
+      // `executionResult` keeps preview data out of history (it's
+      // populated by the backend, not user actions, and snapshots
+      // of it can be tens of MB).
+      partialize: (state) => ({ nodes: state.nodes, edges: state.edges }),
+      // Skip history entries that only differ by an in-progress drag.
+      // React Flow emits a stream of `dragging:true` position changes
+      // per pointer move; we only care about the committed final
+      // position (when `dragging` flips to false). Same for plain
+      // selection changes — toggling `selected` shouldn't be undoable.
+      equality: (prev, next) => {
+        if (prev.edges !== next.edges) return false;
+        if (prev.nodes === next.nodes) return true;
+        if (prev.nodes.length !== next.nodes.length) return false;
+        for (let i = 0; i < prev.nodes.length; i++) {
+          const a = prev.nodes[i]!;
+          const b = next.nodes[i]!;
+          if (a.id !== b.id) return false;
+          if (a.data !== b.data) return false;
+          if (a.type !== b.type) return false;
+          // Treat any node currently being dragged as equal to its
+          // previous state — only the drag-end commit creates a
+          // history entry.
+          if (a.dragging || b.dragging) continue;
+          if (a.position.x !== b.position.x || a.position.y !== b.position.y) return false;
+        }
+        return true;
+      },
+      limit: 100,
+    },
+  ),
+);
+
+/**
+ * Hook into the temporal substore (undo/redo). Use selectors to
+ * subscribe to specific slices, e.g.
+ *   const undo = useTemporalStore((s) => s.undo);
+ *   const canUndo = useTemporalStore((s) => s.pastStates.length > 0);
+ */
+export const useTemporalStore = <T,>(
+  selector: (state: TemporalState<{ nodes: Node[]; edges: Edge[] }>) => T,
+): T => useStore(useGraphStore.temporal, selector);
