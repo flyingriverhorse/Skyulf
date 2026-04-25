@@ -20,22 +20,22 @@ interface FeatureSelectionConfig {
     | 'rfe';
   
   // Common
-  target_column?: string;
-  datasetId?: string;
-  problem_type?: 'auto' | 'classification' | 'regression';
+  target_column?: string | undefined;
+  datasetId?: string | undefined;
+  problem_type?: 'auto' | 'classification' | 'regression' | undefined;
 
   // Method Specific
-  threshold?: number | string; // Variance, Correlation, SelectFromModel (can be "median")
-  correlation_method?: 'pearson' | 'kendall' | 'spearman';
-  k?: number; // SelectKBest, RFE
-  percentile?: number; // SelectPercentile
-  alpha?: number; // FPR, FDR, FWE
-  score_func?: string; // Univariate methods
-  mode?: 'k_best' | 'percentile' | 'fpr' | 'fdr' | 'fwe'; // Generic
-  param?: number; // Generic
-  estimator?: 'RandomForest' | 'LogisticRegression' | 'LinearRegression' | 'auto'; // Model based
-  step?: number; // RFE
-  drop_columns?: boolean;
+  threshold?: number | string | undefined; // Variance, Correlation, SelectFromModel (can be "median")
+  correlation_method?: 'pearson' | 'kendall' | 'spearman' | undefined;
+  k?: number | undefined; // SelectKBest, RFE
+  percentile?: number | undefined; // SelectPercentile
+  alpha?: number | undefined; // FPR, FDR, FWE
+  score_func?: string | undefined; // Univariate methods
+  mode?: 'k_best' | 'percentile' | 'fpr' | 'fdr' | 'fwe' | undefined; // Generic
+  param?: number | undefined; // Generic
+  estimator?: 'RandomForest' | 'LogisticRegression' | 'LinearRegression' | 'auto' | undefined; // Model based
+  step?: number | undefined; // RFE
+  drop_columns?: boolean | undefined;
 }
 
 const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onChange: (c: FeatureSelectionConfig) => void; nodeId?: string }> = ({

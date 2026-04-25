@@ -26,7 +26,7 @@ interface TrainingJobSummary {
   status: string;
   model_type: string;
   created_at: string;
-  metrics?: Record<string, unknown>;
+  metrics?: Record<string, unknown> | undefined;
 }
 
 const COLORS = ['#10B981', '#EF4444', '#F59E0B', '#3B82F6'];
@@ -80,7 +80,7 @@ export const Dashboard: React.FC = () => {
         const last7Days = [...Array(7)].map((_, i) => {
           const d = new Date();
           d.setDate(d.getDate() - i);
-          return d.toISOString().split('T')[0];
+          return d.toISOString().split('T')[0]!;
         }).reverse();
 
         const dailyCounts = last7Days.map(date => ({

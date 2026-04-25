@@ -8,7 +8,7 @@ import { FileUpload } from './FileUpload';
 
 interface DatasetNodeConfig {
   datasetId: string;
-  datasetName?: string;
+  datasetName?: string | undefined;
 }
 
 const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: DatasetNodeConfig) => void }> = ({

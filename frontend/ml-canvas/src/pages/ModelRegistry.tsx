@@ -256,9 +256,10 @@ export const ModelRegistry: React.FC = () => {
     }
     // Fallback: first key
     const keys = Object.keys(metrics);
-    if (keys.length > 0) {
-      const val = metrics[keys[0]];
-      return `${keys[0]}: ${typeof val === 'number' ? val.toFixed(4) : val}`;
+    const firstKey = keys[0];
+    if (firstKey) {
+      const val = metrics[firstKey];
+      return `${firstKey}: ${typeof val === 'number' ? val.toFixed(4) : val}`;
     }
     return '-';
   };

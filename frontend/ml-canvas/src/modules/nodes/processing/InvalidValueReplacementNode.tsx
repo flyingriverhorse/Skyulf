@@ -10,8 +10,8 @@ import { clickableProps } from '../../../core/utils/a11y';
 interface InvalidValueReplacementConfig {
   columns: string[];
   mode: 'negative_to_nan' | 'zero_to_nan' | 'percentage_bounds' | 'age_bounds' | 'custom_range';
-  min_value?: number;
-  max_value?: number;
+  min_value?: number | undefined;
+  max_value?: number | undefined;
 }
 
 // --- Components ---

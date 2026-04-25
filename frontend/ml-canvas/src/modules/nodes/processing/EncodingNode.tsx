@@ -10,16 +10,16 @@ interface EncodingConfig {
   method: 'onehot' | 'ordinal' | 'label' | 'target' | 'hash' | 'dummy';
   columns: string[];
   // OneHot/Dummy specific
-  drop_first?: boolean;
-  drop_original?: boolean;
-  handle_unknown?: 'error' | 'ignore';
+  drop_first?: boolean | undefined;
+  drop_original?: boolean | undefined;
+  handle_unknown?: 'error' | 'ignore' | undefined;
   // Hash specific
-  n_features?: number;
+  n_features?: number | undefined;
   // Target specific
-  target_column?: string;
+  target_column?: string | undefined;
   // Label/Ordinal specific
-  unknown_value?: number; // For Ordinal
-  missing_code?: number; // For Label
+  unknown_value?: number | undefined; // For Ordinal
+  missing_code?: number | undefined; // For Label
 }
 
 const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: EncodingConfig) => void; nodeId?: string }> = ({

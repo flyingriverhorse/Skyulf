@@ -224,15 +224,18 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
     const links: Array<{ source: string; target: string; sourceHandle?: string; targetHandle?: string }> = [];
     for (let i = 0; i < inputs.length - 1; i++) {
-      const sh = firstOutputHandle(inputs[i]);
-      const th = firstInputHandle(inputs[i + 1]);
+      const a = inputs[i]!;
+      const b = inputs[i + 1]!;
+      const sh = firstOutputHandle(a);
+      const th = firstInputHandle(b);
       if (!sh || !th) return false;
-      links.push({ source: inputs[i], target: inputs[i + 1], sourceHandle: sh, targetHandle: th });
+      links.push({ source: a, target: b, sourceHandle: sh, targetHandle: th });
     }
-    const lastSh = firstOutputHandle(inputs[inputs.length - 1]);
+    const lastInput = inputs[inputs.length - 1]!;
+    const lastSh = firstOutputHandle(lastInput);
     const lastTh = firstInputHandle(consumerId);
     if (!lastSh || !lastTh) return false;
-    links.push({ source: inputs[inputs.length - 1], target: consumerId, sourceHandle: lastSh, targetHandle: lastTh });
+    links.push({ source: lastInput, target: consumerId, sourceHandle: lastSh, targetHandle: lastTh });
 
     // Keep head sibling's upstream edges; clear incoming on tail siblings
     // and drop the original fan-in into the consumer.

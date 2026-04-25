@@ -4,9 +4,9 @@ export interface HyperparameterInputProps {
     value: unknown;
     type: string;
     onChange: (value: unknown) => void;
-    step?: number;
-    min?: number;
-    max?: number;
+    step?: number | undefined;
+    min?: number | undefined;
+    max?: number | undefined;
 }
 
 /**

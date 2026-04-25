@@ -22,7 +22,7 @@ interface ColumnProfile {
     std: number;
     minimum: number;
     maximum: number;
-  };
+  } | undefined;
 }
 
 interface DatasetProfile {

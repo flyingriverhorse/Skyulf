@@ -104,7 +104,7 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
     const branchEdgeSets: Set<string>[] = [];
     const branchLabels: string[] = [];
     for (let i = 0; i < branches.length; i++) {
-      const { terminal, inputEdge, localIndex } = branches[i];
+      const { terminal, inputEdge, localIndex } = branches[i]!;
       const modelType = terminal.data.model_type as string | undefined;
       const modelName = modelType ? prettifyModelType(modelType) : '';
       // Per-terminal letter so the label matches the per-terminal tab bar
@@ -148,7 +148,7 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
         // Merge branch: BFS from the terminal node (all its inputs)
         const terminalIncoming = incomingMap.get(terminal.id) || [];
         if (terminalIncoming.length > 0) {
-          terminalEdgeIds.add(terminalIncoming[0].id);
+          terminalEdgeIds.add(terminalIncoming[0]!.id);
         }
         const queue = [terminal.id];
         while (queue.length > 0) {
@@ -169,7 +169,7 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
     const edgeBranchCount = new Map<string, number>();
     const edgeFirstBranch = new Map<string, number>();
     for (let i = 0; i < branchEdgeSets.length; i++) {
-      for (const edgeId of branchEdgeSets[i]) {
+      for (const edgeId of branchEdgeSets[i]!) {
         edgeBranchCount.set(edgeId, (edgeBranchCount.get(edgeId) || 0) + 1);
         if (!edgeFirstBranch.has(edgeId)) {
           edgeFirstBranch.set(edgeId, i);
@@ -181,8 +181,8 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
     for (const [edgeId, count] of edgeBranchCount) {
       const branchIdx = edgeFirstBranch.get(edgeId)!;
       colorMap.set(edgeId, {
-        color: colors[branchIdx],
-        label: terminalEdgeIds.has(edgeId) ? branchLabels[branchIdx] : null,
+        color: colors[branchIdx]!,
+        label: terminalEdgeIds.has(edgeId) ? (branchLabels[branchIdx] ?? null) : null,
         shared: count > 1,
       });
     }

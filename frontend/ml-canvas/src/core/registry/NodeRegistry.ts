@@ -34,10 +34,9 @@ class NodeRegistry {
       // node.category is a string, so it can be used as a key.
       // If it's undefined, it will be "undefined" string key.
       // Assuming category is always present based on type definition.
-      if (!grouped[node.category]) {
-        grouped[node.category] = [];
-      }
-      grouped[node.category].push(node);
+      const bucket = grouped[node.category] ?? [];
+      bucket.push(node);
+      grouped[node.category] = bucket;
     });
     return grouped;
   }

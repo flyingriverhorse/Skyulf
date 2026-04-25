@@ -7,9 +7,9 @@ import { generateBranchColors } from '../../../core/hooks/useBranchColors';
 
 export interface DataPreviewConfig {
   /** Legacy single-job id (kept for backward compatibility with old saved graphs). */
-  lastRunJobId?: string;
+  lastRunJobId?: string | undefined;
   /** All job ids for the most recent preview run (one per parallel input branch). */
-  lastRunJobIds?: string[];
+  lastRunJobIds?: string[] | undefined;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null => {
@@ -177,7 +177,7 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
   useEffect(() => {
     if (branchResults.length > 0) {
       if (!activeBranch || !branchResults.some(b => b.label === activeBranch)) {
-        setActiveBranch(branchResults[0].label);
+        setActiveBranch(branchResults[0]!.label);
       }
     } else if (activeBranch !== null) {
       setActiveBranch(null);
@@ -204,7 +204,7 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
       return;
     }
     if (!activeTab || !splitTabs.includes(activeTab)) {
-      setActiveTab(splitTabs[0]);
+      setActiveTab(splitTabs[0] ?? null);
     }
   }, [splitTabs, activeTab]);
 

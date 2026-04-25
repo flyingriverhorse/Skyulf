@@ -24,7 +24,7 @@ const Sparkline = ({ values, width = 64, height = 20 }: { values: number[], widt
         const y = height - ((v - min) / range) * (height - 4) - 2;
         return `${x},${y}`;
     }).join(' ');
-    const last = values[values.length - 1];
+    const last = values[values.length - 1] ?? 0;
     const color = last > 0.2 ? '#ef4444' : last > 0.1 ? '#f59e0b' : '#22c55e';
     return (
         <svg width={width} height={height} className="inline-block">

@@ -126,7 +126,7 @@ export const EDAPage: React.FC = () => {
       const data = await DatasetService.getUsable();
       setDatasets(data);
       if (data.length > 0 && !selectedDataset) {
-        setSelectedDataset(Number(data[0].id));
+        setSelectedDataset(Number(data[0]!.id));
       }
     } catch (err) {
       console.error("Failed to load datasets", err);

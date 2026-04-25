@@ -14,16 +14,16 @@ interface ImputationConfig {
   
   // Simple Imputer
   strategy: 'mean' | 'median' | 'most_frequent' | 'constant';
-  fill_value?: string | number;
+  fill_value?: string | number | undefined;
 
   // KNN Imputer
-  n_neighbors?: number;
-  weights?: 'uniform' | 'distance';
+  n_neighbors?: number | undefined;
+  weights?: 'uniform' | 'distance' | undefined;
 
   // Iterative Imputer
-  max_iter?: number;
-  estimator?: 'bayesian_ridge' | 'decision_tree' | 'extra_trees' | 'knn';
-  random_state?: number;
+  max_iter?: number | undefined;
+  estimator?: 'bayesian_ridge' | 'decision_tree' | 'extra_trees' | 'knn' | undefined;
+  random_state?: number | undefined;
 }
 
 const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: ImputationConfig) => void; nodeId?: string }> = ({
