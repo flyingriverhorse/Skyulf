@@ -858,9 +858,7 @@ async def preview_pipeline(  # noqa: C901
         # advisory for the shared upstream merge node. Collapse duplicates so
         # the UI shows one row per logically distinct merge.
         all_warnings = [
-            w
-            for _orig, _runnable, res in sub_results
-            for w in getattr(res, "merge_warnings", [])
+            w for _orig, _runnable, res in sub_results for w in getattr(res, "merge_warnings", [])
         ]
         seen_warning_keys: set = set()
         deduped_warnings: List[Dict[str, Any]] = []
