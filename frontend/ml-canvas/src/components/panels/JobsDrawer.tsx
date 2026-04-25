@@ -4,6 +4,7 @@ import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Ter
 import { JobInfo, jobsApi } from '../../core/api/jobs';
 import { useEscapeKey } from '../../core/hooks/useEscapeKey';
 import { formatMetricName } from '../../core/utils/format';
+import { clickableProps } from '../../core/utils/a11y';
 
 const formatMetricValue = (key: string, value: number): string => {
   if (key.endsWith('_std')) return value.toFixed(6);
@@ -101,6 +102,7 @@ export const JobsDrawer: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex justify-center items-center">
       {/* Backdrop */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- backdrop dismiss zone */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={() => toggleDrawer(false)}
@@ -234,7 +236,7 @@ export const JobsDrawer: React.FC = () => {
                   {showFilters && (
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-1.5">
-                        <label className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</label>
+                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</span>
                         <select
                           value={statusFilter}
                           onChange={(e) => setStatusFilter(e.target.value)}
@@ -247,7 +249,7 @@ export const JobsDrawer: React.FC = () => {
                         </select>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <label className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model</label>
+                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model</span>
                         <select
                           value={modelFilter}
                           onChange={(e) => setModelFilter(e.target.value)}
@@ -667,7 +669,7 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
 
   return (
     <div 
-        onClick={onClick}
+        {...clickableProps(onClick)}
         className={`grid grid-cols-12 gap-4 p-3 rounded-lg border text-sm items-center transition-colors cursor-pointer ${getStatusColor(job.status)}`}
     >
       {/* Status */}

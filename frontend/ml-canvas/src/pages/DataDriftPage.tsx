@@ -287,6 +287,7 @@ export const DataDriftPage: React.FC = () => {
                                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" size={14} />
                                         <input
                                             type="text"
+                                            // eslint-disable-next-line jsx-a11y/no-autofocus -- focus the search field on dropdown open
                                             autoFocus
                                             placeholder="Search jobs..."
                                             value={searchTerm}
@@ -449,6 +450,7 @@ export const DataDriftPage: React.FC = () => {
                         {editingDescription ? (
                             <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                 <input
+                                    // eslint-disable-next-line jsx-a11y/no-autofocus -- focus the description field when entering edit mode
                                     autoFocus
                                     value={descriptionDraft}
                                     onChange={e => setDescriptionDraft(e.target.value)}

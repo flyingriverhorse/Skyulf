@@ -98,7 +98,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium">Casting Rules</label>
+          <span className="text-sm font-medium">Casting Rules</span>
           <button
             onClick={handleAdd}
             disabled={!datasetId || columns.length === 0}

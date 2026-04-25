@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { Eraser, Plus, Trash2, Search, Wand2, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { clickableProps } from '../../../core/utils/a11y';
 
 // --- Types ---
 
@@ -56,7 +57,7 @@ const ColumnSelector: React.FC<{
             return (
               <div
                 key={col}
-                onClick={() => { toggle(col); }}
+                {...clickableProps(() => { toggle(col); })}
                 className={`
                   flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors
                   ${isSelected ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'}
@@ -308,9 +309,9 @@ const TextCleaningSettings: React.FC<{ config: TextCleaningConfig; onChange: (c:
           </div>
 
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Cleaning Operations
-            </label>
+            </span>
             <button
               onClick={addOperation}
               className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"

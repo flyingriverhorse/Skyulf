@@ -204,10 +204,10 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
         {/* Model & Target */}
         <div className="space-y-4">
             <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Configuration</label>
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Configuration</span>
                 <div className="grid gap-3">
                     <div>
-                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Model Type</label>
+                        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Model Type</span>
                         <div className="relative">
                             <select
                                 value={config.model_type}
@@ -242,7 +242,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
                                </button>
                                {showScalingAlert && (
                                    <div className="p-2 pt-0 opacity-90 animate-in slide-in-from-top-1 pl-7">
-                                       This model performs best with scaled features. Consider adding a "Feature Scaling" node.
+                                       This model performs best with scaled features. Consider adding a &quot;Feature Scaling&quot; node.
                                    </div>
                                )}
                            </div>
@@ -250,7 +250,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Target Column</label>
+                        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Target Column</span>
                         {availableColumns.length === 0 && (
                             <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-2">
                                 <AlertTriangle className="w-3 h-3" />
@@ -316,7 +316,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
                             <div className="space-y-3 pl-6 border-l-2 border-gray-100 dark:border-gray-800">
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-xs text-gray-500 mb-1">Folds</label>
+                                        <span className="block text-xs text-gray-500 mb-1">Folds</span>
                                         <input
                                             type="number"
                                             value={config.cv_folds ?? 5}
@@ -326,7 +326,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs text-gray-500 mb-1">Method</label>
+                                        <span className="block text-xs text-gray-500 mb-1">Method</span>
                                         <select
                                             value={config.cv_type ?? 'k_fold'}
                                             onChange={(e) => onChange({ ...config, cv_type: e.target.value })}
@@ -347,7 +347,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
                                             <span>Data must be sorted by time. Select a date column below or ensure your data is pre-sorted.</span>
                                         </div>
                                         <div>
-                                            <label className="block text-xs text-gray-500 mb-1">Time Column (optional)</label>
+                                            <span className="block text-xs text-gray-500 mb-1">Time Column (optional)</span>
                                             <select
                                                 value={config.cv_time_column ?? ''}
                                                 onChange={(e) => onChange({ ...config, cv_time_column: e.target.value })}

@@ -192,7 +192,7 @@ export const JobsPage: React.FC = () => {
 
       {showFilters && (
         <div className="flex items-center gap-4 px-4 py-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
-          <label className="text-xs text-slate-500 dark:text-slate-400 font-medium">Status</label>
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Status</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}

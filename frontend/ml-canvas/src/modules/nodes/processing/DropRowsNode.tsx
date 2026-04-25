@@ -56,9 +56,9 @@ const DropRowsSettings: React.FC<{ config: DropRowsConfig; onChange: (c: DropRow
       </div>
 
       <div className={`space-y-2 ${config.drop_if_any_missing ? 'opacity-50 pointer-events-none' : ''}`}>
-        <label className="block text-sm font-medium">
+        <span className="block text-sm font-medium">
           Missing Value Threshold (%)
-        </label>
+        </span>
         <div className="flex items-center gap-2">
           <input
             type="range"

@@ -245,7 +245,7 @@ export const DataSources: React.FC = () => {
         {showFilters && (
           <div className="flex items-center gap-4 pl-1">
             <div className="flex items-center gap-2">
-              <label className="text-xs text-slate-500 dark:text-slate-400 font-medium">Type</label>
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Type</span>
               <select
                 value={filterType}
                 onChange={e => { setFilterType(e.target.value); }}
@@ -258,7 +258,7 @@ export const DataSources: React.FC = () => {
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-xs text-slate-500 dark:text-slate-400 font-medium">Format</label>
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Format</span>
               <select
                 value={filterFormat}
                 onChange={e => { setFilterFormat(e.target.value); }}

@@ -4,6 +4,7 @@ import { useViewStore } from '../../core/store/useViewStore';
 import { ChevronUp, ChevronDown, ChevronRight, Table, Layers, GitBranch, AlertTriangle, Wand2 } from 'lucide-react';
 import type { NodeExecutionResult, PreviewDataRows, PreviewData } from '../../core/api/client';
 import { generateBranchColors } from '../../core/hooks/useBranchColors';
+import { clickableProps } from '../../core/utils/a11y';
 
 /** Convert a PreviewData payload into a {tabName -> rows} map. */
 function toDatasetMap(previewData: PreviewData | null | undefined): Record<string, PreviewDataRows> {
@@ -130,7 +131,7 @@ export const ResultsPanel: React.FC = () => {
       {/* Header */}
       <div 
         className="flex items-center justify-between px-4 py-2 bg-muted/10 cursor-pointer hover:bg-muted/20 border-b select-none"
-        onClick={() => setResultsPanelExpanded(!isResultsPanelExpanded)}
+        {...clickableProps(() => setResultsPanelExpanded(!isResultsPanelExpanded))}
       >
         <div className="flex items-center gap-2">
           <Table className="w-4 h-4 text-primary" />

@@ -496,7 +496,7 @@ export const EDAPage: React.FC = () => {
             <div className="h-8 w-px bg-gray-200 dark:bg-gray-700 mx-2"></div>
             
             <div className="flex flex-col">
-                <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Dataset</label>
+                <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Dataset</span>
                 <select
                     value={selectedDataset || ''}
                     onChange={(e) => setSelectedDataset(Number(e.target.value))}
@@ -513,7 +513,7 @@ export const EDAPage: React.FC = () => {
         {/* Center: Controls */}
         <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800/50 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
             <div className="flex flex-col px-2">
-                <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Target Column</label>
+                <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Target Column</span>
                 <select
                     value={targetCol}
                     onChange={(e) => setTargetCol(e.target.value)}
@@ -533,7 +533,7 @@ export const EDAPage: React.FC = () => {
 
             <div className="flex flex-col px-2">
                 <div className="flex items-center gap-1">
-                    <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Task Type</label>
+                    <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Task Type</span>
                     <div className="group relative">
                         <HelpCircle className="w-3 h-3 text-gray-400 cursor-help" />
                         <div className="absolute bottom-full mb-2 w-56 p-2 bg-slate-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none left-1/2 -translate-x-1/2">

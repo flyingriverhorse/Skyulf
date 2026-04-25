@@ -210,10 +210,10 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         {/* Model & Target */}
         <div className="space-y-4">
             <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Configuration</label>
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Configuration</span>
                 <div className="grid gap-3">
                     <div>
-                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Model Type</label>
+                        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Model Type</span>
                         <div className="relative">
                             <select
                                 value={config.model_type}
@@ -258,7 +258,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                    )}
 
                     <div>
-                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Target Column</label>
+                        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Target Column</span>
                         {availableColumns.length === 0 && (
                             <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-2">
                                 <AlertTriangle className="w-3 h-3" />
@@ -296,14 +296,14 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
 
             {/* Strategy & Metrics */}
             <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tuning Strategy</label>
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tuning Strategy</span>
                 <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2">
                       <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-1.5">
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                                <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">
                                     Search Method
-                                </label>
+                                </span>
                                 <HelpTooltip placement="bottom-left" text={
                                     config.search_strategy === 'optuna' ? 'Optuna uses Bayesian optimization (TPE) to efficiently find optimal hyperparameters with early pruning.' :
                                     config.search_strategy === 'halving_grid' ? 'Successive Halving (Grid) tests all combinations but quickly drops poorly performing candidates to save time.' :
@@ -348,7 +348,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                     </div>
                     
                     <div>
-                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Metric</label>
+                        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Metric</span>
                         <select
                             value={config.metric}
                             onChange={(e) => onChange({ ...config, metric: e.target.value })}
@@ -365,7 +365,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Trials</label>
+                        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Trials</span>
                         <input
                             type="number"
                             value={config.n_trials}
@@ -408,7 +408,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                             <div className="space-y-3 pl-6 border-l-2 border-gray-100 dark:border-gray-800">
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-xs text-gray-500 mb-1">Folds</label>
+                                        <span className="block text-xs text-gray-500 mb-1">Folds</span>
                                         <input
                                             type="number"
                                             value={config.cv_folds ?? 5}
@@ -418,7 +418,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs text-gray-500 mb-1">Method</label>
+                                        <span className="block text-xs text-gray-500 mb-1">Method</span>
                                         <select
                                             value={config.cv_type ?? 'k_fold'}
                                             onChange={(e) => onChange({ ...config, cv_type: e.target.value })}
@@ -439,7 +439,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                                             <span>Data must be sorted by time. Select a date column below or ensure your data is pre-sorted.</span>
                                         </div>
                                         <div>
-                                            <label className="block text-xs text-gray-500 mb-1">Time Column (optional)</label>
+                                            <span className="block text-xs text-gray-500 mb-1">Time Column (optional)</span>
                                             <select
                                                 value={config.cv_time_column ?? ''}
                                                 onChange={(e) => onChange({ ...config, cv_time_column: e.target.value })}

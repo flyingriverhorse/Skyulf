@@ -38,7 +38,7 @@ const DataCleaningSettings: React.FC<{ config: DataCleaningConfig; onChange: (c:
       )}
       
       <div>
-        <label className="block text-sm font-medium mb-1">Fill Strategy</label>
+        <span className="block text-sm font-medium mb-1">Fill Strategy</span>
         <select
           className="w-full p-2 border rounded bg-background"
           value={config.fillStrategy}
@@ -52,7 +52,7 @@ const DataCleaningSettings: React.FC<{ config: DataCleaningConfig; onChange: (c:
       </div>
       
       <div>
-        <label className="block text-sm font-medium mb-1">Drop Columns</label>
+        <span className="block text-sm font-medium mb-1">Drop Columns</span>
         {columns.length > 0 ? (
           <div className="space-y-1 max-h-40 overflow-y-auto border rounded p-2">
             {columns.map(col => (

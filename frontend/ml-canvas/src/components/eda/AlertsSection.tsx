@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { clickableProps } from '../../core/utils/a11y';
 
 interface AlertsSectionProps {
     alerts: any[];
@@ -14,7 +15,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ alerts }) => {
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
             <div 
                 className="flex justify-between items-center cursor-pointer"
-                onClick={() => setIsExpanded(!isExpanded)}
+                {...clickableProps(() => setIsExpanded(!isExpanded))}
             >
                 <h3 className="font-medium text-amber-800 dark:text-amber-200 flex items-center">
                     <AlertCircle className="w-4 h-4 mr-2" />

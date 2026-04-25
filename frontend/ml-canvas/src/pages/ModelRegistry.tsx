@@ -327,7 +327,7 @@ export const ModelRegistry: React.FC = () => {
       {/* Filters */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Filter by Model Type</label>
+          <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Filter by Model Type</span>
           <input 
             type="text" 
             placeholder="e.g. RandomForest" 
@@ -337,7 +337,7 @@ export const ModelRegistry: React.FC = () => {
           />
         </div>
         <div className="flex-1">
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Filter by Dataset</label>
+          <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Filter by Dataset</span>
           <input 
             type="text" 
             placeholder="e.g. Iris Dataset" 
@@ -425,6 +425,7 @@ export const ModelRegistry: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- inline checkbox-cell stopPropagation */}
                         <div className="flex items-center gap-2" onClick={(e) => { e.stopPropagation(); }}>
                           <input 
                             type="checkbox" 
@@ -468,7 +469,9 @@ export const ModelRegistry: React.FC = () => {
 
       {/* Versions Modal/Drawer */}
       {selectedModel && (
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- modal backdrop dismiss zone
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => { setSelectedModel(null); }}>
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- modal panel stopPropagation */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700" onClick={e => { e.stopPropagation(); }}>
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
               <div>
@@ -566,7 +569,9 @@ export const ModelRegistry: React.FC = () => {
 
       {/* Artifacts Modal */}
       {viewingArtifacts && (
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- modal backdrop dismiss zone
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => { setViewingArtifacts(null); }}>
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- modal panel stopPropagation */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700" onClick={e => { e.stopPropagation(); }}>
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">

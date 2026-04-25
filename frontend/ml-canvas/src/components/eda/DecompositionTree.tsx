@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { EDAService, Filter } from '../../core/api/eda';
 import { Plus, X, Loader2 } from 'lucide-react';
+import { clickableProps } from '../../core/utils/a11y';
 
 interface TreeItem {
     name: string;
@@ -390,7 +391,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                                         <div 
                                             key={item.name}
                                             id={`node-${index}-${item.name}`}
-                                            onClick={() => handleItemClick(index, item)}
+                                            {...clickableProps(() => handleItemClick(index, item))}
                                             className={`
                                                 relative p-3 rounded-md border cursor-pointer transition-all group
                                                 ${isSelected 
@@ -458,6 +459,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
             
             {/* Backdrop for menu */}
             {splitMenuOpen && (
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- backdrop dismiss zone
                 <div className="fixed inset-0 z-40" onClick={() => setSplitMenuOpen(null)} />
             )}
         </div>

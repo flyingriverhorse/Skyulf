@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { AlertTriangle, Search, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { clickableProps } from '../../../core/utils/a11y';
 
 // --- Types ---
 
@@ -50,7 +51,7 @@ const ColumnSelector: React.FC<{
             return (
               <div
                 key={col}
-                onClick={() => { toggle(col); }}
+                {...clickableProps(() => { toggle(col); })}
                 className={`
                   flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors
                   ${isSelected ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'}
@@ -150,9 +151,9 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
           </div>
 
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
               Replacement Mode
-            </label>
+            </span>
             <select
               className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2"
               value={config.mode}
@@ -176,7 +177,7 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
           {(config.mode === 'custom_range' || config.mode === 'percentage_bounds' || config.mode === 'age_bounds') && (
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[10px] text-gray-500 uppercase font-semibold">Min Value</label>
+                <span className="text-[10px] text-gray-500 uppercase font-semibold">Min Value</span>
                 <input
                   type="number"
                   className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
@@ -186,7 +187,7 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
                 />
               </div>
               <div>
-                <label className="text-[10px] text-gray-500 uppercase font-semibold">Max Value</label>
+                <span className="text-[10px] text-gray-500 uppercase font-semibold">Max Value</span>
                 <input
                   type="number"
                   className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"

@@ -4,6 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ScatterChart, Scatter, LineChart, Line, ReferenceLine
 } from 'recharts';
+import { clickableProps } from '../../core/utils/a11y';
 import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, RefreshCw, Download, Loader2, Check, Trophy, GitBranch } from 'lucide-react';
 import { LoadingState, ErrorState } from '../shared';
 import { toPng } from 'html-to-image';
@@ -402,7 +403,7 @@ export const ExperimentsPage: React.FC = () => {
             {filteredJobs.map(job => (
               <div 
                 key={job.job_id}
-                onClick={() => { toggleJobSelection(job.job_id); }}
+                {...clickableProps(() => { toggleJobSelection(job.job_id); })}
                 className={`border-b border-gray-100 dark:border-gray-700 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${
                   selectedJobIds.includes(job.job_id) ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500' : 'border-l-4 border-l-transparent'
                 } ${isSidebarCollapsed ? 'p-2 flex justify-center' : 'p-3'}`}
