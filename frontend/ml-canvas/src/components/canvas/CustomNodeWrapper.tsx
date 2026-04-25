@@ -4,12 +4,11 @@ import { registry } from '../../core/registry/NodeRegistry';
 import { AlertCircle, X, CheckCircle2, XCircle, Merge, GitFork } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import type { NodeExecutionResult } from '../../core/api/client';
-
-const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
-// Terminals that auto-split each upstream input into its own parallel
-// branch / preview tab instead of column-merging them. Mirror
-// AUTO_PARALLEL_STEP_TYPES in backend graph_utils.py.
-const AUTO_PARALLEL_TYPES = new Set(['data_preview']);
+import {
+  isAutoParallelType,
+  supportsExecutionModeToggle,
+  getExecutionMode,
+} from '../../core/types/executionMode';
 
 function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   const definitionType = data.definitionType as string;
@@ -35,10 +34,10 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
 
   // Parallel badge: training nodes when user explicitly chose parallel mode,
   // OR auto-parallel terminals (data_preview) wired to 2+ sources.
-  const isTrainingNode = TRAINING_TYPES.has(definitionType);
-  const isAutoParallel = AUTO_PARALLEL_TYPES.has(definitionType);
+  const isTrainingNode = supportsExecutionModeToggle(definitionType);
+  const isAutoParallel = isAutoParallelType(definitionType);
   const isParallel =
-    (isTrainingNode && data.execution_mode === 'parallel') ||
+    (isTrainingNode && getExecutionMode(data) === 'parallel') ||
     (isAutoParallel && incomingSourceCount > 1);
 
   // Only nodes that actually consume upstream data (i.e. declare an input
