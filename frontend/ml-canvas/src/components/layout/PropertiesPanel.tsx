@@ -2,6 +2,12 @@ import React from 'react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { registry } from '../../core/registry/NodeRegistry';
+import {
+  ExecutionMode,
+  getExecutionMode,
+  isAutoParallelType,
+  supportsExecutionModeToggle,
+} from '../../core/types/executionMode';
 import { X, Maximize2, Minimize2, Settings2, Merge } from 'lucide-react';
 import { Node } from '@xyflow/react';
 
@@ -119,19 +125,17 @@ const MultiInputModeSection: React.FC<{ selectedNode: Node }> = ({ selectedNode 
   const edges = useGraphStore((state) => state.edges);
   const updateNodeData = useGraphStore((state) => state.updateNodeData);
 
-  const data = selectedNode.data as { execution_mode?: 'merge' | 'parallel' };
   const definitionType = selectedNode.data.definitionType as string;
 
   // Only modeling nodes opt in to this toggle today.
-  const supportsExecutionMode =
-    definitionType === 'basic_training' || definitionType === 'advanced_tuning';
+  const supportsToggle = supportsExecutionModeToggle(definitionType);
   const incomingSourceCount = new Set(
     edges.filter((e) => e.target === selectedNode.id).map((e) => e.source)
   ).size;
 
-  if (!supportsExecutionMode || incomingSourceCount < 2) return null;
+  if (!supportsToggle || incomingSourceCount < 2) return null;
 
-  const current = data.execution_mode ?? 'merge';
+  const current: ExecutionMode = getExecutionMode(selectedNode.data);
 
   return (
     <div className="border-t pt-4">
@@ -181,15 +185,14 @@ const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }
 
   // Auto-parallel terminals (data_preview) render each input in its own
   // tab instead of merging columns, so the merge-strategy dropdown is
-  // meaningless for them. Mirror AUTO_PARALLEL_STEP_TYPES in graph_utils.py
-  // and AUTO_PARALLEL_TYPES in useBranchColors.ts.
-  const isAutoParallel = definitionType === 'data_preview';
+  // meaningless for them. Sourced from `core/types/executionMode` so the
+  // canvas / engine / UI all agree on which types are auto-parallel.
+  const isAutoParallel = isAutoParallelType(definitionType);
 
   // Modeling nodes expose an explicit Multi-Input Mode toggle (merge / parallel).
   // When the user picks "parallel", merging is skipped at runtime, so the
   // strategy dropdown would be misleading. Hide it in that case.
-  const executionMode = (selectedNode.data as { execution_mode?: string }).execution_mode;
-  const isParallelMode = executionMode === 'parallel';
+  const isParallelMode = getExecutionMode(selectedNode.data) === 'parallel';
 
   // Only expose the strategy when the node actually merges: multi-input
   // node with 2+ distinct upstream sources, not an auto-parallel terminal,

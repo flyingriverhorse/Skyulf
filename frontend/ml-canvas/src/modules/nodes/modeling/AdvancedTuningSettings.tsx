@@ -19,6 +19,7 @@ import { HelpTooltip } from './components/HelpTooltip';
 import { BestParamsModal } from './components/BestParamsModal';
 import { SearchSpaceInput } from './components/SearchSpaceInput';
 import type { HyperparameterDef } from './components/types';
+import type { ExecutionMode } from '../../../core/types/executionMode';
 
 export interface TuningConfig {
   target_column: string;
@@ -35,7 +36,7 @@ export interface TuningConfig {
   cv_random_state: number;
   random_state: number;
   cv_time_column?: string;
-  execution_mode?: 'merge' | 'parallel';
+  execution_mode?: ExecutionMode;
 }
 
 // HyperparameterDef, HelpTooltip, SearchSpaceInput, and BestParamsModal

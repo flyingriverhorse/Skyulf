@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import type { Node, Edge } from '@xyflow/react';
+import {
+  EXECUTION_MODE_AWARE_TYPES,
+  AUTO_PARALLEL_TYPES,
+  isParallelExecution,
+} from '../types/executionMode';
 
-const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
-// Terminals that auto-split into per-input branches when wired to 2+ sources,
-// even without an explicit ``execution_mode === 'parallel'`` flag. Mirrors
-// AUTO_PARALLEL_STEP_TYPES in backend graph_utils.py.
-const AUTO_PARALLEL_TYPES = new Set(['data_preview']);
-const TERMINAL_TYPES = new Set([...TRAINING_TYPES, ...AUTO_PARALLEL_TYPES]);
+// Terminals = mode-aware modeling nodes plus auto-parallel inspectors.
+const TERMINAL_TYPES = new Set([...EXECUTION_MODE_AWARE_TYPES, ...AUTO_PARALLEL_TYPES]);
 
 /** Generate n evenly-spaced, high-saturation HSL colors with a golden-angle offset for variety. */
 export function generateBranchColors(count: number): string[] {
@@ -78,9 +79,8 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
     for (const terminal of terminals) {
       const terminalIncoming = incomingMap.get(terminal.id) || [];
       if (terminalIncoming.length === 0) continue;
-      const isAutoParallel = AUTO_PARALLEL_TYPES.has(terminal.data.definitionType as string);
-      const isParallel =
-        terminal.data.execution_mode === 'parallel' || isAutoParallel;
+      const sourceCount = new Set(terminalIncoming.map((e) => e.source)).size;
+      const isParallel = isParallelExecution(terminal.data, sourceCount);
       if (isParallel && terminalIncoming.length > 1) {
         // Parallel mode: each input path is a separate experiment branch
         terminalIncoming.forEach((edge, localIdx) => {

@@ -17,6 +17,7 @@ import { HelpTooltip } from './components/HelpTooltip';
 import { BestParamsModal } from './components/BestParamsModal';
 import { HyperparameterInput } from './components/HyperparameterInput';
 import type { HyperparameterDef } from './components/types';
+import type { ExecutionMode } from '../../../core/types/executionMode';
 
 export interface ModelTrainingConfig {
   target_column: string;
@@ -28,7 +29,7 @@ export interface ModelTrainingConfig {
   cv_shuffle: boolean;
   cv_random_state: number;
   cv_time_column?: string;
-  execution_mode?: 'merge' | 'parallel';
+  execution_mode?: ExecutionMode;
 }
 
 // HyperparameterDef, HelpTooltip, BestParamsModal, and HyperparameterInput
