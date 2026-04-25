@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
 import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown, Zap, CheckCircle2, Search, Filter } from 'lucide-react';
-import { JobInfo, jobsApi } from '../../core/api/jobs';
+import { JobInfo } from '../../core/api/jobs';
 import { useEscapeKey } from '../../core/hooks/useEscapeKey';
 import { formatMetricName } from '../../core/utils/format';
 import { clickableProps } from '../../core/utils/a11y';
+import { useJobPolling, isTerminalStatus } from '../../core/hooks/useJobPolling';
 
 const formatMetricValue = (key: string, value: number): string => {
   if (key.endsWith('_std')) return value.toFixed(6);
@@ -322,34 +323,19 @@ export const JobsDrawer: React.FC = () => {
 
 const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () => void }> = ({ job: initialJob, onBack, onClose }) => {
     const { cancelJob } = useJobStore();
-    const [job, setJob] = useState<JobInfo>(initialJob);
     const [activeTab, setActiveTab] = useState<'overview' | 'logs'>('overview');
     const [isCancelling, setIsCancelling] = useState(false);
     const logsEndRef = useRef<HTMLDivElement>(null);
 
-    // Poll for updates if running
-    useEffect(() => {
-        let interval: ReturnType<typeof setInterval>;
-        
-        const fetchDetails = async () => {
-            try {
-                const updatedJob = await jobsApi.getJob(initialJob.job_id);
-                setJob(updatedJob);
-            } catch (e) {
-                console.error("Failed to fetch job details", e);
-            }
-        };
-
-        void fetchDetails(); // Initial fetch
-
-        if (job.status === 'running' || job.status === 'queued') {
-            interval = setInterval(() => { void fetchDetails(); }, 2000);
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [initialJob.job_id, job.status]);
+    // Poll the single job until terminal. We feed an empty array once
+    // the initial job is already terminal so the hook does no work,
+    // and otherwise let it stop itself on the next terminal snapshot.
+    const pollIds = useMemo(
+        () => (isTerminalStatus(initialJob.status) ? [] : [initialJob.job_id]),
+        [initialJob.job_id, initialJob.status],
+    );
+    const { jobs: polledJobs } = useJobPolling(pollIds, { intervalMs: 2000 });
+    const job: JobInfo = polledJobs[initialJob.job_id] ?? initialJob;
 
     // Auto-scroll logs
     useEffect(() => {

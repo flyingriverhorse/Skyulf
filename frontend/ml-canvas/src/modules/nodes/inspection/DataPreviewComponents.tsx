@@ -4,6 +4,7 @@ import { Activity, CheckCircle, AlertCircle, Play, GitBranch } from 'lucide-reac
 import { jobsApi, JobInfo } from '../../../core/api/jobs';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { generateBranchColors } from '../../../core/hooks/useBranchColors';
+import { useJobPolling } from '../../../core/hooks/useJobPolling';
 
 export interface DataPreviewConfig {
   /** Legacy single-job id (kept for backward compatibility with old saved graphs). */
@@ -80,7 +81,6 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
 }) => {
   const { nodes, edges } = useGraphStore();
   const [isRunning, setIsRunning] = useState(false);
-  const [jobs, setJobs] = useState<Record<string, JobInfo>>({});
   const [activeBranch, setActiveBranch] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
 
@@ -111,27 +111,9 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
     });
   }, [nodes, edges, nodeId, jobIds.length]);
 
-  // Poll all jobs until each reaches a terminal state.
-  useEffect(() => {
-    if (jobIds.length === 0) return;
-    let cancelled = false;
-    const fetchAll = async () => {
-      const updated: Record<string, JobInfo> = {};
-      await Promise.all(
-        jobIds.map(async (id) => {
-          try {
-            updated[id] = await jobsApi.getJob(id);
-          } catch (e) {
-            console.error('Failed to fetch job', id, e);
-          }
-        }),
-      );
-      if (!cancelled) setJobs(updated);
-    };
-    void fetchAll();
-    const interval = setInterval(() => { void fetchAll(); }, 2000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [jobIds]);
+  // Poll all branch jobs until each reaches a terminal state. The
+  // shared `useJobPolling` hook owns interval/cleanup/cancellation.
+  const { jobs } = useJobPolling(jobIds, { intervalMs: 2000 });
 
   const handleRunPreview = async () => {
     if (!nodeId) return;
@@ -146,7 +128,7 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
       });
 
       const ids = response.job_ids?.length ? response.job_ids : [response.job_id];
-      setJobs({});
+      // Hook auto-resets `jobs` when `jobIds` changes via onChange below.
       setActiveBranch(null);
       setActiveTab(null);
       onChange({ ...config, lastRunJobId: ids[0], lastRunJobIds: ids });
@@ -354,35 +336,23 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
 };
 
 export const DataPreviewComponent: React.FC<{ data: DataPreviewConfig }> = ({ data }) => {
-  const [status, setStatus] = useState<string | null>(null);
-
   // Aggregate status across all branch jobs (parallel previews) so the node
   // badge reflects the overall preview state instead of just the first job.
-  useEffect(() => {
-    const ids = data.lastRunJobIds && data.lastRunJobIds.length > 0
-      ? data.lastRunJobIds
-      : (data.lastRunJobId ? [data.lastRunJobId] : []);
-    if (ids.length === 0) return;
+  // The shared `useJobPolling` hook computes the aggregate; we only need
+  // to reshape `lastRunJobId` (legacy) into the array form it expects.
+  const ids = useMemo(
+    () =>
+      data.lastRunJobIds && data.lastRunJobIds.length > 0
+        ? data.lastRunJobIds
+        : data.lastRunJobId
+        ? [data.lastRunJobId]
+        : [],
+    [data.lastRunJobId, data.lastRunJobIds],
+  );
+  const { aggregateStatus } = useJobPolling(ids, { intervalMs: 5000 });
+  const status: string | null = aggregateStatus === 'idle' ? null : aggregateStatus;
 
-    const checkStatus = async () => {
-      try {
-        const results = await Promise.all(ids.map(id => jobsApi.getJob(id)));
-        const statuses = results.map(r => r.status);
-        if (statuses.some(s => s === 'failed')) setStatus('failed');
-        else if (statuses.every(s => s === 'completed')) setStatus('completed');
-        else setStatus('running');
-      } catch {
-        setStatus('error');
-      }
-    };
-
-    void checkStatus();
-    const interval = setInterval(() => { void checkStatus(); }, 5000);
-
-    return () => { clearInterval(interval); };
-  }, [data.lastRunJobId, data.lastRunJobIds]);
-
-  const hasJob = (data.lastRunJobIds && data.lastRunJobIds.length > 0) || !!data.lastRunJobId;
+  const hasJob = ids.length > 0;
 
   return (
     <div className="text-xs flex items-center gap-2">
