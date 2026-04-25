@@ -45,8 +45,13 @@ export interface TextStats {
   avg_length?: number | null;
   min_length?: number | null;
   max_length?: number | null;
-  common_words: Array<{ word: string; count: number } | Record<string, unknown>>;
-  sentiment_distribution?: Record<string, number> | null;
+  /**
+   * Common-words shape varies between profilers — some emit `{ word, count }`,
+   * older runs emit `{ value, count }`. Both keys are optional so consumers
+   * fall back gracefully (`w.word ?? w.value`).
+   */
+  common_words: Array<{ word?: string; value?: string; count: number }>;
+  sentiment_distribution?: { positive?: number; neutral?: number; negative?: number } | null;
 }
 
 export interface DateStats {
@@ -56,8 +61,10 @@ export interface DateStats {
 }
 
 export interface NormalityTestResult {
-  test: string;
-  statistic: number;
+  /** Newer profiler builds emit `test_name`; older ones emit `test`. */
+  test?: string;
+  test_name?: string;
+  statistic?: number;
   p_value: number;
   is_normal: boolean;
 }
@@ -89,6 +96,8 @@ export interface ColumnProfile {
   normality_test?: NormalityTestResult | null;
   is_constant?: boolean;
   is_unique?: boolean;
+  /** Variance Inflation Factor — present only when multicollinearity is computed. */
+  vif?: number | null;
 }
 
 export interface EDAAlert {
@@ -105,6 +114,13 @@ export interface EDAProfile {
   correlations?: Record<string, Record<string, number>> | null;
   alerts?: EDAAlert[];
   sample_data?: Array<Record<string, unknown>>;
-  /** Catch-all for future fields not yet typed (PCA, clustering, geo, etc.). */
+  /** Aggregate dataset-level health metrics surfaced in the Overview tab. */
+  missing_cells_percentage?: number;
+  duplicate_rows?: number;
+  /** Per-column VIF scores. */
+  vif?: Record<string, number> | null;
+  /** Names of columns the user explicitly excluded from the analysis. */
+  excluded_columns?: string[];
+  /** Catch-all for future fields not yet typed (PCA, clustering, geo, causal, target, timeseries, etc.). */
   [extra: string]: unknown;
 }

@@ -2,9 +2,10 @@ import React from 'react';
 import { BarChart, Bar, ResponsiveContainer } from 'recharts';
 import { AlertTriangle, Hash, Type, Calendar, AlignLeft, EyeOff, Eye } from 'lucide-react';
 import { clickableProps } from '../../core/utils/a11y';
+import type { ColumnProfile } from '../../core/types/edaProfile';
 
 interface VariableCardProps {
-  profile: any;
+  profile: ColumnProfile;
   onClick: () => void;
   onToggleExclude?: (colName: string, exclude: boolean) => void;
   isExcluded?: boolean;
@@ -21,17 +22,18 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, on
     }
   };
 
-  // Prepare mini histogram data if available
-  let miniChartData: any[] = [];
-  
+  // Mini histogram data for the card preview.
+  type MiniDatum = { name: string; count: number };
+  let miniChartData: MiniDatum[] = [];
+
   if (profile.dtype === 'Numeric' && profile.histogram) {
-      miniChartData = profile.histogram.map((b: any) => ({ name: b.start.toFixed(1), count: b.count }));
+      miniChartData = profile.histogram.map((b) => ({ name: b.start.toFixed(1), count: b.count }));
   } else if (profile.dtype === 'Text' && profile.histogram) {
-      miniChartData = profile.histogram.map((b: any) => ({ name: b.start.toFixed(0), count: b.count }));
+      miniChartData = profile.histogram.map((b) => ({ name: b.start.toFixed(0), count: b.count }));
   } else if (profile.dtype === 'DateTime' && profile.histogram) {
-      miniChartData = profile.histogram.map((b: any) => ({ name: new Date(b.start).toLocaleDateString(), count: b.count }));
+      miniChartData = profile.histogram.map((b) => ({ name: new Date(b.start).toLocaleDateString(), count: b.count }));
   } else if (profile.dtype === 'Categorical' && profile.categorical_stats?.top_k) {
-      miniChartData = profile.categorical_stats.top_k.slice(0, 5).map((k: any) => ({ name: k.value, count: k.count }));
+      miniChartData = profile.categorical_stats.top_k.slice(0, 5).map((k) => ({ name: String(k.value), count: k.count }));
   }
 
   return (
