@@ -1,10 +1,12 @@
 import React, { memo, useState } from 'react';
-import { 
-  BaseEdge, 
-  EdgeLabelRenderer, 
-  EdgeProps, 
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  EdgeProps,
+  Position,
   getSmoothStepPath,
-  useReactFlow
+  getStraightPath,
+  useReactFlow,
 } from '@xyflow/react';
 import { X } from 'lucide-react';
 
@@ -24,15 +26,37 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
 }) => {
   const { deleteElements } = useReactFlow();
   const [hovered, setHovered] = useState(false);
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-    borderRadius: 24,
-  });
+
+  // When source and target handles are almost collinear along the handle
+  // axis (e.g. Right -> Left with nearly identical Y), `getSmoothStepPath`
+  // collapses its rounded corners (borderRadius 24) into a degenerate path
+  // that renders as a hairline -- or disappears entirely, leaving only the
+  // floating × delete button. Detect that case and fall back to a straight
+  // path so the connection stays consistently thick and visible.
+  const horizontalAxis =
+    (sourcePosition === Position.Left || sourcePosition === Position.Right) &&
+    (targetPosition === Position.Left || targetPosition === Position.Right);
+  const verticalAxis =
+    (sourcePosition === Position.Top || sourcePosition === Position.Bottom) &&
+    (targetPosition === Position.Top || targetPosition === Position.Bottom);
+  const perpendicularOffset = horizontalAxis
+    ? Math.abs(targetY - sourceY)
+    : verticalAxis
+      ? Math.abs(targetX - sourceX)
+      : Number.POSITIVE_INFINITY;
+  const useStraight = (horizontalAxis || verticalAxis) && perpendicularOffset < 6;
+
+  const [edgePath, labelX, labelY] = useStraight
+    ? getStraightPath({ sourceX, sourceY, targetX, targetY })
+    : getSmoothStepPath({
+        sourceX,
+        sourceY,
+        sourcePosition,
+        targetX,
+        targetY,
+        targetPosition,
+        borderRadius: 16,
+      });
 
   const branchColor = (data as Record<string, unknown>)?.branchColor as string | undefined;
   const branchLabel = (data as Record<string, unknown>)?.branchLabel as string | undefined;

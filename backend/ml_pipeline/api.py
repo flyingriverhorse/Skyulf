@@ -853,6 +853,31 @@ async def preview_pipeline(  # noqa: C901
             except Exception as e:
                 logger.warning("Error generating recommendations: %s", e)
 
+        # Dedup merge warnings across branches: when N parallel sub-pipelines
+        # run independently (Path A / Path B), each engine emits the same
+        # advisory for the shared upstream merge node. Collapse duplicates so
+        # the UI shows one row per logically distinct merge.
+        all_warnings = [
+            w
+            for _orig, _runnable, res in sub_results
+            for w in getattr(res, "merge_warnings", [])
+        ]
+        seen_warning_keys: set = set()
+        deduped_warnings: List[Dict[str, Any]] = []
+        for w in all_warnings:
+            key = (
+                w.get("node_id"),
+                w.get("kind"),
+                tuple(sorted(w.get("inputs") or ())),
+                tuple(w.get("overlap_columns") or ()),
+                tuple(w.get("dropped_columns") or ()),
+                w.get("part"),
+            )
+            if key in seen_warning_keys:
+                continue
+            seen_warning_keys.add(key)
+            deduped_warnings.append(w)
+
         return PreviewResponse(
             pipeline_id=pipeline_config.pipeline_id,
             status=agg_status,
@@ -861,11 +886,7 @@ async def preview_pipeline(  # noqa: C901
             branch_previews=branch_previews,
             branch_node_ids=branch_node_ids,
             recommendations=recommendations,
-            merge_warnings=[
-                w
-                for _orig, _runnable, res in sub_results
-                for w in getattr(res, "merge_warnings", [])
-            ],
+            merge_warnings=deduped_warnings,
         )
 
     except Exception:
