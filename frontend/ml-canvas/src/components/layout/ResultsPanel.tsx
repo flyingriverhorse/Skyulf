@@ -90,15 +90,16 @@ export const ResultsPanel: React.FC = () => {
   // the current tab.
   // NOTE: this useMemo must run on every render (i.e. before any early
   // return below) to preserve React's hook call order.
-  const allMergeWarnings = executionResult?.merge_warnings ?? [];
+  const rawMergeWarnings = executionResult?.merge_warnings;
   const branchNodeIdsMemo = executionResult?.branch_node_ids;
   const mergeWarnings = useMemo(() => {
+    const all = rawMergeWarnings ?? [];
     if (!activeBranch || !branchNodeIdsMemo || !branchNodeIdsMemo[activeBranch]) {
-      return allMergeWarnings;
+      return all;
     }
     const branchNodes = new Set(branchNodeIdsMemo[activeBranch]);
-    return allMergeWarnings.filter((w) => branchNodes.has(w.node_id));
-  }, [allMergeWarnings, activeBranch, branchNodeIdsMemo]);
+    return all.filter((w) => branchNodes.has(w.node_id));
+  }, [rawMergeWarnings, activeBranch, branchNodeIdsMemo]);
 
   if (!executionResult) return null;
 

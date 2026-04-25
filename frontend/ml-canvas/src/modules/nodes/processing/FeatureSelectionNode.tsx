@@ -142,7 +142,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
 
   const isModelBased = ['select_from_model', 'rfe'].includes(config.method);
 
-  const FeedbackSection = () => {
+  const renderFeedback = () => {
     const result = executionResult?.node_results[nodeId || ''];
     if (!result) return null;
     
@@ -322,7 +322,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           )}
           
           {/* Feedback Section - Show here if wide (Left Column) */}
-          {isWide && <FeedbackSection />}
+          {isWide && renderFeedback()}
         </div>
 
         {/* Right Column: Parameters */}
@@ -527,7 +527,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           </p>
 
           {/* Feedback Section - Show here if NOT wide (Mobile/Narrow) */}
-          {!isWide && <FeedbackSection />}
+          {!isWide && renderFeedback()}
         </div>
       </div>
     </div>

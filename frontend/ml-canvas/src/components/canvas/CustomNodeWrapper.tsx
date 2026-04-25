@@ -11,7 +11,7 @@ const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
 // AUTO_PARALLEL_STEP_TYPES in backend graph_utils.py.
 const AUTO_PARALLEL_TYPES = new Set(['data_preview']);
 
-export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
+function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   const definitionType = data.definitionType as string;
   const definition = registry.get(definitionType);
   const { deleteElements } = useReactFlow();
@@ -173,4 +173,6 @@ export const CustomNodeWrapper = memo(({ id, data, selected }: NodeProps) => {
       ))}
     </div>
   );
-});
+}
+
+export const CustomNodeWrapper = memo(CustomNodeWrapperImpl);

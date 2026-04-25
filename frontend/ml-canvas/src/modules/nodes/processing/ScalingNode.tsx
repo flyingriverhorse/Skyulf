@@ -70,7 +70,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
     onChange({ ...config, columns: newCols });
   };
 
-  const FeedbackSection = () => {
+  const renderFeedback = () => {
     if (!nodeResult || !nodeResult.metrics) return null;
     const m = nodeResult.metrics;
     const cols = m.columns as string[] | undefined;
@@ -256,7 +256,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
           )}
           
           {/* Feedback Section (Wide) */}
-          {isWide && <FeedbackSection />}
+          {isWide && renderFeedback()}
         </div>
         
         {/* Right Column: Columns */}
@@ -304,7 +304,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
         </div>
 
         {/* Feedback Section (Narrow) */}
-        {!isWide && <FeedbackSection />}
+        {!isWide && renderFeedback()}
 
       </div>
     </div>

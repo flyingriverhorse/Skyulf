@@ -181,7 +181,7 @@ export const DataDriftPage: React.FC = () => {
         });
     };
 
-    const SortIcon = ({ col }: { col: string }) => {
+    const renderSortIcon = (col: string) => {
         if (sortConfig?.key !== col) return <ArrowUpDown size={11} className="opacity-30" />;
         return sortConfig.dir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />;
     };
@@ -611,10 +611,10 @@ export const DataDriftPage: React.FC = () => {
                             <thead className="bg-gray-50 dark:bg-slate-900">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 dark:hover:text-slate-300" onClick={() => handleSort('column')}>
-                                        <span className="flex items-center gap-1">Column <SortIcon col="column" /></span>
+                                        <span className="flex items-center gap-1">Column {renderSortIcon('column')}</span>
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 dark:hover:text-slate-300" onClick={() => handleSort('status')}>
-                                        <span className="flex items-center gap-1">Status <SortIcon col="status" /></span>
+                                        <span className="flex items-center gap-1">Status {renderSortIcon('status')}</span>
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 dark:hover:text-slate-300" onClick={() => handleSort('wasserstein')}>
                                         <span className="flex items-center gap-1">
@@ -623,7 +623,7 @@ export const DataDriftPage: React.FC = () => {
                                                 tooltip="Measures distance between distributions. Lower is better. < 0.1 usually means stable." 
                                                 icon={<Info className="w-3 h-3 text-slate-400" />}
                                             />
-                                            <SortIcon col="wasserstein" />
+                                            {renderSortIcon('wasserstein')}
                                         </span>
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 dark:hover:text-slate-300" onClick={() => handleSort('psi')}>
@@ -633,7 +633,7 @@ export const DataDriftPage: React.FC = () => {
                                                 tooltip="Population Stability Index. < 0.1: Stable, < 0.2: Minor Drift, > 0.2: Significant Drift." 
                                                 icon={<Info className="w-3 h-3 text-slate-400" />}
                                             />
-                                            <SortIcon col="psi" />
+                                            {renderSortIcon('psi')}
                                         </span>
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 dark:hover:text-slate-300" onClick={() => handleSort('kl')}>
@@ -643,7 +643,7 @@ export const DataDriftPage: React.FC = () => {
                                                 tooltip="Kullback-Leibler Divergence. Measures how one probability distribution diverts from a second." 
                                                 icon={<Info className="w-3 h-3 text-slate-400" />}
                                             />
-                                            <SortIcon col="kl" />
+                                            {renderSortIcon('kl')}
                                         </span>
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 dark:hover:text-slate-300" onClick={() => handleSort('ks')}>
@@ -653,7 +653,7 @@ export const DataDriftPage: React.FC = () => {
                                                 tooltip="Kolmogorov-Smirnov Test. p-value < 0.05 indicates the distributions are significantly different." 
                                                 icon={<Info className="w-3 h-3 text-slate-400" />}
                                             />
-                                            <SortIcon col="ks" />
+                                            {renderSortIcon('ks')}
                                         </span>
                                     </th>
                                     {evaluatedReport.feature_importances && (
@@ -664,7 +664,7 @@ export const DataDriftPage: React.FC = () => {
                                                     tooltip="Combines drift status with feature importance. High = drifted + important feature. Helps prioritize which drifts to investigate." 
                                                     icon={<Info className="w-3 h-3 text-slate-400" />}
                                                 />
-                                                <SortIcon col="risk" />
+                                                {renderSortIcon('risk')}
                                             </span>
                                         </th>
                                     )}

@@ -107,7 +107,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
     onChange({ ...config, columns: newCols });
   };
 
-  const FeedbackSection = () => {
+  const renderFeedback = () => {
     if (!nodeResult || !nodeResult.metrics) return null;
     const m = nodeResult.metrics;
     
@@ -236,7 +236,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
     );
   };
 
-  const RecommendationsSection = () => {
+  const renderRecommendations = () => {
     // Combine backend recommendations with runtime feedback
     const runtimeRecommendations: Recommendation[] = [];
     
@@ -415,8 +415,8 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
           {/* Feedback Section (Wide) */}
           {isWide && (
             <>
-                <FeedbackSection />
-                <RecommendationsSection />
+                {renderFeedback()}
+                {renderRecommendations()}
             </>
           )}
         </div>
@@ -468,8 +468,8 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
         {/* Feedback Section (Narrow) */}
         {!isWide && (
             <>
-                <FeedbackSection />
-                <RecommendationsSection />
+                {renderFeedback()}
+                {renderRecommendations()}
             </>
         )}
 
