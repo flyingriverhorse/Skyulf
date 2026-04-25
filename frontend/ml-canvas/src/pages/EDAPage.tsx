@@ -23,6 +23,7 @@ import { Loader2, RefreshCw, AlertCircle, BarChart2, List, Play, HelpCircle, Tar
 import { downloadChart } from '../core/utils/chartUtils';
 import { LoadingState, ErrorState } from '../components/shared';
 import { useEDAStore, selectExcludedDirty, type EDAFilter } from '../core/store/useEDAStore';
+import type { ColumnProfile } from '../core/types/edaProfile';
 
 // React Query keys for the EDA surface — co-located so cache invalidation stays type-safe.
 const edaKeys = {
@@ -77,16 +78,17 @@ export const EDAPage: React.FC = () => {
     queryFn: async () => {
       try {
         return await EDAService.getLatestReport(selectedDataset!);
-      } catch (err: any) {
+      } catch (err: unknown) {
         // 404 simply means "no report yet" — surface as null rather than a hard error.
-        if (err?.response?.status === 404) return null;
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 404) return null;
         throw err;
       }
     },
     enabled: selectedDataset != null,
     // Auto-poll every 3 s while the backend job is PENDING; stop once it completes/fails.
     refetchInterval: (query) => {
-      const data = query.state.data as any;
+      const data = query.state.data;
       return data && data.status === 'PENDING' ? 3000 : false;
     },
   });
@@ -96,12 +98,12 @@ export const EDAPage: React.FC = () => {
 
   const historyQuery = useQuery({
     queryKey: edaKeys.history(selectedDataset ?? null),
-    queryFn: () => EDAService.getHistory(selectedDataset!) as Promise<any[]>,
+    queryFn: () => EDAService.getHistory(selectedDataset!),
     enabled: selectedDataset != null,
     // Refresh history alongside the report while a job is in flight.
     refetchInterval: report?.status === 'PENDING' ? 3000 : false,
   });
-  const history: any[] = historyQuery.data ?? [];
+  const history = historyQuery.data ?? [];
 
   // ── Mutations ──
   const analyzeMutation = useMutation({
@@ -138,11 +140,11 @@ export const EDAPage: React.FC = () => {
     if (!rawProfile) return null;
 
     const excludedSet = new Set(excludedColsDraft);
-    const filteredColumns: Record<string, any> = {};
+    const filteredColumns: Record<string, ColumnProfile> = {};
     if (rawProfile.columns) {
       Object.entries(rawProfile.columns).forEach(([name, col]) => {
         if (!excludedSet.has(name)) {
-          filteredColumns[name] = col;
+          filteredColumns[name] = col as ColumnProfile;
         }
       });
     }
@@ -151,10 +153,10 @@ export const EDAPage: React.FC = () => {
       ...rawProfile,
       columns: filteredColumns,
       excluded_columns: excludedColsDraft,
-    };
+    } as typeof rawProfile;
   }, [report?.profile_data, excludedColsDraft]);
 
-  const runAnalysis = (overrideExcluded?: string[] | any, overrideFilters?: any[]) => {
+  const runAnalysis = (overrideExcluded?: string[], overrideFilters?: EDAFilter[]) => {
     if (!selectedDataset) return;
     const actualExcluded = Array.isArray(overrideExcluded) ? overrideExcluded : excludedColsApplied;
     const actualFilters = Array.isArray(overrideFilters) ? overrideFilters : filters;
@@ -171,8 +173,8 @@ export const EDAPage: React.FC = () => {
     queryClient.setQueryData(edaKeys.report(selectedDataset), data);
   };
 
-  const handleAddFilter = (column: string, value: any, operator: string = '==') => {
-      const newFilter: EDAFilter = { column, operator: operator as EDAFilter['operator'], value };
+  const handleAddFilter = (column: string, value: string | number | boolean | Array<string | number>, operator: string) => {
+      const newFilter: EDAFilter = { column, operator: (operator || '==') as EDAFilter['operator'], value };
       const newFilters = [...filters, newFilter];
       useEDAStore.getState().setFilters(newFilters);
       runAnalysis(undefined, newFilters);
@@ -356,11 +358,11 @@ export const EDAPage: React.FC = () => {
                 />
             )}
 
-            {activeTab === 'geospatial' && profile.geospatial && (
+            {activeTab === 'geospatial' && !!profile.geospatial && (
                 <GeospatialTab profile={profile} />
             )}
 
-            {activeTab === 'target' && profile.target_col && profile.target_correlations && (
+            {activeTab === 'target' && !!profile.target_col && !!profile.target_correlations && (
                 <TargetAnalysisTab 
                     profile={profile}
                     downloadChart={downloadChart}
@@ -371,7 +373,7 @@ export const EDAPage: React.FC = () => {
                 />
             )}
 
-            {activeTab === 'timeseries' && profile.timeseries && (
+            {activeTab === 'timeseries' && !!profile.timeseries && (
                 <TimeSeriesTab 
                     profile={profile}
                     downloadChart={downloadChart}
@@ -407,17 +409,17 @@ export const EDAPage: React.FC = () => {
                 <OutliersTab profile={profile} />
             )}
 
-            {activeTab === 'correlations' && (profile.correlations || profile.correlations_with_target) && (
+            {activeTab === 'correlations' && (!!profile.correlations || !!profile.correlations_with_target) && (
                 <CorrelationsTab 
                     profile={profile}
                 />
             )}
 
-            {activeTab === 'causal' && profile.causal_graph && (
+            {activeTab === 'causal' && !!profile.causal_graph && (
                 <CausalTab profile={profile} />
             )}
 
-            {activeTab === 'rules' && profile.rule_tree && (
+            {activeTab === 'rules' && !!profile.rule_tree && (
                 <RuleDiscoveryTab profile={profile} />
             )}
 
@@ -594,7 +596,10 @@ export const EDAPage: React.FC = () => {
           queryClient.invalidateQueries({ queryKey: edaKeys.history(selectedDataset ?? null) })
         }
         onFetchReport={async (id) => {
-            return await EDAService.getReport(id);
+            const r = await EDAService.getReport(id);
+            // EDAReport.id is optional in the API type; here we know the route
+            // returned a real report so the id is always present.
+            return { ...r, id: r.id ?? id };
         }}
         onSelect={(selectedReport) => {
             if (selectedDataset) {

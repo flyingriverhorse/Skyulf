@@ -222,7 +222,7 @@ export const useGraphStore = create<GraphState>()(
         definitionType: type,
         catalogType: type, // For backend execution compatibility
         // Initialize with default values if any
-        ...definition.getDefaultConfig(),
+        ...(definition.getDefaultConfig() as object),
         ...(initialData as object)
       },
     };
