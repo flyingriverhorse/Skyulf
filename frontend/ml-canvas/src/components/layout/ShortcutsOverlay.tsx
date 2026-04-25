@@ -18,6 +18,7 @@ const SHORTCUTS: Shortcut[] = [
   { keys: ['Ctrl', 'Z'], description: 'Undo' },
   { keys: ['Ctrl', 'Shift', 'Z'], description: 'Redo' },
   { keys: ['Ctrl', 'D'], description: 'Duplicate selected nodes' },
+  { keys: ['Ctrl', 'K'], description: 'Open command palette (insert node)' },
   { keys: ['Delete'], description: 'Delete selected nodes / edges' },
   { keys: ['F'], description: 'Fit view to canvas' },
   { keys: ['Ctrl', 'Enter'], description: 'Run preview' },

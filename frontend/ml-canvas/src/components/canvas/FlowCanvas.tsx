@@ -142,6 +142,24 @@ const FlowCanvasContent: React.FC = () => {
     return () => window.removeEventListener('keydown', handler);
   }, [fitView]);
 
+  // Command palette → drop selected node at the canvas viewport center.
+  // Lives here (not in the palette itself) because screenToFlowPosition
+  // requires being inside <ReactFlowProvider>.
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const detail = (e as CustomEvent<{ type: string }>).detail;
+      if (!detail?.type) return;
+      const wrapper = reactFlowWrapper.current;
+      const rect = wrapper?.getBoundingClientRect();
+      const cx = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+      const cy = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+      const position = screenToFlowPosition({ x: cx, y: cy });
+      addNode(detail.type, position);
+    };
+    window.addEventListener('skyulf:add-node-at-center', handler);
+    return () => window.removeEventListener('skyulf:add-node-at-center', handler);
+  }, [screenToFlowPosition, addNode]);
+
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();

@@ -18,6 +18,25 @@ export const RUN_PREVIEW_EVENT = 'skyulf:run-preview';
  */
 export const SHOW_SHORTCUTS_EVENT = 'skyulf:show-shortcuts';
 
+/**
+ * Custom event fired when the user presses Ctrl/Cmd+K (or clicks the
+ * palette button). Picked up by the global `<CommandPalette />` mounted
+ * in `MainLayout`.
+ */
+export const SHOW_PALETTE_EVENT = 'skyulf:show-palette';
+
+/**
+ * Custom event the palette dispatches when the user picks a node.
+ * `FlowCanvas` listens and inserts the node at the current viewport
+ * center using `useReactFlow().screenToFlowPosition` (only available
+ * inside `<ReactFlowProvider>`).
+ */
+export const ADD_NODE_AT_CENTER_EVENT = 'skyulf:add-node-at-center';
+
+export interface AddNodeAtCenterDetail {
+  type: string;
+}
+
 interface ShortcutOptions {
   /** Toggles the `?` shortcuts cheatsheet overlay. */
   onToggleHelp: () => void;
@@ -91,6 +110,14 @@ export function useKeyboardShortcuts({
       if (mod && (e.key === 'Enter' || key === 'enter')) {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent(RUN_PREVIEW_EVENT));
+        return;
+      }
+
+      // Ctrl/Cmd+K → open the command palette. Modifier-gated so plain
+      // `k` typed elsewhere stays a no-op.
+      if (mod && key === 'k') {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent(SHOW_PALETTE_EVENT));
         return;
       }
     };

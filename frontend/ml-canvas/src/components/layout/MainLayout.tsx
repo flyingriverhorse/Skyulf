@@ -7,6 +7,7 @@ import { ResultsPanel } from './ResultsPanel';
 import { Navbar } from './Navbar';
 import { RestoreSessionBanner } from './RestoreSessionBanner';
 import { ShortcutsOverlay } from './ShortcutsOverlay';
+import { CommandPalette } from './CommandPalette';
 import { JobsDrawer } from '../panels/JobsDrawer';
 import { useViewStore } from '../../core/store/useViewStore';
 import { useCanvasAutoSave } from '../../core/hooks/useCanvasAutoSave';
@@ -68,6 +69,7 @@ export const MainLayout: React.FC = () => {
         open={showShortcuts}
         onClose={() => setShowShortcuts(false)}
       />
+      <CommandPalette />
     </div>
   );
 };
