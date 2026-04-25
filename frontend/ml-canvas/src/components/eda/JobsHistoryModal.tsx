@@ -5,18 +5,32 @@ import { ModalShell, useConfirm } from '../shared';
 import { StatusBadge } from '../shared/StatusBadge';
 import { clickableProps } from '../../core/utils/a11y';
 import { toast } from '../../core/toast';
+import type { EDAProfile, ColumnProfile } from '../../core/types/edaProfile';
+
+interface EdaHistoryJob {
+  id: number;
+  status: string;
+  created_at: string;
+  updated_at?: string;
+  error?: string | null;
+  dataset_name?: string;
+  target_col?: string;
+  description?: string;
+  task_type?: string;
+  profile_data?: EDAProfile;
+}
 
 interface JobsHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  history: any[];
-  onSelect: (report: any) => void;
-  onFetchReport: (id: number) => Promise<any>;
+  history: EdaHistoryJob[];
+  onSelect: (report: EdaHistoryJob) => void;
+  onFetchReport: (id: number) => Promise<EdaHistoryJob>;
   onRefresh?: () => void;
 }
 
 export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onClose, history, onSelect, onFetchReport, onRefresh }) => {
-  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [selectedJob, setSelectedJob] = useState<EdaHistoryJob | null>(null);
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState<number | null>(null);
   const confirm = useConfirm();
@@ -47,7 +61,7 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
     }
   };
 
-  const handleJobClick = async (job: any) => {
+  const handleJobClick = async (job: EdaHistoryJob) => {
     setLoading(true);
     try {
         const fullReport = await onFetchReport(job.id);
@@ -252,7 +266,7 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {selectedJob.profile_data?.columns && Object.values(selectedJob.profile_data.columns).map((v: any) => (
+                                {selectedJob.profile_data?.columns && (Object.values(selectedJob.profile_data.columns) as ColumnProfile[]).map((v) => (
                                     <tr key={v.name} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                                         <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{v.name}</td>
                                         <td className="px-4 py-3">

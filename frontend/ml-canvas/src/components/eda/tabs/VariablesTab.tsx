@@ -5,11 +5,12 @@ import { Input } from '../../ui/input';
 import { Search } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
+import type { EDAProfile, ColumnProfile } from '../../../core/types/edaProfile';
 
 interface VariablesTabProps {
-    profile: any;
+    profile: EDAProfile;
     handleToggleExclude: (colName: string, exclude: boolean) => void;
-    handleAddFilter: (column: string, value: any, operator: string) => void;
+    handleAddFilter: (column: string, value: string | number, operator: string) => void;
 }
 
 export const VariablesTab: React.FC<VariablesTabProps> = ({
@@ -40,7 +41,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
         setExpandedVars(new Set());
     };
 
-    const filteredColumns = Object.values(profile.columns).filter((col: any) => 
+    const filteredColumns = (Object.values(profile.columns) as ColumnProfile[]).filter((col) => 
         col.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -73,7 +74,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
             {/* List */}
             <div className="space-y-2">
                 {/* Active Columns */}
-                {filteredColumns.map((col: any) => (
+                {filteredColumns.map((col) => (
                     <VariableRow 
                         key={col.name} 
                         profile={col} 

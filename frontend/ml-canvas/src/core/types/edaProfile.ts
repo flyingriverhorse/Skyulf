@@ -69,10 +69,21 @@ export interface NormalityTestResult {
   is_normal: boolean;
 }
 
+export interface OutlierExplanation {
+  feature: string;
+  value: number;
+  median: number;
+  diff_pct: number;
+}
+
 export interface OutlierPoint {
   index: number;
   value: number;
   score?: number;
+  /** Per-feature contribution rationale shown in the Outliers tab. */
+  explanation?: OutlierExplanation[];
+  /** Original row values keyed by column name. */
+  values?: Record<string, number | string | null>;
 }
 
 export interface OutlierAnalysis {

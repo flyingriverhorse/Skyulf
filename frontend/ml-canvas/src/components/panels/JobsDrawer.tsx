@@ -518,7 +518,7 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                                 <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Tuning Configuration</h4>
                                                 <div className="grid grid-cols-2 gap-4 text-xs">
                                                     {(() => {
-                                                        const node = (job.graph?.nodes as any[])?.find((n: any) => n.node_id === job.node_id);
+                                                        const node = (job.graph?.nodes as Array<{ node_id: string; params?: Record<string, unknown> }> | undefined)?.find((n) => n.node_id === job.node_id);
                                                         const config = Object.keys((job.config as any)?.tuning_config || {}).length > 0 
                                                             ? (job.config as any)?.tuning_config 
                                                             : node?.params?.tuning_config;

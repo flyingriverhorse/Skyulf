@@ -4,6 +4,7 @@ import { jobsApi } from '../../core/api/jobs';
 import { DatasetService } from '../../core/api/datasets';
 import { Play, AlertCircle, CheckCircle, Box, Power } from 'lucide-react';
 import { useConfirm } from '../shared';
+import { toast } from '../../core/toast';
 
 export const InferencePage: React.FC = () => {
   const confirm = useConfirm();
@@ -104,6 +105,7 @@ export const InferencePage: React.FC = () => {
       setPredictions(null);
     } catch (e) {
       console.error("Failed to deactivate", e);
+      toast.error('Failed to undeploy model');
     }
   };
 
