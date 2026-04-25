@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { deploymentApi, DeploymentInfo } from '../../core/api/deployment';
 import { Rocket, Power, Clock, CheckCircle, RefreshCw, Box } from 'lucide-react';
-import { ErrorState, EmptyState } from '../shared';
+import { ErrorState, EmptyState, useConfirm } from '../shared';
+import { toast } from '../../core/toast';
 
 export const DeploymentsPage: React.FC = () => {
   const [activeDeployment, setActiveDeployment] = useState<DeploymentInfo | null>(null);
   const [history, setHistory] = useState<DeploymentInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   const loadData = async () => {
     setIsLoading(true);
@@ -32,24 +34,35 @@ export const DeploymentsPage: React.FC = () => {
   }, []);
 
   const handleDeactivate = async () => {
-    if (!confirm("Are you sure you want to deactivate the current deployment?")) return;
+    const ok = await confirm({
+      title: 'Deactivate deployment?',
+      message: 'Are you sure you want to deactivate the current deployment?',
+      confirmLabel: 'Deactivate',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await deploymentApi.deactivate();
       await loadData();
     } catch (e) {
       console.error("Failed to deactivate", e);
-      alert("Failed to deactivate deployment.");
+      toast.error('Failed to deactivate deployment');
     }
   };
 
   const handleRedeploy = async (jobId: string) => {
-    if (!confirm(`Are you sure you want to redeploy job ${jobId}?`)) return;
+    const ok = await confirm({
+      title: 'Redeploy model?',
+      message: `Are you sure you want to redeploy job ${jobId}?`,
+      confirmLabel: 'Redeploy',
+    });
+    if (!ok) return;
     try {
       await deploymentApi.deployModel(jobId);
       await loadData();
     } catch (e) {
       console.error("Failed to redeploy", e);
-      alert("Failed to redeploy model.");
+      toast.error('Failed to redeploy model');
     }
   };
 

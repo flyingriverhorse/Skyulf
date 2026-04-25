@@ -18,6 +18,7 @@ import { BestParamsModal } from './components/BestParamsModal';
 import { HyperparameterInput } from './components/HyperparameterInput';
 import type { HyperparameterDef } from './components/types';
 import type { ExecutionMode } from '../../../core/types/executionMode';
+import { toast } from '../../../core/toast';
 
 export interface ModelTrainingConfig {
   target_column: string;
@@ -188,15 +189,15 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
         if (jobCount > 1) {
             setActiveParallelRun({ jobIds: response.job_ids, startedAt: new Date().toISOString() });
             startPolling();
-            alert(`Parallel execution started! ${jobCount} branches submitted.`);
+            toast.success(`Parallel execution started`, `${jobCount} branches submitted.`);
         } else {
-            alert("Training job submitted successfully!");
+            toast.success('Training job submitted');
         }
         setTab('basic_training');
         toggleJobDrawer(true);
     } catch (error) {
         console.error("Failed to submit training job:", error);
-        alert("Failed to submit training job. Check console for details.");
+        toast.error('Failed to submit training job', 'Check console for details.');
     }
   };
 

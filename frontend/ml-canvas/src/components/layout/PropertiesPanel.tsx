@@ -124,7 +124,7 @@ const PropertiesContent: React.FC<{
  */
 const MultiInputModeSection: React.FC<{ selectedNode: Node }> = ({ selectedNode }) => {
   const edges = useGraphStore((state) => state.edges);
-  const updateNodeData = useGraphStore((state) => state.updateNodeData);
+  const setExecutionMode = useGraphStore((state) => state.setExecutionMode);
 
   const definitionType = selectedNode.data.definitionType as string;
 
@@ -149,7 +149,7 @@ const MultiInputModeSection: React.FC<{ selectedNode: Node }> = ({ selectedNode 
       </p>
       <div className="flex rounded-md overflow-hidden border border-slate-300 dark:border-slate-600 text-xs font-medium w-fit">
         <button
-          onClick={() => updateNodeData(selectedNode.id, { execution_mode: 'merge' })}
+          onClick={() => setExecutionMode(selectedNode.id, 'merge')}
           className={`px-3 py-1.5 transition-colors ${
             current === 'merge'
               ? 'bg-purple-500 text-white'
@@ -159,7 +159,7 @@ const MultiInputModeSection: React.FC<{ selectedNode: Node }> = ({ selectedNode 
           Merge
         </button>
         <button
-          onClick={() => updateNodeData(selectedNode.id, { execution_mode: 'parallel' })}
+          onClick={() => setExecutionMode(selectedNode.id, 'parallel')}
           className={`px-3 py-1.5 transition-colors ${
             current === 'parallel'
               ? 'bg-blue-500 text-white'

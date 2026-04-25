@@ -8,10 +8,12 @@ import { formatBytes } from '../core/utils/format';
 import { DatasetPreviewModal } from '../components/data/DatasetPreviewModal';
 import { AddSourceModal } from '../components/data/AddSourceModal';
 import { IngestionJobsModal } from '../components/data/IngestionJobsModal';
-import { LoadingState, EmptyState } from '../components/shared';
+import { LoadingState, EmptyState, useConfirm } from '../components/shared';
+import { toast } from '../core/toast';
 
 export const DataSources: React.FC = () => {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
@@ -77,30 +79,42 @@ export const DataSources: React.FC = () => {
   }, [datasets]); // Re-run effect when datasets change to update "hasPending" check
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this dataset?')) return;
-    
+    const ok = await confirm({
+      title: 'Delete dataset?',
+      message: 'Are you sure you want to delete this dataset? This cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     setDeletingId(id);
     try {
       await DatasetService.delete(id);
       setDatasets(datasets.filter(d => d.id !== id));
     } catch (error) {
       console.error('Failed to delete dataset:', error);
-      alert('Failed to delete dataset');
+      toast.error('Failed to delete dataset');
     } finally {
       setDeletingId(null);
     }
   };
 
   const handleCancel = async (id: string) => {
-    if (!window.confirm('Are you sure you want to cancel this ingestion job?')) return;
-    
+    const ok = await confirm({
+      title: 'Cancel ingestion job?',
+      message: 'Are you sure you want to cancel this ingestion job?',
+      confirmLabel: 'Cancel job',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     setCancellingId(id);
     try {
       await DatasetService.cancelIngestion(id);
       fetchDatasets();
     } catch (error) {
       console.error('Failed to cancel ingestion:', error);
-      alert('Failed to cancel ingestion');
+      toast.error('Failed to cancel ingestion');
     } finally {
       setCancellingId(null);
     }

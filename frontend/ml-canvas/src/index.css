@@ -87,6 +87,22 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Honour OS-level "reduce motion" by collapsing every transition,
+     animation, and smooth-scroll to a near-zero duration. Single rule
+     covers all Tailwind animate- and transition- usages without touching
+     each call site. Use 0.01ms (not 0) so events that depend on
+     animation/transition end still fire. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer components {

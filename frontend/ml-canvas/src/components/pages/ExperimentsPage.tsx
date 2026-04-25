@@ -6,7 +6,8 @@ import {
 } from 'recharts';
 import { clickableProps } from '../../core/utils/a11y';
 import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, RefreshCw, Download, Loader2, Check, Trophy, GitBranch } from 'lucide-react';
-import { LoadingState, ErrorState } from '../shared';
+import { LoadingState, ErrorState, useConfirm } from '../shared';
+import { toast } from '../../core/toast';
 import { toPng } from 'html-to-image';
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
@@ -48,6 +49,7 @@ interface EvaluationData {
 
 export const ExperimentsPage: React.FC = () => {
   const { jobs, fetchJobs, hasMore, loadMoreJobs, isLoading, promoteJob, unpromoteJob } = useJobStore();
+  const confirm = useConfirm();
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
   const [filterType, setFilterType] = useState<'all' | 'basic_training' | 'advanced_tuning'>('all');
   const [datasets, setDatasets] = useState<{id: string, name: string}[]>([]);
@@ -101,12 +103,17 @@ export const ExperimentsPage: React.FC = () => {
 
   const handleDeploy = async (e: React.MouseEvent, jobId: string) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to deploy this model to production?')) return;
+    const ok = await confirm({
+      title: 'Deploy to production?',
+      message: 'Are you sure you want to deploy this model to production?',
+      confirmLabel: 'Deploy',
+    });
+    if (!ok) return;
     try {
       await deploymentApi.deployModel(jobId);
-      alert('Model deployed successfully!');
+      toast.success('Model deployed');
     } catch (err) {
-      alert('Failed to deploy model');
+      toast.error('Failed to deploy model');
       console.error(err);
     }
   };
@@ -120,7 +127,7 @@ export const ExperimentsPage: React.FC = () => {
         await promoteJob(job.job_id);
       }
     } catch (err) {
-      alert('Failed to update promotion status');
+      toast.error('Failed to update promotion status');
       console.error(err);
     }
   };

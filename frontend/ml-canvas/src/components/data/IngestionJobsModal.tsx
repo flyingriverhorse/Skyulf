@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Loader2, CheckCircle, XCircle, Clock, Ban } from 'lucide-react';
 import { Dataset } from '../../core/types/api';
 import { DatasetService } from '../../core/api/datasets';
-import { ModalShell } from '../shared';
+import { ModalShell, useConfirm } from '../shared';
 import { VirtualList } from '../shared/VirtualList';
+import { toast } from '../../core/toast';
 
 interface IngestionJobsModalProps {
   isOpen: boolean;
@@ -14,9 +15,16 @@ interface IngestionJobsModalProps {
 
 export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, onClose, datasets, onRefresh }) => {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   const handleCancel = async (id: string) => {
-    if (!window.confirm('Are you sure you want to cancel this ingestion job?')) return;
+    const ok = await confirm({
+      title: 'Cancel ingestion job?',
+      message: 'Are you sure you want to cancel this ingestion job?',
+      confirmLabel: 'Cancel job',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     setCancellingId(id);
     try {
@@ -24,7 +32,7 @@ export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, 
       if (onRefresh) onRefresh();
     } catch (error) {
       console.error('Failed to cancel ingestion:', error);
-      alert('Failed to cancel ingestion');
+      toast.error('Failed to cancel ingestion');
     } finally {
       setCancellingId(null);
     }

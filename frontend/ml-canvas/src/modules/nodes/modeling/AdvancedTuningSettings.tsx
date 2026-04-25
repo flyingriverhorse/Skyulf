@@ -20,6 +20,7 @@ import { BestParamsModal } from './components/BestParamsModal';
 import { SearchSpaceInput } from './components/SearchSpaceInput';
 import type { HyperparameterDef } from './components/types';
 import type { ExecutionMode } from '../../../core/types/executionMode';
+import { toast } from '../../../core/toast';
 
 export interface TuningConfig {
   target_column: string;
@@ -192,15 +193,15 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         if (jobCount > 1) {
             setActiveParallelRun({ jobIds: response.job_ids, startedAt: new Date().toISOString() });
             startPolling();
-            alert(`Parallel execution started! ${jobCount} branches submitted.`);
+            toast.success('Parallel execution started', `${jobCount} branches submitted.`);
         } else {
-            alert("Training job submitted successfully!");
+            toast.success('Training job submitted');
         }
         setTab('advanced_tuning');
         toggleDrawer(true);
     } catch (error) {
         console.error("Failed to submit tuning job:", error);
-        alert("Failed to submit tuning job.");
+        toast.error('Failed to submit tuning job');
     }
   };
 

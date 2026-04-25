@@ -18,6 +18,11 @@ import {
 import { registry } from '../registry/NodeRegistry';
 import { PreviewResponse } from '../api/client';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  type ExecutionMode,
+  getExecutionMode as readExecutionMode,
+} from '../types/executionMode';
+import { toast } from '../toast';
 
 interface GraphState {
   nodes: Node[];
@@ -31,6 +36,15 @@ interface GraphState {
   // Custom Actions
   addNode: (type: string, position: { x: number, y: number }, initialData?: unknown) => string;
   updateNodeData: (id: string, data: unknown) => void;
+  /**
+   * Read the effective `execution_mode` for a node, defaulting to the
+   * canonical `'merge'` when unset. Cheaper than `useGraphStore` callers
+   * pulling `nodes` and re-deriving the value, and keeps the cast to
+   * `ExecutionModeData` in one place.
+   */
+  getExecutionMode: (nodeId: string) => ExecutionMode;
+  /** Typed setter for the modeling-node Merge/Parallel toggle. */
+  setExecutionMode: (nodeId: string, mode: ExecutionMode) => void;
   /**
    * Clone every currently-selected node with a small position offset
    * and a fresh id. New clones become the selection (originals are
@@ -96,9 +110,9 @@ export const useGraphStore = create<GraphState>()(
       // Block: connecting a training/tuning output into another training/tuning node
       const modelTypes = ['basic_training', 'advanced_tuning'];
       if (modelTypes.includes(sourceType) && modelTypes.includes(targetType)) {
-        alert(
-          'Invalid connection: You cannot connect a model output to another training node.\n\n' +
-          'Training nodes expect data (DataFrame), not a trained model.'
+        toast.error(
+          'Invalid connection',
+          'You cannot connect a model output to another training node. Training nodes expect data (DataFrame), not a trained model.',
         );
         return;
       }
@@ -130,7 +144,10 @@ export const useGraphStore = create<GraphState>()(
         }
 
         if (!hasTrainTestSplit) {
-          const proceed = confirm(
+          // window.confirm is intentional here: onConnect is a synchronous
+          // React Flow callback that must return before the edge is
+          // committed, so we can't await the async <ConfirmDialog>.
+          const proceed = window.confirm(
             'Warning: X/Y Split without a prior Train-Test Split.\n\n' +
             'This means 100% of data will be used (possible data leakage).\n\n' +
             'Click OK to connect anyway, or Cancel to abort.'
@@ -156,7 +173,8 @@ export const useGraphStore = create<GraphState>()(
       if (autoParallelTypes.includes(targetType)) {
         // Skip both confirms below; each input becomes its own preview tab.
       } else if (isNewSource && uniqueSourceCount >= 2 && modelTypes.includes(targetType)) {
-        const proceed = confirm(
+        // window.confirm: see note above on sync onConnect contract.
+        const proceed = window.confirm(
           `This training node will receive ${uniqueSourceCount} inputs.\n\n` +
           'You have two options:\n' +
           '  • MERGE (default): Inputs are auto-merged into one dataset before training.\n' +
@@ -170,7 +188,8 @@ export const useGraphStore = create<GraphState>()(
         // Direction-A means non-training nodes also auto-merge fan-in via
         // column union + last-wins. Surface that contract before the user
         // wires it so silent column overwrites aren't a surprise at run time.
-        const proceed = confirm(
+        // window.confirm: see note above on sync onConnect contract.
+        const proceed = window.confirm(
           `This node will receive ${uniqueSourceCount} inputs.\n\n` +
           'Inputs are auto-merged via column union with LAST-WINS on overlap ' +
           '(the last connected input overwrites earlier ones on shared columns).\n\n' +
@@ -220,6 +239,21 @@ export const useGraphStore = create<GraphState>()(
         }
         return node;
       }),
+    });
+  },
+
+  getExecutionMode: (nodeId: string) => {
+    const node = get().nodes.find((n) => n.id === nodeId);
+    return readExecutionMode(node?.data as { execution_mode?: ExecutionMode } | undefined);
+  },
+
+  setExecutionMode: (nodeId: string, mode: ExecutionMode) => {
+    set({
+      nodes: get().nodes.map((node) =>
+        node.id === nodeId
+          ? { ...node, data: { ...node.data, execution_mode: mode } }
+          : node,
+      ),
     });
   },
 
