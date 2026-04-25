@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle } from 'lucide-react';
-import { useGraphStore } from '../../core/store/useGraphStore';
+import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2 } from 'lucide-react';
+import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { runPipelinePreview, savePipeline, fetchPipeline } from '../../core/api/client';
 import { convertGraphToPipelineConfig } from '../../core/utils/pipelineConverter';
@@ -17,6 +17,42 @@ export const Toolbar: React.FC = () => {
   const setGraph = useGraphStore((state) => state.setGraph);
   
   const { toggleDrawer, setActiveParallelRun, startPolling } = useJobStore();
+
+  // Undo/redo state from the temporal substore (zundo). Keeping these
+  // as separate selectors so the toolbar only re-renders when the
+  // counts actually flip across zero.
+  const undo = useTemporalStore((s) => s.undo);
+  const redo = useTemporalStore((s) => s.redo);
+  const canUndo = useTemporalStore((s) => s.pastStates.length > 0);
+  const canRedo = useTemporalStore((s) => s.futureStates.length > 0);
+
+  // Global undo/redo hotkeys: Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y).
+  // We intentionally skip when focus is in a text input/textarea/contentEditable
+  // so we don't fight native input undo.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      const isEditable =
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        target?.isContentEditable === true;
+      if (isEditable) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const key = e.key.toLowerCase();
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if ((key === 'z' && e.shiftKey) || key === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [undo, redo]);
   
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -208,6 +244,24 @@ export const Toolbar: React.FC = () => {
 
   return (
     <div className="absolute top-4 right-4 z-10 flex gap-2">
+      <button
+        onClick={() => undo()}
+        disabled={!canUndo}
+        title="Undo (Ctrl+Z)"
+        aria-label="Undo"
+        className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
+      >
+        <Undo2 className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => redo()}
+        disabled={!canRedo}
+        title="Redo (Ctrl+Shift+Z)"
+        aria-label="Redo"
+        className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
+      >
+        <Redo2 className="w-4 h-4" />
+      </button>
       <button
         onClick={() => setShowLegend(v => !v)}
         title="Show node badge legend"
