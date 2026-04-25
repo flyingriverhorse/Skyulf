@@ -61,7 +61,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
             
             <div className="flex flex-wrap gap-4 mb-6 items-end">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">X Axis</label>
+                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">X Axis</span>
                     <select 
                         value={scatterX} 
                         onChange={(e) => setScatterX(e.target.value)}
@@ -77,7 +77,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                     </select>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Y Axis</label>
+                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Y Axis</span>
                     <select 
                         value={scatterY} 
                         onChange={(e) => setScatterY(e.target.value)}
@@ -95,7 +95,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                 
                 {is3D && (
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Z Axis</label>
+                        <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Z Axis</span>
                         <select 
                             value={scatterZ} 
                             onChange={(e) => setScatterZ(e.target.value)}
@@ -113,7 +113,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                 )}
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Color By</label>
+                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Color By</span>
                     <select 
                         value={scatterColor} 
                         onChange={(e) => setScatterColor(e.target.value)}

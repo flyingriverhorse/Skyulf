@@ -20,22 +20,22 @@ interface FeatureSelectionConfig {
     | 'rfe';
   
   // Common
-  target_column?: string;
-  datasetId?: string;
-  problem_type?: 'auto' | 'classification' | 'regression';
+  target_column?: string | undefined;
+  datasetId?: string | undefined;
+  problem_type?: 'auto' | 'classification' | 'regression' | undefined;
 
   // Method Specific
-  threshold?: number | string; // Variance, Correlation, SelectFromModel (can be "median")
-  correlation_method?: 'pearson' | 'kendall' | 'spearman';
-  k?: number; // SelectKBest, RFE
-  percentile?: number; // SelectPercentile
-  alpha?: number; // FPR, FDR, FWE
-  score_func?: string; // Univariate methods
-  mode?: 'k_best' | 'percentile' | 'fpr' | 'fdr' | 'fwe'; // Generic
-  param?: number; // Generic
-  estimator?: 'RandomForest' | 'LogisticRegression' | 'LinearRegression' | 'auto'; // Model based
-  step?: number; // RFE
-  drop_columns?: boolean;
+  threshold?: number | string | undefined; // Variance, Correlation, SelectFromModel (can be "median")
+  correlation_method?: 'pearson' | 'kendall' | 'spearman' | undefined;
+  k?: number | undefined; // SelectKBest, RFE
+  percentile?: number | undefined; // SelectPercentile
+  alpha?: number | undefined; // FPR, FDR, FWE
+  score_func?: string | undefined; // Univariate methods
+  mode?: 'k_best' | 'percentile' | 'fpr' | 'fdr' | 'fwe' | undefined; // Generic
+  param?: number | undefined; // Generic
+  estimator?: 'RandomForest' | 'LogisticRegression' | 'LinearRegression' | 'auto' | undefined; // Model based
+  step?: number | undefined; // RFE
+  drop_columns?: boolean | undefined;
 }
 
 const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onChange: (c: FeatureSelectionConfig) => void; nodeId?: string }> = ({
@@ -142,7 +142,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
 
   const isModelBased = ['select_from_model', 'rfe'].includes(config.method);
 
-  const FeedbackSection = () => {
+  const renderFeedback = () => {
     const result = executionResult?.node_results[nodeId || ''];
     if (!result) return null;
     
@@ -258,7 +258,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
         {/* Left Column: Method & Target */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Selection Method</label>
+            <span className="text-sm font-medium">Selection Method</span>
             <select
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.method}
@@ -285,7 +285,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
 
           {config.method !== 'variance_threshold' && config.method !== 'correlation_threshold' && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Target Column</label>
+              <span className="text-sm font-medium">Target Column</span>
               {upstreamTargetColumn ? (
                 <div className="p-2 bg-muted rounded text-sm text-muted-foreground border">
                   {upstreamTargetColumn} <span className="text-xs italic">(Auto-detected)</span>
@@ -308,7 +308,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
 
           {(isUnivariate || isModelBased) && (
              <div className="space-y-2">
-               <label className="text-sm font-medium">Problem Type</label>
+               <span className="text-sm font-medium">Problem Type</span>
                <select
                  className="w-full p-2 border rounded bg-background text-sm"
                  value={config.problem_type ?? 'auto'}
@@ -322,7 +322,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           )}
           
           {/* Feedback Section - Show here if wide (Left Column) */}
-          {isWide && <FeedbackSection />}
+          {isWide && renderFeedback()}
         </div>
 
         {/* Right Column: Parameters */}
@@ -332,7 +332,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           {/* Variance Threshold */}
           {config.method === 'variance_threshold' && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Threshold</label>
+              <span className="text-sm font-medium">Threshold</span>
               <input
                 type="number"
                 step="0.01"
@@ -348,7 +348,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           {config.method === 'correlation_threshold' && (
             <>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Threshold</label>
+                <span className="text-sm font-medium">Threshold</span>
                 <input
                   type="number"
                   step="0.01"
@@ -360,7 +360,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Method</label>
+                <span className="text-sm font-medium">Method</span>
                 <select
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.correlation_method ?? 'pearson'}
@@ -377,7 +377,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           {/* Univariate Common: Score Function */}
           {isUnivariate && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Scoring Function</label>
+              <span className="text-sm font-medium">Scoring Function</span>
               <select
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.score_func ?? ''}
@@ -394,7 +394,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           {/* K Best / RFE */}
           {(config.method === 'select_k_best' || config.method === 'rfe') && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">K (Number of Features)</label>
+              <span className="text-sm font-medium">K (Number of Features)</span>
               <input
                 type="number"
                 className="w-full p-2 border rounded bg-background text-sm"
@@ -407,7 +407,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           {/* Percentile */}
           {config.method === 'select_percentile' && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Percentile</label>
+              <span className="text-sm font-medium">Percentile</span>
               <input
                 type="number"
                 className="w-full p-2 border rounded bg-background text-sm"
@@ -420,7 +420,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           {/* Alpha (FPR, FDR, FWE) */}
           {['select_fpr', 'select_fdr', 'select_fwe'].includes(config.method) && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Alpha (Significance)</label>
+              <span className="text-sm font-medium">Alpha (Significance)</span>
               <input
                 type="number"
                 step="0.001"
@@ -435,7 +435,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           {config.method === 'generic_univariate_select' && (
             <>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Mode</label>
+                <span className="text-sm font-medium">Mode</span>
                 <select
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.mode ?? 'k_best'}
@@ -449,7 +449,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Parameter</label>
+                <span className="text-sm font-medium">Parameter</span>
                 <input
                   type="number"
                   step="0.001"
@@ -465,7 +465,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           {/* Model Based Common */}
           {isModelBased && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Estimator</label>
+              <span className="text-sm font-medium">Estimator</span>
               <select
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.estimator ?? 'auto'}
@@ -482,7 +482,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           {/* Select From Model Specific */}
           {config.method === 'select_from_model' && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Threshold</label>
+              <span className="text-sm font-medium">Threshold</span>
               <input
                 type="text"
                 className="w-full p-2 border rounded bg-background text-sm"
@@ -490,14 +490,14 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 value={config.threshold ?? 'median'}
                 onChange={(e) => onChange({ ...config, threshold: e.target.value })}
               />
-              <p className="text-xs text-muted-foreground">String (e.g. "median") or float.</p>
+              <p className="text-xs text-muted-foreground">String (e.g. &quot;median&quot;) or float.</p>
             </div>
           )}
 
           {/* RFE Specific */}
           {config.method === 'rfe' && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Step</label>
+              <span className="text-sm font-medium">Step</span>
               <input
                 type="number"
                 min="1"
@@ -527,7 +527,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           </p>
 
           {/* Feedback Section - Show here if NOT wide (Mobile/Narrow) */}
-          {!isWide && <FeedbackSection />}
+          {!isWide && renderFeedback()}
         </div>
       </div>
     </div>

@@ -87,6 +87,50 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Honour OS-level "reduce motion" by collapsing every transition,
+     animation, and smooth-scroll to a near-zero duration. Single rule
+     covers all Tailwind animate- and transition- usages without touching
+     each call site. Use 0.01ms (not 0) so events that depend on
+     animation/transition end still fire. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Unified focus ring. Apply to interactive elements that are not the
+     shadcn Button/Input (those already include their own ring styles). */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900;
+  }
+
+  /* One-shot validation pulse: fires when a node first becomes invalid.
+     The element manages its own remount via a `key` change so the
+     animation always plays from frame 0; we run for 3 cycles at 1.6s
+     each (~4.8 s total) — slow enough that the ring is clearly
+     readable as an alert rather than a flicker, then settles into the
+     steady-state soft red border defined inline in CustomNodeWrapper. */
+  .animate-validation-pulse {
+    animation: validation-pulse 1.6s ease-in-out 3;
+  }
+}
+
+@keyframes validation-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.55);
+  }
 }
 
 /* Custom Scrollbar */

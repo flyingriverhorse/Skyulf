@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { EDAService, Filter } from '../../core/api/eda';
 import { Plus, X, Loader2 } from 'lucide-react';
+import { clickableProps } from '../../core/utils/a11y';
 
 interface TreeItem {
     name: string;
@@ -79,6 +80,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                 let x2, y2;
                 
                 const nextLevel = levels[index + 1];
+                if (!nextLevel) return;
                 if (nextLevel.selectedItemName) {
                     // If next level has a selection, connect to that item
                     const endId = `node-${index + 1}-${nextLevel.selectedItemName}`;
@@ -179,7 +181,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     const handleHeaderSplitClick = (levelIndex: number, event: React.MouseEvent) => {
         // Only allow splitting if an item is selected in this level
         const level = levels[levelIndex];
-        if (!level.selectedItemName) {
+        if (!level || !level.selectedItemName) {
             // Maybe show a toast or tooltip? For now just return.
             return;
         }
@@ -217,7 +219,9 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     const handleItemClick = async (levelIndex: number, item: TreeItem) => {
         // 1. Update selection in current level
         const newLevels = [...levels];
-        newLevels[levelIndex].selectedItemName = item.name;
+        const currentLevel = newLevels[levelIndex];
+        if (!currentLevel) return;
+        currentLevel.selectedItemName = item.name;
         
         // Check if we have a next level defined in our split path
         const nextSplitCol = splitPath[levelIndex + 1];
@@ -227,7 +231,6 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
             setLoading(true);
             try {
                 // Construct filters for the next level
-                const currentLevel = newLevels[levelIndex];
                 const newFilters = [...currentLevel.filters];
                 if (currentLevel.splitColumn) {
                     newFilters.push({
@@ -288,6 +291,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
 
         try {
             const currentLevel = levels[levelIndex];
+            if (!currentLevel) return;
             const newFilters = [...currentLevel.filters];
             if (currentLevel.splitColumn) {
                 newFilters.push({
@@ -390,7 +394,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                                         <div 
                                             key={item.name}
                                             id={`node-${index}-${item.name}`}
-                                            onClick={() => handleItemClick(index, item)}
+                                            {...clickableProps(() => handleItemClick(index, item))}
                                             className={`
                                                 relative p-3 rounded-md border cursor-pointer transition-all group
                                                 ${isSelected 
@@ -458,6 +462,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
             
             {/* Backdrop for menu */}
             {splitMenuOpen && (
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- backdrop dismiss zone
                 <div className="fixed inset-0 z-40" onClick={() => setSplitMenuOpen(null)} />
             )}
         </div>

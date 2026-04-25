@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DatasetService } from '../core/api/datasets';
 import { EDAService } from '../core/api/eda';
 import { JobsHistoryModal } from '../components/eda/JobsHistoryModal';
@@ -21,37 +22,117 @@ import { DecompositionTab } from '../components/eda/tabs/DecompositionTab';
 import { Loader2, RefreshCw, AlertCircle, BarChart2, List, Play, HelpCircle, Target } from 'lucide-react';
 import { downloadChart } from '../core/utils/chartUtils';
 import { LoadingState, ErrorState } from '../components/shared';
+import { useEDAStore, selectExcludedDirty, type EDAFilter } from '../core/store/useEDAStore';
+
+// React Query keys for the EDA surface — co-located so cache invalidation stays type-safe.
+const edaKeys = {
+  datasets: ['eda', 'datasets'] as const,
+  report: (id: number | null) => ['eda', 'report', id] as const,
+  history: (id: number | null) => ['eda', 'history', id] as const,
+  reportById: (id: number) => ['eda', 'reportById', id] as const,
+};
 
 export const EDAPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const [datasets, setDatasets] = useState<any[]>([]);
-  const [selectedDataset, setSelectedDataset] = useState<number | null>(() => {
-    const id = searchParams.get('dataset_id');
-    return id ? Number(id) : null;
-  });
-  const [report, setReport] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [targetCol, setTargetCol] = useState<string>('');
-  const [taskType, setTaskType] = useState<string>(''); // "Classification" or "Regression" or "" (Auto)
-  const [excludedColsDraft, setExcludedColsDraft] = useState<string[]>([]);
-  const [excludedColsApplied, setExcludedColsApplied] = useState<string[]>([]);
-  const [filters, setFilters] = useState<any[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
+  const queryClient = useQueryClient();
+
+  // Only UI-toggle state remains local; server data lives in React Query, view state in the slice.
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  
-  // Manual Filter State (Moved to FilterBar)
 
-  // Scatter Plot State
-  const [scatterX, setScatterX] = useState<string>('');
-  const [scatterY, setScatterY] = useState<string>('');
-  const [scatterZ, setScatterZ] = useState<string>('');
-  const [scatterColor, setScatterColor] = useState<string>('');
-  const [is3D, setIs3D] = useState(false);
-  const [isPCA3D, setIsPCA3D] = useState(false);
+  // ── View + analysis-input state lives in the EDA zustand slice ──
+  const activeTab = useEDAStore((s) => s.activeTab);
+  const setActiveTab = useEDAStore((s) => s.setActiveTab);
+  const selectedDataset = useEDAStore((s) => s.selectedDataset);
+  const setSelectedDataset = useEDAStore((s) => s.setSelectedDataset);
+  const targetCol = useEDAStore((s) => s.targetCol);
+  const setTargetCol = useEDAStore((s) => s.setTargetCol);
+  const taskType = useEDAStore((s) => s.taskType);
+  const setTaskType = useEDAStore((s) => s.setTaskType);
+  const excludedColsDraft = useEDAStore((s) => s.excludedColsDraft);
+  const excludedColsApplied = useEDAStore((s) => s.excludedColsApplied);
+  const filters = useEDAStore((s) => s.filters);
+  const scatter = useEDAStore((s) => s.scatter);
+  const setScatter = useEDAStore((s) => s.setScatter);
+  const excludedDirty = useEDAStore(selectExcludedDirty);
 
+  // Seed the dataset id from `?dataset_id=…` once on mount.
+  useEffect(() => {
+    const id = searchParams.get('dataset_id');
+    if (id && useEDAStore.getState().selectedDataset == null) {
+      setSelectedDataset(Number(id));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── React Query: datasets / latest report / history ──
+  const datasetsQuery = useQuery({
+    queryKey: edaKeys.datasets,
+    queryFn: () => DatasetService.getUsable(),
+  });
+  // Memoize the fallback so dependent effects don't refire on every render.
+  const datasets = useMemo(() => datasetsQuery.data ?? [], [datasetsQuery.data]);
+
+  const reportQuery = useQuery({
+    queryKey: edaKeys.report(selectedDataset ?? null),
+    queryFn: async () => {
+      try {
+        return await EDAService.getLatestReport(selectedDataset!);
+      } catch (err: any) {
+        // 404 simply means "no report yet" — surface as null rather than a hard error.
+        if (err?.response?.status === 404) return null;
+        throw err;
+      }
+    },
+    enabled: selectedDataset != null,
+    // Auto-poll every 3 s while the backend job is PENDING; stop once it completes/fails.
+    refetchInterval: (query) => {
+      const data = query.state.data as any;
+      return data && data.status === 'PENDING' ? 3000 : false;
+    },
+  });
+  const report = reportQuery.data ?? null;
+  const loading = reportQuery.isLoading;
+  const error = reportQuery.isError ? 'Failed to load report' : null;
+
+  const historyQuery = useQuery({
+    queryKey: edaKeys.history(selectedDataset ?? null),
+    queryFn: () => EDAService.getHistory(selectedDataset!) as Promise<any[]>,
+    enabled: selectedDataset != null,
+    // Refresh history alongside the report while a job is in flight.
+    refetchInterval: report?.status === 'PENDING' ? 3000 : false,
+  });
+  const history: any[] = historyQuery.data ?? [];
+
+  // ── Mutations ──
+  const analyzeMutation = useMutation({
+    mutationFn: (params: { excluded: string[]; filters: EDAFilter[] }) =>
+      EDAService.analyze(
+        selectedDataset!,
+        targetCol || undefined,
+        params.excluded,
+        params.filters,
+        taskType || undefined,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: edaKeys.report(selectedDataset ?? null) });
+      queryClient.invalidateQueries({ queryKey: edaKeys.history(selectedDataset ?? null) });
+    },
+  });
+  const analyzing = analyzeMutation.isPending;
+
+  // Default-select the first dataset once the list loads.
+  useEffect(() => {
+    if (!selectedDataset && datasets.length > 0) {
+      setSelectedDataset(Number(datasets[0]!.id));
+    }
+  }, [datasets, selectedDataset, setSelectedDataset]);
+
+  // Wipe per-dataset slice fields whenever the user switches datasets.
+  useEffect(() => {
+    useEDAStore.getState().resetForDataset();
+  }, [selectedDataset]);
+
+  // Strip excluded columns from the profile for the UI without mutating the cached payload.
   const profileForUi = useMemo(() => {
     const rawProfile = report?.profile_data;
     if (!rawProfile) return null;
@@ -73,152 +154,44 @@ export const EDAPage: React.FC = () => {
     };
   }, [report?.profile_data, excludedColsDraft]);
 
-  useEffect(() => {
-    loadDatasets();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (selectedDataset) {
-      setReport(null); // Clear previous report to show loader
-      setExcludedColsDraft([]); // Reset excluded columns
-      setExcludedColsApplied([]);
-      setFilters([]); // Reset filters
-      setTargetCol(''); // Reset target column
-      setScatterX('');
-      setScatterY('');
-      setScatterZ('');
-      setScatterColor('');
-      setActiveTab('dashboard'); // Reset active tab
-      loadReport(selectedDataset);
-      loadHistory(selectedDataset);
-    } else {
-      setReport(null);
-      setHistory([]);
-      setExcludedColsDraft([]);
-      setExcludedColsApplied([]);
-      setFilters([]);
-      setTargetCol('');
-      setScatterX('');
-      setScatterY('');
-      setScatterZ('');
-      setScatterColor('');
-      setActiveTab('dashboard');
-    }
-  }, [selectedDataset]);
-
-  // Poll for status if pending
-  useEffect(() => {
-    let interval: any;
-    if (report && report.status === 'PENDING') {
-      interval = setInterval(() => {
-        if (selectedDataset) {
-            loadReport(selectedDataset, true);
-            loadHistory(selectedDataset);
-        }
-      }, 3000);
-    }
-    return () => clearInterval(interval);
-  }, [report, selectedDataset]);
-
-  const loadDatasets = async () => {
-    try {
-      const data = await DatasetService.getUsable();
-      setDatasets(data);
-      if (data.length > 0 && !selectedDataset) {
-        setSelectedDataset(Number(data[0].id));
-      }
-    } catch (err) {
-      console.error("Failed to load datasets", err);
-    }
-  };
-
-  const loadHistory = async (id: number) => {
-    try {
-        const data = await EDAService.getHistory(id);
-        setHistory(data);
-    } catch (err) {
-        console.error("Failed to load history", err);
-    }
-  };
-
-  const loadReport = async (id: number, silent = false) => {
-    if (!silent) setLoading(true);
-    setError(null);
-    try {
-      const data = await EDAService.getLatestReport(id);
-      setReport(data);
-    } catch (err: any) {
-      if (err.response && err.response.status === 404) {
-        setReport(null); // No report yet
-      } else {
-        // Only show error if not silent (polling)
-        if (!silent) setError("Failed to load report");
-      }
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
-
-  const loadSpecificReport = async (reportId: number) => {
-    setLoading(true);
-    try {
-        const data = await EDAService.getReport(reportId);
-        setReport(data);
-    } catch (err) {
-        setError("Failed to load report");
-    } finally {
-        setLoading(false);
-    }
-  };
-
-  const runAnalysis = async (overrideExcluded?: string[] | any, overrideFilters?: any[]) => {
+  const runAnalysis = (overrideExcluded?: string[] | any, overrideFilters?: any[]) => {
+    if (!selectedDataset) return;
     const actualExcluded = Array.isArray(overrideExcluded) ? overrideExcluded : excludedColsApplied;
     const actualFilters = Array.isArray(overrideFilters) ? overrideFilters : filters;
+    analyzeMutation.mutate({ excluded: actualExcluded, filters: actualFilters });
+  };
 
+  // Load a non-latest report into the latest-cache slot so the existing UI renders it.
+  const loadSpecificReport = async (reportId: number) => {
     if (!selectedDataset) return;
-    setAnalyzing(true);
-    try {
-      await EDAService.analyze(selectedDataset, targetCol || undefined, actualExcluded, actualFilters, taskType || undefined);
-      // Reload immediately to get the PENDING state
-      loadReport(selectedDataset);
-      loadHistory(selectedDataset);
-    } catch (err) {
-      setError("Failed to start analysis");
-    } finally {
-      setAnalyzing(false);
-    }
+    const data = await queryClient.fetchQuery({
+      queryKey: edaKeys.reportById(reportId),
+      queryFn: () => EDAService.getReport(reportId),
+    });
+    queryClient.setQueryData(edaKeys.report(selectedDataset), data);
   };
 
   const handleAddFilter = (column: string, value: any, operator: string = '==') => {
-      // Check if filter already exists to avoid duplicates if needed, 
-      // but for now let's allow multiple filters on same col (e.g. range)
-      const newFilter = { column, operator, value };
+      const newFilter: EDAFilter = { column, operator: operator as EDAFilter['operator'], value };
       const newFilters = [...filters, newFilter];
-      setFilters(newFilters);
+      useEDAStore.getState().setFilters(newFilters);
       runAnalysis(undefined, newFilters);
   };
 
   const handleRemoveFilter = (index: number) => {
-      const newFilters = [...filters];
-      newFilters.splice(index, 1);
-      setFilters(newFilters);
+      const newFilters = filters.filter((_, i) => i !== index);
+      useEDAStore.getState().setFilters(newFilters);
       runAnalysis(undefined, newFilters);
   };
 
   const handleToggleExclude = (colName: string, exclude: boolean) => {
-    setExcludedColsDraft((prev) => {
-      if (exclude) {
-        if (prev.includes(colName)) return prev;
-        return [...prev, colName];
-      }
-      return prev.filter((c) => c !== colName);
-    });
+    useEDAStore.getState().toggleExclude(colName, exclude);
   };
 
     const handleApplyExcluded = () => {
-    setExcludedColsApplied(excludedColsDraft);
-    runAnalysis(excludedColsDraft);
+    const draft = useEDAStore.getState().excludedColsDraft;
+    useEDAStore.getState().applyExcluded();
+    runAnalysis(draft);
     };
 
   // Sync target col and excluded cols from report if available
@@ -230,20 +203,11 @@ export const EDAPage: React.FC = () => {
       const serverExcluded = Array.isArray(report.profile_data.excluded_columns)
         ? report.profile_data.excluded_columns
         : [];
-      setExcludedColsApplied(serverExcluded);
-      setExcludedColsDraft(serverExcluded);
+      useEDAStore.getState().setExcludedApplied(serverExcluded);
+      useEDAStore.getState().setExcludedDraft(serverExcluded);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [report?.id]);
-
-    const excludedDirty = (() => {
-    if (excludedColsApplied.length !== excludedColsDraft.length) return true;
-    const appliedSet = new Set(excludedColsApplied);
-    for (const col of excludedColsDraft) {
-      if (!appliedSet.has(col)) return true;
-    }
-    return false;
-    })();
 
   // Helper to find existing report for current target
   const existingReport = targetCol ? history.find(h => h.target_col === targetCol && h.status === 'COMPLETED') : null;
@@ -257,7 +221,7 @@ export const EDAPage: React.FC = () => {
       return (
         <ErrorState
           error={error}
-          onRetry={() => selectedDataset && loadReport(selectedDataset)}
+          onRetry={() => reportQuery.refetch()}
         />
       );
     }
@@ -365,7 +329,7 @@ export const EDAPage: React.FC = () => {
             analyzing={analyzing}
             onAddFilter={handleAddFilter}
             onRemoveFilter={handleRemoveFilter}
-            onClearFilters={() => { setFilters([]); runAnalysis(undefined, []); }}
+            onClearFilters={() => { useEDAStore.getState().clearFilters(); runAnalysis(undefined, []); }}
             onToggleExclude={handleToggleExclude}
             onApplyExcluded={handleApplyExcluded}
         />
@@ -386,8 +350,8 @@ export const EDAPage: React.FC = () => {
             {activeTab === 'pca' && (
                 <PCATab 
                     profile={profile} 
-                    isPCA3D={isPCA3D} 
-                    setIsPCA3D={setIsPCA3D} 
+                    isPCA3D={scatter.isPCA3D} 
+                    setIsPCA3D={(v) => setScatter({ isPCA3D: v })} 
                     downloadChart={downloadChart} 
                 />
             )}
@@ -426,16 +390,16 @@ export const EDAPage: React.FC = () => {
                 <BivariateTab 
                     profile={profile}
                     downloadChart={downloadChart}
-                    scatterX={scatterX}
-                    setScatterX={setScatterX}
-                    scatterY={scatterY}
-                    setScatterY={setScatterY}
-                    scatterZ={scatterZ}
-                    setScatterZ={setScatterZ}
-                    scatterColor={scatterColor}
-                    setScatterColor={setScatterColor}
-                    is3D={is3D}
-                    setIs3D={setIs3D}
+                    scatterX={scatter.x}
+                    setScatterX={(v) => setScatter({ x: v })}
+                    scatterY={scatter.y}
+                    setScatterY={(v) => setScatter({ y: v })}
+                    scatterZ={scatter.z}
+                    setScatterZ={(v) => setScatter({ z: v })}
+                    scatterColor={scatter.color}
+                    setScatterColor={(v) => setScatter({ color: v })}
+                    is3D={scatter.is3D}
+                    setIs3D={(v) => setScatter({ is3D: v })}
                 />
             )}
 
@@ -496,7 +460,7 @@ export const EDAPage: React.FC = () => {
             <div className="h-8 w-px bg-gray-200 dark:bg-gray-700 mx-2"></div>
             
             <div className="flex flex-col">
-                <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Dataset</label>
+                <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Dataset</span>
                 <select
                     value={selectedDataset || ''}
                     onChange={(e) => setSelectedDataset(Number(e.target.value))}
@@ -513,7 +477,7 @@ export const EDAPage: React.FC = () => {
         {/* Center: Controls */}
         <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800/50 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
             <div className="flex flex-col px-2">
-                <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Target Column</label>
+                <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Target Column</span>
                 <select
                     value={targetCol}
                     onChange={(e) => setTargetCol(e.target.value)}
@@ -533,7 +497,7 @@ export const EDAPage: React.FC = () => {
 
             <div className="flex flex-col px-2">
                 <div className="flex items-center gap-1">
-                    <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Task Type</label>
+                    <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Task Type</span>
                     <div className="group relative">
                         <HelpCircle className="w-3 h-3 text-gray-400 cursor-help" />
                         <div className="absolute bottom-full mb-2 w-56 p-2 bg-slate-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none left-1/2 -translate-x-1/2">
@@ -626,17 +590,21 @@ export const EDAPage: React.FC = () => {
         isOpen={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
         history={history}
-        onRefresh={() => selectedDataset && loadHistory(selectedDataset)}
+        onRefresh={() =>
+          queryClient.invalidateQueries({ queryKey: edaKeys.history(selectedDataset ?? null) })
+        }
         onFetchReport={async (id) => {
             return await EDAService.getReport(id);
         }}
         onSelect={(selectedReport) => {
-            setReport(selectedReport);
+            if (selectedDataset) {
+              queryClient.setQueryData(edaKeys.report(selectedDataset), selectedReport);
+            }
           const serverExcluded = Array.isArray(selectedReport.profile_data?.excluded_columns)
             ? selectedReport.profile_data.excluded_columns
             : [];
-          setExcludedColsApplied(serverExcluded);
-          setExcludedColsDraft(serverExcluded);
+          useEDAStore.getState().setExcludedApplied(serverExcluded);
+          useEDAStore.getState().setExcludedDraft(serverExcluded);
         }}
       />
     </div>

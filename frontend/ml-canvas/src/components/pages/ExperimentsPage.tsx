@@ -4,8 +4,10 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ScatterChart, Scatter, LineChart, Line, ReferenceLine
 } from 'recharts';
+import { clickableProps } from '../../core/utils/a11y';
 import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, RefreshCw, Download, Loader2, Check, Trophy, GitBranch } from 'lucide-react';
-import { LoadingState, ErrorState } from '../shared';
+import { LoadingState, ErrorState, useConfirm } from '../shared';
+import { toast } from '../../core/toast';
 import { toPng } from 'html-to-image';
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
@@ -47,6 +49,7 @@ interface EvaluationData {
 
 export const ExperimentsPage: React.FC = () => {
   const { jobs, fetchJobs, hasMore, loadMoreJobs, isLoading, promoteJob, unpromoteJob } = useJobStore();
+  const confirm = useConfirm();
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
   const [filterType, setFilterType] = useState<'all' | 'basic_training' | 'advanced_tuning'>('all');
   const [datasets, setDatasets] = useState<{id: string, name: string}[]>([]);
@@ -100,12 +103,17 @@ export const ExperimentsPage: React.FC = () => {
 
   const handleDeploy = async (e: React.MouseEvent, jobId: string) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to deploy this model to production?')) return;
+    const ok = await confirm({
+      title: 'Deploy to production?',
+      message: 'Are you sure you want to deploy this model to production?',
+      confirmLabel: 'Deploy',
+    });
+    if (!ok) return;
     try {
       await deploymentApi.deployModel(jobId);
-      alert('Model deployed successfully!');
+      toast.success('Model deployed');
     } catch (err) {
-      alert('Failed to deploy model');
+      toast.error('Failed to deploy model');
       console.error(err);
     }
   };
@@ -119,7 +127,7 @@ export const ExperimentsPage: React.FC = () => {
         await promoteJob(job.job_id);
       }
     } catch (err) {
-      alert('Failed to update promotion status');
+      toast.error('Failed to update promotion status');
       console.error(err);
     }
   };
@@ -200,7 +208,7 @@ export const ExperimentsPage: React.FC = () => {
             const classIndex = (labelList ?? y_proba.classes).findIndex(c => String(c) === targetClassStr);
       if (classIndex === -1) return null;
       
-      const scores = y_proba.values.map(v => v[classIndex]);
+      const scores = y_proba.values.map(v => v[classIndex] ?? 0);
       
       const data = scores.map((score, i) => ({
           score,
@@ -221,7 +229,7 @@ export const ExperimentsPage: React.FC = () => {
       rocPoints.push({ fpr: 0, tpr: 0 });
       
       for (let i = 0; i < data.length; i++) {
-          if (data[i].actual === 1) tp++;
+          if (data[i]!.actual === 1) tp++;
           else fp++;
           
           rocPoints.push({
@@ -239,10 +247,10 @@ export const ExperimentsPage: React.FC = () => {
           // If we have a specific eval job selected, use it
           // Otherwise default to the first selected job
           if (!evalJobId && selectedJobIds.length > 0) {
-              void fetchEvaluationData(selectedJobIds[0]);
+              void fetchEvaluationData(selectedJobIds[0]!);
           } else if (evalJobId && !selectedJobIds.includes(evalJobId) && selectedJobIds.length > 0) {
               // If current eval job is deselected, switch to another
-              void fetchEvaluationData(selectedJobIds[0]);
+              void fetchEvaluationData(selectedJobIds[0]!);
           } else if (selectedJobIds.length === 0) {
               setEvaluationData(null);
               setEvalJobId(null);
@@ -402,7 +410,7 @@ export const ExperimentsPage: React.FC = () => {
             {filteredJobs.map(job => (
               <div 
                 key={job.job_id}
-                onClick={() => { toggleJobSelection(job.job_id); }}
+                {...clickableProps(() => { toggleJobSelection(job.job_id); })}
                 className={`border-b border-gray-100 dark:border-gray-700 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${
                   selectedJobIds.includes(job.job_id) ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500' : 'border-l-4 border-l-transparent'
                 } ${isSidebarCollapsed ? 'p-2 flex justify-center' : 'p-3'}`}
@@ -614,7 +622,7 @@ export const ExperimentsPage: React.FC = () => {
                               <tr key={key} className="border-b border-purple-100 dark:border-purple-800/50">
                                 <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">
                                   {key === 'best_score'
-                                    ? `Best Score (${formatMetricName(getJobScoringMetric(groupJobs[0])) || 'CV'})`
+                                    ? `Best Score (${formatMetricName(getJobScoringMetric(groupJobs[0] ?? {})) || 'CV'})`
                                     : key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                                 </td>
                                 {groupJobs.map(j => {
@@ -798,7 +806,7 @@ export const ExperimentsPage: React.FC = () => {
                         <tr key={metricKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                           <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">
                             {metricKey === 'best_score'
-                              ? `Best Score (${formatMetricName(getJobScoringMetric(selectedJobs[0])) || 'CV'})`
+                              ? `Best Score (${formatMetricName(getJobScoringMetric(selectedJobs[0] ?? {})) || 'CV'})`
                               : metricKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                           </td>
                           {selectedJobs.map(job => {
@@ -1208,7 +1216,8 @@ export const ExperimentsPage: React.FC = () => {
                                                         if (proba?.labels && proba.labels.length === proba.classes.length) {
                                                             const labelToClass = new Map<string, string | number>();
                                                             proba.labels.forEach((label, idx) => {
-                                                                labelToClass.set(String(label), proba.classes[idx]);
+                                                                const cls = proba.classes[idx];
+                                                                if (cls !== undefined) labelToClass.set(String(label), cls);
                                                             });
                                                             yTrueForCm = splitData.y_true.map(y => labelToClass.get(String(y)) ?? y);
                                                             yPredForCm = splitData.y_pred.map(y => labelToClass.get(String(y)) ?? y);

@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { Zap, Search, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { clickableProps } from '../../../core/utils/a11y';
 
 interface PolynomialFeaturesConfig {
   columns: string[];
@@ -52,7 +53,7 @@ const ColumnSelector: React.FC<{
               return (
                 <div
                   key={col}
-                  onClick={() => { toggle(col); }}
+                  {...clickableProps(() => { toggle(col); })}
                   className={`
                     flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors
                     ${isSelected ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-accent text-foreground'}
@@ -122,7 +123,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
         <div className="border rounded-md bg-card">
           <div 
             className="flex items-center justify-between p-2 cursor-pointer hover:bg-accent/50 transition-colors"
-            onClick={toggleExpand}
+            {...clickableProps(toggleExpand)}
           >
             <div className="flex items-center gap-2">
               <Zap size={14} className="text-primary" />
@@ -143,7 +144,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
 
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                     Degree
                     <div className="group relative">
                       <Info size={10} className="cursor-help" />
@@ -151,7 +152,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
                         The degree of the polynomial features. Default = 2.
                       </div>
                     </div>
-                  </label>
+                  </span>
                   <input
                     type="number"
                     min={2}
@@ -163,7 +164,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Output Prefix</label>
+                  <span className="text-xs font-medium text-muted-foreground">Output Prefix</span>
                   <input
                     type="text"
                     className="w-full px-2 py-1.5 text-xs border rounded bg-background"

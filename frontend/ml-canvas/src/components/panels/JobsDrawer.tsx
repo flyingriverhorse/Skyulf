@@ -1,9 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
-import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown, Zap, CheckCircle2, Search, Filter } from 'lucide-react';
-import { JobInfo, jobsApi } from '../../core/api/jobs';
+import { X, RefreshCw, CheckCircle, AlertCircle, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown, Zap, CheckCircle2, Search, Filter } from 'lucide-react';
+import { JobInfo } from '../../core/api/jobs';
 import { useEscapeKey } from '../../core/hooks/useEscapeKey';
 import { formatMetricName } from '../../core/utils/format';
+import { clickableProps } from '../../core/utils/a11y';
+import { useJobPolling, isTerminalStatus } from '../../core/hooks/useJobPolling';
+import { StatusBadge } from '../shared/StatusBadge';
+import { VirtualList } from '../shared/VirtualList';
+import { useConfirm } from '../shared';
+import { toast } from '../../core/toast';
 
 const formatMetricValue = (key: string, value: number): string => {
   if (key.endsWith('_std')) return value.toFixed(6);
@@ -27,7 +33,7 @@ const FeatureImportancesSection: React.FC<{ result: Record<string, unknown> }> =
 
   const sorted = Object.entries(raw).sort(([, a], [, b]) => b - a).slice(0, 5);
   if (sorted.length === 0) return null;
-  const maxVal = sorted[0][1] || 1;
+  const maxVal = sorted[0]![1] || 1;
 
   return (
     <div className="space-y-2">
@@ -101,6 +107,7 @@ export const JobsDrawer: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex justify-center items-center">
       {/* Backdrop */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- backdrop dismiss zone */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={() => toggleDrawer(false)}
@@ -234,7 +241,7 @@ export const JobsDrawer: React.FC = () => {
                   {showFilters && (
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-1.5">
-                        <label className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</label>
+                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</span>
                         <select
                           value={statusFilter}
                           onChange={(e) => setStatusFilter(e.target.value)}
@@ -247,7 +254,7 @@ export const JobsDrawer: React.FC = () => {
                         </select>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <label className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model</label>
+                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model</span>
                         <select
                           value={modelFilter}
                           onChange={(e) => setModelFilter(e.target.value)}
@@ -281,8 +288,8 @@ export const JobsDrawer: React.FC = () => {
                     <div className="col-span-2">Score</div>
                 </div>
 
-                {/* List */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50/30 dark:bg-gray-900/30">
+                {/* List — virtualized once length crosses the threshold (#15). */}
+                <div className="flex-1 flex flex-col overflow-hidden bg-gray-50/30 dark:bg-gray-900/30">
                 {filteredJobs.length === 0 ? (
                     <div className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">
                     {searchQuery || statusFilter !== 'all' || modelFilter !== 'all'
@@ -292,12 +299,20 @@ export const JobsDrawer: React.FC = () => {
                     </div>
                 ) : (
                     <>
-                        {filteredJobs.map(job => (
-                            <JobRow key={job.job_id} job={job} onClick={() => { setSelectedJob(job); }} />
-                        ))}
+                        <VirtualList
+                            items={filteredJobs}
+                            getKey={(job) => job.job_id}
+                            estimateSize={84}
+                            className="flex-1 overflow-y-auto p-4 space-y-2"
+                            renderItem={(job) => (
+                                <div className="pb-2">
+                                    <JobRow job={job} onClick={() => { setSelectedJob(job); }} />
+                                </div>
+                            )}
+                        />
                         
                         {hasMore && (
-                            <div className="flex justify-center pt-2 pb-4">
+                            <div className="flex-none flex justify-center pt-2 pb-4">
                                 <button 
                                     onClick={() => loadMoreJobs()}
                                     disabled={isLoading}
@@ -320,34 +335,20 @@ export const JobsDrawer: React.FC = () => {
 
 const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () => void }> = ({ job: initialJob, onBack, onClose }) => {
     const { cancelJob } = useJobStore();
-    const [job, setJob] = useState<JobInfo>(initialJob);
+    const confirm = useConfirm();
     const [activeTab, setActiveTab] = useState<'overview' | 'logs'>('overview');
     const [isCancelling, setIsCancelling] = useState(false);
     const logsEndRef = useRef<HTMLDivElement>(null);
 
-    // Poll for updates if running
-    useEffect(() => {
-        let interval: ReturnType<typeof setInterval>;
-        
-        const fetchDetails = async () => {
-            try {
-                const updatedJob = await jobsApi.getJob(initialJob.job_id);
-                setJob(updatedJob);
-            } catch (e) {
-                console.error("Failed to fetch job details", e);
-            }
-        };
-
-        void fetchDetails(); // Initial fetch
-
-        if (job.status === 'running' || job.status === 'queued') {
-            interval = setInterval(() => { void fetchDetails(); }, 2000);
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [initialJob.job_id, job.status]);
+    // Poll the single job until terminal. We feed an empty array once
+    // the initial job is already terminal so the hook does no work,
+    // and otherwise let it stop itself on the next terminal snapshot.
+    const pollIds = useMemo(
+        () => (isTerminalStatus(initialJob.status) ? [] : [initialJob.job_id]),
+        [initialJob.job_id, initialJob.status],
+    );
+    const { jobs: polledJobs } = useJobPolling(pollIds, { intervalMs: 2000 });
+    const job: JobInfo = polledJobs[initialJob.job_id] ?? initialJob;
 
     // Auto-scroll logs
     useEffect(() => {
@@ -357,12 +358,18 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
     }, [job.logs, activeTab]);
 
     const handleCancel = async () => {
-        if (!confirm('Are you sure you want to stop this job?')) return;
+        const ok = await confirm({
+            title: 'Stop job?',
+            message: 'Are you sure you want to stop this job?',
+            confirmLabel: 'Stop',
+            variant: 'danger',
+        });
+        if (!ok) return;
         setIsCancelling(true);
         try {
             await cancelJob(job.job_id);
         } catch (e) {
-            alert('Failed to cancel job');
+            toast.error('Failed to cancel job');
         } finally {
             setIsCancelling(false);
         }
@@ -629,17 +636,6 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
 };
 
 const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick }) => {
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed': 
-      case 'succeeded':
-        return <CheckCircle className="w-4 h-4 text-green-500 dark:text-green-400" />;
-      case 'failed': return <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400" />;
-      case 'running': return <RefreshCw className="w-4 h-4 text-blue-500 dark:text-blue-400 animate-spin" />;
-      default: return <Clock className="w-4 h-4 text-gray-400 dark:text-gray-500" />;
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50';
@@ -667,15 +663,12 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
 
   return (
     <div 
-        onClick={onClick}
+        {...clickableProps(onClick)}
         className={`grid grid-cols-12 gap-4 p-3 rounded-lg border text-sm items-center transition-colors cursor-pointer ${getStatusColor(job.status)}`}
     >
       {/* Status */}
       <div className="col-span-2 flex items-center gap-2">
-        {getStatusIcon(job.status)}
-        <span className="font-medium text-gray-700 dark:text-gray-300 capitalize truncate">
-          {job.status}
-        </span>
+        <StatusBadge status={job.status} />
       </div>
 
       {/* Dataset & Model */}

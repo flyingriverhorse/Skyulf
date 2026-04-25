@@ -1,9 +1,11 @@
 import React from 'react';
 import { BarChart, Bar, ResponsiveContainer } from 'recharts';
 import { AlertTriangle, Hash, Type, Calendar, AlignLeft, EyeOff, Eye } from 'lucide-react';
+import { clickableProps } from '../../core/utils/a11y';
+import type { ColumnProfile } from '../../core/types/edaProfile';
 
 interface VariableCardProps {
-  profile: any;
+  profile: ColumnProfile;
   onClick: () => void;
   onToggleExclude?: (colName: string, exclude: boolean) => void;
   isExcluded?: boolean;
@@ -20,17 +22,18 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, on
     }
   };
 
-  // Prepare mini histogram data if available
-  let miniChartData: any[] = [];
-  
+  // Mini histogram data for the card preview.
+  type MiniDatum = { name: string; count: number };
+  let miniChartData: MiniDatum[] = [];
+
   if (profile.dtype === 'Numeric' && profile.histogram) {
-      miniChartData = profile.histogram.map((b: any) => ({ name: b.start.toFixed(1), count: b.count }));
+      miniChartData = profile.histogram.map((b) => ({ name: b.start.toFixed(1), count: b.count }));
   } else if (profile.dtype === 'Text' && profile.histogram) {
-      miniChartData = profile.histogram.map((b: any) => ({ name: b.start.toFixed(0), count: b.count }));
+      miniChartData = profile.histogram.map((b) => ({ name: b.start.toFixed(0), count: b.count }));
   } else if (profile.dtype === 'DateTime' && profile.histogram) {
-      miniChartData = profile.histogram.map((b: any) => ({ name: new Date(b.start).toLocaleDateString(), count: b.count }));
+      miniChartData = profile.histogram.map((b) => ({ name: new Date(b.start).toLocaleDateString(), count: b.count }));
   } else if (profile.dtype === 'Categorical' && profile.categorical_stats?.top_k) {
-      miniChartData = profile.categorical_stats.top_k.slice(0, 5).map((k: any) => ({ name: k.value, count: k.count }));
+      miniChartData = profile.categorical_stats.top_k.slice(0, 5).map((k) => ({ name: String(k.value), count: k.count }));
   }
 
   return (
@@ -40,7 +43,7 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, on
           ? 'bg-gray-50 border-gray-200 dark:bg-gray-900 dark:border-gray-800 opacity-75' 
           : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-md'
       }`}
-      onClick={onClick}
+      {...clickableProps(onClick)}
     >
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center gap-2 w-full">

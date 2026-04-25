@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Search, ArrowRight } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { clickableProps } from '../../../core/utils/a11y';
 
 export interface ReplacementItem {
   old: unknown;
@@ -52,7 +53,7 @@ const ColumnSelector: React.FC<{
             return (
               <div
                 key={col}
-                onClick={() => { toggle(col); }}
+                {...clickableProps(() => { toggle(col); })}
                 className={`
                   flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors
                   ${isSelected ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'}
@@ -222,7 +223,7 @@ export const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig
   return (
     <div className="space-y-4 p-1">
       <div className="space-y-2">
-        <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Target Columns</label>
+        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Target Columns</span>
         <ColumnSelector
           columns={availableColumns}
           selected={config.columns}
@@ -235,7 +236,7 @@ export const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Replacements</label>
+          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Replacements</span>
           <button
             onClick={addReplacement}
             className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400"

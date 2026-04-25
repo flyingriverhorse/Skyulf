@@ -14,16 +14,16 @@ interface ImputationConfig {
   
   // Simple Imputer
   strategy: 'mean' | 'median' | 'most_frequent' | 'constant';
-  fill_value?: string | number;
+  fill_value?: string | number | undefined;
 
   // KNN Imputer
-  n_neighbors?: number;
-  weights?: 'uniform' | 'distance';
+  n_neighbors?: number | undefined;
+  weights?: 'uniform' | 'distance' | undefined;
 
   // Iterative Imputer
-  max_iter?: number;
-  estimator?: 'bayesian_ridge' | 'decision_tree' | 'extra_trees' | 'knn';
-  random_state?: number;
+  max_iter?: number | undefined;
+  estimator?: 'bayesian_ridge' | 'decision_tree' | 'extra_trees' | 'knn' | undefined;
+  random_state?: number | undefined;
 }
 
 const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: ImputationConfig) => void; nodeId?: string }> = ({
@@ -96,7 +96,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
     onChange({ ...config, columns: newCols });
   };
 
-  const FeedbackSection = () => (
+  const renderFeedback = () => (
     metrics ? (
       <div className="mt-4 p-3 bg-muted/50 rounded border text-xs">
         <div className="font-medium text-muted-foreground mb-2">Execution Feedback</div>
@@ -175,7 +175,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-1">Imputation Method</label>
+            <span className="block text-sm font-medium mb-1">Imputation Method</span>
             <select
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.method || 'simple'}
@@ -191,7 +191,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
           {(config.method === 'simple' || !config.method) && (
             <>
               <div>
-                <label className="block text-sm font-medium mb-1">Strategy</label>
+                <span className="block text-sm font-medium mb-1">Strategy</span>
                 <select
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.strategy}
@@ -212,7 +212,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
 
               {config.strategy === 'constant' && (
                 <div>
-                  <label className="block text-sm font-medium mb-1">Fill Value</label>
+                  <span className="block text-sm font-medium mb-1">Fill Value</span>
                   <input
                     type="text"
                     className="w-full p-2 border rounded bg-background text-sm"
@@ -229,7 +229,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
           {config.method === 'knn' && (
             <>
               <div>
-                <label className="block text-sm font-medium mb-1">Number of Neighbors</label>
+                <span className="block text-sm font-medium mb-1">Number of Neighbors</span>
                 <input
                   type="number"
                   min="1"
@@ -239,7 +239,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Weights</label>
+                <span className="block text-sm font-medium mb-1">Weights</span>
                 <select
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.weights || 'uniform'}
@@ -260,7 +260,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
           {config.method === 'iterative' && (
             <>
               <div>
-                <label className="block text-sm font-medium mb-1">Max Iterations</label>
+                <span className="block text-sm font-medium mb-1">Max Iterations</span>
                 <input
                   type="number"
                   min="1"
@@ -270,7 +270,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Estimator</label>
+                <span className="block text-sm font-medium mb-1">Estimator</span>
                 <select
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.estimator || 'bayesian_ridge'}
@@ -286,7 +286,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Random State</label>
+                <span className="block text-sm font-medium mb-1">Random State</span>
                 <input
                   type="number"
                   className="w-full p-2 border rounded bg-background text-sm"
@@ -298,7 +298,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
           )}
 
           {/* Feedback Section - Only show here if wide */}
-          {isWide && <FeedbackSection />}
+          {isWide && renderFeedback()}
         </div>
 
         {/* Right Column (Column Selection) */}
@@ -357,7 +357,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
         </div>
         
         {/* Feedback Section - Show here if NOT wide (mobile/narrow) */}
-        {!isWide && <FeedbackSection />}
+        {!isWide && renderFeedback()}
       </div>
     </div>
   );

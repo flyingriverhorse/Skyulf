@@ -4,6 +4,9 @@ import { useViewStore } from '../../core/store/useViewStore';
 import { ChevronUp, ChevronDown, ChevronRight, Table, Layers, GitBranch, AlertTriangle, Wand2 } from 'lucide-react';
 import type { NodeExecutionResult, PreviewDataRows, PreviewData } from '../../core/api/client';
 import { generateBranchColors } from '../../core/hooks/useBranchColors';
+import { clickableProps } from '../../core/utils/a11y';
+import { useConfirm } from '../shared';
+import { toast } from '../../core/toast';
 
 /** Convert a PreviewData payload into a {tabName -> rows} map. */
 function toDatasetMap(previewData: PreviewData | null | undefined): Record<string, PreviewDataRows> {
@@ -17,6 +20,7 @@ export const ResultsPanel: React.FC = () => {
   const executionResult = useGraphStore((state) => state.executionResult);
   const canvasNodes = useGraphStore((state) => state.nodes);
   const chainSiblings = useGraphStore((state) => state.chainSiblings);
+  const confirm = useConfirm();
   const { isResultsPanelExpanded, setResultsPanelExpanded } = useViewStore();
   const [activeBranch, setActiveBranch] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
@@ -57,7 +61,7 @@ export const ResultsPanel: React.FC = () => {
   // Pick default branch when branches change
   React.useEffect(() => {
     if (branchLabels.length > 0 && (!activeBranch || !branchLabels.includes(activeBranch))) {
-      setActiveBranch(branchLabels[0]);
+      setActiveBranch(branchLabels[0] ?? null);
     } else if (branchLabels.length === 0 && activeBranch !== null) {
       setActiveBranch(null);
     }
@@ -78,7 +82,7 @@ export const ResultsPanel: React.FC = () => {
     if (tabNames.length > 0 && (!activeTab || !tabNames.includes(activeTab))) {
       if (tabNames.includes('train')) setActiveTab('train');
       else if (tabNames.includes('X')) setActiveTab('X');
-      else setActiveTab(tabNames[0]);
+      else setActiveTab(tabNames[0] ?? null);
     }
   }, [tabNames, activeTab]);
 
@@ -90,15 +94,16 @@ export const ResultsPanel: React.FC = () => {
   // the current tab.
   // NOTE: this useMemo must run on every render (i.e. before any early
   // return below) to preserve React's hook call order.
-  const allMergeWarnings = executionResult?.merge_warnings ?? [];
+  const rawMergeWarnings = executionResult?.merge_warnings;
   const branchNodeIdsMemo = executionResult?.branch_node_ids;
   const mergeWarnings = useMemo(() => {
+    const all = rawMergeWarnings ?? [];
     if (!activeBranch || !branchNodeIdsMemo || !branchNodeIdsMemo[activeBranch]) {
-      return allMergeWarnings;
+      return all;
     }
     const branchNodes = new Set(branchNodeIdsMemo[activeBranch]);
-    return allMergeWarnings.filter((w) => branchNodes.has(w.node_id));
-  }, [allMergeWarnings, activeBranch, branchNodeIdsMemo]);
+    return all.filter((w) => branchNodes.has(w.node_id));
+  }, [rawMergeWarnings, activeBranch, branchNodeIdsMemo]);
 
   if (!executionResult) return null;
 
@@ -129,7 +134,7 @@ export const ResultsPanel: React.FC = () => {
       {/* Header */}
       <div 
         className="flex items-center justify-between px-4 py-2 bg-muted/10 cursor-pointer hover:bg-muted/20 border-b select-none"
-        onClick={() => setResultsPanelExpanded(!isResultsPanelExpanded)}
+        {...clickableProps(() => setResultsPanelExpanded(!isResultsPanelExpanded))}
       >
         <div className="flex items-center gap-2">
           <Table className="w-4 h-4 text-primary" />
@@ -314,14 +319,25 @@ export const ResultsPanel: React.FC = () => {
                                 onClick={() => {
                                   const consumerLabel = nodeLabelMap[w.node_id] ?? w.node_id;
                                   const chainStr = [...inputLabels, consumerLabel].join(' → ');
-                                  const ok = window.confirm(
-                                    `Rewire as a linear chain?\n\n${chainStr}\n\nUse Ctrl+Z to undo.`
-                                  );
-                                  if (!ok) return;
-                                  const success = chainSiblings(w.node_id, inputs);
-                                  if (!success) {
-                                    window.alert('Auto-chain failed. Re-run preview and try again.');
-                                  }
+                                  void (async () => {
+                                    const ok = await confirm({
+                                      title: 'Rewire as a linear chain?',
+                                      message: (
+                                        <span>
+                                          {chainStr}
+                                          <br />
+                                          <br />
+                                          <span className="text-xs text-slate-500">Use Ctrl+Z to undo.</span>
+                                        </span>
+                                      ),
+                                      confirmLabel: 'Rewire',
+                                    });
+                                    if (!ok) return;
+                                    const success = chainSiblings(w.node_id, inputs);
+                                    if (!success) {
+                                      toast.error('Auto-chain failed', 'Re-run preview and try again.');
+                                    }
+                                  })();
                                 }}
                                 className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded border border-amber-400 dark:border-amber-600 bg-amber-100 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-100 transition-colors"
                                 title="Rewire fan-in into a linear chain (no fan-in, no overwrite)"

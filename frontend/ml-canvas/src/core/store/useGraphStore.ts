@@ -1,13 +1,16 @@
 import { create } from 'zustand';
-import { 
-  Connection, 
-  Edge, 
-  EdgeChange, 
-  Node, 
-  NodeChange, 
-  addEdge, 
-  OnNodesChange, 
-  OnEdgesChange, 
+import { temporal } from 'zundo';
+import type { TemporalState } from 'zundo';
+import { useStore } from 'zustand';
+import {
+  Connection,
+  Edge,
+  EdgeChange,
+  Node,
+  NodeChange,
+  addEdge,
+  OnNodesChange,
+  OnEdgesChange,
   OnConnect,
   applyNodeChanges,
   applyEdgeChanges,
@@ -15,6 +18,11 @@ import {
 import { registry } from '../registry/NodeRegistry';
 import { PreviewResponse } from '../api/client';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  type ExecutionMode,
+  getExecutionMode as readExecutionMode,
+} from '../types/executionMode';
+import { toast } from '../toast';
 
 interface GraphState {
   nodes: Node[];
@@ -28,6 +36,23 @@ interface GraphState {
   // Custom Actions
   addNode: (type: string, position: { x: number, y: number }, initialData?: unknown) => string;
   updateNodeData: (id: string, data: unknown) => void;
+  /**
+   * Read the effective `execution_mode` for a node, defaulting to the
+   * canonical `'merge'` when unset. Cheaper than `useGraphStore` callers
+   * pulling `nodes` and re-deriving the value, and keeps the cast to
+   * `ExecutionModeData` in one place.
+   */
+  getExecutionMode: (nodeId: string) => ExecutionMode;
+  /** Typed setter for the modeling-node Merge/Parallel toggle. */
+  setExecutionMode: (nodeId: string, mode: ExecutionMode) => void;
+  /**
+   * Clone every currently-selected node with a small position offset
+   * and a fresh id. New clones become the selection (originals are
+   * deselected). Edges between selected nodes are NOT copied — keep
+   * it predictable; users can re-wire if they want a parallel branch.
+   * Returns the count of cloned nodes (0 when nothing is selected).
+   */
+  duplicateSelectedNodes: () => number;
   validateGraph: () => Promise<boolean>;
   setGraph: (nodes: Node[], edges: Edge[]) => void;
   /**
@@ -50,7 +75,9 @@ interface GraphState {
   setExecutionResult: (result: PreviewResponse | null) => void;
 }
 
-export const useGraphStore = create<GraphState>((set, get) => ({
+export const useGraphStore = create<GraphState>()(
+  temporal(
+    (set, get) => ({
   nodes: [],
   edges: [],
   executionResult: null,
@@ -83,9 +110,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       // Block: connecting a training/tuning output into another training/tuning node
       const modelTypes = ['basic_training', 'advanced_tuning'];
       if (modelTypes.includes(sourceType) && modelTypes.includes(targetType)) {
-        alert(
-          'Invalid connection: You cannot connect a model output to another training node.\n\n' +
-          'Training nodes expect data (DataFrame), not a trained model.'
+        toast.error(
+          'Invalid connection',
+          'You cannot connect a model output to another training node. Training nodes expect data (DataFrame), not a trained model.',
         );
         return;
       }
@@ -117,7 +144,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         }
 
         if (!hasTrainTestSplit) {
-          const proceed = confirm(
+          // window.confirm is intentional here: onConnect is a synchronous
+          // React Flow callback that must return before the edge is
+          // committed, so we can't await the async <ConfirmDialog>.
+          const proceed = window.confirm(
             'Warning: X/Y Split without a prior Train-Test Split.\n\n' +
             'This means 100% of data will be used (possible data leakage).\n\n' +
             'Click OK to connect anyway, or Cancel to abort.'
@@ -126,18 +156,26 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         }
       }
 
-      // Warn: multi-input on a training/tuning node — explain merge vs parallel
+      // Warn: multi-input on a training/tuning node — explain merge vs parallel.
+      // Count UNIQUE source nodes, not edges: multi-output splitters
+      // (train_test_split, feature_target_split) legitimately produce
+      // several edges from the same source (train/test/X/y handles)
+      // into one downstream node, and that's not fan-in — the engine
+      // dedupes by source id, so no merge happens.
       const existingInputs = edges.filter(e => e.target === connection.target);
+      const existingSources = new Set(existingInputs.map(e => e.source));
+      const isNewSource = connection.source != null && !existingSources.has(connection.source);
+      const uniqueSourceCount = existingSources.size + (isNewSource ? 1 : 0);
       // Auto-parallel terminals (data_preview) split each input into its own
       // tab instead of merging — no warning needed, no merge contract to
       // confirm. Mirrors AUTO_PARALLEL_STEP_TYPES in backend graph_utils.py.
       const autoParallelTypes = ['data_preview'];
       if (autoParallelTypes.includes(targetType)) {
         // Skip both confirms below; each input becomes its own preview tab.
-      } else if (existingInputs.length >= 1 && modelTypes.includes(targetType)) {
-        const inputCount = existingInputs.length + 1;
-        const proceed = confirm(
-          `This training node will receive ${inputCount} inputs.\n\n` +
+      } else if (isNewSource && uniqueSourceCount >= 2 && modelTypes.includes(targetType)) {
+        // window.confirm: see note above on sync onConnect contract.
+        const proceed = window.confirm(
+          `This training node will receive ${uniqueSourceCount} inputs.\n\n` +
           'You have two options:\n' +
           '  • MERGE (default): Inputs are auto-merged into one dataset before training.\n' +
           '  • PARALLEL: Each input runs as a separate experiment.\n' +
@@ -145,14 +183,14 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           'Click OK to connect (merge mode), or Cancel to abort.'
         );
         if (!proceed) return;
-      } else if (existingInputs.length >= 1 && !modelTypes.includes(targetType)) {
+      } else if (isNewSource && uniqueSourceCount >= 2 && !modelTypes.includes(targetType)) {
         // Pre-flight lint for non-training nodes (audit issue #7).
         // Direction-A means non-training nodes also auto-merge fan-in via
         // column union + last-wins. Surface that contract before the user
         // wires it so silent column overwrites aren't a surprise at run time.
-        const inputCount = existingInputs.length + 1;
-        const proceed = confirm(
-          `This node will receive ${inputCount} inputs.\n\n` +
+        // window.confirm: see note above on sync onConnect contract.
+        const proceed = window.confirm(
+          `This node will receive ${uniqueSourceCount} inputs.\n\n` +
           'Inputs are auto-merged via column union with LAST-WINS on overlap ' +
           '(the last connected input overwrites earlier ones on shared columns).\n\n' +
           'For sequential transformations, chain the nodes linearly instead.\n\n' +
@@ -204,6 +242,40 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     });
   },
 
+  getExecutionMode: (nodeId: string) => {
+    const node = get().nodes.find((n) => n.id === nodeId);
+    return readExecutionMode(node?.data as { execution_mode?: ExecutionMode } | undefined);
+  },
+
+  setExecutionMode: (nodeId: string, mode: ExecutionMode) => {
+    set({
+      nodes: get().nodes.map((node) =>
+        node.id === nodeId
+          ? { ...node, data: { ...node.data, execution_mode: mode } }
+          : node,
+      ),
+    });
+  },
+
+  duplicateSelectedNodes: () => {
+    const current = get().nodes;
+    const selected = current.filter((n) => n.selected);
+    if (selected.length === 0) return 0;
+    const OFFSET = 32;
+    const clones: Node[] = selected.map((src) => ({
+      ...src,
+      id: `${src.data.definitionType as string}-${uuidv4()}`,
+      position: { x: src.position.x + OFFSET, y: src.position.y + OFFSET },
+      selected: true,
+      data: { ...src.data },
+    }));
+    const deselected = current.map((n) =>
+      n.selected ? { ...n, selected: false } : n
+    );
+    set({ nodes: [...deselected, ...clones] });
+    return clones.length;
+  },
+
   chainSiblings: (consumerId: string, orderedInputIds: string[]) => {
     const inputs = orderedInputIds.filter(Boolean);
     if (inputs.length < 2) return false;
@@ -224,15 +296,18 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
     const links: Array<{ source: string; target: string; sourceHandle?: string; targetHandle?: string }> = [];
     for (let i = 0; i < inputs.length - 1; i++) {
-      const sh = firstOutputHandle(inputs[i]);
-      const th = firstInputHandle(inputs[i + 1]);
+      const a = inputs[i]!;
+      const b = inputs[i + 1]!;
+      const sh = firstOutputHandle(a);
+      const th = firstInputHandle(b);
       if (!sh || !th) return false;
-      links.push({ source: inputs[i], target: inputs[i + 1], sourceHandle: sh, targetHandle: th });
+      links.push({ source: a, target: b, sourceHandle: sh, targetHandle: th });
     }
-    const lastSh = firstOutputHandle(inputs[inputs.length - 1]);
+    const lastInput = inputs[inputs.length - 1]!;
+    const lastSh = firstOutputHandle(lastInput);
     const lastTh = firstInputHandle(consumerId);
     if (!lastSh || !lastTh) return false;
-    links.push({ source: inputs[inputs.length - 1], target: consumerId, sourceHandle: lastSh, targetHandle: lastTh });
+    links.push({ source: lastInput, target: consumerId, sourceHandle: lastSh, targetHandle: lastTh });
 
     // Keep head sibling's upstream edges; clear incoming on tail siblings
     // and drop the original fan-in into the consumer.
@@ -289,4 +364,47 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
     return true;
   },
-}));
+    }),
+    {
+      // Only track structural graph state for undo/redo. Excluding
+      // `executionResult` keeps preview data out of history (it's
+      // populated by the backend, not user actions, and snapshots
+      // of it can be tens of MB).
+      partialize: (state) => ({ nodes: state.nodes, edges: state.edges }),
+      // Skip history entries that only differ by an in-progress drag.
+      // React Flow emits a stream of `dragging:true` position changes
+      // per pointer move; we only care about the committed final
+      // position (when `dragging` flips to false). Same for plain
+      // selection changes — toggling `selected` shouldn't be undoable.
+      equality: (prev, next) => {
+        if (prev.edges !== next.edges) return false;
+        if (prev.nodes === next.nodes) return true;
+        if (prev.nodes.length !== next.nodes.length) return false;
+        for (let i = 0; i < prev.nodes.length; i++) {
+          const a = prev.nodes[i]!;
+          const b = next.nodes[i]!;
+          if (a.id !== b.id) return false;
+          if (a.data !== b.data) return false;
+          if (a.type !== b.type) return false;
+          // Treat any node currently being dragged as equal to its
+          // previous state — only the drag-end commit creates a
+          // history entry.
+          if (a.dragging || b.dragging) continue;
+          if (a.position.x !== b.position.x || a.position.y !== b.position.y) return false;
+        }
+        return true;
+      },
+      limit: 100,
+    },
+  ),
+);
+
+/**
+ * Hook into the temporal substore (undo/redo). Use selectors to
+ * subscribe to specific slices, e.g.
+ *   const undo = useTemporalStore((s) => s.undo);
+ *   const canUndo = useTemporalStore((s) => s.pastStates.length > 0);
+ */
+export const useTemporalStore = <T,>(
+  selector: (state: TemporalState<{ nodes: Node[]; edges: Edge[] }>) => T,
+): T => useStore(useGraphStore.temporal, selector);

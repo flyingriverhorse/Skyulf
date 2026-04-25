@@ -8,8 +8,9 @@ export function useElementSize<T extends HTMLElement = HTMLDivElement>(): [
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   const handleResize = useCallback((entries: ResizeObserverEntry[]) => {
-    if (entries.length === 0) return;
-    const { width, height } = entries[0].contentRect;
+    const first = entries[0];
+    if (!first) return;
+    const { width, height } = first.contentRect;
     setSize({ width, height });
   }, []);
 

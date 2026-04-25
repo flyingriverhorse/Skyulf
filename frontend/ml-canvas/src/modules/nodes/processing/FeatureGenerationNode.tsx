@@ -7,17 +7,18 @@ import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
+import { clickableProps } from '../../../core/utils/a11y';
 
 interface MathOperation {
   operation_type: 'arithmetic' | 'datetime_extract' | 'ratio' | 'similarity' | 'group_agg';
   method: string;
   input_columns: string[];
-  secondary_columns?: string[]; // For arithmetic (second operand)
-  constants?: number[];
-  output_column?: string;
-  datetime_features?: string[]; // For datetime_extract
+  secondary_columns?: string[] | undefined; // For arithmetic (second operand)
+  constants?: number[] | undefined;
+  output_column?: string | undefined;
+  datetime_features?: string[] | undefined; // For datetime_extract
 
-  isExpanded?: boolean; // UI state
+  isExpanded?: boolean | undefined; // UI state
 }
 
 interface FeatureGenerationConfig {
@@ -82,7 +83,7 @@ const ColumnSelector: React.FC<{
               return (
                 <div
                   key={col}
-                  onClick={() => { toggle(col); }}
+                  {...clickableProps(() => { toggle(col); })}
                   className={`
                     flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors
                     ${isSelected ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-accent text-foreground'}
@@ -175,7 +176,9 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
 
   const updateOperation = (index: number, updates: Partial<MathOperation>) => {
     const newOps = [...(config.operations || [])];
-    newOps[index] = { ...newOps[index], ...updates };
+    const existing = newOps[index];
+    if (!existing) return;
+    newOps[index] = { ...existing, ...updates };
     onChange({ operations: newOps });
   };
 
@@ -188,7 +191,9 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
 
   const toggleExpand = (index: number) => {
     const newOps = [...(config.operations || [])];
-    newOps[index] = { ...newOps[index], isExpanded: !newOps[index].isExpanded };
+    const existing = newOps[index];
+    if (!existing) return;
+    newOps[index] = { ...existing, isExpanded: !existing.isExpanded };
     onChange({ operations: newOps });
   };
 
@@ -253,7 +258,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
             {/* Header */}
             <div 
               className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => { toggleExpand(idx); }}
+              {...clickableProps(() => { toggleExpand(idx); })}
             >
               <div className="flex items-center gap-2">
                 {op.isExpanded ? <ChevronDown size={14} className="text-muted-foreground" /> : <ChevronRight size={14} className="text-muted-foreground" />}
@@ -357,8 +362,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                   <div className="text-[10px] text-muted-foreground bg-muted/20 p-1.5 rounded border border-muted/20 space-y-1">
                     <p>Calculates string similarity score (0-100) between two text columns.</p>
                     <ul className="list-disc pl-3 space-y-0.5 opacity-80">
-                      <li><strong>Ratio:</strong> Strict character matching (Levenshtein). "apple banana" != "banana apple".</li>
-                      <li><strong>Token Sort:</strong> Sorts words alphabetically then compares. "apple banana" == "banana apple".</li>
+                      <li><strong>Ratio:</strong> Strict character matching (Levenshtein). &quot;apple banana&quot; != &quot;banana apple&quot;.</li>
+                      <li><strong>Token Sort:</strong> Sorts words alphabetically then compares. &quot;apple banana&quot; == &quot;banana apple&quot;.</li>
                       <li><strong>Token Set:</strong> Compares intersection of words. Handles duplicates/subsets well.</li>
                     </ul>
                   </div>
@@ -427,7 +432,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                   />
                   
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Features to Extract</label>
+                    <span className="text-xs font-medium text-muted-foreground">Features to Extract</span>
                     <div className="grid grid-cols-2 gap-2">
                       {DATE_METHODS.map(method => (
                         <label key={method} className="flex items-center gap-2 text-xs p-1.5 border rounded hover:bg-accent cursor-pointer transition-colors">
@@ -453,7 +458,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
 
               {/* Output Name */}
               <div className="pt-2">
-                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1 block">Output Column Name</label>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1 block">Output Column Name</span>
                 <input
                   type="text"
                   className="w-full text-xs border rounded px-2 py-1.5 bg-background focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"

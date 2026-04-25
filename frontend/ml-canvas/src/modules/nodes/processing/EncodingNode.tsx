@@ -10,16 +10,16 @@ interface EncodingConfig {
   method: 'onehot' | 'ordinal' | 'label' | 'target' | 'hash' | 'dummy';
   columns: string[];
   // OneHot/Dummy specific
-  drop_first?: boolean;
-  drop_original?: boolean;
-  handle_unknown?: 'error' | 'ignore';
+  drop_first?: boolean | undefined;
+  drop_original?: boolean | undefined;
+  handle_unknown?: 'error' | 'ignore' | undefined;
   // Hash specific
-  n_features?: number;
+  n_features?: number | undefined;
   // Target specific
-  target_column?: string;
+  target_column?: string | undefined;
   // Label/Ordinal specific
-  unknown_value?: number; // For Ordinal
-  missing_code?: number; // For Label
+  unknown_value?: number | undefined; // For Ordinal
+  missing_code?: number | undefined; // For Label
 }
 
 const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: EncodingConfig) => void; nodeId?: string }> = ({
@@ -103,7 +103,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
       <div className={`grid gap-4 ${isWide ? 'grid-cols-2' : 'grid-cols-1'}`}>
         {/* Method Selection */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium">Encoding Method</label>
+          <span className="block text-sm font-medium">Encoding Method</span>
           <select
             className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
             value={config.method}
@@ -156,7 +156,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
                 Drop First Category
               </label>
               <div className="space-y-1">
-                <label className="block text-xs font-medium">Handle Unknown</label>
+                <span className="block text-xs font-medium">Handle Unknown</span>
                 <select
                   className="w-full p-1 text-sm border rounded"
                   value={config.handle_unknown || 'ignore'}
@@ -167,7 +167,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
                   <option value="error">Raise Error</option>
                 </select>
                 <p className="text-[10px] text-muted-foreground">
-                  "Ignore" produces all-zeros for unknown categories.
+                  &quot;Ignore&quot; produces all-zeros for unknown categories.
                 </p>
               </div>
             </div>
@@ -175,7 +175,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
 
           {config.method === 'target' && (
             <div className="space-y-2 p-3 bg-muted/20 rounded border h-full">
-              <label className="block text-sm font-medium">Target Column</label>
+              <span className="block text-sm font-medium">Target Column</span>
               <select
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.target_column || ''}
@@ -194,7 +194,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
 
           {config.method === 'hash' && (
             <div className="space-y-2 p-3 bg-muted/20 rounded border h-full">
-              <label className="block text-sm font-medium">Number of Features</label>
+              <span className="block text-sm font-medium">Number of Features</span>
               <input
                 type="number"
                 min="1"
@@ -207,7 +207,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
 
           {config.method === 'ordinal' && (
             <div className="space-y-2 p-3 bg-muted/20 rounded border h-full">
-              <label className="block text-sm font-medium">Unknown Value</label>
+              <span className="block text-sm font-medium">Unknown Value</span>
               <input
                 type="number"
                 className="w-full p-2 border rounded"
@@ -223,7 +223,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
 
           {config.method === 'label' && (
             <div className="space-y-2 p-3 bg-muted/20 rounded border h-full">
-              <label className="block text-sm font-medium">Missing/Unknown Code</label>
+              <span className="block text-sm font-medium">Missing/Unknown Code</span>
               <input
                 type="number"
                 className="w-full p-2 border rounded"
@@ -242,7 +242,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
       {/* Column Selection */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium">Columns to Encode</label>
+          <span className="block text-sm font-medium">Columns to Encode</span>
           <span className="text-xs text-muted-foreground">
             {config.columns.length} selected
           </span>
@@ -283,7 +283,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
             ))}
             {filteredColumns.length === 0 && (
               <div className="text-xs text-muted-foreground text-center py-2">
-                No columns match "{searchTerm}"
+                No columns match &quot;{searchTerm}&quot;
               </div>
             )}
           </div>
