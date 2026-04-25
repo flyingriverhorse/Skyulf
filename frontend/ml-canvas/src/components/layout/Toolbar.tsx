@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle } from 'lucide-react';
+import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown } from 'lucide-react';
 import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { runPipelinePreview, savePipeline, fetchPipeline } from '../../core/api/client';
@@ -10,7 +10,9 @@ import { jobsApi } from '../../core/api/jobs';
 import {
   RUN_PREVIEW_EVENT,
   SHOW_SHORTCUTS_EVENT,
+  SHOW_PALETTE_EVENT,
 } from '../../core/hooks/useKeyboardShortcuts';
+import { exportCanvasToPng, exportCanvasToSvg } from '../../core/utils/canvasExport';
 import { toast } from '../../core/toast';
 import { useConfirm } from '../shared';
 
@@ -66,6 +68,27 @@ export const Toolbar: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isRunningAll, setIsRunningAll] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async (kind: 'png' | 'svg'): Promise<void> => {
+    setShowExportMenu(false);
+    setIsExporting(true);
+    try {
+      const fn = kind === 'png' ? exportCanvasToPng : exportCanvasToSvg;
+      const result = await fn(`skyulf-canvas.${kind}`);
+      if (!result) {
+        toast.error('Export failed', 'Canvas viewport not found');
+      } else {
+        toast.success(`Canvas exported as ${kind.toUpperCase()}`);
+      }
+    } catch (err) {
+      console.error('Canvas export failed', err);
+      toast.error('Export failed', String(err));
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Run Preview is only meaningful when the graph has a dataset node
   // wired into at least one downstream node. Hiding the button (and
@@ -307,6 +330,14 @@ export const Toolbar: React.FC = () => {
           <Keyboard className="w-4 h-4" />
         </button>
         <button
+          onClick={() => window.dispatchEvent(new CustomEvent(SHOW_PALETTE_EVENT))}
+          title="Command palette (Ctrl/Cmd+K)"
+          aria-label="Open command palette"
+          className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors focus-ring"
+        >
+          <Command className="w-4 h-4" />
+        </button>
+        <button
           onClick={() => redo()}
           disabled={!canRedo}
           title="Redo (Ctrl+Shift+Z)"
@@ -476,6 +507,41 @@ export const Toolbar: React.FC = () => {
           <Wand2 className="w-4 h-4" />
           <span className="text-sm font-medium">Tidy</span>
         </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowExportMenu(v => !v)}
+            disabled={isExporting || nodes.length === 0}
+            title="Export canvas as image"
+            aria-haspopup="menu"
+            aria-expanded={showExportMenu}
+            className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+          >
+            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            <span className="text-sm font-medium">Export</span>
+            <ChevronDown className="w-3 h-3" />
+          </button>
+          {showExportMenu && (
+            <div
+              role="menu"
+              className="absolute top-full right-0 mt-1 w-40 bg-background border rounded-md shadow-lg overflow-hidden z-20"
+            >
+              <button
+                role="menuitem"
+                onClick={() => { void handleExport('png'); }}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+              >
+                PNG (high-DPI)
+              </button>
+              <button
+                role="menuitem"
+                onClick={() => { void handleExport('svg'); }}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+              >
+                SVG (vector)
+              </button>
+            </div>
+          )}
+        </div>
         {hasMultipleBranches && (
           <button
             onClick={() => { void handleRunAll(); }}
