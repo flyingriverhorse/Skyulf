@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
-import { X, RefreshCw, CheckCircle, AlertCircle, Clock, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown, Zap, CheckCircle2, Search, Filter } from 'lucide-react';
+import { X, RefreshCw, CheckCircle, AlertCircle, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown, Zap, CheckCircle2, Search, Filter } from 'lucide-react';
 import { JobInfo } from '../../core/api/jobs';
 import { useEscapeKey } from '../../core/hooks/useEscapeKey';
 import { formatMetricName } from '../../core/utils/format';
 import { clickableProps } from '../../core/utils/a11y';
 import { useJobPolling, isTerminalStatus } from '../../core/hooks/useJobPolling';
+import { StatusBadge } from '../shared/StatusBadge';
 
 const formatMetricValue = (key: string, value: number): string => {
   if (key.endsWith('_std')) return value.toFixed(6);
@@ -617,17 +618,6 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
 };
 
 const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick }) => {
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed': 
-      case 'succeeded':
-        return <CheckCircle className="w-4 h-4 text-green-500 dark:text-green-400" />;
-      case 'failed': return <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400" />;
-      case 'running': return <RefreshCw className="w-4 h-4 text-blue-500 dark:text-blue-400 animate-spin" />;
-      default: return <Clock className="w-4 h-4 text-gray-400 dark:text-gray-500" />;
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50';
@@ -660,10 +650,7 @@ const JobRow: React.FC<{ job: JobInfo; onClick: () => void }> = ({ job, onClick 
     >
       {/* Status */}
       <div className="col-span-2 flex items-center gap-2">
-        {getStatusIcon(job.status)}
-        <span className="font-medium text-gray-700 dark:text-gray-300 capitalize truncate">
-          {job.status}
-        </span>
+        <StatusBadge status={job.status} />
       </div>
 
       {/* Dataset & Model */}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Hash, AlignLeft, Calendar, Ban } from 'lucide-react';
 import { EDAService } from '../../core/api/eda';
 import { ModalShell } from '../shared';
+import { StatusBadge } from '../shared/StatusBadge';
 import { clickableProps } from '../../core/utils/a11y';
 
 interface JobsHistoryModalProps {
@@ -134,14 +135,7 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                       <div>
                         <div className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-2">
                           Analysis #{job.id}
-                          <span className={`text-xs px-2 py-0.5 rounded-full border ${
-                            job.status === 'COMPLETED' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800' :
-                            job.status === 'FAILED' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800' :
-                            job.status === 'CANCELLED' ? 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700' :
-                            'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800'
-                          }`}>
-                            {job.status}
-                          </span>
+                          <StatusBadge status={job.status} />
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           {new Date(job.created_at).toLocaleString()}

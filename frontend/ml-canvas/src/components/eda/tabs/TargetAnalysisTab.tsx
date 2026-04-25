@@ -20,6 +20,7 @@ import {
     Scatter 
 } from 'recharts';
 import { InfoTooltip } from '../../ui/InfoTooltip';
+import { StatusBadge } from '../../shared/StatusBadge';
 import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
 import { getChartTheme } from '../constants';
 
@@ -338,12 +339,8 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                     <div className="text-xs opacity-70 mt-1">
                                         {new Date(item.created_at).toLocaleString()}
                                     </div>
-                                    <div className={`text-xs mt-1 inline-block px-1.5 py-0.5 rounded ${
-                                        item.status === 'COMPLETED' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                                        item.status === 'FAILED' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
-                                        'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                    }`}>
-                                        {item.status}
+                                    <div className="mt-1">
+                                        <StatusBadge status={item.status} />
                                     </div>
                                 </button>
                             ))
