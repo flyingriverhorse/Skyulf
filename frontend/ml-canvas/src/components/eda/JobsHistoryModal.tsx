@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Hash, AlignLeft, Calendar, Ban } from 'lucide-react';
-import { EDAService } from '../../core/api/eda';
+import { useCancelEdaJob } from '../../core/hooks/useEdaJobs';
 import { ModalShell, useConfirm } from '../shared';
 import { StatusBadge } from '../shared/StatusBadge';
 import { clickableProps } from '../../core/utils/a11y';
@@ -29,15 +29,17 @@ interface JobsHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   history: EdaHistoryJob[];
+  datasetId: number | null;
   onSelect: (report: EdaHistoryJob) => void;
   onFetchReport: (id: number) => Promise<EdaHistoryJob>;
   onRefresh?: () => void;
 }
 
-export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onClose, history, onSelect, onFetchReport, onRefresh }) => {
+export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onClose, history, datasetId, onSelect, onFetchReport, onRefresh }) => {
   const [selectedJob, setSelectedJob] = useState<EdaHistoryJob | null>(null);
   const [loading, setLoading] = useState(false);
-  const [cancelling, setCancelling] = useState<number | null>(null);
+  const cancelMutation = useCancelEdaJob(datasetId);
+  const cancelling = cancelMutation.isPending ? cancelMutation.variables ?? null : null;
   const confirm = useConfirm();
 
   const handleClose = () => {
@@ -54,15 +56,14 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
       variant: 'danger',
     });
     if (!ok) return;
-    setCancelling(jobId);
     try {
-      await EDAService.cancelJob(jobId);
+      await cancelMutation.mutateAsync(jobId);
+      // Mutation invalidates the EDA history+report cache; the optional
+      // callback is kept for legacy callers that drive their own refresh.
       if (onRefresh) onRefresh();
     } catch (err) {
       console.error('Failed to cancel job', err);
       toast.error('Failed to cancel job');
-    } finally {
-      setCancelling(null);
     }
   };
 

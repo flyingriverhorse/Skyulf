@@ -168,8 +168,7 @@ async def cancel_ingestion(
     """
     success = await service.cancel_ingestion(source_id)
     if not success:
-        raise HTTPException(
-            status_code=400,
-            detail="Job could not be cancelled (maybe it's already finished or doesn't exist)",
-        )
+        # `cancel_ingestion` is idempotent for finished jobs, so the only
+        # remaining `False` case is a missing source row.
+        raise HTTPException(status_code=404, detail="Source not found")
     return {"message": "Ingestion job cancelled successfully"}

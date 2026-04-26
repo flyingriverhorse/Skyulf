@@ -9,7 +9,9 @@ module.exports = {
     'plugin:react-hooks/recommended',
     'plugin:jsx-a11y/recommended',
   ],
-  ignorePatterns: ['dist', '.eslintrc.cjs'],
+  // e2e/ has its own runtime (Playwright, not Vitest/jsdom) and uses
+  // patterns that conflict with the React-app config above.
+  ignorePatterns: ['dist', '.eslintrc.cjs', 'e2e', 'playwright-report', 'test-results'],
   parser: '@typescript-eslint/parser',
   plugins: ['react-refresh'],
   settings: {

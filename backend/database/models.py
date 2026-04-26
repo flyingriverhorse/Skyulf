@@ -20,7 +20,7 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from .engine import Base
@@ -344,7 +344,10 @@ class EDAReport(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     data_source_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("data_sources.id"), nullable=False, index=True
+        Integer,
+        ForeignKey("data_sources.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     # PENDING, COMPLETED, FAILED
     status: Mapped[str] = mapped_column(String(20), default="PENDING", nullable=False)
@@ -354,8 +357,19 @@ class EDAReport(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     test_status: Mapped[str] = mapped_column(String(20), default="untested", nullable=False)
 
-    # Relationship
-    data_source = relationship("DataSource", backref="eda_reports")
+    # Cascade-delete the report rows when the parent DataSource is removed.
+    # Without this, deleting a DataSource tries to NULL `data_source_id`
+    # (which is NOT NULL) and the DELETE fails with an IntegrityError.
+    # `passive_deletes` is intentionally False (default): existing SQLite
+    # databases were created without ON DELETE CASCADE on the FK, so we
+    # need SQLAlchemy to issue the child DELETEs itself.
+    data_source = relationship(
+        "DataSource",
+        backref=backref(
+            "eda_reports",
+            cascade="all, delete-orphan",
+        ),
+    )
 
     def to_dict(self):
         return {

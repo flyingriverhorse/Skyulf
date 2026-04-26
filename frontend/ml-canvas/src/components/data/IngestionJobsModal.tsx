@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Loader2, CheckCircle, XCircle, Clock, Ban } from 'lucide-react';
 import { Dataset } from '../../core/types/api';
-import { DatasetService } from '../../core/api/datasets';
+import { useCancelIngestion } from '../../core/hooks/useDatasets';
 import { ModalShell, useConfirm } from '../shared';
 import { VirtualList } from '../shared/VirtualList';
 import { toast } from '../../core/toast';
@@ -14,7 +14,8 @@ interface IngestionJobsModalProps {
 }
 
 export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, onClose, datasets, onRefresh }) => {
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const cancelMutation = useCancelIngestion();
+  const cancellingId = cancelMutation.isPending ? cancelMutation.variables ?? null : null;
   const confirm = useConfirm();
 
   const handleCancel = async (id: string) => {
@@ -26,15 +27,14 @@ export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, 
     });
     if (!ok) return;
 
-    setCancellingId(id);
     try {
-      await DatasetService.cancelIngestion(id);
+      await cancelMutation.mutateAsync(id);
+      // Mutation invalidates the dataset list cache; the optional callback
+      // is kept for callers that need a manual refresh signal.
       if (onRefresh) onRefresh();
     } catch (error) {
       console.error('Failed to cancel ingestion:', error);
       toast.error('Failed to cancel ingestion');
-    } finally {
-      setCancellingId(null);
     }
   };
 

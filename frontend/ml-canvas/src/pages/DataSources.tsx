@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DatasetService } from '../core/api/datasets';
 import { Dataset } from '../core/types/api';
 import { FileUpload } from '../modules/nodes/data/FileUpload';
 import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2, XCircle, BarChart2, Download, Search, Filter } from 'lucide-react';
@@ -10,17 +9,37 @@ import { AddSourceModal } from '../components/data/AddSourceModal';
 import { IngestionJobsModal } from '../components/data/IngestionJobsModal';
 import { LoadingState, EmptyState, useConfirm } from '../components/shared';
 import { toast } from '../core/toast';
+import {
+  useDatasets,
+  useDeleteDataset,
+  useCancelIngestion,
+  hasPendingIngestion,
+} from '../core/hooks/useDatasets';
+import { DatasetService } from '../core/api/datasets';
 
 export const DataSources: React.FC = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const [datasets, setDatasets] = useState<Dataset[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  // Server state via React Query: poll while any ingestion is in flight,
+  // pause otherwise. The hook handles cache invalidation on mutations
+  // so we no longer need a manual `fetchDatasets` re-trigger.
+  const datasetsQuery = useDatasets({
+    refetchInterval: (query) => (hasPendingIngestion(query.state.data) ? 5000 : false),
+  });
+  const datasets: Dataset[] = datasetsQuery.data ?? [];
+  const loading = datasetsQuery.isLoading;
+
+  const deleteMutation = useDeleteDataset();
+  const cancelMutation = useCancelIngestion();
+
+  // Track which row's mutation is in flight (for per-row spinner state).
+  const deletingId = deleteMutation.isPending ? deleteMutation.variables ?? null : null;
+  const cancellingId = cancelMutation.isPending ? cancelMutation.variables ?? null : null;
+
   const [showUpload, setShowUpload] = useState(false);
   const [showAddSource, setShowAddSource] = useState(false);
   const [showIngestionJobs, setShowIngestionJobs] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [previewDataset, setPreviewDataset] = useState<Dataset | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,39 +64,6 @@ export const DataSources: React.FC = () => {
 
   const activeFilterCount = (filterType !== 'all' ? 1 : 0) + (filterFormat !== 'all' ? 1 : 0);
 
-  const fetchDatasets = async () => {
-    // Don't set loading to true on subsequent polls to avoid flickering
-    if (datasets.length === 0) setLoading(true);
-    try {
-      const data = await DatasetService.getAll();
-      setDatasets(data);
-    } catch (error) {
-      console.error('Failed to fetch datasets:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void fetchDatasets();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    // Poll every 5 seconds if there are pending jobs
-    const interval = setInterval(() => {
-      const hasPending = datasets.some(d => 
-        d.source_metadata?.ingestion_status?.status === 'pending' || 
-        d.source_metadata?.ingestion_status?.status === 'processing'
-      );
-      if (hasPending) {
-        void fetchDatasets();
-      }
-    }, 5000);
-    return () => { clearInterval(interval); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datasets]); // Re-run effect when datasets change to update "hasPending" check
-
   const handleDelete = async (id: string) => {
     const ok = await confirm({
       title: 'Delete dataset?',
@@ -87,15 +73,11 @@ export const DataSources: React.FC = () => {
     });
     if (!ok) return;
 
-    setDeletingId(id);
     try {
-      await DatasetService.delete(id);
-      setDatasets(datasets.filter(d => d.id !== id));
+      await deleteMutation.mutateAsync(id);
     } catch (error) {
       console.error('Failed to delete dataset:', error);
       toast.error('Failed to delete dataset');
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -108,15 +90,11 @@ export const DataSources: React.FC = () => {
     });
     if (!ok) return;
 
-    setCancellingId(id);
     try {
-      await DatasetService.cancelIngestion(id);
-      fetchDatasets();
+      await cancelMutation.mutateAsync(id);
     } catch (error) {
       console.error('Failed to cancel ingestion:', error);
       toast.error('Failed to cancel ingestion');
-    } finally {
-      setCancellingId(null);
     }
   };
 
@@ -126,12 +104,11 @@ export const DataSources: React.FC = () => {
 
   const handleUploadComplete = () => {
     setShowUpload(false);
-    fetchDatasets();
+    // Cache invalidation happens inside the upload mutation; nothing else needed.
   };
 
   const handleSourceCreated = () => {
     setShowAddSource(false);
-    fetchDatasets();
   };
 
   const getStatusBadge = (dataset: Dataset) => {
@@ -180,7 +157,7 @@ export const DataSources: React.FC = () => {
         isOpen={showIngestionJobs}
         onClose={() => { setShowIngestionJobs(false); }}
         datasets={datasets}
-        onRefresh={fetchDatasets}
+        onRefresh={() => { void datasetsQuery.refetch(); }}
       />
 
       <div className="flex justify-between items-center">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Database, Globe, Check, Cloud, ChevronDown, ChevronRight } from 'lucide-react';
-import { DatasetService } from '../../core/api/datasets';
+import { useCreateDataSource } from '../../core/hooks/useDatasets';
 import { DataSourceCreate } from '../../core/types/api';
 import { ModalShell } from '../shared';
 
@@ -19,12 +19,14 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
   const [method, setMethod] = useState('GET');
   const [s3Path, setS3Path] = useState('');
   const [showCredentials, setShowCredentials] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Mutation owns the loading state + invalidates the dataset list cache on success.
+  const createMutation = useCreateDataSource();
+  const loading = createMutation.isPending;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
 
     try {
@@ -60,13 +62,11 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
         description: `Imported from ${type}`
       };
 
-      const response = await DatasetService.createSource(payload);
+      const response = await createMutation.mutateAsync(payload);
       onSuccess(response.job_id);
       onClose();
     } catch (err: unknown) {
       setError((err as Error).message || 'Failed to create source');
-    } finally {
-      setLoading(false);
     }
   };
 

@@ -30,6 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# === Playwright (frontend E2E) ===
+frontend/ml-canvas/playwright-report/
+frontend/ml-canvas/test-results/
+frontend/ml-canvas/.playwright/
+
 # === Database ===
 .mlops_database.db/
 .mlops_database.db
