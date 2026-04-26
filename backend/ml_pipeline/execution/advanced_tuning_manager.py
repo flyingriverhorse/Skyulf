@@ -120,7 +120,13 @@ class AdvancedTuningManager:
 
     @staticmethod
     async def cancel_tuning_job(session: AsyncSession, job_id: str) -> bool:
-        """Cancels a tuning job if it is running or queued."""
+        """Cancels a tuning job if it is running or queued.
+
+        Mirrors `BasicTrainingManager.cancel_training_job`: flips the DB row
+        to CANCELLED and revokes the underlying Celery task with terminate
+        so the worker actually stops. The status guard in `update_status_sync`
+        prevents late writes from racing the row back to COMPLETED.
+        """
         stmt = select(AdvancedTuningJob).where(AdvancedTuningJob.id == job_id)
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
@@ -129,6 +135,15 @@ class AdvancedTuningManager:
             job.status = JobStatus.CANCELLED.value
             job.error_message = "Job cancelled by user."
             job.finished_at = datetime.now()
+            meta = (job.job_metadata or {}) if isinstance(job.job_metadata, dict) else {}
+            task_id = meta.get("celery_task_id")
+            if task_id:
+                try:
+                    from backend.celery_app import celery_app
+
+                    celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+                except Exception:
+                    pass
             await session.commit()
             return True
         return False
@@ -159,6 +174,16 @@ class AdvancedTuningManager:
         job = session.query(AdvancedTuningJob).filter(AdvancedTuningJob.id == job_id).first()
         if not job:
             return False
+
+        # See BasicTrainingManager.update_status_sync — refuse to overwrite
+        # a CANCELLED row so a late-arriving worker write can't flip Stop
+        # back to Completed.
+        if job.status == JobStatus.CANCELLED.value:
+            if logs:
+                current_logs: List[str] = job.logs or []
+                job.logs = current_logs + logs
+                session.commit()
+            return True
 
         if status:
             job.status = status.value

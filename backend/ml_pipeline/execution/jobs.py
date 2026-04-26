@@ -78,6 +78,28 @@ class JobManager:
         return await AdvancedTuningManager.cancel_tuning_job(session, job_id)
 
     @staticmethod
+    async def attach_celery_task_id(
+        session: AsyncSession, job_id: str, task_id: str
+    ) -> None:
+        """Stash the Celery task id on the job's metadata so cancel_job can revoke it.
+
+        Stored under `job_metadata.celery_task_id` to avoid a schema migration.
+        Tries BasicTrainingJob first, then AdvancedTuningJob; silently no-ops
+        if the job row doesn't exist (job creation race shouldn't break submit).
+        """
+        for model in (BasicTrainingJob, AdvancedTuningJob):
+            stmt = select(model).where(model.id == job_id)
+            result = await session.execute(stmt)
+            job = result.scalar_one_or_none()
+            if job is None:
+                continue
+            meta = dict(job.job_metadata) if isinstance(job.job_metadata, dict) else {}
+            meta["celery_task_id"] = task_id
+            job.job_metadata = meta
+            await session.commit()
+            return
+
+    @staticmethod
     def update_status_sync(
         session: Session,
         job_id: str,

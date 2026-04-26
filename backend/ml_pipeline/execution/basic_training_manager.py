@@ -112,7 +112,16 @@ class BasicTrainingManager:
 
     @staticmethod
     async def cancel_training_job(session: AsyncSession, job_id: str) -> bool:
-        """Cancels a training job if it is running or queued."""
+        """Cancels a training job if it is running or queued.
+
+        Flips the DB row to CANCELLED *and* revokes the underlying Celery
+        task (terminate=True so SIGTERM kills any in-flight `model.fit`).
+        Without the revoke, the worker would keep training and overwrite
+        the status back to COMPLETED via `update_status_sync` once it
+        finished — which is the bug users reported as "Stop doesn't stop
+        training". The `update_status_sync` cancelled-state guard further
+        protects against any late writes that race past the revoke.
+        """
         stmt = select(BasicTrainingJob).where(BasicTrainingJob.id == job_id)
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
@@ -121,6 +130,19 @@ class BasicTrainingManager:
             job.status = JobStatus.CANCELLED.value
             job.error_message = "Job cancelled by user."
             job.finished_at = datetime.now()
+            # Revoke the Celery task if we recorded its id at submission time.
+            meta = (job.job_metadata or {}) if isinstance(job.job_metadata, dict) else {}
+            task_id = meta.get("celery_task_id")
+            if task_id:
+                try:
+                    from backend.celery_app import celery_app
+
+                    celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+                except Exception:
+                    # Best-effort: never let revoke errors block the user-visible
+                    # cancel. The status guard in update_status_sync still keeps
+                    # the row at CANCELLED even if the worker writes back.
+                    pass
             await session.commit()
             return True
         return False
@@ -147,6 +169,18 @@ class BasicTrainingManager:
         job = session.query(BasicTrainingJob).filter(BasicTrainingJob.id == job_id).first()
         if not job:
             return False
+
+        # Guard: once a job is CANCELLED by the user, the worker may still be
+        # mid-`fit` and try to flip it back to RUNNING/COMPLETED on its next
+        # progress write. Refuse those overwrites so the user-visible state
+        # stays accurate; logs are still appended so cancellation traces are
+        # preserved for debugging.
+        if job.status == JobStatus.CANCELLED.value:
+            if logs:
+                current_logs: List[str] = job.logs or []
+                job.logs = current_logs + logs
+                session.commit()
+            return True
 
         if status:
             job.status = status.value

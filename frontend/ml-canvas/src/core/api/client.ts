@@ -97,8 +97,14 @@ export interface PreviewResponse {
   status: string;
   node_results: Record<string, NodeExecutionResult>;
   preview_data: PreviewData | null;
+  /** True row counts per split key in `preview_data` (rows themselves are
+   *  capped at 50 for transport). For single-frame previews exposed under
+   *  the synthetic `_total` key. */
+  preview_totals?: Record<string, number> | null;
   /** Set when the pipeline ran multiple parallel branches. */
   branch_previews?: BranchPreviews | null;
+  /** Per-branch true row counts (mirrors `branch_previews` keys). */
+  branch_preview_totals?: Record<string, Record<string, number>> | null;
   /** Per-branch list of node IDs (used to filter the applied-steps pills). */
   branch_node_ids?: BranchNodeIds | null;
   /** Advisories surfaced when the engine had to merge sibling fan-in inputs. */
