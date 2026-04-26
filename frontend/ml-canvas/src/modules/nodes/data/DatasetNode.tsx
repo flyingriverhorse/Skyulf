@@ -4,6 +4,7 @@ import { Database, TableProperties, Plus } from 'lucide-react';
 import { DatasetService } from '../../../core/api/datasets';
 import { Dataset } from '../../../core/types/api';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useUsableDatasets } from '../../../core/hooks/useDatasets';
 import { FileUpload } from './FileUpload';
 
 interface DatasetNodeConfig {
@@ -15,22 +16,15 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
   config,
   onChange,
 }) => {
-  const [datasets, setDatasets] = useState<Dataset[]>([]);
-  const [loading, setLoading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const { data: schema, isLoading: isSchemaLoading } = useDatasetSchema(config.datasetId);
 
-  const fetchDatasets = () => {
-    setLoading(true);
-    DatasetService.getUsable()
-      .then(setDatasets)
-      .catch(console.error)
-      .finally(() => { setLoading(false); });
-  };
-
-  useEffect(() => {
-    fetchDatasets();
-  }, []);
+  // Shared cache: every Dataset node on the canvas reads from the same
+  // `useUsableDatasets` query, and the upload mutation invalidates it
+  // so a freshly-uploaded source appears in every node's dropdown.
+  const datasetsQuery = useUsableDatasets();
+  const datasets: Dataset[] = datasetsQuery.data ?? [];
+  const loading = datasetsQuery.isLoading;
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
@@ -44,7 +38,8 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
 
   const handleUploadComplete = (newId: string, newName: string) => {
     setShowUpload(false);
-    fetchDatasets(); // Refresh list
+    // The upload mutation already invalidated the cached usable list;
+    // no manual fetch needed.
     onChange({
       ...config,
       datasetId: newId,

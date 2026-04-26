@@ -104,6 +104,14 @@ class DataIngestionService:
     async def cancel_ingestion(self, source_id: Union[int, str]) -> bool:
         """
         Cancel an ongoing ingestion job.
+
+        Idempotent: returns True if the job is now in a non-running state
+        (i.e. either we just cancelled it, or it had already finished /
+        been cancelled). Returns False only when the source itself does
+        not exist — that lets the router answer 404 cleanly without
+        flagging benign races as 400 errors. The most common cause of a
+        spurious 400 was the UI's 5 s poll racing the user's click on a
+        job that completed in the same tick.
         """
         source = await self.get_source(source_id)
         if not source:
@@ -122,9 +130,10 @@ class DataIngestionService:
             }
             cast(Any, source).source_metadata = metadata
             await self.session.commit()
-            return True
 
-        return False
+        # Already finished / cancelled / not yet started → desired state
+        # already holds, so the cancel is a successful no-op.
+        return True
 
     async def get_sample(self, source_id: Union[int, str], limit: int = 5) -> list[dict]:
         """

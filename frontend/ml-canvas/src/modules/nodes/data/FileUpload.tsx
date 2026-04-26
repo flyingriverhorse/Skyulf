@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Upload, FileSpreadsheet, AlertCircle, X } from 'lucide-react';
-import { DatasetService } from '../../../core/api/datasets';
+import { useUploadDataset } from '../../../core/hooks/useDatasets';
 
 interface FileUploadProps {
   onUploadComplete: (datasetId: string, datasetName: string) => void;
@@ -9,9 +9,14 @@ interface FileUploadProps {
 
 export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCancel }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+
+  // Mutation invalidates the dataset list cache on success so the next
+  // `useDatasets()` consumer (e.g. DataSources page) sees the new row
+  // without an explicit refetch.
+  const uploadMutation = useUploadDataset();
+  const uploading = uploadMutation.isPending;
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -41,22 +46,16 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
   };
 
   const handleFiles = async (file: File) => {
-    setUploading(true);
     setError(null);
     setProgress(0);
 
     try {
-      // Use DatasetService.upload
-      const response = await DatasetService.upload(file);
-      
+      const response = await uploadMutation.mutateAsync(file);
       // Returns job_id (which is source_id) and status
       onUploadComplete(response.job_id, file.name);
-      
     } catch (err: unknown) {
       console.error('Upload failed:', err);
       setError((err as Error).message || 'Failed to upload file. Please try again.');
-    } finally {
-      setUploading(false);
     }
   };
 

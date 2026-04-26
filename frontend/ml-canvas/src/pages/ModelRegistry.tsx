@@ -1,72 +1,54 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Archive, Box, CheckCircle, ChevronRight, X, Play, Folder, FileText, Cloud, HardDrive } from 'lucide-react';
 import { LoadingState, ErrorState, EmptyState, useConfirm } from '../components/shared';
 import { toast } from '../core/toast';
 import { useEscapeKey } from '../core/hooks/useEscapeKey';
-
-interface ArtifactResponse {
-  storage_type: string;
-  base_uri: string;
-  files: string[];
-}
-
-interface ModelVersion {
-  job_id: string;
-  pipeline_id: string;
-  node_id: string;
-  model_type: string;
-  version: number | string;
-  source: string;
-  status: string;
-  metrics: Record<string, unknown>;
-  hyperparameters: Record<string, unknown>;
-  created_at: string;
-  artifact_uri: string;
-  is_deployed: boolean;
-  deployment_id?: number;
-}
-
-interface ModelRegistryEntry {
-  model_type: string;
-  dataset_id: string;
-  dataset_name: string;
-  dataset_type?: string;
-  latest_version: ModelVersion | null;
-  versions: ModelVersion[];
-  deployment_count: number;
-}
-
-interface RegistryStats {
-  total_models: number;
-  total_versions: number;
-  active_deployments: number;
-}
+import {
+  useRegistryStats,
+  useRegistryModels,
+  useArtifacts,
+  useDeployModel,
+  type ModelRegistryEntry,
+} from '../core/hooks/useModelRegistry';
 
 export const ModelRegistry: React.FC = () => {
   const confirm = useConfirm();
-  const [stats, setStats] = useState<RegistryStats | null>(null);
-  const [models, setModels] = useState<ModelRegistryEntry[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ModelRegistryEntry | null>(null);
-  const [deployingId, setDeployingId] = useState<string | null>(null);
-  
-  useEscapeKey(() => setSelectedModel(null), !!selectedModel);
+  // Server state -> React Query. Cache invalidation lives in the hook module.
+  const statsQuery = useRegistryStats();
+  const modelsQuery = useRegistryModels();
+  const deployMutation = useDeployModel();
 
-  // Artifacts viewing
+  const stats = statsQuery.data ?? null;
+  const models: ModelRegistryEntry[] = useMemo(
+    () => modelsQuery.data?.pages.flat() ?? [],
+    [modelsQuery.data],
+  );
+  const loading = modelsQuery.isFetching;
+  const error = modelsQuery.error ? (modelsQuery.error as Error).message : null;
+  const hasMore = modelsQuery.hasNextPage ?? false;
+
+  const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
+  const selectedModel = useMemo(
+    () =>
+      selectedModelKey
+        ? models.find((m) => `${m.model_type}-${m.dataset_id}` === selectedModelKey) ?? null
+        : null,
+    [selectedModelKey, models],
+  );
+  const deployingId = deployMutation.isPending ? deployMutation.variables ?? null : null;
+
+  useEscapeKey(() => setSelectedModelKey(null), !!selectedModel);
+
+  // Artifacts: fetched lazily once a row is expanded.
   const [viewingArtifacts, setViewingArtifacts] = useState<string | null>(null);
-  const [artifacts, setArtifacts] = useState<ArtifactResponse | null>(null);
-  const [loadingArtifacts, setLoadingArtifacts] = useState(false);
-  
-  // Pagination
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const LIMIT = 10;
-  
-  // Filters
+  const artifactsQuery = useArtifacts(viewingArtifacts);
+  const artifacts = artifactsQuery.data ?? null;
+  const loadingArtifacts = artifactsQuery.isFetching;
+
+  // Filters (client-side; the API endpoint does not accept them yet).
   const [datasetFilter, setDatasetFilter] = useState('');
   const [modelTypeFilter, setModelTypeFilter] = useState('');
-  
+
   // Manual deployment tracking (Local Storage)
   const [manualDeployments, setManualDeployments] = useState<Record<string, boolean>>(() => {
     try {
@@ -85,93 +67,20 @@ export const ModelRegistry: React.FC = () => {
     });
   };
 
-  const handleViewArtifacts = async (jobId: string) => {
+  const handleViewArtifacts = (jobId: string) => {
     setViewingArtifacts(jobId);
-    setLoadingArtifacts(true);
-    setArtifacts(null);
-    try {
-      const res = await fetch(`/api/registry/artifacts/${jobId}`);
-      if (res.ok) {
-        const data: ArtifactResponse = await res.json();
-        setArtifacts(data);
-      } else {
-        const err = await res.json();
-        // Fallback for error display
-        setArtifacts({ 
-          storage_type: 'error', 
-          base_uri: '', 
-          files: [`Failed to load artifacts: ${err.detail || 'Unknown error'}`] 
-        });
-      }
-    } catch (e) {
-      setArtifacts({ 
-        storage_type: 'error', 
-        base_uri: '', 
-        files: ['Error loading artifacts'] 
-      });
-    } finally {
-      setLoadingArtifacts(false);
-    }
   };
 
-  const fetchStats = async () => {
-    try {
-      const statsRes = await fetch('/api/registry/stats');
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
-      }
-    } catch (e) {
-      console.error("Failed to fetch stats", e);
-    }
-  };
-
-  const fetchModels = async (pageNum: number, reset: boolean = false) => {
-    if (loading) return;
-    try {
-      setLoading(true);
-      const skip = pageNum * LIMIT;
-      const params = new URLSearchParams({
-        skip: skip.toString(),
-        limit: LIMIT.toString()
-      });
-      const modelsRes = await fetch(`/api/registry/models?${params.toString()}`);
-      if (!modelsRes.ok) throw new Error('Failed to fetch models');
-      const modelsData = await modelsRes.json();
-      
-      if (modelsData.length < LIMIT) {
-        setHasMore(false);
-      } else {
-        setHasMore(true);
-      }
-
-      setModels(prev => reset ? modelsData : [...prev, ...modelsData]);
-      return modelsData;
-    } catch (err: unknown) {
-      setError((err as Error).message);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Initial load
-  useEffect(() => {
-    void fetchStats();
-    void fetchModels(0, true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Infinite scroll listener
+  // Infinite scroll listener -> trigger React Query's `fetchNextPage`.
   useEffect(() => {
     const handleScroll = (e: Event) => {
       const target = e.target as HTMLElement;
       if (
         target.scrollTop + target.clientHeight >= target.scrollHeight - 100 &&
-        !loading &&
+        !modelsQuery.isFetchingNextPage &&
         hasMore
       ) {
-        setPage(prev => prev + 1);
+        void modelsQuery.fetchNextPage();
       }
     };
 
@@ -179,20 +88,10 @@ export const ModelRegistry: React.FC = () => {
     if (mainElement) {
       mainElement.addEventListener('scroll', handleScroll);
       return () => { mainElement.removeEventListener('scroll', handleScroll); };
-    } else {
-      // Fallback to window if main not found (though it should be there)
-      window.addEventListener('scroll', handleScroll as unknown as EventListener);
-      return () => { window.removeEventListener('scroll', handleScroll as unknown as EventListener); };
     }
-  }, [loading, hasMore]);
-
-  // Fetch on page change
-  useEffect(() => {
-    if (page > 0) {
-      void fetchModels(page, false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+    window.addEventListener('scroll', handleScroll as unknown as EventListener);
+    return () => { window.removeEventListener('scroll', handleScroll as unknown as EventListener); };
+  }, [modelsQuery, hasMore]);
 
   const handleDeploy = async (jobId: string) => {
     const ok = await confirm({
@@ -204,30 +103,13 @@ export const ModelRegistry: React.FC = () => {
     if (!ok) return;
 
     try {
-      setDeployingId(jobId);
-      const res = await fetch(`/api/deployment/deploy/${jobId}`, { method: 'POST' });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Deployment failed');
-      }
-
-      // Refresh data to update UI (reset to page 0)
-      setPage(0);
-      const updatedModels = await fetchModels(0, true);
-
-      // Also update selected model if open
-      if (selectedModel && updatedModels) {
-        const updatedModel = updatedModels.find((m: ModelRegistryEntry) =>
-          m.model_type === selectedModel.model_type && m.dataset_id === selectedModel.dataset_id
-        );
-        if (updatedModel) setSelectedModel(updatedModel);
-      }
-
+      await deployMutation.mutateAsync(jobId);
+      // Cache invalidation in the hook will refetch models+stats; the
+      // selected-model panel is derived from `models`, so it updates
+      // automatically once the new data arrives.
       toast.success('Model deployed', 'Open the Deployments page to manage it.');
     } catch (err: unknown) {
       toast.error('Error deploying model', (err as Error).message);
-    } finally {
-      setDeployingId(null);
     }
   };
 
@@ -300,7 +182,10 @@ export const ModelRegistry: React.FC = () => {
           <p className="text-slate-600 dark:text-slate-400 mt-1">Manage versions, track metrics, and deploy your best models.</p>
         </div>
         <button 
-          onClick={() => { setPage(0); void fetchModels(0, true); fetchStats(); }} 
+          onClick={() => {
+            void modelsQuery.refetch();
+            void statsQuery.refetch();
+          }} 
           className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
         >
           Refresh
@@ -449,7 +334,7 @@ export const ModelRegistry: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button 
-                          onClick={() => { setSelectedModel(model); }}
+                          onClick={() => { setSelectedModelKey(`${model.model_type}-${model.dataset_id}`); }}
                           className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 flex items-center justify-end gap-1 ml-auto"
                         >
                           View Versions <ChevronRight size={16} />
@@ -474,7 +359,7 @@ export const ModelRegistry: React.FC = () => {
       {/* Versions Modal/Drawer */}
       {selectedModel && (
         // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- modal backdrop dismiss zone
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => { setSelectedModel(null); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => { setSelectedModelKey(null); }}>
           {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- modal panel stopPropagation */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700" onClick={e => { e.stopPropagation(); }}>
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
@@ -482,7 +367,7 @@ export const ModelRegistry: React.FC = () => {
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white">{selectedModel.model_type}</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Version History</p>
               </div>
-              <button onClick={() => { setSelectedModel(null); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+              <button onClick={() => { setSelectedModelKey(null); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
                 <X size={24} />
               </button>
             </div>
@@ -525,7 +410,7 @@ export const ModelRegistry: React.FC = () => {
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => { void handleViewArtifacts(version.job_id); }}
+                            onClick={() => { handleViewArtifacts(version.job_id); }}
                             className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                             title="View Artifacts"
                           >
@@ -561,7 +446,7 @@ export const ModelRegistry: React.FC = () => {
             
             <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end">
               <button 
-                onClick={() => { setSelectedModel(null); }}
+                onClick={() => { setSelectedModelKey(null); }}
                 className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
                 Close

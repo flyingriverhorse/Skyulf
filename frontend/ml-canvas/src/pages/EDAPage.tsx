@@ -24,14 +24,7 @@ import { downloadChart } from '../core/utils/chartUtils';
 import { LoadingState, ErrorState } from '../components/shared';
 import { useEDAStore, selectExcludedDirty, type EDAFilter } from '../core/store/useEDAStore';
 import type { ColumnProfile } from '../core/types/edaProfile';
-
-// React Query keys for the EDA surface — co-located so cache invalidation stays type-safe.
-const edaKeys = {
-  datasets: ['eda', 'datasets'] as const,
-  report: (id: number | null) => ['eda', 'report', id] as const,
-  history: (id: number | null) => ['eda', 'history', id] as const,
-  reportById: (id: number) => ['eda', 'reportById', id] as const,
-};
+import { edaKeys } from '../core/hooks/useEdaJobs';
 
 export const EDAPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -592,6 +585,7 @@ export const EDAPage: React.FC = () => {
         isOpen={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
         history={history}
+        datasetId={selectedDataset ?? null}
         onRefresh={() =>
           queryClient.invalidateQueries({ queryKey: edaKeys.history(selectedDataset ?? null) })
         }

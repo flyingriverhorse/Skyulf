@@ -6,6 +6,10 @@ import App from './App.tsx'
 import './index.css'
 import { initializeRegistry } from './core/registry/init'
 import { ErrorBoundary, ConfirmProvider } from './components/shared'
+// Dev-only side-effect import: exposes `window.__skyulfTest` for
+// Playwright. Stripped from production by Vite's DCE on the
+// `import.meta.env.DEV` guard inside the module.
+import './test/devHooks'
 
 // Initialize node registry before rendering
 initializeRegistry();
