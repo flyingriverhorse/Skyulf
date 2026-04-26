@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useGraphStore } from '../store/useGraphStore';
 import { useViewStore } from '../store/useViewStore';
+import { getReadOnlyMode } from './useReadOnlyMode';
 
 /**
  * Custom event name fired when the user presses Ctrl/Cmd+Enter on
@@ -103,20 +104,24 @@ export function useKeyboardShortcuts({
 
       if (mod && key === 'd') {
         e.preventDefault();
+        if (getReadOnlyMode()) return;
         useGraphStore.getState().duplicateSelectedNodes();
         return;
       }
 
       if (mod && (e.key === 'Enter' || key === 'enter')) {
         e.preventDefault();
+        if (getReadOnlyMode()) return;
         window.dispatchEvent(new CustomEvent(RUN_PREVIEW_EVENT));
         return;
       }
 
       // Ctrl/Cmd+K → open the command palette. Modifier-gated so plain
-      // `k` typed elsewhere stays a no-op.
+      // `k` typed elsewhere stays a no-op. Read-only mode disables the
+      // palette since every action it offers is a graph mutation.
       if (mod && key === 'k') {
         e.preventDefault();
+        if (getReadOnlyMode()) return;
         window.dispatchEvent(new CustomEvent(SHOW_PALETTE_EVENT));
         return;
       }

@@ -3,6 +3,7 @@ import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
 import { registry } from '../../core/registry/NodeRegistry';
 import { AlertCircle, X, CheckCircle2, XCircle, Merge, GitFork } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
+import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import type { NodeExecutionResult } from '../../core/api/client';
 import {
   isAutoParallelType,
@@ -14,7 +15,10 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   const definitionType = data.definitionType as string;
   const definition = registry.get(definitionType);
   const { deleteElements } = useReactFlow();
-  
+  // In read-only mode the per-node X is hidden along with the global
+  // editor affordances (Backspace, sidebars, undo/redo, palette).
+  const readOnly = useReadOnlyMode();
+
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult: NodeExecutionResult | undefined = executionResult?.node_results?.[id];
   const incomingSourceCount = useGraphStore(
@@ -112,7 +116,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   
   return (
     <div className={`
-      min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all duration-150
+      relative group min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all duration-150
       ${selected
         ? 'border-primary shadow-lg shadow-primary/30 scale-[1.02]'
         : validationMessage
@@ -120,17 +124,63 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         : 'border-border hover:border-primary/50'}
       ${isPulsing ? 'animate-validation-pulse' : ''}
     `}>
+      {/* Floating delete chip — absolute on the card corner so it never
+          competes with header text/badges for flex space. Hidden in
+          read-only and revealed on hover or when selected. */}
+      {!readOnly && (
+        <button
+          onClick={onDelete}
+          aria-label="Remove node"
+          title="Remove node"
+          className={`absolute -top-2 -right-2 z-10 flex items-center justify-center w-6 h-6 rounded-full bg-background border border-border shadow-sm text-muted-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-all ${
+            selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+          }`}
+        >
+          <X size={12} />
+        </button>
+      )}
+      {/* Floating status/validation chips at the top-left corner. Kept
+          out of the header text row so they can't be squeezed by long
+          titles and out of the right edge so they can't collide with
+          output-handle labels (which absolute-position at 25/50/75%
+          of the card height for multi-output nodes like splitters). */}
+      {(nodeResult || validationMessage) && (
+        <div className="absolute -top-2 -left-2 z-10 flex items-center gap-1">
+          {nodeResult && (
+            <span
+              title={nodeResult.status === 'success' ? 'Last run: success' : 'Last run: failed'}
+              aria-label={nodeResult.status === 'success' ? 'Last run: success' : 'Last run: failed'}
+              className={`flex items-center justify-center w-5 h-5 rounded-full border shadow-sm ${
+                nodeResult.status === 'success'
+                  ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-400 dark:border-green-900'
+                  : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/40 dark:text-red-400 dark:border-red-900'
+              }`}
+            >
+              {nodeResult.status === 'success' ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+            </span>
+          )}
+          {validationMessage && (
+            <span
+              title={validationMessage}
+              aria-label={`Configuration issue: ${validationMessage}`}
+              className="flex items-center justify-center w-5 h-5 rounded-full bg-red-50 text-red-600 border border-red-200 shadow-sm dark:bg-red-900/40 dark:text-red-400 dark:border-red-900"
+            >
+              <AlertCircle size={11} />
+            </span>
+          )}
+        </div>
+      )}
       {/* Header */}
-      <div className="flex items-center p-3 border-b bg-muted/30 rounded-t-lg relative group">
-        <div className="p-1.5 bg-primary/10 rounded mr-3">
+      <div className="flex items-center p-3 border-b bg-muted/30 rounded-t-lg">
+        <div className="p-1.5 bg-primary/10 rounded mr-3 shrink-0">
           {definition.icon && <definition.icon className="w-4 h-4 text-primary" />}
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <div className="text-sm font-bold">{definition.label}</div>
+            <div className="text-sm font-bold truncate" title={definition.label}>{definition.label}</div>
             {showMergeBadge && (
               <span
-                className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                className={`shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                   isParallel
                     ? 'bg-amber-500/15 text-amber-500'
                     : mergeWarningSeverity === 'risk'
@@ -149,38 +199,11 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
                 {incomingSourceCount}
               </span>
             )}
-            {nodeResult && (
-              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border ${
-                nodeResult.status === 'success' 
-                  ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-900' 
-                  : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-900'
-              }`}>
-                {nodeResult.status === 'success' ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
-              </div>
-            )}
-            {validationMessage && (
-              <span
-                title={validationMessage}
-                aria-label={`Configuration issue: ${validationMessage}`}
-                className="flex items-center justify-center w-4 h-4 rounded-full bg-red-500/15 text-red-500 ring-1 ring-red-500/40"
-              >
-                <AlertCircle size={10} />
-              </span>
-            )}
           </div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
             {definition.category}
           </div>
         </div>
-
-        {/* Delete Button */}
-        <button
-          onClick={onDelete}
-          className="p-1 rounded-md hover:bg-destructive/10 hover:text-destructive text-muted-foreground/50 transition-all opacity-0 group-hover:opacity-100 ml-2"
-          title="Remove Node"
-        >
-          <X size={14} />
-        </button>
       </div>
 
       {/* Body (Custom Component or Default) */}
@@ -204,7 +227,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
           className="!w-3 !h-3 !bg-muted-foreground hover:!bg-primary transition-colors"
           style={{ top: `${((index + 1) * 100) / (definition.inputs.length + 1)}%` }}
         >
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none whitespace-nowrap">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none whitespace-nowrap px-1 rounded bg-card/80 backdrop-blur-[1px]">
             {input.label}
           </div>
         </Handle>
@@ -220,7 +243,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
           className="!w-3 !h-3 !bg-muted-foreground hover:!bg-primary transition-colors"
           style={{ top: `${((index + 1) * 100) / (definition.outputs.length + 1)}%` }}
         >
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none whitespace-nowrap">
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none whitespace-nowrap px-1 rounded bg-card/80 backdrop-blur-[1px]">
             {output.label}
           </div>
         </Handle>
