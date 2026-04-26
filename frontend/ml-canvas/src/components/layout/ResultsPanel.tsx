@@ -75,6 +75,16 @@ export const ResultsPanel: React.FC = () => {
     return toDatasetMap(executionResult?.preview_data);
   }, [executionResult, branchLabels, activeBranch]);
 
+  // True row totals (rows in `datasets` are capped at 50 for transport).
+  // Falls back to the preview row count when the backend didn't supply a
+  // total — keeps older clients/responses functional.
+  const totals = useMemo<Record<string, number>>(() => {
+    if (branchLabels.length > 0 && activeBranch && executionResult?.branch_preview_totals) {
+      return executionResult.branch_preview_totals[activeBranch] ?? {};
+    }
+    return executionResult?.preview_totals ?? {};
+  }, [executionResult, branchLabels, activeBranch]);
+
   const tabNames = Object.keys(datasets);
 
   // Derive the effective tab synchronously so that switching branches or
@@ -141,6 +151,12 @@ export const ResultsPanel: React.FC = () => {
   if (!executionResult) return null;
 
   const currentRows = (effectiveTab && datasets[effectiveTab]) ? datasets[effectiveTab] : [];
+  // Real dataset size for the active tab; falls back to the preview row
+  // count when the backend didn't ship a total (older response, or single
+  // list payload registered under the synthetic `_total` key).
+  const currentTotal = effectiveTab
+    ? (totals[effectiveTab] ?? totals._total ?? currentRows.length)
+    : 0;
   const columns = currentRows.length > 0 ? Object.keys(currentRows[0] ?? {}) : [];
   // When viewing a specific branch, restrict the applied-steps pills to nodes
   // that actually ran in that branch (otherwise every tab shows every node).
@@ -173,7 +189,9 @@ export const ResultsPanel: React.FC = () => {
           <Table className="w-4 h-4 text-primary" />
           <span className="font-semibold text-sm">Preview Results</span>
           <span className="text-xs text-muted-foreground ml-2">
-            {currentRows.length} rows shown
+            {currentRows.length === currentTotal
+              ? `${currentTotal} rows`
+              : `${currentRows.length} of ${currentTotal} rows shown`}
           </span>
           {branchLabels.length > 0 && (
             <span className="text-xs text-muted-foreground ml-2">
@@ -250,7 +268,9 @@ export const ResultsPanel: React.FC = () => {
               <Layers className="w-3 h-3 text-muted-foreground mr-1" />
               {tabNames.map(name => {
                 const rows = datasets[name];
-                const rowCount = Array.isArray(rows) ? rows.length : 0;
+                const previewCount = Array.isArray(rows) ? rows.length : 0;
+                const total = totals[name] ?? totals._total ?? previewCount;
+                const truncated = total > previewCount;
                 return (
                   <button
                     key={name}
@@ -260,7 +280,11 @@ export const ResultsPanel: React.FC = () => {
                         ? 'bg-background text-primary border-b-background translate-y-[1px]'
                         : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border-transparent'
                     }`}
-                    title={`${rowCount} row${rowCount === 1 ? '' : 's'} in ${name}`}
+                    title={
+                      truncated
+                        ? `${total} row${total === 1 ? '' : 's'} in ${name} (${previewCount} shown in preview)`
+                        : `${total} row${total === 1 ? '' : 's'} in ${name}`
+                    }
                   >
                     {name}
                     <span
@@ -270,7 +294,7 @@ export const ResultsPanel: React.FC = () => {
                           : 'bg-muted/60 text-muted-foreground'
                       }`}
                     >
-                      {rowCount}
+                      {total}
                     </span>
                   </button>
                 );

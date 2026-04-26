@@ -394,7 +394,13 @@ async def run_pipeline(  # noqa: C901
 
         # Trigger task
         if settings.USE_CELERY:
-            run_pipeline_task.delay(job_id, sub_payload)
+            task = run_pipeline_task.delay(job_id, sub_payload)
+            # Persist the celery task id so cancel_job can revoke it later.
+            try:
+                await JobManager.attach_celery_task_id(db, job_id, task.id)
+            except Exception:
+                # Best-effort: never let metadata persistence block job submit.
+                logger.warning("Failed to attach celery task id for job %s", job_id)
         else:
             task_payloads.append((job_id, sub_payload))
 
@@ -433,10 +439,17 @@ class PreviewResponse(BaseModel):
     node_results: Dict[str, Any]
     # We return the preview data for the last node (or specific nodes)
     preview_data: Optional[Union[List[Dict[str, Any]], Dict[str, Any]]] = None
+    # True row counts for each split key in `preview_data` (the rows in
+    # `preview_data` are capped at 50 for transport). Mirrors the dict keys
+    # of `preview_data`; for single-frame previews uses the synthetic
+    # `_total` key.
+    preview_totals: Optional[Dict[str, int]] = None
     # When the pipeline has multiple branches (parallel execution), per-branch
     # preview keyed by branch label (e.g. "Path A · Random Forest").
     # Each value matches the shape of preview_data above.
     branch_previews: Optional[Dict[str, Any]] = None
+    # Per-branch true row counts (mirrors `branch_previews` keys).
+    branch_preview_totals: Optional[Dict[str, Dict[str, int]]] = None
     # Per-branch list of node IDs that ran in that branch. Used by the
     # frontend to show only the relevant "applied steps" pills per tab.
     branch_node_ids: Optional[Dict[str, List[str]]] = None
@@ -753,9 +766,35 @@ async def preview_pipeline(  # noqa: C901
                 pass
             return []
 
+        def count_rows(df) -> int:
+            # True total row count for the underlying artifact, regardless of
+            # the 50-row preview cap applied by `to_records`. Used so the UI
+            # can show the real dataset size in tab badges.
+            if df is None:
+                return 0
+            if isinstance(df, pd.DataFrame):
+                return int(df.shape[0])
+            if isinstance(df, pd.Series):
+                return int(df.shape[0])
+            try:
+                import polars as pl
+
+                if isinstance(df, (pl.DataFrame, pl.Series)):
+                    return int(df.shape[0])
+            except ImportError:
+                pass
+            try:
+                return int(len(df))
+            except Exception:
+                return 0
+
         def process_xy(xy_tuple, prefix):
             X, y = xy_tuple
             return {f"{prefix}_X": to_records(X), f"{prefix}_y": to_records(y)}
+
+        def process_xy_totals(xy_tuple, prefix):
+            X, y = xy_tuple
+            return {f"{prefix}_X": count_rows(X), f"{prefix}_y": count_rows(y)}
 
         def to_pandas_safe(df):
             if isinstance(df, pd.DataFrame):
@@ -790,11 +829,18 @@ async def preview_pipeline(  # noqa: C901
             return target_id
 
         def extract_preview(target_node_id: Optional[str]):
-            """Return (preview_data, df_for_analysis) for a single artifact."""
+            """Return (preview_data, totals, df_for_analysis) for a single artifact.
+
+            `totals` mirrors the shape of `preview_data`:
+            - dict of split-name → row count when `preview_data` is a dict;
+            - a single int wrapped under the `_total` key when `preview_data`
+              is a list (single-frame case).
+            """
             preview_data: Any = {}
+            totals: Dict[str, int] = {}
             df_for_analysis = None
             if not target_node_id or not artifact_store.exists(target_node_id):
-                return preview_data, df_for_analysis
+                return preview_data, totals, df_for_analysis
 
             artifact = artifact_store.load(target_node_id)
             logger.debug(f"Loaded artifact for node {target_node_id}. Type: {type(artifact)}")
@@ -810,30 +856,39 @@ async def preview_pipeline(  # noqa: C901
 
             if is_polars:
                 preview_data = to_records(artifact)
+                totals = {"_total": count_rows(artifact)}
                 df_for_analysis = to_pandas_safe(artifact)
             elif isinstance(artifact, pd.DataFrame):
                 preview_data = json.loads(artifact.head(50).to_json(orient="records"))
+                totals = {"_total": count_rows(artifact)}
                 df_for_analysis = artifact
             elif isinstance(artifact, SplitDataset):
                 preview_data = {}
                 if isinstance(artifact.train, tuple):
                     preview_data.update(process_xy(artifact.train, "train"))
+                    totals.update(process_xy_totals(artifact.train, "train"))
                     df_for_analysis = to_pandas_safe(artifact.train[0])
                 else:
                     preview_data["train"] = to_records(artifact.train)
+                    totals["train"] = count_rows(artifact.train)
                     df_for_analysis = to_pandas_safe(artifact.train)
                 if isinstance(artifact.test, tuple):
                     preview_data.update(process_xy(artifact.test, "test"))
+                    totals.update(process_xy_totals(artifact.test, "test"))
                 else:
                     preview_data["test"] = to_records(artifact.test)
+                    totals["test"] = count_rows(artifact.test)
                 if artifact.validation is not None:
                     if isinstance(artifact.validation, tuple):
                         preview_data.update(process_xy(artifact.validation, "validation"))
+                        totals.update(process_xy_totals(artifact.validation, "validation"))
                     else:
                         preview_data["validation"] = to_records(artifact.validation)
+                        totals["validation"] = count_rows(artifact.validation)
             elif isinstance(artifact, tuple) and len(artifact) == 2:
                 X, y = artifact
                 preview_data = {"X": to_records(X), "y": to_records(y)}
+                totals = {"X": count_rows(X), "y": count_rows(y)}
                 df_for_analysis = to_pandas_safe(X)
             elif (
                 isinstance(artifact, dict)
@@ -842,17 +897,22 @@ async def preview_pipeline(  # noqa: C901
             ):
                 preview_data = {}
                 preview_data.update(process_xy(artifact["train"], "train"))
+                totals.update(process_xy_totals(artifact["train"], "train"))
                 df_for_analysis = to_pandas_safe(artifact["train"][0])
                 if "test" in artifact:
                     preview_data.update(process_xy(artifact["test"], "test"))
+                    totals.update(process_xy_totals(artifact["test"], "test"))
                 if "validation" in artifact:
                     preview_data.update(process_xy(artifact["validation"], "validation"))
+                    totals.update(process_xy_totals(artifact["validation"], "validation"))
 
-            return preview_data, df_for_analysis
+            return preview_data, totals, df_for_analysis
 
         # 4. Aggregate per-branch previews
         preview_data: Any = {}
+        preview_totals: Dict[str, int] = {}
         branch_previews: Optional[Dict[str, Any]] = None
+        branch_preview_totals: Optional[Dict[str, Dict[str, int]]] = None
         branch_node_ids: Optional[Dict[str, List[str]]] = None
         recommendations: List[Recommendation] = []
         combined_node_results: Dict[str, Any] = {}
@@ -863,6 +923,7 @@ async def preview_pipeline(  # noqa: C901
         is_multi = len(sub_results) > 1
         if is_multi:
             branch_previews = {}
+            branch_preview_totals = {}
             branch_node_ids = {}
 
         # Pre-compute "#N" disambiguators for training terminals that share
@@ -908,15 +969,22 @@ async def preview_pipeline(  # noqa: C901
                 agg_status = sub_result.status
             if sub_result.status == "success" and runnable_sub.nodes:
                 target_id = pick_target_node_id(runnable_sub.nodes)
-                pdata, pdf = extract_preview(target_id)
+                pdata, ptotals, pdf = extract_preview(target_id)
                 if idx == 0:
                     preview_data = pdata
+                    preview_totals = ptotals
                     first_pdf = pdf
-                if is_multi and branch_previews is not None and branch_node_ids is not None:
+                if (
+                    is_multi
+                    and branch_previews is not None
+                    and branch_node_ids is not None
+                    and branch_preview_totals is not None
+                ):
                     # Label uses the ORIGINAL sub (training node included) so
                     # the model name shows up in the tab.
                     label = _branch_label(idx, orig_sub, dup_suffix_by_branch.get(idx, ""))
                     branch_previews[label] = pdata
+                    branch_preview_totals[label] = ptotals
                     branch_node_ids[label] = [n.node_id for n in runnable_sub.nodes]
 
         # 5. Recommendations from first branch's data only (avoid heavy work).
@@ -956,7 +1024,9 @@ async def preview_pipeline(  # noqa: C901
             status=agg_status,
             node_results=combined_node_results,
             preview_data=preview_data,
+            preview_totals=preview_totals,
             branch_previews=branch_previews,
+            branch_preview_totals=branch_preview_totals,
             branch_node_ids=branch_node_ids,
             recommendations=recommendations,
             merge_warnings=deduped_warnings,

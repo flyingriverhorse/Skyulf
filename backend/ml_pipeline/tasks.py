@@ -174,6 +174,18 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
         # 6. Handle Result
         job.logs = job_logs  # Final log update
 
+        # Cancellation guard: the user may have clicked Stop while this
+        # worker was still in `model.fit`. Re-read the row from the DB so
+        # we don't blindly overwrite a `cancelled` status (and its metrics
+        # / best_params) with completed results. Without this, the
+        # non-Celery thread path (which can't be hard-killed) would always
+        # show a finished training run despite the cancel.
+        session.refresh(job, ["status"])
+        if job.status == "cancelled":
+            logger.info(f"Job {job_id} was cancelled mid-run; skipping result write")
+            session.commit()
+            return
+
         if result.status == "success":
             job.status = "completed"
             job.progress = 100
@@ -206,7 +218,13 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
             job, strategy = JobStrategyFactory.find_job(session, job_id)
 
             if job and strategy:
-                strategy.handle_failure(job, str(e))
-                session.commit()
+                # Same cancellation guard for the exception path: a job that
+                # was cancelled and then crashed in cleanup must stay
+                # cancelled, not flip to failed.
+                if job.status == "cancelled":
+                    session.commit()
+                else:
+                    strategy.handle_failure(job, str(e))
+                    session.commit()
     finally:
         session.close()
