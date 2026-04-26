@@ -97,6 +97,27 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
 
     const colors = generateBranchColors(branches.length);
 
+    // Disambiguate terminals that share the same model type (e.g. two
+    // Advanced Training nodes both running XGBoost). Without this, every
+    // branch ends up labeled "Path A · Xgboost" / "Path B · Xgboost" with
+    // no way to tell which terminal each path actually feeds. We assign a
+    // 1-based suffix (#1, #2, …) per model-type group, but only when a
+    // collision exists — single-terminal-per-model canvases stay clean.
+    const terminalsByModel = new Map<string, string[]>();
+    for (const t of terminals) {
+      const mt = (t.data.model_type as string | undefined) ?? '';
+      const list = terminalsByModel.get(mt) ?? [];
+      list.push(t.id);
+      terminalsByModel.set(mt, list);
+    }
+    const terminalSuffix = new Map<string, string>();
+    for (const [, ids] of terminalsByModel) {
+      if (ids.length < 2) continue;
+      ids.forEach((id, idx) => {
+        terminalSuffix.set(id, `#${idx + 1}`);
+      });
+    }
+
     // Collect the terminal-entering edge ids so we can tag them with labels
     const terminalEdgeIds = new Set<string>();
 
@@ -122,6 +143,13 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
           || (typeof data.definitionType === 'string'
               ? (data.definitionType as string).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
               : '');
+      }
+      // Append a #N counter when multiple terminals share the same model
+      // type so e.g. two XGBoost training nodes render as "Path A · Xgboost
+      // #1" and "Path A · Xgboost #2" instead of two identical labels.
+      const dupSuffix = terminalSuffix.get(terminal.id);
+      if (dupSuffix && suffix) {
+        suffix = `${suffix} ${dupSuffix}`;
       }
       const label = suffix ? `Path ${pathLetter} · ${suffix}` : `Path ${pathLetter}`;
       branchLabels.push(label);
