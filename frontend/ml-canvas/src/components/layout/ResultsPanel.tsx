@@ -77,6 +77,20 @@ export const ResultsPanel: React.FC = () => {
 
   const tabNames = Object.keys(datasets);
 
+  // Derive the effective tab synchronously so that switching branches or
+  // receiving a fresh executionResult never produces an in-between render
+  // with `activeTab` pointing at a key that doesn't exist in `datasets`
+  // (which previously flashed "No preview data available" before the
+  // default-picking effect caught up). The state setter still drives user
+  // intent; this just absorbs the one-frame mismatch.
+  const effectiveTab = useMemo<string | null>(() => {
+    if (activeTab && tabNames.includes(activeTab)) return activeTab;
+    if (tabNames.length === 0) return null;
+    if (tabNames.includes('train')) return 'train';
+    if (tabNames.includes('X')) return 'X';
+    return tabNames[0] ?? null;
+  }, [activeTab, tabNames]);
+
   // Set default split tab when datasets change
   React.useEffect(() => {
     if (tabNames.length > 0 && (!activeTab || !tabNames.includes(activeTab))) {
@@ -105,9 +119,28 @@ export const ResultsPanel: React.FC = () => {
     return all.filter((w) => branchNodes.has(w.node_id));
   }, [rawMergeWarnings, activeBranch, branchNodeIdsMemo]);
 
+  // Per-branch advisory counts so the user can see at-a-glance which other
+  // branch tabs have warnings without having to click through each one.
+  // The banner above is filtered to the active branch only, so without this
+  // badge there is no signal that e.g. branch B has 4 advisories while
+  // branch A has 0.
+  const branchAdvisoryCounts = useMemo<Record<string, number>>(() => {
+    const counts: Record<string, number> = {};
+    const all = rawMergeWarnings ?? [];
+    if (all.length === 0 || !branchNodeIdsMemo) return counts;
+    for (const branch of branchLabels) {
+      const ids = branchNodeIdsMemo[branch];
+      if (!ids) continue;
+      const set = new Set(ids);
+      const n = all.filter((w) => set.has(w.node_id)).length;
+      if (n > 0) counts[branch] = n;
+    }
+    return counts;
+  }, [rawMergeWarnings, branchNodeIdsMemo, branchLabels]);
+
   if (!executionResult) return null;
 
-  const currentRows = (activeTab && datasets[activeTab]) ? datasets[activeTab] : [];
+  const currentRows = (effectiveTab && datasets[effectiveTab]) ? datasets[effectiveTab] : [];
   const columns = currentRows.length > 0 ? Object.keys(currentRows[0] ?? {}) : [];
   // When viewing a specific branch, restrict the applied-steps pills to nodes
   // that actually ran in that branch (otherwise every tab shows every node).
@@ -175,21 +208,36 @@ export const ResultsPanel: React.FC = () => {
               <GitBranch className="w-3 h-3 text-muted-foreground mr-1" />
               {branchLabels.map((label, idx) => {
                 const isActive = activeBranch === label;
+                const advisoryCount = branchAdvisoryCounts[label] ?? 0;
                 return (
                   <button
                     key={label}
-                    onClick={() => { setActiveBranch(label); setActiveTab(null); }}
+                    onClick={() => { setActiveBranch(label); }}
                     className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-t-md border-t border-l border-r transition-colors ${
                       isActive
                         ? 'bg-background text-foreground border-b-background translate-y-[1px]'
                         : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border-transparent'
                     }`}
+                    title={
+                      advisoryCount > 0
+                        ? `${advisoryCount} merge advisor${advisoryCount === 1 ? 'y' : 'ies'} in this branch`
+                        : undefined
+                    }
                   >
                     <span
                       className="inline-block w-2.5 h-2.5 rounded-full"
                       style={{ backgroundColor: branchColors[idx] }}
                     />
                     {label}
+                    {advisoryCount > 0 && (
+                      <span
+                        className="ml-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 text-[10px] font-semibold leading-none"
+                        aria-label={`${advisoryCount} merge advisories`}
+                      >
+                        <AlertTriangle className="w-2.5 h-2.5" />
+                        {advisoryCount}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -200,19 +248,33 @@ export const ResultsPanel: React.FC = () => {
           {tabNames.length > 1 && (
             <div className="flex items-center gap-1 px-2 pt-2 border-b bg-muted/5">
               <Layers className="w-3 h-3 text-muted-foreground mr-1" />
-              {tabNames.map(name => (
-                <button
-                  key={name}
-                  onClick={() => { setActiveTab(name); }}
-                  className={`px-3 py-1 text-xs font-medium rounded-t-md border-t border-l border-r transition-colors ${
-                    activeTab === name 
-                      ? 'bg-background text-primary border-b-background translate-y-[1px]' 
-                      : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border-transparent'
-                  }`}
-                >
-                  {name}
-                </button>
-              ))}
+              {tabNames.map(name => {
+                const rows = datasets[name];
+                const rowCount = Array.isArray(rows) ? rows.length : 0;
+                return (
+                  <button
+                    key={name}
+                    onClick={() => { setActiveTab(name); }}
+                    className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-t-md border-t border-l border-r transition-colors ${
+                      effectiveTab === name
+                        ? 'bg-background text-primary border-b-background translate-y-[1px]'
+                        : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border-transparent'
+                    }`}
+                    title={`${rowCount} row${rowCount === 1 ? '' : 's'} in ${name}`}
+                  >
+                    {name}
+                    <span
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none ${
+                        effectiveTab === name
+                          ? 'bg-primary/15 text-primary'
+                          : 'bg-muted/60 text-muted-foreground'
+                      }`}
+                    >
+                      {rowCount}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -393,7 +455,7 @@ export const ResultsPanel: React.FC = () => {
             </table>
             {currentRows.length === 0 && (
               <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-                No preview data available {activeTab ? `for ${activeTab}` : ''}
+                No preview data available {effectiveTab ? `for ${effectiveTab}` : ''}
               </div>
             )}
           </div>

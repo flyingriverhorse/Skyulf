@@ -4,7 +4,12 @@ from typing import Any, Dict, List, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from ..utils import pack_pipeline_output, resolve_columns, unpack_pipeline_input
+from ..utils import (
+    pack_pipeline_output,
+    resolve_columns,
+    unpack_pipeline_input,
+    user_picked_no_columns,
+)
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
@@ -292,6 +297,9 @@ class TextCleaningCalculator(BaseCalculator):
 
         X, _, _ = unpack_pipeline_input(df)
 
+        if user_picked_no_columns(config):
+            return {}
+
         cols = resolve_columns(X, config, _auto_detect_text_columns)
 
         if not cols:
@@ -425,6 +433,10 @@ class InvalidValueReplacementCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+
+        if user_picked_no_columns(config):
+            return {}
+
         cols = resolve_columns(X, config, _auto_detect_numeric_columns)
 
         return {
@@ -707,6 +719,10 @@ class AliasReplacementCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+
+        if user_picked_no_columns(config):
+            return {}
+
         cols = resolve_columns(X, config, _auto_detect_text_columns)
 
         # Support both 'alias_type' and 'mode'

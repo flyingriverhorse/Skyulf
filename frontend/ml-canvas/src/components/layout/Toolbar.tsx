@@ -3,6 +3,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown } from 'lucide-react';
 import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
+import { useViewStore } from '../../core/store/useViewStore';
 import { runPipelinePreview, savePipeline, fetchPipeline } from '../../core/api/client';
 import { convertGraphToPipelineConfig } from '../../core/utils/pipelineConverter';
 import { autoLayoutGraph } from '../../core/utils/autoLayout';
@@ -25,6 +26,7 @@ export const Toolbar: React.FC = () => {
   const setGraph = useGraphStore((state) => state.setGraph);
   
   const { toggleDrawer, setActiveParallelRun, startPolling } = useJobStore();
+  const isSidebarOpen = useViewStore((s) => s.isSidebarOpen);
   const confirm = useConfirm();
 
   // Undo/redo state from the temporal substore (zundo). Keeping these
@@ -312,8 +314,16 @@ export const Toolbar: React.FC = () => {
           reverse of the previous right-side order so destructive
           actions stay closest to the canvas action cluster on the
           right). The dropdown anchor below switches from right-0 to
-          left-0 to follow the move. */}
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
+          left-0 to follow the move.
+          When the Sidebar is collapsed, its floating "Expand
+          Components" button sits at left-4/top-4 with z-50 and would
+          cover the legend button below; we shift the cluster right
+          (left-16) so both stay reachable. */}
+      <div
+        className={`absolute top-4 z-10 flex gap-2 transition-[left] duration-300 ${
+          isSidebarOpen ? 'left-4' : 'left-16'
+        }`}
+      >
         <button
           onClick={() => setShowLegend(v => !v)}
           title="Show node badge legend"
@@ -469,30 +479,40 @@ export const Toolbar: React.FC = () => {
         )}
       </div>
 
-      {/* Right-side action cluster: history / load / save / tidy / run. */}
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
+      {/* Right-side action cluster: history / load / save / tidy /
+          export / run. Wraps onto a second row when the viewport is
+          too narrow to fit everything on one line, and the secondary
+          buttons collapse to icon-only at xl and below so the cluster
+          stays compact even when the Properties panel is open. The
+          primary Run / Run All buttons keep their labels because
+          they're the user's most-used affordance. The max-width keeps
+          the cluster from sliding under the left-side cluster. */}
+      <div className="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2 max-w-[calc(100%-13rem)]">
         <button
           onClick={() => toggleDrawer()}
-          className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+          title="Jobs history"
+          className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
         >
           <History className="w-4 h-4" />
-          <span className="text-sm font-medium">Jobs</span>
+          <span className="text-sm font-medium hidden xl:inline">Jobs</span>
         </button>
         <button
           onClick={() => { void handleLoad(); }}
           disabled={isLoading || isRunning}
-          className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+          title="Load pipeline"
+          className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
         >
           {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />}
-          <span className="text-sm font-medium">{isLoading ? 'Loading...' : 'Load'}</span>
+          <span className="text-sm font-medium hidden xl:inline">{isLoading ? 'Loading...' : 'Load'}</span>
         </button>
         <button
           onClick={() => { void handleSave(); }}
           disabled={isSaving || isRunning}
-          className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+          title="Save pipeline"
+          className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
         >
           {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          <span className="text-sm font-medium">{isSaving ? 'Saving...' : 'Save'}</span>
+          <span className="text-sm font-medium hidden xl:inline">{isSaving ? 'Saving...' : 'Save'}</span>
         </button>
         <button
           onClick={() => {
@@ -502,10 +522,10 @@ export const Toolbar: React.FC = () => {
           }}
           disabled={isRunning || nodes.length === 0}
           title="Auto-arrange nodes left-to-right by data flow"
-          className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
         >
           <Wand2 className="w-4 h-4" />
-          <span className="text-sm font-medium">Tidy</span>
+          <span className="text-sm font-medium hidden xl:inline">Tidy</span>
         </button>
         <div className="relative">
           <button
@@ -514,10 +534,10 @@ export const Toolbar: React.FC = () => {
             title="Export canvas as image"
             aria-haspopup="menu"
             aria-expanded={showExportMenu}
-            className="flex items-center gap-2 px-4 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
           >
             {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            <span className="text-sm font-medium">Export</span>
+            <span className="text-sm font-medium hidden xl:inline">Export</span>
             <ChevronDown className="w-3 h-3" />
           </button>
           {showExportMenu && (
@@ -546,10 +566,11 @@ export const Toolbar: React.FC = () => {
           <button
             onClick={() => { void handleRunAll(); }}
             disabled={isRunningAll || isRunning}
-            className="flex items-center gap-2 px-4 py-2 text-white bg-amber-600 rounded-md shadow-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
+            title="Run all parallel branches as separate experiments"
+            className="flex items-center gap-2 px-3 py-2 text-white bg-amber-600 rounded-md shadow-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
           >
             {isRunningAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
-            <span className="text-sm font-medium">{isRunningAll ? 'Queuing...' : 'Run All Experiments'}</span>
+            <span className="text-sm font-medium hidden md:inline">{isRunningAll ? 'Queuing...' : 'Run All Experiments'}</span>
           </button>
         )}
         {canRunPreview && (
@@ -557,11 +578,11 @@ export const Toolbar: React.FC = () => {
             onClick={() => { void handleRun(); }}
             disabled={isRunning}
             title="Run Preview (Ctrl+Enter)"
-            className="flex items-center gap-2 px-4 py-2 text-white rounded-md shadow-sm transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 text-white rounded-md shadow-sm transition-all disabled:opacity-50"
             style={{ background: 'var(--main-gradient)' }}
           >
             {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-            <span className="text-sm font-medium">{isRunning ? 'Running...' : 'Run Preview'}</span>
+            <span className="text-sm font-medium hidden md:inline">{isRunning ? 'Running...' : 'Run Preview'}</span>
           </button>
         )}
       </div>

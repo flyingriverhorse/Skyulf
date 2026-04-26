@@ -319,3 +319,23 @@ def resolve_columns(
         return [c for c in cols if c in df.columns]
 
     return []
+
+
+def user_picked_no_columns(config: Dict[str, Any]) -> bool:
+    """Return True when the caller explicitly passed `columns: []`.
+
+    Many preprocessing UIs let the user multi-select the columns to operate
+    on. When every box is unchecked, the user's intent is unambiguously
+    "do nothing for this node". `resolve_columns` would otherwise treat an
+    empty list as "auto-detect everything", which silently scales /
+    encodes / imputes the whole frame — a confusing footgun.
+
+    Calculators that present an explicit column picker should call this at
+    the top of `fit()` and short-circuit with `{}` when it returns True.
+    Calculators that don't show a picker (e.g. feature-selection nodes
+    where empty really does mean "use all eligible") should NOT call this.
+    """
+    if "columns" not in config:
+        return False
+    cols = config.get("columns")
+    return isinstance(cols, list) and len(cols) == 0
