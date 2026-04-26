@@ -12,6 +12,7 @@ from ..utils import (
     pack_pipeline_output,
     resolve_columns,
     unpack_pipeline_input,
+    user_picked_no_columns,
 )
 from .base import BaseApplier, BaseCalculator
 from ..engines import SkyulfDataFrame, get_engine
@@ -118,6 +119,9 @@ class PowerTransformerCalculator(BaseCalculator):
         engine = get_engine(X)
         if engine.name == "polars":
             X = X.to_pandas()
+
+        if user_picked_no_columns(config):
+            return {}
 
         # Config: {'method': 'yeo-johnson' | 'box-cox', 'standardize': True, 'columns': [...]}
         method = config.get("method", "yeo-johnson")

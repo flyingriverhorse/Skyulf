@@ -10,6 +10,7 @@ from ..utils import (
     pack_pipeline_output,
     resolve_columns,
     unpack_pipeline_input,
+    user_picked_no_columns,
 )
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
@@ -219,6 +220,9 @@ class GeneralBinningCalculator(BaseCalculator):
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
 
+        if user_picked_no_columns(config):
+            return {}
+
         # Ensure X is pandas for fitting logic
         engine = get_engine(X)
         if engine.name == "polars":
@@ -362,6 +366,9 @@ class CustomBinningCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+
+        if user_picked_no_columns(config):
+            return {}
 
         # Ensure X is pandas for fitting logic
         engine = get_engine(X)

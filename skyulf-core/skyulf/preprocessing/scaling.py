@@ -15,6 +15,7 @@ from ..utils import (
     pack_pipeline_output,
     resolve_columns,
     unpack_pipeline_input,
+    user_picked_no_columns,
 )
 from .base import BaseApplier, BaseCalculator
 from ..core.meta.decorators import node_meta
@@ -110,6 +111,9 @@ class StandardScalerCalculator(BaseCalculator):
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
+
+        if user_picked_no_columns(config):
+            return {}
 
         # Config: {'with_mean': True, 'with_std': True, 'columns': [...]}
         with_mean = config.get("with_mean", True)
@@ -215,6 +219,9 @@ class MinMaxScalerCalculator(BaseCalculator):
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
+
+        if user_picked_no_columns(config):
+            return {}
 
         # Config: {'feature_range': (0, 1), 'columns': [...]}
         feature_range = config.get("feature_range", (0, 1))
@@ -339,6 +346,9 @@ class RobustScalerCalculator(BaseCalculator):
         X, _, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
 
+        if user_picked_no_columns(config):
+            return {}
+
         # Config: {'quantile_range': (25.0, 75.0), 'with_centering': True, 'with_scaling': True, 'columns': [...]}
         quantile_range = config.get("quantile_range", (25.0, 75.0))
         with_centering = config.get("with_centering", True)
@@ -448,6 +458,9 @@ class MaxAbsScalerCalculator(BaseCalculator):
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
+
+        if user_picked_no_columns(config):
+            return {}
 
         if engine.name == "polars":
             X_pl: Any = X

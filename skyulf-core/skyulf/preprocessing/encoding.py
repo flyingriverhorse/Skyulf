@@ -10,7 +10,12 @@ from sklearn.preprocessing import (
     TargetEncoder,
 )
 
-from ..utils import pack_pipeline_output, resolve_columns, unpack_pipeline_input
+from ..utils import (
+    pack_pipeline_output,
+    resolve_columns,
+    unpack_pipeline_input,
+    user_picked_no_columns,
+)
 from .base import BaseApplier, BaseCalculator
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
@@ -208,6 +213,9 @@ class OneHotEncoderCalculator(BaseCalculator):
         X, y, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
 
+        if user_picked_no_columns(config):
+            return {}
+
         cols = resolve_columns(X, config, detect_categorical_columns)
         cols = _exclude_target_column(cols, config, "OneHotEncoder", y)
 
@@ -367,6 +375,9 @@ class OrdinalEncoderCalculator(BaseCalculator):
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
+
+        if user_picked_no_columns(config):
+            return {}
 
         cols = resolve_columns(X, config, detect_categorical_columns)
 
@@ -674,6 +685,9 @@ class TargetEncoderCalculator(BaseCalculator):
             logger.warning("TargetEncoder requires a target variable (y). Skipping.")
             return {}
 
+        if user_picked_no_columns(config):
+            return {}
+
         cols = resolve_columns(X, config, detect_categorical_columns)
         cols = _exclude_target_column(cols, config, "TargetEncoder", y)
         if not cols:
@@ -772,6 +786,9 @@ class HashEncoderCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, y, _ = unpack_pipeline_input(df)
+
+        if user_picked_no_columns(config):
+            return {}
 
         cols = resolve_columns(X, config, detect_categorical_columns)
         cols = _exclude_target_column(cols, config, "HashEncoder", y)
@@ -874,6 +891,9 @@ class DummyEncoderCalculator(BaseCalculator):
     ) -> Dict[str, Any]:
         X, y, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
+
+        if user_picked_no_columns(config):
+            return {}
 
         cols = resolve_columns(X, config, detect_categorical_columns)
         cols = _exclude_target_column(cols, config, "DummyEncoder", y)

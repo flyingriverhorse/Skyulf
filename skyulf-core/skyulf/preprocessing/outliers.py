@@ -9,6 +9,7 @@ from ..utils import (
     pack_pipeline_output,
     resolve_columns,
     unpack_pipeline_input,
+    user_picked_no_columns,
 )
 from .base import BaseApplier, BaseCalculator
 from ..core.meta.decorators import node_meta
@@ -113,6 +114,9 @@ class IQRCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+
+        if user_picked_no_columns(config):
+            return {}
 
         get_engine(X)
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
@@ -254,6 +258,10 @@ class ZScoreCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+
+        if user_picked_no_columns(config):
+            return {}
+
         get_engine(X)
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
 
@@ -359,6 +367,10 @@ class WinsorizeCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+
+        if user_picked_no_columns(config):
+            return {}
+
         get_engine(X)
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
 
@@ -604,6 +616,10 @@ class EllipticEnvelopeCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
+
+        if user_picked_no_columns(config):
+            return {}
+
         get_engine(X)
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
 
