@@ -13,6 +13,7 @@ import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { useClipboard } from '../../core/hooks/useClipboard';
 import { useBranchColors } from '../../core/hooks/useBranchColors';
+import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import { CustomNodeWrapper } from './CustomNodeWrapper';
 import { CustomEdge } from './CustomEdge';
 import { useConfirm } from '../shared';
@@ -50,6 +51,7 @@ const FlowCanvasContent: React.FC = () => {
   );
 
   const { isResultsPanelExpanded } = useViewStore();
+  const readOnly = useReadOnlyMode();
 
   const confirm = useConfirm();
 
@@ -197,6 +199,14 @@ const FlowCanvasContent: React.FC = () => {
         nodeTypes={nodeTypes}
         onDragOver={onDragOver}
         onDrop={onDrop}
+        // Read-only mode (auto on tablet/mobile, or user toggle): keep
+        // pan/zoom/selection so the user can still inspect a pipeline,
+        // but disable all mutations and the delete-key handler.
+        nodesDraggable={!readOnly}
+        nodesConnectable={!readOnly}
+        edgesReconnectable={!readOnly}
+        elementsSelectable
+        deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']}
         fitView
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{
@@ -217,7 +227,6 @@ const FlowCanvasContent: React.FC = () => {
           animated: true,
         }}
         edgeTypes={edgeTypes}
-        deleteKeyCode={['Backspace', 'Delete']}
         onBeforeDelete={onBeforeDelete}
       >
         <Background />

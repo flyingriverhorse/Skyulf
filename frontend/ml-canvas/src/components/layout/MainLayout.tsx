@@ -11,6 +11,7 @@ import { CommandPalette } from './CommandPalette';
 import { JobsDrawer } from '../panels/JobsDrawer';
 import { useViewStore } from '../../core/store/useViewStore';
 import { useCanvasAutoSave } from '../../core/hooks/useCanvasAutoSave';
+import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import {
   useKeyboardShortcuts,
   SHOW_SHORTCUTS_EVENT,
@@ -20,6 +21,11 @@ import { InferencePage } from '../pages/InferencePage';
 
 export const MainLayout: React.FC = () => {
   const { activeView, isPropertiesPanelExpanded } = useViewStore();
+  // Below the lg breakpoint (or when the user toggles it on), the
+  // editor sidebars are hidden and the canvas drops into pan/zoom +
+  // inspect-only mode. Sidebars are useless on tablet — drag-and-drop
+  // doesn't work well on touch and the panels eat the whole viewport.
+  const readOnly = useReadOnlyMode();
   // Throttled localStorage autosave of the canvas graph; restore prompt
   // is rendered below in the canvas branch.
   useCanvasAutoSave();
@@ -49,7 +55,7 @@ export const MainLayout: React.FC = () => {
       
       {activeView === 'canvas' ? (
         <div className="flex flex-1 overflow-hidden relative">
-          <Sidebar />
+          {!readOnly && <Sidebar />}
           <main className="flex-1 h-full relative flex flex-col transition-all duration-300 ease-in-out">
             {!isPropertiesPanelExpanded && <Toolbar />}
             <div className="flex-1 relative">
@@ -58,7 +64,7 @@ export const MainLayout: React.FC = () => {
               <ResultsPanel />
             </div>
           </main>
-          <PropertiesPanel />
+          {!readOnly && <PropertiesPanel />}
         </div>
       ) : activeView === 'experiments' ? (
         <ExperimentsPage />

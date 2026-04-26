@@ -2,6 +2,10 @@ import { create } from 'zustand';
 
 type ViewType = 'canvas' | 'experiments' | 'inference';
 
+// `auto` defers to viewport width (read-only below the lg breakpoint).
+// `on`/`off` are explicit user overrides from the Navbar toggle.
+export type ReadOnlyOverride = 'auto' | 'on' | 'off';
+
 interface ViewState {
   activeView: ViewType;
   setView: (view: ViewType) => void;
@@ -11,6 +15,8 @@ interface ViewState {
   setPropertiesPanelExpanded: (isExpanded: boolean) => void;
   isResultsPanelExpanded: boolean;
   setResultsPanelExpanded: (isExpanded: boolean) => void;
+  readOnlyOverride: ReadOnlyOverride;
+  setReadOnlyOverride: (mode: ReadOnlyOverride) => void;
 }
 
 export const useViewStore = create<ViewState>((set) => ({
@@ -22,4 +28,6 @@ export const useViewStore = create<ViewState>((set) => ({
   setPropertiesPanelExpanded: (isExpanded) => set({ isPropertiesPanelExpanded: isExpanded }),
   isResultsPanelExpanded: true,
   setResultsPanelExpanded: (isExpanded) => set({ isResultsPanelExpanded: isExpanded }),
+  readOnlyOverride: 'auto',
+  setReadOnlyOverride: (mode) => set({ readOnlyOverride: mode }),
 }));

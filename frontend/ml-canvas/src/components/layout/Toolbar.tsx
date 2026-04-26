@@ -4,6 +4,7 @@ import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Me
 import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
+import { getReadOnlyMode, useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import { runPipelinePreview, savePipeline, fetchPipeline } from '../../core/api/client';
 import { convertGraphToPipelineConfig } from '../../core/utils/pipelineConverter';
 import { autoLayoutGraph } from '../../core/utils/autoLayout';
@@ -27,6 +28,9 @@ export const Toolbar: React.FC = () => {
   
   const { toggleDrawer, setActiveParallelRun, startPolling } = useJobStore();
   const isSidebarOpen = useViewStore((s) => s.isSidebarOpen);
+  // Hide editor-only buttons (save/tidy/run/undo/redo/load/palette) on
+  // tablet or when the user has toggled read-only on.
+  const readOnly = useReadOnlyMode();
   const confirm = useConfirm();
 
   // Undo/redo state from the temporal substore (zundo). Keeping these
@@ -52,6 +56,9 @@ export const Toolbar: React.FC = () => {
       if (isEditable) return;
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
+      // Undo/redo are graph mutations: skip in read-only mode so the
+      // hotkey doesn't quietly mutate state behind a hidden button.
+      if (getReadOnlyMode()) return;
       const key = e.key.toLowerCase();
       if (key === 'z' && !e.shiftKey) {
         e.preventDefault();
@@ -339,32 +346,38 @@ export const Toolbar: React.FC = () => {
         >
           <Keyboard className="w-4 h-4" />
         </button>
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent(SHOW_PALETTE_EVENT))}
-          title="Command palette (Ctrl/Cmd+K)"
-          aria-label="Open command palette"
-          className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors focus-ring"
-        >
-          <Command className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => redo()}
-          disabled={!canRedo}
-          title="Redo (Ctrl+Shift+Z)"
-          aria-label="Redo"
-          className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
-        >
-          <Redo2 className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => undo()}
-          disabled={!canUndo}
-          title="Undo (Ctrl+Z)"
-          aria-label="Undo"
-          className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
-        >
-          <Undo2 className="w-4 h-4" />
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent(SHOW_PALETTE_EVENT))}
+            title="Command palette (Ctrl/Cmd+K)"
+            aria-label="Open command palette"
+            className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors focus-ring"
+          >
+            <Command className="w-4 h-4" />
+          </button>
+        )}
+        {!readOnly && (
+          <button
+            onClick={() => redo()}
+            disabled={!canRedo}
+            title="Redo (Ctrl+Shift+Z)"
+            aria-label="Redo"
+            className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
+          >
+            <Redo2 className="w-4 h-4" />
+          </button>
+        )}
+        {!readOnly && (
+          <button
+            onClick={() => undo()}
+            disabled={!canUndo}
+            title="Undo (Ctrl+Z)"
+            aria-label="Undo"
+            className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
+          >
+            <Undo2 className="w-4 h-4" />
+          </button>
+        )}
         {showLegend && (
           <div className="absolute top-12 left-0 mt-2 w-96 p-4 bg-background border rounded-md shadow-lg text-sm max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-3">
@@ -496,37 +509,43 @@ export const Toolbar: React.FC = () => {
           <History className="w-4 h-4" />
           <span className="text-sm font-medium hidden xl:inline">Jobs</span>
         </button>
-        <button
-          onClick={() => { void handleLoad(); }}
-          disabled={isLoading || isRunning}
-          title="Load pipeline"
-          className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
-        >
-          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />}
-          <span className="text-sm font-medium hidden xl:inline">{isLoading ? 'Loading...' : 'Load'}</span>
-        </button>
-        <button
-          onClick={() => { void handleSave(); }}
-          disabled={isSaving || isRunning}
-          title="Save pipeline"
-          className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
-        >
-          {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          <span className="text-sm font-medium hidden xl:inline">{isSaving ? 'Saving...' : 'Save'}</span>
-        </button>
-        <button
-          onClick={() => {
-            // Tidy up multi-branch canvases via dagre topological layout.
-            const { nodes: laidOut, edges: keptEdges } = autoLayoutGraph(nodes, edges);
-            setGraph(laidOut, keptEdges);
-          }}
-          disabled={isRunning || nodes.length === 0}
-          title="Auto-arrange nodes left-to-right by data flow"
-          className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
-        >
-          <Wand2 className="w-4 h-4" />
-          <span className="text-sm font-medium hidden xl:inline">Tidy</span>
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => { void handleLoad(); }}
+            disabled={isLoading || isRunning}
+            title="Load pipeline"
+            className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+          >
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />}
+            <span className="text-sm font-medium hidden xl:inline">{isLoading ? 'Loading...' : 'Load'}</span>
+          </button>
+        )}
+        {!readOnly && (
+          <button
+            onClick={() => { void handleSave(); }}
+            disabled={isSaving || isRunning}
+            title="Save pipeline"
+            className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+          >
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span className="text-sm font-medium hidden xl:inline">{isSaving ? 'Saving...' : 'Save'}</span>
+          </button>
+        )}
+        {!readOnly && (
+          <button
+            onClick={() => {
+              // Tidy up multi-branch canvases via dagre topological layout.
+              const { nodes: laidOut, edges: keptEdges } = autoLayoutGraph(nodes, edges);
+              setGraph(laidOut, keptEdges);
+            }}
+            disabled={isRunning || nodes.length === 0}
+            title="Auto-arrange nodes left-to-right by data flow"
+            className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+          >
+            <Wand2 className="w-4 h-4" />
+            <span className="text-sm font-medium hidden xl:inline">Tidy</span>
+          </button>
+        )}
         <div className="relative">
           <button
             onClick={() => setShowExportMenu(v => !v)}
@@ -562,7 +581,7 @@ export const Toolbar: React.FC = () => {
             </div>
           )}
         </div>
-        {hasMultipleBranches && (
+        {!readOnly && hasMultipleBranches && (
           <button
             onClick={() => { void handleRunAll(); }}
             disabled={isRunningAll || isRunning}
@@ -573,7 +592,7 @@ export const Toolbar: React.FC = () => {
             <span className="text-sm font-medium hidden md:inline">{isRunningAll ? 'Queuing...' : 'Run All Experiments'}</span>
           </button>
         )}
-        {canRunPreview && (
+        {!readOnly && canRunPreview && (
           <button
             onClick={() => { void handleRun(); }}
             disabled={isRunning}
