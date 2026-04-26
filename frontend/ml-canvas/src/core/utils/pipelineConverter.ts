@@ -3,6 +3,7 @@ import { PipelineConfigModel, NodeConfigModel } from '../api/client';
 import { v4 as uuidv4 } from 'uuid';
 import { StepType as BackendStepType } from '../constants/stepTypes';
 import { getMergeStrategy } from '../types/nodeData';
+import { registry } from '../registry/NodeRegistry';
 
 export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): PipelineConfigModel => {
     const sortedNodes: NodeConfigModel[] = [];
@@ -259,10 +260,18 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           // Kept under an underscore key to keep it separate from
           // step-specific params.
           const strat = getMergeStrategy(node.data);
-          if (strat && strat !== 'last_wins') {
-            return { ...params, _merge_strategy: strat };
-          }
-          return params;
+          // Resolve the canvas-displayed label so the backend can use it
+          // as the suffix for branch tabs (matches what the user sees on
+          // the canvas — e.g. "Encoding" rather than the raw step type
+          // "LabelEncoder").
+          const defType = node.data.definitionType as string | undefined;
+          const userLabel = (node.data.label as string | undefined) || (node.data.title as string | undefined);
+          const registryLabel = defType ? registry.get(defType)?.label : undefined;
+          const displayName = userLabel || registryLabel;
+          const merged: Record<string, unknown> = { ...params };
+          if (strat && strat !== 'last_wins') merged._merge_strategy = strat;
+          if (displayName) merged._display_name = displayName;
+          return merged;
         })(),
         inputs: inputs
       });
@@ -273,7 +282,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
 
     // Prune dead-end branches: reverse-walk from terminal/seed nodes,
     // keep only ancestors. When no explicit terminals exist, infer from
-    // graph depth — deepest leaf nodes become implicit seeds.
+    // graph leaves so parallel preview branches survive.
     const terminalTypes = new Set([
       BackendStepType.BASIC_TRAINING,
       BackendStepType.ADVANCED_TUNING,
@@ -281,31 +290,29 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
     ]);
     let seeds = sortedNodes.filter(n => terminalTypes.has(n.step_type));
 
-    // No explicit terminals → infer seeds from graph depth
-    if (seeds.length === 0 && sortedNodes.length > 1) {
-      // Compute depth of each node from dataset
-      const nodeDepth = new Map<string, number>();
-      for (const node of sortedNodes) {
-        const parentDepths = node.inputs
-          .map(id => nodeDepth.get(id))
-          .filter((d): d is number => d !== undefined);
-        nodeDepth.set(
-          node.node_id,
-          parentDepths.length > 0 ? Math.max(...parentDepths) + 1 : 0
-        );
-      }
-
-      // Leaf nodes = not consumed as input by any other node
+    // Always treat data leaves (no downstream consumer) as additional seeds.
+    // This keeps preview-only branches alive when the canvas mixes a training
+    // pipeline with one or more dangling preprocessing chains — without this,
+    // Run Preview would silently drop the dangling branches and only show the
+    // training-fed ones in the results tabs.
+    if (sortedNodes.length > 1) {
       const consumed = new Set<string>();
       for (const node of sortedNodes) {
         for (const id of node.inputs) consumed.add(id);
       }
       const leaves = sortedNodes.filter(n => !consumed.has(n.node_id));
-
-      // Among multiple leaves, keep only the deepest as seeds
-      if (leaves.length > 1) {
-        const maxDepth = Math.max(...leaves.map(n => nodeDepth.get(n.node_id) ?? 0));
-        seeds = leaves.filter(n => (nodeDepth.get(n.node_id) ?? 0) === maxDepth);
+      // De-dupe: a node already in `seeds` (e.g. a training terminal) won't
+      // be added twice because the reverse-BFS short-circuits on `reachable`.
+      if (seeds.length === 0 && leaves.length > 1) {
+        seeds = leaves;
+      } else if (seeds.length > 0) {
+        const seedIds = new Set(seeds.map(n => n.node_id));
+        for (const leaf of leaves) {
+          if (!seedIds.has(leaf.node_id)) {
+            seeds.push(leaf);
+            seedIds.add(leaf.node_id);
+          }
+        }
       }
     }
 

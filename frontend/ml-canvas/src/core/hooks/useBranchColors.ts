@@ -57,6 +57,25 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
       n => TERMINAL_TYPES.has(n.data.definitionType as string) && edges.some(e => e.target === n.id)
     );
 
+    // Also treat raw data leaves (nodes with no downstream consumers) as
+    // pseudo-terminals so dangling preprocessing chains get their own
+    // branch color + label on the canvas — matching the Run Preview tabs
+    // which now include preview-only branches alongside training branches.
+    const consumed = new Set<string>();
+    for (const e of edges) consumed.add(e.source);
+    const knownTerminalIds = new Set(terminals.map(t => t.id));
+    for (const n of nodes) {
+      if (knownTerminalIds.has(n.id)) continue;
+      if (consumed.has(n.id)) continue;
+      // Skip nodes with no incoming edges (orphaned dataset/source nodes
+      // would otherwise become "branches" of size zero).
+      if (!edges.some(e => e.target === n.id)) continue;
+      // Skip the data_preview node itself — it already lives in
+      // TERMINAL_TYPES via AUTO_PARALLEL_TYPES if relevant.
+      if (n.data.definitionType === 'data_preview') continue;
+      terminals.push(n);
+    }
+
     if (terminals.length === 0) return colorMap;
 
     // Build adjacency: target → source edges (for BFS backwards)
@@ -128,10 +147,15 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
       const { terminal, inputEdge, localIndex } = branches[i]!;
       const modelType = terminal.data.model_type as string | undefined;
       const modelName = modelType ? prettifyModelType(modelType) : '';
-      // Per-terminal letter so the label matches the per-terminal tab bar
-      // (Data Preview tabs always start at Path A regardless of how many
-      // other parallel terminals exist on the canvas).
-      const pathLetter = String.fromCharCode(65 + localIndex);
+      // Path letter strategy:
+      //   * Single terminal w/ multiple parallel inputs → per-terminal
+      //     localIndex (so its tabs read Path A / Path B / …).
+      //   * Multiple terminals (training + dangling preview branches, etc)
+      //     → use the global branch index so canvas labels line up with
+      //     the global tab order in Preview Results (Path A, B, C, …).
+      const isMultiTerminal = terminals.length > 1;
+      const letterIndex = isMultiTerminal ? i : localIndex;
+      const pathLetter = String.fromCharCode(65 + letterIndex);
       // For preview-only branches, suffix the upstream source node label
       // so users can tell which path each tab corresponds to.
       let suffix = modelName;
@@ -142,6 +166,21 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
           || (data.title as string)
           || (typeof data.definitionType === 'string'
               ? (data.definitionType as string).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+              : '');
+      }
+      // Merge-mode branches (no specific input edge) and non-training
+      // terminals: fall back to the terminal node's own friendly name so
+      // dangling preview branches get a meaningful label like
+      // "Path B · Standard Scaler" instead of just "Path B".
+      if (!suffix) {
+        const data = (terminal.data ?? {}) as Record<string, unknown>;
+        suffix = (data.label as string)
+          || (data.title as string)
+          || (typeof data.definitionType === 'string'
+              ? (data.definitionType as string)
+                  .replace(/([a-z])([A-Z])/g, '$1 $2')
+                  .replace(/_/g, ' ')
+                  .replace(/\b\w/g, c => c.toUpperCase())
               : '');
       }
       // Append a #N counter when multiple terminals share the same model

@@ -143,8 +143,11 @@ describe('convertGraphToPipelineConfig', () => {
     expect(preview?.params).toEqual({});
   });
 
-  it('prunes dead-end branches that don\'t feed a terminal', () => {
-    // Two parallel chains: one ends at a training terminal, the other dangles.
+  it('keeps dangling preprocessing leaves alongside training terminals', () => {
+    // Two parallel chains: one ends at a training terminal, the other is a
+    // dangling preprocessing leaf with no consumer. Both should survive so
+    // Run Preview can show a tab per branch (training data + dangling
+    // preprocessing output side-by-side).
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
       node('imp', 'imputation_node', { method: 'simple', strategy: 'mean' }),
@@ -167,8 +170,75 @@ describe('convertGraphToPipelineConfig', () => {
     expect(ids).toContain('train');
     expect(ids).toContain('imp');
     expect(ids).toContain('ds');
-    // Pruning kicks in via the terminalTypes seed walk and removes the
-    // disconnected branch.
-    expect(ids).not.toContain('dangling');
+    // Dangling leaves are now intentionally kept so the backend can render
+    // a preview tab for them. (Previously they were pruned, which silently
+    // hid them from Run Preview when a training node was also present.)
+    expect(ids).toContain('dangling');
+  });
+
+  it('keeps every parallel preview branch even when their chain lengths differ', () => {
+    // Regression: previously the depth heuristic only kept the deepest leaves,
+    // so a Run Preview without a training/preview terminal silently dropped
+    // shorter branches and the UI showed only one path's data.
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      // Branch A: ds → impA (depth 1, leaf)
+      node('impA', 'imputation_node', { method: 'simple', strategy: 'mean' }),
+      // Branch B: ds → impB → scaleB (depth 2, leaf)
+      node('impB', 'imputation_node', { method: 'simple', strategy: 'median' }),
+      node('scaleB', 'StandardScaler', { columns: ['x'] }),
+    ];
+    const edges = [
+      edge('ds', 'impA'),
+      edge('ds', 'impB'),
+      edge('impB', 'scaleB'),
+    ];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const ids = cfg.nodes.map((n) => n.node_id);
+    // Both leaves (impA and scaleB) and their ancestors must survive so the
+    // backend can split the preview into one tab per branch.
+    expect(ids).toContain('impA');
+    expect(ids).toContain('impB');
+    expect(ids).toContain('scaleB');
+    expect(ids).toContain('ds');
+  });
+
+  it('keeps dangling preview branches when a training terminal also exists', () => {
+    // Regression: when the canvas mixes a training pipeline with a separate
+    // preprocessing-only branch, the seed-from-terminals walk previously
+    // pruned the dangling branch out of the request — Run Preview only
+    // showed the training-fed data and the other branch silently vanished.
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      // Training branch: ds → impA → train
+      node('impA', 'imputation_node', { method: 'simple', strategy: 'mean' }),
+      node('train', 'basic_training', {
+        target_column: 'y',
+        model_type: 'rf',
+        hyperparameters: {},
+        cv_enabled: false,
+        cv_folds: 5,
+        cv_type: 'kfold',
+        cv_shuffle: true,
+        cv_random_state: 0,
+      }),
+      // Dangling preprocessing branch: ds → scaleB (no training downstream)
+      node('scaleB', 'StandardScaler', { columns: ['x'] }),
+    ];
+    const edges = [
+      edge('ds', 'impA'),
+      edge('impA', 'train'),
+      edge('ds', 'scaleB'),
+    ];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const ids = cfg.nodes.map((n) => n.node_id);
+    // Both the training leaf and the dangling preprocessing leaf must
+    // survive so the backend can produce a tab for each.
+    expect(ids).toContain('train');
+    expect(ids).toContain('impA');
+    expect(ids).toContain('scaleB');
+    expect(ids).toContain('ds');
   });
 });
