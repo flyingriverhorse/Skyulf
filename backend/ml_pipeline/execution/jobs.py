@@ -78,9 +78,7 @@ class JobManager:
         return await AdvancedTuningManager.cancel_tuning_job(session, job_id)
 
     @staticmethod
-    async def attach_celery_task_id(
-        session: AsyncSession, job_id: str, task_id: str
-    ) -> None:
+    async def attach_celery_task_id(session: AsyncSession, job_id: str, task_id: str) -> None:
         """Stash the Celery task id on the job's metadata so cancel_job can revoke it.
 
         Stored under `job_metadata.celery_task_id` to avoid a schema migration.
