@@ -68,6 +68,7 @@ export const ExperimentsPage: React.FC = () => {
   const [isMetricsExpanded, setIsMetricsExpanded] = useState(true);
   const [isParamsExpanded, setIsParamsExpanded] = useState(true);
   const [isTuningExpanded, setIsTuningExpanded] = useState(true);
+  const [isPipelineExpanded, setIsPipelineExpanded] = useState(true);
 
   // View state
   const [activeView, setActiveView] = useState<'charts' | 'table' | 'evaluation' | 'importance'>('charts');
@@ -793,6 +794,100 @@ export const ExperimentsPage: React.FC = () => {
                           </td>
                         ))}
                       </tr>
+                      {/* Pipeline Steps — preprocessing/splits/etc that fed each terminal */}
+                      <tr
+                        className="bg-gray-50/50 dark:bg-gray-900/20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
+                        onClick={() => { setIsPipelineExpanded(!isPipelineExpanded); }}
+                      >
+                        <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2" colSpan={selectedJobs.length + 1}>
+                          {isPipelineExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                          Pipeline Steps
+                        </td>
+                      </tr>
+                      {isPipelineExpanded && (() => {
+                        // Walk each job's graph backwards from the training
+                        // terminal to collect preprocessing / split / encoding
+                        // ancestors. Each row in the table is one position in
+                        // the chain (Step 1, Step 2, …) so users can compare
+                        // what came before each model side-by-side.
+                        type GraphNode = { node_id: string; step_type?: string; params?: Record<string, unknown>; inputs?: string[] };
+                        const friendlyStep = (st: string): string => {
+                          if (!st) return '';
+                          if (st.includes('_')) {
+                            return st.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                          }
+                          return st.replace(/(?<!^)(?=[A-Z])/g, ' ').trim();
+                        };
+                        const collectChain = (job: typeof selectedJobs[number]): GraphNode[] => {
+                          const graphNodes = (job.graph?.nodes as GraphNode[] | undefined) || [];
+                          if (graphNodes.length === 0 || !job.node_id) return [];
+                          const map = new Map(graphNodes.map(n => [n.node_id, n]));
+                          // BFS backwards from the terminal, then return in
+                          // root → terminal order (excluding the terminal).
+                          const seen = new Set<string>();
+                          const order: GraphNode[] = [];
+                          const walk = (id: string): void => {
+                            if (seen.has(id)) return;
+                            seen.add(id);
+                            const n = map.get(id);
+                            if (!n) return;
+                            for (const parent of n.inputs || []) walk(parent);
+                            order.push(n);
+                          };
+                          walk(job.node_id);
+                          return order.filter(n => n.node_id !== job.node_id);
+                        };
+                        const summarizeStep = (n: GraphNode): string => {
+                          const display = (n.params?._display_name as string | undefined) || friendlyStep(String(n.step_type || ''));
+                          const interestingKeys = ['method', 'strategy', 'columns', 'target_column', 'test_size', 'val_size', 'random_state', 'n_neighbors'];
+                          const detail: string[] = [];
+                          for (const k of interestingKeys) {
+                            const v = n.params?.[k];
+                            if (v === undefined || v === null || v === '') continue;
+                            if (Array.isArray(v) && v.length === 0) continue;
+                            let rendered: string;
+                            if (Array.isArray(v)) {
+                              // Show real column names; truncate long lists so
+                              // the cell stays readable.
+                              const items = v.map(x => String(x));
+                              rendered = items.length > 4
+                                ? `[${items.slice(0, 4).join(', ')}, +${items.length - 4} more]`
+                                : `[${items.join(', ')}]`;
+                            } else if (typeof v === 'object') {
+                              rendered = JSON.stringify(v);
+                            } else {
+                              rendered = String(v);
+                            }
+                            detail.push(`${k}=${rendered}`);
+                          }
+                          return detail.length > 0 ? `${display} (${detail.join(', ')})` : display;
+                        };
+                        const chainsByJob = new Map(selectedJobs.map(j => [j.job_id, collectChain(j)]));
+                        const maxChainLength = Math.max(0, ...Array.from(chainsByJob.values()).map(c => c.length));
+                        if (maxChainLength === 0) {
+                          return (
+                            <tr className="bg-white dark:bg-gray-800">
+                              <td className="px-4 py-1.5 text-gray-400 italic pl-8" colSpan={selectedJobs.length + 1}>
+                                No upstream pipeline steps captured for these runs.
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return Array.from({ length: maxChainLength }).map((_, idx) => (
+                          <tr key={`pipeline-step-${idx}`} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                            <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">Step {idx + 1}</td>
+                            {selectedJobs.map(job => {
+                              const chain = chainsByJob.get(job.job_id) || [];
+                              const step = chain[idx];
+                              return (
+                                <td key={job.job_id} className="px-4 py-1.5 text-gray-600 dark:text-gray-300">
+                                  {step ? summarizeStep(step) : <span className="text-gray-400">—</span>}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ));
+                      })()}
                       {/* Metrics Section in Table */}
                       <tr 
                         className="bg-gray-50/50 dark:bg-gray-900/20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
