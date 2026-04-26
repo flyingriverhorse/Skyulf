@@ -459,29 +459,48 @@ def _prettify_model_type(model_type: str) -> str:
     return " ".join(w.capitalize() for w in cleaned.split("_"))
 
 
-def _branch_label(index: int, sub_config: PipelineConfig) -> str:
+def _branch_label(index: int, sub_config: PipelineConfig, dup_suffix: str = "") -> str:
     """Build a 'Path A · <suffix>' label for a branch sub-pipeline.
 
-    Suffix is the model name for training/tuning branches. For preview-only
-    branches (no model fitted) the suffix is the upstream source node id,
-    so users can tell which incoming path a preview tab corresponds to.
+    Suffix priority (most specific first):
+      1. Model name when a training/tuning node is present.
+      2. The leaf node's ``_display_name`` (canvas label, sent by the
+         frontend converter) so preview tabs read "Encoding" / "Scaling"
+         rather than the raw step type "LabelEncoder" / "RobustScaler".
+      3. Friendly version of the leaf node's step_type as last resort.
+
+    ``dup_suffix`` is appended to disambiguate sibling branches that share
+    the same model_type (e.g. two XGBoost training nodes get ``#1`` / ``#2``)
+    so the tab labels match the canvas edge labels exactly.
     """
     letter = chr(ord("A") + index)
     model_type = ""
-    preview_source = ""
+    leaf_step = ""
+    leaf_display = ""
     for n in sub_config.nodes:
         if n.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
             model_type = n.params.get("model_type") or n.params.get("algorithm") or ""
-        elif n.step_type == "data_preview" and n.inputs:
-            # Per-input partition: data_preview terminal has exactly one input.
-            preview_source = n.inputs[0]
+    if sub_config.nodes:
+        leaf = sub_config.nodes[-1]
+        if leaf.step_type not in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
+            leaf_step = str(leaf.step_type)
+            leaf_display = str(leaf.params.get("_display_name") or "")
     pretty = _prettify_model_type(str(model_type))
+    suffix_tail = f" {dup_suffix}" if dup_suffix else ""
     if pretty:
-        return f"Path {letter} · {pretty}"
-    if preview_source:
-        # Strip uuid suffix for readability: "scaler-abcd1234..." -> "scaler"
-        short = preview_source.split("-")[0] if "-" in preview_source else preview_source
-        return f"Path {letter} · {short}"
+        return f"Path {letter} · {pretty}{suffix_tail}"
+    if leaf_display:
+        return f"Path {letter} · {leaf_display}{suffix_tail}"
+    if leaf_step:
+        # Convert PascalCase / snake_case step types to a readable suffix:
+        # "StandardScaler" → "Standard Scaler", "data_loader" → "Data Loader".
+        if "_" in leaf_step:
+            friendly = " ".join(w.capitalize() for w in leaf_step.split("_"))
+        else:
+            import re
+
+            friendly = re.sub(r"(?<!^)(?=[A-Z])", " ", leaf_step).strip()
+        return f"Path {letter} · {friendly}{suffix_tail}"
     return f"Path {letter}"
 
 
@@ -680,6 +699,26 @@ async def preview_pipeline(  # noqa: C901
                 )
 
             paired_subs = [(orig, _strip(orig)) for orig in training_subs]
+
+            # Also include preview-only branches (data leaves that don't feed
+            # any training terminal). Without this, a canvas mixing a training
+            # pipeline with one or more dangling preprocessing chains would
+            # silently drop the dangling chains from Run Preview — users only
+            # saw the training branch's data and assumed the others vanished.
+            covered_node_ids: set[str] = set()
+            for orig, _runnable in paired_subs:
+                for n in orig.nodes:
+                    covered_node_ids.add(n.node_id)
+            preview_only_subs = partition_for_preview(pipeline_config)
+            for sub in preview_only_subs:
+                if not sub.nodes:
+                    continue
+                leaf = sub.nodes[-1]
+                # Skip sub-pipelines whose leaf is already produced by a
+                # training branch (avoids duplicate tabs for the same data).
+                if leaf.node_id in covered_node_ids:
+                    continue
+                paired_subs.append((sub, sub))
         else:
             preview_subs = partition_for_preview(pipeline_config)
             # No training → no separate label source; reuse the runnable sub.
@@ -826,6 +865,42 @@ async def preview_pipeline(  # noqa: C901
             branch_previews = {}
             branch_node_ids = {}
 
+        # Pre-compute "#N" disambiguators for training terminals that share
+        # the same model_type (mirrors the canvas edge label scheme in
+        # useBranchColors). The suffix is keyed on the *terminal node_id*,
+        # not the branch index — so two branches feeding the same XGBoost
+        # terminal both render as "#1", and a second XGBoost terminal (with
+        # any number of branches) becomes "#2". Without this, parallel
+        # branches of the same terminal incorrectly got "#1" / "#2" / "#3"
+        # despite originating from the same training node on the canvas.
+        # Preview-only branches (no model_type) skip this and stay unsuffixed.
+        terminals_by_model: Dict[str, List[str]] = {}
+        terminal_id_per_branch: Dict[int, str] = {}
+        for i, (orig_sub, _runnable, _res) in enumerate(sub_results):
+            mt = ""
+            term_id = ""
+            for n in orig_sub.nodes:
+                if n.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
+                    mt = str(n.params.get("model_type") or n.params.get("algorithm") or "")
+                    term_id = n.node_id
+                    break
+            if mt and term_id:
+                terminal_id_per_branch[i] = term_id
+                ids = terminals_by_model.setdefault(mt, [])
+                if term_id not in ids:
+                    ids.append(term_id)
+        terminal_suffix: Dict[str, str] = {}
+        for _mt, ids in terminals_by_model.items():
+            if len(ids) < 2:
+                continue
+            for n_, term_id in enumerate(ids, start=1):
+                terminal_suffix[term_id] = f"#{n_}"
+        dup_suffix_by_branch: Dict[int, str] = {
+            branch_idx: terminal_suffix[term_id]
+            for branch_idx, term_id in terminal_id_per_branch.items()
+            if term_id in terminal_suffix
+        }
+
         for idx, (orig_sub, runnable_sub, sub_result) in enumerate(sub_results):
             for k, v in sub_result.node_results.items():
                 combined_node_results[k] = v.__dict__
@@ -840,7 +915,7 @@ async def preview_pipeline(  # noqa: C901
                 if is_multi and branch_previews is not None and branch_node_ids is not None:
                     # Label uses the ORIGINAL sub (training node included) so
                     # the model name shows up in the tab.
-                    label = _branch_label(idx, orig_sub)
+                    label = _branch_label(idx, orig_sub, dup_suffix_by_branch.get(idx, ""))
                     branch_previews[label] = pdata
                     branch_node_ids[label] = [n.node_id for n in runnable_sub.nodes]
 
