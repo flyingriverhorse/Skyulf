@@ -211,7 +211,12 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
           2. Backend post-run summary (`nodeResult.metadata.summary`).
           3. Frontend pre-run preview (`definition.bodyPreview(data)`).
           4. Static italic description.
-          5. Nothing — collapse padding so card visually shrinks. */}
+          5. Nothing — collapse padding so card visually shrinks.
+          Side padding is bumped on text bodies (px-10) so the body
+          text never collides with the absolutely-positioned port
+          labels ("Data" / "X" / "y" / "Train" / "Test") that float at
+          left-4 / right-4. min-h gives the floating port labels
+          vertical separation from the centered body line. */}
       {(() => {
         if (definition.component) {
           return (
@@ -223,9 +228,9 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         const summary = nodeResult?.metadata?.summary?.trim();
         if (summary) {
           return (
-            <div className="px-3 pt-1 pb-2">
+            <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">
               <div
-                className="text-[11px] text-foreground/80 font-mono tabular-nums truncate"
+                className="text-[11px] text-foreground/80 font-mono tabular-nums truncate text-center w-full"
                 title={summary}
               >
                 {summary}
@@ -244,9 +249,9 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         }
         if (preview && preview.trim()) {
           return (
-            <div className="px-3 pt-1 pb-2">
+            <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">
               <div
-                className="text-[11px] text-muted-foreground truncate"
+                className="text-[11px] text-muted-foreground truncate text-center w-full"
                 title={preview}
               >
                 {preview}
@@ -256,9 +261,9 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         }
         if (definition.description) {
           return (
-            <div className="px-3 pt-1 pb-2">
+            <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">
               <div
-                className="text-[11px] text-muted-foreground italic line-clamp-2"
+                className="text-[11px] text-muted-foreground italic line-clamp-2 text-center w-full"
                 title={definition.description}
               >
                 {definition.description}
@@ -266,7 +271,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
             </div>
           );
         }
-        return <div className="pb-1" />;
+        return <div className="min-h-[1.5rem]" />;
       })()}
 
       {/* Input Handles */}
