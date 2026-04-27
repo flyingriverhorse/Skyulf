@@ -45,7 +45,7 @@
     "html-to-image": "^1.11.13",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.363.0",
-    "plotly.js-dist-min": "^3.3.1",
+    "plotly.js-gl3d-dist-min": "^3.5.0",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^18.2.0",

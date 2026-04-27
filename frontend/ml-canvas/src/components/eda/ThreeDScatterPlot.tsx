@@ -1,5 +1,5 @@
 import React from 'react';
-import Plot from 'react-plotly.js';
+import { Plot } from '../../core/plotly';
 
 /** A single point for the 3-D scatter; values are looked up by `xKey/yKey/zKey/labelKey`. */
 export type ScatterPoint = Record<string, string | number | null | undefined>;
