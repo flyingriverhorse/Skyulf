@@ -15,6 +15,7 @@ aiofiles>=24.1.0
 python-multipart>=0.0.6,<1.0.0
 httpx>=0.25.0,<1.0.0
 celery>=5.4.0
+redis>=5.0.0,<6.0.0
 
 # ML stack used by tests
 pandas>=2.0.0,<3.0.0
