@@ -22,6 +22,8 @@ import { COLORS } from '../constants';
 import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
 
 interface TimeSeriesTabProps {
+    // Profile shape varies across EDA payloads; consumers read many
+    // dynamic keys, so we keep this loose intentionally.
     profile: any;
     downloadChart: (id: string, filename: string, title: string, subtitle?: string, extraInfo?: string) => void;
 }
