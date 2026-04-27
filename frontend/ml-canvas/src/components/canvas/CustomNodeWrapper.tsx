@@ -115,7 +115,10 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   // This is a simplified version. In a real app, we might want more control over handle placement.
   
   return (
-    <div className={`
+    <div
+      data-testid={`canvas-node-${definitionType}`}
+      data-node-definition-type={definitionType}
+      className={`
       relative group min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all duration-150
       ${selected
         ? 'border-primary shadow-lg shadow-primary/30 scale-[1.02]'

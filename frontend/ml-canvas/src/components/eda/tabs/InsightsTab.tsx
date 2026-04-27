@@ -1,11 +1,24 @@
 import React from 'react';
 import { Lightbulb } from 'lucide-react';
 
+interface Recommendation {
+    action: string;
+    column?: string;
+    reason?: string;
+    suggestion?: string;
+    [k: string]: unknown;
+}
 interface InsightsTabProps {
-    profile: any;
+    // Profile shape varies across EDA payload versions; we only read
+    // `recommendations` here so a permissive prop type avoids forcing
+    // every caller into a tight cast.
+    profile: { recommendations?: unknown } & Record<string, unknown>;
 }
 
 export const InsightsTab: React.FC<InsightsTabProps> = ({ profile }) => {
+    const recommendations: Recommendation[] = Array.isArray(profile.recommendations)
+        ? (profile.recommendations as Recommendation[])
+        : [];
     return (
         <div className="mt-4 space-y-6">
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
@@ -13,9 +26,9 @@ export const InsightsTab: React.FC<InsightsTabProps> = ({ profile }) => {
                     <Lightbulb className="w-5 h-5 mr-2 text-yellow-500" />
                     Smart Recommendations
                 </h3>
-                {profile.recommendations && profile.recommendations.length > 0 ? (
+                {recommendations.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {profile.recommendations.map((rec: any, idx: number) => (
+                        {recommendations.map((rec, idx: number) => (
                             <div key={idx} className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800">
                                 <div className="flex justify-between items-start mb-2">
                                     <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800 px-2 py-1 rounded border border-blue-100 dark:border-blue-800">
