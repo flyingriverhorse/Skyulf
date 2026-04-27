@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown } from 'lucide-react';
+import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown, Clock, Trash2, Pin, PinOff, Pencil } from 'lucide-react';
 import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
@@ -15,6 +15,15 @@ import {
   SHOW_PALETTE_EVENT,
 } from '../../core/hooks/useKeyboardShortcuts';
 import { exportCanvasToPng, exportCanvasToSvg } from '../../core/utils/canvasExport';
+import {
+  getRecentPipelines,
+  pushRecentPipeline,
+  clearRecentPipelines,
+  togglePinRecentPipeline,
+  renameRecentPipeline,
+  deleteRecentPipeline,
+  type RecentPipelineEntry,
+} from '../../core/utils/recentPipelines';
 import { toast } from '../../core/toast';
 import { useConfirm } from '../shared';
 
@@ -79,6 +88,13 @@ export const Toolbar: React.FC = () => {
   const [showLegend, setShowLegend] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  // Recent pipelines ring buffer (M2). Hydrated lazily on first open
+  // so the toolbar mount cost stays zero, then refreshed on every save.
+  const [showRecentMenu, setShowRecentMenu] = useState(false);
+  const [recentPipelines, setRecentPipelines] = useState<RecentPipelineEntry[]>([]);
+  // Inline rename state — `null` when no row is being edited.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
 
   const handleExport = async (kind: 'png' | 'svg'): Promise<void> => {
     setShowExportMenu(false);
@@ -161,6 +177,7 @@ export const Toolbar: React.FC = () => {
   const handleSave = async () => {
     const datasetNode = nodes.find(n => n.data.definitionType === 'dataset_node');
     const datasetId = datasetNode?.data.datasetId as string;
+    const datasetName = datasetNode?.data.datasetName as string | undefined;
 
     if (!datasetId) {
       toast.error('No dataset node found', 'Cannot save pipeline without a dataset context.');
@@ -174,9 +191,19 @@ export const Toolbar: React.FC = () => {
         description: 'Saved from Canvas',
         graph: getPipelinePayload()
       });
+      // Mirror into the local recent-pipelines ring buffer so the user
+      // can roll back to this exact graph from the Toolbar even if the
+      // server copy gets overwritten by a later save. Best-effort —
+      // never fail the Save toast on a localStorage error.
+      pushRecentPipeline({
+        name: 'My Pipeline',
+        datasetId,
+        ...(datasetName ? { datasetName } : {}),
+        nodes,
+        edges,
+      });
       toast.success('Pipeline saved');
-    } catch (error) {
-      console.error('Save failed:', error);
+    } catch {
       toast.error('Failed to save pipeline');
     } finally {
       setIsSaving(false);
@@ -199,7 +226,6 @@ export const Toolbar: React.FC = () => {
       variant: 'danger',
     });
     if (!ok) return;
-
     setIsLoading(true);
     try {
       const pipeline = await fetchPipeline(datasetId);
@@ -211,8 +237,7 @@ export const Toolbar: React.FC = () => {
       } else {
         toast.info('No saved pipeline found for this dataset');
       }
-    } catch (error) {
-      console.error('Load failed:', error);
+    } catch {
       toast.error('Failed to load pipeline');
     } finally {
       setIsLoading(false);
@@ -254,9 +279,8 @@ export const Toolbar: React.FC = () => {
       }
       toast.success(`${count} experiment${count > 1 ? 's' : ''} queued`);
       toggleDrawer();
-    } catch (error) {
-      console.error('Run All failed:', error);
-      toast.error('Failed to run experiments', 'Check console for details.');
+    } catch {
+      toast.error('Failed to run experiments');
     } finally {
       setIsRunningAll(false);
     }
@@ -315,6 +339,116 @@ export const Toolbar: React.FC = () => {
     return () => window.removeEventListener(RUN_PREVIEW_EVENT, fire);
   }, []);
 
+  // Recent-pipelines dropdown: hydrate lazily on open so the toolbar
+  // doesn't touch localStorage on every mount. We re-read on each open
+  // so a save in another tab is reflected next time the menu pops.
+  const openRecentMenu = (): void => {
+    setRecentPipelines(getRecentPipelines());
+    setShowRecentMenu(v => !v);
+  };
+
+  const handleRestoreRecent = async (entry: RecentPipelineEntry): Promise<void> => {
+    setShowRecentMenu(false);
+    // Warn when the snapshot was saved against a different dataset than
+    // the one currently loaded. Restoring is still allowed (some nodes
+    // are dataset-agnostic) but the user should be aware schema-bound
+    // nodes (column pickers, target column, …) may break.
+    const currentDatasetNode = nodes.find(n => n.data.definitionType === 'dataset_node');
+    const currentDatasetId = currentDatasetNode?.data.datasetId as string | undefined;
+    const mismatch =
+      entry.datasetId !== undefined &&
+      currentDatasetId !== undefined &&
+      entry.datasetId !== currentDatasetId;
+    const message = mismatch
+      ? `This snapshot was saved against "${entry.datasetName ?? entry.datasetId}", but the canvas is currently on a different dataset. Column-bound nodes may need to be reconfigured. Continue?`
+      : 'Loading this snapshot will overwrite your current canvas. Continue?';
+    const ok = await confirm({
+      title: `Restore "${entry.name}"?`,
+      message,
+      confirmLabel: 'Restore',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    setGraph(entry.nodes, entry.edges);
+    toast.success(`Restored "${entry.name}"`);
+  };
+
+  const handleClearRecent = async (): Promise<void> => {
+    const ok = await confirm({
+      title: 'Clear pipeline history?',
+      message: 'This removes all 5 recent snapshots from this browser. The server-side saved pipeline is unaffected.',
+      confirmLabel: 'Clear',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    clearRecentPipelines();
+    setRecentPipelines([]);
+    setShowRecentMenu(false);
+    toast.success('Pipeline history cleared');
+  };
+
+  // Pin / unpin keeps a snapshot from being evicted by FIFO so the user
+  // can lock in a known-good state alongside the rolling recent slots.
+  const handleTogglePin = (entry: RecentPipelineEntry): void => {
+    const updated = togglePinRecentPipeline(entry.id);
+    setRecentPipelines(updated);
+    toast.success(entry.pinned ? 'Unpinned' : 'Pinned');
+  };
+
+  const startRename = (entry: RecentPipelineEntry): void => {
+    setRenamingId(entry.id);
+    setRenameDraft(entry.name);
+  };
+
+  const commitRename = (): void => {
+    if (renamingId === null) return;
+    const updated = renameRecentPipeline(renamingId, renameDraft);
+    // renameRecentPipeline silently rejects empty / clashing names; if
+    // the list didn't change we surface a small toast so the user knows
+    // why the row didn't update.
+    const changed = updated.find((e) => e.id === renamingId)?.name === renameDraft.trim();
+    if (!changed && renameDraft.trim()) {
+      toast.error('Rename failed', 'Name is empty or already used by another snapshot.');
+    }
+    setRecentPipelines(updated);
+    setRenamingId(null);
+    setRenameDraft('');
+  };
+
+  const cancelRename = (): void => {
+    setRenamingId(null);
+    setRenameDraft('');
+  };
+
+  const handleDeleteRecent = async (entry: RecentPipelineEntry): Promise<void> => {
+    const ok = await confirm({
+      title: `Delete "${entry.name}"?`,
+      message: 'This snapshot will be removed from your local history. The server-side saved pipeline is unaffected.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    const updated = deleteRecentPipeline(entry.id);
+    setRecentPipelines(updated);
+    toast.success('Snapshot deleted');
+  };
+
+  // Compact human-readable "X minutes ago" — avoids pulling in a
+  // formatting library for one tiny use site.
+  const formatRelativeTime = (iso: string): string => {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    if (Number.isNaN(diffMs) || diffMs < 0) return 'just now';
+    const sec = Math.floor(diffMs / 1000);
+    if (sec < 45) return 'just now';
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ago`;
+    const day = Math.floor(hr / 24);
+    if (day < 30) return `${day}d ago`;
+    return new Date(iso).toLocaleDateString();
+  };
+
   return (
     <>
       {/* Left-side cluster: legend, keyboard help, redo, undo (in
@@ -334,6 +468,8 @@ export const Toolbar: React.FC = () => {
         <button
           onClick={() => setShowLegend(v => !v)}
           title="Show node badge legend"
+          aria-label="Show node badge legend"
+          aria-expanded={showLegend}
           className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
         >
           <HelpCircle className="w-4 h-4" />
@@ -362,6 +498,7 @@ export const Toolbar: React.FC = () => {
             disabled={!canRedo}
             title="Redo (Ctrl+Shift+Z)"
             aria-label="Redo"
+            data-testid="toolbar-redo"
             className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
           >
             <Redo2 className="w-4 h-4" />
@@ -373,6 +510,7 @@ export const Toolbar: React.FC = () => {
             disabled={!canUndo}
             title="Undo (Ctrl+Z)"
             aria-label="Undo"
+            data-testid="toolbar-undo"
             className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
           >
             <Undo2 className="w-4 h-4" />
@@ -503,17 +641,146 @@ export const Toolbar: React.FC = () => {
       <div className="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2 max-w-[calc(100%-13rem)]">
         <button
           onClick={() => toggleDrawer()}
-          title="Jobs history"
+          title="Job runs history"
+          aria-label="Job runs history"
+          data-testid="toolbar-jobs"
           className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
         >
           <History className="w-4 h-4" />
           <span className="text-sm font-medium hidden xl:inline">Jobs</span>
         </button>
         {!readOnly && (
+          <div className="relative">
+            <button
+              onClick={openRecentMenu}
+              title="Recently saved pipelines (last 5)"
+              aria-label="Recently saved pipelines"
+              aria-haspopup="menu"
+              aria-expanded={showRecentMenu}
+              data-testid="toolbar-recent"
+              className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+            >
+              <Clock className="w-4 h-4" />
+              <span className="text-sm font-medium hidden xl:inline">Recent</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            {showRecentMenu && (
+              <div
+                role="menu"
+                aria-label="Recent pipelines"
+                className="absolute top-full right-0 mt-1 w-72 bg-background border rounded-md shadow-lg overflow-hidden z-20"
+              >
+                {recentPipelines.length === 0 ? (
+                  <div className="px-3 py-3 text-sm text-muted-foreground">
+                    No recent pipelines yet. Save one to populate this list.
+                  </div>
+                ) : (
+                  <>
+                    {recentPipelines.map((entry) => {
+                      const isRenaming = renamingId === entry.id;
+                      return (
+                        <div
+                          key={entry.id}
+                          role="menuitem"
+                          className="group w-full px-3 py-2 text-sm hover:bg-accent border-b last:border-b-0"
+                        >
+                          {isRenaming ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                // Focus is moved to the input as a direct response
+                                // to the user clicking the pencil — the inline-rename
+                                // affordance is unusable without it.
+                                // eslint-disable-next-line jsx-a11y/no-autofocus
+                                autoFocus
+                                value={renameDraft}
+                                onChange={(e) => setRenameDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') commitRename();
+                                  else if (e.key === 'Escape') cancelRename();
+                                }}
+                                onBlur={commitRename}
+                                aria-label="Rename pipeline"
+                                className="flex-1 px-2 py-1 text-sm bg-background border rounded outline-none focus:ring-1 focus:ring-primary"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex items-start gap-1.5">
+                              <button
+                                onClick={() => { void handleRestoreRecent(entry); }}
+                                className="flex-1 text-left min-w-0"
+                                title="Restore this snapshot"
+                              >
+                                <div className="font-medium truncate flex items-center gap-1.5">
+                                  {entry.pinned && <Pin className="w-3 h-3 text-amber-500 flex-shrink-0" aria-label="Pinned" />}
+                                  <span className="truncate">{entry.name}</span>
+                                </div>
+                                {entry.datasetName && (
+                                  <div className="text-xs text-muted-foreground truncate mt-0.5" title={entry.datasetName}>
+                                    on <span className="font-medium text-foreground/80">{entry.datasetName}</span>
+                                  </div>
+                                )}
+                                <div className="text-xs text-muted-foreground flex items-center justify-between mt-0.5">
+                                  <span>{formatRelativeTime(entry.savedAt)}</span>
+                                  <span className="tabular-nums">
+                                    {entry.nodes.length} nodes · {entry.edges.length} edges
+                                  </span>
+                                </div>
+                              </button>
+                              {/* Per-row actions — visible on hover/focus to keep
+                                  the resting row uncluttered. */}
+                              <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => handleTogglePin(entry)}
+                                  title={entry.pinned ? 'Unpin' : 'Pin (exempt from FIFO)'}
+                                  aria-label={entry.pinned ? 'Unpin pipeline' : 'Pin pipeline'}
+                                  className="p-1 rounded hover:bg-background text-muted-foreground hover:text-foreground"
+                                >
+                                  {entry.pinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
+                                </button>
+                                <button
+                                  onClick={() => startRename(entry)}
+                                  title="Rename"
+                                  aria-label="Rename pipeline"
+                                  className="p-1 rounded hover:bg-background text-muted-foreground hover:text-foreground"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => { void handleDeleteRecent(entry); }}
+                                  title="Delete"
+                                  aria-label="Delete pipeline"
+                                  className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <button
+                      role="menuitem"
+                      onClick={() => { void handleClearRecent(); }}
+                      className="w-full text-left px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-1.5"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Clear history
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {!readOnly && (
           <button
             onClick={() => { void handleLoad(); }}
             disabled={isLoading || isRunning}
             title="Load pipeline"
+            aria-label="Load pipeline"
+            data-testid="toolbar-load"
             className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />}
@@ -525,6 +792,8 @@ export const Toolbar: React.FC = () => {
             onClick={() => { void handleSave(); }}
             disabled={isSaving || isRunning}
             title="Save pipeline"
+            aria-label="Save pipeline"
+            data-testid="toolbar-save"
             className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -540,6 +809,7 @@ export const Toolbar: React.FC = () => {
             }}
             disabled={isRunning || nodes.length === 0}
             title="Auto-arrange nodes left-to-right by data flow"
+            aria-label="Tidy: auto-arrange nodes"
             className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
           >
             <Wand2 className="w-4 h-4" />
@@ -551,6 +821,7 @@ export const Toolbar: React.FC = () => {
             onClick={() => setShowExportMenu(v => !v)}
             disabled={isExporting || nodes.length === 0}
             title="Export canvas as image"
+            aria-label="Export canvas as image"
             aria-haspopup="menu"
             aria-expanded={showExportMenu}
             className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
@@ -586,6 +857,8 @@ export const Toolbar: React.FC = () => {
             onClick={() => { void handleRunAll(); }}
             disabled={isRunningAll || isRunning}
             title="Run all parallel branches as separate experiments"
+            aria-label="Run all parallel branches as separate experiments"
+            data-testid="toolbar-run-all"
             className="flex items-center gap-2 px-3 py-2 text-white bg-amber-600 rounded-md shadow-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
           >
             {isRunningAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
@@ -597,6 +870,8 @@ export const Toolbar: React.FC = () => {
             onClick={() => { void handleRun(); }}
             disabled={isRunning}
             title="Run Preview (Ctrl+Enter)"
+            aria-label="Run Preview"
+            data-testid="toolbar-run-preview"
             className="flex items-center gap-2 px-3 py-2 text-white rounded-md shadow-sm transition-all disabled:opacity-50"
             style={{ background: 'var(--main-gradient)' }}
           >

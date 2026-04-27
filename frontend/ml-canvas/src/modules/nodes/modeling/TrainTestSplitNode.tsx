@@ -196,6 +196,14 @@ export const TrainTestSplitNode: NodeDefinition<TrainTestSplitConfig> = {
     { id: 'test', label: 'Test', type: 'dataset' }
   ],
   settings: TrainTestSplitSettings,
+  bodyPreview: (config) => {
+    const test = config.test_size ?? 0.2;
+    const val = config.validation_size ?? 0;
+    const train = Math.max(0, 1 - test - val);
+    const fmt = (x: number) => x.toFixed(2).replace(/\.?0+$/, '') || '0';
+    if (val > 0) return `${fmt(train)} / ${fmt(val)} / ${fmt(test)}`;
+    return `${fmt(train)} / ${fmt(test)}`;
+  },
   validate: (config) => {
     if (config.test_size <= 0 || config.test_size >= 1) {
       return { isValid: false, message: 'Test size must be between 0 and 1.' };

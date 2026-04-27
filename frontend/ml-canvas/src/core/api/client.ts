@@ -62,6 +62,14 @@ export interface NodeExecutionResult {
   error?: string;
   metrics?: Record<string, unknown>;
   output?: unknown;
+  /** Optional engine-side per-node free-form metadata. `summary` is a
+   * short one-line human string (e.g. "7,000 / 1,500 / 1,500" for a
+   * train/test split) that the canvas renders inside the node body when
+   * present. Backend may add other keys here later. */
+  metadata?: {
+    summary?: string;
+    [key: string]: unknown;
+  };
 }
 
 export type PreviewDataRows = Array<Record<string, unknown>>;

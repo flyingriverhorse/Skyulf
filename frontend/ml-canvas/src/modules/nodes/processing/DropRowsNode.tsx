@@ -111,6 +111,12 @@ export const DropRowsNode: NodeDefinition<DropRowsConfig> = {
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Cleaned Data', type: 'dataset' }],
   settings: DropRowsSettings,
+  bodyPreview: (config) => {
+    if (config.drop_if_any_missing) return 'Drop rows with any missing';
+    const thr = config.missing_threshold ?? 0;
+    if (thr > 0) return `Drop rows missing > ${thr}%`;
+    return null;
+  },
   validate: (_config) => ({ isValid: true }),
   getDefaultConfig: () => ({
     drop_if_any_missing: false,

@@ -22,7 +22,7 @@ export default defineConfig({
         assetFileNames: 'assets/[name]-[hash][extname]',
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
-          'vendor-plotly': ['plotly.js-dist-min', 'react-plotly.js'],
+          'vendor-plotly': ['plotly.js-gl3d-dist-min', 'react-plotly.js'],
           'vendor-charts': ['recharts', 'chart.js', 'react-chartjs-2'],
           'vendor-flow': ['@xyflow/react'],
           'vendor-utils': ['html-to-image', 'lucide-react', 'axios', 'dagre']

@@ -100,6 +100,13 @@ export const PolynomialFeaturesNode: NodeDefinition = {
     isExpanded: true
   }),
 
+  bodyPreview: (config: { columns?: string[]; degree?: number }) => {
+    const cols = config.columns?.length ?? 0;
+    const deg = config.degree ?? 2;
+    if (cols === 0) return `degree=${deg}`;
+    return `degree=${deg} \u00b7 ${cols} ${cols === 1 ? 'col' : 'cols'}`;
+  },
+
   settings: function PolynomialFeaturesSettings({ config, onChange, nodeId }) {
     const upstreamData = useUpstreamData(nodeId || '');
     const datasetId = upstreamData.find((d) => d.datasetId)?.datasetId as string | undefined;

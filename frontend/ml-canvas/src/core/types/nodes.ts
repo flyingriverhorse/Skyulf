@@ -42,7 +42,15 @@ export interface NodeDefinition<TConfig = any> {
   // Components
   component?: React.JSXElementConstructor<any>; // Custom Node View (optional)
   settings: React.JSXElementConstructor<NodeSettingsProps<TConfig>>; // The Form in the Sidebar
-  
+
+  // Optional one-line config preview rendered in the node body slot when
+  // there is no custom `component` and the backend has not yet emitted a
+  // post-run `metadata.summary`. Should return a short string (≤ ~40 chars
+  // ideally) describing the user's current configuration, or null if there
+  // is nothing meaningful to show yet (so the wrapper falls back to the
+  // static `description`). Pure, must not throw.
+  bodyPreview?: (config: TConfig) => string | null;
+
   // Behavior
   validate: (config: TConfig) => ValidationResult;
   getDefaultConfig: () => TConfig;

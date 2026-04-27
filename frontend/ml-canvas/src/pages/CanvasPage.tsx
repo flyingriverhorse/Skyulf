@@ -19,7 +19,7 @@ export const CanvasPage: React.FC = () => {
       // Check if we already have this dataset on the canvas
       const alreadyExists = nodes.some(n => 
         n.type === 'dataset_node' && 
-        (n.data as any)?.datasetId === sourceId
+        (n.data as { datasetId?: string })?.datasetId === sourceId
       );
 
       if (alreadyExists) {

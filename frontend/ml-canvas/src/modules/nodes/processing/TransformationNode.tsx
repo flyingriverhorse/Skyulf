@@ -359,6 +359,16 @@ export const TransformationNode: NodeDefinition<TransformationConfig> = {
     return { isValid: true };
   },
   settings: TransformationSettings,
+  bodyPreview: (config) => {
+    const n = config.transformations?.length ?? 0;
+    if (n === 0) return null;
+    if (n === 1) {
+      const t = config.transformations[0];
+      const c = t?.columns?.length ?? 0;
+      return `${t?.method ?? '?'} · ${c} ${c === 1 ? 'col' : 'cols'}`;
+    }
+    return `${n} ops`;
+  },
   getDefaultConfig: () => ({
     transformations: []
   })

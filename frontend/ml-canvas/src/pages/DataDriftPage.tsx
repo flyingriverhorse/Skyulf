@@ -160,8 +160,12 @@ export const DataDriftPage: React.FC = () => {
             setReport(result);
             // Refresh drift history
             monitoringApi.getDriftHistory(selectedJob).then(setDriftHistory).catch(() => {});
-        } catch (err: any) {
-            setError(err.response?.data?.detail || "Failed to calculate drift.");
+        } catch (err: unknown) {
+            const detail =
+                err && typeof err === 'object' && 'response' in err
+                    ? ((err as { response?: { data?: { detail?: string } } }).response?.data?.detail)
+                    : undefined;
+            setError(detail || "Failed to calculate drift.");
         } finally {
             setLoading(false);
         }
@@ -822,7 +826,7 @@ export const DataDriftPage: React.FC = () => {
                                                                         <BarChart data={col.distribution.bins} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                                                                             <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-slate-700" vertical={false} />
                                                                             <XAxis 
-                                                                                dataKey={(bin: any) => `${bin.bin_start.toFixed(2)}`} 
+                                                                                dataKey={(bin: { bin_start: number }) => `${bin.bin_start.toFixed(2)}`} 
                                                                                 className="text-xs"
                                                                                 tick={{ fill: '#64748b' }}
                                                                                 tickLine={false}

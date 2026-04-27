@@ -519,9 +519,23 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                                 <div className="grid grid-cols-2 gap-4 text-xs">
                                                     {(() => {
                                                         const node = (job.graph?.nodes as Array<{ node_id: string; params?: Record<string, unknown> }> | undefined)?.find((n) => n.node_id === job.node_id);
-                                                        const config = Object.keys((job.config as any)?.tuning_config || {}).length > 0 
-                                                            ? (job.config as any)?.tuning_config 
-                                                            : node?.params?.tuning_config;
+                                                        // Tuning config is a free-form server payload that varies by strategy.
+                                                        type TuningConfig = {
+                                                            strategy?: string;
+                                                            search_strategy?: string;
+                                                            strategy_params?: Record<string, unknown>;
+                                                            metric?: string;
+                                                            n_trials?: number;
+                                                            cv_enabled?: boolean;
+                                                            cv_type?: string;
+                                                            cv_folds?: number;
+                                                            cv_shuffle?: boolean;
+                                                        };
+                                                        const jobConfig = job.config as { tuning_config?: TuningConfig } | undefined;
+                                                        const rawConfig = Object.keys(jobConfig?.tuning_config || {}).length > 0
+                                                            ? jobConfig?.tuning_config
+                                                            : (node?.params?.tuning_config as TuningConfig | undefined);
+                                                        const config: TuningConfig | undefined = rawConfig;
                                                         if (!config) return <div className="text-gray-400 col-span-2">No configuration found</div>;
                                                         
                                                         return (

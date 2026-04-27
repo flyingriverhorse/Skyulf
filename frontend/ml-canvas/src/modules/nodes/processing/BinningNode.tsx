@@ -291,6 +291,13 @@ export const BinningNode: NodeDefinition = {
     return { isValid: true };
   },
   settings: BinningSettings,
+  bodyPreview: (config) => {
+    const cols = config.columns?.length ?? 0;
+    const strat = config.strategy ?? 'equal_width';
+    const n = config.n_bins ?? 5;
+    if (cols === 0) return `${strat} · q=${n}`;
+    return `${strat} · q=${n} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
+  },
   getDefaultConfig: () => ({
     columns: [],
     strategy: 'equal_width',

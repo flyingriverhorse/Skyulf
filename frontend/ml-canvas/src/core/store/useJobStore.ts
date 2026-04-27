@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { jobsApi, JobInfo, RunPipelineRequest } from '../api/jobs';
+import { jobEventsSocket } from '../realtime/jobEventsSocket';
 
 interface ActiveParallelRun {
   jobIds: string[];
@@ -32,12 +33,79 @@ interface JobState {
   stopPolling: () => void;
 }
 
-// Polling interval in ms
-const POLLING_INTERVAL = 3000;
+// Polling cadence. WS-connected: long safety net. WS-disconnected:
+// short fallback so UX still feels live if the realtime layer is down.
+const POLL_INTERVAL_FAST = 3000;
+const POLL_INTERVAL_SLOW = 30_000;
 const PAGE_SIZE = 50;
 
 export const useJobStore = create<JobState>((set, get) => {
   let pollingInterval: ReturnType<typeof setInterval> | null = null;
+  let unsubscribeWs: (() => void) | null = null;
+  let unsubscribeStatus: (() => void) | null = null;
+  let wsConnected = false;
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Coalesce bursty WS events (a Celery task can publish status +
+  // progress + status within a few ms). One refresh per 250ms is enough
+  // for a UI that humans look at.
+  const scheduleRefresh = (run: () => Promise<void>): void => {
+    if (refreshTimer) return;
+    refreshTimer = setTimeout(() => {
+      refreshTimer = null;
+      void run();
+    }, 250);
+  };
+
+  const restartIntervalAtCurrentCadence = (): void => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+    const cadence = wsConnected ? POLL_INTERVAL_SLOW : POLL_INTERVAL_FAST;
+    pollingInterval = setInterval(() => { void runPollTick(); }, cadence);
+  };
+
+  // The shared poll-tick body: also used as the WS-event refresh.
+  const runPollTick = async (): Promise<void> => {
+    try {
+      const latestJobs = await jobsApi.getJobs(PAGE_SIZE, 0);
+
+      set(state => {
+          if (state.jobs.length <= PAGE_SIZE) {
+              return { jobs: latestJobs };
+          } else {
+              return { jobs: [...latestJobs, ...state.jobs.slice(PAGE_SIZE)] };
+          }
+      });
+
+      // Stop polling if no active jobs and drawer is closed. WS still
+      // listens — a fresh `created` event will revive the loop.
+      const hasActive = latestJobs.some(j => j.status === 'running' || j.status === 'queued');
+      if (!hasActive && !get().isDrawerOpen) {
+        get().stopPolling();
+      }
+
+      const parallelRun = get().activeParallelRun;
+      if (parallelRun) {
+        const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
+        const allDone = parallelRun.jobIds.every(id => {
+          const j = latestJobs.find(job => job.job_id === id);
+          return j && TERMINAL.has(j.status);
+        });
+        if (allDone) {
+          if (!parallelRun.completedAt) {
+            set({ activeParallelRun: { ...parallelRun, completedAt: new Date().toISOString() } });
+          } else {
+            const elapsed = Date.now() - new Date(parallelRun.completedAt).getTime();
+            if (elapsed >= 5000) set({ activeParallelRun: null });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Polling error:', error);
+    }
+  };
 
   return {
     jobs: [],
@@ -140,51 +208,30 @@ export const useJobStore = create<JobState>((set, get) => {
     },
 
     startPolling: () => {
+      // Subscribe to the realtime channel once; events trigger a
+      // (debounced) full refresh so the UI converges without burning
+      // a request every 3 seconds.
+      if (!unsubscribeWs) {
+        unsubscribeWs = jobEventsSocket.subscribe(() => {
+          scheduleRefresh(runPollTick);
+        });
+      }
+      if (!unsubscribeStatus) {
+        unsubscribeStatus = jobEventsSocket.onStatus((connected) => {
+          const changed = connected !== wsConnected;
+          wsConnected = connected;
+          if (changed && pollingInterval) {
+            // Re-arm the safety net at the new cadence.
+            restartIntervalAtCurrentCadence();
+          }
+          if (connected) {
+            // Reconnect: pull fresh state in case we missed events.
+            scheduleRefresh(runPollTick);
+          }
+        });
+      }
       if (pollingInterval) return;
-      
-      pollingInterval = setInterval(() => { void (async () => {
-        // Silent fetch (no loading spinner)
-        try {
-          const latestJobs = await jobsApi.getJobs(PAGE_SIZE, 0);
-          
-          set(state => {
-              if (state.jobs.length <= PAGE_SIZE) {
-                  return { jobs: latestJobs };
-              } else {
-                  // Replace first page, keep the rest
-                  return { jobs: [...latestJobs, ...state.jobs.slice(PAGE_SIZE)] };
-              }
-          });
-          
-          // Stop polling if no active jobs and drawer is closed
-          const hasActive = latestJobs.some(j => j.status === 'running' || j.status === 'queued');
-          if (!hasActive && !get().isDrawerOpen) {
-            get().stopPolling();
-          }
-
-          // Auto-clear parallel run when all tracked jobs are terminal
-          const parallelRun = get().activeParallelRun;
-          if (parallelRun) {
-            const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
-            const allDone = parallelRun.jobIds.every(id => {
-              const j = latestJobs.find(job => job.job_id === id);
-              return j && TERMINAL.has(j.status);
-            });
-            if (allDone) {
-              if (!parallelRun.completedAt) {
-                // Mark completion time, keep banner visible
-                set({ activeParallelRun: { ...parallelRun, completedAt: new Date().toISOString() } });
-              } else {
-                // Clear after 5s linger
-                const elapsed = Date.now() - new Date(parallelRun.completedAt).getTime();
-                if (elapsed >= 5000) set({ activeParallelRun: null });
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Polling error:', error);
-        }
-      })(); }, POLLING_INTERVAL);
+      restartIntervalAtCurrentCadence();
     },
 
     stopPolling: () => {
@@ -192,6 +239,8 @@ export const useJobStore = create<JobState>((set, get) => {
         clearInterval(pollingInterval);
         pollingInterval = null;
       }
+      // Keep the WS subscription alive while the tab is open: a new
+      // `created` event from elsewhere should still revive the loop.
     }
   };
 });

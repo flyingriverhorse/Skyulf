@@ -179,6 +179,11 @@ export const MissingIndicatorNode: NodeDefinition<MissingIndicatorConfig> = {
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Augmented Data', type: 'dataset' }],
   settings: MissingIndicatorSettings,
+  bodyPreview: (config) => {
+    const cols = config.columns?.length ?? 0;
+    if (cols === 0) return null;
+    return `${cols} ${cols === 1 ? 'col' : 'cols'} → flags`;
+  },
   validate: (_config) => ({ isValid: true }),
   getDefaultConfig: () => ({
     columns: [],

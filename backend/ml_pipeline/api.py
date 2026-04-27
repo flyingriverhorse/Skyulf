@@ -30,6 +30,7 @@ from backend.database.models import (
 )
 from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.tasks import run_pipeline_task
+from backend.realtime.events import JobEvent, publish_job_event
 from backend.utils.file_utils import extract_file_path_from_source
 from backend.ml_pipeline.services.evaluation_service import EvaluationService
 from backend.ml_pipeline.resolution import resolve_pipeline_nodes
@@ -363,20 +364,15 @@ async def run_pipeline(  # noqa: C901
                     job_type = "preview"
                 break
 
-        # Create Job in DB
-        job_id = await JobManager.create_job(
-            session=db,
-            pipeline_id=sub.pipeline_id,
-            node_id=target_node_id or "unknown",
-            job_type=cast(Literal["basic_training", "advanced_tuning", "preview"], job_type),
-            dataset_id=dataset_id,
-            model_type=model_type,
-            graph=config.model_dump(),
-        )
-        all_job_ids.append(job_id)
-
-        # Build payload for this sub-pipeline
-        sub_payload = {
+        # Build the per-branch graph snapshot. We persist *this branch's*
+        # nodes (with the terminal's `inputs` already rewritten by the
+        # partitioner to point only at this branch's parent in parallel
+        # mode) instead of the full original config — otherwise the
+        # Experiments comparison view walks back from a shared terminal
+        # whose `inputs` still list every branch's parent and ends up
+        # showing both branches' preprocessing chains in every column
+        # (reported as "Path A and Path B both show every Encoding").
+        branch_graph: Dict[str, Any] = {
             "pipeline_id": sub.pipeline_id,
             "nodes": [
                 {
@@ -389,6 +385,23 @@ async def run_pipeline(  # noqa: C901
             ],
             "metadata": sub.metadata,
         }
+
+        # Create Job in DB
+        job_id = await JobManager.create_job(
+            session=db,
+            pipeline_id=sub.pipeline_id,
+            node_id=target_node_id or "unknown",
+            job_type=cast(Literal["basic_training", "advanced_tuning", "preview"], job_type),
+            dataset_id=dataset_id,
+            model_type=model_type,
+            graph=branch_graph,
+        )
+        all_job_ids.append(job_id)
+        publish_job_event(JobEvent(event="created", job_id=job_id, status="queued", progress=0))
+
+        # Reuse the same dict shape for the Celery payload (storage_options
+        # is added below; we don't persist it into the DB graph snapshot).
+        sub_payload: Dict[str, Any] = dict(branch_graph)
         if resolved_s3_options:
             sub_payload["storage_options"] = resolved_s3_options
 
@@ -1062,6 +1075,7 @@ async def cancel_job(job_id: str, session: AsyncSession = Depends(get_async_sess
             status_code=400,
             detail="Job could not be cancelled (maybe it's already finished or doesn't exist)",
         )
+    publish_job_event(JobEvent(event="status", job_id=job_id, status="cancelled"))
     return {"message": "Job cancelled successfully"}
 
 

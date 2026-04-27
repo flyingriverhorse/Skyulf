@@ -166,6 +166,12 @@ export const DeduplicationNode: NodeDefinition<DeduplicationConfig> = {
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Unique Data', type: 'dataset' }],
   settings: DeduplicationSettings,
+  bodyPreview: (config) => {
+    const subset = config.subset?.length ?? 0;
+    const keep = config.keep ?? 'first';
+    const subsetStr = subset === 0 ? 'all' : `${subset} ${subset === 1 ? 'col' : 'cols'}`;
+    return `Subset: ${subsetStr} · keep ${keep}`;
+  },
   validate: (_config) => ({ isValid: true }),
   getDefaultConfig: () => ({
     subset: [],

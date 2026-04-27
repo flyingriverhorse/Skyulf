@@ -551,6 +551,11 @@ export const FeatureGenerationNode: NodeDefinition = {
     return { isValid: true };
   },
   settings: FeatureGenerationSettings,
+  bodyPreview: (config) => {
+    const n = config.operations?.length ?? 0;
+    if (n === 0) return null;
+    return `+${n} feature${n === 1 ? '' : 's'}`;
+  },
   getDefaultConfig: () => ({
     operations: []
   })
