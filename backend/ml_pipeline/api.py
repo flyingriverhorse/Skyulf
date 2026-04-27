@@ -1055,18 +1055,26 @@ async def preview_pipeline(  # noqa: C901
 
 
 
-@router.get("/jobs/node-summaries", response_model=Dict[str, str])
+@router.get("/jobs/node-summaries", response_model=Dict[str, List[Dict[str, Any]]])
 async def get_node_summaries(
     limit: int = 200, session: AsyncSession = Depends(get_async_session)
 ):
-    """Per-node card summaries from recent completed jobs.
+    """Per-node card summaries from the latest completed run group.
 
-    Returns ``{ node_id: summary_string }`` for the latest completed
-    training/tuning job per node. Lets the canvas render the same
-    one-liner on trainer cards that the engine produces inline for
-    every other node â€” trainer/tuner jobs run via Celery and the
-    engine's per-node ``metadata.summary`` never reaches the FE store
-    through the regular ``/preview`` path (which strips trainers).
+    Returns ``{ node_id: [entry, ...] }`` where each entry carries a
+    ``summary`` string plus parallel-branch metadata (``branch_index``,
+    ``pipeline_id``, ``parent_pipeline_id``, ``finished_at``). For
+    canvases with a parallel terminal (one training node fed by N
+    branches), the array contains one entry per branch so the card can
+    render Path A / Path B / … on separate lines. Older run groups are
+    dropped per node id so a fresh single-branch run never inherits
+    stale per-branch entries from a previous parallel run.
+
+    Lets the canvas render the same one-liner on trainer cards that the
+    engine produces inline for every other node — trainer/tuner jobs
+    run via Celery and the engine's per-node ``metadata.summary``
+    never reaches the FE store through the regular ``/preview`` path
+    (which strips trainers).
     """
     return await JobManager.get_node_summaries(session, limit=limit)
 

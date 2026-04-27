@@ -40,6 +40,17 @@ export interface RunPipelineRequest extends PipelineConfigModel {
   job_type?: 'basic_training' | 'advanced_tuning' | 'preview';
 }
 
+// One entry per completed branch in the latest run group of a trainer
+// node. Single-terminal (merge) runs return exactly one entry with
+// `branch_index = null`; parallel runs return one per branch.
+export interface NodeSummaryEntry {
+  summary: string;
+  branch_index: number | null;
+  pipeline_id: string;
+  parent_pipeline_id: string | null;
+  finished_at: string | null;
+}
+
 export interface RunPipelineResponse {
   message: string;
   pipeline_id: string;
@@ -143,12 +154,15 @@ export const jobsApi = {
     return response.data;
   },
 
-  // Per-node card-summary strings for trainer/tuner nodes. Trainer jobs
+  // Per-node card-summary entries for trainer/tuner nodes. Trainer jobs
   // run via Celery so the engine's per-node `metadata.summary` doesn't
   // reach `executionResult.node_results` on the FE — this endpoint
-  // surfaces the same one-liner from the latest completed job per node.
-  getNodeSummaries: async (limit: number = 200): Promise<Record<string, string>> => {
-    const response = await apiClient.get<Record<string, string>>(
+  // surfaces the same one-liner from the latest completed run group
+  // per node. For canvases with a parallel terminal (one training node
+  // fed by N branches), the array contains one entry per branch so the
+  // card can render Path A / Path B / … on separate lines.
+  getNodeSummaries: async (limit: number = 200): Promise<Record<string, NodeSummaryEntry[]>> => {
+    const response = await apiClient.get<Record<string, NodeSummaryEntry[]>>(
       `/pipeline/jobs/node-summaries`,
       { params: { limit } },
     );

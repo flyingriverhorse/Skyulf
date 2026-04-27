@@ -87,6 +87,20 @@ const FlowCanvasContent: React.FC = () => {
 
   const branchColorMap = useBranchColors(nodes, edges);
 
+  // Mirror the per-edge Path label into the global store so trainer
+  // cards (rendered inside individual nodes) can show the exact same
+  // "Path B · Xgboost" letters the user sees on the canvas, instead
+  // of re-deriving them from `branch_index` (which can drift across
+  // multi-terminal partitions).
+  const setBranchEdgeLabels = useGraphStore((s) => s.setBranchEdgeLabels);
+  useEffect(() => {
+    const labels: Record<string, string> = {};
+    for (const [edgeId, info] of branchColorMap) {
+      if (info.label) labels[edgeId] = info.label;
+    }
+    setBranchEdgeLabels(labels);
+  }, [branchColorMap, setBranchEdgeLabels]);
+
   // Edges that "won" a merge: for every sibling_fan_in advisory, mark the
   // edge from winner_input -> advisory.node_id so the canvas can highlight
   // which branch's values survived the last-wins / first-wins tiebreak.
