@@ -1,4 +1,4 @@
-import Plotly from 'plotly.js-dist-min';
+import { Plotly } from '../plotly';
 import { toPng } from 'html-to-image';
 
 export const downloadChart = async (elementId: string, filename: string, title?: string, subtitle?: string, extraInfo?: string) => {

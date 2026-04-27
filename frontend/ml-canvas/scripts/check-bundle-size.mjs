@@ -17,9 +17,13 @@ const distAssets = join(__dirname, '..', '..', '..', 'static', 'ml_canvas', 'ass
 // Per-chunk gzip ceilings in bytes. Bump deliberately when a feature
 // genuinely needs the headroom; the point is to make the bump visible
 // in code review.
-// NOTE: vendor-plotly is currently the full plotly.js-dist-min build
-// (~2.85 MB gzip). When item #14 (slim plotly-gl3d swap) is reapplied
-// this drops to ~542 KB and the budget should be ratcheted down.
+// NOTE: vendor-plotly ships the slim `plotly.js-gl3d-dist-min` build
+// (~542 KB gzip vs ~2.85 MB for the full bundle). The 750 KB ceiling
+// gives ~38% headroom for plotly minor-version growth without making
+// regressions invisible. If a future feature needs an unsupported
+// trace type (geo / mapbox / sankey / treemap / parcoords / finance)
+// the wrapper at `src/core/plotly.ts` can be flipped back to
+// `plotly.js-dist-min` and this ceiling raised to 3100 KB.
 //
 // `kind: 'vendor'` is required to be present (missing chunk = WARN).
 // `kind: 'route'` is optional — the chunk only exists once the route
@@ -27,7 +31,7 @@ const distAssets = join(__dirname, '..', '..', '..', 'static', 'ml_canvas', 'ass
 // doesn't fight the budget gate.
 const BUDGETS = [
   // Vendor chunks (always emitted, manualChunks in vite.config.ts)
-  { prefix: 'vendor-plotly', maxGzipBytes: 3100 * 1024, label: 'vendor-plotly', kind: 'vendor' },
+  { prefix: 'vendor-plotly', maxGzipBytes: 750 * 1024,  label: 'vendor-plotly', kind: 'vendor' },
   { prefix: 'vendor-charts', maxGzipBytes: 220 * 1024,  label: 'vendor-charts', kind: 'vendor' },
   { prefix: 'vendor-flow',   maxGzipBytes: 80 * 1024,   label: 'vendor-flow',   kind: 'vendor' },
   { prefix: 'vendor-react',  maxGzipBytes: 70 * 1024,   label: 'vendor-react',  kind: 'vendor' },
