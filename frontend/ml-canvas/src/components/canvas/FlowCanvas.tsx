@@ -14,6 +14,7 @@ import { useViewStore } from '../../core/store/useViewStore';
 import { useClipboard } from '../../core/hooks/useClipboard';
 import { useBranchColors } from '../../core/hooks/useBranchColors';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
+import { useNodeJobSummaries } from '../../core/hooks/useNodeJobSummaries';
 import { CustomNodeWrapper } from './CustomNodeWrapper';
 import { CustomEdge } from './CustomEdge';
 import { useConfirm } from '../shared';
@@ -78,6 +79,11 @@ const FlowCanvasContent: React.FC = () => {
   );
 
   useClipboard();
+
+  // Keep trainer/tuner card summaries fresh from the backend even
+  // though their jobs run via Celery (so the inline preview path
+  // never populates `executionResult.node_results` for them).
+  useNodeJobSummaries();
 
   const branchColorMap = useBranchColors(nodes, edges);
 

@@ -21,6 +21,11 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult: NodeExecutionResult | undefined = executionResult?.node_results?.[id];
+  // Fallback summary for trainer/tuner nodes whose jobs run via
+  // Celery — they never populate `executionResult.node_results`. The
+  // `useNodeJobSummaries` hook keeps this map fresh from the
+  // `/jobs/node-summaries` endpoint after every job event.
+  const jobSummary = useGraphStore((state) => state.nodeJobSummaries[id]);
   const incomingSourceCount = useGraphStore(
     (state) => new Set(state.edges.filter((e) => e.target === id).map((e) => e.source)).size,
     (a, b) => a === b
@@ -228,7 +233,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
             </div>
           );
         }
-        const summary = nodeResult?.metadata?.summary?.trim();
+        const summary = nodeResult?.metadata?.summary?.trim() || jobSummary?.trim();
         if (summary) {
           return (
             <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">

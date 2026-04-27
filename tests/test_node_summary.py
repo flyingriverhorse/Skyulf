@@ -36,7 +36,7 @@ def test_split_dataset_summary_two_way() -> None:
     test = pd.DataFrame({"x": range(1500), "y": range(1500)})
     sd = SplitDataset(train=train, test=test)
     out = build_summary(step_type="TrainTestSplitter", output=sd, metrics={})
-    assert out == "7,000 / 1,500 rows × 2 cols"
+    assert out == "82/18% · 7,000 / 1,500 × 2 cols"
 
 
 def test_split_dataset_summary_with_validation() -> None:
@@ -45,7 +45,7 @@ def test_split_dataset_summary_with_validation() -> None:
     val = pd.DataFrame({"x": range(1500)})
     sd = SplitDataset(train=train, test=test, validation=val)
     out = build_summary(step_type="Split", output=sd, metrics={})
-    assert out == "7,000 / 1,500 / 1,500 rows × 1 cols"
+    assert out == "70/15/15% · 7,000 / 1,500 / 1,500 × 1 cols"
 
 
 def test_split_dataset_with_x_y_tuple_payload() -> None:
@@ -57,7 +57,7 @@ def test_split_dataset_with_x_y_tuple_payload() -> None:
     sd = SplitDataset(train=(X_train, y_train), test=(X_test, y_test))
     out = build_summary(step_type="feature_target_split", output=sd, metrics={})
     # 1 X col + y → 2 cols reported.
-    assert out == "7,000 / 1,500 rows × 2 cols"
+    assert out == "82/18% · 7,000 / 1,500 × 2 cols"
 
 
 # ---------------------------------------------------------------------------
@@ -236,7 +236,8 @@ def test_training_summary_handles_test_prefixed_classification_metrics() -> None
     """Engine flattens evaluation report into ``test_*`` / ``train_*`` keys.
 
     Make sure the builder finds them — this was previously broken for
-    binary f1 only when the bare ``f1`` key was missing.
+    binary f1 only when the bare ``f1`` key was missing. Train/test
+    here diverge by 0.12 so the overfit-gap badge also appears.
     """
     out = build_summary(
         step_type="basic_training",
@@ -248,7 +249,7 @@ def test_training_summary_handles_test_prefixed_classification_metrics() -> None
             "test_f1": 0.842,
         },
     )
-    assert out == "acc 0.87 · f1 0.84"
+    assert out == "acc 0.87 · f1 0.84 · ▲0.12"
 
 
 def test_training_summary_handles_multiclass_f1_weighted() -> None:
@@ -275,7 +276,7 @@ def test_training_summary_handles_test_prefixed_regression_metrics() -> None:
             "test_rmse": 0.123,
         },
     )
-    assert out == "r² 0.87 · rmse 0.123"
+    assert out == "r² 0.87 · rmse 0.123 · ▲0.08"
 
 
 def test_training_summary_falls_back_to_auc_when_no_acc_or_f1() -> None:
@@ -301,3 +302,124 @@ def test_build_summary_swallows_exceptions() -> None:
 
     out = build_summary(step_type="training", output=None, metrics=_Boom())  # type: ignore[arg-type]
     assert out is None
+
+
+# ---------------------------------------------------------------------------
+# Overfit-gap badge — surfaces train→test divergence on the card
+# ---------------------------------------------------------------------------
+
+
+def test_training_summary_appends_overfit_gap_when_train_diverges() -> None:
+    """When ``train_*`` and ``test_*`` differ by ≥ 0.05, append ▲gap."""
+    out = build_summary(
+        step_type="basic_training",
+        output=None,
+        metrics={
+            "train_accuracy": 0.99,
+            "train_f1": 0.99,
+            "test_accuracy": 0.80,
+            "test_f1": 0.78,
+        },
+    )
+    assert out == "acc 0.80 · f1 0.78 · ▲0.19"
+
+
+def test_training_summary_omits_gap_when_train_test_close() -> None:
+    """A small gap (< 0.05) is not interesting; keep the card clean."""
+    out = build_summary(
+        step_type="basic_training",
+        output=None,
+        metrics={
+            "train_accuracy": 0.88,
+            "test_accuracy": 0.86,
+        },
+    )
+    assert out == "acc 0.86"
+
+
+def test_regression_overfit_gap_uses_r2_direction() -> None:
+    out = build_summary(
+        step_type="linear_regression",
+        output=None,
+        metrics={"train_r2": 0.95, "test_r2": 0.72, "test_rmse": 0.4, "train_rmse": 0.1},
+    )
+    assert out == "r² 0.72 · rmse 0.4 · ▲0.23"
+
+
+# ---------------------------------------------------------------------------
+# Advanced tuning — best_score fallback + trial count + per-split phrasing
+# ---------------------------------------------------------------------------
+
+
+def test_advanced_tuning_uses_best_score_when_no_test_metrics() -> None:
+    """When the post-tune evaluate() failed silently, the card still
+    shows the tuner's headline (best_score + scoring metric + trial
+    count) so the user knows the run produced something."""
+    out = build_summary(
+        step_type="advanced_tuning",
+        output=None,
+        metrics={
+            "best_score": 0.913,
+            "scoring_metric": "f1",
+            "trials": [{}, {}, {}, {}, {}],
+        },
+    )
+    assert out == "best 0.913 (f1) · 5 trials"
+
+
+def test_advanced_tuning_prefers_test_metrics_with_trial_count() -> None:
+    """When evaluate() did succeed, the per-split metric is the headline
+    and ``trials`` is appended for context."""
+    out = build_summary(
+        step_type="advanced_tuning",
+        output=None,
+        metrics={
+            "best_score": 0.913,
+            "scoring_metric": "f1",
+            "trials": [{}] * 40,
+            "test_accuracy": 0.873,
+            "test_f1": 0.842,
+        },
+    )
+    assert out == "acc 0.87 · f1 0.84 · 40 trials"
+
+
+def test_advanced_tuning_int_trials_is_accepted() -> None:
+    """Some tuners report ``trials`` as a count rather than a list."""
+    out = build_summary(
+        step_type="advanced_tuning",
+        output=None,
+        metrics={"best_score": 0.5, "scoring_metric": "r2", "trials": 12},
+    )
+    assert out == "best 0.500 (r2) · 12 trials"
+
+
+# ---------------------------------------------------------------------------
+# Loader / snapshot dtype-mix enrichment
+# ---------------------------------------------------------------------------
+
+
+def test_loader_appends_dtype_breakdown_for_mixed_schema() -> None:
+    df = pd.DataFrame(
+        {
+            "n1": range(100),
+            "n2": range(100),
+            "c1": ["x"] * 100,
+            "c2": ["y"] * 100,
+        }
+    )
+    out = build_summary(step_type="data_loader", output=df, metrics={})
+    assert out == "100 rows × 4 cols (2 num · 2 cat)"
+
+
+def test_loader_omits_dtype_breakdown_for_uniform_schema() -> None:
+    """Single-bucket dtype mix adds no info; keep the line short."""
+    df = pd.DataFrame({"a": range(50), "b": range(50)})
+    out = build_summary(step_type="data_loader", output=df, metrics={})
+    assert out == "50 rows × 2 cols"
+
+
+def test_snapshot_node_also_uses_loader_phrasing() -> None:
+    df = pd.DataFrame({"n": range(10), "c": ["x"] * 10})
+    out = build_summary(step_type="DataSnapshot", output=df, metrics={})
+    assert out == "10 rows × 2 cols (1 num · 1 cat)"

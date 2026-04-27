@@ -1053,6 +1053,24 @@ async def preview_pipeline(  # noqa: C901
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
+
+
+@router.get("/jobs/node-summaries", response_model=Dict[str, str])
+async def get_node_summaries(
+    limit: int = 200, session: AsyncSession = Depends(get_async_session)
+):
+    """Per-node card summaries from recent completed jobs.
+
+    Returns ``{ node_id: summary_string }`` for the latest completed
+    training/tuning job per node. Lets the canvas render the same
+    one-liner on trainer cards that the engine produces inline for
+    every other node â€” trainer/tuner jobs run via Celery and the
+    engine's per-node ``metadata.summary`` never reaches the FE store
+    through the regular ``/preview`` path (which strips trainers).
+    """
+    return await JobManager.get_node_summaries(session, limit=limit)
+
+
 @router.get("/jobs/{job_id}", response_model=JobInfo)
 async def get_job_status(job_id: str, session: AsyncSession = Depends(get_async_session)):
     """
@@ -1130,6 +1148,8 @@ async def list_jobs(
     Lists recent jobs.
     """
     return await JobManager.list_jobs(session, limit, skip, job_type)
+
+
 
 
 @router.get("/jobs/tuning/latest/{node_id}", response_model=Optional[JobInfo])

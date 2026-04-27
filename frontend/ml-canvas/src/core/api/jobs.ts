@@ -143,6 +143,18 @@ export const jobsApi = {
     return response.data;
   },
 
+  // Per-node card-summary strings for trainer/tuner nodes. Trainer jobs
+  // run via Celery so the engine's per-node `metadata.summary` doesn't
+  // reach `executionResult.node_results` on the FE — this endpoint
+  // surfaces the same one-liner from the latest completed job per node.
+  getNodeSummaries: async (limit: number = 200): Promise<Record<string, string>> => {
+    const response = await apiClient.get<Record<string, string>>(
+      `/pipeline/jobs/node-summaries`,
+      { params: { limit } },
+    );
+    return response.data;
+  },
+
   getBestTuningJob: async (modelType: string): Promise<JobInfo | null> => {
     const response = await apiClient.get<JobInfo | null>(`/pipeline/jobs/tuning/best/${modelType}`);
     return response.data;

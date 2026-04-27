@@ -1,8 +1,9 @@
 """Per-node one-line summary builder rendered on the canvas card.
 
-Each successful node writes a short ``metadata.summary`` string (≤ ~50
-chars) the frontend stamps under the node title. This lets the user see
-*what each node actually did* without opening the inspector.
+Each successful node writes a short ``metadata.summary`` string (≤ ~60
+chars) the frontend stamps under the node title. The goal is to let
+the user see *what each node actually did* without opening the
+inspector.
 
 Design constraints
 ------------------
@@ -11,8 +12,9 @@ Design constraints
   static description. Never block a pipeline.
 * **Family-aware.** Each registered transformer is classified by what
   it *does* (drop rows, encode, scale, impute, …) and the phrasing
-  borrows the most informative fact for that family — strategy name,
-  row delta with %, column delta with target count, headline metric.
+  borrows the most informative facts for that family — strategy name,
+  row delta with %, column delta with target count, headline metric +
+  per-split detail (test/train) for trained models.
 """
 
 from __future__ import annotations
@@ -30,7 +32,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Node-family classification
 # ---------------------------------------------------------------------------
-# Mapping registered step_type id (case/sep-insensitive) -> family tag.
 
 _FAMILY: Dict[str, str] = {
     # Encoders — typically expand column count.
@@ -95,16 +96,9 @@ _FAMILY: Dict[str, str] = {
     # Profiling / snapshot — pass-through frames.
     "datasnapshot": "snapshot",
     "datasetprofile": "snapshot",
-}
-
-# Verb word stamped onto same-shape transformers when no delta exists.
-_VERB_BY_FAMILY: Dict[str, str] = {
-    "scale": "scaled",
-    "impute": "imputed",
-    "replace": "cleaned",
-    "bin": "binned",
-    "encode": "encoded",
-    "generate": "generated",
+    # Loaders.
+    "dataloader": "loader",
+    "data_loader": "loader",
 }
 
 # Pretty short labels for scaler implementations.
@@ -119,17 +113,25 @@ _SCALER_LABEL: Dict[str, str] = {
 
 
 def _normalize(step_type: Any) -> str:
-    return str(step_type or "").lower().replace(" ", "").replace("-", "").replace("_", "")
+    # Prefer the enum's underlying value so `StepType.BASIC_TRAINING`
+    # normalises to `"basictraining"`, not `"steptype.basictraining"`
+    # (Python ≥ 3.11 changes `str(IntEnum)`/`str(StrEnum)` semantics; the
+    # project supports both 3.10 and 3.12, so don't rely on `str(enum)`).
+    raw = getattr(step_type, "value", step_type)
+    return str(raw or "").lower().replace(" ", "").replace("-", "").replace("_", "")
 
 
 def _family_of(step_type: Any) -> str:
     """Classify a step_type into one of the known families."""
-    raw = str(step_type or "")
-    key = _normalize(raw)
+    raw = getattr(step_type, "value", step_type)
+    raw_str = str(raw or "")
+    key = _normalize(raw_str)
     if key in _FAMILY:
         return _FAMILY[key]
-    low = raw.lower()
-    if "training" in low or "tuning" in low or "regress" in low or "classif" in low:
+    low = raw_str.lower()
+    if "tuning" in low:
+        return "tune"
+    if "training" in low or "regress" in low or "classif" in low:
         return "train"
     if "split" in low and "feature" not in low:
         return "split"
@@ -145,7 +147,9 @@ def _family_of(step_type: Any) -> str:
         return "bin"
     if "scal" in low or "transform" in low:
         return "scale"
-    if "loader" in low or "snapshot" in low or "profile" in low:
+    if "loader" in low:
+        return "loader"
+    if "snapshot" in low or "profile" in low:
         return "snapshot"
     return "generic"
 
@@ -171,18 +175,66 @@ def _shape_of(payload: Any) -> Optional[Tuple[int, int]]:
     return None
 
 
+def _dtype_breakdown(df: pd.DataFrame) -> Optional[str]:
+    """Return ``"10 num · 2 cat"`` style breakdown when a DataFrame has a
+    meaningful mix of dtypes. ``None`` when it's all one kind (avoids
+    redundant noise)."""
+    try:
+        num = int(df.select_dtypes(include="number").shape[1])
+        cat = int(df.select_dtypes(include=["object", "category", "string"]).shape[1])
+        dt = int(df.select_dtypes(include="datetime").shape[1])
+        bo = int(df.select_dtypes(include="bool").shape[1])
+        parts = []
+        if num:
+            parts.append(f"{num} num")
+        if cat:
+            parts.append(f"{cat} cat")
+        if dt:
+            parts.append(f"{dt} dt")
+        if bo:
+            parts.append(f"{bo} bool")
+        # Only render when there's actual mix; a single bucket adds no info.
+        if len(parts) >= 2:
+            return " · ".join(parts)
+        return None
+    except Exception:
+        return None
+
+
 def _split_summary(data: SplitDataset) -> Optional[str]:
-    """Format ``train / test [/ val]`` row counts plus column count."""
+    """Format ``train / test [/ val]`` row counts with ratio + column count."""
     train = _shape_of(data.train)
     test = _shape_of(data.test)
     if train is None or test is None:
         return None
-    parts = [_fmt_int(train[0]), _fmt_int(test[0])]
+    train_n, test_n = train[0], test[0]
+    val_n = 0
     if data.validation is not None:
-        val = _shape_of(data.validation)
-        if val is not None:
-            parts.append(_fmt_int(val[0]))
-    return f"{' / '.join(parts)} rows × {train[1]} cols"
+        v = _shape_of(data.validation)
+        if v is not None:
+            val_n = v[0]
+    total = train_n + test_n + val_n
+    if total <= 0:
+        return None
+
+    # Absolute row counts.
+    parts = [_fmt_int(train_n), _fmt_int(test_n)]
+    if val_n:
+        parts.append(_fmt_int(val_n))
+    abs_str = " / ".join(parts)
+
+    # Ratio percentages — the single most useful piece of context the
+    # absolute numbers are missing. Round to nearest int and ensure they
+    # add to 100 by adjusting the largest bucket.
+    pcts = [round(train_n / total * 100), round(test_n / total * 100)]
+    if val_n:
+        pcts.append(round(val_n / total * 100))
+    drift = 100 - sum(pcts)
+    if drift:
+        pcts[pcts.index(max(pcts))] += drift
+    ratio_str = "/".join(str(p) for p in pcts) + "%"
+
+    return f"{ratio_str} · {abs_str} × {train[1]} cols"
 
 
 def _delta_phrase(in_shape: Tuple[int, int], out_shape: Tuple[int, int]) -> Optional[str]:
@@ -225,6 +277,14 @@ def _scaler_label(step_type: Any) -> str:
     return _SCALER_LABEL.get(_normalize(step_type), "scaled")
 
 
+def _loader_or_snapshot(out: pd.DataFrame) -> str:
+    """Loader / snapshot phrasing — adds dtype mix when meaningful."""
+    rows, cols = out.shape
+    breakdown = _dtype_breakdown(out)
+    head = f"{_fmt_int(rows)} rows × {cols} cols"
+    return f"{head} ({breakdown})" if breakdown else head
+
+
 def _frame_branch(
     family: str,
     step_type: Any,
@@ -235,8 +295,12 @@ def _frame_branch(
     """Render a one-liner for a node whose output is a single DataFrame."""
     out_rows, out_cols = out.shape
 
-    # Prefer a row/col delta when we have a baseline — that's the most
-    # informative single fact for transformers that change the frame.
+    # Loaders + snapshots: enrich the shape line with a dtype mix when
+    # a mixed schema is present.
+    if family in {"loader", "snapshot"}:
+        return _loader_or_snapshot(out)
+
+    # Prefer a row/col delta when we have a baseline.
     if in_shape is not None:
         delta = _delta_phrase(in_shape, out.shape)
         if delta:
@@ -265,14 +329,12 @@ def _frame_branch(
 
 
 # ---------------------------------------------------------------------------
-# Trainer phrasing — robust to the prefixed key layout produced by
-# ``_run_basic_training`` / ``_run_advanced_tuning`` (test_*, train_*,
-# val_* and the bare-key form some unit tests use).
+# Trainer / tuner phrasing
 # ---------------------------------------------------------------------------
 
 
 def _first_finite(metrics: Mapping[str, Any], candidates: Iterable[str]) -> Optional[float]:
-    """Return the first numeric value found under any of ``candidates``."""
+    """Return the first finite numeric value found under any of ``candidates``."""
     for key in candidates:
         v = metrics.get(key)
         if isinstance(v, (int, float)) and not isinstance(v, bool):
@@ -280,23 +342,62 @@ def _first_finite(metrics: Mapping[str, Any], candidates: Iterable[str]) -> Opti
                 f = float(v)
             except (TypeError, ValueError):
                 continue
-            # Skip NaN.
-            if f == f:
+            if f == f:  # filter NaN
                 return f
     return None
 
 
-# Search order matters: prefer test_, then bare, then val_, then train_.
 def _expand(name: str) -> Tuple[str, ...]:
+    """Search order: prefer ``test_*``, then bare, then ``val_*``, then ``train_*``."""
     return (f"test_{name}", name, f"val_{name}", f"train_{name}")
+
+
+# Per-metric search keys, ordered. Both binary and multiclass variants
+# fold into the same family so the headline picks whichever exists.
+_F1_KEYS = _expand("f1") + _expand("f1_weighted") + _expand("f1_score")
+_AUC_KEYS = _expand("roc_auc") + _expand("auc") + _expand("roc_auc_weighted")
+_R2_KEYS = _expand("r2") + _expand("r2_score")
+_RMSE_KEYS = _expand("rmse") + _expand("root_mean_squared_error")
+_MAE_KEYS = _expand("mae") + _expand("mean_absolute_error")
+_MSE_KEYS = _expand("mse") + _expand("mean_squared_error")
+
+
+def _train_only(metrics: Mapping[str, Any], candidates: Iterable[str]) -> Optional[float]:
+    """Same as ``_first_finite`` but only checks ``train_*`` keys."""
+    for key in candidates:
+        if not key.startswith("train_"):
+            continue
+        v = metrics.get(key)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            try:
+                f = float(v)
+                if f == f:
+                    return f
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def _gap_suffix(test_v: float, train_v: Optional[float], higher_is_better: bool) -> str:
+    """Render ``"  ▲0.12"`` when the train→test gap is meaningful overfit.
+
+    Empty string when train is missing or the gap is small (< 0.05).
+    """
+    if train_v is None:
+        return ""
+    diff = (train_v - test_v) if higher_is_better else (test_v - train_v)
+    if diff < 0.05:
+        return ""
+    return f" · ▲{diff:.2f}"
 
 
 def _training_summary(metrics: Mapping[str, Any]) -> Optional[str]:
     """Build the headline metric line for a trained model.
 
     Strategy: probe for classification metrics first (acc / f1 / auc),
-    then regression (r² / rmse / mae). Each metric is searched under
-    the most informative prefix order.
+    then regression (r² / rmse / mae). For each headline, append a
+    train→test overfit gap badge when both splits exist and the gap is
+    meaningful (≥ 0.05).
     """
     inner: Mapping[str, Any]
     nested = metrics.get("metrics") if isinstance(metrics, Mapping) else None
@@ -306,32 +407,61 @@ def _training_summary(metrics: Mapping[str, Any]) -> Optional[str]:
 
     # ---- Classification ----
     acc = _first_finite(inner, _expand("accuracy"))
-    f1 = _first_finite(
-        inner,
-        _expand("f1") + _expand("f1_weighted") + _expand("f1_score"),
-    )
+    f1 = _first_finite(inner, _F1_KEYS)
     if acc is not None and f1 is not None:
-        return f"acc {acc:.2f} · f1 {f1:.2f}"
+        gap = _gap_suffix(acc, _train_only(inner, _expand("accuracy")), higher_is_better=True)
+        return f"acc {acc:.2f} · f1 {f1:.2f}{gap}"
     if acc is not None:
-        return f"acc {acc:.2f}"
-    auc = _first_finite(inner, _expand("roc_auc") + _expand("auc") + _expand("roc_auc_weighted"))
+        gap = _gap_suffix(acc, _train_only(inner, _expand("accuracy")), higher_is_better=True)
+        return f"acc {acc:.2f}{gap}"
+    auc = _first_finite(inner, _AUC_KEYS)
     if auc is not None:
         return f"auc {auc:.2f}"
 
     # ---- Regression ----
-    r2 = _first_finite(inner, _expand("r2") + _expand("r2_score"))
-    rmse = _first_finite(inner, _expand("rmse") + _expand("root_mean_squared_error"))
+    r2 = _first_finite(inner, _R2_KEYS)
+    rmse = _first_finite(inner, _RMSE_KEYS)
     if r2 is not None and rmse is not None:
-        return f"r² {r2:.2f} · rmse {rmse:.3g}"
+        gap = _gap_suffix(r2, _train_only(inner, _R2_KEYS), higher_is_better=True)
+        return f"r² {r2:.2f} · rmse {rmse:.3g}{gap}"
     if r2 is not None:
-        return f"r² {r2:.2f}"
-    mae = _first_finite(inner, _expand("mae") + _expand("mean_absolute_error"))
+        gap = _gap_suffix(r2, _train_only(inner, _R2_KEYS), higher_is_better=True)
+        return f"r² {r2:.2f}{gap}"
+    mae = _first_finite(inner, _MAE_KEYS)
     if mae is not None:
         return f"mae {mae:.3g}"
-    mse = _first_finite(inner, _expand("mse") + _expand("mean_squared_error"))
+    mse = _first_finite(inner, _MSE_KEYS)
     if mse is not None:
         return f"mse {mse:.3g}"
 
+    return None
+
+
+def _tuning_summary(metrics: Mapping[str, Any]) -> Optional[str]:
+    """Hyperparameter-tuning summary.
+
+    Prefers the same per-split metric layout as basic training (so the
+    user sees the same headline shape). When the post-tuning evaluation
+    didn't run, falls back to the tuner's ``best_score`` + scoring metric
+    + trial count so the card is never empty after a successful tune.
+    """
+    base = _training_summary(metrics)
+    trials = metrics.get("trials")
+    n_trials: Optional[int] = None
+    if isinstance(trials, list):
+        n_trials = len(trials)
+    elif isinstance(trials, int):
+        n_trials = trials
+
+    if base is not None:
+        return f"{base} · {n_trials} trials" if n_trials else base
+
+    # Fallback path: best_score is the only thing we have.
+    best = metrics.get("best_score")
+    if isinstance(best, (int, float)) and not isinstance(best, bool):
+        scoring = metrics.get("scoring_metric") or "score"
+        head = f"best {float(best):.3f} ({scoring})"
+        return f"{head} · {n_trials} trials" if n_trials else head
     return None
 
 
@@ -355,30 +485,35 @@ def build_summary(
     step_type:
         Node kind string (e.g. ``"DropMissingRows"``, ``"basic_training"``).
     output:
-        The artifact written by the node (DataFrame, SplitDataset, model, …).
+        The artifact written by the node (DataFrame, SplitDataset, model,
+        …). Trainers do not need a usable output — the summary is built
+        purely from ``metrics`` for the ``train`` / ``tune`` families,
+        so passing ``None`` is safe there.
     metrics:
         Dict returned by the runner. Training runners flatten each
         split's metrics under ``train_*`` / ``test_*`` / ``val_*``;
-        feature-engineering runners often nest under ``"metrics"``.
+        tuning adds ``best_score`` / ``scoring_metric`` / ``trials``.
         Both layouts are tolerated.
     input_shape:
         Optional ``(rows, cols)`` of the upstream artifact. Lets us
         render ``"−127 rows (1.8%)"`` for filters / encoders / selectors.
     params:
         Optional node config params — used to name strategies
-        (``mean imputer``, ``standard scaler``, ``binned (5 bins)``).
+        (``mean imputer``, ``standard``, ``binned (5 bins)``).
     """
     try:
         family = _family_of(step_type)
         params = params or {}
 
-        # Splitters: per-slot row counts beat any other phrasing.
-        if isinstance(output, SplitDataset):
-            return _split_summary(output)
-
-        # Trainers: model output (or anything non-frame) — headline metric.
+        # Trainers / tuners don't depend on the output artifact at all.
+        if family == "tune":
+            return _tuning_summary(metrics)
         if family == "train":
             return _training_summary(metrics)
+
+        # Splitters: per-slot row counts + ratio + col count.
+        if isinstance(output, SplitDataset):
+            return _split_summary(output)
 
         # Frames: family-aware delta or shape line.
         if isinstance(output, pd.DataFrame):
@@ -390,5 +525,4 @@ def build_summary(
         return None
 
 
-# Re-export for tests / external callers that want to inspect families.
 __all__ = ["build_summary", "_family_of"]
