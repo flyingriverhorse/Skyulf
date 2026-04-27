@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown } from 'lucide-react';
+import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown, Clock, Trash2 } from 'lucide-react';
 import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
@@ -15,6 +15,12 @@ import {
   SHOW_PALETTE_EVENT,
 } from '../../core/hooks/useKeyboardShortcuts';
 import { exportCanvasToPng, exportCanvasToSvg } from '../../core/utils/canvasExport';
+import {
+  getRecentPipelines,
+  pushRecentPipeline,
+  clearRecentPipelines,
+  type RecentPipelineEntry,
+} from '../../core/utils/recentPipelines';
 import { toast } from '../../core/toast';
 import { useConfirm } from '../shared';
 
@@ -79,6 +85,10 @@ export const Toolbar: React.FC = () => {
   const [showLegend, setShowLegend] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  // Recent pipelines ring buffer (M2). Hydrated lazily on first open
+  // so the toolbar mount cost stays zero, then refreshed on every save.
+  const [showRecentMenu, setShowRecentMenu] = useState(false);
+  const [recentPipelines, setRecentPipelines] = useState<RecentPipelineEntry[]>([]);
 
   const handleExport = async (kind: 'png' | 'svg'): Promise<void> => {
     setShowExportMenu(false);
@@ -161,6 +171,7 @@ export const Toolbar: React.FC = () => {
   const handleSave = async () => {
     const datasetNode = nodes.find(n => n.data.definitionType === 'dataset_node');
     const datasetId = datasetNode?.data.datasetId as string;
+    const datasetName = datasetNode?.data.datasetName as string | undefined;
 
     if (!datasetId) {
       toast.error('No dataset node found', 'Cannot save pipeline without a dataset context.');
@@ -173,6 +184,17 @@ export const Toolbar: React.FC = () => {
         name: 'My Pipeline', // TODO: Add UI for naming
         description: 'Saved from Canvas',
         graph: getPipelinePayload()
+      });
+      // Mirror into the local recent-pipelines ring buffer so the user
+      // can roll back to this exact graph from the Toolbar even if the
+      // server copy gets overwritten by a later save. Best-effort —
+      // never fail the Save toast on a localStorage error.
+      pushRecentPipeline({
+        name: 'My Pipeline',
+        datasetId,
+        ...(datasetName ? { datasetName } : {}),
+        nodes,
+        edges,
       });
       toast.success('Pipeline saved');
     } catch {
@@ -198,7 +220,6 @@ export const Toolbar: React.FC = () => {
       variant: 'danger',
     });
     if (!ok) return;
-
     setIsLoading(true);
     try {
       const pipeline = await fetchPipeline(datasetId);
@@ -311,6 +332,70 @@ export const Toolbar: React.FC = () => {
     window.addEventListener(RUN_PREVIEW_EVENT, fire);
     return () => window.removeEventListener(RUN_PREVIEW_EVENT, fire);
   }, []);
+
+  // Recent-pipelines dropdown: hydrate lazily on open so the toolbar
+  // doesn't touch localStorage on every mount. We re-read on each open
+  // so a save in another tab is reflected next time the menu pops.
+  const openRecentMenu = (): void => {
+    setRecentPipelines(getRecentPipelines());
+    setShowRecentMenu(v => !v);
+  };
+
+  const handleRestoreRecent = async (entry: RecentPipelineEntry): Promise<void> => {
+    setShowRecentMenu(false);
+    // Warn when the snapshot was saved against a different dataset than
+    // the one currently loaded. Restoring is still allowed (some nodes
+    // are dataset-agnostic) but the user should be aware schema-bound
+    // nodes (column pickers, target column, …) may break.
+    const currentDatasetNode = nodes.find(n => n.data.definitionType === 'dataset_node');
+    const currentDatasetId = currentDatasetNode?.data.datasetId as string | undefined;
+    const mismatch =
+      entry.datasetId !== undefined &&
+      currentDatasetId !== undefined &&
+      entry.datasetId !== currentDatasetId;
+    const message = mismatch
+      ? `This snapshot was saved against "${entry.datasetName ?? entry.datasetId}", but the canvas is currently on a different dataset. Column-bound nodes may need to be reconfigured. Continue?`
+      : 'Loading this snapshot will overwrite your current canvas. Continue?';
+    const ok = await confirm({
+      title: `Restore "${entry.name}"?`,
+      message,
+      confirmLabel: 'Restore',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    setGraph(entry.nodes, entry.edges);
+    toast.success(`Restored "${entry.name}"`);
+  };
+
+  const handleClearRecent = async (): Promise<void> => {
+    const ok = await confirm({
+      title: 'Clear pipeline history?',
+      message: 'This removes all 5 recent snapshots from this browser. The server-side saved pipeline is unaffected.',
+      confirmLabel: 'Clear',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    clearRecentPipelines();
+    setRecentPipelines([]);
+    setShowRecentMenu(false);
+    toast.success('Pipeline history cleared');
+  };
+
+  // Compact human-readable "X minutes ago" — avoids pulling in a
+  // formatting library for one tiny use site.
+  const formatRelativeTime = (iso: string): string => {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    if (Number.isNaN(diffMs) || diffMs < 0) return 'just now';
+    const sec = Math.floor(diffMs / 1000);
+    if (sec < 45) return 'just now';
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ago`;
+    const day = Math.floor(hr / 24);
+    if (day < 30) return `${day}d ago`;
+    return new Date(iso).toLocaleDateString();
+  };
 
   return (
     <>
@@ -502,13 +587,74 @@ export const Toolbar: React.FC = () => {
       <div className="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2 max-w-[calc(100%-13rem)]">
         <button
           onClick={() => toggleDrawer()}
-          title="Jobs history"
-          aria-label="Jobs history"
+          title="Job runs history"
+          aria-label="Job runs history"
           className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
         >
           <History className="w-4 h-4" />
           <span className="text-sm font-medium hidden xl:inline">Jobs</span>
         </button>
+        {!readOnly && (
+          <div className="relative">
+            <button
+              onClick={openRecentMenu}
+              title="Recently saved pipelines (last 5)"
+              aria-label="Recently saved pipelines"
+              aria-haspopup="menu"
+              aria-expanded={showRecentMenu}
+              className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+            >
+              <Clock className="w-4 h-4" />
+              <span className="text-sm font-medium hidden xl:inline">Recent</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            {showRecentMenu && (
+              <div
+                role="menu"
+                aria-label="Recent pipelines"
+                className="absolute top-full right-0 mt-1 w-72 bg-background border rounded-md shadow-lg overflow-hidden z-20"
+              >
+                {recentPipelines.length === 0 ? (
+                  <div className="px-3 py-3 text-sm text-muted-foreground">
+                    No recent pipelines yet. Save one to populate this list.
+                  </div>
+                ) : (
+                  <>
+                    {recentPipelines.map((entry) => (
+                      <button
+                        key={entry.id}
+                        role="menuitem"
+                        onClick={() => { void handleRestoreRecent(entry); }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent border-b last:border-b-0"
+                      >
+                        <div className="font-medium truncate">{entry.name}</div>
+                        {entry.datasetName && (
+                          <div className="text-xs text-muted-foreground truncate mt-0.5" title={entry.datasetName}>
+                            on <span className="font-medium text-foreground/80">{entry.datasetName}</span>
+                          </div>
+                        )}
+                        <div className="text-xs text-muted-foreground flex items-center justify-between mt-0.5">
+                          <span>{formatRelativeTime(entry.savedAt)}</span>
+                          <span className="tabular-nums">
+                            {entry.nodes.length} nodes · {entry.edges.length} edges
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                    <button
+                      role="menuitem"
+                      onClick={() => { void handleClearRecent(); }}
+                      className="w-full text-left px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-1.5"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Clear history
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {!readOnly && (
           <button
             onClick={() => { void handleLoad(); }}
