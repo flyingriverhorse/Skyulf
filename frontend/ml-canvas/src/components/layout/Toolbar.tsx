@@ -279,6 +279,9 @@ export const Toolbar: React.FC = () => {
       }
       toast.success(`${count} experiment${count > 1 ? 's' : ''} queued`);
       toggleDrawer();
+      
+      // Keep standard nodes populated with data while experiments run in the background.
+      void handleRun();
     } catch {
       toast.error('Failed to run experiments');
     } finally {

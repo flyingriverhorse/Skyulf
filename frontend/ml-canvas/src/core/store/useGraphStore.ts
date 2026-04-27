@@ -73,6 +73,15 @@ interface GraphState {
   // Execution State
   executionResult: PreviewResponse | null;
   setExecutionResult: (result: PreviewResponse | null) => void;
+
+  // Per-node card summaries sourced from completed training/tuning
+  // jobs. Trainer/tuner jobs run via Celery and the engine's per-node
+  // `metadata.summary` never makes it into `executionResult` (the
+  // `/preview` path strips trainers before execution). The
+  // `useNodeJobSummaries` hook polls `/pipeline/jobs/node-summaries`
+  // and writes the result here so trainer cards can fall back to it.
+  nodeJobSummaries: Record<string, string>;
+  setNodeJobSummaries: (summaries: Record<string, string>) => void;
 }
 
 export const useGraphStore = create<GraphState>()(
@@ -83,6 +92,9 @@ export const useGraphStore = create<GraphState>()(
   executionResult: null,
 
   setExecutionResult: (result) => set({ executionResult: result }),
+
+  nodeJobSummaries: {},
+  setNodeJobSummaries: (summaries) => set({ nodeJobSummaries: summaries }),
   setGraph: (nodes, edges) => set({ nodes, edges }),
 
   onNodesChange: (changes: NodeChange[]) => {

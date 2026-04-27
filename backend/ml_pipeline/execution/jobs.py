@@ -160,6 +160,43 @@ class JobManager:
         return await AdvancedTuningManager.get_latest_tuning_job_for_node(session, node_id)
 
     @staticmethod
+    async def get_node_summaries(session: AsyncSession, limit: int = 200) -> Dict[str, str]:
+        """Latest completed-job ``metrics["summary"]`` keyed by ``node_id``.
+
+        Used by the canvas to populate trainer/tuner card lines after a
+        ``/pipeline/run`` job finishes — the engine stamps the summary
+        into ``metadata.summary`` per-node, but only ``job.metrics`` is
+        persisted to the DB (under the job that owns the trainer node).
+        We expose that single string per node id so the canvas can
+        render the same one-liner the inline preview path already shows
+        for non-trainer nodes.
+
+        Latest-wins: if the same node has been re-run, the most recent
+        completed job for that node provides the summary.
+        """
+        # Cheap aggregate: pull recent completed jobs from both tables
+        # and fold by node_id with start_time ordering. ``limit`` caps
+        # the scan so a long-running canvas with thousands of jobs
+        # doesn't pay an unbounded read on every poll.
+        train_jobs = await BasicTrainingManager.list_training_jobs(session, limit, 0)
+        tune_jobs = await AdvancedTuningManager.list_tuning_jobs(session, limit, 0)
+        out: Dict[str, str] = {}
+        # Sort newest first so the first hit per node_id wins.
+        for job in sorted(
+            train_jobs + tune_jobs,
+            key=lambda j: j.start_time or datetime.min,
+            reverse=True,
+        ):
+            if job.status != "completed" or not job.node_id:
+                continue
+            if job.node_id in out:
+                continue
+            summary = (job.metrics or {}).get("summary") if job.metrics else None
+            if isinstance(summary, str) and summary.strip():
+                out[job.node_id] = summary.strip()
+        return out
+
+    @staticmethod
     async def get_best_tuning_job_for_model(
         session: AsyncSession, model_type: str
     ) -> Optional[JobInfo]:
