@@ -120,13 +120,13 @@ const FlowCanvasContent: React.FC = () => {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
-  // F key → fit view. Lives here (not in the global keyboard hook)
-  // because `fitView` is only available inside ReactFlowProvider.
-  // Skip when typing in form fields so it doesn't fight with text input.
+  // F or Ctrl/Cmd+0 → fit view. Lives here (not in the global keyboard
+  // hook) because `fitView` is only available inside ReactFlowProvider.
+  // Ctrl/Cmd+0 mirrors the browser-standard "reset zoom" gesture users
+  // already have muscle memory for. Skip when typing in form fields so
+  // it doesn't fight with text input.
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
-      if (e.key !== 'f' && e.key !== 'F') return;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName;
       if (
@@ -137,6 +137,10 @@ const FlowCanvasContent: React.FC = () => {
       ) {
         return;
       }
+      const mod = e.ctrlKey || e.metaKey;
+      const isPlainF = (e.key === 'f' || e.key === 'F') && !mod && !e.altKey;
+      const isModZero = mod && e.key === '0';
+      if (!isPlainF && !isModZero) return;
       e.preventDefault();
       fitView({ duration: 250, padding: 0.15 });
     };

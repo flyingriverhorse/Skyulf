@@ -113,9 +113,8 @@ export const ExperimentsPage: React.FC = () => {
     try {
       await deploymentApi.deployModel(jobId);
       toast.success('Model deployed');
-    } catch (err) {
+    } catch {
       toast.error('Failed to deploy model');
-      console.error(err);
     }
   };
 
@@ -127,9 +126,8 @@ export const ExperimentsPage: React.FC = () => {
       } else {
         await promoteJob(job.job_id);
       }
-    } catch (err) {
+    } catch {
       toast.error('Failed to update promotion status');
-      console.error(err);
     }
   };
 
@@ -152,7 +150,6 @@ export const ExperimentsPage: React.FC = () => {
         link.href = dataUrl;
         link.click();
     } catch (e) {
-        console.error('Failed to download image', e);
         toast.error('Image download failed', String(e));
     } finally {
         setDownloadingChart(null);
