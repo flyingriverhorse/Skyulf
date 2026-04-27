@@ -13,6 +13,7 @@ from backend.ml_pipeline.execution.engine import PipelineEngine
 from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
 from backend.ml_pipeline.execution.strategies import JobStrategyFactory
 from backend.ml_pipeline.constants import StepType
+from backend.realtime.events import JobEvent, publish_job_event
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,9 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
         job.started_at = datetime.now()
         job.progress = 0
         session.commit()
+        publish_job_event(
+            JobEvent(event="status", job_id=job_id, status="running", progress=0)
+        )
 
         # 2. Setup Artifact Store
         from backend.ml_pipeline.artifacts.factory import ArtifactFactory
@@ -163,6 +167,17 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
                     job.logs = list(job_logs)
                     session.commit()
                     last_log_update = datetime.now()
+                    # Hint the frontend to refresh; payload stays minimal
+                    # because the WS is an invalidator, not a data source.
+                    publish_job_event(
+                        JobEvent(
+                            event="progress",
+                            job_id=job_id,
+                            status=job.status,
+                            progress=job.progress,
+                            current_step=job.current_step,
+                        )
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to update logs: {e}")
 
@@ -209,6 +224,9 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
 
         session.commit()
         logger.info(f"Job {job_id} finished with status: {job.status}")
+        publish_job_event(
+            JobEvent(event="status", job_id=job_id, status=job.status, progress=job.progress)
+        )
 
     except Exception as e:
         logger.error(f"Job {job_id} failed with exception: {str(e)}")
@@ -226,5 +244,8 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
                 else:
                     strategy.handle_failure(job, str(e))
                     session.commit()
+                publish_job_event(
+                    JobEvent(event="status", job_id=job_id, status=job.status)
+                )
     finally:
         session.close()
