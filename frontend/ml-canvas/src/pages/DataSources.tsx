@@ -75,8 +75,7 @@ export const DataSources: React.FC = () => {
 
     try {
       await deleteMutation.mutateAsync(id);
-    } catch (error) {
-      console.error('Failed to delete dataset:', error);
+    } catch {
       toast.error('Failed to delete dataset');
     }
   };
@@ -92,8 +91,7 @@ export const DataSources: React.FC = () => {
 
     try {
       await cancelMutation.mutateAsync(id);
-    } catch (error) {
-      console.error('Failed to cancel ingestion:', error);
+    } catch {
       toast.error('Failed to cancel ingestion');
     }
   };

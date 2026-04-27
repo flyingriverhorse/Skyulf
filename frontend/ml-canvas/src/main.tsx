@@ -11,6 +11,17 @@ import { ErrorBoundary, ConfirmProvider } from './components/shared'
 // `import.meta.env.DEV` guard inside the module.
 import './test/devHooks'
 
+// React Query Devtools — dev-only. Vite tree-shakes the import in
+// production builds because of the `import.meta.env.DEV` guard, so
+// there is zero impact on the prod bundle.
+const ReactQueryDevtools = import.meta.env.DEV
+  ? React.lazy(() =>
+      import('@tanstack/react-query-devtools').then((m) => ({
+        default: m.ReactQueryDevtools,
+      })),
+    )
+  : null;
+
 // Initialize node registry before rendering
 initializeRegistry();
 
@@ -25,6 +36,11 @@ if (rootElement) {
           <ConfirmProvider>
             <App />
             <Toaster richColors closeButton position="top-right" />
+            {ReactQueryDevtools && (
+              <React.Suspense fallback={null}>
+                <ReactQueryDevtools initialIsOpen={false} />
+              </React.Suspense>
+            )}
           </ConfirmProvider>
         </QueryClientProvider>
       </ErrorBoundary>

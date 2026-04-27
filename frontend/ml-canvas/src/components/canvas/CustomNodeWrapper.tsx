@@ -206,12 +206,16 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         </div>
       </div>
 
-      {/* Body (Custom Component or Default) */}
-      <div className="p-3">
+      {/* Body (Custom Component or Default).
+          When a node type has no custom body component we collapse the
+          padding so the empty card doesn't leave a hollow gap under the
+          header. Phase D placeholder until the per-node body content
+          plan (M1 in temp/frontend_polish_suggestions_2026.md) lands. */}
+      <div className={definition.component ? 'p-3' : 'px-3 pt-1 pb-2'}>
         {definition.component ? (
           <definition.component data={data} />
         ) : (
-          <div className="text-xs text-muted-foreground italic">
+          <div className="text-[11px] text-muted-foreground italic">
             No configuration needed
           </div>
         )}

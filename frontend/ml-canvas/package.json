@@ -65,6 +65,7 @@
   "devDependencies": {
     "@ladle/react": "^5.1.1",
     "@playwright/test": "^1.48.0",
+    "@tanstack/react-query-devtools": "^5.100.5",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^14.3.1",
     "@testing-library/user-event": "^14.6.1",

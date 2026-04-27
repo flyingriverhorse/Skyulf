@@ -175,8 +175,7 @@ export const Toolbar: React.FC = () => {
         graph: getPipelinePayload()
       });
       toast.success('Pipeline saved');
-    } catch (error) {
-      console.error('Save failed:', error);
+    } catch {
       toast.error('Failed to save pipeline');
     } finally {
       setIsSaving(false);
@@ -211,8 +210,7 @@ export const Toolbar: React.FC = () => {
       } else {
         toast.info('No saved pipeline found for this dataset');
       }
-    } catch (error) {
-      console.error('Load failed:', error);
+    } catch {
       toast.error('Failed to load pipeline');
     } finally {
       setIsLoading(false);
@@ -254,9 +252,8 @@ export const Toolbar: React.FC = () => {
       }
       toast.success(`${count} experiment${count > 1 ? 's' : ''} queued`);
       toggleDrawer();
-    } catch (error) {
-      console.error('Run All failed:', error);
-      toast.error('Failed to run experiments', 'Check console for details.');
+    } catch {
+      toast.error('Failed to run experiments');
     } finally {
       setIsRunningAll(false);
     }
@@ -334,6 +331,8 @@ export const Toolbar: React.FC = () => {
         <button
           onClick={() => setShowLegend(v => !v)}
           title="Show node badge legend"
+          aria-label="Show node badge legend"
+          aria-expanded={showLegend}
           className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
         >
           <HelpCircle className="w-4 h-4" />
@@ -504,6 +503,7 @@ export const Toolbar: React.FC = () => {
         <button
           onClick={() => toggleDrawer()}
           title="Jobs history"
+          aria-label="Jobs history"
           className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
         >
           <History className="w-4 h-4" />
@@ -514,6 +514,7 @@ export const Toolbar: React.FC = () => {
             onClick={() => { void handleLoad(); }}
             disabled={isLoading || isRunning}
             title="Load pipeline"
+            aria-label="Load pipeline"
             className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />}
@@ -525,6 +526,7 @@ export const Toolbar: React.FC = () => {
             onClick={() => { void handleSave(); }}
             disabled={isSaving || isRunning}
             title="Save pipeline"
+            aria-label="Save pipeline"
             className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -540,6 +542,7 @@ export const Toolbar: React.FC = () => {
             }}
             disabled={isRunning || nodes.length === 0}
             title="Auto-arrange nodes left-to-right by data flow"
+            aria-label="Tidy: auto-arrange nodes"
             className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
           >
             <Wand2 className="w-4 h-4" />
@@ -551,6 +554,7 @@ export const Toolbar: React.FC = () => {
             onClick={() => setShowExportMenu(v => !v)}
             disabled={isExporting || nodes.length === 0}
             title="Export canvas as image"
+            aria-label="Export canvas as image"
             aria-haspopup="menu"
             aria-expanded={showExportMenu}
             className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
@@ -586,6 +590,7 @@ export const Toolbar: React.FC = () => {
             onClick={() => { void handleRunAll(); }}
             disabled={isRunningAll || isRunning}
             title="Run all parallel branches as separate experiments"
+            aria-label="Run all parallel branches as separate experiments"
             className="flex items-center gap-2 px-3 py-2 text-white bg-amber-600 rounded-md shadow-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
           >
             {isRunningAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
@@ -597,6 +602,7 @@ export const Toolbar: React.FC = () => {
             onClick={() => { void handleRun(); }}
             disabled={isRunning}
             title="Run Preview (Ctrl+Enter)"
+            aria-label="Run Preview"
             className="flex items-center gap-2 px-3 py-2 text-white rounded-md shadow-sm transition-all disabled:opacity-50"
             style={{ background: 'var(--main-gradient)' }}
           >
