@@ -81,6 +81,7 @@ export const Sidebar: React.FC = () => {
                   // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- draggable item; drag is the primary interaction
                   <div
                     key={node.type}
+                    data-testid={`sidebar-node-${node.type}`}
                     className="group flex items-center p-3 border rounded-lg bg-card hover:border-primary/50 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all"
                     draggable
                     onDragStart={(e) => { handleDragStart(e, node.type); }}

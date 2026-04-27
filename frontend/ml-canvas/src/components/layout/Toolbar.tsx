@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown, Clock, Trash2 } from 'lucide-react';
+import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown, Clock, Trash2, Pin, PinOff, Pencil } from 'lucide-react';
 import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
@@ -19,6 +19,9 @@ import {
   getRecentPipelines,
   pushRecentPipeline,
   clearRecentPipelines,
+  togglePinRecentPipeline,
+  renameRecentPipeline,
+  deleteRecentPipeline,
   type RecentPipelineEntry,
 } from '../../core/utils/recentPipelines';
 import { toast } from '../../core/toast';
@@ -89,6 +92,9 @@ export const Toolbar: React.FC = () => {
   // so the toolbar mount cost stays zero, then refreshed on every save.
   const [showRecentMenu, setShowRecentMenu] = useState(false);
   const [recentPipelines, setRecentPipelines] = useState<RecentPipelineEntry[]>([]);
+  // Inline rename state — `null` when no row is being edited.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
 
   const handleExport = async (kind: 'png' | 'svg'): Promise<void> => {
     setShowExportMenu(false);
@@ -381,6 +387,52 @@ export const Toolbar: React.FC = () => {
     toast.success('Pipeline history cleared');
   };
 
+  // Pin / unpin keeps a snapshot from being evicted by FIFO so the user
+  // can lock in a known-good state alongside the rolling recent slots.
+  const handleTogglePin = (entry: RecentPipelineEntry): void => {
+    const updated = togglePinRecentPipeline(entry.id);
+    setRecentPipelines(updated);
+    toast.success(entry.pinned ? 'Unpinned' : 'Pinned');
+  };
+
+  const startRename = (entry: RecentPipelineEntry): void => {
+    setRenamingId(entry.id);
+    setRenameDraft(entry.name);
+  };
+
+  const commitRename = (): void => {
+    if (renamingId === null) return;
+    const updated = renameRecentPipeline(renamingId, renameDraft);
+    // renameRecentPipeline silently rejects empty / clashing names; if
+    // the list didn't change we surface a small toast so the user knows
+    // why the row didn't update.
+    const changed = updated.find((e) => e.id === renamingId)?.name === renameDraft.trim();
+    if (!changed && renameDraft.trim()) {
+      toast.error('Rename failed', 'Name is empty or already used by another snapshot.');
+    }
+    setRecentPipelines(updated);
+    setRenamingId(null);
+    setRenameDraft('');
+  };
+
+  const cancelRename = (): void => {
+    setRenamingId(null);
+    setRenameDraft('');
+  };
+
+  const handleDeleteRecent = async (entry: RecentPipelineEntry): Promise<void> => {
+    const ok = await confirm({
+      title: `Delete "${entry.name}"?`,
+      message: 'This snapshot will be removed from your local history. The server-side saved pipeline is unaffected.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    const updated = deleteRecentPipeline(entry.id);
+    setRecentPipelines(updated);
+    toast.success('Snapshot deleted');
+  };
+
   // Compact human-readable "X minutes ago" — avoids pulling in a
   // formatting library for one tiny use site.
   const formatRelativeTime = (iso: string): string => {
@@ -446,6 +498,7 @@ export const Toolbar: React.FC = () => {
             disabled={!canRedo}
             title="Redo (Ctrl+Shift+Z)"
             aria-label="Redo"
+            data-testid="toolbar-redo"
             className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
           >
             <Redo2 className="w-4 h-4" />
@@ -457,6 +510,7 @@ export const Toolbar: React.FC = () => {
             disabled={!canUndo}
             title="Undo (Ctrl+Z)"
             aria-label="Undo"
+            data-testid="toolbar-undo"
             className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
           >
             <Undo2 className="w-4 h-4" />
@@ -589,6 +643,7 @@ export const Toolbar: React.FC = () => {
           onClick={() => toggleDrawer()}
           title="Job runs history"
           aria-label="Job runs history"
+          data-testid="toolbar-jobs"
           className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
         >
           <History className="w-4 h-4" />
@@ -602,6 +657,7 @@ export const Toolbar: React.FC = () => {
               aria-label="Recently saved pipelines"
               aria-haspopup="menu"
               aria-expanded={showRecentMenu}
+              data-testid="toolbar-recent"
               className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
             >
               <Clock className="w-4 h-4" />
@@ -620,27 +676,90 @@ export const Toolbar: React.FC = () => {
                   </div>
                 ) : (
                   <>
-                    {recentPipelines.map((entry) => (
-                      <button
-                        key={entry.id}
-                        role="menuitem"
-                        onClick={() => { void handleRestoreRecent(entry); }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent border-b last:border-b-0"
-                      >
-                        <div className="font-medium truncate">{entry.name}</div>
-                        {entry.datasetName && (
-                          <div className="text-xs text-muted-foreground truncate mt-0.5" title={entry.datasetName}>
-                            on <span className="font-medium text-foreground/80">{entry.datasetName}</span>
-                          </div>
-                        )}
-                        <div className="text-xs text-muted-foreground flex items-center justify-between mt-0.5">
-                          <span>{formatRelativeTime(entry.savedAt)}</span>
-                          <span className="tabular-nums">
-                            {entry.nodes.length} nodes · {entry.edges.length} edges
-                          </span>
+                    {recentPipelines.map((entry) => {
+                      const isRenaming = renamingId === entry.id;
+                      return (
+                        <div
+                          key={entry.id}
+                          role="menuitem"
+                          className="group w-full px-3 py-2 text-sm hover:bg-accent border-b last:border-b-0"
+                        >
+                          {isRenaming ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                // Focus is moved to the input as a direct response
+                                // to the user clicking the pencil — the inline-rename
+                                // affordance is unusable without it.
+                                // eslint-disable-next-line jsx-a11y/no-autofocus
+                                autoFocus
+                                value={renameDraft}
+                                onChange={(e) => setRenameDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') commitRename();
+                                  else if (e.key === 'Escape') cancelRename();
+                                }}
+                                onBlur={commitRename}
+                                aria-label="Rename pipeline"
+                                className="flex-1 px-2 py-1 text-sm bg-background border rounded outline-none focus:ring-1 focus:ring-primary"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex items-start gap-1.5">
+                              <button
+                                onClick={() => { void handleRestoreRecent(entry); }}
+                                className="flex-1 text-left min-w-0"
+                                title="Restore this snapshot"
+                              >
+                                <div className="font-medium truncate flex items-center gap-1.5">
+                                  {entry.pinned && <Pin className="w-3 h-3 text-amber-500 flex-shrink-0" aria-label="Pinned" />}
+                                  <span className="truncate">{entry.name}</span>
+                                </div>
+                                {entry.datasetName && (
+                                  <div className="text-xs text-muted-foreground truncate mt-0.5" title={entry.datasetName}>
+                                    on <span className="font-medium text-foreground/80">{entry.datasetName}</span>
+                                  </div>
+                                )}
+                                <div className="text-xs text-muted-foreground flex items-center justify-between mt-0.5">
+                                  <span>{formatRelativeTime(entry.savedAt)}</span>
+                                  <span className="tabular-nums">
+                                    {entry.nodes.length} nodes · {entry.edges.length} edges
+                                  </span>
+                                </div>
+                              </button>
+                              {/* Per-row actions — visible on hover/focus to keep
+                                  the resting row uncluttered. */}
+                              <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => handleTogglePin(entry)}
+                                  title={entry.pinned ? 'Unpin' : 'Pin (exempt from FIFO)'}
+                                  aria-label={entry.pinned ? 'Unpin pipeline' : 'Pin pipeline'}
+                                  className="p-1 rounded hover:bg-background text-muted-foreground hover:text-foreground"
+                                >
+                                  {entry.pinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
+                                </button>
+                                <button
+                                  onClick={() => startRename(entry)}
+                                  title="Rename"
+                                  aria-label="Rename pipeline"
+                                  className="p-1 rounded hover:bg-background text-muted-foreground hover:text-foreground"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => { void handleDeleteRecent(entry); }}
+                                  title="Delete"
+                                  aria-label="Delete pipeline"
+                                  className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </button>
-                    ))}
+                      );
+                    })}
                     <button
                       role="menuitem"
                       onClick={() => { void handleClearRecent(); }}
@@ -661,6 +780,7 @@ export const Toolbar: React.FC = () => {
             disabled={isLoading || isRunning}
             title="Load pipeline"
             aria-label="Load pipeline"
+            data-testid="toolbar-load"
             className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />}
@@ -673,6 +793,7 @@ export const Toolbar: React.FC = () => {
             disabled={isSaving || isRunning}
             title="Save pipeline"
             aria-label="Save pipeline"
+            data-testid="toolbar-save"
             className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -737,6 +858,7 @@ export const Toolbar: React.FC = () => {
             disabled={isRunningAll || isRunning}
             title="Run all parallel branches as separate experiments"
             aria-label="Run all parallel branches as separate experiments"
+            data-testid="toolbar-run-all"
             className="flex items-center gap-2 px-3 py-2 text-white bg-amber-600 rounded-md shadow-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
           >
             {isRunningAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
@@ -749,6 +871,7 @@ export const Toolbar: React.FC = () => {
             disabled={isRunning}
             title="Run Preview (Ctrl+Enter)"
             aria-label="Run Preview"
+            data-testid="toolbar-run-preview"
             className="flex items-center gap-2 px-3 py-2 text-white rounded-md shadow-sm transition-all disabled:opacity-50"
             style={{ background: 'var(--main-gradient)' }}
           >

@@ -5,14 +5,14 @@ import { InfoTooltip } from '../ui/InfoTooltip';
 interface FilterItem {
     column: string;
     operator: string;
-    value: any;
+    value: unknown;
 }
 
 interface FilterBarProps {
     filters: FilterItem[];
     columns: string[];
     excludedCols: string[];
-    onAddFilter: (column: string, value: any, operator: string) => void;
+    onAddFilter: (column: string, value: unknown, operator: string) => void;
     onRemoveFilter: (index: number) => void;
     onClearFilters: () => void;
     onToggleExclude: (column: string, exclude: boolean) => void;

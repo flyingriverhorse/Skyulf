@@ -160,8 +160,12 @@ export const DataDriftPage: React.FC = () => {
             setReport(result);
             // Refresh drift history
             monitoringApi.getDriftHistory(selectedJob).then(setDriftHistory).catch(() => {});
-        } catch (err: any) {
-            setError(err.response?.data?.detail || "Failed to calculate drift.");
+        } catch (err: unknown) {
+            const detail =
+                err && typeof err === 'object' && 'response' in err
+                    ? ((err as { response?: { data?: { detail?: string } } }).response?.data?.detail)
+                    : undefined;
+            setError(detail || "Failed to calculate drift.");
         } finally {
             setLoading(false);
         }

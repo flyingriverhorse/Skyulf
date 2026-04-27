@@ -3,6 +3,7 @@ import { BarChart2, GitBranch, Eye, Pencil, Rocket } from 'lucide-react';
 import { useViewStore } from '../../core/store/useViewStore';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import { useViewport } from '../../core/hooks/useViewport';
+import { Breadcrumb } from './Breadcrumb';
 
 export const Navbar: React.FC = () => {
   const { activeView, setView } = useViewStore();
@@ -24,8 +25,9 @@ export const Navbar: React.FC = () => {
 
   return (
     <div className="h-14 border-b bg-card px-4 flex items-center justify-center shrink-0 relative">
+      <Breadcrumb />
       {/* Navigation */}
-      <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg">
+      <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg" data-testid="navbar-views">
         <button
           onClick={() => setView('canvas')}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
