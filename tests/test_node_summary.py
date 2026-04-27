@@ -351,10 +351,29 @@ def test_regression_overfit_gap_uses_r2_direction() -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_advanced_tuning_leads_with_best_score_and_scoring_metric() -> None:
+    """Tuning headline mirrors the JobsDrawer's "Best Score" line.
+
+    Even when post-tune eval metrics exist, the card leads with the
+    tuner's own objective so the number on the card matches the number
+    the user sees in the drawer (and updates run-over-run, which the
+    rounded test-set numbers often don't on small holdouts).
+    """
+    out = build_summary(
+        step_type="advanced_tuning",
+        output=None,
+        metrics={
+            "best_score": 0.9324,
+            "scoring_metric": "f1_weighted",
+            "trials": [{}] * 10,
+            "test_accuracy": 0.9667,
+            "test_f1_weighted": 0.9666,
+        },
+    )
+    assert out == "f1w 0.932 · 10 trials"
+
+
 def test_advanced_tuning_uses_best_score_when_no_test_metrics() -> None:
-    """When the post-tune evaluate() failed silently, the card still
-    shows the tuner's headline (best_score + scoring metric + trial
-    count) so the user knows the run produced something."""
     out = build_summary(
         step_type="advanced_tuning",
         output=None,
@@ -364,24 +383,7 @@ def test_advanced_tuning_uses_best_score_when_no_test_metrics() -> None:
             "trials": [{}, {}, {}, {}, {}],
         },
     )
-    assert out == "best 0.913 (f1) · 5 trials"
-
-
-def test_advanced_tuning_prefers_test_metrics_with_trial_count() -> None:
-    """When evaluate() did succeed, the per-split metric is the headline
-    and ``trials`` is appended for context."""
-    out = build_summary(
-        step_type="advanced_tuning",
-        output=None,
-        metrics={
-            "best_score": 0.913,
-            "scoring_metric": "f1",
-            "trials": [{}] * 40,
-            "test_accuracy": 0.873,
-            "test_f1": 0.842,
-        },
-    )
-    assert out == "acc 0.87 · f1 0.84 · 40 trials"
+    assert out == "f1 0.913 · 5 trials"
 
 
 def test_advanced_tuning_int_trials_is_accepted() -> None:
@@ -391,7 +393,37 @@ def test_advanced_tuning_int_trials_is_accepted() -> None:
         output=None,
         metrics={"best_score": 0.5, "scoring_metric": "r2", "trials": 12},
     )
-    assert out == "best 0.500 (r2) · 12 trials"
+    assert out == "r² 0.500 · 12 trials"
+
+
+def test_advanced_tuning_neg_loss_is_sign_flipped() -> None:
+    """sklearn losses come in as ``neg_*`` (higher-is-better). Show the
+    natural magnitude on the card so the user can reason about it."""
+    out = build_summary(
+        step_type="advanced_tuning",
+        output=None,
+        metrics={
+            "best_score": -12.34,
+            "scoring_metric": "neg_mean_squared_error",
+            "trials": 20,
+        },
+    )
+    assert out == "mse 12.340 · 20 trials"
+
+
+def test_advanced_tuning_legacy_eval_only_falls_back_to_test_metrics() -> None:
+    """Old job rows without ``best_score`` (pre-tuning-summary refactor)
+    still render via the eval headline."""
+    out = build_summary(
+        step_type="advanced_tuning",
+        output=None,
+        metrics={
+            "trials": [{}] * 40,
+            "test_accuracy": 0.873,
+            "test_f1": 0.842,
+        },
+    )
+    assert out == "acc 0.87 · f1 0.84 · 40 trials"
 
 
 # ---------------------------------------------------------------------------

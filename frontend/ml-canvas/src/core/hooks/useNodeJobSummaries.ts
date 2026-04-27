@@ -49,9 +49,20 @@ export function useNodeJobSummaries(): void {
       scheduleRefresh();
     });
 
+    // Safety-net poll: the WS event stream is the primary refresh trigger,
+    // but if it drops (Redis bounce, proxy timeout, dev stack without
+    // Celery) the trainer cards would otherwise show stale numbers from
+    // a previous run until the user navigates away. 30 s is rare enough
+    // not to load the API but tight enough that "I just hit Run" feels
+    // live.
+    const safetyPoll = setInterval(() => {
+      void fetchSummaries();
+    }, 30_000);
+
     return () => {
       cancelled = true;
       if (refreshTimer) clearTimeout(refreshTimer);
+      clearInterval(safetyPoll);
       unsubscribe();
     };
   }, [setNodeJobSummaries]);

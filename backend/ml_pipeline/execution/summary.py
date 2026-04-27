@@ -437,15 +437,50 @@ def _training_summary(metrics: Mapping[str, Any]) -> Optional[str]:
     return None
 
 
+# Short labels used in the tuning headline. Mirrors what the JobsDrawer
+# renders next to "Best Score (…)" so the card and the drawer agree on
+# wording. Anything not listed falls back to the raw scoring name.
+_SCORING_LABEL: Dict[str, str] = {
+    "accuracy": "acc",
+    "balanced_accuracy": "bal-acc",
+    "f1": "f1",
+    "f1_weighted": "f1w",
+    "f1_macro": "f1m",
+    "f1_micro": "f1µ",
+    "precision": "prec",
+    "precision_weighted": "precw",
+    "recall": "rec",
+    "recall_weighted": "recw",
+    "roc_auc": "auc",
+    "roc_auc_weighted": "aucw",
+    "roc_auc_ovr": "auc",
+    "roc_auc_ovr_weighted": "aucw",
+    "average_precision": "ap",
+    "neg_log_loss": "logloss",
+    "r2": "r²",
+    "neg_mean_absolute_error": "mae",
+    "neg_mean_squared_error": "mse",
+    "neg_root_mean_squared_error": "rmse",
+    "neg_mean_absolute_percentage_error": "mape",
+}
+
+
 def _tuning_summary(metrics: Mapping[str, Any]) -> Optional[str]:
     """Hyperparameter-tuning summary.
 
-    Prefers the same per-split metric layout as basic training (so the
-    user sees the same headline shape). When the post-tuning evaluation
-    didn't run, falls back to the tuner's ``best_score`` + scoring metric
-    + trial count so the card is never empty after a successful tune.
+    Leads with the tuner's own ``best_score`` + scoring-metric short
+    label, because that is the headline number the JobsDrawer shows
+    ("Best Score (F1 Weighted) 0.9324"). The post-tuning test-set
+    evaluation lives further down in the drawer; using *that* as the
+    card line caused two recurring complaints:
+
+    * It didn't match the prominent "Best Score" the user just read.
+    * Small test sets often round identically across re-tunes, so the
+      card looked stale even when the tuner improved.
+
+    Falls back to the eval headline when no ``best_score`` is present
+    (e.g. legacy job rows), then to nothing.
     """
-    base = _training_summary(metrics)
     trials = metrics.get("trials")
     n_trials: Optional[int] = None
     if isinstance(trials, list):
@@ -453,15 +488,22 @@ def _tuning_summary(metrics: Mapping[str, Any]) -> Optional[str]:
     elif isinstance(trials, int):
         n_trials = trials
 
-    if base is not None:
-        return f"{base} · {n_trials} trials" if n_trials else base
-
-    # Fallback path: best_score is the only thing we have.
     best = metrics.get("best_score")
     if isinstance(best, (int, float)) and not isinstance(best, bool):
-        scoring = metrics.get("scoring_metric") or "score"
-        head = f"best {float(best):.3f} ({scoring})"
+        scoring_raw = str(metrics.get("scoring_metric") or "").strip()
+        # Most sklearn losses are reported as `neg_*` (higher is better).
+        # Flip the sign so the card shows the natural magnitude.
+        value = float(best)
+        if scoring_raw.startswith("neg_") and value <= 0:
+            value = -value
+        label = _SCORING_LABEL.get(scoring_raw) or (scoring_raw.replace("_", " ") or "score")
+        head = f"{label} {value:.3f}"
         return f"{head} · {n_trials} trials" if n_trials else head
+
+    # Legacy fallback: no best_score recorded — use eval headline.
+    base = _training_summary(metrics)
+    if base is not None:
+        return f"{base} · {n_trials} trials" if n_trials else base
     return None
 
 

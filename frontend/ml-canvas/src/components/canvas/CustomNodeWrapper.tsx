@@ -3,6 +3,7 @@ import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
 import { registry } from '../../core/registry/NodeRegistry';
 import { AlertCircle, X, CheckCircle2, XCircle, Merge, GitFork } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
+import { useJobStore } from '../../core/store/useJobStore';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import type { NodeExecutionResult } from '../../core/api/client';
 import {
@@ -14,18 +15,30 @@ import {
 function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   const definitionType = data.definitionType as string;
   const definition = registry.get(definitionType);
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, getEdges } = useReactFlow();
   // In read-only mode the per-node X is hidden along with the global
   // editor affordances (Backspace, sidebars, undo/redo, palette).
   const readOnly = useReadOnlyMode();
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult: NodeExecutionResult | undefined = executionResult?.node_results?.[id];
-  // Fallback summary for trainer/tuner nodes whose jobs run via
-  // Celery — they never populate `executionResult.node_results`. The
-  // `useNodeJobSummaries` hook keeps this map fresh from the
-  // `/jobs/node-summaries` endpoint after every job event.
-  const jobSummary = useGraphStore((state) => state.nodeJobSummaries[id]);
+  // Fallback summary entries for trainer/tuner nodes whose jobs run
+  // via Celery — they never populate `executionResult.node_results`.
+  // The `useNodeJobSummaries` hook keeps this map fresh from
+  // `/jobs/node-summaries` after every job event. For parallel runs
+  // the array contains one entry per branch; merge runs have one.
+  const jobSummaries = useGraphStore((state) => state.nodeJobSummaries[id]);
+  // Mirror of the canvas branch labels so multi-branch trainer cards
+  // can show "Path B · Xgboost" letters that match the colored edges.
+  const branchEdgeLabels = useGraphStore((state) => state.branchEdgeLabels);
+  // Whether a fresh job is currently in flight for this node — lets
+  // the card tag the existing (now-stale) summary as "previous run"
+  // in its tooltip until the new job completes and overwrites it.
+  const isJobInFlight = useJobStore((state) =>
+    state.jobs.some(
+      (j) => j.node_id === id && (j.status === 'running' || j.status === 'queued'),
+    ),
+  );
   const incomingSourceCount = useGraphStore(
     (state) => new Set(state.edges.filter((e) => e.target === id).map((e) => e.source)).size,
     (a, b) => a === b
@@ -233,16 +246,83 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
             </div>
           );
         }
-        const summary = nodeResult?.metadata?.summary?.trim() || jobSummary?.trim();
-        if (summary) {
-          return (
-            <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">
-              <div
-                className="text-[11px] text-foreground/80 font-mono tabular-nums truncate text-center w-full"
-                title={summary}
-              >
-                {summary}
+        // Priority chain for the body line:
+        //  1. Inline preview run (`nodeResult.metadata.summary`) wins
+        //     because it's always the freshest source for non-trainer
+        //     nodes that run through `/preview`.
+        //  2. Trainer/tuner Celery jobs land in `jobSummaries` instead.
+        //     For parallel terminals this is an array (one entry per
+        //     branch); for merge terminals it's a single entry.
+        const inlineSummary = nodeResult?.metadata?.summary?.trim();
+        const jobEntries = (jobSummaries ?? []).filter((e) => e.summary && e.summary.trim());
+        if (inlineSummary || jobEntries.length > 0) {
+          // Tooltip phrasing: when a fresh job is in flight, mark the
+          // currently-rendered summary as the previous run so the user
+          // knows the card hasn't updated yet.
+          const tooltipPrefix = isJobInFlight ? 'Previous run · new run in progress—\n' : '';
+          if (inlineSummary || jobEntries.length === 1) {
+            const text = inlineSummary || jobEntries[0]!.summary;
+            return (
+              <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">
+                <div
+                  className="text-[11px] text-foreground/80 font-mono tabular-nums truncate text-center w-full"
+                  title={`${tooltipPrefix}${text}`}
+                >
+                  {text}
+                </div>
               </div>
+            );
+          }
+          // Multi-branch: render one row per branch. Path labels come
+          // from the canvas's `useBranchColors` map (mirrored into the
+          // store as `branchEdgeLabels`) so the letters here always
+          // match the colored "Path B · Xgboost" tags on the incoming
+          // edges. We pair entries to incoming edges by order — both
+          // backend (`partition_parallel_pipeline`) and the canvas
+          // iterate `term.inputs` / `terminalIncoming` in the same
+          // order, and `jobEntries` is already sorted by branch_index.
+          const incomingEdges = getEdges()
+            .filter((e) => e.target === id)
+            .sort((a, b) => (a.sourceHandle ?? '').localeCompare(b.sourceHandle ?? ''));
+          const rows = jobEntries.map((entry, idx) => {
+            const edge = incomingEdges[idx];
+            const fullLabel = edge ? branchEdgeLabels[edge.id] : undefined;
+            // `Path X · Suffix` -> just `X` for the inline pill; full
+            // label still goes into the tooltip below for context.
+            let letter: string;
+            const m = fullLabel?.match(/^Path\s+([A-Z])/);
+            if (m) {
+              letter = m[1]!;
+            } else {
+              const fallbackIdx = entry.branch_index ?? idx;
+              letter = String.fromCharCode(65 + Math.max(0, fallbackIdx));
+            }
+            return {
+              key: entry.pipeline_id,
+              letter,
+              tooltipLabel: fullLabel ?? `Path ${letter}`,
+              summary: entry.summary,
+            };
+          });
+          const tooltipBody = rows
+            .map((r) => `${r.tooltipLabel}: ${r.summary}`)
+            .join('\n');
+          return (
+            <div
+              className="px-3 py-2 flex flex-col gap-0.5"
+              title={`${tooltipPrefix}${tooltipBody}`}
+            >
+              {rows.map((r) => (
+                <div
+                  key={r.key}
+                  className="text-[11px] text-foreground/80 font-mono tabular-nums truncate flex items-center gap-1.5"
+                >
+                  <span className="shrink-0 px-1 rounded bg-muted text-[10px] text-muted-foreground">
+                    {r.letter}
+                  </span>
+                  <span className="truncate">{r.summary}</span>
+                </div>
+              ))}
             </div>
           );
         }

@@ -160,40 +160,91 @@ class JobManager:
         return await AdvancedTuningManager.get_latest_tuning_job_for_node(session, node_id)
 
     @staticmethod
-    async def get_node_summaries(session: AsyncSession, limit: int = 200) -> Dict[str, str]:
-        """Latest completed-job ``metrics["summary"]`` keyed by ``node_id``.
+    async def get_node_summaries(
+        session: AsyncSession, limit: int = 200
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """Per-node card summaries from the latest *run group*, keyed by ``node_id``.
+
+        Returns ``{node_id: [entry, ...]}`` where each entry is::
+
+            {
+                "summary": "acc 0.87 · f1 0.84",
+                "branch_index": 0,                   # Optional[int]
+                "pipeline_id": "...__branch_0",
+                "parent_pipeline_id": "...",
+                "finished_at": "2026-04-27T...",
+            }
+
+        For canvases with parallel terminals (one training node fed by N
+        branches), a single ``Run All`` produces N completed jobs that
+        share a ``parent_pipeline_id`` — we keep all of them so the card
+        can render one summary line per branch (Path A / Path B / …).
+        Older run groups are dropped: only the most recent
+        ``parent_pipeline_id`` per node id is returned, so the card never
+        mixes a fresh branch with a stale one.
 
         Used by the canvas to populate trainer/tuner card lines after a
-        ``/pipeline/run`` job finishes — the engine stamps the summary
-        into ``metadata.summary`` per-node, but only ``job.metrics`` is
-        persisted to the DB (under the job that owns the trainer node).
-        We expose that single string per node id so the canvas can
-        render the same one-liner the inline preview path already shows
-        for non-trainer nodes.
-
-        Latest-wins: if the same node has been re-run, the most recent
-        completed job for that node provides the summary.
+        ``/pipeline/run`` finishes — the engine stamps the summary into
+        ``metadata.summary`` per-node, but only ``job.metrics`` is
+        persisted, so the per-node engine metadata never reaches the FE
+        store. We expose the same one-liner the inline preview path
+        already shows for non-trainer nodes.
         """
-        # Cheap aggregate: pull recent completed jobs from both tables
-        # and fold by node_id with start_time ordering. ``limit`` caps
-        # the scan so a long-running canvas with thousands of jobs
-        # doesn't pay an unbounded read on every poll.
         train_jobs = await BasicTrainingManager.list_training_jobs(session, limit, 0)
         tune_jobs = await AdvancedTuningManager.list_tuning_jobs(session, limit, 0)
-        out: Dict[str, str] = {}
-        # Sort newest first so the first hit per node_id wins.
-        for job in sorted(
+        # Newest first so the first hit per node_id wins for the
+        # "latest run group" key.
+        all_jobs = sorted(
             train_jobs + tune_jobs,
             key=lambda j: j.start_time or datetime.min,
             reverse=True,
-        ):
+        )
+        # Phase 1: pick the parent_pipeline_id of the most recent
+        # completed job for each node. Treat a missing
+        # ``parent_pipeline_id`` as a single-branch run; collapse it on
+        # the job's own ``pipeline_id`` so single-terminal runs still
+        # group together correctly.
+        latest_group: Dict[str, str] = {}
+        for job in all_jobs:
             if job.status != "completed" or not job.node_id:
                 continue
-            if job.node_id in out:
+            if job.node_id in latest_group:
+                continue
+            group_key = job.parent_pipeline_id or job.pipeline_id
+            if group_key:
+                latest_group[job.node_id] = group_key
+        # Phase 2: collect every completed job belonging to that group.
+        out: Dict[str, List[Dict[str, Any]]] = {}
+        for job in all_jobs:
+            if job.status != "completed" or not job.node_id:
+                continue
+            target_group = latest_group.get(job.node_id)
+            if target_group is None:
+                continue
+            group_key = job.parent_pipeline_id or job.pipeline_id
+            if group_key != target_group:
                 continue
             summary = (job.metrics or {}).get("summary") if job.metrics else None
-            if isinstance(summary, str) and summary.strip():
-                out[job.node_id] = summary.strip()
+            if not isinstance(summary, str) or not summary.strip():
+                continue
+            entry: Dict[str, Any] = {
+                "summary": summary.strip(),
+                "branch_index": job.branch_index,
+                "pipeline_id": job.pipeline_id,
+                "parent_pipeline_id": job.parent_pipeline_id,
+                "finished_at": job.end_time.isoformat() if job.end_time else None,
+            }
+            out.setdefault(job.node_id, []).append(entry)
+        # Sort each node's entries by branch_index (None last) so the
+        # frontend can render them in deterministic Path-A/B/C order
+        # without re-sorting.
+        for entries in out.values():
+            entries.sort(
+                key=lambda e: (
+                    e["branch_index"] is None,
+                    e["branch_index"] if e["branch_index"] is not None else 0,
+                )
+            )
         return out
 
     @staticmethod
