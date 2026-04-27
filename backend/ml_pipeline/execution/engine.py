@@ -289,7 +289,24 @@ class PipelineEngine:
             metadata: Dict[str, Any] = {}
             try:
                 output = self.artifact_store.load(node.node_id)
-                summary = build_summary(step_type=node.step_type, output=output, metrics=metrics)
+                # Best-effort upstream shape — lets the summary render
+                # row/col deltas (e.g. "−127 rows (1.8%)") for filters
+                # and selectors instead of an opaque post-shape line.
+                input_shape = None
+                try:
+                    if node.inputs:
+                        upstream = self.artifact_store.load(node.inputs[0])
+                        if isinstance(upstream, pd.DataFrame):
+                            input_shape = upstream.shape
+                except Exception:
+                    input_shape = None
+                summary = build_summary(
+                    step_type=node.step_type,
+                    output=output,
+                    metrics=metrics,
+                    input_shape=input_shape,
+                    params=node.params or {},
+                )
                 if summary:
                     metadata["summary"] = summary
             except Exception:
