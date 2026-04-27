@@ -543,6 +543,14 @@ export const FeatureSelectionNode: NodeDefinition<FeatureSelectionConfig> = {
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Selected', type: 'dataset' }],
   settings: FeatureSelectionSettings,
+  bodyPreview: (config) => {
+    const method = config.method ?? 'variance_threshold';
+    if (method === 'select_k_best' && config.k != null) return `${method} · k=${config.k}`;
+    if (method === 'select_percentile' && config.percentile != null) return `${method} · ${config.percentile}%`;
+    if (method === 'variance_threshold' && config.threshold != null) return `${method} · σ>${config.threshold}`;
+    if (method === 'rfe' && config.k != null) return `${method} · k=${config.k}`;
+    return method;
+  },
   validate: (config) => {
     if (config.method !== 'variance_threshold' && !config.target_column) {
       return { isValid: false, message: 'Target column is required for this method.' };

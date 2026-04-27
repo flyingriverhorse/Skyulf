@@ -90,6 +90,12 @@ export const DataCleaningNode: NodeDefinition<DataCleaningConfig> = {
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Cleaned Data', type: 'dataset' }],
   settings: DataCleaningSettings,
+  bodyPreview: (config) => {
+    const drops = config.dropColumns?.length ?? 0;
+    const fill = config.fillStrategy ?? 'mean';
+    if (drops > 0) return `Drop ${drops} cols · fill ${fill}`;
+    return `Fill missing: ${fill}`;
+  },
   validate: (_config) => ({ isValid: true }),
   getDefaultConfig: () => ({
     dropColumns: [],

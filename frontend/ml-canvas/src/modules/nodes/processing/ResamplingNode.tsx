@@ -483,6 +483,12 @@ export const ResamplingNode: NodeDefinition<ResamplingConfig> = {
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Balanced Data', type: 'dataset' }],
   settings: ResamplingSettings,
+  bodyPreview: (config) => {
+    const method = (config.method ?? 'smote').toUpperCase();
+    const target = config.target_column;
+    if (target) return `${method} → ${target}`;
+    return method;
+  },
   validate: validate,
   getDefaultConfig: () => ({
     type: 'oversampling',

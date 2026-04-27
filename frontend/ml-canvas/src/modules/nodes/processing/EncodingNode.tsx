@@ -363,6 +363,12 @@ export const EncodingNode: NodeDefinition<EncodingConfig> = {
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Encoded Data', type: 'dataset' }],
   settings: EncodingSettings,
+  bodyPreview: (config) => {
+    const cols = config.columns?.length ?? 0;
+    const method = config.method ?? 'onehot';
+    if (cols === 0) return method;
+    return `${method} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
+  },
   validate: (config) => {
     if (config.columns.length === 0) return { isValid: false, error: 'Select at least one column' };
     return { isValid: true };

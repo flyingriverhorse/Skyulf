@@ -359,6 +359,12 @@ export const TextCleaningNode: NodeDefinition<TextCleaningConfig> = {
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Cleaned Data', type: 'dataset' }],
   settings: TextCleaningSettings,
+  bodyPreview: (config) => {
+    const cols = config.columns?.length ?? 0;
+    const ops = config.operations?.length ?? 0;
+    if (cols === 0 && ops === 0) return null;
+    return `${ops} op${ops === 1 ? '' : 's'} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
+  },
   validate: (config) => {
     if (config.columns.length === 0) return { isValid: false, message: 'Select at least one column.' };
     if (config.operations.length === 0) return { isValid: false, message: 'Add at least one operation.' };

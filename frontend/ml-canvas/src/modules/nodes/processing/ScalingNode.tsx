@@ -320,6 +320,12 @@ export const ScalingNode: NodeDefinition<ScalingConfig> = {
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Scaled Data', type: 'dataset' }],
   settings: ScalingSettings,
+  bodyPreview: (config) => {
+    const cols = config.columns?.length ?? 0;
+    const method = config.method ?? 'standard';
+    if (cols === 0) return method;
+    return `${method} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
+  },
   validate: (config) => ({ 
     isValid: config.columns.length > 0,
     message: config.columns.length === 0 ? 'Select at least one column' : undefined
