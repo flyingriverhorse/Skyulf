@@ -206,20 +206,68 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         </div>
       </div>
 
-      {/* Body (Custom Component or Default).
-          When a node type has no custom body component we collapse the
-          padding so the empty card doesn't leave a hollow gap under the
-          header. Phase D placeholder until the per-node body content
-          plan (M1 in temp/frontend_polish_suggestions_2026.md) lands. */}
-      <div className={definition.component ? 'p-3' : 'px-3 pt-1 pb-2'}>
-        {definition.component ? (
-          <definition.component data={data} />
-        ) : (
-          <div className="text-[11px] text-muted-foreground italic">
-            No configuration needed
-          </div>
-        )}
-      </div>
+      {/* Body — priority chain (see temp/node_body_content_plan.md):
+          1. Inspection-class nodes with a custom `component` always win.
+          2. Backend post-run summary (`nodeResult.metadata.summary`).
+          3. Frontend pre-run preview (`definition.bodyPreview(data)`).
+          4. Static italic description.
+          5. Nothing — collapse padding so card visually shrinks. */}
+      {(() => {
+        if (definition.component) {
+          return (
+            <div className="p-3">
+              <definition.component data={data} />
+            </div>
+          );
+        }
+        const summary = nodeResult?.metadata?.summary?.trim();
+        if (summary) {
+          return (
+            <div className="px-3 pt-1 pb-2">
+              <div
+                className="text-[11px] text-foreground/80 font-mono tabular-nums truncate"
+                title={summary}
+              >
+                {summary}
+              </div>
+            </div>
+          );
+        }
+        let preview: string | null = null;
+        if (definition.bodyPreview) {
+          try {
+            preview = definition.bodyPreview(data as never);
+          } catch {
+            // A buggy preview must not break the canvas.
+            preview = null;
+          }
+        }
+        if (preview && preview.trim()) {
+          return (
+            <div className="px-3 pt-1 pb-2">
+              <div
+                className="text-[11px] text-muted-foreground truncate"
+                title={preview}
+              >
+                {preview}
+              </div>
+            </div>
+          );
+        }
+        if (definition.description) {
+          return (
+            <div className="px-3 pt-1 pb-2">
+              <div
+                className="text-[11px] text-muted-foreground italic line-clamp-2"
+                title={definition.description}
+              >
+                {definition.description}
+              </div>
+            </div>
+          );
+        }
+        return <div className="pb-1" />;
+      })()}
 
       {/* Input Handles */}
       {definition.inputs.map((input, index) => (

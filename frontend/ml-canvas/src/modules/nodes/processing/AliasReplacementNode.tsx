@@ -275,6 +275,12 @@ export const AliasReplacementNode: NodeDefinition<AliasReplacementConfig> = {
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Standardized Data', type: 'dataset' }],
   settings: AliasReplacementSettings,
+  bodyPreview: (config) => {
+    const cols = config.columns?.length ?? 0;
+    const mode = config.mode ?? 'custom';
+    if (cols === 0) return mode;
+    return `${mode} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
+  },
   validate: (config) => {
     if (config.columns.length === 0) return { isValid: false, message: 'Select at least one column.' };
     if (config.mode === 'custom' && Object.keys(config.custom_pairs).length === 0) {

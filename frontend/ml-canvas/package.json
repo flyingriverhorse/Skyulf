@@ -63,6 +63,7 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.2",
     "@ladle/react": "^5.1.1",
     "@playwright/test": "^1.48.0",
     "@tanstack/react-query-devtools": "^5.100.5",

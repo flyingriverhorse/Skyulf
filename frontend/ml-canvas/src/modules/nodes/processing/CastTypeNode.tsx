@@ -189,6 +189,11 @@ export const CastTypeNode: NodeDefinition<CastTypeConfig> = {
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Casted Data', type: 'dataset' }],
   settings: CastTypeSettings,
+  bodyPreview: (config) => {
+    const n = Object.keys(config.column_types ?? {}).length;
+    if (n === 0) return null;
+    return `Cast ${n} ${n === 1 ? 'col' : 'cols'}`;
+  },
   validate: (_config) => ({ isValid: true }),
   getDefaultConfig: () => ({
     column_types: {},

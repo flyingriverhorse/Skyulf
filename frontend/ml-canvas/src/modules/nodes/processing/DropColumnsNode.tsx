@@ -237,6 +237,14 @@ export const DropColumnsNode: NodeDefinition<DropColumnsConfig> = {
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Data', type: 'dataset' }],
   settings: DropColumnsSettings,
+  bodyPreview: (config) => {
+    const cols = config.columns?.length ?? 0;
+    const thr = config.missing_threshold ?? 0;
+    if (cols > 0 && thr > 0) return `Drop ${cols} cols · missing > ${thr}%`;
+    if (cols > 0) return `Drop ${cols} ${cols === 1 ? 'col' : 'cols'}`;
+    if (thr > 0) return `Drop missing > ${thr}%`;
+    return null;
+  },
   validate: (config) => ({ 
     isValid: config.columns.length > 0 || (config.missing_threshold !== undefined && config.missing_threshold > 0),
     message: (config.columns.length === 0 && (!config.missing_threshold || config.missing_threshold === 0)) 

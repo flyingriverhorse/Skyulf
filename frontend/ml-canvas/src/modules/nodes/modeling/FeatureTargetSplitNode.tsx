@@ -91,6 +91,11 @@ export const FeatureTargetSplitNode: NodeDefinition<FeatureTargetSplitConfig> = 
     { id: 'y', label: 'Target (y)', type: 'dataset' }
   ],
   settings: FeatureTargetSplitSettings,
+  bodyPreview: (config) => {
+    const tgt = config.target_column;
+    if (tgt && tgt.trim()) return `target: ${tgt}`;
+    return 'Set target';
+  },
   validate: (config) => {
     if (!config.target_column) {
       return { isValid: false, message: 'Target column is required.' };
