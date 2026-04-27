@@ -92,6 +92,12 @@ class NodeExecutionResult:
     metrics: Dict[str, Any] = field(default_factory=dict)
     error: Optional[str] = None
     execution_time: float = 0.0  # Seconds
+    # Free-form per-node metadata surfaced to the canvas. `summary` is a
+    # short one-line human string the node card renders post-run
+    # (e.g. "7,000 / 1,500 / 1,500" for a split, "acc 0.87" for a
+    # classifier). Other keys are reserved for future overlays
+    # (duration_ms, memory_delta, drift_score, ...).
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

@@ -24,6 +24,7 @@ from .schemas import (
     PipelineConfig,
     PipelineExecutionResult,
 )
+from .summary import build_summary
 
 logger = logging.getLogger(__name__)
 
@@ -278,12 +279,29 @@ class PipelineEngine:
                     raise e
 
             duration = time.time() - start_ts
+
+            # Build the one-line node-card summary. The artifact store
+            # already has the freshly-saved output (every _run_* path
+            # writes under node_id), so loading it here is cheap and
+            # keeps summary logic out of the per-runner methods. We
+            # tolerate any failure — a missing summary just means the
+            # card falls back to its static description.
+            metadata: Dict[str, Any] = {}
+            try:
+                output = self.artifact_store.load(node.node_id)
+                summary = build_summary(step_type=node.step_type, output=output, metrics=metrics)
+                if summary:
+                    metadata["summary"] = summary
+            except Exception:
+                logger.debug("summary skipped for node %s", node.node_id, exc_info=True)
+
             return NodeExecutionResult(
                 node_id=node.node_id,
                 status="success",
                 output_artifact_id=output_artifact_id,
                 metrics=metrics,
                 execution_time=duration,
+                metadata=metadata,
             )
 
         except Exception as e:
