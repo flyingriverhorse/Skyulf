@@ -42,6 +42,7 @@ from backend.ml_pipeline.deployment.api import router as deployment_router
 from backend.ml_pipeline.model_registry.api import router as model_registry_router
 from backend.eda.router import router as eda_router
 from backend.monitoring.router import router as monitoring_router
+from backend.realtime import connection_manager, router as realtime_router
 
 # Configure logging
 setup_universal_logging()
@@ -150,6 +151,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await create_tables()
     logger.info("✅ Database tables created/verified")
 
+    # Start the realtime job-event subscriber. Failures are non-fatal:
+    # the frontend has a polling safety net.
+    try:
+        await connection_manager.start()
+        logger.info("✅ Realtime subscriber started")
+    except Exception as exc:
+        logger.warning("Realtime subscriber failed to start: %s", exc)
+
     # Initialize other services here as needed
     # await init_cache()
     # await init_background_tasks()
@@ -161,6 +170,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Shutdown
     logger.info("🛑 Shutting down FastAPI MLops Application")
+    try:
+        await connection_manager.stop()
+    except Exception as exc:
+        logger.warning("Realtime subscriber shutdown error: %s", exc)
     await close_db()
     logger.info("✅ Application shutdown complete")
 
@@ -286,6 +299,9 @@ def _include_routers(app: FastAPI) -> None:
     app.include_router(eda_router, prefix="/api")
     app.include_router(monitoring_router, prefix="/api")
 
+    # Realtime job-event WebSocket (mounted at root: /ws/jobs)
+    app.include_router(realtime_router, tags=["realtime"])
+
     # Root & SPA catch-all — serve frontend if built, otherwise redirect to API docs
     from fastapi.responses import RedirectResponse
 
@@ -303,6 +319,7 @@ def _include_routers(app: FastAPI) -> None:
         "/openapi.json",
         "/static/",
         "/assets/",
+        "/ws/",
     )
 
     if frontend_index.exists():

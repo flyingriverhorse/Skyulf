@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { jobsApi, JobInfo, JobStatus } from '../api/jobs';
+import { jobEventsSocket } from '../realtime/jobEventsSocket';
+
+// Cadence used as a safety net while the WebSocket is healthy. A live
+// connection will normally invalidate within ~250 ms of any backend
+// change, so a sparse interval is fine — it only matters if the
+// connection drops or we missed a publish.
+const SAFETY_NET_INTERVAL_MS = 30_000;
 
 // A status is "terminal" when no further state changes are expected
 // from the backend. We stop polling once every tracked job has hit a
@@ -145,13 +152,45 @@ export function useJobPolling(
 
     setIsPolling(true);
     if (!skipInitialFetch) void fetchAll();
-    interval = setInterval(() => {
-      void fetchAll();
-    }, intervalMs);
+
+    // WebSocket-driven invalidation. Each event carries a job_id; if
+    // it matches one we're tracking we trigger an immediate (debounced)
+    // refetch so the UI converges in ~250 ms instead of waiting for
+    // the next interval tick.
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let wsConnected = false;
+    const scheduleRefresh = (): void => {
+      if (refreshTimer) return;
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        void fetchAll();
+      }, 250);
+    };
+
+    const startInterval = (ms: number): void => {
+      if (interval) clearInterval(interval);
+      interval = setInterval(() => { void fetchAll(); }, ms);
+    };
+
+    const unsubscribeWs = jobEventsSocket.subscribe((evt) => {
+      if (idsRef.current.includes(evt.job_id)) scheduleRefresh();
+    });
+    const unsubscribeStatus = jobEventsSocket.onStatus((connected) => {
+      if (connected === wsConnected) return;
+      wsConnected = connected;
+      // Stretch the safety net while WS is up; tighten back on drop.
+      startInterval(connected ? SAFETY_NET_INTERVAL_MS : intervalMs);
+      if (connected) scheduleRefresh();
+    });
+
+    startInterval(intervalMs);
 
     return () => {
       cancelled = true;
       if (interval) clearInterval(interval);
+      if (refreshTimer) clearTimeout(refreshTimer);
+      unsubscribeWs();
+      unsubscribeStatus();
       setIsPolling(false);
     };
     // idsKey is the stable signature; intervalMs/stopOnTerminal/skipInitialFetch

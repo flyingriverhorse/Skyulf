@@ -30,6 +30,7 @@ from backend.database.models import (
 )
 from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.tasks import run_pipeline_task
+from backend.realtime.events import JobEvent, publish_job_event
 from backend.utils.file_utils import extract_file_path_from_source
 from backend.ml_pipeline.services.evaluation_service import EvaluationService
 from backend.ml_pipeline.resolution import resolve_pipeline_nodes
@@ -396,6 +397,9 @@ async def run_pipeline(  # noqa: C901
             graph=branch_graph,
         )
         all_job_ids.append(job_id)
+        publish_job_event(
+            JobEvent(event="created", job_id=job_id, status="queued", progress=0)
+        )
 
         # Reuse the same dict shape for the Celery payload (storage_options
         # is added below; we don't persist it into the DB graph snapshot).
@@ -1073,6 +1077,7 @@ async def cancel_job(job_id: str, session: AsyncSession = Depends(get_async_sess
             status_code=400,
             detail="Job could not be cancelled (maybe it's already finished or doesn't exist)",
         )
+    publish_job_event(JobEvent(event="status", job_id=job_id, status="cancelled"))
     return {"message": "Job cancelled successfully"}
 
 
