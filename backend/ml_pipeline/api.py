@@ -397,9 +397,7 @@ async def run_pipeline(  # noqa: C901
             graph=branch_graph,
         )
         all_job_ids.append(job_id)
-        publish_job_event(
-            JobEvent(event="created", job_id=job_id, status="queued", progress=0)
-        )
+        publish_job_event(JobEvent(event="created", job_id=job_id, status="queued", progress=0))
 
         # Reuse the same dict shape for the Celery payload (storage_options
         # is added below; we don't persist it into the DB graph snapshot).

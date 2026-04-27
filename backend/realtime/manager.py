@@ -65,9 +65,7 @@ class ConnectionManager:
         self._stop.clear()
         settings = get_settings()
         target = self._subscriber_loop if settings.USE_CELERY else self._local_loop
-        self._subscriber_task = asyncio.create_task(
-            target(), name="realtime-subscriber"
-        )
+        self._subscriber_task = asyncio.create_task(target(), name="realtime-subscriber")
 
     async def stop(self) -> None:
         """Cancel the subscriber and close all sockets."""
@@ -103,9 +101,7 @@ class ConnectionManager:
                 from redis import asyncio as aioredis
 
                 settings = get_settings()
-                client = aioredis.from_url(
-                    settings.CELERY_BROKER_URL, decode_responses=True
-                )
+                client = aioredis.from_url(settings.CELERY_BROKER_URL, decode_responses=True)
                 pubsub = client.pubsub()
                 await pubsub.subscribe(JOB_EVENTS_CHANNEL)
                 logger.info("Realtime subscriber attached to %s", JOB_EVENTS_CHANNEL)
@@ -132,7 +128,6 @@ class ConnectionManager:
                 except asyncio.TimeoutError:
                     pass
                 backoff = min(backoff * 2, 30.0)
-
 
     async def _local_loop(self) -> None:
         """Drain the in-process bus and broadcast (no-Celery mode)."""

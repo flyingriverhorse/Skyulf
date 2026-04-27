@@ -53,9 +53,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
         job.started_at = datetime.now()
         job.progress = 0
         session.commit()
-        publish_job_event(
-            JobEvent(event="status", job_id=job_id, status="running", progress=0)
-        )
+        publish_job_event(JobEvent(event="status", job_id=job_id, status="running", progress=0))
 
         # 2. Setup Artifact Store
         from backend.ml_pipeline.artifacts.factory import ArtifactFactory
@@ -244,8 +242,6 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict):  # noqa: C901
                 else:
                     strategy.handle_failure(job, str(e))
                     session.commit()
-                publish_job_event(
-                    JobEvent(event="status", job_id=job_id, status=job.status)
-                )
+                publish_job_event(JobEvent(event="status", job_id=job_id, status=job.status))
     finally:
         session.close()
