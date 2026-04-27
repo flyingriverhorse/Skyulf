@@ -58,9 +58,7 @@ async def test_publish_job_event_routes_to_local_bus_when_no_celery(
 
         monkeypatch.setattr(events_mod, "get_settings", lambda: _FakeSettings())
 
-        publish_job_event(
-            JobEvent(event="progress", job_id="abc", status="running", progress=42)
-        )
+        publish_job_event(JobEvent(event="progress", job_id="abc", status="running", progress=42))
         raw = await asyncio.wait_for(queue.get(), timeout=1.0)
         payload = json.loads(raw)
         assert payload == {
