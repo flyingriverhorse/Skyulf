@@ -14,6 +14,7 @@ interface CreateNodeConfig {
   settings: React.ComponentType<{ config: AnyConfig; onChange: (next: AnyConfig) => void; nodeId?: string }>;
   defaultConfig?: Record<string, unknown>;
   validate?: (config: AnyConfig) => { isValid: boolean; message?: string };
+  bodyPreview?: (config: AnyConfig) => string | null;
   category?: 'Data Source' | 'Preprocessing' | 'Modeling' | 'Evaluation' | 'Utility';
   inputs?: NodeDefinition['inputs'];
   outputs?: NodeDefinition['outputs'];
@@ -27,6 +28,7 @@ export const createModelingNode = ({
   settings,
   defaultConfig = {},
   validate,
+  bodyPreview,
   category = 'Modeling',
   inputs = [{ id: 'in', label: 'Training Data', type: 'dataset' }],
   outputs = [{ id: 'model', label: 'Model', type: 'model' }]
@@ -40,6 +42,14 @@ export const createModelingNode = ({
     inputs,
     outputs,
     settings,
+    bodyPreview: bodyPreview || ((config: { model_type?: string; target_column?: string }) => {
+      const model = config.model_type;
+      const target = config.target_column;
+      if (model && target) return `${model} \u2192 ${target}`;
+      if (model) return model;
+      if (target) return `target: ${target}`;
+      return null;
+    }),
     validate: validate || ((config: { target_column?: string }) => {
       if (!config.target_column) return { isValid: false, message: 'Target column is required.' };
       return { isValid: true };

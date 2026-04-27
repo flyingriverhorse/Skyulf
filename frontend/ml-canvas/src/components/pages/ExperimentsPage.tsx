@@ -113,9 +113,8 @@ export const ExperimentsPage: React.FC = () => {
     try {
       await deploymentApi.deployModel(jobId);
       toast.success('Model deployed');
-    } catch (err) {
+    } catch {
       toast.error('Failed to deploy model');
-      console.error(err);
     }
   };
 
@@ -127,9 +126,8 @@ export const ExperimentsPage: React.FC = () => {
       } else {
         await promoteJob(job.job_id);
       }
-    } catch (err) {
+    } catch {
       toast.error('Failed to update promotion status');
-      console.error(err);
     }
   };
 
@@ -152,7 +150,6 @@ export const ExperimentsPage: React.FC = () => {
         link.href = dataUrl;
         link.click();
     } catch (e) {
-        console.error('Failed to download image', e);
         toast.error('Image download failed', String(e));
     } finally {
         setDownloadingChart(null);
@@ -860,11 +857,33 @@ export const ExperimentsPage: React.FC = () => {
                             }
                             detail.push(`${k}=${rendered}`);
                           }
+                          // Special-case Feature Generation: its config lives
+                          // under `operations: MathOperation[]`, not the
+                          // generic keys above. Render the per-op summary
+                          // (e.g. `multiply(a, b)`, `month(date)`) so the
+                          // comparison row carries real signal instead of
+                          // just "Feature Generation".
+                          const ops = n.params?.['operations'];
+                          if (Array.isArray(ops) && ops.length > 0) {
+                            const formatted = ops.slice(0, 3).map((raw) => {
+                              const op = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+                              const method = String(op['method'] ?? op['operation_type'] ?? 'op');
+                              const inputs = Array.isArray(op['input_columns']) ? op['input_columns'] as unknown[] : [];
+                              const secondary = Array.isArray(op['secondary_columns']) ? op['secondary_columns'] as unknown[] : [];
+                              const operands = [...inputs, ...secondary].map(String);
+                              const args = operands.length > 2
+                                ? `${operands.slice(0, 2).join(', ')}, +${operands.length - 2}`
+                                : operands.join(', ');
+                              return args ? `${method}(${args})` : method;
+                            });
+                            const tail = ops.length > 3 ? `, +${ops.length - 3} more` : '';
+                            detail.push(`ops=[${formatted.join(', ')}${tail}]`);
+                          }
                           return detail.length > 0 ? `${display} (${detail.join(', ')})` : display;
                         };
                         const chainsByJob = new Map(selectedJobs.map(j => [j.job_id, collectChain(j)]));
-                        const maxChainLength = Math.max(0, ...Array.from(chainsByJob.values()).map(c => c.length));
-                        if (maxChainLength === 0) {
+                        const allChains = Array.from(chainsByJob.values());
+                        if (allChains.every(c => c.length === 0)) {
                           return (
                             <tr className="bg-white dark:bg-gray-800">
                               <td className="px-4 py-1.5 text-gray-400 italic pl-8" colSpan={selectedJobs.length + 1}>
@@ -873,20 +892,80 @@ export const ExperimentsPage: React.FC = () => {
                             </tr>
                           );
                         }
-                        return Array.from({ length: maxChainLength }).map((_, idx) => (
-                          <tr key={`pipeline-step-${idx}`} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                            <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">Step {idx + 1}</td>
-                            {selectedJobs.map(job => {
-                              const chain = chainsByJob.get(job.job_id) || [];
-                              const step = chain[idx];
-                              return (
-                                <td key={job.job_id} className="px-4 py-1.5 text-gray-600 dark:text-gray-300">
-                                  {step ? summarizeStep(step) : <span className="text-gray-400">—</span>}
+                        // L6 — Align rows by node_id rather than by raw
+                        // chain index. When the trunk is shared (the
+                        // common case after the per-branch graph snapshot
+                        // fix), shared nodes occupy a single row across
+                        // all columns. Branch-only steps land on their
+                        // own rows with em-dashes in the other columns.
+                        // Algorithm: walk every chain in lockstep,
+                        // emitting the next un-emitted node id in chain
+                        // order. A node id appears in the merged order
+                        // the first time any chain references it.
+                        const mergedOrder: string[] = [];
+                        const emitted = new Set<string>();
+                        const cursors = allChains.map(() => 0);
+                        // Bound the loop to the sum of chain lengths to
+                        // guarantee termination on pathological inputs.
+                        const safety = allChains.reduce((s, c) => s + c.length, 0) + 1;
+                        for (let guard = 0; guard < safety; guard++) {
+                          let advanced = false;
+                          for (let ci = 0; ci < allChains.length; ci++) {
+                            const chain = allChains[ci];
+                            if (!chain) continue;
+                            // Skip past nodes we've already emitted.
+                            while (cursors[ci]! < chain.length && emitted.has(chain[cursors[ci]!]!.node_id)) {
+                              cursors[ci] = cursors[ci]! + 1;
+                            }
+                            if (cursors[ci]! < chain.length) {
+                              const candidate = chain[cursors[ci]!]!;
+                              if (!emitted.has(candidate.node_id)) {
+                                mergedOrder.push(candidate.node_id);
+                                emitted.add(candidate.node_id);
+                                advanced = true;
+                                break; // restart sweep so other chains catch up
+                              }
+                            }
+                          }
+                          if (!advanced) break;
+                        }
+                        return mergedOrder.map((nid, idx) => {
+                          // Per-row cell strings, plus a sameness flag
+                          // for shared trunk highlighting.
+                          const cells = selectedJobs.map(job => {
+                            const chain = chainsByJob.get(job.job_id) || [];
+                            const step = chain.find(n => n.node_id === nid);
+                            return step ? summarizeStep(step) : null;
+                          });
+                          const presentCells = cells.filter((c): c is string => c !== null);
+                          const allPresent = presentCells.length === cells.length;
+                          const allSame = allPresent && presentCells.every(c => c === presentCells[0]);
+                          // Shared trunk row → muted background; divergent
+                          // row (some columns dash, others differ) →
+                          // amber accent so the diff jumps out.
+                          const rowTone = allSame
+                            ? 'bg-white dark:bg-gray-800'
+                            : 'bg-amber-50/40 dark:bg-amber-900/10';
+                          return (
+                            <tr key={`pipeline-step-${nid}`} className={`${rowTone} hover:bg-gray-50 dark:hover:bg-gray-700/50`}>
+                              <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">Step {idx + 1}</td>
+                              {cells.map((text, ci) => (
+                                <td
+                                  key={selectedJobs[ci]?.job_id ?? ci}
+                                  className={
+                                    text === null
+                                      ? 'px-4 py-1.5 text-gray-300 dark:text-gray-600'
+                                      : allSame
+                                        ? 'px-4 py-1.5 text-gray-500 dark:text-gray-400'
+                                        : 'px-4 py-1.5 text-gray-900 dark:text-gray-100 font-medium'
+                                  }
+                                >
+                                  {text ?? <span className="text-gray-400">—</span>}
                                 </td>
-                              );
-                            })}
-                          </tr>
-                        ));
+                              ))}
+                            </tr>
+                          );
+                        });
                       })()}
                       {/* Metrics Section in Table */}
                       <tr 

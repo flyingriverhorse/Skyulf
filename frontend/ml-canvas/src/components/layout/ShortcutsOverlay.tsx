@@ -21,6 +21,7 @@ const SHORTCUTS: Shortcut[] = [
   { keys: ['Ctrl', 'K'], description: 'Open command palette (insert node)' },
   { keys: ['Delete'], description: 'Delete selected nodes / edges' },
   { keys: ['F'], description: 'Fit view to canvas' },
+  { keys: ['Ctrl', '0'], description: 'Fit view to canvas (alt)' },
   { keys: ['Ctrl', 'Enter'], description: 'Run preview' },
   { keys: ['?'], description: 'Toggle this cheatsheet' },
   { keys: ['Esc'], description: 'Close overlays / collapse panels' },

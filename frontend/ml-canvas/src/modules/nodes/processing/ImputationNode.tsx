@@ -372,6 +372,12 @@ export const ImputationNode: NodeDefinition<ImputationConfig> = {
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Cleaned Data', type: 'dataset' }],
   settings: ImputationSettings,
+  bodyPreview: (config) => {
+    const cols = config.columns?.length ?? 0;
+    const strat = config.strategy ?? config.method ?? 'mean';
+    if (cols === 0) return null;
+    return `${strat} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
+  },
   validate: (config) => {
     if (config.columns.length === 0) return { isValid: false, message: 'Select at least one column' };
     if (config.method === 'simple' && config.strategy === 'constant' && (config.fill_value === undefined || config.fill_value === '')) {

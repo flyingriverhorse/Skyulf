@@ -487,6 +487,12 @@ export const OutlierNode: NodeDefinition = {
   inputs: [{ id: 'in', type: 'dataset', label: 'Dataset' }],
   outputs: [{ id: 'out', type: 'dataset', label: 'Cleaned' }],
   settings: OutlierSettings,
+  bodyPreview: (config) => {
+    const cols = config.columns?.length ?? 0;
+    const method = (config.method ?? 'iqr').toUpperCase();
+    if (cols === 0) return method;
+    return `${method} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
+  },
   validate: (config: OutlierConfig) => {
     if (config.columns.length === 0) {
       return { isValid: false, message: 'Select at least one column.' };

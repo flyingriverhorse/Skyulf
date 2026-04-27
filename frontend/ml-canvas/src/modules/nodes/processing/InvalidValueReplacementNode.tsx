@@ -217,6 +217,12 @@ export const InvalidValueReplacementNode: NodeDefinition<InvalidValueReplacement
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Cleaned Data', type: 'dataset' }],
   settings: InvalidValueSettings,
+  bodyPreview: (config) => {
+    const cols = config.columns?.length ?? 0;
+    const mode = config.mode ?? 'negative_to_nan';
+    if (cols === 0) return mode;
+    return `${mode} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
+  },
   validate: (config) => {
     if (config.columns.length === 0) return { isValid: false, message: 'Select at least one column.' };
     if (config.mode === 'custom_range' && config.min_value === undefined && config.max_value === undefined) {

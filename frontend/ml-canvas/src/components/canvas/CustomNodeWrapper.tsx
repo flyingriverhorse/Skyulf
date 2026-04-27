@@ -115,7 +115,10 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   // This is a simplified version. In a real app, we might want more control over handle placement.
   
   return (
-    <div className={`
+    <div
+      data-testid={`canvas-node-${definitionType}`}
+      data-node-definition-type={definitionType}
+      className={`
       relative group min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all duration-150
       ${selected
         ? 'border-primary shadow-lg shadow-primary/30 scale-[1.02]'
@@ -206,16 +209,73 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         </div>
       </div>
 
-      {/* Body (Custom Component or Default) */}
-      <div className="p-3">
-        {definition.component ? (
-          <definition.component data={data} />
-        ) : (
-          <div className="text-xs text-muted-foreground italic">
-            No configuration needed
-          </div>
-        )}
-      </div>
+      {/* Body — priority chain (see temp/node_body_content_plan.md):
+          1. Inspection-class nodes with a custom `component` always win.
+          2. Backend post-run summary (`nodeResult.metadata.summary`).
+          3. Frontend pre-run preview (`definition.bodyPreview(data)`).
+          4. Static italic description.
+          5. Nothing — collapse padding so card visually shrinks.
+          Side padding is bumped on text bodies (px-10) so the body
+          text never collides with the absolutely-positioned port
+          labels ("Data" / "X" / "y" / "Train" / "Test") that float at
+          left-4 / right-4. min-h gives the floating port labels
+          vertical separation from the centered body line. */}
+      {(() => {
+        if (definition.component) {
+          return (
+            <div className="p-3">
+              <definition.component data={data} />
+            </div>
+          );
+        }
+        const summary = nodeResult?.metadata?.summary?.trim();
+        if (summary) {
+          return (
+            <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">
+              <div
+                className="text-[11px] text-foreground/80 font-mono tabular-nums truncate text-center w-full"
+                title={summary}
+              >
+                {summary}
+              </div>
+            </div>
+          );
+        }
+        let preview: string | null = null;
+        if (definition.bodyPreview) {
+          try {
+            preview = definition.bodyPreview(data as never);
+          } catch {
+            // A buggy preview must not break the canvas.
+            preview = null;
+          }
+        }
+        if (preview && preview.trim()) {
+          return (
+            <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">
+              <div
+                className="text-[11px] text-muted-foreground truncate text-center w-full"
+                title={preview}
+              >
+                {preview}
+              </div>
+            </div>
+          );
+        }
+        if (definition.description) {
+          return (
+            <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">
+              <div
+                className="text-[11px] text-muted-foreground italic line-clamp-2 text-center w-full"
+                title={definition.description}
+              >
+                {definition.description}
+              </div>
+            </div>
+          );
+        }
+        return <div className="min-h-[1.5rem]" />;
+      })()}
 
       {/* Input Handles */}
       {definition.inputs.map((input, index) => (
