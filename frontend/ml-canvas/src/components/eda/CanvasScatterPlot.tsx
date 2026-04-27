@@ -124,6 +124,7 @@ export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({
     plugins: {
       tooltip: {
         callbacks: {
+          // chart.js TooltipModel callback signature is wide; we keep this loose intentionally.
           label: (context: any) => {
             const point = context.raw;
             let label = context.dataset.label || '';

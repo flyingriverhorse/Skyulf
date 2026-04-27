@@ -171,7 +171,7 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
                                 </div>
                                 <select
                                     value={config.sampler ?? 'tpe'}
-                                    onChange={(e) => setConfig({ ...config, sampler: e.target.value as any })}
+                                    onChange={(e) => setConfig({ ...config, sampler: e.target.value as 'tpe' | 'random' | 'cmaes' })}
                                     className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
                                 >
                                     <option value="tpe">TPE (Bayesian Optimization)</option>
@@ -190,7 +190,7 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
                                 </div>
                                 <select
                                     value={config.pruner ?? 'median'}
-                                    onChange={(e) => setConfig({ ...config, pruner: e.target.value as any })}
+                                    onChange={(e) => setConfig({ ...config, pruner: e.target.value as 'median' | 'hyperband' | 'none' })}
                                     className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
                                 >
                                     <option value="median">Median Pruner</option>

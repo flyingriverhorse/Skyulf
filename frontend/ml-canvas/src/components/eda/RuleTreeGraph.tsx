@@ -39,7 +39,7 @@ const nodeWidth = 220;
 const nodeHeight = 100;
 
 // Custom Node Component
-const DecisionNode = ({ data }: { data: any }) => {
+const DecisionNode = ({ data }: { data: RuleNodeData & { class_name?: string } }) => {
     const isLeaf = data.is_leaf;
     
     // Calculate class distribution percentage
