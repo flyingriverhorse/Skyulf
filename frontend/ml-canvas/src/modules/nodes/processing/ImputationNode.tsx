@@ -367,7 +367,7 @@ export const ImputationNode: NodeDefinition<ImputationConfig> = {
   type: 'imputation_node',
   label: 'Imputation',
   category: 'Preprocessing',
-  description: 'Fill missing values using Simple, KNN, or Iterative strategies.',
+  description: 'Fill missing values.',
   icon: PaintBucket,
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Cleaned Data', type: 'dataset' }],
