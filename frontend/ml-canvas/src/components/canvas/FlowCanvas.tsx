@@ -18,6 +18,8 @@ import { useNodeJobSummaries } from '../../core/hooks/useNodeJobSummaries';
 import { CustomNodeWrapper } from './CustomNodeWrapper';
 import { CustomEdge } from './CustomEdge';
 import { useConfirm } from '../shared';
+import { Sparkles } from 'lucide-react';
+import { SHOW_TEMPLATES_EVENT } from '../../core/hooks/useKeyboardShortcuts';
 
 const nodeTypes = {
   custom: CustomNodeWrapper
@@ -209,7 +211,7 @@ const FlowCanvasContent: React.FC = () => {
 
   return (
     <div 
-      className="w-full h-full outline-none" 
+      className="w-full h-full outline-none relative" 
       ref={reactFlowWrapper}
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- canvas wrapper must be focusable to capture keyboard shortcuts
       tabIndex={0}
@@ -263,6 +265,31 @@ const FlowCanvasContent: React.FC = () => {
           }
         />
       </ReactFlow>
+      {!readOnly && nodes.length === 0 && (
+        // Cold-start helper. Floats above the empty React Flow viewport;
+        // pointer-events stay scoped to the inner card so users can still
+        // pan/zoom the empty canvas around it. Dispatches to the Toolbar's
+        // gallery modal via the same event-bridge pattern used for the
+        // command palette and shortcuts overlay.
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-10">
+          <div className="pointer-events-auto rounded-lg border border-dashed border-border bg-background/80 backdrop-blur px-6 py-5 max-w-sm text-center shadow-sm">
+            <div className="text-sm font-medium mb-1">Empty canvas</div>
+            <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+              Drag a node from the sidebar, or start from a curated
+              pipeline template.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent(SHOW_TEMPLATES_EVENT))}
+              data-testid="empty-state-templates"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Browse templates
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

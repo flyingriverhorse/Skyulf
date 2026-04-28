@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown, Clock, Trash2, Pin, PinOff, Pencil } from 'lucide-react';
+import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown, Clock, Trash2, Pin, PinOff, Pencil, Sparkles } from 'lucide-react';
 import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
@@ -13,6 +13,7 @@ import {
   RUN_PREVIEW_EVENT,
   SHOW_SHORTCUTS_EVENT,
   SHOW_PALETTE_EVENT,
+  SHOW_TEMPLATES_EVENT,
 } from '../../core/hooks/useKeyboardShortcuts';
 import { exportCanvasToPng, exportCanvasToSvg } from '../../core/utils/canvasExport';
 import {
@@ -26,6 +27,7 @@ import {
 } from '../../core/utils/recentPipelines';
 import { toast } from '../../core/toast';
 import { useConfirm } from '../shared';
+import { TemplatesGalleryModal } from '../canvas/TemplatesGalleryModal';
 
 const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
 
@@ -95,6 +97,10 @@ export const Toolbar: React.FC = () => {
   // Inline rename state — `null` when no row is being edited.
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
+  // L3 templates gallery — modal mount controlled here so both the
+  // Toolbar button and the canvas empty-state can open it (the empty
+  // state dispatches a custom event the Toolbar subscribes to).
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const handleExport = async (kind: 'png' | 'svg'): Promise<void> => {
     setShowExportMenu(false);
@@ -340,6 +346,15 @@ export const Toolbar: React.FC = () => {
     const fire = (): void => handleRunRef.current();
     window.addEventListener(RUN_PREVIEW_EVENT, fire);
     return () => window.removeEventListener(RUN_PREVIEW_EVENT, fire);
+  }, []);
+
+  // Bridge: the canvas empty-state CTA dispatches this event instead of
+  // owning its own modal — keeps the gallery state singleton in the
+  // Toolbar and lets the canvas stay presentational.
+  useEffect(() => {
+    const open = (): void => setShowTemplates(true);
+    window.addEventListener(SHOW_TEMPLATES_EVENT, open);
+    return () => window.removeEventListener(SHOW_TEMPLATES_EVENT, open);
   }, []);
 
   // Recent-pipelines dropdown: hydrate lazily on open so the toolbar
@@ -653,6 +668,18 @@ export const Toolbar: React.FC = () => {
           <span className="text-sm font-medium hidden xl:inline">Jobs</span>
         </button>
         {!readOnly && (
+          <button
+            onClick={() => setShowTemplates(true)}
+            title="Start from a template"
+            aria-label="Start from a template"
+            data-testid="toolbar-templates"
+            className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span className="text-sm font-medium hidden xl:inline">Templates</span>
+          </button>
+        )}
+        {!readOnly && (
           <div className="relative">
             <button
               onClick={openRecentMenu}
@@ -883,6 +910,10 @@ export const Toolbar: React.FC = () => {
           </button>
         )}
       </div>
+      <TemplatesGalleryModal
+        isOpen={showTemplates}
+        onClose={() => setShowTemplates(false)}
+      />
     </>
   );
 };
