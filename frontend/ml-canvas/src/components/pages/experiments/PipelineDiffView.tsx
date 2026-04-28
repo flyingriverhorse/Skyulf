@@ -527,7 +527,16 @@ export const PipelineDiffView: React.FC<Props> = ({ jobs }) => {
                     nodesDraggable={false}
                     nodesConnectable={false}
                     elementsSelectable={false}
-                    panOnScroll
+                    // Page scroll must pass through this canvas.
+                    // Without these flags the wheel either zooms the
+                    // graph or pans it, which makes the diff section
+                    // feel "sticky" when the user is scrolling the
+                    // Experiments page.
+                    panOnScroll={false}
+                    zoomOnScroll={false}
+                    zoomOnPinch={false}
+                    zoomOnDoubleClick={false}
+                    preventScrolling={false}
                     proOptions={{ hideAttribution: true }}
                   >
                     <Background gap={16} size={1} />
