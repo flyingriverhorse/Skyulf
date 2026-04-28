@@ -5,6 +5,7 @@ import { AlertCircle, X, CheckCircle2, XCircle, Merge, GitFork } from 'lucide-re
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
+import { bucketDuration, getPerfFamily } from '../../core/perf/perfThresholds';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import type { NodeExecutionResult } from '../../core/api/client';
 import {
@@ -47,11 +48,14 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
 
   // L4 perf overlay. When the user toggles the Toolbar gauge, every
   // card whose last run has a known wall-clock duration grows a
-  // colored ring (green < 100 ms, amber < 1 s, red ≥ 1 s) and a
-  // tooltip with exact ms. Two sources for the duration:
+  // colored ring and a tooltip with exact ms.
+  // Two duration sources:
   //   1. Preview-run path: `nodeResult.execution_time` (seconds).
   //   2. Trainer/tuner Celery path: latest `jobSummaries[i].duration_ms`.
-  // Off → no behavioural change to the card.
+  // Thresholds are family-aware (see `core/perf/perfThresholds.ts`):
+  // preprocessing nodes finish in milliseconds, single-fit trainers in
+  // seconds, and HPO/CV tuners legitimately run for minutes. Using one
+  // flat threshold would paint every tuner red and convey no signal.
   const perfOverlayEnabled = useViewStore((s) => s.perfOverlayEnabled);
   const perfDurationMs: number | null = (() => {
     if (!perfOverlayEnabled) return null;
@@ -65,11 +69,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   const perfBucket: 'fast' | 'medium' | 'slow' | null =
     perfDurationMs === null
       ? null
-      : perfDurationMs < 100
-      ? 'fast'
-      : perfDurationMs < 1000
-      ? 'medium'
-      : 'slow';
+      : bucketDuration(perfDurationMs, getPerfFamily(definitionType));
   const perfRingClass =
     perfBucket === 'fast'
       ? 'ring-2 ring-green-500/60 ring-offset-1 ring-offset-background'
