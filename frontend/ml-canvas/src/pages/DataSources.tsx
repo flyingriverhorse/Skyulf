@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dataset } from '../core/types/api';
 import { FileUpload } from '../modules/nodes/data/FileUpload';
-import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2, XCircle, BarChart2, Download, Search, Filter } from 'lucide-react';
+import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2, XCircle, BarChart2, Download, Search, Filter, FileClock } from 'lucide-react';
 import { formatBytes } from '../core/utils/format';
 import { DatasetPreviewModal } from '../components/data/DatasetPreviewModal';
 import { AddSourceModal } from '../components/data/AddSourceModal';
 import { IngestionJobsModal } from '../components/data/IngestionJobsModal';
+import { PipelineVersionsModal } from '../components/data/PipelineVersionsModal';
 import { LoadingState, EmptyState, useConfirm } from '../components/shared';
 import { toast } from '../core/toast';
 import {
@@ -41,6 +42,8 @@ export const DataSources: React.FC = () => {
   const [showAddSource, setShowAddSource] = useState(false);
   const [showIngestionJobs, setShowIngestionJobs] = useState(false);
   const [previewDataset, setPreviewDataset] = useState<Dataset | null>(null);
+  // L7: server-side pipeline versions modal, scoped to a single dataset.
+  const [versionsDataset, setVersionsDataset] = useState<Dataset | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
@@ -156,6 +159,22 @@ export const DataSources: React.FC = () => {
         onClose={() => { setShowIngestionJobs(false); }}
         datasets={datasets}
         onRefresh={() => { void datasetsQuery.refetch(); }}
+      />
+
+      <PipelineVersionsModal
+        isOpen={!!versionsDataset}
+        onClose={() => { setVersionsDataset(null); }}
+        datasetId={versionsDataset?.id ?? null}
+        {...(versionsDataset?.name ? { datasetName: versionsDataset.name } : {})}
+        onRestore={(entry) => {
+          // Hand the snapshot graph off through router state so the
+          // canvas can apply it on mount without a second round-trip.
+          if (versionsDataset) {
+            navigate(`/canvas?source_id=${versionsDataset.id}`, {
+              state: { restoreVersion: entry },
+            });
+          }
+        }}
       />
 
       <div className="flex justify-between items-center">
@@ -397,6 +416,15 @@ export const DataSources: React.FC = () => {
                             >
                               <Download size={16} />
                               CSV
+                            </button>
+                            <button
+                              onClick={() => { setVersionsDataset(d); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-md transition-colors"
+                              title="Pipeline versions for this dataset"
+                              aria-label="View pipeline versions"
+                            >
+                              <FileClock size={16} />
+                              Versions
                             </button>
                           </>
                         )}
