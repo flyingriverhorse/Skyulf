@@ -20,6 +20,7 @@ import { CustomEdge } from './CustomEdge';
 import { useConfirm } from '../shared';
 import { Sparkles } from 'lucide-react';
 import { SHOW_TEMPLATES_EVENT } from '../../core/hooks/useKeyboardShortcuts';
+import { PerfOverlayLegend } from './PerfOverlayLegend';
 
 const nodeTypes = {
   custom: CustomNodeWrapper
@@ -53,7 +54,7 @@ const FlowCanvasContent: React.FC = () => {
     }))
   );
 
-  const { isResultsPanelExpanded } = useViewStore();
+  const { isResultsPanelExpanded, perfOverlayEnabled, setPerfOverlayEnabled } = useViewStore();
   const readOnly = useReadOnlyMode();
 
   const confirm = useConfirm();
@@ -265,6 +266,13 @@ const FlowCanvasContent: React.FC = () => {
           }
         />
       </ReactFlow>
+      {perfOverlayEnabled && nodes.length > 0 && (
+        // Floating mini-legend so the colored rings on each node are
+        // self-explanatory without opening the Toolbar's legend popover.
+        // Draggable + collapsible; "hide" also flips the global toggle
+        // off so the toolbar Perf button stays in sync.
+        <PerfOverlayLegend onHide={() => setPerfOverlayEnabled(false)} />
+      )}
       {!readOnly && nodes.length === 0 && (
         // Cold-start helper. Floats above the empty React Flow viewport;
         // pointer-events stay scoped to the inner card so users can still
