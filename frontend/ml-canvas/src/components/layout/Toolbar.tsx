@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown, Clock, Trash2, Pin, PinOff, Pencil, Sparkles } from 'lucide-react';
+import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown, Clock, Trash2, Pin, PinOff, Pencil, Sparkles, Gauge } from 'lucide-react';
 import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
@@ -39,6 +39,8 @@ export const Toolbar: React.FC = () => {
   
   const { toggleDrawer, setActiveParallelRun, startPolling } = useJobStore();
   const isSidebarOpen = useViewStore((s) => s.isSidebarOpen);
+  const perfOverlayEnabled = useViewStore((s) => s.perfOverlayEnabled);
+  const setPerfOverlayEnabled = useViewStore((s) => s.setPerfOverlayEnabled);
   // Hide editor-only buttons (save/tidy/run/undo/redo/load/palette) on
   // tablet or when the user has toggled read-only on.
   const readOnly = useReadOnlyMode();
@@ -679,6 +681,21 @@ export const Toolbar: React.FC = () => {
             <span className="text-sm font-medium hidden xl:inline">Templates</span>
           </button>
         )}
+        <button
+          onClick={() => setPerfOverlayEnabled(!perfOverlayEnabled)}
+          title={perfOverlayEnabled ? 'Hide per-node performance overlay' : 'Color-code nodes by last-run duration'}
+          aria-label="Toggle performance overlay"
+          aria-pressed={perfOverlayEnabled}
+          data-testid="toolbar-perf-overlay"
+          className={`flex items-center gap-2 px-3 py-2 border rounded-md shadow-sm transition-colors ${
+            perfOverlayEnabled
+              ? 'bg-primary/10 border-primary/40 text-primary hover:bg-primary/15'
+              : 'bg-background hover:bg-accent'
+          }`}
+        >
+          <Gauge className="w-4 h-4" />
+          <span className="text-sm font-medium hidden xl:inline">Perf</span>
+        </button>
         {!readOnly && (
           <div className="relative">
             <button

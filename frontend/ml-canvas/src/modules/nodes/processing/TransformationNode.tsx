@@ -342,7 +342,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
 export const TransformationNode: NodeDefinition<TransformationConfig> = {
   type: 'TransformationNode',
   label: 'Transformation',
-  description: 'Apply mathematical transformations to features.',
+  description: 'Apply transformations.',
   icon: FunctionSquare as unknown as React.FC<any>,
   category: 'Preprocessing',
   inputs: [{ id: 'in', type: 'dataset', label: 'Dataset' }],

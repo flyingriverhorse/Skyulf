@@ -49,6 +49,11 @@ export interface NodeSummaryEntry {
   pipeline_id: string;
   parent_pipeline_id: string | null;
   finished_at: string | null;
+  /** Wall-clock duration of this branch's last completed job, in
+   * milliseconds. Computed by the backend from start/end timestamps.
+   * Used by the L4 perf overlay to color trainer/tuner cards (which
+   * never populate `executionResult.node_results`). */
+  duration_ms?: number;
 }
 
 export interface RunPipelineResponse {
