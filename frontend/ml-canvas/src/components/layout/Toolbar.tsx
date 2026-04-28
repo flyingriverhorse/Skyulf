@@ -5,7 +5,8 @@ import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore'
 import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { getReadOnlyMode, useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
-import { runPipelinePreview, savePipeline, fetchPipeline } from '../../core/api/client';
+import { runPipelinePreview, savePipeline } from '../../core/api/client';
+import { pipelineVersionsApi, type PipelineVersionEntry } from '../../core/api/pipelineVersions';
 import { convertGraphToPipelineConfig } from '../../core/utils/pipelineConverter';
 import { autoLayoutGraph } from '../../core/utils/autoLayout';
 import { jobsApi } from '../../core/api/jobs';
@@ -117,7 +118,10 @@ export const Toolbar: React.FC = () => {
   
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  // Reserved: previously toggled while loading a full pipeline payload.
+  // The Load split-dropdown now drives version-level fetches via
+  // `loadVersionsLoading`. Kept inlined as `false` so any future
+  // re-introduction only needs to flip this back to a state.
   const [isRunningAll, setIsRunningAll] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -134,6 +138,19 @@ export const Toolbar: React.FC = () => {
   // Inline rename state — `null` when no row is being edited.
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
+  // L7: Load split-dropdown showing the latest server-side versions for
+  // the current dataset. The classic "load the active pipeline" path
+  // moves to the dropdown footer.
+  const [showLoadMenu, setShowLoadMenu] = useState(false);
+  const [loadVersions, setLoadVersions] = useState<PipelineVersionEntry[]>([]);
+  const [loadVersionsLoading, setLoadVersionsLoading] = useState(false);
+  // True once we know the current dataset has at least one server
+  // version. Used to gate the Recent (localStorage) button so it only
+  // appears as a true fallback when the server has nothing yet.
+  const [hasServerVersions, setHasServerVersions] = useState(false);
+  // Default: show 5 latest versions; "Show more" expands to all (with
+  // internal scroll). Resets every time the menu reopens.
+  const [showAllVersions, setShowAllVersions] = useState(false);
   // L3 templates gallery — modal mount controlled here so both the
   // Toolbar button and the canvas empty-state can open it (the empty
   // state dispatches a custom event the Toolbar subscribes to).
@@ -144,10 +161,12 @@ export const Toolbar: React.FC = () => {
   const legendRef = useRef<HTMLDivElement | null>(null);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const recentMenuRef = useRef<HTMLDivElement | null>(null);
+  const loadMenuRef = useRef<HTMLDivElement | null>(null);
   useDismissable(showMoreMenu, () => setShowMoreMenu(false), moreMenuRef);
   useDismissable(showLegend, () => setShowLegend(false), legendRef);
   useDismissable(showExportMenu, () => setShowExportMenu(false), exportMenuRef);
   useDismissable(showRecentMenu, () => setShowRecentMenu(false), recentMenuRef);
+  useDismissable(showLoadMenu, () => setShowLoadMenu(false), loadMenuRef);
 
   const handleExport = async (kind: 'png' | 'svg'): Promise<void> => {
     setShowExportMenu(false);
@@ -172,6 +191,13 @@ export const Toolbar: React.FC = () => {
   // wired into at least one downstream node. Hiding the button (and
   // gating the Ctrl+Enter hotkey) prevents the "No dataset node found!"
   // alert and avoids dispatching empty pipelines to the backend.
+  // Memoised dataset id from the canvas — drives Load dropdown,
+  // hasServerVersions hydration, and Recent fallback gating.
+  const currentDatasetId = useMemo<string | undefined>(() => {
+    const datasetNode = nodes.find((n) => n.data.definitionType === 'dataset_node');
+    return datasetNode?.data.datasetId as string | undefined;
+  }, [nodes]);
+
   const canRunPreview = useMemo(() => {
     const datasetNode = nodes.find(
       (n) => n.data.definitionType === 'dataset_node'
@@ -260,40 +286,6 @@ export const Toolbar: React.FC = () => {
       toast.error('Failed to save pipeline');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleLoad = async () => {
-    const datasetNode = nodes.find(n => n.data.definitionType === 'dataset_node');
-    const datasetId = datasetNode?.data.datasetId as string;
-
-    if (!datasetId) {
-      toast.error('No dataset node found', 'Cannot load pipeline without a dataset context.');
-      return;
-    }
-
-    const ok = await confirm({
-      title: 'Load saved pipeline?',
-      message: 'Loading a pipeline will overwrite your current work. Continue?',
-      confirmLabel: 'Load',
-      variant: 'danger',
-    });
-    if (!ok) return;
-    setIsLoading(true);
-    try {
-      const pipeline = await fetchPipeline(datasetId);
-      if (pipeline) {
-        const graphNodes: Node[] = Array.isArray(pipeline.graph.nodes) ? (pipeline.graph.nodes as Node[]) : [];
-        const graphEdges: Edge[] = Array.isArray(pipeline.graph.edges) ? (pipeline.graph.edges as Edge[]) : [];
-        setGraph(graphNodes, graphEdges);
-        toast.success('Pipeline loaded');
-      } else {
-        toast.info('No saved pipeline found for this dataset');
-      }
-    } catch {
-      toast.error('Failed to load pipeline');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -410,6 +402,86 @@ export const Toolbar: React.FC = () => {
   const openRecentMenu = (): void => {
     setRecentPipelines(getRecentPipelines());
     setShowRecentMenu(v => !v);
+  };
+
+  // L7: hydrate the recent count once on mount so the Recent button
+  // can render only when localStorage actually has fallback entries.
+  // (Server-side versions are now the canonical history; Recent is a
+  // per-browser secondary cache and shouldn't add visual noise when
+  // empty.)
+  useEffect(() => {
+    setRecentPipelines(getRecentPipelines());
+  }, []);
+
+  // L7: probe the server every time the dataset changes so we know
+  // whether to show the Recent (localStorage) fallback button. Recent
+  // should only surface when the dataset has *no* server-side history
+  // at all — that's the genuine fallback semantic. Best-effort: if the
+  // probe fails we assume "no versions" and show the fallback.
+  useEffect(() => {
+    if (!currentDatasetId) {
+      setHasServerVersions(false);
+      return;
+    }
+    let cancelled = false;
+    void pipelineVersionsApi
+      .list(currentDatasetId)
+      .then((list) => {
+        if (!cancelled) setHasServerVersions(list.length > 0);
+      })
+      .catch(() => {
+        if (!cancelled) setHasServerVersions(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentDatasetId]);
+
+  // L7: Load button now opens a dropdown of the latest server-side
+  // versions for the current dataset. The classic "load active
+  // pipeline" path is preserved as a footer button so muscle memory
+  // still works when the user just wants the latest save.
+  const openLoadMenu = async (): Promise<void> => {
+    if (showLoadMenu) {
+      setShowLoadMenu(false);
+      return;
+    }
+    setShowLoadMenu(true);
+    setShowAllVersions(false);
+    if (!currentDatasetId) {
+      setLoadVersions([]);
+      return;
+    }
+    setLoadVersionsLoading(true);
+    try {
+      const list = await pipelineVersionsApi.list(currentDatasetId);
+      // Fetch all — render slices to 5 unless "Show more" is clicked.
+      setLoadVersions(list);
+      setHasServerVersions(list.length > 0);
+    } catch {
+      // Best-effort — falling back to "Load latest" footer is still useful.
+      setLoadVersions([]);
+    } finally {
+      setLoadVersionsLoading(false);
+    }
+  };
+
+  const handleLoadVersion = async (entry: PipelineVersionEntry): Promise<void> => {
+    setShowLoadMenu(false);
+    const ok = await confirm({
+      title: `Load v${entry.versionInt} "${entry.name}"?`,
+      message: 'Loading this version will overwrite your current canvas. Continue?',
+      confirmLabel: 'Load',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    const graph = entry.graph as { nodes?: Node[]; edges?: Edge[] } | undefined;
+    if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) {
+      toast.error('Load failed', 'Snapshot graph is in an unrecognised shape.');
+      return;
+    }
+    setGraph(graph.nodes, graph.edges);
+    toast.success(`Loaded "${entry.name}"`, `Version v${entry.versionInt}`);
   };
 
   const handleRestoreRecent = async (entry: RecentPipelineEntry): Promise<void> => {
@@ -855,12 +927,12 @@ export const Toolbar: React.FC = () => {
           <Gauge className="w-4 h-4" />
           <span className="text-sm font-medium hidden xl:inline">Perf</span>
         </button>
-        {!readOnly && (
+        {!readOnly && !hasServerVersions && recentPipelines.length > 0 && (
           <div className="relative" ref={recentMenuRef}>
             <button
               onClick={openRecentMenu}
-              title="Recently saved pipelines (last 5)"
-              aria-label="Recently saved pipelines"
+              title="Per-browser fallback (localStorage). Server-side versions live in DataSources."
+              aria-label="Recent pipelines (local fallback)"
               aria-haspopup="menu"
               aria-expanded={showRecentMenu}
               data-testid="toolbar-recent"
@@ -981,17 +1053,94 @@ export const Toolbar: React.FC = () => {
           </div>
         )}
         {!readOnly && (
-          <button
-            onClick={() => { void handleLoad(); }}
-            disabled={isLoading || isRunning}
-            title="Load pipeline"
-            aria-label="Load pipeline"
-            data-testid="toolbar-load"
-            className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
-          >
-            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />}
-            <span className="text-sm font-medium hidden xl:inline">{isLoading ? 'Loading...' : 'Load'}</span>
-          </button>
+          <div className="relative" ref={loadMenuRef}>
+            <button
+              onClick={() => { void openLoadMenu(); }}
+              disabled={isRunning}
+              title="Load a recent pipeline version (latest 5)"
+              aria-label="Load pipeline"
+              aria-haspopup="menu"
+              aria-expanded={showLoadMenu}
+              data-testid="toolbar-load"
+              className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+            >
+              <FolderOpen className="w-4 h-4" />
+              <span className="text-sm font-medium hidden xl:inline">Load</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            {showLoadMenu && (
+              <>
+                {/*
+                  Bulletproof outside-click catcher. Sits behind the
+                  dropdown (z-10) but in front of every other toolbar /
+                  canvas element, so any click outside the menu is
+                  captured here and dismisses cleanly. This avoids the
+                  fragile document-level mousedown listener in the
+                  shared `useDismissable` hook misbehaving under
+                  React Flow's pointer handling.
+                */}
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowLoadMenu(false)}
+                  aria-hidden="true"
+                />
+                <div
+                  role="menu"
+                  aria-label="Load pipeline version"
+                  className="absolute top-full right-0 mt-1 w-72 bg-background border rounded-md shadow-lg overflow-hidden z-20"
+                >
+                  {loadVersionsLoading ? (
+                    <div className="px-3 py-4 flex items-center justify-center text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    </div>
+                  ) : loadVersions.length === 0 ? (
+                    <div className="px-3 py-3 text-sm text-muted-foreground">
+                      No versions yet for this dataset. Save your pipeline to stamp the first one.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="px-3 py-1.5 text-xs uppercase tracking-wide text-muted-foreground border-b flex items-center justify-between">
+                        <span>{showAllVersions ? `All versions (${loadVersions.length})` : 'Latest versions'}</span>
+                      </div>
+                      <div className={showAllVersions ? 'max-h-80 overflow-y-auto' : ''}>
+                        {(showAllVersions ? loadVersions : loadVersions.slice(0, 5)).map((entry) => (
+                          <button
+                            key={entry.id}
+                            role="menuitem"
+                            onClick={() => { void handleLoadVersion(entry); }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-accent border-b last:border-b-0"
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {entry.pinned && (
+                                <Pin className="w-3 h-3 text-amber-500 flex-shrink-0" aria-label="Pinned" />
+                              )}
+                              <span className="font-medium truncate flex-1">{entry.name}</span>
+                              <span className="text-xs font-mono text-muted-foreground flex-shrink-0">
+                                v{entry.versionInt}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground tabular-nums mt-0.5">
+                              {entry.nodeCount} nodes · {entry.edgeCount} edges
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {loadVersions.length > 5 && !showAllVersions && (
+                    <button
+                      role="menuitem"
+                      onClick={() => setShowAllVersions(true)}
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-t"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                      Show more versions ({loadVersions.length - 5} more)
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         )}
         {!readOnly && (
           <button

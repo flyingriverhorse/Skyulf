@@ -194,6 +194,57 @@ class FeatureEngineeringPipeline(Base, TimestampMixin):
         }
 
 
+class PipelineVersion(Base):
+    """Append-only pipeline snapshots (L7 — server-side versioning).
+
+    Replaces the per-browser localStorage Recent ring buffer with a
+    durable, cross-device history. Keyed by `dataset_source_id` to
+    match how `FeatureEngineeringPipeline` is upserted today (one
+    active pipeline per dataset).
+
+    `version_int` is monotonically increasing per dataset and assigned
+    by the service on insert (max+1). Pinned rows are exempt from any
+    future eviction policy.
+    """
+
+    __tablename__ = "pipeline_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    dataset_source_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    version_int: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String(150), nullable=False, default="Pipeline")
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="manual", index=True)
+    pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    graph: Mapped[Any] = mapped_column(JSON, nullable=False)
+    node_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    edge_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    dataset_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "dataset_source_id": self.dataset_source_id,
+            "version_int": self.version_int,
+            "name": self.name,
+            "note": self.note,
+            "kind": self.kind,
+            "pinned": self.pinned,
+            "graph": self.graph,
+            "node_count": self.node_count,
+            "edge_count": self.edge_count,
+            "dataset_name": self.dataset_name,
+            "user_id": self.user_id,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 class MLJob(Base, TimestampMixin):
     """Abstract base class containing common fields for ML jobs."""
 
