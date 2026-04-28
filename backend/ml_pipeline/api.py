@@ -1053,12 +1053,8 @@ async def preview_pipeline(  # noqa: C901
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-
-
 @router.get("/jobs/node-summaries", response_model=Dict[str, List[Dict[str, Any]]])
-async def get_node_summaries(
-    limit: int = 200, session: AsyncSession = Depends(get_async_session)
-):
+async def get_node_summaries(limit: int = 200, session: AsyncSession = Depends(get_async_session)):
     """Per-node card summaries from the latest completed run group.
 
     Returns ``{ node_id: [entry, ...] }`` where each entry carries a
@@ -1156,8 +1152,6 @@ async def list_jobs(
     Lists recent jobs.
     """
     return await JobManager.list_jobs(session, limit, skip, job_type)
-
-
 
 
 @router.get("/jobs/tuning/latest/{node_id}", response_model=Optional[JobInfo])

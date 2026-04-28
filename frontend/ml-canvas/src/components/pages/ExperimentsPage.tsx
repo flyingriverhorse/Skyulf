@@ -12,6 +12,7 @@ import { toPng } from 'html-to-image';
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
 import { formatMetricName } from '../../core/utils/format';
+import { PipelineDiffView } from './experiments/PipelineDiffView';
 
 /** Extract the resolved scoring metric from a job's result (top-level or nested in metrics). */
 function getJobScoringMetric(job: { result?: Record<string, unknown> | null }): string | undefined {
@@ -71,7 +72,7 @@ export const ExperimentsPage: React.FC = () => {
   const [isPipelineExpanded, setIsPipelineExpanded] = useState(true);
 
   // View state
-  const [activeView, setActiveView] = useState<'charts' | 'table' | 'evaluation' | 'importance'>('charts');
+  const [activeView, setActiveView] = useState<'charts' | 'table' | 'evaluation' | 'importance' | 'diff'>('charts');
   const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
   const [isEvalLoading, setIsEvalLoading] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
@@ -541,6 +542,17 @@ export const ExperimentsPage: React.FC = () => {
                       onClick={() => { setActiveView('evaluation'); }}
                   >
                       Model Evaluation
+                  </button>
+                  <button
+                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                          activeView === 'diff'
+                              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                              : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                      }`}
+                      onClick={() => { setActiveView('diff'); }}
+                      data-testid="experiments-tab-diff"
+                  >
+                      Pipeline Diff
                   </button>
                   {hasFeatureImportances && (
                   <button
@@ -1498,6 +1510,13 @@ export const ExperimentsPage: React.FC = () => {
                         </div>
                         </div>
                     )}
+                </div>
+              )}
+
+              {/* Pipeline Diff View (L5) */}
+              {activeView === 'diff' && (
+                <div className="animate-in fade-in duration-300">
+                  <PipelineDiffView jobs={selectedJobs} />
                 </div>
               )}
 
