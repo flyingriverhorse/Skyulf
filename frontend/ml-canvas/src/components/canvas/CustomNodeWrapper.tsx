@@ -4,6 +4,7 @@ import { registry } from '../../core/registry/NodeRegistry';
 import { AlertCircle, X, CheckCircle2, XCircle, Merge, GitFork } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
+import { useViewStore } from '../../core/store/useViewStore';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import type { NodeExecutionResult } from '../../core/api/client';
 import {
@@ -43,6 +44,46 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
     (state) => new Set(state.edges.filter((e) => e.target === id).map((e) => e.source)).size,
     (a, b) => a === b
   );
+
+  // L4 perf overlay. When the user toggles the Toolbar gauge, every
+  // card whose last run has a known wall-clock duration grows a
+  // colored ring (green < 100 ms, amber < 1 s, red ≥ 1 s) and a
+  // tooltip with exact ms. Two sources for the duration:
+  //   1. Preview-run path: `nodeResult.execution_time` (seconds).
+  //   2. Trainer/tuner Celery path: latest `jobSummaries[i].duration_ms`.
+  // Off → no behavioural change to the card.
+  const perfOverlayEnabled = useViewStore((s) => s.perfOverlayEnabled);
+  const perfDurationMs: number | null = (() => {
+    if (!perfOverlayEnabled) return null;
+    if (typeof nodeResult?.execution_time === 'number') {
+      return Math.max(0, Math.round(nodeResult.execution_time * 1000));
+    }
+    const fromJob = jobSummaries?.find((e) => typeof e.duration_ms === 'number');
+    if (fromJob && typeof fromJob.duration_ms === 'number') return fromJob.duration_ms;
+    return null;
+  })();
+  const perfBucket: 'fast' | 'medium' | 'slow' | null =
+    perfDurationMs === null
+      ? null
+      : perfDurationMs < 100
+      ? 'fast'
+      : perfDurationMs < 1000
+      ? 'medium'
+      : 'slow';
+  const perfRingClass =
+    perfBucket === 'fast'
+      ? 'ring-2 ring-green-500/60 ring-offset-1 ring-offset-background'
+      : perfBucket === 'medium'
+      ? 'ring-2 ring-amber-500/70 ring-offset-1 ring-offset-background'
+      : perfBucket === 'slow'
+      ? 'ring-2 ring-red-500/70 ring-offset-1 ring-offset-background'
+      : '';
+  const perfTooltip =
+    perfDurationMs === null
+      ? undefined
+      : perfDurationMs >= 1000
+      ? `Last run: ${(perfDurationMs / 1000).toFixed(2)} s`
+      : `Last run: ${perfDurationMs} ms`;
 
   // Has this node received an active sibling-fan-in advisory with real
   // overlap (i.e. last-wins overwrite is happening)? If so, color the
@@ -136,6 +177,9 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
     <div
       data-testid={`canvas-node-${definitionType}`}
       data-node-definition-type={definitionType}
+      data-perf-bucket={perfBucket ?? undefined}
+      data-perf-duration-ms={perfDurationMs ?? undefined}
+      title={perfTooltip}
       className={`
       relative group min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all duration-150
       ${selected
@@ -144,6 +188,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         ? 'border-red-500/40 hover:border-red-500/60'
         : 'border-border hover:border-primary/50'}
       ${isPulsing ? 'animate-validation-pulse' : ''}
+      ${perfRingClass}
     `}>
       {/* Floating delete chip — absolute on the card corner so it never
           competes with header text/badges for flex space. Hidden in

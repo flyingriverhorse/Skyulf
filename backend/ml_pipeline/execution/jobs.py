@@ -234,6 +234,15 @@ class JobManager:
                 "parent_pipeline_id": job.parent_pipeline_id,
                 "finished_at": job.end_time.isoformat() if job.end_time else None,
             }
+            # Wall-clock duration for the L4 perf overlay. Computed
+            # from start/end timestamps so we don't depend on the
+            # engine writing it into ``metrics``. None when the job
+            # is missing either timestamp (legacy / partial rows).
+            if job.start_time and job.end_time:
+                entry["duration_ms"] = max(
+                    0,
+                    int((job.end_time - job.start_time).total_seconds() * 1000),
+                )
             out.setdefault(job.node_id, []).append(entry)
         # Sort each node's entries by branch_index (None last) so the
         # frontend can render them in deterministic Path-A/B/C order

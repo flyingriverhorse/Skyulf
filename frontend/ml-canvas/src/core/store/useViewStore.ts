@@ -17,6 +17,12 @@ interface ViewState {
   setResultsPanelExpanded: (isExpanded: boolean) => void;
   readOnlyOverride: ReadOnlyOverride;
   setReadOnlyOverride: (mode: ReadOnlyOverride) => void;
+  /** L4 perf overlay: when true, every node card whose last run has a
+   * known wall-clock duration shows a colored ring (green < 100 ms,
+   * amber < 1 s, red ≥ 1 s) plus a tooltip with the exact ms. Off
+   * by default — opt-in via the Toolbar gauge button. */
+  perfOverlayEnabled: boolean;
+  setPerfOverlayEnabled: (enabled: boolean) => void;
 }
 
 export const useViewStore = create<ViewState>((set) => ({
@@ -30,4 +36,6 @@ export const useViewStore = create<ViewState>((set) => ({
   setResultsPanelExpanded: (isExpanded) => set({ isResultsPanelExpanded: isExpanded }),
   readOnlyOverride: 'auto',
   setReadOnlyOverride: (mode) => set({ readOnlyOverride: mode }),
+  perfOverlayEnabled: false,
+  setPerfOverlayEnabled: (enabled) => set({ perfOverlayEnabled: enabled }),
 }));
