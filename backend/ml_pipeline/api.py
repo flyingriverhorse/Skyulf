@@ -720,9 +720,7 @@ async def create_pipeline_version(
         return version.to_dict()
     except Exception as e:  # noqa: BLE001
         await session.rollback()
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create pipeline version: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create pipeline version: {str(e)}")
 
 
 @router.patch("/versions/{dataset_source_id}/{version_id}")
