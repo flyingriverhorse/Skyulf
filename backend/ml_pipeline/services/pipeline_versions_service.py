@@ -81,9 +81,7 @@ class PipelineVersionsService:
         return version
 
     @staticmethod
-    async def list_versions(
-        session: AsyncSession, dataset_source_id: str
-    ) -> List[PipelineVersion]:
+    async def list_versions(session: AsyncSession, dataset_source_id: str) -> List[PipelineVersion]:
         # Pinned first, then newest first.
         stmt = (
             select(PipelineVersion)
@@ -97,9 +95,7 @@ class PipelineVersionsService:
         return list(result.scalars().all())
 
     @staticmethod
-    async def get_version(
-        session: AsyncSession, version_id: int
-    ) -> Optional[PipelineVersion]:
+    async def get_version(session: AsyncSession, version_id: int) -> Optional[PipelineVersion]:
         return await session.get(PipelineVersion, version_id)
 
     @staticmethod
