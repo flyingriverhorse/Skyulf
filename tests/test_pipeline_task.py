@@ -77,7 +77,8 @@ def test_run_pipeline_task_training_job(mock_get_db_session, mock_engine_class):
     # Assertions
     assert job.status == "completed"
     assert job.progress == 100
-    assert job.metrics == {"accuracy": 0.95}
+    assert job.metrics is not None
+    assert job.metrics["accuracy"] == 0.95
     assert job.finished_at is not None
 
     # Verify Engine was called
