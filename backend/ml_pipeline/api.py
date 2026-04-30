@@ -27,6 +27,10 @@ from backend.database.models import (
     BasicTrainingJob,
     DataSource,
     Deployment,
+    PipelineVersion,
+)
+from backend.ml_pipeline.services.pipeline_versions_service import (
+    PipelineVersionsService,
 )
 from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.tasks import run_pipeline_task
@@ -534,6 +538,29 @@ class SavedPipelineModel(BaseModel):
     name: str
     description: Optional[str] = None
     graph: Dict[str, Any]
+    # L7: optional metadata captured at save time so the auto-snapshot
+    # row carries useful labels even when the client doesn't pass them.
+    note: Optional[str] = None
+    dataset_name: Optional[str] = None
+
+
+class PipelineVersionCreateModel(BaseModel):
+    """Body for explicit POST /pipeline/versions/{dataset_id}."""
+
+    name: str
+    graph: Dict[str, Any]
+    note: Optional[str] = None
+    dataset_name: Optional[str] = None
+    kind: str = "manual"
+    pinned: bool = False
+
+
+class PipelineVersionPatchModel(BaseModel):
+    """Body for PATCH /pipeline/versions/{dataset_id}/{version_id}."""
+
+    name: Optional[str] = None
+    note: Optional[str] = None
+    pinned: Optional[bool] = None
 
 
 # --- Endpoints ---
@@ -590,6 +617,26 @@ async def save_pipeline(
             session.add(new_pipeline)
 
         await session.commit()
+
+        # L7: stamp a server-side version snapshot every successful save.
+        # Best-effort — version persistence must never break Save itself.
+        try:
+            await PipelineVersionsService.create_version(
+                session=session,
+                dataset_source_id=dataset_id,
+                graph=payload.graph,
+                name=payload.name,
+                kind="manual",
+                note=payload.note,
+                dataset_name=payload.dataset_name,
+            )
+        except Exception as ver_err:  # noqa: BLE001
+            logger.warning(
+                "Failed to write pipeline_version snapshot for %s: %s",
+                dataset_id,
+                ver_err,
+            )
+
         return {"status": "success", "id": dataset_id, "storage": "database"}
     except Exception as e:
         await session.rollback()
@@ -631,6 +678,87 @@ async def load_pipeline(dataset_id: str, session: AsyncSession = Depends(get_asy
         return pipeline.to_dict()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load pipeline: {str(e)}")
+
+
+# --- L7: Server-side pipeline versioning ---
+#
+# Replaces the per-browser localStorage Recent ring buffer with a
+# durable, cross-device history. Routes mirror the shape of
+# `frontend/ml-canvas/src/core/utils/recentPipelines.ts` so the
+# frontend swap is mechanical.
+
+
+@router.get("/versions/{dataset_source_id}")
+async def list_pipeline_versions(
+    dataset_source_id: str,
+    session: AsyncSession = Depends(get_async_session),
+) -> List[Dict[str, Any]]:
+    """List all snapshots for a dataset (pinned first, newest first)."""
+    versions = await PipelineVersionsService.list_versions(session, dataset_source_id)
+    return [v.to_dict() for v in versions]
+
+
+@router.post("/versions/{dataset_source_id}")
+async def create_pipeline_version(
+    dataset_source_id: str,
+    payload: PipelineVersionCreateModel,
+    session: AsyncSession = Depends(get_async_session),
+) -> Dict[str, Any]:
+    """Explicitly create a snapshot. `kind` defaults to 'manual'; pass
+    'auto' from background callers (e.g. successful Run hooks)."""
+    try:
+        version = await PipelineVersionsService.create_version(
+            session=session,
+            dataset_source_id=dataset_source_id,
+            graph=payload.graph,
+            name=payload.name,
+            kind=payload.kind,
+            note=payload.note,
+            dataset_name=payload.dataset_name,
+            pinned=payload.pinned,
+        )
+        return version.to_dict()
+    except Exception as e:  # noqa: BLE001
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create pipeline version: {str(e)}")
+
+
+@router.patch("/versions/{dataset_source_id}/{version_id}")
+async def update_pipeline_version(
+    dataset_source_id: str,
+    version_id: int,
+    payload: PipelineVersionPatchModel,
+    session: AsyncSession = Depends(get_async_session),
+) -> Dict[str, Any]:
+    """Toggle pin, rename, or edit the note on a snapshot."""
+    version = await PipelineVersionsService.get_version(session, version_id)
+    if version is None or version.dataset_source_id != dataset_source_id:
+        raise HTTPException(status_code=404, detail="Version not found")
+    updated = await PipelineVersionsService.update_version(
+        session,
+        version_id,
+        name=payload.name,
+        note=payload.note,
+        pinned=payload.pinned,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Version not found")
+    return updated.to_dict()
+
+
+@router.delete("/versions/{dataset_source_id}/{version_id}")
+async def delete_pipeline_version(
+    dataset_source_id: str,
+    version_id: int,
+    session: AsyncSession = Depends(get_async_session),
+) -> Dict[str, Any]:
+    """Hard-delete a snapshot. Pinned rows are not protected from
+    explicit user deletion (matches the localStorage behavior)."""
+    version = await PipelineVersionsService.get_version(session, version_id)
+    if version is None or version.dataset_source_id != dataset_source_id:
+        raise HTTPException(status_code=404, detail="Version not found")
+    ok = await PipelineVersionsService.delete_version(session, version_id)
+    return {"status": "success" if ok else "not_found", "id": version_id}
 
 
 @router.post("/preview", response_model=PreviewResponse)
