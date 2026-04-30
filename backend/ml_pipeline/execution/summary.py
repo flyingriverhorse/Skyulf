@@ -20,7 +20,8 @@ Design constraints
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Tuple
 
 import pandas as pd
 
@@ -508,6 +509,94 @@ def _tuning_summary(metrics: Mapping[str, Any]) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
+# Renderer registry — one base shape, one entry per family
+# ---------------------------------------------------------------------------
+#
+# L1 follow-up: the previous ``build_summary`` body was an inline
+# if/elif union over every family, which made adding a new node kind
+# touch the orchestrator. A small registry keeps families isolated:
+# each renderer takes the same ``SummaryContext`` and returns
+# ``Optional[str]``. Adding a family is now a one-line table edit, not
+# an orchestrator surgery.
+
+
+@dataclass(frozen=True)
+class SummaryContext:
+    """Inputs every family renderer receives.
+
+    Frozen so renderers can't mutate it by accident — the orchestrator
+    builds one and hands the same instance to whichever renderer the
+    family table dispatches to.
+    """
+
+    step_type: Any
+    output: Any
+    metrics: Mapping[str, Any]
+    input_shape: Optional[Tuple[int, int]]
+    params: Mapping[str, Any]
+
+
+SummaryRenderer = Callable[[SummaryContext], Optional[str]]
+
+
+def _render_tune(ctx: SummaryContext) -> Optional[str]:
+    return _tuning_summary(ctx.metrics)
+
+
+def _render_train(ctx: SummaryContext) -> Optional[str]:
+    return _training_summary(ctx.metrics)
+
+
+def _render_split(ctx: SummaryContext) -> Optional[str]:
+    if isinstance(ctx.output, SplitDataset):
+        return _split_summary(ctx.output)
+    return None
+
+
+def _render_frame(ctx: SummaryContext) -> Optional[str]:
+    """Default renderer for any family whose output is a DataFrame.
+
+    Covers loaders, snapshots, encoders, scalers, imputers, drops,
+    outliers, selectors, binning, generators, replacements and
+    sampling — _frame_branch already dispatches on family for the
+    actual phrasing.
+    """
+    if isinstance(ctx.output, pd.DataFrame):
+        family = _family_of(ctx.step_type)
+        return _frame_branch(family, ctx.step_type, ctx.output, ctx.input_shape, ctx.params)
+    return None
+
+
+# Family → renderer. Anything not listed falls through to the
+# DataFrame renderer when applicable (covers all "shape-changing"
+# data-prep families with one entry).
+_RENDERERS: Dict[str, SummaryRenderer] = {
+    "tune": _render_tune,
+    "train": _render_train,
+    "split": _render_split,
+    # Frame-output families share one renderer.
+    "loader": _render_frame,
+    "snapshot": _render_frame,
+    "encode": _render_frame,
+    "scale": _render_frame,
+    "impute": _render_frame,
+    "drop": _render_frame,
+    "outlier": _render_frame,
+    "select": _render_frame,
+    "bin": _render_frame,
+    "generate": _render_frame,
+    "replace": _render_frame,
+    "resample": _render_frame,
+    "generic": _render_frame,
+}
+
+
+def register_renderer(family: str, renderer: SummaryRenderer) -> None:
+    """Plug a custom renderer in for a family. Used by tests / plugins."""
+    _RENDERERS[family] = renderer
+
+
+# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
@@ -545,26 +634,29 @@ def build_summary(
     """
     try:
         family = _family_of(step_type)
-        params = params or {}
-
-        # Trainers / tuners don't depend on the output artifact at all.
-        if family == "tune":
-            return _tuning_summary(metrics)
-        if family == "train":
-            return _training_summary(metrics)
-
-        # Splitters: per-slot row counts + ratio + col count.
+        ctx = SummaryContext(
+            step_type=step_type,
+            output=output,
+            metrics=metrics,
+            input_shape=input_shape,
+            params=params or {},
+        )
+        # Splitter outputs are dispatched by *type* not family — some
+        # nodes registered as `split` only emit SplitDataset, while
+        # others (legacy) hand back a tuple. The renderer handles both.
         if isinstance(output, SplitDataset):
-            return _split_summary(output)
-
-        # Frames: family-aware delta or shape line.
-        if isinstance(output, pd.DataFrame):
-            return _frame_branch(family, step_type, output, input_shape, params)
-
-        return None
+            return _render_split(ctx)
+        renderer = _RENDERERS.get(family, _render_frame)
+        return renderer(ctx)
     except Exception as exc:  # pragma: no cover - defensive
         logger.debug("summary build failed for step=%s: %s", step_type, exc)
         return None
 
 
-__all__ = ["build_summary", "_family_of"]
+__all__ = [
+    "build_summary",
+    "register_renderer",
+    "SummaryContext",
+    "SummaryRenderer",
+    "_family_of",
+]
