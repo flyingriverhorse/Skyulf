@@ -62,6 +62,10 @@ export interface NodeExecutionResult {
   error?: string;
   metrics?: Record<string, unknown>;
   output?: unknown;
+  /** Wall-clock duration of this node's last successful run, in
+   * seconds. Source: backend `NodeExecutionResult.execution_time`.
+   * Used by the L4 perf overlay to color-code node cards. */
+  execution_time?: number;
   /** Optional engine-side per-node free-form metadata. `summary` is a
    * short one-line human string (e.g. "7,000 / 1,500 / 1,500" for a
    * train/test split) that the canvas renders inside the node body when

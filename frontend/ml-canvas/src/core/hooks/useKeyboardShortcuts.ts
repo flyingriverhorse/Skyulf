@@ -27,6 +27,14 @@ export const SHOW_SHORTCUTS_EVENT = 'skyulf:show-shortcuts';
 export const SHOW_PALETTE_EVENT = 'skyulf:show-palette';
 
 /**
+ * Custom event fired when the canvas empty-state's "Start from a
+ * template" CTA wants to open the gallery modal owned by the Toolbar.
+ * Same pattern as the palette/shortcut events — avoids prop-drilling
+ * across the canvas boundary.
+ */
+export const SHOW_TEMPLATES_EVENT = 'skyulf:show-templates';
+
+/**
  * Custom event the palette dispatches when the user picks a node.
  * `FlowCanvas` listens and inserts the node at the current viewport
  * center using `useReactFlow().screenToFlowPosition` (only available

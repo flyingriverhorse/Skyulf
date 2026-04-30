@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.database.models import MLJob, BasicTrainingJob, AdvancedTuningJob
 from backend.ml_pipeline.execution.schemas import PipelineExecutionResult
+from backend.ml_pipeline.execution.summary import build_summary
 from backend.ml_pipeline.constants import StepType
 
 
@@ -49,6 +50,30 @@ class JobStrategy(ABC):
             if all_dropped_columns:
                 all_dropped_columns = list(set(all_dropped_columns))
                 final_metrics["dropped_columns"] = all_dropped_columns
+
+            # Stamp a one-line summary the canvas can render on the
+            # trainer node card. The engine builds `metadata.summary`
+            # for every node, but trainer/tuner jobs run via Celery and
+            # only `job.metrics` is persisted to the DB — the per-node
+            # metadata never reaches the FE store. Forwarding the
+            # already-computed summary here keeps the trainer card in
+            # sync with the rest of the canvas after `/pipeline/run`.
+            summary = (last_result.metadata or {}).get("summary") if last_result.metadata else None
+            if not summary:
+                # Fallback: rebuild from this job's own metrics so even
+                # legacy runs (where the engine didn't stamp metadata)
+                # still render a card line.
+                step_type = getattr(job, "step_type", None) or "training"
+                try:
+                    summary = build_summary(
+                        step_type=step_type,
+                        output=None,
+                        metrics=final_metrics,
+                    )
+                except Exception:
+                    summary = None
+            if summary:
+                final_metrics["summary"] = summary
 
             job.metrics = final_metrics
 

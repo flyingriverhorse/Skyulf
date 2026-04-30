@@ -4,7 +4,7 @@ import logging
 import time
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import numpy as np
 import pandas as pd
@@ -24,6 +24,7 @@ from .schemas import (
     PipelineConfig,
     PipelineExecutionResult,
 )
+from .summary import build_summary
 
 logger = logging.getLogger(__name__)
 
@@ -278,12 +279,52 @@ class PipelineEngine:
                     raise e
 
             duration = time.time() - start_ts
+
+            # Build the one-line node-card summary. The artifact store
+            # already has the freshly-saved output (every _run_* path
+            # writes under node_id), so loading it here is cheap and
+            # keeps summary logic out of the per-runner methods. We
+            # tolerate any failure — a missing summary just means the
+            # card falls back to its static description.
+            metadata: Dict[str, Any] = {}
+            # Output / upstream loads are best-effort and isolated from
+            # the summary call — for trainers and tuners the summary
+            # comes purely from `metrics`, so a failed model load (e.g.
+            # an artifact bundle that doesn't unpickle cleanly) must not
+            # suppress the card line.
+            output: Any = None
+            try:
+                output = self.artifact_store.load(node.node_id)
+            except Exception:
+                logger.debug("summary: output load skipped for %s", node.node_id, exc_info=True)
+            input_shape: Optional[Tuple[int, int]] = None
+            try:
+                if node.inputs:
+                    upstream = self.artifact_store.load(node.inputs[0])
+                    if isinstance(upstream, pd.DataFrame):
+                        input_shape = upstream.shape
+            except Exception:
+                input_shape = None
+            try:
+                summary = build_summary(
+                    step_type=node.step_type,
+                    output=output,
+                    metrics=metrics,
+                    input_shape=input_shape,
+                    params=node.params or {},
+                )
+                if summary:
+                    metadata["summary"] = summary
+            except Exception:
+                logger.debug("summary skipped for node %s", node.node_id, exc_info=True)
+
             return NodeExecutionResult(
                 node_id=node.node_id,
                 status="success",
                 output_artifact_id=output_artifact_id,
                 metrics=metrics,
                 execution_time=duration,
+                metadata=metadata,
             )
 
         except Exception as e:

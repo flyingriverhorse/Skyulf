@@ -232,7 +232,7 @@ export const DropColumnsNode: NodeDefinition<DropColumnsConfig> = {
   type: 'drop_missing_columns', // Maps to backend handler
   label: 'Drop Columns',
   category: 'Preprocessing',
-  description: 'Remove specific columns or those with high missing values.',
+  description: 'Remove specific columns.',
   icon: Trash2,
   inputs: [{ id: 'in', label: 'Data', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Data', type: 'dataset' }],
