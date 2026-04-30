@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown, Clock, Trash2, Pin, PinOff, Pencil } from 'lucide-react';
+import { Play, Save, Loader2, FolderOpen, History, Rocket, Wand2, HelpCircle, Merge, GitFork, X, CheckCircle2, XCircle, Undo2, Redo2, Keyboard, AlertCircle, Command, Download, ChevronDown, Clock, Trash2, Pin, PinOff, Pencil, Sparkles, Gauge, MoreHorizontal } from 'lucide-react';
 import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
@@ -13,6 +13,7 @@ import {
   RUN_PREVIEW_EVENT,
   SHOW_SHORTCUTS_EVENT,
   SHOW_PALETTE_EVENT,
+  SHOW_TEMPLATES_EVENT,
 } from '../../core/hooks/useKeyboardShortcuts';
 import { exportCanvasToPng, exportCanvasToSvg } from '../../core/utils/canvasExport';
 import {
@@ -26,8 +27,39 @@ import {
 } from '../../core/utils/recentPipelines';
 import { toast } from '../../core/toast';
 import { useConfirm } from '../shared';
+import { TemplatesGalleryModal } from '../canvas/TemplatesGalleryModal';
 
 const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
+
+// Shared dismiss behaviour for popover-style dropdowns: Esc anywhere,
+// or a mousedown outside the anchor element. We use mousedown rather
+// than click so the menu closes before a click handler on a different
+// menu can re-open it (avoids the "stuck open" feel when toggling
+// between two adjacent dropdowns).
+function useDismissable(
+  open: boolean,
+  close: () => void,
+  ref: React.RefObject<HTMLElement | null>,
+): void {
+  useEffect(() => {
+    if (!open) return;
+    const onMouseDown = (e: MouseEvent): void => {
+      const node = ref.current;
+      // `Node` is shadowed in this file by React Flow's node type
+      // (imported above), so we route through the global DOM Node.
+      if (node && !node.contains(e.target as unknown as globalThis.Node)) close();
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, close, ref]);
+}
 
 export const Toolbar: React.FC = () => {
   const nodes = useGraphStore((state) => state.nodes);
@@ -37,6 +69,8 @@ export const Toolbar: React.FC = () => {
   
   const { toggleDrawer, setActiveParallelRun, startPolling } = useJobStore();
   const isSidebarOpen = useViewStore((s) => s.isSidebarOpen);
+  const perfOverlayEnabled = useViewStore((s) => s.perfOverlayEnabled);
+  const setPerfOverlayEnabled = useViewStore((s) => s.setPerfOverlayEnabled);
   // Hide editor-only buttons (save/tidy/run/undo/redo/load/palette) on
   // tablet or when the user has toggled read-only on.
   const readOnly = useReadOnlyMode();
@@ -88,6 +122,11 @@ export const Toolbar: React.FC = () => {
   const [showLegend, setShowLegend] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  // Compact-toolbar overflow menu (below `xl`). Collapses the
+  // secondary actions (Jobs, Templates, Perf, Tidy, Export) into a
+  // single “More” dropdown so the right cluster never wraps onto a
+  // second row and overlaps the left cluster on 1024–1280 px screens.
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   // Recent pipelines ring buffer (M2). Hydrated lazily on first open
   // so the toolbar mount cost stays zero, then refreshed on every save.
   const [showRecentMenu, setShowRecentMenu] = useState(false);
@@ -95,6 +134,20 @@ export const Toolbar: React.FC = () => {
   // Inline rename state — `null` when no row is being edited.
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
+  // L3 templates gallery — modal mount controlled here so both the
+  // Toolbar button and the canvas empty-state can open it (the empty
+  // state dispatches a custom event the Toolbar subscribes to).
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  // Refs for outside-click dismissal of the four toolbar dropdowns.
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
+  const legendRef = useRef<HTMLDivElement | null>(null);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
+  const recentMenuRef = useRef<HTMLDivElement | null>(null);
+  useDismissable(showMoreMenu, () => setShowMoreMenu(false), moreMenuRef);
+  useDismissable(showLegend, () => setShowLegend(false), legendRef);
+  useDismissable(showExportMenu, () => setShowExportMenu(false), exportMenuRef);
+  useDismissable(showRecentMenu, () => setShowRecentMenu(false), recentMenuRef);
 
   const handleExport = async (kind: 'png' | 'svg'): Promise<void> => {
     setShowExportMenu(false);
@@ -279,6 +332,9 @@ export const Toolbar: React.FC = () => {
       }
       toast.success(`${count} experiment${count > 1 ? 's' : ''} queued`);
       toggleDrawer();
+      
+      // Keep standard nodes populated with data while experiments run in the background.
+      void handleRun();
     } catch {
       toast.error('Failed to run experiments');
     } finally {
@@ -337,6 +393,15 @@ export const Toolbar: React.FC = () => {
     const fire = (): void => handleRunRef.current();
     window.addEventListener(RUN_PREVIEW_EVENT, fire);
     return () => window.removeEventListener(RUN_PREVIEW_EVENT, fire);
+  }, []);
+
+  // Bridge: the canvas empty-state CTA dispatches this event instead of
+  // owning its own modal — keeps the gallery state singleton in the
+  // Toolbar and lets the canvas stay presentational.
+  useEffect(() => {
+    const open = (): void => setShowTemplates(true);
+    window.addEventListener(SHOW_TEMPLATES_EVENT, open);
+    return () => window.removeEventListener(SHOW_TEMPLATES_EVENT, open);
   }, []);
 
   // Recent-pipelines dropdown: hydrate lazily on open so the toolbar
@@ -461,19 +526,22 @@ export const Toolbar: React.FC = () => {
           cover the legend button below; we shift the cluster right
           (left-16) so both stay reachable. */}
       <div
+        ref={legendRef}
         className={`absolute top-4 z-10 flex gap-2 transition-[left] duration-300 ${
           isSidebarOpen ? 'left-4' : 'left-16'
         }`}
       >
-        <button
-          onClick={() => setShowLegend(v => !v)}
-          title="Show node badge legend"
-          aria-label="Show node badge legend"
-          aria-expanded={showLegend}
-          className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
-        >
-          <HelpCircle className="w-4 h-4" />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowLegend(v => !v)}
+            title="Show node badge legend"
+            aria-label="Show node badge legend"
+            aria-expanded={showLegend}
+            className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
+        </div>
         <button
           onClick={() => window.dispatchEvent(new CustomEvent(SHOW_SHORTCUTS_EVENT))}
           title="Keyboard shortcuts (?)"
@@ -517,7 +585,7 @@ export const Toolbar: React.FC = () => {
           </button>
         )}
         {showLegend && (
-          <div className="absolute top-12 left-0 mt-2 w-96 p-4 bg-background border rounded-md shadow-lg text-sm max-h-[80vh] overflow-y-auto">
+          <div className="absolute top-12 left-0 mt-2 w-80 p-3 bg-background border rounded-md shadow-lg text-sm max-h-[80vh] overflow-y-auto z-20">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold">Canvas Legend</h3>
               <button
@@ -587,6 +655,34 @@ export const Toolbar: React.FC = () => {
               </li>
             </ul>
 
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Performance Overlay</div>
+            <p className="text-xs text-muted-foreground mb-2">
+              Toggle the <Gauge className="w-3 h-3 inline-block align-text-bottom" /> Perf button. Each node card grows a colored ring sized by its last-run wall-clock. Thresholds adapt by node family — preprocessing runs in milliseconds, single-fit trainers in seconds, and HPO/CV tuners legitimately take minutes.
+            </p>
+            <ul className="space-y-3 mb-4">
+              <li className="flex items-start gap-3">
+                <span className="inline-block w-5 h-5 rounded-full ring-2 ring-green-500/60 ring-offset-2 ring-offset-background bg-card shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-medium">Fast</div>
+                  <div className="text-xs text-muted-foreground">Preprocess &lt; 500 ms · Trainer &lt; 5 s · Tuner &lt; 1 min. Cheap step, nothing to tune.</div>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="inline-block w-5 h-5 rounded-full ring-2 ring-amber-500/70 ring-offset-2 ring-offset-background bg-card shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-medium">Medium</div>
+                  <div className="text-xs text-muted-foreground">Preprocess 0.5 – 5 s · Trainer 5 – 60 s · Tuner 1 – 10 min. Healthy range; watch growth over time.</div>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="inline-block w-5 h-5 rounded-full ring-2 ring-red-500/70 ring-offset-2 ring-offset-background bg-card shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-medium">Slow</div>
+                  <div className="text-xs text-muted-foreground">Preprocess ≥ 5 s · Trainer ≥ 60 s · Tuner ≥ 10 min. Bottleneck candidate — consider sampling, caching, fewer trials, or a smaller search space.</div>
+                </div>
+              </li>
+            </ul>
+
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Edges</div>
             <ul className="space-y-3">
               <li className="flex items-start gap-3">
@@ -638,19 +734,129 @@ export const Toolbar: React.FC = () => {
           primary Run / Run All buttons keep their labels because
           they're the user's most-used affordance. The max-width keeps
           the cluster from sliding under the left-side cluster. */}
-      <div className="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2 max-w-[calc(100%-13rem)]">
+      <div className="absolute top-4 right-4 z-10 flex flex-nowrap justify-end gap-2 max-w-[calc(100%-13rem)]">
+        {/* Compact-mode overflow menu (below xl). Replaces the Jobs /
+            Templates / Perf / Tidy / Export buttons with one
+            ⋯ trigger so the right cluster never wraps and overlaps
+            the left-side undo/redo/legend cluster on 1024–1280 px
+            screens. Above xl the same actions render inline below. */}
+        <div className="relative xl:hidden" ref={moreMenuRef}>
+          <button
+            onClick={() => setShowMoreMenu((v) => !v)}
+            title="More canvas tools"
+            aria-label="More canvas tools"
+            aria-haspopup="menu"
+            aria-expanded={showMoreMenu}
+            data-testid="toolbar-more"
+            className="flex items-center gap-1 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+          {showMoreMenu && (
+            <div
+              role="menu"
+              aria-label="More canvas tools"
+              className="absolute top-full right-0 mt-1 w-52 bg-background border rounded-md shadow-lg overflow-hidden z-20"
+            >
+              <button
+                role="menuitem"
+                onClick={() => { setShowMoreMenu(false); toggleDrawer(); }}
+                className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
+              >
+                <History className="w-4 h-4" /> Jobs
+              </button>
+              {!readOnly && (
+                <button
+                  role="menuitem"
+                  onClick={() => { setShowMoreMenu(false); setShowTemplates(true); }}
+                  className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
+                >
+                  <Sparkles className="w-4 h-4" /> Templates
+                </button>
+              )}
+              <button
+                role="menuitemcheckbox"
+                onClick={() => { setShowMoreMenu(false); setPerfOverlayEnabled(!perfOverlayEnabled); }}
+                aria-checked={perfOverlayEnabled}
+                className={`w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent ${
+                  perfOverlayEnabled ? 'text-primary' : ''
+                }`}
+              >
+                <Gauge className="w-4 h-4" />
+                Perf overlay {perfOverlayEnabled ? '· on' : ''}
+              </button>
+              {!readOnly && (
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    const { nodes: laidOut, edges: keptEdges } = autoLayoutGraph(nodes, edges);
+                    setGraph(laidOut, keptEdges);
+                  }}
+                  disabled={isRunning || nodes.length === 0}
+                  className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
+                >
+                  <Wand2 className="w-4 h-4" /> Tidy layout
+                </button>
+              )}
+              <button
+                role="menuitem"
+                onClick={() => { setShowMoreMenu(false); void handleExport('png'); }}
+                disabled={isExporting || nodes.length === 0}
+                className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
+              >
+                <Download className="w-4 h-4" /> Export PNG
+              </button>
+              <button
+                role="menuitem"
+                onClick={() => { setShowMoreMenu(false); void handleExport('svg'); }}
+                disabled={isExporting || nodes.length === 0}
+                className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
+              >
+                <Download className="w-4 h-4" /> Export SVG
+              </button>
+            </div>
+          )}
+        </div>
         <button
           onClick={() => toggleDrawer()}
           title="Job runs history"
           aria-label="Job runs history"
           data-testid="toolbar-jobs"
-          className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+          className="hidden xl:flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
         >
           <History className="w-4 h-4" />
           <span className="text-sm font-medium hidden xl:inline">Jobs</span>
         </button>
         {!readOnly && (
-          <div className="relative">
+          <button
+            onClick={() => setShowTemplates(true)}
+            title="Start from a template"
+            aria-label="Start from a template"
+            data-testid="toolbar-templates"
+            className="hidden xl:flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span className="text-sm font-medium hidden xl:inline">Templates</span>
+          </button>
+        )}
+        <button
+          onClick={() => setPerfOverlayEnabled(!perfOverlayEnabled)}
+          title={perfOverlayEnabled ? 'Hide per-node performance overlay' : 'Color-code nodes by last-run duration'}
+          aria-label="Toggle performance overlay"
+          aria-pressed={perfOverlayEnabled}
+          data-testid="toolbar-perf-overlay"
+          className={`hidden xl:flex items-center gap-2 px-3 py-2 border rounded-md shadow-sm transition-colors ${
+            perfOverlayEnabled
+              ? 'bg-primary/10 border-primary/40 text-primary hover:bg-primary/15'
+              : 'bg-background hover:bg-accent'
+          }`}
+        >
+          <Gauge className="w-4 h-4" />
+          <span className="text-sm font-medium hidden xl:inline">Perf</span>
+        </button>
+        {!readOnly && (
+          <div className="relative" ref={recentMenuRef}>
             <button
               onClick={openRecentMenu}
               title="Recently saved pipelines (last 5)"
@@ -810,13 +1016,13 @@ export const Toolbar: React.FC = () => {
             disabled={isRunning || nodes.length === 0}
             title="Auto-arrange nodes left-to-right by data flow"
             aria-label="Tidy: auto-arrange nodes"
-            className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+            className="hidden xl:flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
           >
             <Wand2 className="w-4 h-4" />
             <span className="text-sm font-medium hidden xl:inline">Tidy</span>
           </button>
         )}
-        <div className="relative">
+        <div className="relative hidden xl:block" ref={exportMenuRef}>
           <button
             onClick={() => setShowExportMenu(v => !v)}
             disabled={isExporting || nodes.length === 0}
@@ -862,7 +1068,7 @@ export const Toolbar: React.FC = () => {
             className="flex items-center gap-2 px-3 py-2 text-white bg-amber-600 rounded-md shadow-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
           >
             {isRunningAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
-            <span className="text-sm font-medium hidden md:inline">{isRunningAll ? 'Queuing...' : 'Run All Experiments'}</span>
+            <span className="text-sm font-medium hidden 2xl:inline">{isRunningAll ? 'Queuing...' : 'Run All Experiments'}</span>
           </button>
         )}
         {!readOnly && canRunPreview && (
@@ -876,10 +1082,14 @@ export const Toolbar: React.FC = () => {
             style={{ background: 'var(--main-gradient)' }}
           >
             {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-            <span className="text-sm font-medium hidden md:inline">{isRunning ? 'Running...' : 'Run Preview'}</span>
+            <span className="text-sm font-medium hidden 2xl:inline">{isRunning ? 'Running...' : 'Run Preview'}</span>
           </button>
         )}
       </div>
+      <TemplatesGalleryModal
+        isOpen={showTemplates}
+        onClose={() => setShowTemplates(false)}
+      />
     </>
   );
 };

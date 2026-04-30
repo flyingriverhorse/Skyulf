@@ -3,6 +3,9 @@ import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
 import { registry } from '../../core/registry/NodeRegistry';
 import { AlertCircle, X, CheckCircle2, XCircle, Merge, GitFork } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
+import { useJobStore } from '../../core/store/useJobStore';
+import { useViewStore } from '../../core/store/useViewStore';
+import { bucketDuration, getPerfFamily } from '../../core/perf/perfThresholds';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import type { NodeExecutionResult } from '../../core/api/client';
 import {
@@ -14,17 +17,73 @@ import {
 function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   const definitionType = data.definitionType as string;
   const definition = registry.get(definitionType);
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, getEdges } = useReactFlow();
   // In read-only mode the per-node X is hidden along with the global
   // editor affordances (Backspace, sidebars, undo/redo, palette).
   const readOnly = useReadOnlyMode();
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult: NodeExecutionResult | undefined = executionResult?.node_results?.[id];
+  // Fallback summary entries for trainer/tuner nodes whose jobs run
+  // via Celery — they never populate `executionResult.node_results`.
+  // The `useNodeJobSummaries` hook keeps this map fresh from
+  // `/jobs/node-summaries` after every job event. For parallel runs
+  // the array contains one entry per branch; merge runs have one.
+  const jobSummaries = useGraphStore((state) => state.nodeJobSummaries[id]);
+  // Mirror of the canvas branch labels so multi-branch trainer cards
+  // can show "Path B · Xgboost" letters that match the colored edges.
+  const branchEdgeLabels = useGraphStore((state) => state.branchEdgeLabels);
+  // Whether a fresh job is currently in flight for this node — lets
+  // the card tag the existing (now-stale) summary as "previous run"
+  // in its tooltip until the new job completes and overwrites it.
+  const isJobInFlight = useJobStore((state) =>
+    state.jobs.some(
+      (j) => j.node_id === id && (j.status === 'running' || j.status === 'queued'),
+    ),
+  );
   const incomingSourceCount = useGraphStore(
     (state) => new Set(state.edges.filter((e) => e.target === id).map((e) => e.source)).size,
     (a, b) => a === b
   );
+
+  // L4 perf overlay. When the user toggles the Toolbar gauge, every
+  // card whose last run has a known wall-clock duration grows a
+  // colored ring and a tooltip with exact ms.
+  // Two duration sources:
+  //   1. Preview-run path: `nodeResult.execution_time` (seconds).
+  //   2. Trainer/tuner Celery path: latest `jobSummaries[i].duration_ms`.
+  // Thresholds are family-aware (see `core/perf/perfThresholds.ts`):
+  // preprocessing nodes finish in milliseconds, single-fit trainers in
+  // seconds, and HPO/CV tuners legitimately run for minutes. Using one
+  // flat threshold would paint every tuner red and convey no signal.
+  const perfOverlayEnabled = useViewStore((s) => s.perfOverlayEnabled);
+  const perfDurationMs: number | null = (() => {
+    if (!perfOverlayEnabled) return null;
+    if (typeof nodeResult?.execution_time === 'number') {
+      return Math.max(0, Math.round(nodeResult.execution_time * 1000));
+    }
+    const fromJob = jobSummaries?.find((e) => typeof e.duration_ms === 'number');
+    if (fromJob && typeof fromJob.duration_ms === 'number') return fromJob.duration_ms;
+    return null;
+  })();
+  const perfBucket: 'fast' | 'medium' | 'slow' | null =
+    perfDurationMs === null
+      ? null
+      : bucketDuration(perfDurationMs, getPerfFamily(definitionType));
+  const perfRingClass =
+    perfBucket === 'fast'
+      ? 'ring-2 ring-green-500/60 ring-offset-1 ring-offset-background'
+      : perfBucket === 'medium'
+      ? 'ring-2 ring-amber-500/70 ring-offset-1 ring-offset-background'
+      : perfBucket === 'slow'
+      ? 'ring-2 ring-red-500/70 ring-offset-1 ring-offset-background'
+      : '';
+  const perfTooltip =
+    perfDurationMs === null
+      ? undefined
+      : perfDurationMs >= 1000
+      ? `Last run: ${(perfDurationMs / 1000).toFixed(2)} s`
+      : `Last run: ${perfDurationMs} ms`;
 
   // Has this node received an active sibling-fan-in advisory with real
   // overlap (i.e. last-wins overwrite is happening)? If so, color the
@@ -118,6 +177,9 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
     <div
       data-testid={`canvas-node-${definitionType}`}
       data-node-definition-type={definitionType}
+      data-perf-bucket={perfBucket ?? undefined}
+      data-perf-duration-ms={perfDurationMs ?? undefined}
+      title={perfTooltip}
       className={`
       relative group min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all duration-150
       ${selected
@@ -126,6 +188,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         ? 'border-red-500/40 hover:border-red-500/60'
         : 'border-border hover:border-primary/50'}
       ${isPulsing ? 'animate-validation-pulse' : ''}
+      ${perfRingClass}
     `}>
       {/* Floating delete chip — absolute on the card corner so it never
           competes with header text/badges for flex space. Hidden in
@@ -228,16 +291,83 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
             </div>
           );
         }
-        const summary = nodeResult?.metadata?.summary?.trim();
-        if (summary) {
-          return (
-            <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">
-              <div
-                className="text-[11px] text-foreground/80 font-mono tabular-nums truncate text-center w-full"
-                title={summary}
-              >
-                {summary}
+        // Priority chain for the body line:
+        //  1. Inline preview run (`nodeResult.metadata.summary`) wins
+        //     because it's always the freshest source for non-trainer
+        //     nodes that run through `/preview`.
+        //  2. Trainer/tuner Celery jobs land in `jobSummaries` instead.
+        //     For parallel terminals this is an array (one entry per
+        //     branch); for merge terminals it's a single entry.
+        const inlineSummary = nodeResult?.metadata?.summary?.trim();
+        const jobEntries = (jobSummaries ?? []).filter((e) => e.summary && e.summary.trim());
+        if (inlineSummary || jobEntries.length > 0) {
+          // Tooltip phrasing: when a fresh job is in flight, mark the
+          // currently-rendered summary as the previous run so the user
+          // knows the card hasn't updated yet.
+          const tooltipPrefix = isJobInFlight ? 'Previous run · new run in progress—\n' : '';
+          if (inlineSummary || jobEntries.length === 1) {
+            const text = inlineSummary || jobEntries[0]!.summary;
+            return (
+              <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">
+                <div
+                  className="text-[11px] text-foreground/80 font-mono tabular-nums truncate text-center w-full"
+                  title={`${tooltipPrefix}${text}`}
+                >
+                  {text}
+                </div>
               </div>
+            );
+          }
+          // Multi-branch: render one row per branch. Path labels come
+          // from the canvas's `useBranchColors` map (mirrored into the
+          // store as `branchEdgeLabels`) so the letters here always
+          // match the colored "Path B · Xgboost" tags on the incoming
+          // edges. We pair entries to incoming edges by order — both
+          // backend (`partition_parallel_pipeline`) and the canvas
+          // iterate `term.inputs` / `terminalIncoming` in the same
+          // order, and `jobEntries` is already sorted by branch_index.
+          const incomingEdges = getEdges()
+            .filter((e) => e.target === id)
+            .sort((a, b) => (a.sourceHandle ?? '').localeCompare(b.sourceHandle ?? ''));
+          const rows = jobEntries.map((entry, idx) => {
+            const edge = incomingEdges[idx];
+            const fullLabel = edge ? branchEdgeLabels[edge.id] : undefined;
+            // `Path X · Suffix` -> just `X` for the inline pill; full
+            // label still goes into the tooltip below for context.
+            let letter: string;
+            const m = fullLabel?.match(/^Path\s+([A-Z])/);
+            if (m) {
+              letter = m[1]!;
+            } else {
+              const fallbackIdx = entry.branch_index ?? idx;
+              letter = String.fromCharCode(65 + Math.max(0, fallbackIdx));
+            }
+            return {
+              key: entry.pipeline_id,
+              letter,
+              tooltipLabel: fullLabel ?? `Path ${letter}`,
+              summary: entry.summary,
+            };
+          });
+          const tooltipBody = rows
+            .map((r) => `${r.tooltipLabel}: ${r.summary}`)
+            .join('\n');
+          return (
+            <div
+              className="px-3 py-2 flex flex-col gap-0.5"
+              title={`${tooltipPrefix}${tooltipBody}`}
+            >
+              {rows.map((r) => (
+                <div
+                  key={r.key}
+                  className="text-[11px] text-foreground/80 font-mono tabular-nums truncate flex items-center gap-1.5"
+                >
+                  <span className="shrink-0 px-1 rounded bg-muted text-[10px] text-muted-foreground">
+                    {r.letter}
+                  </span>
+                  <span className="truncate">{r.summary}</span>
+                </div>
+              ))}
             </div>
           );
         }

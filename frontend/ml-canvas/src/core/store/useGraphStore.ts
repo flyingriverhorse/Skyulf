@@ -17,6 +17,7 @@ import {
 } from '@xyflow/react';
 import { registry } from '../registry/NodeRegistry';
 import { PreviewResponse } from '../api/client';
+import type { NodeSummaryEntry } from '../api/jobs';
 import { v4 as uuidv4 } from 'uuid';
 import {
   type ExecutionMode,
@@ -73,6 +74,24 @@ interface GraphState {
   // Execution State
   executionResult: PreviewResponse | null;
   setExecutionResult: (result: PreviewResponse | null) => void;
+
+  // Per-node card summaries sourced from completed training/tuning
+  // jobs. Trainer/tuner jobs run via Celery and the engine's per-node
+  // `metadata.summary` never makes it into `executionResult` (the
+  // `/preview` path strips trainers before execution). The
+  // `useNodeJobSummaries` hook polls `/pipeline/jobs/node-summaries`
+  // and writes the result here so trainer cards can fall back to it.
+  // For parallel terminals each branch contributes one entry so the
+  // card can render Path A / Path B / … on separate lines.
+  nodeJobSummaries: Record<string, NodeSummaryEntry[]>;
+  setNodeJobSummaries: (summaries: Record<string, NodeSummaryEntry[]>) => void;
+
+  // Canvas-derived map: edgeId -> Path label (e.g. "Path B · Xgboost").
+  // Written by `FlowCanvas` after `useBranchColors` runs so other
+  // surfaces (trainer cards) can show the same Path letters the user
+  // sees on the canvas without re-deriving the partition logic.
+  branchEdgeLabels: Record<string, string>;
+  setBranchEdgeLabels: (labels: Record<string, string>) => void;
 }
 
 export const useGraphStore = create<GraphState>()(
@@ -83,6 +102,12 @@ export const useGraphStore = create<GraphState>()(
   executionResult: null,
 
   setExecutionResult: (result) => set({ executionResult: result }),
+
+  nodeJobSummaries: {},
+  setNodeJobSummaries: (summaries) => set({ nodeJobSummaries: summaries }),
+
+  branchEdgeLabels: {},
+  setBranchEdgeLabels: (labels) => set({ branchEdgeLabels: labels }),
   setGraph: (nodes, edges) => set({ nodes, edges }),
 
   onNodesChange: (changes: NodeChange[]) => {
