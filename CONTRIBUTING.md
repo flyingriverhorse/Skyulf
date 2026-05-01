@@ -20,7 +20,7 @@ Alternatively, without uv:
 ## Lint & typecheck
 - Black/Isort: `uv run black . && uv run isort .`
 - Flake8: `uv run flake8`
-- MyPy: `uv run mypy .`
+- Ty (instead of MyPy): `uv run ty`
 
 ## Commit style
 - Keep diffs focused.
