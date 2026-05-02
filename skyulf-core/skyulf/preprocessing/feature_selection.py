@@ -32,7 +32,7 @@ from ..utils import (
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ class VarianceThresholdApplier(BaseApplier):
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
 
         if cols_to_drop_list and drop_columns:
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 pass
 
                 X_pl: Any = X
@@ -152,7 +152,7 @@ class VarianceThresholdCalculator(BaseCalculator):
         selector = VarianceThreshold(threshold=threshold)
 
         # Use Bridge for fitting
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X_pl: Any = X
             X_subset = X_pl.select(cols)
         else:
@@ -199,7 +199,7 @@ class CorrelationThresholdApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         if drop_columns:
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 pass
 
                 X_pl: Any = X
@@ -227,7 +227,7 @@ class CorrelationThresholdCalculator(BaseCalculator):
         engine = get_engine(X)
 
         # Ensure pandas for correlation logic
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X = X.to_pandas()
 
         # Config: {"threshold": 0.95, "correlation_method": "pearson"}
@@ -278,7 +278,7 @@ class UnivariateSelectionApplier(BaseApplier):
         cols_to_drop_set = set(candidate_columns) - set(selected_cols)
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
         if cols_to_drop_list and drop_columns:
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 pass
 
                 X_pl: Any = X
@@ -314,7 +314,7 @@ class UnivariateSelectionCalculator(BaseCalculator):
                     f"UnivariateSelection requires target column '{target_col}' to be present in training data."
                 )
                 return {}
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 pass
 
                 y = X.select(target_col).to_series().to_pandas()
@@ -379,7 +379,7 @@ class UnivariateSelectionCalculator(BaseCalculator):
             return {}
 
         # Use Bridge for fitting
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             # Cast X for safety
             X_pl: Any = X
             X_subset = X_pl.select(cols).fill_null(0)
@@ -481,7 +481,7 @@ class ModelBasedSelectionApplier(BaseApplier):
         cols_to_drop_set = set(candidate_columns) - set(selected_cols)
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
         if cols_to_drop_list and drop_columns:
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 pass
 
                 X_pl: Any = X
@@ -517,7 +517,7 @@ class ModelBasedSelectionCalculator(BaseCalculator):
                     f"ModelBasedSelection requires target column '{target_col}' to be present in training data."
                 )
                 return {}
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 pass
 
                 y = X.select(target_col).to_series().to_pandas()
@@ -577,7 +577,7 @@ class ModelBasedSelectionCalculator(BaseCalculator):
             return {}
 
         # Use Bridge for fitting
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X_pl: Any = X
             X_subset = X_pl.select(cols).fill_null(0)
         else:

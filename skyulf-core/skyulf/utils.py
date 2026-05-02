@@ -1,3 +1,4 @@
+from skyulf.engines import EngineName
 import logging
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union, cast
 
@@ -189,7 +190,7 @@ def detect_numeric_columns(
     engine = get_engine(frame)
 
     # Polars Path
-    if engine.name == "polars":
+    if engine.name == EngineName.POLARS:
         import polars as pl
 
         detected: List[str] = []

@@ -26,7 +26,6 @@ from skyulf.preprocessing.inspection import DatasetProfileCalculator
 
 
 class TestPolarsPreprocessingFull(unittest.TestCase):
-
     def setUp(self):
         # Create a standard Polars DataFrame for testing
         self.df = pl.DataFrame(

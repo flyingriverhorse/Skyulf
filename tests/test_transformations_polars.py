@@ -12,7 +12,6 @@ from skyulf.preprocessing.transformations import (
 
 
 class TestTransformationsPolars(unittest.TestCase):
-
     def test_simple_transformation(self):
         print("\n--- Testing Simple Transformations (Polars) ---")
         df = pl.DataFrame(

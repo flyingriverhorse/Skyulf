@@ -7,6 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class DataProfiler:
     """
     Calculates basic statistics for a Polars DataFrame.

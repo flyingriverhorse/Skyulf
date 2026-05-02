@@ -82,13 +82,6 @@ try:
 except ImportError:
     VADER_AVAILABLE = False
 
-try:
-    from causallearn.search.ConstraintBased.PC import pc  # ty: ignore[unresolved-import]
-
-    CAUSAL_LEARN_AVAILABLE = True
-except ImportError:
-    CAUSAL_LEARN_AVAILABLE = False
-
 
 class EDAAnalyzer:
     def __init__(self, df: pl.DataFrame):
@@ -471,7 +464,7 @@ class EDAAnalyzer:
         if encoded_target_col:
             causal_cols.append(encoded_target_col)
 
-        if CAUSAL_LEARN_AVAILABLE and len(causal_cols) >= 2:
+        if len(causal_cols) >= 2:
             causal_graph = self._discover_causal_graph(causal_cols)
 
         # 10. Rule Discovery (Decision Tree)
@@ -780,6 +773,13 @@ class EDAAnalyzer:
 
             # Convert to numpy array
             data = df_numeric.to_numpy()
+
+            try:
+                from causallearn.search.ConstraintBased.PC import (
+                    pc,
+                )  # ty: ignore[unresolved-import]
+            except ImportError:
+                return None
 
             # 2. Run PC Algorithm
             # alpha=0.05 is standard significance level

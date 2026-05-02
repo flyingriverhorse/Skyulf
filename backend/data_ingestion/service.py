@@ -320,4 +320,3 @@ class DataIngestionService:
 
         metadata: Dict[str, Any] = cast(Dict[str, Any], source.source_metadata) or {}
         return cast(Dict[str, Any], metadata.get("ingestion_status", {"status": "unknown"}))
-

@@ -13,7 +13,7 @@ from ..utils import (
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 # --- Constants ---
 ALIAS_PUNCTUATION_TABLE = str.maketrans("", "", string.punctuation)
@@ -59,7 +59,7 @@ TWO_DIGIT_YEAR_PIVOT = 50
 
 def _auto_detect_text_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
     engine = get_engine(df)
-    if engine.name == "polars":
+    if engine.name == EngineName.POLARS:
         import polars as pl
 
         return [
@@ -70,7 +70,7 @@ def _auto_detect_text_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[
 
 def _auto_detect_numeric_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
     engine = get_engine(df)
-    if engine.name == "polars":
+    if engine.name == EngineName.POLARS:
         import polars as pl
 
         return [
@@ -95,7 +95,7 @@ def _auto_detect_numeric_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> Li
 
 def _auto_detect_datetime_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
     engine = get_engine(df)
-    if engine.name == "polars":
+    if engine.name == EngineName.POLARS:
         import polars as pl
 
         return [
@@ -129,7 +129,7 @@ class TextCleaningApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             exprs = []
@@ -342,7 +342,7 @@ class InvalidValueReplacementApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             exprs = []
@@ -471,7 +471,7 @@ class ValueReplacementApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             exprs = []
@@ -620,7 +620,7 @@ class AliasReplacementApplier(BaseApplier):
             mapping = custom_map
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
             import re
 

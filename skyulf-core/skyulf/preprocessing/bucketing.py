@@ -14,7 +14,7 @@ from ..utils import (
 )
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 # --- Base Binning Applier ---
 
@@ -47,7 +47,7 @@ class BaseBinningApplier(BaseApplier):
         custom_labels_map = params.get("custom_labels", {})
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -108,9 +108,9 @@ class BaseBinningApplier(BaseApplier):
             processed_cols.append(col)
 
             # Determine labels for pd.cut
-            labels: Union[Literal[False], List[Any], None] = (
-                False  # Default for ordinal (returns integers)
-            )
+            labels: Union[
+                Literal[False], List[Any], None
+            ] = False  # Default for ordinal (returns integers)
 
             # Check for custom labels first
             col_custom_labels = custom_labels_map.get(col)
@@ -225,7 +225,7 @@ class GeneralBinningCalculator(BaseCalculator):
 
         # Ensure X is pandas for fitting logic
         engine = get_engine(X)
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X = X.to_pandas()
 
         columns = resolve_columns(X, config, detect_numeric_columns)
@@ -372,7 +372,7 @@ class CustomBinningCalculator(BaseCalculator):
 
         # Ensure X is pandas for fitting logic
         engine = get_engine(X)
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X = X.to_pandas()
 
         columns = resolve_columns(X, config, detect_numeric_columns)

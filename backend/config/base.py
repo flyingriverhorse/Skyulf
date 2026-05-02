@@ -115,10 +115,10 @@ class Settings(
                     params.append(f"sslrootcert={self.DB_SSLROOTCERT}")
                 if self.DB_EXTRA_PARAMS:
                     params.append(self.DB_EXTRA_PARAMS)
-                
+
                 if params:
                     url += f"?{'&'.join(params)}"
-                    
+
                 self.DATABASE_URL = url
         elif self.DB_TYPE == "sqlite":
             if not self.DATABASE_URL.startswith("sqlite"):

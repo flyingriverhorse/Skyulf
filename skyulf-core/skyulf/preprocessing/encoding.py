@@ -19,7 +19,7 @@ from ..utils import (
 from .base import BaseApplier, BaseCalculator
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ def _exclude_target_column(
 
 def detect_categorical_columns(df: Any) -> List[str]:
     engine = get_engine(df)
-    if engine.name == "polars":
+    if engine.name == EngineName.POLARS:
         import polars as pl
 
         # Polars dtypes
@@ -115,7 +115,7 @@ class OneHotEncoderApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -231,7 +231,7 @@ class OneHotEncoderCalculator(BaseCalculator):
         include_missing = config.get("include_missing", False)
 
         # Handle missing values for fit if requested
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X_pl: Any = X
             X_subset = X_pl.select(cols)
             if include_missing:
@@ -315,7 +315,7 @@ class OrdinalEncoderApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -401,7 +401,7 @@ class OrdinalEncoderCalculator(BaseCalculator):
         # We'll convert to string to treat NaN as "nan" category if needed, or let it fail.
         # Safer: Convert to string.
 
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -438,7 +438,7 @@ class LabelEncoderApplier(BaseApplier):
         encoders = params.get("encoders", {})
         cols = params.get("columns")
 
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -517,7 +517,7 @@ class LabelEncoderCalculator(BaseCalculator):
         target_col = config.get("target_column")
         if y is None and target_col:
             # Check if target_col is in X
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 X_pl: Any = X
                 cols = X_pl.columns
                 if target_col in cols:
@@ -538,7 +538,7 @@ class LabelEncoderCalculator(BaseCalculator):
 
         if cols:
             # Encode features
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 X_pl_data: Any = X
                 valid_cols = [c for c in cols if c in X_pl_data.columns]
                 import polars as pl
@@ -616,7 +616,7 @@ class TargetEncoderApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -673,7 +673,7 @@ class TargetEncoderCalculator(BaseCalculator):
         # Attempt to extract y from X if not provided
         target_col = config.get("target_column")
         if y is None and target_col:
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 X_pl_y: Any = X
                 if target_col in X_pl_y.columns:
                     y = X_pl_y.get_column(target_col)
@@ -700,7 +700,7 @@ class TargetEncoderCalculator(BaseCalculator):
         encoder = TargetEncoder(smooth=smooth, target_type=target_type)
 
         # Use Bridge for fitting
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X_pl: Any = X
             X_subset = X_pl.select(cols)
         else:
@@ -740,7 +740,7 @@ class HashEncoderApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -765,7 +765,6 @@ class HashEncoderApplier(BaseApplier):
         # We use a simple deterministic hash() % n_features approach.
 
         for col in valid_cols:
-
             X_out[col] = X_out[col].astype(str).apply(lambda x: hash(x) % n_features)
 
         return pack_pipeline_output(X_out, y, is_tuple)
@@ -823,7 +822,7 @@ class DummyEncoderApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -901,7 +900,7 @@ class DummyEncoderCalculator(BaseCalculator):
         # We need to know all possible categories to align columns during transform
         categories = {}
 
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
