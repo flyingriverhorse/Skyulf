@@ -1569,6 +1569,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#x-merges-n-parallel-branches-merge-advisory-banner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "X merges N parallel branches…" (merge advisory banner)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="&#34;X merges N parallel branches…&#34; (merge advisory banner)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-it-means" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it means
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-its-usually-a-bug" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why it's usually a bug
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-entirely-fix-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to entirely fix it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-fan-in-is-fine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When fan-in is fine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-engine-guarantees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the engine guarantees
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#target-column-not-found-after-encoding" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2784,6 +2856,72 @@
 <p><strong>Fix:</strong></p>
 <pre><code class="language-bash">pip install skyulf-core[tuning]
 </code></pre>
+<hr />
+<h2 id="x-merges-n-parallel-branches-merge-advisory-banner">"X merges N parallel branches…" (merge advisory banner)</h2>
+<p>You see an amber banner in the Results panel like:</p>
+<blockquote>
+<p><em>Drop Missing Columns merges 2 parallel branches: TransformationNode + MissingIndicator. 6 overlapping columns take values from MissingIndicator; unique columns from the others are kept as-is. For sequential application, chain them instead.</em></p>
+</blockquote>
+<h3 id="what-it-means">What it means</h3>
+<p>A node has <strong>two or more incoming edges</strong> that trace back to a common ancestor (sibling fan-in). The engine merges them with two rules:</p>
+<ol>
+<li><strong>Union of columns</strong> — any column unique to one branch is kept as-is.</li>
+<li><strong>Last-wins on overlap</strong> — for columns present in two or more branches, the <strong>last input</strong> in the node's input list overwrites the earlier ones. Earlier branches' modifications to those columns are silently dropped.</li>
+</ol>
+<h3 id="why-its-usually-a-bug">Why it's usually a bug</h3>
+<p>If both branches modify the same columns (e.g. <code>TransformationNode</code> rescales <code>SepalLengthCm</code> and <code>MissingIndicator</code> outputs the original <code>SepalLengthCm</code> plus <code>*_missing</code> flags), only the last branch's values survive. You lose the work the other branch did.</p>
+<h3 id="how-to-entirely-fix-it">How to entirely fix it</h3>
+<p><strong>Chain the nodes instead of fanning them out.</strong> Instead of:</p>
+<pre><code>Dataset ──&gt; TransformationNode ──┐
+        ──&gt; MissingIndicator ────┴──&gt; DropMissingColumns
+</code></pre>
+<p>wire:</p>
+<pre><code>Dataset ──&gt; TransformationNode ──&gt; MissingIndicator ──&gt; DropMissingColumns
+</code></pre>
+<p>Now <code>MissingIndicator</code> reads <code>TransformationNode</code>'s output, adds <code>*_missing</code> flags on top, and passes the combined frame downstream. No fan-in, no warning, all changes preserved.</p>
+<p>In the canvas:</p>
+<ol>
+<li>Delete the <code>Dataset → MissingIndicator</code> edge.</li>
+<li>Drag a new edge from <code>TransformationNode</code> → <code>MissingIndicator</code>.</li>
+<li>Re-run preview — the banner will disappear.</li>
+</ol>
+<h3 id="when-fan-in-is-fine">When fan-in is fine</h3>
+<ul>
+<li><strong>Disjoint columns</strong> — branches output non-overlapping columns. The banner says <em>"No column overlap — all columns from all branches are kept."</em> You can ignore it.</li>
+<li><strong>Redundant edge</strong> (e.g. <code>Splitter → Scaler</code> plus a direct <code>Splitter → Encoder</code> while <code>Scaler → Encoder</code> also exists) — the engine detects this and <strong>suppresses the warning entirely</strong> because the descendant supersedes the ancestor under last-wins.</li>
+</ul>
+<h3 id="what-the-engine-guarantees">What the engine guarantees</h3>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Linear chain <code>A → B → C</code></td>
+<td>No warning, full data flow</td>
+</tr>
+<tr>
+<td>Redundant ancestor edge</td>
+<td>Suppressed silently</td>
+</tr>
+<tr>
+<td>Disjoint-column fan-in</td>
+<td>Advisory only, all columns kept</td>
+</tr>
+<tr>
+<td><strong>Overlapping-column fan-in</strong></td>
+<td><strong>Last input wins — chain instead</strong></td>
+</tr>
+<tr>
+<td>Cycles</td>
+<td>Engine rejects</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule of thumb:</strong> if two branches touch the same columns, chain them; if they touch different columns, fanning in is fine.</p>
 <hr />
 <h2 id="target-column-not-found-after-encoding">Target column not found after encoding</h2>
 <p>If your target column is categorical and you apply <code>OneHotEncoder</code> with <code>drop_original=True</code>, the target column may be dropped or expanded.</p>
