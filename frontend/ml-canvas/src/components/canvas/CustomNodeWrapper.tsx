@@ -78,12 +78,44 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
       : perfBucket === 'slow'
       ? 'ring-2 ring-red-500/70 ring-offset-1 ring-offset-background'
       : '';
-  const perfTooltip =
-    perfDurationMs === null
-      ? undefined
-      : perfDurationMs >= 1000
-      ? `Last run: ${(perfDurationMs / 1000).toFixed(2)} s`
-      : `Last run: ${perfDurationMs} ms`;
+  const perfTelemetry = (() => {
+    if (perfDurationMs === null) return null;
+    
+    // Core wall-clock duration message:
+    const durStr =
+      perfDurationMs >= 1000
+        ? `${(perfDurationMs / 1000).toFixed(2)}s`
+        : `${perfDurationMs}ms`;
+
+    let fitStr: string | null = null;
+    let memMB: number | null = null;
+    let rowsStr: string | null = null;
+
+    // Append granular metric details if Python sent them over:
+    const m = nodeResult?.metrics;
+    if (m) {
+      if (typeof m.fit_time === 'number') {
+        fitStr = m.fit_time >= 1 
+          ? `${m.fit_time.toFixed(2)}s` 
+          : `${Math.round(m.fit_time * 1000)}ms`;
+      }
+      if (typeof m.peak_memory_bytes === 'number') {
+        memMB = m.peak_memory_bytes / (1024 * 1024);
+      }
+      if (typeof m.rows_in === 'number' && typeof m.rows_out === 'number') {
+        rowsStr = `${m.rows_in} \u2192 ${m.rows_out}`;
+      }
+    }
+    
+    let tooltip = `Last run: ${durStr}`;
+    if (fitStr) tooltip += `\nFit time: ${fitStr}`;
+    if (memMB !== null) tooltip += `\nPeak mem: ${memMB.toFixed(1)} MB`;
+    if (rowsStr) tooltip += `\nRows: ${rowsStr}`;
+
+    return { durStr, fitStr, memMB, rowsStr, tooltip };
+  })();
+
+  const perfTooltip = perfTelemetry?.tooltip;
 
   // Has this node received an active sibling-fan-in advisory with real
   // overlap (i.e. last-wins overwrite is happening)? If so, color the
@@ -406,6 +438,16 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         }
         return <div className="min-h-[1.5rem]" />;
       })()}
+
+      {perfOverlayEnabled && perfTelemetry && (
+        <div className="flex flex-row items-center justify-between gap-3 px-3 py-1.5 border-t border-border bg-muted/30 text-[9px] text-muted-foreground font-mono rounded-b-lg">
+          <div className="flex flex-row items-center gap-2 min-w-0">
+            <span className="truncate" title="Wall-clock time">⏱ {perfTelemetry.durStr}</span>
+            {perfTelemetry.fitStr && <span className="truncate" title="Core fit time">⚡ {perfTelemetry.fitStr}</span>}
+          </div>
+          {perfTelemetry.memMB !== null && <span className="shrink-0 font-semibold" title="Peak Memory">💾 {perfTelemetry.memMB.toFixed(1)}MB</span>}
+        </div>
+      )}
 
       {/* Input Handles */}
       {definition.inputs.map((input, index) => (
