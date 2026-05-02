@@ -1,3 +1,4 @@
+from backend.exceptions.core import SkyulfException
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form
 from typing import Optional, List, Dict, Any, cast
@@ -256,7 +257,7 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
             ref_df = pl.DataFrame(ref_data)
     except Exception:
         logger.exception("Failed to load reference data for job %s", job_id)
-        raise HTTPException(status_code=500, detail="Failed to load reference data")
+        raise SkyulfException(message="Failed to load reference data")
 
     # 3. Load Current Data
     try:
@@ -288,7 +289,7 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
         report = calculator.calculate_drift(thresholds=custom_thresholds or None)
     except Exception:
         logger.exception("Drift calculation failed for job %s", job_id)
-        raise HTTPException(status_code=500, detail="Drift calculation failed")
+        raise SkyulfException(message="Drift calculation failed")
 
     # 5. Save drift check result to DB for history
     try:
