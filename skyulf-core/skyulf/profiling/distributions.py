@@ -1,7 +1,10 @@
+import logging
 import polars as pl
 from typing import List, Optional, cast
 from .schemas import HistogramBin
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def _collect(lf: pl.LazyFrame) -> pl.DataFrame:
@@ -55,8 +58,8 @@ def calculate_histogram(
                 bin_idx = int(bin_val)
                 # The count column is named "len" by default in Polars group_by().len()
                 counts[bin_idx] = row.get("len", row.get("count"))
-            except Exception:
-                # print(f"Error parsing bin: {e}")
+            except Exception as parse_e:
+                logger.debug("Error parsing bin %r: %s", row, parse_e)
                 continue
 
         histogram = []

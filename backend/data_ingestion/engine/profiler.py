@@ -3,6 +3,10 @@ from typing import Any, Dict
 import polars as pl
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class DataProfiler:
     """
     Calculates basic statistics for a Polars DataFrame.
@@ -42,8 +46,8 @@ class DataProfiler:
                 try:
                     value_counts = series.value_counts().sort("count", descending=True).head(5)
                     col_stats["top_values"] = value_counts.to_dicts()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Failed to compute top values for column %s: %s", col, e)
 
             profile["columns"][col] = col_stats
 

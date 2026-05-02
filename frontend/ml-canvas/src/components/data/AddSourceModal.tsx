@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, Globe, Check, Cloud, ChevronDown, ChevronRight } from 'lucide-react';
+import { Check, Cloud, ChevronDown, ChevronRight } from 'lucide-react';
 import { useCreateDataSource } from '../../core/hooks/useDatasets';
 import { DataSourceCreate } from '../../core/types/api';
 import { ModalShell } from '../shared';
@@ -11,12 +11,8 @@ interface AddSourceModalProps {
 }
 
 export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const [type, setType] = useState<'database' | 'api' | 's3'>('database');
+  const [type, setType] = useState<'s3'>('s3');
   const [name, setName] = useState('');
-  const [connectionString, setConnectionString] = useState('');
-  const [query, setQuery] = useState('');
-  const [apiUrl, setApiUrl] = useState('');
-  const [method, setMethod] = useState('GET');
   const [s3Path, setS3Path] = useState('');
   const [showCredentials, setShowCredentials] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,10 +27,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
 
     try {
       const config: Record<string, unknown> = {};
-      if (type === 'database') {
-        config.connection_string = connectionString;
-        config.query = query;
-      } else if (type === 's3') {
+      if (type === 's3') {
         config.path = s3Path;
         
         // Extract credentials from form
@@ -50,9 +43,6 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
             region: region || undefined
           };
         }
-      } else {
-        config.url = apiUrl;
-        config.method = method;
       }
 
       const payload: DataSourceCreate = {
@@ -75,16 +65,6 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
       <div className="p-4">
           <div className="flex gap-2 mb-6">
             <button
-              onClick={() => { setType('database'); }}
-              className={`flex-1 py-2 px-4 rounded-md flex items-center justify-center gap-2 border ${
-                type === 'database'
-                  ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-900/20 dark:border-blue-400 dark:text-blue-400'
-                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-              }`}
-            >
-              <Database size={16} /> Database
-            </button>
-            <button
               onClick={() => { setType('s3'); }}
               className={`flex-1 py-2 px-4 rounded-md flex items-center justify-center gap-2 border ${
                 type === 's3'
@@ -93,16 +73,6 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
               }`}
             >
               <Cloud size={16} /> S3
-            </button>
-            <button
-              onClick={() => { setType('api'); }}
-              className={`flex-1 py-2 px-4 rounded-md flex items-center justify-center gap-2 border ${
-                type === 'api'
-                  ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-900/20 dark:border-blue-400 dark:text-blue-400'
-                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-              }`}
-            >
-              <Globe size={16} /> API
             </button>
           </div>
 
@@ -118,32 +88,6 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                 placeholder="My Dataset"
               />
             </div>
-
-            {type === 'database' && (
-              <>
-                <div>
-                  <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Connection String</span>
-                  <input
-                    type="text"
-                    required
-                    value={connectionString}
-                    onChange={(e) => { setConnectionString(e.target.value); }}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
-                    placeholder="postgresql://user:pass@localhost:5432/db"
-                  />
-                </div>
-                <div>
-                  <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">SQL Query</span>
-                  <textarea
-                    required
-                    value={query}
-                    onChange={(e) => { setQuery(e.target.value); }}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 h-24"
-                    placeholder="SELECT * FROM users"
-                  />
-                </div>
-              </>
-            )}
 
             {type === 's3' && (
               <div className="space-y-4">
@@ -213,33 +157,6 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
               </div>
             )}
 
-            {type === 'api' && (
-              <>
-                <div>
-                  <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">API URL</span>
-                  <input
-                    type="url"
-                    required
-                    value={apiUrl}
-                    onChange={(e) => { setApiUrl(e.target.value); }}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
-                    placeholder="https://api.example.com/data"
-                  />
-                </div>
-                <div>
-                  <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Method</span>
-                  <select
-                    value={method}
-                    onChange={(e) => { setMethod(e.target.value); }}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="GET">GET</option>
-                    <option value="POST">POST</option>
-                  </select>
-                </div>
-              </>
-            )}
-
             {error && (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-md">
                 {error}
@@ -267,3 +184,8 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
     </ModalShell>
   );
 };
+
+
+
+
+

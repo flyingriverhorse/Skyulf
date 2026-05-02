@@ -254,7 +254,7 @@ class DriftCalculator:
         Calculate Population Stability Index (PSI).
         """
 
-        def scale_range(input, min, max):
+        def scale_range(input, min, max):  # noqa: A002
             input += -(np.min(input))
             input /= np.max(input) / (max - min)
             input += min
