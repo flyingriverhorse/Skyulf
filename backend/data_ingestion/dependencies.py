@@ -1,13 +1,9 @@
-"""FastAPI dependencies for data ingestion."""
-
 from typing import Annotated
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.engine import get_async_session
-
-from .exceptions import DataIngestionException
 from .service import DataIngestionService
 
 
@@ -26,15 +22,3 @@ async def require_data_access() -> None:
 async def require_data_admin() -> None:
     """Require admin permission for data administration (Disabled)."""
     return None
-
-
-def handle_data_ingestion_exception(exc: DataIngestionException) -> HTTPException:
-    """Convert data ingestion exceptions to HTTP exceptions."""
-    return HTTPException(
-        status_code=exc.status_code,
-        detail={
-            "message": exc.message,
-            "detail": exc.details,
-            "type": exc.__class__.__name__,
-        },
-    )

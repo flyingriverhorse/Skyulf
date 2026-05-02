@@ -64,6 +64,8 @@ def unpack_pipeline_input(
     `Series[Any] | ...`, poisoning every downstream `with_columns` /
     `to_pandas` call. The runtime contract is unchanged.
     """
+    if isinstance(data, (pd.DataFrame, SkyulfDataFrame)):
+        return data, None, False
     if isinstance(data, tuple):
         return data[0], data[1], True
     return data, None, False

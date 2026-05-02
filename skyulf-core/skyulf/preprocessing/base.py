@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Union, cast
 
 import pandas as pd
+import time
+import tracemalloc
+from ..utils import get_data_stats
 
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
@@ -49,8 +52,34 @@ class StatefulTransformer:
         self.apply_on_test = apply_on_test
         self.apply_on_validation = apply_on_validation
         self.params: Dict[str, Any] = {}  # Store params in memory instead of ArtifactStore
+        # Profiling metrics
+        self.fit_time: float = 0.0
+        self.peak_memory_bytes: int = 0
+        self.rows_in: int = 0
+        self.rows_out: int = 0
 
     def fit_transform(
+        self,
+        dataset: Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple],
+        config: Dict[str, Any],
+    ) -> Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple]:
+        self.rows_in, _ = get_data_stats(dataset)
+        tracemalloc.start()
+        start = time.time()
+
+        result = self._fit_transform_inner(dataset, config)
+
+        self.fit_time = time.time() - start
+
+        if tracemalloc.is_tracing():
+            _, peak = tracemalloc.get_traced_memory()
+            self.peak_memory_bytes = peak
+            tracemalloc.stop()
+
+        self.rows_out, _ = get_data_stats(result)
+        return result
+
+    def _fit_transform_inner(
         self,
         dataset: Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple],
         config: Dict[str, Any],

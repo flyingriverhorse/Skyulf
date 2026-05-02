@@ -32,7 +32,6 @@ I named it Skyulf after two ideas. Sky is the open space above Earth, where the 
 - [Quick Start](#quick-start)
 - [Using Skyulf as a Library](#using-skyulf-as-a-library)
 - [Key Features](#key-features)
-- [Roadmap](#roadmap)
 - [Version History](#version-history)
 - [Workflow Overview](#workflow-overview)
 - [Development](#development)
@@ -176,22 +175,11 @@ For detailed examples including **Time Series**, **Geospatial Analysis**, and **
 *   **Drift Analysis** Built on the EDA engine to monitor data and model drift over time with statistical tests and visualizations.
 *   **High-Performance Engine:** Built on **FastAPI** and **Polars** for lightning-fast data processing and easy API extension.
 *   **⚡ Async by Default:** Heavy training jobs run in the background via Celery & Redis (or background threads)—your UI never freezes.
-*   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or SQL. Start with SQLite (zero-config) and scale to PostgreSQL.
+*   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or S3. Backend storage starts with SQLite (zero-config) and scales to PostgreSQL.
 *   **☁️ S3 Integration:** Full support for S3-compatible storage (AWS, MinIO) for data ingestion, artifact storage, and model registry.
 *   **🧠 Model Training:** Built-in support for Scikit-Learn models with hyperparameter search (Grid/Random/Halving) and optional Optuna integration.
 *   **📦 Model Registry & Deployment:** Version control your models, track metrics, and deploy them to a live inference API with a single click.
 *   **📊 Experiment Tracking:** Compare multiple runs side-by-side with interactive charts, confusion matrices, and ROC curves.
-
-## Roadmap
-
-We have a clear vision to turn Skyulf into a complete **App Hub** for AI.
-
-*   **Phase 1: Polish & Stability** (Done) - Architecturing, type safety, and documentation.
-*   **Phase 2: Deepening Data Science** (Current Focus) - Advanced EDA, Ethics/Fairness checks, Synthetic Data, and Public Data Hubs, more models, NLP and more.
-*   **Phase 3: The "App Hub" Vision** - Plugin system, GenAI/LLM Builders, and Deployment.
-*   **Phase 4: Expansion** - Real-time collaboration, Edge/IoT export, and Audio support.
-
-👉 **[View the full ROADMAP.md](./ROADMAP.md)** for details.
 
 ## Version History
 
