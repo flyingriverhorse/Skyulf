@@ -783,10 +783,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#b-machine-learning-core-pandasnumpy" class="md-nav__link">
+  <a href="#b-machine-learning-core-numpy-scikit-learn" class="md-nav__link">
     <span class="md-ellipsis">
       
-        B. Machine Learning Core (Pandas/Numpy)
+        B. Machine Learning Core (Numpy / Scikit-Learn)
       
     </span>
   </a>
@@ -794,10 +794,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#c-the-bridge-apache-arrow" class="md-nav__link">
+  <a href="#c-the-bridge-sklearnbridge-apache-arrow" class="md-nav__link">
     <span class="md-ellipsis">
       
-        C. The Bridge: Apache Arrow
+        C. The Bridge: SklearnBridge &amp; Apache Arrow
       
     </span>
   </a>
@@ -2745,22 +2745,22 @@
 </li>
 <li><strong>Format:</strong> Data is kept in Polars DataFrames or converted to Python dictionaries (<code>to_dicts()</code>) for JSON API responses.</li>
 </ul>
-<h3 id="b-machine-learning-core-pandasnumpy">B. Machine Learning Core (Pandas/Numpy)</h3>
+<h3 id="b-machine-learning-core-numpy-scikit-learn">B. Machine Learning Core (Numpy / Scikit-Learn)</h3>
 <ul>
-<li><strong>Engine:</strong> <a href="https://pandas.pydata.org/">Pandas</a> &amp; <a href="https://numpy.org/">Numpy</a></li>
-<li><strong>Why:</strong> The vast majority of the Python ML ecosystem (Scikit-Learn, XGBoost, LightGBM) is built around Numpy arrays and Pandas DataFrames.</li>
+<li><strong>Engine:</strong> <a href="https://numpy.org/">Numpy</a> &amp; <a href="https://scikit-learn.org/">Scikit-Learn</a></li>
+<li><strong>Why:</strong> The vast majority of the Python ML ecosystem (Scikit-Learn, XGBoost, LightGBM) requires raw Numpy arrays (matrices) to perform fast, C++ bound mathematics.</li>
 <li><strong>Where:</strong> <ul>
-<li><code>skyulf-core/</code>: The actual ML pipeline execution.</li>
-<li><code>backend/ml_pipeline/execution/</code>: The orchestration layer that runs the core library.</li>
+<li><code>skyulf-core/</code>: The actual mathematical pipeline execution (e.g. Scikit-Learn Wrappers).</li>
+<li><code>backend/ml_pipeline/execution/</code>: The orchestration layer running the nodes.</li>
 </ul>
 </li>
-<li><strong>Format:</strong> Data is converted to Pandas DataFrames before entering the <code>SkyulfPipeline</code>.</li>
+<li><strong>Format:</strong> Data is structurally maintained as Polars or Pandas depending on the caller, but strictly converted to Numpy arrays when hitting statistical/ML nodes via the <code>SklearnBridge</code>.</li>
 </ul>
-<h3 id="c-the-bridge-apache-arrow">C. The Bridge: Apache Arrow</h3>
+<h3 id="c-the-bridge-sklearnbridge-apache-arrow">C. The Bridge: SklearnBridge &amp; Apache Arrow</h3>
 <ul>
-<li><strong>Technology:</strong> <a href="https://arrow.apache.org/">Apache Arrow</a></li>
+<li><strong>Technology:</strong> <code>SklearnBridge</code> over <a href="https://arrow.apache.org/">Apache Arrow</a></li>
 <li><strong>Role:</strong> Arrow is the in-memory columnar format that both Polars and Pandas (2.0+) support.</li>
-<li><strong>Benefit:</strong> It allows for <strong>zero-copy</strong> (or near zero-copy) conversion between Polars and Pandas. When we load data with Polars and then hand it to Scikit-Learn, we aren't serializing/deserializing text; we are just passing memory pointers. This makes the "switch" extremely efficient.</li>
+<li><strong>Benefit:</strong> Instead of rigidly forcing one DataFrame type everywhere, the engine is dual-lane. If a Data Scientist passes Pandas, the <code>SklearnBridge</code> converts <code>Pandas -&gt; Numpy</code>. If the ML Canvas uses Polars, the bridge converts <code>Polars -&gt; Numpy</code>. Neither format wastes time converting into the other just to reach Scikit-Learn!</li>
 </ul>
 <hr />
 <h2 id="2-future-architecture-the-ai-hub">2. Future Architecture: The AI Hub</h2>

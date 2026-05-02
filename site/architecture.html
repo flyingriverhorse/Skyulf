@@ -819,6 +819,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#topological-execution-order-kahns-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Topological Execution Order (Kahn's Algorithm)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Topological Execution Order (Kahn&#39;s Algorithm)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-the-diamond-case-broke-reversed-bfs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the diamond case broke reversed-BFS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preview-specific-partitioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview-specific partitioning
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2814,6 +2853,47 @@ Dataset → Encoding  ──┘
     │
     └──→ Encoding → XGBoost (Train)         → Job 2
 </code></pre>
+<h2 id="topological-execution-order-kahns-algorithm">Topological Execution Order (Kahn's Algorithm)</h2>
+<p><em>Hardened in v0.5.1</em></p>
+<p>Sub-pipelines produced by partitioning must be executed in <strong>topological order</strong> —
+every parent must finish (and write its artifact) before any child reads it.
+Earlier versions used a reversed-BFS in <code>_collect_ancestors()</code>, which silently
+produced an incorrect order for diamond-shaped graphs and caused
+<code>FileNotFoundError: Artifact not found</code> at run time.</p>
+<p><code>_collect_ancestors()</code> now uses <strong>Kahn's algorithm</strong> restricted to the ancestor
+subgraph of the requested node:</p>
+<ol>
+<li><strong>Discover</strong> the ancestor set (the node plus everything reachable backwards
+   through <code>inputs</code>) via BFS.</li>
+<li><strong>Build in-degree map</strong> counting how many parents each ancestor has <em>within
+   the subgraph</em>.</li>
+<li><strong>Pop ready nodes</strong> (in-degree 0) one at a time, append to the result, and
+   decrement the in-degree of each child. Any child whose in-degree drops to 0
+   becomes ready.</li>
+<li><strong>Cycle detection</strong> — if the result is shorter than the discovered set, the
+   subgraph contains a cycle; we log a warning and fall back to discovery
+   order.</li>
+</ol>
+<blockquote>
+<p><strong>BFS in one line:</strong> <em>Breadth-First Search</em> explores a graph level-by-level using a FIFO queue — visit a node, enqueue its neighbours,repeat. Contrast with DFS which uses a stack and goes deep first. We use BFS in step 1 because we only need the <em>set</em> of ancestors (level order is irrelevant); the actual execution order comes from step 3.</p>
+</blockquote>
+<h3 id="why-the-diamond-case-broke-reversed-bfs">Why the diamond case broke reversed-BFS</h3>
+<pre><code>Dataset ──► Split ──► Scaler ──► Train
+   │                    ▲
+   └────────────────────┘   (shortcut edge)
+</code></pre>
+<p>Scaler has two parents (<code>Split</code> and <code>Dataset</code>). Reversed-BFS starting from
+Train enqueues parents in the order it visits children, so for some traversal
+orders Scaler ended up emitted <strong>before</strong> Split. The engine then ran Scaler →
+tried to load Split's artifact → file did not exist.</p>
+<p>Kahn's prevents this because Scaler's in-degree (2) cannot reach 0 until both
+Split and Dataset have been emitted.</p>
+<h3 id="preview-specific-partitioning">Preview-specific partitioning</h3>
+<p><code>partition_for_preview()</code> (also v0.5.1) reuses <code>_collect_ancestors()</code> to split
+a graph by <strong>data leaves</strong> rather than by training terminals. A canvas with
+several parallel preprocessing chains and no training node now renders one
+preview tab per leaf — see <code>branch_previews</code> in the <code>/api/pipeline/preview</code>
+response and the branch tab bar in <code>ResultsPanel.tsx</code>.</p>
 
 
 
