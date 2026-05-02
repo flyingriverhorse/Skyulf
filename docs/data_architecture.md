@@ -12,18 +12,18 @@ Skyulf uses a hybrid approach to data processing to balance **performance** (Ing
     *   `backend/services/data_service.py`: Generating data previews and samples for the UI.
 *   **Format:** Data is kept in Polars DataFrames or converted to Python dictionaries (`to_dicts()`) for JSON API responses.
 
-### B. Machine Learning Core (Pandas/Numpy)
-*   **Engine:** [Pandas](https://pandas.pydata.org/) & [Numpy](https://numpy.org/)
-*   **Why:** The vast majority of the Python ML ecosystem (Scikit-Learn, XGBoost, LightGBM) is built around Numpy arrays and Pandas DataFrames.
+### B. Machine Learning Core (Numpy / Scikit-Learn)
+*   **Engine:** [Numpy](https://numpy.org/) & [Scikit-Learn](https://scikit-learn.org/)
+*   **Why:** The vast majority of the Python ML ecosystem (Scikit-Learn, XGBoost, LightGBM) requires raw Numpy arrays (matrices) to perform fast, C++ bound mathematics.
 *   **Where:** 
-    *   `skyulf-core/`: The actual ML pipeline execution.
-    *   `backend/ml_pipeline/execution/`: The orchestration layer that runs the core library.
-*   **Format:** Data is converted to Pandas DataFrames before entering the `SkyulfPipeline`.
+    *   `skyulf-core/`: The actual mathematical pipeline execution (e.g. Scikit-Learn Wrappers).
+    *   `backend/ml_pipeline/execution/`: The orchestration layer running the nodes.
+*   **Format:** Data is structurally maintained as Polars or Pandas depending on the caller, but strictly converted to Numpy arrays when hitting statistical/ML nodes via the `SklearnBridge`.
 
-### C. The Bridge: Apache Arrow
-*   **Technology:** [Apache Arrow](https://arrow.apache.org/)
+### C. The Bridge: SklearnBridge & Apache Arrow
+*   **Technology:** `SklearnBridge` over [Apache Arrow](https://arrow.apache.org/)
 *   **Role:** Arrow is the in-memory columnar format that both Polars and Pandas (2.0+) support.
-*   **Benefit:** It allows for **zero-copy** (or near zero-copy) conversion between Polars and Pandas. When we load data with Polars and then hand it to Scikit-Learn, we aren't serializing/deserializing text; we are just passing memory pointers. This makes the "switch" extremely efficient.
+*   **Benefit:** Instead of rigidly forcing one DataFrame type everywhere, the engine is dual-lane. If a Data Scientist passes Pandas, the `SklearnBridge` converts `Pandas -> Numpy`. If the ML Canvas uses Polars, the bridge converts `Polars -> Numpy`. Neither format wastes time converting into the other just to reach Scikit-Learn!
 
 ---
 

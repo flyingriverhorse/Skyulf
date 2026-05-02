@@ -277,92 +277,11 @@ class EDAAnalyzer:
         # 2. Column Analysis
         col_profiles = {}
         alerts = []
+
         numeric_cols = []
 
-        # -- A3: BATCHED PER-COLUMN AGGREGATIONS --
-        # Query 1: Basic stats (null_count, n_unique) for all columns
-        basic_aggs = []
         for col in self.columns:
-            basic_aggs.extend([
-                pl.col(col).null_count().alias(f"{col}__null"),
-                pl.col(col).n_unique().alias(f"{col}__unique"),
-            ])
-        basic_stats_df = _collect(self.lazy_df.select(basic_aggs))
-        basic_stats = basic_stats_df.row(0, named=True) if len(basic_stats_df) > 0 else {}
-
-        semantic_types = {}
-        for col in self.columns:
-            dtype = self.df[col].dtype
-            n_unique = basic_stats.get(f"{col}__unique", 0)
-            ratio = n_unique / self.row_count if self.row_count > 0 else 0
-
-            # Determine semantic type inline instead of eager series evaluating
-            if dtype in [pl.Float32, pl.Float64]:
-                stype = "Numeric"
-            elif dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64]:
-                if ratio < 0.05 and n_unique < 20:
-                    stype = "Categorical"
-                else:
-                    stype = "Numeric"
-            elif dtype == pl.Boolean:
-                stype = "Boolean"
-            elif dtype in [pl.Date, pl.Datetime, pl.Duration]:
-                stype = "DateTime"
-            elif dtype in [pl.Utf8, pl.String]:
-                if ratio < 0.05:
-                    stype = "Categorical"
-                else:
-                    stype = "Text"
-            elif str(dtype) == "Categorical":
-                stype = "Categorical"
-            else:
-                stype = "Text"
-            semantic_types[col] = stype
-
-        # Query 2: Advanced type-specific aggregations for all columns
-        advanced_aggs = []
-        for col in self.columns:
-            stype = semantic_types[col]
-            if stype == "Numeric":
-                advanced_aggs.extend([
-                    pl.col(col).mean().alias(f"{col}__mean"),
-                    pl.col(col).median().alias(f"{col}__median"),
-                    pl.col(col).std().alias(f"{col}__std"),
-                    pl.col(col).var().alias(f"{col}__var"),
-                    pl.col(col).min().alias(f"{col}__min"),
-                    pl.col(col).max().alias(f"{col}__max"),
-                    pl.col(col).quantile(0.25).alias(f"{col}__q25"),
-                    pl.col(col).quantile(0.75).alias(f"{col}__q75"),
-                    pl.col(col).skew().alias(f"{col}__skew"),
-                    pl.col(col).kurtosis().alias(f"{col}__kurt"),
-                    (pl.col(col) == 0).sum().alias(f"{col}__zeros"),
-                    (pl.col(col) < 0).sum().alias(f"{col}__negatives"),
-                ])
-            elif stype == "Categorical":
-                advanced_aggs.extend([
-                    pl.col(col).value_counts(sort=True).head(10).implode().alias(f"{col}__top_k"),
-                    (pl.col(col).value_counts().struct.field("count") < 5).sum().alias(f"{col}__rare"),
-                ])
-            elif stype == "DateTime":
-                advanced_aggs.extend([
-                    pl.col(col).min().alias(f"{col}__min"),
-                    pl.col(col).max().alias(f"{col}__max"),
-                ])
-            elif stype == "Text":
-                advanced_aggs.extend([
-                    pl.col(col).str.len_bytes().cast(pl.Float64).mean().alias(f"{col}__avg_len"),
-                    pl.col(col).str.len_bytes().min().alias(f"{col}__min_len"),
-                    pl.col(col).str.len_bytes().max().alias(f"{col}__max_len"),
-                ])
-
-        advanced_stats = {}
-        if advanced_aggs:
-            advanced_stats_df = _collect(self.lazy_df.select(advanced_aggs))
-            if len(advanced_stats_df) > 0:
-                advanced_stats = advanced_stats_df.row(0, named=True)
-
-        for col in self.columns:
-            profile, col_alerts = self._analyze_column(col, basic_stats, advanced_stats, semantic_types)
+            profile, col_alerts = self._analyze_column(col)
             col_profiles[col] = profile
             alerts.extend(col_alerts)
 
@@ -1653,14 +1572,16 @@ class EDAAnalyzer:
             print(f"Error calculating target correlations: {e}")
             return {}
 
-    def _analyze_column(self, col: str, basic_stats: dict, advanced_stats: dict, semantic_types: dict) -> Tuple[ColumnProfile, List[Alert]]:  # noqa: C901
+    def _analyze_column(self, col: str) -> Tuple[ColumnProfile, List[Alert]]:  # noqa: C901
         str(self.df[col].dtype)
         alerts = []
 
-        # From batched metrics
-        semantic_type = semantic_types[col]
-        null_count = basic_stats.get(f"{col}__null", 0)
-        null_pct = (null_count / self.row_count) * 100 if self.row_count > 0 else 0
+        # Determine semantic type
+        semantic_type = self._get_semantic_type(self.df[col])
+
+        # Basic stats
+        null_count = self.df[col].null_count()
+        null_pct = (null_count / self.row_count) * 100
 
         if null_pct > 5:
             alerts.append(
@@ -1679,7 +1600,7 @@ class EDAAnalyzer:
 
         # Type-specific analysis
         if semantic_type == "Numeric":
-            profile.numeric_stats = self._analyze_numeric(col, advanced_stats)
+            profile.numeric_stats = self._analyze_numeric(col)
             profile.histogram = calculate_histogram(self.lazy_df, col)
 
             # Normality Test (Shapiro-Wilk / KS)
@@ -1756,7 +1677,7 @@ class EDAAnalyzer:
                 )
 
         elif semantic_type == "Categorical" or semantic_type == "Boolean":
-            profile.categorical_stats = self._analyze_categorical(col, advanced_stats, basic_stats)
+            profile.categorical_stats = self._analyze_categorical(col)
 
             # High Cardinality check
             if profile.categorical_stats.unique_count > 50 and semantic_type == "Categorical":
@@ -1794,7 +1715,7 @@ class EDAAnalyzer:
                 )
 
         elif semantic_type == "DateTime":
-            profile.date_stats = self._analyze_date(col, advanced_stats)
+            profile.date_stats = self._analyze_date(col)
 
             # Calculate Histogram for DateTime (Distribution over time)
             try:
@@ -1815,7 +1736,7 @@ class EDAAnalyzer:
                 print(f"Failed to calculate date histogram for {col}: {e}")
 
         elif semantic_type == "Text":
-            profile.text_stats = self._analyze_text(col, advanced_stats)
+            profile.text_stats = self._analyze_text(col)
 
             # Sentiment Analysis
             if profile.text_stats:
@@ -2119,51 +2040,97 @@ class EDAAnalyzer:
 
         return "Text"  # Fallback
 
-    def _analyze_numeric(self, col: str, row: dict) -> NumericStats:
-        return NumericStats(
-            mean=row.get(f"{col}__mean"),
-            median=row.get(f"{col}__median"),
-            std=row.get(f"{col}__std"),
-            variance=row.get(f"{col}__var"),
-            min=row.get(f"{col}__min"),
-            max=row.get(f"{col}__max"),
-            q25=row.get(f"{col}__q25"),
-            q75=row.get(f"{col}__q75"),
-            skewness=row.get(f"{col}__skew"),
-            kurtosis=row.get(f"{col}__kurt"),
-            zeros_count=row.get(f"{col}__zeros", 0),
-            negatives_count=row.get(f"{col}__negatives", 0),
+    def _analyze_numeric(self, col: str) -> NumericStats:
+        # Use lazy stats
+        stats = _collect(
+            self.lazy_df.select(
+                [
+                    pl.col(col).mean().alias("mean"),
+                    pl.col(col).median().alias("median"),
+                    pl.col(col).std().alias("std"),
+                    pl.col(col).var().alias("variance"),
+                    pl.col(col).min().alias("min"),
+                    pl.col(col).max().alias("max"),
+                    pl.col(col).quantile(0.25).alias("q25"),
+                    pl.col(col).quantile(0.75).alias("q75"),
+                    pl.col(col).skew().alias("skew"),
+                    pl.col(col).kurtosis().alias("kurt"),
+                    (pl.col(col) == 0).sum().alias("zeros"),
+                    (pl.col(col) < 0).sum().alias("negatives"),
+                ]
+            )
         )
 
-    def _analyze_categorical(self, col: str, row: dict, basic: dict) -> CategoricalStats:
-        unique_count = basic.get(f"{col}__unique", 0)
-        top_k_list = row.get(f"{col}__top_k", [])
-        
-        top_k = []
-        if top_k_list is not None:
-            for item in top_k_list:
-                # the struct looks like {'col_name': value, 'count': c}
-                if isinstance(item, dict):
-                    keys = list(item.keys())
-                    # there are two keys in the struct, one is 'count'
-                    val_key = keys[0] if keys[0] != "count" else keys[1]
-                    top_k.append({"value": str(item[val_key]), "count": item["count"]})
+        row = stats.row(0, named=True)
+        return NumericStats(
+            mean=row["mean"],
+            median=row["median"],
+            std=row["std"],
+            variance=row.get("variance"),
+            min=row["min"],
+            max=row["max"],
+            q25=row["q25"],
+            q75=row["q75"],
+            skewness=row["skew"],
+            kurtosis=row["kurt"],
+            zeros_count=row["zeros"],
+            negatives_count=row["negatives"],
+        )
 
-        rare_count = row.get(f"{col}__rare", 0)
+    def _analyze_categorical(self, col: str) -> CategoricalStats:
+        unique_count = self.df[col].n_unique()
+
+        # Top K
+        top_k_df = self.df[col].value_counts(sort=True).head(10)
+        top_k = []
+        for row in top_k_df.iter_rows():
+            top_k.append({"value": str(row[0]), "count": row[1]})
+
+        # Rare labels (count < 5)
+        # We can use the top_k logic to infer if we have a long tail
+        # Or count rows where col is not in top_k? No, that's not right.
+        # Correct way: group by col, count, filter count < 5, count rows
+        try:
+            rare_count = _collect(
+                self.lazy_df.group_by(col)
+                .agg(pl.len().alias("cnt"))
+                .filter(pl.col("cnt") < 5)
+                .select(pl.len())
+            ).item()
+        except Exception:
+            rare_count = 0
+
         return CategoricalStats(
             unique_count=unique_count, top_k=top_k, rare_labels_count=rare_count
         )
 
-    def _analyze_date(self, col: str, row: dict) -> DateStats:
-        min_date = row.get(f"{col}__min")
-        max_date = row.get(f"{col}__max")
+    def _analyze_date(self, col: str) -> DateStats:
+        stats = _collect(
+            self.lazy_df.select([pl.col(col).min().alias("min"), pl.col(col).max().alias("max")])
+        )
+
+        min_date = stats["min"][0]
+        max_date = stats["max"][0]
+
         duration = None
         if min_date and max_date:
             delta = max_date - min_date
             duration = delta.days if hasattr(delta, "days") else None
+
         return DateStats(min_date=str(min_date), max_date=str(max_date), duration_days=duration)
 
-    def _analyze_text(self, col: str, advanced_stats: dict) -> TextStats:
+    def _analyze_text(self, col: str) -> TextStats:
+        # Length stats
+        stats = _collect(
+            self.lazy_df.select(
+                [
+                    pl.col(col).str.len_bytes().mean().alias("avg_len"),
+                    pl.col(col).str.len_bytes().min().alias("min_len"),
+                    pl.col(col).str.len_bytes().max().alias("max_len"),
+                ]
+            )
+        )
+
         # Most common words (simple tokenization by space)
         common_words = []
         try:
@@ -2192,9 +2159,9 @@ class EDAAnalyzer:
             print(f"Error calculating common words for {col}: {e}")
 
         return TextStats(
-            avg_length=advanced_stats.get(f"{col}__avg_len") or 0.0,
-            min_length=int(advanced_stats.get(f"{col}__min_len") or 0),
-            max_length=int(advanced_stats.get(f"{col}__max_len") or 0),
+            avg_length=stats["avg_len"][0],
+            min_length=stats["min_len"][0],
+            max_length=stats["max_len"][0],
             common_words=common_words,
         )
 

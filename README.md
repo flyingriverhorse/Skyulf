@@ -173,7 +173,7 @@ For detailed examples including **Time Series**, **Geospatial Analysis**, and **
 *   **🎨 Visual Feature Canvas:** A node-based editor to clean, transform, and engineer features without writing spaghetti code. (25+ built-in nodes).
 *   **Automated EDA:** Professional-grade Exploratory Data Analysis with interactive charts, causal discovery (DAGs), decision trees for rule extraction, segmentation, outlier detection, and statistical alerts.
 *   **Drift Analysis** Built on the EDA engine to monitor data and model drift over time with statistical tests and visualizations.
-*   **High-Performance Engine:** Built on **FastAPI** and **Polars** for lightning-fast data processing and easy API extension.
+*   **High-Performance Dual Engine:** Built on **FastAPI** and **Polars** for lightning-fast ETL (Extract/Transform/Load) operations. Data strictly bypasses Pandas overhead by using zero-copy Apache Arrow conversions directly to NumPy via our `SklearnBridge` for advanced ML nodes.
 *   **⚡ Async by Default:** Heavy training jobs run in the background via Celery & Redis (or background threads)—your UI never freezes.
 *   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or S3. Backend storage starts with SQLite (zero-config) and scales to PostgreSQL.
 *   **☁️ S3 Integration:** Full support for S3-compatible storage (AWS, MinIO) for data ingestion, artifact storage, and model registry.
