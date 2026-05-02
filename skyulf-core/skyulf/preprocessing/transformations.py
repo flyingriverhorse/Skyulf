@@ -44,18 +44,12 @@ class PowerTransformerApplier(BaseApplier):
 
         if was_polars:
             import polars as pl
-
-            X_pd = X.to_pandas()
+            X_vals = X.select(valid_cols).to_numpy()
+            df_out = X # We won't copy whole df here
         else:
             X_pd = X
-
-        df_out = X_pd.copy()
-
-        # Reconstruct PowerTransformer state for application
-        # We manually restore the lambdas and internal scaler to apply the transform
-        # without re-fitting.
-
-        X_vals = df_out[valid_cols].values
+            df_out = X_pd.copy()
+            X_vals = df_out[valid_cols].values
         # Filter lambdas and scaler params to match valid_cols
         col_indices = [cols.index(c) for c in valid_cols]
         lambdas_arr = np.array(lambdas)[col_indices]
@@ -89,14 +83,16 @@ class PowerTransformerApplier(BaseApplier):
             X_trans = pt.transform(X_vals)
             # sklearn can be configured with transform_output="pandas", which returns a DataFrame.
             X_trans_arr = X_trans.to_numpy() if hasattr(X_trans, "to_numpy") else X_trans
-            df_out.loc[:, valid_cols] = np.asarray(X_trans_arr)
+            
+            if was_polars:
+                series = [pl.Series(name, X_trans_arr[:, i]) for i, name in enumerate(valid_cols)]
+                df_out = df_out.with_columns(series)
+            else:
+                df_out.loc[:, valid_cols] = np.asarray(X_trans_arr)
 
         except Exception as e:
             logger.error(f"PowerTransformer application failed: {e}")
-            # Fallback?
-
-        if was_polars:
-            df_out = pl.from_pandas(cast(pd.DataFrame, df_out))
+            # Fallback is keeping df_out as it was
 
         return pack_pipeline_output(df_out, y, is_tuple)
 
