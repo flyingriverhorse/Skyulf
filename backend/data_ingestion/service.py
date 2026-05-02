@@ -1,3 +1,4 @@
+from backend.exceptions.core import SkyulfException
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -176,7 +177,7 @@ class DataIngestionService:
                     raise HTTPException(
                         status_code=400, detail="S3 access denied or resource not found"
                     )
-                raise HTTPException(status_code=500, detail="Failed to read S3 data sample")
+                raise SkyulfException(message="Failed to read S3 data sample")
 
         if source.type in ["file", "csv", "txt"]:
             if not file_path:
@@ -192,7 +193,7 @@ class DataIngestionService:
                 return await self.data_service.get_sample(abs_path, limit=limit)
             except Exception as e:
                 logger.error(f"Failed to get sample: {e}")
-                raise HTTPException(status_code=500, detail="Failed to read data sample")
+                raise SkyulfException(message="Failed to read data sample")
 
         elif source.type in ["s3", "parquet"]:
             # This block might be redundant now if file_path starts with s3://,
@@ -214,7 +215,7 @@ class DataIngestionService:
                     return df.to_dicts()
                 except Exception:
                     logger.exception("Failed to read local parquet: %s", file_path)
-                    raise HTTPException(status_code=500, detail="Failed to read local parquet file")
+                    raise SkyulfException(message="Failed to read local parquet file")
 
             try:
                 logger.info(
@@ -228,7 +229,7 @@ class DataIngestionService:
                 return df.to_dicts()
             except Exception as e:
                 logger.error(f"Failed to get S3 sample: {e}")
-                raise HTTPException(status_code=500, detail="Failed to read S3 data sample")
+                raise SkyulfException(message="Failed to read S3 data sample")
 
         # TODO: Handle other source types (SQL, etc.)
         return []
@@ -256,7 +257,7 @@ class DataIngestionService:
                     await out_file.write(content)
         except Exception as e:
             logger.error(f"Failed to save file: {e}")
-            raise HTTPException(status_code=500, detail="Failed to save file")
+            raise SkyulfException(message="Failed to save file")
 
         # 3. Create DataSource record
         try:
@@ -306,7 +307,7 @@ class DataIngestionService:
             # Cleanup file if DB fails
             if file_path.exists():
                 file_path.unlink()
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+            raise SkyulfException(message=f"Database error: {str(e)}")
 
     async def get_ingestion_status(self, source_id: int) -> Dict[str, Any]:
         """
