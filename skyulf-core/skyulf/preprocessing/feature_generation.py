@@ -124,14 +124,13 @@ class PolynomialFeaturesApplier(BaseApplier):
 
             # For PolynomialFeatures, we use the pandas/sklearn implementation via conversion
             # to ensure full compatibility with complex degree/interaction logic.
-            X_pd = X_pl.to_pandas()
-
             poly = PolynomialFeatures(
                 degree=degree, interaction_only=interaction_only, include_bias=include_bias
             )
-            poly.fit(X_pd[valid_cols])
+            X_subset = X_pl.select(valid_cols).to_pandas()
+            poly.fit(X_subset)
 
-            transformed = poly.transform(X_pd[valid_cols])
+            transformed = poly.transform(X_subset)
             # sklearn may return a DataFrame when transform_output="pandas" is set
             if hasattr(transformed, "values"):
                 transformed = transformed.values
