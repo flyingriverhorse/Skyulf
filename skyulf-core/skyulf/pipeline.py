@@ -215,10 +215,10 @@ class SkyulfPipeline:
         """Save the pipeline to a file."""
         # We can use pickle to save the whole object since we removed external dependencies
         with open(path, "wb") as f:
-            pickle.dump(self, f)
+            pickle.dump(self, f)  # nosec B301
 
     @classmethod
     def load(cls, path: str) -> "SkyulfPipeline":
         """Load the pipeline from a file."""
         with open(path, "rb") as f:
-            return pickle.load(f)
+            return pickle.load(f)  # nosec B301

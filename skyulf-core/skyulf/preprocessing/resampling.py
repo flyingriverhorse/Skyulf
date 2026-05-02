@@ -2,7 +2,9 @@ import logging
 from typing import Any, Dict, Tuple, Union
 
 import numpy as np
+import polars as pl
 import pandas as pd
+
 from imblearn.combine import SMOTETomek
 from imblearn.over_sampling import ADASYN, SMOTE, SVMSMOTE, BorderlineSMOTE, KMeansSMOTE
 from imblearn.under_sampling import (
@@ -38,7 +40,7 @@ class OversamplingApplier(BaseApplier):
         if y is None:
             if target_col and target_col in X.columns:
                 if was_polars:
-                    import polars as pl
+
 
                     y = X.select(target_col).to_series()
                     X = X.drop(target_col)
@@ -188,7 +190,7 @@ class UndersamplingApplier(BaseApplier):
         if y is None:
             if target_col and target_col in X.columns:
                 if was_polars:
-                    import polars as pl
+
 
                     y = X.select(target_col).to_series()
                     X = X.drop(target_col)

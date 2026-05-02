@@ -6,7 +6,7 @@ This is the async equivalent of the Flask db/data_sources/postgres_queries.py
 import logging
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import column, literal_column, select, table, update
+from sqlalchemy import column, literal_column, select, table, update, delete
 from sqlalchemy import text as sa_text
 
 from backend.config import Settings
@@ -104,16 +104,12 @@ async def delete_data_source(settings: Settings, filter_dict: Dict[str, Any]):
     """Delete data source records."""
     async with async_session_or_connection(settings) as session:
         try:
-            where_parts = []
-            params = {}
+            tbl = table(TABLE, *[column(c) for c in filter_dict.keys()])
+            stmt = delete(tbl)
             for k, v in filter_dict.items():
-                where_parts.append(f"{k} = :{k}")
-                params[k] = v
+                stmt = stmt.where(column(k) == v)
 
-            where_clause = " WHERE " + " AND ".join(where_parts)
-            sql = sa_text(f"DELETE FROM {TABLE}{where_clause}")  # nosec
-
-            result = await session.execute(sql, params)
+            result = await session.execute(stmt)
             await session.commit()
 
             return {"affected_rows": result.rowcount}
@@ -134,7 +130,7 @@ async def select_data_source_by_file_hash(
     async with async_session_or_connection(settings) as session:
         try:
             sql = sa_text(
-                f"SELECT * FROM {TABLE} WHERE config ->> 'file_hash' = :file_hash LIMIT 1"  # nosec
+                "SELECT * FROM data_sources WHERE config ->> 'file_hash' = :file_hash LIMIT 1"
             )
             result = await session.execute(sql, {"file_hash": file_hash})
             row = result.fetchone()

@@ -110,6 +110,7 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+pythonpath = ["skyulf-core"] # Allow test imports from skyulf-core without needing to install it
 
 [tool.black]
 line-length = 100

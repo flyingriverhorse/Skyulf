@@ -7,10 +7,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.config import get_settings
-from backend.data_ingestion.connectors.api import ApiConnector
 from backend.data_ingestion.connectors.base import BaseConnector
 from backend.data_ingestion.connectors.file import LocalFileConnector
-from backend.data_ingestion.connectors.sql import DatabaseConnector
 from backend.data_ingestion.connectors.s3 import S3Connector
 from backend.data_ingestion.engine.profiler import DataProfiler
 from backend.database.models import DataSource
@@ -67,31 +65,6 @@ def ingest_data_task(source_id: int):
                 raise ValueError("Missing file_path in config")
             connector = LocalFileConnector(file_path)
 
-        elif data_source.type in ["postgres", "mysql", "sqlite", "snowflake"]:
-            # For SQL, we expect connection_string in config (or built from credentials)
-            # In a real app, we would decrypt credentials here.
-            connection_string = config.get("connection_string")
-            table_name = config.get("table_name")
-            query = config.get("query")
-
-            if not connection_string:
-                raise ValueError("Missing connection_string in config")
-
-            connector = DatabaseConnector(connection_string, table_name=table_name, query=query)
-
-        elif data_source.type == "api":
-            url = config.get("url")
-            method = config.get("method", "GET")
-            headers = config.get("headers")
-            params = config.get("params")
-            data_key = config.get("data_key")
-
-            if not url:
-                raise ValueError("Missing url in config")
-
-            connector = ApiConnector(
-                url, method=method, headers=headers, params=params, data_key=data_key
-            )
         elif data_source.type == "s3":
             path = config.get("path")
             if not path:

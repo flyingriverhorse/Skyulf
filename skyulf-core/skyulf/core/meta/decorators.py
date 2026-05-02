@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class NodeMetadata:
-    id: str
+    id: str  # noqa: A002, A003
     name: str
     category: str
     description: str
@@ -13,7 +13,7 @@ class NodeMetadata:
 
 
 def node_meta(
-    id: str,
+    id: str,  # noqa: A002, A003
     name: str,
     category: str,
     description: str,

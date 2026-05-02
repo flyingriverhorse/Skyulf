@@ -308,59 +308,6 @@ class DataIngestionService:
                 file_path.unlink()
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    async def create_database_source(
-        self,
-        data: DataSourceCreate,
-        user_id: int,
-        background_tasks: Optional[BackgroundTasks] = None,
-    ) -> IngestionJobResponse:
-        """
-        Create a database source and trigger ingestion.
-        """
-        try:
-            source_id = str(uuid.uuid4())
-            new_source = DataSource(
-                source_id=source_id,
-                name=data.name,
-                type=data.type,  # 'postgres', 'mysql', etc.
-                config=data.config,
-                created_by=user_id,
-                is_active=True,
-                test_status="untested",
-                description=data.description,
-                source_metadata={
-                    "ingestion_status": {
-                        "status": "pending",
-                        "progress": 0.0,
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                    }
-                },
-            )
-            self.session.add(new_source)
-            await self.session.commit()
-            await self.session.refresh(new_source)
-
-            # Trigger ingestion
-            settings = get_settings()
-            if settings.USE_CELERY:
-                ingest_data_task.delay(new_source.id)
-            elif background_tasks:
-                background_tasks.add_task(ingest_data_task, new_source.id)
-            else:
-                # Fallback: Run in thread
-                import asyncio
-
-                asyncio.create_task(asyncio.to_thread(ingest_data_task, new_source.id))
-
-            return IngestionJobResponse(
-                job_id=str(new_source.id),
-                status="pending",
-                message="Database source created and ingestion started",
-            )
-        except Exception as e:
-            logger.error(f"Failed to create database source: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to create source: {str(e)}")
-
     async def get_ingestion_status(self, source_id: int) -> Dict[str, Any]:
         """
         Get the status of an ingestion job.
@@ -373,3 +320,4 @@ class DataIngestionService:
 
         metadata: Dict[str, Any] = cast(Dict[str, Any], source.source_metadata) or {}
         return cast(Dict[str, Any], metadata.get("ingestion_status", {"status": "unknown"}))
+

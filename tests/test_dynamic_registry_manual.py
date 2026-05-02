@@ -45,7 +45,7 @@ def test_registry():
 
     # Check if our dynamic nodes are in the list
     dynamic_ids = ["logistic_regression", "random_forest_classifier"]
-    found_map = {id: False for id in dynamic_ids}
+    found_map = {node_id: False for node_id in dynamic_ids}
 
     for node in nodes:
         if node.id in found_map:
