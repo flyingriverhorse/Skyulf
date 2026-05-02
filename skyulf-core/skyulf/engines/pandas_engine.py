@@ -2,7 +2,7 @@ from typing import Any, List, Sequence, Tuple
 import pandas as pd
 import numpy as np
 
-from .registry import BaseEngine, EngineRegistry
+from .registry import BaseEngine, EngineRegistry, EngineName
 from .protocol import SkyulfDataFrame
 
 
@@ -57,7 +57,7 @@ class SkyulfPandasWrapper:
 
 
 class PandasEngine(BaseEngine):
-    name = "pandas"
+    name = EngineName.PANDAS
 
     @classmethod
     def is_compatible(cls, data: Any) -> bool:

@@ -15,7 +15,6 @@ async def test_artifact_routing_logic():
         patch("backend.ml_pipeline.tasks.PipelineEngine") as MockEngine,
         patch("os.makedirs"),
     ):
-
         # Setup Session and Job
         session = MagicMock()
         mock_get_session.return_value = session

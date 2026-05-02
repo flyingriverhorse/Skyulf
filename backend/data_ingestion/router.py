@@ -157,4 +157,3 @@ async def cancel_ingestion(
         # remaining `False` case is a missing source row.
         raise HTTPException(status_code=404, detail="Source not found")
     return {"message": "Ingestion job cancelled successfully"}
-

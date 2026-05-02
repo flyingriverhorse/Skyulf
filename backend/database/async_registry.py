@@ -76,7 +76,8 @@ async def ensure_registry_tables(settings: Settings) -> None:
                         logger.warning(f"Could not create directory {d}")
 
                 async with aiosqlite.connect(dbpath) as conn:
-                    await conn.execute("""
+                    await conn.execute(
+                        """
                         CREATE TABLE IF NOT EXISTS data_sources (
                             id TEXT PRIMARY KEY,
                             source_type TEXT,
@@ -86,7 +87,8 @@ async def ensure_registry_tables(settings: Settings) -> None:
                             category TEXT,
                             created_at TEXT
                         )
-                        """)
+                        """
+                    )
                     await conn.commit()
                     logger.info(f"Successfully created registry tables in SQLite at {dbpath}")
 

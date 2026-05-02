@@ -57,14 +57,3 @@ def test_ingest_file_task(
     assert mock_data_source.source_metadata["row_count"] == 3
     assert mock_data_source.source_metadata["column_count"] == 2
     assert "profile" in mock_data_source.source_metadata
-
-
-
-
-
-
-
-
-
-
-

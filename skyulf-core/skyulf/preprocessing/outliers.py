@@ -14,7 +14,7 @@ from ..utils import (
 from .base import BaseApplier, BaseCalculator
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class IQRApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -173,7 +173,7 @@ class ZScoreApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -315,7 +315,7 @@ class WinsorizeApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -422,7 +422,7 @@ class ManualBoundsApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -525,7 +525,7 @@ class EllipticEnvelopeApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path: Convert to Pandas because we use sklearn models
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             # Polars conversion path
             X_pd = X.to_pandas()
             y_pd = None
@@ -582,7 +582,7 @@ class EllipticEnvelopeApplier(BaseApplier):
         if y_pd is not None:
             y_filtered = y_pd[mask]
             # If we started with Polars, we might want to convert back.
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 import polars as pl
 
                 return pack_pipeline_output(
@@ -593,7 +593,7 @@ class EllipticEnvelopeApplier(BaseApplier):
 
             return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
 
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             return pack_pipeline_output(pl.from_pandas(X_filtered), y, is_tuple)

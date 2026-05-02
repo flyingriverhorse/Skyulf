@@ -1,7 +1,10 @@
+import logging
 import polars as pl
 import numpy as np
 from typing import List, Optional, cast
 from .schemas import CorrelationMatrix
+
+logger = logging.getLogger(__name__)
 
 
 def _collect(lf: pl.LazyFrame) -> pl.DataFrame:
@@ -80,5 +83,5 @@ def calculate_correlations(
         return CorrelationMatrix(columns=valid_cols, values=matrix)
 
     except Exception as e:
-        print(f"Error calculating correlations: {e}")
+        logger.error(f"Error calculating correlations: {e}")
         return None

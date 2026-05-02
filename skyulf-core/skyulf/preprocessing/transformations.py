@@ -15,7 +15,7 @@ from ..utils import (
     user_picked_no_columns,
 )
 from .base import BaseApplier, BaseCalculator
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class PowerTransformerApplier(BaseApplier):
     ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
-        was_polars = engine.name == "polars"
+        was_polars = engine.name == EngineName.POLARS
 
         cols = params.get("columns", [])
         lambdas = params.get("lambdas")
@@ -117,7 +117,7 @@ class PowerTransformerCalculator(BaseCalculator):
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X = X.to_pandas()
 
         if user_picked_no_columns(config):
@@ -185,7 +185,7 @@ class SimpleTransformationApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -299,7 +299,7 @@ class GeneralTransformationApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -464,7 +464,7 @@ class GeneralTransformationCalculator(BaseCalculator):
                 # Fit PowerTransformer
                 try:
                     # Prepare data (Pandas Series/DataFrame)
-                    if engine.name == "polars":
+                    if engine.name == EngineName.POLARS:
                         col_series = X[col].to_pandas()
                         col_df = col_series.to_frame()
                     else:

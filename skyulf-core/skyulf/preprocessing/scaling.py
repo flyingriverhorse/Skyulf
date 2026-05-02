@@ -20,7 +20,7 @@ from ..utils import (
 from .base import BaseApplier, BaseCalculator
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class StandardScalerApplier(BaseApplier):
         # Check Engine
         engine = get_engine(X)
 
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             # Polars Native Implementation
@@ -120,7 +120,7 @@ class StandardScalerCalculator(BaseCalculator):
         with_std = config.get("with_std", True)
 
         # Casting for strict type checking
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X_pl: Any = X
             cols = resolve_columns(X_pl, config, detect_numeric_columns)
             if not cols:
@@ -175,7 +175,7 @@ class MinMaxScalerApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -226,7 +226,7 @@ class MinMaxScalerCalculator(BaseCalculator):
         # Config: {'feature_range': (0, 1), 'columns': [...]}
         feature_range = config.get("feature_range", (0, 1))
 
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X_pl: Any = X
             cols = resolve_columns(X_pl, config, detect_numeric_columns)
             if not cols:
@@ -278,7 +278,7 @@ class RobustScalerApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -354,7 +354,7 @@ class RobustScalerCalculator(BaseCalculator):
         with_centering = config.get("with_centering", True)
         with_scaling = config.get("with_scaling", True)
 
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X_pl: Any = X
             cols = resolve_columns(X_pl, config, detect_numeric_columns)
             if not cols:
@@ -409,7 +409,7 @@ class MaxAbsScalerApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -462,7 +462,7 @@ class MaxAbsScalerCalculator(BaseCalculator):
         if user_picked_no_columns(config):
             return {}
 
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X_pl: Any = X
             cols = resolve_columns(X_pl, config, detect_numeric_columns)
             if not cols:

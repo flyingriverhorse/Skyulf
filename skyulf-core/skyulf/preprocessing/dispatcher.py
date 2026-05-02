@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, Optional, Tuple, Union
 import pandas as pd
 
 from ..utils import unpack_pipeline_input, pack_pipeline_output
-from ..engines import get_engine, SkyulfDataFrame
+from ..engines import EngineName, get_engine, SkyulfDataFrame
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ def apply_dual_engine(
     X, y, is_tuple = unpack_pipeline_input(df)
     engine = get_engine(X)
 
-    if engine.name == "polars":
+    if engine.name == EngineName.POLARS:
         # Polars path
         # We pass X directly. The func should handle typing (X_pl: Any = X)
         try:
@@ -86,7 +86,7 @@ def fit_dual_engine(
     X, y, _ = unpack_pipeline_input(df)
     engine = get_engine(X)
 
-    if engine.name == "polars":
+    if engine.name == EngineName.POLARS:
         try:
             return polars_func(X, y, params)
         except Exception as e:

@@ -1,5 +1,5 @@
 from .protocol import SkyulfDataFrame
-from .registry import EngineRegistry, get_engine, BaseEngine
+from .registry import EngineRegistry, get_engine, BaseEngine, EngineName
 from .pandas_engine import PandasEngine
 from .polars_engine import PolarsEngine
 
@@ -8,6 +8,7 @@ __all__ = [
     "EngineRegistry",
     "get_engine",
     "BaseEngine",
+    "EngineName",
     "PandasEngine",
     "PolarsEngine",
 ]

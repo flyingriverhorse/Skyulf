@@ -60,10 +60,10 @@ class DatabaseMixin:
             params.append(f"sslrootcert={self.DB_SSLROOTCERT}")
         if getattr(self, "DB_EXTRA_PARAMS", None):
             params.append(str(self.DB_EXTRA_PARAMS))
-            
+
         if params:
             url += f"?{'&'.join(params)}"
-            
+
         return url
 
     def get_database_url_for_type(self, db_type: str) -> str:

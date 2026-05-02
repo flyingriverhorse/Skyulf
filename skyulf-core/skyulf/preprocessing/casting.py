@@ -6,7 +6,7 @@ import pandas as pd
 from .base import BaseApplier, BaseCalculator
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 from ..utils import pack_pipeline_output, unpack_pipeline_input
 
 # Map common aliases to pandas types
@@ -77,7 +77,7 @@ class CastingApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             exprs = []

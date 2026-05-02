@@ -8,7 +8,7 @@ from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
 from ..data.dataset import SplitDataset
 from .base import BaseApplier, BaseCalculator
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ class DataSplitter:
         Splits X and y arrays.
         """
         engine = get_engine(X)
-        is_polars = engine.name == "polars"
+        is_polars = engine.name == EngineName.POLARS
 
         if is_polars:
             # Convert to Pandas to preserve schema/metadata during split
@@ -196,7 +196,7 @@ class DataSplitter:
         Splits a DataFrame.
         """
         engine = get_engine(df)
-        is_polars = engine.name == "polars"
+        is_polars = engine.name == EngineName.POLARS
 
         if is_polars:
             # Convert to Pandas to preserve schema/metadata during split
@@ -278,7 +278,7 @@ class FeatureTargetSplitApplier(BaseApplier):
 
         def split_one(data: Union[pd.DataFrame, SkyulfDataFrame, Any]) -> Tuple[Any, Any]:
             engine = get_engine(data)
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 data_pl: Any = cast(Any, data)
                 if target_col not in data_pl.columns:
                     raise ValueError(f"Target column '{target_col}' not found in dataset")

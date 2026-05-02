@@ -50,7 +50,6 @@ def _maybe_decode_predictions(
 
 
 class DeploymentService:
-
     @staticmethod
     async def deploy_model(
         session: AsyncSession, job_id: str, user_id: Optional[int] = None

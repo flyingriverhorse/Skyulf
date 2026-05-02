@@ -16,7 +16,6 @@ from .schemas import ArtifactListResponse, ModelRegistryEntry, ModelVersion, Reg
 
 
 class ModelRegistryService:
-
     @staticmethod
     async def get_next_version(
         session: AsyncSession, dataset_id: str, model_type: str, job_type: str
