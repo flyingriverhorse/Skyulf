@@ -510,6 +510,7 @@ class TestHistGradientBoostingClassifier:
         ds = classification_dataset
         # Inject NaN into training set
         import pandas as _pd
+
         train_with_nan = _pd.DataFrame(ds.train).copy()
         train_with_nan.iloc[0, 0] = np.nan
 
