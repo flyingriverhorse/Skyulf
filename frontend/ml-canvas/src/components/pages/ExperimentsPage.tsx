@@ -1106,7 +1106,19 @@ export const ExperimentsPage: React.FC = () => {
                                 if (field === 'CV Shuffle') value = cvSource.cv_enabled ? (cvSource.cv_shuffle ? 'Yes' : 'No') : '-';
                                 if (field === 'CV Random State') value = cvSource.cv_enabled ? str(cvSource.cv_random_state) : '-';
                                 if (field === 'Strategy') value = str(tuningConfig?.strategy ?? tuningConfig?.search_strategy);
-                                if (field === 'Strategy Params') value = tuningConfig?.strategy_params && Object.keys(tuningConfig.strategy_params as Record<string, unknown>).length > 0 ? JSON.stringify(tuningConfig.strategy_params) : '-';
+                                if (field === 'Strategy Params') {
+                                  const sp = tuningConfig?.strategy_params as Record<string, unknown> | undefined;
+                                  const strategy = String(tuningConfig?.strategy ?? tuningConfig?.search_strategy ?? '');
+                                  if (sp && Object.keys(sp).length > 0) {
+                                    value = JSON.stringify(sp);
+                                  } else if (strategy === 'optuna') {
+                                    value = 'sampler: tpe · pruner: median (defaults)';
+                                  } else if (strategy === 'halving_grid' || strategy === 'halving_random') {
+                                    value = 'factor: 3 · min: exhaust (defaults)';
+                                  } else {
+                                    value = '-';
+                                  }
+                                }
                                 if (field === 'Metric') value = str(tuningConfig?.metric);
                                 if (field === 'Trials') value = str(tuningConfig?.n_trials);
 

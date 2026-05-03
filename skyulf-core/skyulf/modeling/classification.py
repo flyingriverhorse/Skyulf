@@ -21,9 +21,23 @@ except ImportError:
     XGBOOST_AVAILABLE = False
 
 try:
+    import lightgbm as _lgb  # ty: ignore[unresolved-import]
     from lightgbm import LGBMClassifier  # ty: ignore[unresolved-import]
 
     LIGHTGBM_AVAILABLE = True
+
+    # LightGBM 4.x emits C++ stderr warnings ("No further splits with positive
+    # gain", auto col-wise info, etc.) that the `verbose=-1` constructor param
+    # does not always silence. Register a no-op logger so all native messages
+    # are intercepted by Python and dropped. Safe to call multiple times.
+    class _SilentLgbmLogger:
+        def info(self, msg: str) -> None:  # noqa: D401
+            pass
+
+        def warning(self, msg: str) -> None:  # noqa: D401
+            pass
+
+    _lgb.register_logger(_SilentLgbmLogger())
 except ImportError:
     LIGHTGBM_AVAILABLE = False
 
@@ -344,7 +358,33 @@ class HistGradientBoostingClassifierCalculator(SklearnCalculator):
 if LIGHTGBM_AVAILABLE:
 
     class LGBMClassifierApplier(SklearnApplier):
-        """LightGBM Classifier Applier."""
+        """LightGBM Classifier Applier.
+
+        LightGBM 4.x sets ``feature_names_in_`` to auto-generated names
+        (``Column_0``, ``Column_1``...) even when fit with numpy arrays, and the
+        property's deleter is intentionally a no-op (see upstream source). That
+        triggers sklearn's ``UserWarning: X does not have valid feature names``
+        on every predict call. We suppress it locally here so the warning never
+        leaks out of the applier boundary.
+        """
+
+        def predict(self, df, model_artifact):
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore", message=".*valid feature names.*"
+                )
+                return super().predict(df, model_artifact)
+
+        def predict_proba(self, df, model_artifact):
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore", message=".*valid feature names.*"
+                )
+                return super().predict_proba(df, model_artifact)
 
     @NodeRegistry.register("lgbm_classifier", LGBMClassifierApplier)
     @node_meta(
@@ -374,9 +414,19 @@ if LIGHTGBM_AVAILABLE:
                     "n_jobs": -1,
                     "random_state": 42,
                     "verbose": -1,
+                    "verbosity": -1,
                 },
                 problem_type="classification",
             )
+
+        def fit(self, X, y, config, **kwargs):
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore", message=".*valid feature names.*"
+                )
+                return super().fit(X, y, config, **kwargs)
 
 
 # --- Gaussian NB ---

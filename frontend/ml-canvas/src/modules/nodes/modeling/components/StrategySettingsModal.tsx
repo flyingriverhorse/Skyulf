@@ -132,6 +132,14 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
             <div className="p-5 space-y-4">
                     {isHalving && (
                         <>
+                            {strategy === 'halving_grid' && (
+                                <div className="flex items-start gap-2 p-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-700 dark:text-amber-400">
+                                    <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                                    <span>
+                                        <strong>halving_grid</strong> evaluates the full cartesian product of your search space across multiple halving rounds. Large grids can take many minutes — reduce candidate values in the <strong>Search Space</strong> section of the node, or switch to <strong>halving_random</strong>.
+                                    </span>
+                                </div>
+                            )}
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
                                     <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">

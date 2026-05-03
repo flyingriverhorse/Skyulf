@@ -538,17 +538,27 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                                         const config: TuningConfig | undefined = rawConfig;
                                                         if (!config) return <div className="text-gray-400 col-span-2">No configuration found</div>;
                                                         
+                                                        const activeStrategy = config.strategy || config.search_strategy || '';
+                                                        const sp = config.strategy_params;
+                                                        const hasStrategyParams = sp && Object.keys(sp).length > 0;
+                                                        const strategyParamsDisplay = hasStrategyParams
+                                                            ? Object.entries(sp!).map(([k, v]) => `${k}: ${v}`).join(' · ')
+                                                            : activeStrategy === 'optuna'
+                                                            ? 'sampler: tpe · pruner: median (defaults)'
+                                                            : activeStrategy === 'halving_grid' || activeStrategy === 'halving_random'
+                                                            ? 'factor: 3 · resource: n_samples · min_resources: exhaust (defaults)'
+                                                            : '-';
+
                                                         return (
                                                             <>
                                                                 <div>
                                                                     <span className="text-gray-500">Strategy:</span>
-                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300 capitalize">{config.strategy || config.search_strategy || '-'}</span>
+                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300 capitalize">{activeStrategy || '-'}</span>
+                                                                    
                                                                 </div>
-                                                                <div>
+                                                                <div className="col-span-2">
                                                                     <span className="text-gray-500">Strategy Params:</span>
-                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">
-                                                                        {config.strategy_params && Object.keys(config.strategy_params).length > 0 ? JSON.stringify(config.strategy_params) : '-'}
-                                                                    </span>
+                                                                    <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{strategyParamsDisplay}</span>
                                                                 </div>
                                                                 <div>
                                                                     <span className="text-gray-500">Metric:</span>

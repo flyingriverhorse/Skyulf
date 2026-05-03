@@ -1433,11 +1433,13 @@ def get_model_hyperparameters(model_type: str):
 
 
 @router.get("/hyperparameters/{model_type}/defaults")
-def get_model_default_search_space(model_type: str):
+def get_model_default_search_space(model_type: str, strategy: str = "random"):
     """
     Returns the default search space for a specific model type.
+    Pass ?strategy=halving_grid or ?strategy=grid to get a trimmed space
+    suitable for exhaustive grid evaluation.
     """
-    return get_default_search_space(model_type)
+    return get_default_search_space(model_type, strategy=strategy)
 
 
 @router.get("/datasets/list", response_model=List[Dict[str, Any]])
