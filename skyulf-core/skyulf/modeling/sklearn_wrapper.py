@@ -83,18 +83,25 @@ class SklearnCalculator(BaseModelCalculator):
             log_callback(msg)
 
         # 2. Instantiate Model
-        # Filter params to only include those accepted by the model_class constructor
+        # Filter params to only include those accepted by the model_class constructor.
+        # Skip filtering when the constructor uses **kwargs (e.g. XGBoost 2.x) because
+        # every named param would fail the membership check even though it is valid.
         import inspect
 
         sig = inspect.signature(self.model_class)
-        valid_params = {k: v for k, v in params.items() if k in sig.parameters}
+        accepts_kwargs = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        )
 
-        # Log dropped params if any (for debugging)
-        dropped = set(params.keys()) - set(valid_params.keys())
-        if dropped:
-            logger.warning(
-                f"Dropped parameters not supported by {self.model_class.__name__}: {dropped}"
-            )
+        if accepts_kwargs:
+            valid_params = params
+        else:
+            valid_params = {k: v for k, v in params.items() if k in sig.parameters}
+            dropped = set(params.keys()) - set(valid_params.keys())
+            if dropped:
+                logger.warning(
+                    f"Dropped parameters not supported by {self.model_class.__name__}: {dropped}"
+                )
 
         model = self.model_class(**valid_params)
 

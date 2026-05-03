@@ -254,10 +254,10 @@ if XGBOOST_AVAILABLE:
                     "n_estimators": 100,
                     "max_depth": 6,
                     "learning_rate": 0.3,
+                    "subsample": 0.8,
+                    "colsample_bytree": 0.8,
                     "n_jobs": -1,
                     "random_state": 42,
-                    "use_label_encoder": False,
-                    "eval_metric": "logloss",
                 },
                 problem_type="classification",
             )
