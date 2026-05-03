@@ -108,9 +108,9 @@ class BaseBinningApplier(BaseApplier):
             processed_cols.append(col)
 
             # Determine labels for pd.cut
-            labels: Union[
-                Literal[False], List[Any], None
-            ] = False  # Default for ordinal (returns integers)
+            labels: Union[Literal[False], List[Any], None] = (
+                False  # Default for ordinal (returns integers)
+            )
 
             # Check for custom labels first
             col_custom_labels = custom_labels_map.get(col)

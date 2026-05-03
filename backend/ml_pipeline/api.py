@@ -258,9 +258,9 @@ class PipelineConfigModel(BaseModel):
     nodes: List[NodeConfigModel]
     metadata: Dict[str, Any] = {}
     target_node_id: Optional[str] = None
-    job_type: Optional[
-        str
-    ] = StepType.BASIC_TRAINING  # "basic_training", "advanced_tuning", or "preview"
+    job_type: Optional[str] = (
+        StepType.BASIC_TRAINING
+    )  # "basic_training", "advanced_tuning", or "preview"
 
 
 class RunPipelineResponse(BaseModel):

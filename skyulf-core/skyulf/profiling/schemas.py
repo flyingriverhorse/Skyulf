@@ -36,9 +36,9 @@ class TextStats(BaseModel):
     min_length: Optional[int] = None
     max_length: Optional[int] = None
     common_words: List[Dict[str, Any]] = Field(default_factory=list)
-    sentiment_distribution: Optional[
-        Dict[str, float]
-    ] = None  # {"positive": 0.6, "neutral": 0.3, "negative": 0.1}
+    sentiment_distribution: Optional[Dict[str, float]] = (
+        None  # {"positive": 0.6, "neutral": 0.3, "negative": 0.1}
+    )
 
 
 class HistogramBin(BaseModel):
@@ -86,9 +86,9 @@ class RuleTree(BaseModel):
     nodes: List[RuleNode]
     accuracy: Optional[float] = None  # Surrogate model accuracy
     rules: Optional[List[str]] = None  # Human readable rules
-    feature_importances: Optional[
-        List[Dict[str, Union[str, float]]]
-    ] = None  # Feature importance from surrogate model
+    feature_importances: Optional[List[Dict[str, Union[str, float]]]] = (
+        None  # Feature importance from surrogate model
+    )
 
 
 class ColumnProfile(BaseModel):
@@ -210,9 +210,9 @@ class OutlierPoint(BaseModel):
     index: int
     values: Dict[str, Any]  # Key values for context
     score: float  # Anomaly score (lower is more anomalous for IF, or distance for others)
-    explanation: Optional[
-        List[Dict[str, Any]]
-    ] = None  # [{"feature": "Age", "value": 95, "mean": 35, "diff": 60}, ...]
+    explanation: Optional[List[Dict[str, Any]]] = (
+        None  # [{"feature": "Age", "value": 95, "mean": 35, "diff": 60}, ...]
+    )
 
 
 class OutlierAnalysis(BaseModel):
@@ -220,9 +220,9 @@ class OutlierAnalysis(BaseModel):
     total_outliers: int
     outlier_percentage: float
     top_outliers: List[OutlierPoint]
-    plot_data: Optional[
-        List[Dict[str, Any]]
-    ] = None  # For visualization (e.g. PCA projection of outliers)
+    plot_data: Optional[List[Dict[str, Any]]] = (
+        None  # For visualization (e.g. PCA projection of outliers)
+    )
 
 
 class ClusteringPoint(BaseModel):
