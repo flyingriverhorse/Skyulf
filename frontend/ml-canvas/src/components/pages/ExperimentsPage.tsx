@@ -11,7 +11,8 @@ import { toast } from '../../core/toast';
 import { toPng } from 'html-to-image';
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
-import { formatMetricName } from '../../core/utils/format';
+import { formatMetricName, getMetricDescription, getHyperparamDescription, getTrainingConfigDescription } from '../../core/utils/format';
+import { InfoTooltip } from '../ui/InfoTooltip';
 import { PipelineDiffView } from './experiments/PipelineDiffView';
 
 /** Extract the resolved scoring metric from a job's result (top-level or nested in metrics). */
@@ -717,13 +718,14 @@ export const ExperimentsPage: React.FC = () => {
                             <button
                                 key={metric}
                                 onClick={() => { setSelectedMetric(metric); }}
-                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
                                     activeMetric === metric
                                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                                         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                                 }`}
                             >
                                 {metric.toUpperCase()}
+                                {getMetricDescription(metric) && <InfoTooltip size="sm" text={getMetricDescription(metric)!} />}
                             </button>
                         ))}
                     </div>
@@ -992,9 +994,12 @@ export const ExperimentsPage: React.FC = () => {
                       {isMetricsExpanded && metricKeys.map(metricKey => (
                         <tr key={metricKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                           <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">
-                            {metricKey === 'best_score'
-                              ? `Best Score (${formatMetricName(getJobScoringMetric(selectedJobs[0] ?? {})) || 'CV'})`
-                              : metricKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                            <div className="flex items-center gap-1">
+                              {metricKey === 'best_score'
+                                ? `Best Score (${formatMetricName(getJobScoringMetric(selectedJobs[0] ?? {})) || 'CV'})`
+                                : metricKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                              {getMetricDescription(metricKey) && <InfoTooltip size="sm" text={getMetricDescription(metricKey)!} />}
+                            </div>
                           </td>
                           {selectedJobs.map(job => {
                              const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
@@ -1045,7 +1050,12 @@ export const ExperimentsPage: React.FC = () => {
                         }
                         return allKeys.map(paramKey => (
                           <tr key={paramKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                            <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{paramKey}</td>
+                            <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">
+                              <div className="flex items-center gap-1">
+                                {paramKey}
+                                {getHyperparamDescription(paramKey) && <InfoTooltip size="sm" text={getHyperparamDescription(paramKey)!} />}
+                              </div>
+                            </td>
                             {selectedJobs.map(job => {
                               const params = getModelParams(job);
                               const val = params[paramKey];
@@ -1073,7 +1083,12 @@ export const ExperimentsPage: React.FC = () => {
                         <>
                           {['Target Column', 'CV Enabled', 'CV Method', 'CV Folds', 'CV Shuffle', 'CV Random State', ...(selectedJobs.some(j => j.job_type === 'advanced_tuning') ? ['Strategy', 'Strategy Params', 'Metric', 'Trials'] : [])].map(field => (
                             <tr key={field} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                              <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{field}</td>
+                              <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">
+                              <div className="flex items-center gap-1">
+                                {field}
+                                {getTrainingConfigDescription(field) && <InfoTooltip size="sm" text={getTrainingConfigDescription(field)!} />}
+                              </div>
+                            </td>
                               {selectedJobs.map(job => {
                                 // Resolve config: for advanced tuning use job.config or graph node params,
                                 // for basic training use job.hyperparameters (which contains full node params)

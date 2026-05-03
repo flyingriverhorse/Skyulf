@@ -3,7 +3,8 @@ import { useJobStore } from '../../core/store/useJobStore';
 import { X, RefreshCw, CheckCircle, AlertCircle, ArrowLeft, Database, Terminal, Square, FileText, LayoutDashboard, ChevronDown, Zap, CheckCircle2, Search, Filter } from 'lucide-react';
 import { JobInfo } from '../../core/api/jobs';
 import { useEscapeKey } from '../../core/hooks/useEscapeKey';
-import { formatMetricName } from '../../core/utils/format';
+import { formatMetricName, getMetricDescription } from '../../core/utils/format';
+import { InfoTooltip } from '../ui/InfoTooltip';
 import { clickableProps } from '../../core/utils/a11y';
 import { useJobPolling, isTerminalStatus } from '../../core/hooks/useJobPolling';
 import { StatusBadge } from '../shared/StatusBadge';
@@ -499,7 +500,10 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                                 .filter(([, v]) => typeof v === 'number' || typeof v === 'string')
                                                 .map(([k, v]) => (
                                                 <div key={k} className={`p-3 border rounded-lg ${k.startsWith('cv_') ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">{k.replace(/_/g, ' ')}</div>
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize flex items-center gap-1">
+                                                        {k.replace(/_/g, ' ')}
+                                                        {getMetricDescription(k) && <InfoTooltip size="sm" text={getMetricDescription(k)!} />}
+                                                    </div>
                                                     <div className={`font-mono font-medium ${k.startsWith('cv_') ? 'text-purple-600 dark:text-purple-400' : 'text-blue-600 dark:text-blue-400'}`}>
                                                         {typeof v === 'number' ? formatMetricValue(k, v) : String(v)}
                                                     </div>
@@ -616,7 +620,10 @@ const JobDetailsView: React.FC<{ job: JobInfo; onBack: () => void; onClose: () =
                                                         .filter(([k, v]) => !['best_score', 'best_params', 'trials'].includes(k) && (typeof v === 'number' || typeof v === 'string'))
                                                         .map(([k, v]) => (
                                                         <div key={k} className={`p-3 border rounded-lg ${k.startsWith('cv_') ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
-                                                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">{k.replace(/_/g, ' ')}</div>
+                                                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize flex items-center gap-1">
+                                                                {k.replace(/_/g, ' ')}
+                                                                {getMetricDescription(k) && <InfoTooltip size="sm" text={getMetricDescription(k)!} />}
+                                                            </div>
                                                             <div className={`font-mono font-medium ${k.startsWith('cv_') ? 'text-purple-600 dark:text-purple-400' : 'text-blue-600 dark:text-blue-400'}`}>
                                                                 {typeof v === 'number' ? formatMetricValue(k, v as number) : String(v)}
                                                             </div>
