@@ -43,9 +43,9 @@ class PipelineEngine:
         self.artifact_store = artifact_store
         self.catalog = catalog
         self.log_callback = log_callback
-        self.executed_transformers: List[
-            Any
-        ] = []  # Track fitted transformers for inference pipeline
+        self.executed_transformers: List[Any] = (
+            []
+        )  # Track fitted transformers for inference pipeline
         self._results: Dict[str, NodeExecutionResult] = {}
         self._node_configs: Dict[str, NodeConfig] = {}
         # Engine-emitted advisories surfaced via PipelineExecutionResult.
