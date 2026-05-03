@@ -2959,7 +2959,7 @@ Expects 'bin_edges' in params: Dict[str, List[float]] mapping column names to bi
         <span class="n">custom_labels_map</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;custom_labels&quot;</span><span class="p">,</span> <span class="p">{})</span>
 
         <span class="c1"># Polars Path</span>
-        <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;polars&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">EngineName</span><span class="o">.</span><span class="n">POLARS</span><span class="p">:</span>
             <span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
 
             <span class="n">X_pl</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">X</span>
@@ -3233,7 +3233,7 @@ Applies specific bin edges to selected columns.</p>
 
         <span class="c1"># Ensure X is pandas for fitting logic</span>
         <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;polars&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">EngineName</span><span class="o">.</span><span class="n">POLARS</span><span class="p">:</span>
             <span class="n">X</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span>
 
         <span class="n">columns</span> <span class="o">=</span> <span class="n">resolve_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">detect_numeric_columns</span><span class="p">)</span>
@@ -3469,7 +3469,7 @@ Applies specific bin edges to selected columns.</p>
 
         <span class="c1"># Ensure X is pandas for fitting logic</span>
         <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;polars&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">EngineName</span><span class="o">.</span><span class="n">POLARS</span><span class="p">:</span>
             <span class="n">X</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span>
 
         <span class="n">columns</span> <span class="o">=</span> <span class="n">resolve_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">detect_numeric_columns</span><span class="p">)</span>
