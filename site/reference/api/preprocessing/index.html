@@ -2840,10 +2840,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/base.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
@@ -2851,7 +2848,10 @@
 <span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span>
-<span class="normal">34</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseApplier</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseApplier</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">],</span> <span class="n">params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -2904,17 +2904,17 @@ defensively narrow on every use, which is worse than <code>Any</code> here.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/base.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
 <span class="normal">30</span>
 <span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span>
-<span class="normal">34</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">],</span> <span class="n">params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Applies the transformation using fitted parameters.</span>
@@ -2965,15 +2965,15 @@ defensively narrow on every use, which is worse than <code>Any</code> here.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/base.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">12</span>
-<span class="normal">13</span>
-<span class="normal">14</span>
-<span class="normal">15</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">15</span>
 <span class="normal">16</span>
 <span class="normal">17</span>
 <span class="normal">18</span>
 <span class="normal">19</span>
-<span class="normal">20</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseCalculator</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseCalculator</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">],</span> <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
@@ -3019,14 +3019,14 @@ Returns a dictionary of fitted parameters (serializable).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/base.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">13</span>
-<span class="normal">14</span>
-<span class="normal">15</span>
-<span class="normal">16</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">16</span>
 <span class="normal">17</span>
 <span class="normal">18</span>
 <span class="normal">19</span>
-<span class="normal">20</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">],</span> <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
@@ -3152,7 +3152,7 @@ Applies specific bin edges to selected columns.</p>
 
         <span class="c1"># Ensure X is pandas for fitting logic</span>
         <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;polars&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">EngineName</span><span class="o">.</span><span class="n">POLARS</span><span class="p">:</span>
             <span class="n">X</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span>
 
         <span class="n">columns</span> <span class="o">=</span> <span class="n">resolve_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">detect_numeric_columns</span><span class="p">)</span>
@@ -3681,7 +3681,14 @@ Applies specific bin edges to selected columns.</p>
 <span class="normal">472</span>
 <span class="normal">473</span>
 <span class="normal">474</span>
-<span class="normal">475</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineer</span><span class="p">:</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineer</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Orchestrates a sequence of feature engineering steps.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -3749,7 +3756,7 @@ Applies specific bin edges to selected columns.</p>
             <span class="n">calculator</span><span class="p">,</span> <span class="n">applier</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_transformer_components</span><span class="p">(</span><span class="n">transformer_type</span><span class="p">)</span>
             <span class="n">step_node_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">node_id_prefix</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
 
-            <span class="n">current_data</span><span class="p">,</span> <span class="n">fitted_params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_step</span><span class="p">(</span>
+            <span class="n">current_data</span><span class="p">,</span> <span class="n">fitted_params</span><span class="p">,</span> <span class="n">transformer_inst</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_step</span><span class="p">(</span>
                 <span class="n">transformer_type</span><span class="o">=</span><span class="n">transformer_type</span><span class="p">,</span>
                 <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
                 <span class="n">calculator</span><span class="o">=</span><span class="n">calculator</span><span class="p">,</span>
@@ -3758,6 +3765,13 @@ Applies specific bin edges to selected columns.</p>
                 <span class="n">current_data</span><span class="o">=</span><span class="n">current_data</span><span class="p">,</span>
                 <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">,</span>
             <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">transformer_inst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># Add node-level performance metrics directly into `metrics` dictionary</span>
+                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;fit_time&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;fit_time&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;rows_in&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;rows_in&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;rows_out&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;rows_out&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Step </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> complete. New data type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">current_data</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
@@ -3792,7 +3806,7 @@ Applies specific bin edges to selected columns.</p>
         <span class="n">step_node_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>  <span class="c1"># Returns (data, params, transformer)</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Execute one pipeline step. Returns (new_data, fitted_params).</span>
 
 <span class="sd">        Splitters change the data structure (DataFrame -&gt; SplitDataset / (X, y)),</span>
@@ -3812,13 +3826,13 @@ Applies specific bin edges to selected columns.</p>
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                     <span class="s2">&quot;Attempting to split an already split dataset. Skipping TrainTestSplitter.&quot;</span>
                 <span class="p">)</span>
-            <span class="k">return</span> <span class="n">current_data</span><span class="p">,</span> <span class="n">fitted_params</span>
+            <span class="k">return</span> <span class="n">current_data</span><span class="p">,</span> <span class="n">fitted_params</span><span class="p">,</span> <span class="kc">None</span>
 
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="o">==</span> <span class="s2">&quot;feature_target_split&quot;</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Handling feature_target_split&quot;</span><span class="p">)</span>
             <span class="n">params</span> <span class="o">=</span> <span class="n">calculator</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
             <span class="n">current_data</span> <span class="o">=</span> <span class="n">applier</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">current_data</span><span class="p">,</span> <span class="n">fitted_params</span>
+            <span class="k">return</span> <span class="n">current_data</span><span class="p">,</span> <span class="n">fitted_params</span><span class="p">,</span> <span class="kc">None</span>
 
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Handling standard transformer via StatefulTransformer&quot;</span><span class="p">)</span>
         <span class="n">current_data</span> <span class="o">=</span> <span class="n">transformer</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
@@ -3831,7 +3845,7 @@ Applies specific bin edges to selected columns.</p>
                 <span class="s2">&quot;artifact&quot;</span><span class="p">:</span> <span class="n">fitted_params</span><span class="p">,</span>
             <span class="p">}</span>
         <span class="p">)</span>
-        <span class="k">return</span> <span class="n">current_data</span><span class="p">,</span> <span class="n">fitted_params</span>
+        <span class="k">return</span> <span class="n">current_data</span><span class="p">,</span> <span class="n">fitted_params</span><span class="p">,</span> <span class="n">transformer</span>
 
     <span class="c1"># ------------------------------------------------------------------</span>
     <span class="c1"># Metrics collection</span>
@@ -4224,7 +4238,14 @@ Returns: (transformed_data, metrics_dict)</p>
 <span class="normal">112</span>
 <span class="normal">113</span>
 <span class="normal">114</span>
-<span class="normal">115</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">node_id_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -4251,7 +4272,7 @@ Returns: (transformed_data, metrics_dict)</p>
         <span class="n">calculator</span><span class="p">,</span> <span class="n">applier</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_transformer_components</span><span class="p">(</span><span class="n">transformer_type</span><span class="p">)</span>
         <span class="n">step_node_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">node_id_prefix</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
 
-        <span class="n">current_data</span><span class="p">,</span> <span class="n">fitted_params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_step</span><span class="p">(</span>
+        <span class="n">current_data</span><span class="p">,</span> <span class="n">fitted_params</span><span class="p">,</span> <span class="n">transformer_inst</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_step</span><span class="p">(</span>
             <span class="n">transformer_type</span><span class="o">=</span><span class="n">transformer_type</span><span class="p">,</span>
             <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
             <span class="n">calculator</span><span class="o">=</span><span class="n">calculator</span><span class="p">,</span>
@@ -4260,6 +4281,13 @@ Returns: (transformed_data, metrics_dict)</p>
             <span class="n">current_data</span><span class="o">=</span><span class="n">current_data</span><span class="p">,</span>
             <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">,</span>
         <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">transformer_inst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Add node-level performance metrics directly into `metrics` dictionary</span>
+            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;fit_time&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;fit_time&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;rows_in&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;rows_in&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;rows_out&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;rows_out&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Step </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> complete. New data type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">current_data</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
@@ -4556,7 +4584,7 @@ Returns: (transformed_data, metrics_dict)</p>
 
         <span class="c1"># Ensure X is pandas for fitting logic</span>
         <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;polars&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">EngineName</span><span class="o">.</span><span class="n">POLARS</span><span class="p">:</span>
             <span class="n">X</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span>
 
         <span class="n">columns</span> <span class="o">=</span> <span class="n">resolve_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">detect_numeric_columns</span><span class="p">)</span>

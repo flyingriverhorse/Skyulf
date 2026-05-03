@@ -2960,7 +2960,7 @@
 <span class="sd">        Splits X and y arrays.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
-        <span class="n">is_polars</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;polars&quot;</span>
+        <span class="n">is_polars</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">EngineName</span><span class="o">.</span><span class="n">POLARS</span>
 
         <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
             <span class="c1"># Convert to Pandas to preserve schema/metadata during split</span>
@@ -3051,7 +3051,7 @@
 <span class="sd">        Splits a DataFrame.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
-        <span class="n">is_polars</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;polars&quot;</span>
+        <span class="n">is_polars</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">EngineName</span><span class="o">.</span><span class="n">POLARS</span>
 
         <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
             <span class="c1"># Convert to Pandas to preserve schema/metadata during split</span>
@@ -3228,7 +3228,7 @@
 <span class="sd">    Splits a DataFrame.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
-    <span class="n">is_polars</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;polars&quot;</span>
+    <span class="n">is_polars</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">EngineName</span><span class="o">.</span><span class="n">POLARS</span>
 
     <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
         <span class="c1"># Convert to Pandas to preserve schema/metadata during split</span>
@@ -3416,7 +3416,7 @@
 <span class="sd">    Splits X and y arrays.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
-    <span class="n">is_polars</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;polars&quot;</span>
+    <span class="n">is_polars</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">EngineName</span><span class="o">.</span><span class="n">POLARS</span>
 
     <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
         <span class="c1"># Convert to Pandas to preserve schema/metadata during split</span>
