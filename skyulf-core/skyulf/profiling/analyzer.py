@@ -109,9 +109,7 @@ class EDAAnalyzer(
                     elif op == "in" and isinstance(val, list):
                         self.df = self.df.filter(pl.col(col).is_in(val))
 
-                    active_filters.append(
-                        Filter(column=str(col), operator=str(op), value=val)
-                    )
+                    active_filters.append(Filter(column=str(col), operator=str(op), value=val))
 
             self.lazy_df = self.df.lazy()
             self.row_count = self.df.height
@@ -168,9 +166,7 @@ class EDAAnalyzer(
                 ]
             )
         basic_stats_df = _collect(self.lazy_df.select(basic_aggs))
-        basic_stats = (
-            basic_stats_df.row(0, named=True) if len(basic_stats_df) > 0 else {}
-        )
+        basic_stats = basic_stats_df.row(0, named=True) if len(basic_stats_df) > 0 else {}
 
         # Inline semantic-type inference (avoids re-fetching n_unique per column).
         semantic_types: Dict[str, str] = {}
@@ -296,10 +292,7 @@ class EDAAnalyzer(
         if target_col and target_col in self.columns and target_col not in numeric_cols:
             encoded_target = f"{target_col}_encoded"
             self.df = self.df.with_columns(
-                pl.col(target_col)
-                .cast(pl.Categorical)
-                .to_physical()
-                .alias(encoded_target)
+                pl.col(target_col).cast(pl.Categorical).to_physical().alias(encoded_target)
             )
             self.lazy_df = self.df.lazy()
             encoded_target_col = encoded_target
@@ -342,9 +335,7 @@ class EDAAnalyzer(
             elif encoded_target_col:
                 target_corr_cols = feature_cols + [encoded_target_col]
         if len(target_corr_cols) >= 2:
-            correlations_with_target = calculate_correlations(
-                self.lazy_df, target_corr_cols
-            )
+            correlations_with_target = calculate_correlations(self.lazy_df, target_corr_cols)
 
         # 3b. Target-relationship analytics (correlations / interactions / leakage).
         target_correlations: Dict[str, float] = {}
@@ -375,8 +366,7 @@ class EDAAnalyzer(
                     cat_cols = [
                         c
                         for c in self.columns
-                        if self._get_semantic_type(self.df[c]) == "Categorical"
-                        and c != target_col
+                        if self._get_semantic_type(self.df[c]) == "Categorical" and c != target_col
                     ]
                     if cat_cols:
                         target_interactions = self._calculate_target_interactions(
@@ -423,9 +413,7 @@ class EDAAnalyzer(
             clustering = self._perform_clustering(feature_cols, target_col)
 
         # 7-8. Geo + time series.
-        geospatial = self._analyze_geospatial(
-            numeric_cols, target_col, lat_col, lon_col
-        )
+        geospatial = self._analyze_geospatial(numeric_cols, target_col, lat_col, lon_col)
         timeseries = self._analyze_timeseries(numeric_cols, target_col, date_col)
 
         # 9. Causal discovery (include encoded target so it shows in the graph).
@@ -444,14 +432,10 @@ class EDAAnalyzer(
             if target_type in ["Categorical", "Boolean", "Numeric"]:
                 rule_tree = self._discover_rules(feature_cols, target_col, task_type)
                 if not final_task_type:
-                    final_task_type = (
-                        "Regression" if target_type == "Numeric" else "Classification"
-                    )
+                    final_task_type = "Regression" if target_type == "Numeric" else "Classification"
 
         # 11. Recommendations.
-        recommendations = self._generate_recommendations(
-            col_profiles, alerts, target_col
-        )
+        recommendations = self._generate_recommendations(col_profiles, alerts, target_col)
 
         return DatasetProfile(
             row_count=self.row_count,

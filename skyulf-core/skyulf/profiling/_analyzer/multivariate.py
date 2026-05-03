@@ -100,21 +100,14 @@ class MultivariateMixin(_AnalyzerState):
             if hasattr(pca, "components_"):
                 feature_names = numeric_cols
                 for i, comp in enumerate(pca.components_):
-                    weights = {
-                        feature_names[j]: float(comp[j])
-                        for j in range(len(feature_names))
-                    }
+                    weights = {feature_names[j]: float(comp[j]) for j in range(len(feature_names))}
                     top_features = dict(
-                        sorted(
-                            weights.items(), key=lambda item: abs(item[1]), reverse=True
-                        )[:5]
+                        sorted(weights.items(), key=lambda item: abs(item[1]), reverse=True)[:5]
                     )
                     components_list.append(
                         PCAComponent(
                             component=f"PC{i+1}",
-                            explained_variance_ratio=float(
-                                pca.explained_variance_ratio_[i]
-                            ),
+                            explained_variance_ratio=float(pca.explained_variance_ratio_[i]),
                             top_features=top_features,
                         )
                     )
@@ -179,8 +172,7 @@ class MultivariateMixin(_AnalyzerState):
             feature_names = numeric_cols
             for i, label in enumerate(unique_labels):
                 center_dict = {
-                    col: float(val)
-                    for col, val in zip(feature_names, centers_original[i])
+                    col: float(val) for col, val in zip(feature_names, centers_original[i])
                 }
                 clusters_stats.append(
                     ClusterStats(
@@ -280,9 +272,7 @@ class MultivariateMixin(_AnalyzerState):
                     if val is not None and medians.get(col) is not None
                 ]
                 # Only surface deviations large enough to be interpretable.
-                explanation = [
-                    e for e in explanation if cast(float, e["diff_pct"]) > 50
-                ]
+                explanation = [e for e in explanation if cast(float, e["diff_pct"]) > 50]
                 explanation.sort(key=lambda x: x["diff_pct"], reverse=True)
 
                 top_outliers.append(

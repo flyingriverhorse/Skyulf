@@ -7,9 +7,7 @@ from ._utils import _AnalyzerState
 class CategoricalMixin(_AnalyzerState):
     """Categorical helpers for :class:`EDAAnalyzer`."""
 
-    def _analyze_categorical(
-        self, col: str, row: dict, basic: dict
-    ) -> CategoricalStats:
+    def _analyze_categorical(self, col: str, row: dict, basic: dict) -> CategoricalStats:
         unique_count = basic.get(f"{col}__unique", 0)
         top_k_list = row.get(f"{col}__top_k", [])
 

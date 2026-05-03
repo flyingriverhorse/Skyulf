@@ -49,33 +49,23 @@ class TemporalMixin(_AnalyzerState):
             max_date = cast(Any, self.df[date_col].max())  # type: ignore[attr-defined]
 
             cols_to_track = numeric_cols[:3]
-            if (
-                target_col
-                and target_col in numeric_cols
-                and target_col not in cols_to_track
-            ):
+            if target_col and target_col in numeric_cols and target_col not in cols_to_track:
                 cols_to_track.append(target_col)
 
             # Small datasets: skip resampling, plot raw points.
             if self.row_count < 1000:  # type: ignore[attr-defined]
                 trend_df = _collect(
-                    ts_df.select(
-                        [pl.col(date_col).alias("date"), *cols_to_track]
-                    ).drop_nulls()
+                    ts_df.select([pl.col(date_col).alias("date"), *cols_to_track]).drop_nulls()
                 )
 
                 trend_points = []
                 for row in trend_df.iter_rows(named=True):
                     if row["date"] is None:
                         continue
-                    vals = {
-                        k: v for k, v in row.items() if k != "date" and v is not None
-                    }
+                    vals = {k: v for k, v in row.items() if k != "date" and v is not None}
                     if not vals:
                         continue
-                    trend_points.append(
-                        TimeSeriesPoint(date=row["date"].isoformat(), values=vals)
-                    )
+                    trend_points.append(TimeSeriesPoint(date=row["date"].isoformat(), values=vals))
             else:
                 # Aim for ~100 points across the date range.
                 interval = "1d"
@@ -102,18 +92,14 @@ class TemporalMixin(_AnalyzerState):
                 else:
                     aggs = [pl.col(c).mean().alias(c) for c in cols_to_track]
                     trend_df = _collect(
-                        ts_df.group_by_dynamic(date_col, every=interval)
-                        .agg(aggs)
-                        .sort(date_col)
+                        ts_df.group_by_dynamic(date_col, every=interval).agg(aggs).sort(date_col)
                     )
 
                 trend_points = []
                 for row in trend_df.iter_rows(named=True):
                     if row[date_col] is None:
                         continue
-                    vals = {
-                        k: v for k, v in row.items() if k != date_col and v is not None
-                    }
+                    vals = {k: v for k, v in row.items() if k != date_col and v is not None}
                     if not vals:
                         continue
                     trend_points.append(
@@ -172,11 +158,7 @@ class TemporalMixin(_AnalyzerState):
                     for lag in range(1, min(31, n // 2)):
                         y1 = series[lag:]
                         y2 = series[:-lag]
-                        corr = (
-                            0
-                            if var == 0
-                            else np.sum((y1 - mean) * (y2 - mean)) / n / var
-                        )
+                        corr = 0 if var == 0 else np.sum((y1 - mean) * (y2 - mean)) / n / var
                         acf_stats.append({"lag": lag, "corr": float(corr)})
 
             stationarity_test = None
@@ -204,9 +186,7 @@ class TemporalMixin(_AnalyzerState):
             return TimeSeriesAnalysis(
                 date_col=date_col,
                 trend=trend_points,
-                seasonality=SeasonalityStats(
-                    day_of_week=dow_stats, month_of_year=moy_stats
-                ),
+                seasonality=SeasonalityStats(day_of_week=dow_stats, month_of_year=moy_stats),
                 autocorrelation=acf_stats,
                 stationarity_test=stationarity_test,
             )

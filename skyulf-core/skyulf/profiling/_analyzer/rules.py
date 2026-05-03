@@ -93,9 +93,7 @@ class RulesMixin(_AnalyzerState):
                     ).to_series()
 
                 y = y_series.cast(pl.Categorical).to_physical().to_numpy()
-                class_names = (
-                    y_series.cast(pl.Categorical).cat.get_categories().to_list()
-                )
+                class_names = y_series.cast(pl.Categorical).cat.get_categories().to_list()
                 clf = DecisionTreeClassifier(max_depth=4, random_state=42)
 
             clf.fit(X, y)
@@ -129,9 +127,7 @@ class RulesMixin(_AnalyzerState):
                     value = tree_.value[node_id][0].tolist()
                     class_idx = np.argmax(value)
                     class_name = (
-                        str(class_names[class_idx])
-                        if class_idx < len(class_names)
-                        else "Unknown"
+                        str(class_names[class_idx]) if class_idx < len(class_names) else "Unknown"
                     )
 
                 children = []
@@ -166,7 +162,9 @@ class RulesMixin(_AnalyzerState):
                     total_samples = int(tree_.n_node_samples[node_id])
                     if is_regression:
                         val = float(tree_.value[node_id][0][0])
-                        rule_str = f"IF {current_rule} THEN Value = {val:.2f} (Samples: {total_samples})"
+                        rule_str = (
+                            f"IF {current_rule} THEN Value = {val:.2f} (Samples: {total_samples})"
+                        )
                     else:
                         value = tree_.value[node_id][0]
                         class_idx = np.argmax(value)
@@ -176,9 +174,7 @@ class RulesMixin(_AnalyzerState):
                             else "Unknown"
                         )
                         total = np.sum(value)
-                        confidence = (
-                            (value[class_idx] / total) * 100 if total > 0 else 0
-                        )
+                        confidence = (value[class_idx] / total) * 100 if total > 0 else 0
                         rule_str = (
                             f"IF {current_rule} THEN {class_name} "
                             f"(Confidence: {confidence:.1f}%, Samples: {int(total)})"

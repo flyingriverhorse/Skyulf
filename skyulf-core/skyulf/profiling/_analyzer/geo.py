@@ -83,9 +83,7 @@ class GeoMixin(_AnalyzerState):
                 if row["lat"] is None or row["lon"] is None:
                     continue
                 label = (
-                    str(row["target"])
-                    if "target" in row and row["target"] is not None
-                    else None
+                    str(row["target"]) if "target" in row and row["target"] is not None else None
                 )
                 points.append(GeoPoint(lat=row["lat"], lon=row["lon"], label=label))
 

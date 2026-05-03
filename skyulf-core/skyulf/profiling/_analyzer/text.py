@@ -56,11 +56,7 @@ class TextMixin(_AnalyzerState):
             )
 
             # Cap sample for runtime budget.
-            sample = (
-                text_series.sample(1000, seed=42)
-                if text_series.len() > 1000
-                else text_series
-            )
+            sample = text_series.sample(1000, seed=42) if text_series.len() > 1000 else text_series
 
             texts = sample.drop_nulls().to_list()
             if not texts:

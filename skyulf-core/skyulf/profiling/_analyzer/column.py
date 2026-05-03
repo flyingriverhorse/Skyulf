@@ -110,9 +110,7 @@ class ColumnMixin(_AnalyzerState):
                         else:
                             # Fit normal to data first; otherwise KS would test against N(0,1).
                             mean, std = np.mean(sample_data), np.std(sample_data)
-                            stat, p_value = kstest(
-                                sample_data, "norm", args=(mean, std)
-                            )
+                            stat, p_value = kstest(sample_data, "norm", args=(mean, std))
                             test_name = "Kolmogorov-Smirnov"
 
                         profile.normality_test = NormalityTestResult(
@@ -167,10 +165,7 @@ class ColumnMixin(_AnalyzerState):
                 col, advanced_stats, basic_stats
             )
 
-            if (
-                profile.categorical_stats.unique_count > 50
-                and semantic_type == "Categorical"
-            ):
+            if profile.categorical_stats.unique_count > 50 and semantic_type == "Categorical":
                 # Distinguish "looks like an ID" from plain high-cardinality.
                 if profile.categorical_stats.unique_count == self.row_count:  # type: ignore[attr-defined]
                     profile.is_unique = True

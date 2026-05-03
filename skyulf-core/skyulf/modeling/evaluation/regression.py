@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Optional, Union
 
 import numpy as np
@@ -31,7 +32,9 @@ def evaluate_regression_model(
     metrics = calculate_regression_metrics(model, X_test, y_test)
 
     # Generate predictions
-    y_pred = model.predict(X_test_np)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*valid feature names.*")
+        y_pred = model.predict(X_test_np)
 
     # Ensure numpy arrays
     y_true_arr = y_test_np

@@ -100,9 +100,7 @@ class DatesMixin(_AnalyzerState):
                         )
                     elif method == "datetime_format":
                         self.df = self.df.with_columns(  # type: ignore[attr-defined]
-                            pl.col(col)
-                            .str.to_datetime(format=fmt, strict=False)
-                            .alias(col)
+                            pl.col(col).str.to_datetime(format=fmt, strict=False).alias(col)
                         )
                 except Exception as e:
                     print(f"Failed to cast column {col} using {best_method_name}: {e}")
@@ -114,6 +112,4 @@ class DatesMixin(_AnalyzerState):
         if min_date and max_date:
             delta = max_date - min_date
             duration = delta.days if hasattr(delta, "days") else None
-        return DateStats(
-            min_date=str(min_date), max_date=str(max_date), duration_days=duration
-        )
+        return DateStats(min_date=str(min_date), max_date=str(max_date), duration_days=duration)

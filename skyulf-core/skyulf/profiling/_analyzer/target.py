@@ -35,9 +35,7 @@ class TargetMixin(_AnalyzerState):
                 if val is not None and not np.isnan(val):
                     corrs[col] = float(val)
 
-            return dict(
-                sorted(corrs.items(), key=lambda item: abs(item[1]), reverse=True)
-            )
+            return dict(sorted(corrs.items(), key=lambda item: abs(item[1]), reverse=True))
 
         except Exception as e:
             print(f"Error calculating target correlations: {e}")
@@ -79,9 +77,7 @@ class TargetMixin(_AnalyzerState):
                 eta_squared = ss_between / ss_total
                 associations[col] = float(np.sqrt(eta_squared))
 
-            return dict(
-                sorted(associations.items(), key=lambda item: item[1], reverse=True)
-            )
+            return dict(sorted(associations.items(), key=lambda item: item[1], reverse=True))
 
         except Exception as e:
             print(f"Error calculating categorical target associations: {e}")
@@ -110,10 +106,7 @@ class TargetMixin(_AnalyzerState):
                 stats_df = _collect(
                     self.lazy_df.group_by(group_col).agg(  # type: ignore[attr-defined]
                         [
-                            pl.col(value_col)
-                            .cast(pl.Float64, strict=False)
-                            .min()
-                            .alias("min"),
+                            pl.col(value_col).cast(pl.Float64, strict=False).min().alias("min"),
                             pl.col(value_col)
                             .cast(pl.Float64, strict=False)
                             .quantile(0.25)
@@ -126,10 +119,7 @@ class TargetMixin(_AnalyzerState):
                             .cast(pl.Float64, strict=False)
                             .quantile(0.75)
                             .alias("q3"),
-                            pl.col(value_col)
-                            .cast(pl.Float64, strict=False)
-                            .max()
-                            .alias("max"),
+                            pl.col(value_col).cast(pl.Float64, strict=False).max().alias("max"),
                         ]
                     )
                 )
@@ -166,10 +156,7 @@ class TargetMixin(_AnalyzerState):
 
                         groups_data = []
                         for row in anova_data.iter_rows(named=True):
-                            if (
-                                row[group_col] is not None
-                                and row[value_col] is not None
-                            ):
+                            if row[group_col] is not None and row[value_col] is not None:
                                 vals = [v for v in row[value_col] if v is not None]
                                 if len(vals) > 1:
                                     groups_data.append(vals)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import math
+import warnings
 from typing import Any, Dict, Union
 
 import numpy as np
@@ -51,7 +52,9 @@ def calculate_classification_metrics(
     # Use DataFrame directly if possible to preserve feature names
     # Only convert to numpy if model doesn't support pandas or if X is not pandas
 
-    predictions = model.predict(X_np)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*valid feature names.*")
+        predictions = model.predict(X_np)
 
     # For metrics calculation, we might need numpy arrays for y
     y_arr = y_np
@@ -91,7 +94,9 @@ def calculate_classification_metrics(
 
     try:
         if hasattr(model, "predict_proba"):
-            proba = model.predict_proba(X_np)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*valid feature names.*")
+                proba = model.predict_proba(X_np)
             if proba.ndim == 2 and proba.shape[1] >= 2:
                 class_count = proba.shape[1]
                 try:

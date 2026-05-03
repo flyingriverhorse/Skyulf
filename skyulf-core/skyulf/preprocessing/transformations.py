@@ -44,8 +44,9 @@ class PowerTransformerApplier(BaseApplier):
 
         if was_polars:
             import polars as pl
+
             X_vals = X.select(valid_cols).to_numpy()
-            df_out = X # We won't copy whole df here
+            df_out = X  # We won't copy whole df here
         else:
             X_pd = X
             df_out = X_pd.copy()
@@ -83,7 +84,7 @@ class PowerTransformerApplier(BaseApplier):
             X_trans = pt.transform(X_vals)
             # sklearn can be configured with transform_output="pandas", which returns a DataFrame.
             X_trans_arr = X_trans.to_numpy() if hasattr(X_trans, "to_numpy") else X_trans
-            
+
             if was_polars:
                 series = [pl.Series(name, X_trans_arr[:, i]) for i, name in enumerate(valid_cols)]
                 df_out = df_out.with_columns(series)
