@@ -431,6 +431,24 @@ GRADIENT_BOOSTING_PARAMS = [
         step=0.1,
         description="The fraction of samples to be used for fitting the individual base learners.",
     ),
+    HyperparameterField(
+        name="min_samples_split",
+        label="Min Samples Split",
+        type="number",
+        default=2,
+        min=2,
+        max=20,
+        description="Minimum samples required to split an internal node.",
+    ),
+    HyperparameterField(
+        name="min_samples_leaf",
+        label="Min Samples Leaf",
+        type="number",
+        default=1,
+        min=1,
+        max=20,
+        description="Minimum samples required at a leaf node.",
+    ),
 ]
 
 # --- AdaBoost ---
@@ -505,6 +523,46 @@ XGBOOST_PARAMS = [
         max=1.0,
         step=0.1,
         description="Subsample ratio of columns when constructing each tree.",
+    ),
+    HyperparameterField(
+        name="min_child_weight",
+        label="Min Child Weight",
+        type="number",
+        default=1,
+        min=0,
+        max=50,
+        step=1,
+        description="Minimum sum of instance weights in a child. Higher values regularize against overfitting.",
+    ),
+    HyperparameterField(
+        name="gamma",
+        label="Gamma (min_split_loss)",
+        type="number",
+        default=0.0,
+        min=0.0,
+        max=10.0,
+        step=0.1,
+        description="Minimum loss reduction required to make a split. Higher = more conservative tree growth.",
+    ),
+    HyperparameterField(
+        name="reg_alpha",
+        label="L1 Regularization (reg_alpha)",
+        type="number",
+        default=0.0,
+        min=0.0,
+        max=10.0,
+        step=0.1,
+        description="L1 regularization term on leaf weights.",
+    ),
+    HyperparameterField(
+        name="reg_lambda",
+        label="L2 Regularization (reg_lambda)",
+        type="number",
+        default=1.0,
+        min=0.0,
+        max=10.0,
+        step=0.1,
+        description="L2 regularization term on leaf weights. Default sklearn XGBoost is 1.",
     ),
 ]
 
@@ -838,6 +896,7 @@ DEFAULT_SEARCH_SPACES = {
         "max_depth": [None, 5, 10, 20, 30, 50],
         "min_samples_split": [2, 5, 10, 20],
         "min_samples_leaf": [1, 2, 4, 8],
+        "criterion": ["squared_error", "friedman_mse", "absolute_error"],
         "bootstrap": [True, False],
     },
     "ridge_regression": {
@@ -892,12 +951,14 @@ DEFAULT_SEARCH_SPACES = {
         "learning_rate": [0.01, 0.05, 0.1, 0.2],
         "max_depth": [3, 5, 7, 9],
         "subsample": [0.6, 0.8, 1.0],
+        "min_samples_leaf": [1, 5, 10, 20],
     },
     "gradient_boosting_regressor": {
         "n_estimators": [50, 100, 200, 500],
         "learning_rate": [0.01, 0.05, 0.1, 0.2],
         "max_depth": [3, 5, 7, 9],
         "subsample": [0.6, 0.8, 1.0],
+        "min_samples_leaf": [1, 5, 10, 20],
     },
     "adaboost_classifier": {
         "n_estimators": [50, 100, 200, 500],
@@ -913,6 +974,9 @@ DEFAULT_SEARCH_SPACES = {
         "learning_rate": [0.01, 0.05, 0.1, 0.3],
         "subsample": [0.6, 0.8, 1.0],
         "colsample_bytree": [0.6, 0.8, 1.0],
+        "min_child_weight": [1, 3, 5, 7],
+        "reg_alpha": [0.0, 0.01, 0.1, 1.0],
+        "reg_lambda": [0.1, 1.0, 5.0, 10.0],
     },
     "xgboost_regressor": {
         "n_estimators": [100, 200, 500, 1000],
@@ -920,6 +984,9 @@ DEFAULT_SEARCH_SPACES = {
         "learning_rate": [0.01, 0.05, 0.1, 0.3],
         "subsample": [0.6, 0.8, 1.0],
         "colsample_bytree": [0.6, 0.8, 1.0],
+        "min_child_weight": [1, 3, 5, 7],
+        "reg_alpha": [0.0, 0.01, 0.1, 1.0],
+        "reg_lambda": [0.1, 1.0, 5.0, 10.0],
     },
     "gaussian_nb": {
         "var_smoothing": [1e-9, 1e-8, 1e-7, 1e-6],
@@ -983,5 +1050,171 @@ DEFAULT_SEARCH_SPACES = {
 }
 
 
-def get_default_search_space(model_key: str) -> Dict[str, Any]:
+# ---------------------------------------------------------------------------
+# Grid-safe search spaces (grid / halving_grid)
+#
+# These are intentionally trimmed to keep the cartesian product manageable.
+# The full DEFAULT_SEARCH_SPACES above are designed for random/optuna/halving_random
+# where only a subset of combinations is ever evaluated.
+# ---------------------------------------------------------------------------
+GRID_SEARCH_SPACES: Dict[str, Any] = {
+    "logistic_regression": {
+        "C": [0.01, 0.1, 1.0, 10.0],
+        "penalty": ["l1", "l2"],
+        "solver": ["saga"],
+        "max_iter": [200, 500],
+    },
+    "random_forest_classifier": {
+        "n_estimators": [100, 200, 500],
+        "max_depth": [5, 10, 20],
+        "min_samples_split": [2, 10],
+        "min_samples_leaf": [1, 4],
+        "criterion": ["gini", "entropy"],
+    },
+    "random_forest_regressor": {
+        "n_estimators": [100, 200, 500],
+        "max_depth": [5, 10, 20],
+        "min_samples_split": [2, 10],
+        "min_samples_leaf": [1, 4],
+        "criterion": ["squared_error", "friedman_mse"],
+    },
+    "ridge_regression": {
+        "alpha": [0.01, 0.1, 1.0, 10.0, 100.0],
+        "solver": ["auto", "saga"],
+        "fit_intercept": [True, False],
+    },
+    "lasso_regression": {
+        "alpha": [0.001, 0.01, 0.1, 1.0, 10.0],
+    },
+    "elasticnet_regression": {
+        "alpha": [0.01, 0.1, 1.0],
+        "l1_ratio": [0.3, 0.5, 0.7],
+    },
+    "linear_regression": {
+        "fit_intercept": [True, False],
+    },
+    "svc": {
+        "C": [0.1, 1.0, 10.0],
+        "kernel": ["linear", "rbf"],
+        "gamma": ["scale", "auto"],
+    },
+    "svr": {
+        "C": [0.1, 1.0, 10.0],
+        "kernel": ["linear", "rbf"],
+        "gamma": ["scale", "auto"],
+    },
+    "k_neighbors_classifier": {
+        "n_neighbors": [3, 5, 9],
+        "weights": ["uniform", "distance"],
+        "algorithm": ["auto"],
+    },
+    "k_neighbors_regressor": {
+        "n_neighbors": [3, 5, 9],
+        "weights": ["uniform", "distance"],
+        "algorithm": ["auto"],
+    },
+    "decision_tree_classifier": {
+        "max_depth": [5, 10, 20],
+        "min_samples_split": [2, 5, 10],
+        "criterion": ["gini", "entropy"],
+    },
+    "decision_tree_regressor": {
+        "max_depth": [5, 10, 20],
+        "min_samples_split": [2, 5, 10],
+        "criterion": ["squared_error", "friedman_mse"],
+    },
+    "gradient_boosting_classifier": {
+        "n_estimators": [100, 200, 500],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "max_depth": [3, 5],
+        "subsample": [0.8, 1.0],
+        "min_samples_leaf": [1, 5],
+    },
+    "gradient_boosting_regressor": {
+        "n_estimators": [100, 200, 500],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "max_depth": [3, 5],
+        "subsample": [0.8, 1.0],
+        "min_samples_leaf": [1, 5],
+    },
+    "adaboost_classifier": {
+        "n_estimators": [50, 100, 200],
+        "learning_rate": [0.1, 0.5, 1.0],
+    },
+    "adaboost_regressor": {
+        "n_estimators": [50, 100, 200],
+        "learning_rate": [0.1, 0.5, 1.0],
+    },
+    "xgboost_classifier": {
+        "n_estimators": [100, 200, 500],
+        "max_depth": [3, 5, 7],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "subsample": [0.8, 1.0],
+        "min_child_weight": [1, 3, 5],
+        "reg_lambda": [0.1, 1.0, 5.0],
+    },
+    "xgboost_regressor": {
+        "n_estimators": [100, 200, 500],
+        "max_depth": [3, 5, 7],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "subsample": [0.8, 1.0],
+        "min_child_weight": [1, 3, 5],
+        "reg_lambda": [0.1, 1.0, 5.0],
+    },
+    "gaussian_nb": {
+        "var_smoothing": [1e-9, 1e-8, 1e-7, 1e-6],
+    },
+    "extra_trees_classifier": {
+        "n_estimators": [100, 200, 500],
+        "max_depth": [5, 10, 20],
+        "min_samples_split": [2, 5],
+        "criterion": ["gini", "entropy"],
+    },
+    "extra_trees_regressor": {
+        "n_estimators": [100, 200, 500],
+        "max_depth": [5, 10, 20],
+        "min_samples_split": [2, 5],
+        "criterion": ["squared_error", "friedman_mse"],
+    },
+    "hist_gradient_boosting_classifier": {
+        "max_iter": [100, 200, 500],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "max_leaf_nodes": [31, 63],
+        "min_samples_leaf": [20, 50],
+    },
+    "hist_gradient_boosting_regressor": {
+        "max_iter": [100, 200, 500],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "max_leaf_nodes": [31, 63],
+        "min_samples_leaf": [20, 50],
+    },
+    "lgbm_classifier": {
+        "n_estimators": [100, 200, 500],
+        "num_leaves": [31, 63, 127],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "max_depth": [-1, 5, 10],
+        "subsample": [0.8, 1.0],
+    },
+    "lgbm_regressor": {
+        "n_estimators": [100, 200, 500],
+        "num_leaves": [31, 63, 127],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "max_depth": [-1, 5, 10],
+        "subsample": [0.8, 1.0],
+    },
+}
+
+_GRID_STRATEGIES = {"grid", "halving_grid"}
+
+
+def get_default_search_space(model_key: str, strategy: str = "random") -> Dict[str, Any]:
+    """Return the default search space for *model_key*.
+
+    For grid-based strategies (``grid`` / ``halving_grid``) the trimmed
+    ``GRID_SEARCH_SPACES`` dict is used so that the cartesian product stays
+    manageable.  All other strategies (``random``, ``halving_random``,
+    ``optuna``) use the richer ``DEFAULT_SEARCH_SPACES``.
+    """
+    if strategy in _GRID_STRATEGIES:
+        return GRID_SEARCH_SPACES.get(model_key, DEFAULT_SEARCH_SPACES.get(model_key, {}))
     return DEFAULT_SEARCH_SPACES.get(model_key, {})

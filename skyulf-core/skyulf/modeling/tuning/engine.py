@@ -455,6 +455,31 @@ class TuningCalculator(BaseModelCalculator):
             resource = strategy_params.get("resource", "n_samples")
             min_resources = strategy_params.get("min_resources", "exhaust")
 
+            # Halving search uses sklearn's internal scheduler and does NOT
+            # expose per-trial callbacks (no equivalent of Optuna's callbacks=).
+            # Emit a started log here so the Live Logs panel is never empty
+            # while the search is running. Per-iteration progress is not
+            # available without monkey-patching sklearn internals.
+            if log_callback:
+                space = self._clean_search_space(config.search_space)
+                if config.strategy == "halving_grid":
+                    grid_size = int(np.prod([len(v) for v in space.values()] or [0]))
+                    log_callback(
+                        f"Starting halving_grid search "
+                        f"(grid_size={grid_size}, factor={factor}, "
+                        f"resource={resource}, min_resources={min_resources}). "
+                        f"sklearn HalvingGridSearchCV runs without per-trial callbacks; "
+                        f"this may take a while."
+                    )
+                else:
+                    log_callback(
+                        f"Starting halving_random search "
+                        f"(n_candidates={config.n_trials}, factor={factor}, "
+                        f"resource={resource}, min_resources={min_resources}). "
+                        f"sklearn HalvingRandomSearchCV runs without per-trial callbacks; "
+                        f"this may take a while."
+                    )
+
             if isinstance(min_resources, str) and min_resources.isdigit():
                 min_resources = int(min_resources)
 
@@ -591,6 +616,14 @@ class TuningCalculator(BaseModelCalculator):
                     "ignore",
                     message="Failed to report cross validation scores for TerminatorCallback",
                 )
+                # LightGBM 4.x sets feature_names_in_ even for numpy input; during
+                # halving/optuna internal CV sklearn's validate_data emits this warning
+                # on every fold's score() call. Suppress it here — the root cause is
+                # already fixed in the LGBM calculator's fit() override.
+                warnings.filterwarnings(
+                    "ignore",
+                    message=".*valid feature names.*",
+                )
                 searcher.fit(X_arr, y_arr)
         except Exception as e:
             logger.error(f"Hyperparameter tuning failed: {str(e)}")
@@ -646,6 +679,20 @@ class TuningCalculator(BaseModelCalculator):
                             "score": results["mean_test_score"][i],
                         }
                     )
+
+        # Final completion log for strategies that don't emit per-trial callbacks
+        # (halving_grid / halving_random / optuna). The grid/random branch above
+        # already logs completion inside its custom loop.
+        if log_callback and config.strategy in [
+            "halving_grid",
+            "halving_random",
+            "optuna",
+        ]:
+            log_callback(
+                f"Tuning Completed ({config.strategy}). "
+                f"Trials evaluated: {len(trials)}. Best Score: {best_score:.4f}"
+            )
+            log_callback(f"Best Params: {best_params}")
 
         return TuningResult(
             best_params=best_params,
