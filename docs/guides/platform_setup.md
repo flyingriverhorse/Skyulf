@@ -11,7 +11,7 @@ This guide walks you through deploying the complete Skyulf platform — backend 
 | Requirement | Notes |
 |---|---|
 | **Docker Desktop** (recommended) | Docker Compose launches everything in containers — no host Python or Redis needed. |
-| **Python 3.10+** (manual path) | Only if you prefer running services directly on your machine. |
+| **Python 3.12** (manual path) | Only if you prefer running services directly on your machine. |
 | **Redis** (manual path) | Required for Celery background tasks. Install natively, via WSL, or run `docker run -d -p 6379:6379 redis:7`. |
 | **Git** | To clone the repository. |
 

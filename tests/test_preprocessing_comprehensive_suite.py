@@ -119,7 +119,6 @@ from skyulf.preprocessing.transformations import (
 
 
 class TestPolarsPreprocessingComprehensive(unittest.TestCase):
-
     def setUp(self):
         # Create a rich Polars DataFrame covering text, numbers, nulls
         self.df = pl.DataFrame(

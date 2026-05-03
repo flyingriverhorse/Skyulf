@@ -58,7 +58,7 @@ def start_celery_worker():
     ]
 
     print(f"👷 Starting Celery worker: {' '.join(cmd)}")
-    return subprocess.Popen(cmd, cwd=os.getcwd())
+    return subprocess.Popen(cmd, cwd=os.getcwd())  # nosec B603
 
 
 def check_redis_availability():

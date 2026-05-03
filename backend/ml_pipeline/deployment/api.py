@@ -1,3 +1,4 @@
+from backend.exceptions.core import SkyulfException
 import logging
 from typing import AsyncGenerator, List
 
@@ -32,7 +33,7 @@ async def deploy_model(job_id: str, session: AsyncSession = Depends(get_async_se
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         logger.exception("Failed to deploy model for job %s", job_id)
-        raise HTTPException(status_code=500, detail="Failed to deploy model")
+        raise SkyulfException(message="Failed to deploy model")
 
 
 @router.get("/active", response_model=DeploymentInfo)

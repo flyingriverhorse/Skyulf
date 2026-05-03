@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 import logging
+from functools import lru_cache
 from pydantic import BaseModel
 from backend.ml_pipeline.constants import StepType
 
@@ -37,6 +38,7 @@ class RegistryItem(BaseModel):
 
 class NodeRegistry:
     @staticmethod
+    @lru_cache(maxsize=1)
     def get_dynamic_nodes() -> List[RegistryItem]:
         """Fetch nodes dynamically from skyulf-core registry."""
         items = []
@@ -44,11 +46,14 @@ class NodeRegistry:
             for node_id, metadata in SkyulfRegistry._metadata.items():
                 # Convert skyulf metadata to RegistryItem
                 # We assume metadata dict matches the structure or we map fields
-                # Skyulf meta: id, name, category, description, params
-                items.append(RegistryItem(**metadata))
+                item_data = dict(metadata)
+                if "id" not in item_data:
+                    item_data["id"] = node_id
+                items.append(RegistryItem(**item_data))
         return items
 
     @staticmethod
+    @lru_cache(maxsize=1)
     def get_all_nodes() -> List[RegistryItem]:
         static_nodes = [
             # --- Data Loading ---

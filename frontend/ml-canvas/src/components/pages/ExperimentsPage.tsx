@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  ScatterChart, Scatter, LineChart, Line, ReferenceLine
+  ScatterChart, Scatter, Line, ReferenceLine, ComposedChart, Area
 } from 'recharts';
 import { clickableProps } from '../../core/utils/a11y';
 import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, RefreshCw, Download, Loader2, Check, Trophy, GitBranch } from 'lucide-react';
@@ -11,7 +11,8 @@ import { toast } from '../../core/toast';
 import { toPng } from 'html-to-image';
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
-import { formatMetricName } from '../../core/utils/format';
+import { formatMetricName, getMetricDescription, getHyperparamDescription, getTrainingConfigDescription } from '../../core/utils/format';
+import { InfoTooltip } from '../ui/InfoTooltip';
 import { PipelineDiffView } from './experiments/PipelineDiffView';
 
 /** Extract the resolved scoring metric from a job's result (top-level or nested in metrics). */
@@ -80,6 +81,8 @@ export const ExperimentsPage: React.FC = () => {
   const [downloadingChart, setDownloadingChart] = useState<string | null>(null);
   const [doneChart, setDoneChart] = useState<string | null>(null);
   const [selectedRocClass, setSelectedRocClass] = useState<string | null>(null);
+  const [threshold, setThreshold] = useState(0.5);
+  const [cmView, setCmView] = useState<'overall' | 'per-class'>('overall');
 
   useEffect(() => {
     fetchJobs();
@@ -717,13 +720,14 @@ export const ExperimentsPage: React.FC = () => {
                             <button
                                 key={metric}
                                 onClick={() => { setSelectedMetric(metric); }}
-                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
                                     activeMetric === metric
                                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                                         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                                 }`}
                             >
                                 {metric.toUpperCase()}
+                                {getMetricDescription(metric) && <InfoTooltip size="sm" text={getMetricDescription(metric)!} />}
                             </button>
                         ))}
                     </div>
@@ -992,9 +996,12 @@ export const ExperimentsPage: React.FC = () => {
                       {isMetricsExpanded && metricKeys.map(metricKey => (
                         <tr key={metricKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                           <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">
-                            {metricKey === 'best_score'
-                              ? `Best Score (${formatMetricName(getJobScoringMetric(selectedJobs[0] ?? {})) || 'CV'})`
-                              : metricKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                            <div className="flex items-center gap-1">
+                              {metricKey === 'best_score'
+                                ? `Best Score (${formatMetricName(getJobScoringMetric(selectedJobs[0] ?? {})) || 'CV'})`
+                                : metricKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                              {getMetricDescription(metricKey) && <InfoTooltip size="sm" text={getMetricDescription(metricKey)!} />}
+                            </div>
                           </td>
                           {selectedJobs.map(job => {
                              const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
@@ -1045,7 +1052,12 @@ export const ExperimentsPage: React.FC = () => {
                         }
                         return allKeys.map(paramKey => (
                           <tr key={paramKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                            <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{paramKey}</td>
+                            <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">
+                              <div className="flex items-center gap-1">
+                                {paramKey}
+                                {getHyperparamDescription(paramKey) && <InfoTooltip size="sm" text={getHyperparamDescription(paramKey)!} />}
+                              </div>
+                            </td>
                             {selectedJobs.map(job => {
                               const params = getModelParams(job);
                               const val = params[paramKey];
@@ -1073,7 +1085,12 @@ export const ExperimentsPage: React.FC = () => {
                         <>
                           {['Target Column', 'CV Enabled', 'CV Method', 'CV Folds', 'CV Shuffle', 'CV Random State', ...(selectedJobs.some(j => j.job_type === 'advanced_tuning') ? ['Strategy', 'Strategy Params', 'Metric', 'Trials'] : [])].map(field => (
                             <tr key={field} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                              <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">{field}</td>
+                              <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">
+                              <div className="flex items-center gap-1">
+                                {field}
+                                {getTrainingConfigDescription(field) && <InfoTooltip size="sm" text={getTrainingConfigDescription(field)!} />}
+                              </div>
+                            </td>
                               {selectedJobs.map(job => {
                                 // Resolve config: for advanced tuning use job.config or graph node params,
                                 // for basic training use job.hyperparameters (which contains full node params)
@@ -1106,7 +1123,19 @@ export const ExperimentsPage: React.FC = () => {
                                 if (field === 'CV Shuffle') value = cvSource.cv_enabled ? (cvSource.cv_shuffle ? 'Yes' : 'No') : '-';
                                 if (field === 'CV Random State') value = cvSource.cv_enabled ? str(cvSource.cv_random_state) : '-';
                                 if (field === 'Strategy') value = str(tuningConfig?.strategy ?? tuningConfig?.search_strategy);
-                                if (field === 'Strategy Params') value = tuningConfig?.strategy_params && Object.keys(tuningConfig.strategy_params as Record<string, unknown>).length > 0 ? JSON.stringify(tuningConfig.strategy_params) : '-';
+                                if (field === 'Strategy Params') {
+                                  const sp = tuningConfig?.strategy_params as Record<string, unknown> | undefined;
+                                  const strategy = String(tuningConfig?.strategy ?? tuningConfig?.search_strategy ?? '');
+                                  if (sp && Object.keys(sp).length > 0) {
+                                    value = JSON.stringify(sp);
+                                  } else if (strategy === 'optuna') {
+                                    value = 'sampler: tpe · pruner: median (defaults)';
+                                  } else if (strategy === 'halving_grid' || strategy === 'halving_random') {
+                                    value = 'factor: 3 · min: exhaust (defaults)';
+                                  } else {
+                                    value = '-';
+                                  }
+                                }
                                 if (field === 'Metric') value = str(tuningConfig?.metric);
                                 if (field === 'Trials') value = str(tuningConfig?.n_trials);
 
@@ -1163,80 +1192,77 @@ export const ExperimentsPage: React.FC = () => {
                         </div>
                     ) : (
                         <div className="space-y-6">
-                            {/* Controls for Evaluation View */}
-                            <div className="flex flex-col gap-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                                <div className="flex justify-between items-center">
-                                    <div className="flex gap-4 text-sm">
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={showTrainMetrics}
-                                                onChange={e => { setShowTrainMetrics(e.target.checked); }}
-                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-gray-700 dark:text-gray-300">Train</span>
-                                        </label>
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={showTestMetrics}
-                                                onChange={e => { setShowTestMetrics(e.target.checked); }}
-                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-gray-700 dark:text-gray-300">Test</span>
-                                        </label>
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={showValMetrics}
-                                                onChange={e => { setShowValMetrics(e.target.checked); }}
-                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-gray-700 dark:text-gray-300">Validation</span>
-                                        </label>
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={showCvMetrics}
-                                                onChange={e => { setShowCvMetrics(e.target.checked); }}
-                                                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                                            />
-                                            <span className="text-gray-700 dark:text-gray-300">Cross-Validation</span>
-                                        </label>
-                                    </div>
+                            {/* Controls for Evaluation View — sticky so it stays visible while scrolling splits */}
+                            <div className="sticky top-0 z-10 flex flex-wrap items-center gap-x-6 gap-y-2 bg-white dark:bg-gray-800 px-4 py-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                                {/* Split visibility toggles */}
+                                <div className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Splits:</div>
+                                <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                                    <input type="checkbox" checked={showTrainMetrics} onChange={e => { setShowTrainMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    <span className="text-gray-700 dark:text-gray-300">Train</span>
+                                </label>
+                                <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                                    <input type="checkbox" checked={showTestMetrics} onChange={e => { setShowTestMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    <span className="text-gray-700 dark:text-gray-300">Test</span>
+                                </label>
+                                <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                                    <input type="checkbox" checked={showValMetrics} onChange={e => { setShowValMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    <span className="text-gray-700 dark:text-gray-300">Validation</span>
+                                </label>
 
-                                    {evaluationData.problem_type === 'classification' && evaluationData.splits.train?.y_proba && (() => {
-                                        const proba = evaluationData.splits.train.y_proba!;
-                                        return (
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm text-gray-500 dark:text-gray-400">Target Class (ROC):</span>
-                                                <select
-                                                    className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5"
-                                                    value={selectedRocClass || ''}
-                                                    onChange={(e) => { setSelectedRocClass(e.target.value); }}
-                                                >
-                                                    {proba.classes.map((c: string | number, idx: number) => {
-                                                        const label = proba.labels?.[idx] ?? c;
-                                                        return (
-                                                            <option key={String(c)} value={String(label)}>{String(label)}</option>
-                                                        );
-                                                    })}
-                                                </select>
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-
-                                {evaluationData.problem_type === 'classification' && evaluationData.splits.train?.y_proba?.labels && (() => {
+                                {/* Classification controls */}
+                                {evaluationData.problem_type === 'classification' && evaluationData.splits.train?.y_proba && (() => {
                                     const proba = evaluationData.splits.train.y_proba!;
+                                    const isBinary = proba.classes.length === 2;
                                     return (
-                                        <div className="w-full text-xs text-gray-500 dark:text-gray-400">
-                                            Mapping: {proba.classes.map((c, idx) => `${String(c)}→${String(proba.labels?.[idx] ?? c)}`).join(', ')}
-                                        </div>
+                                        <>
+                                            <div className="w-px h-5 bg-gray-200 dark:bg-gray-600" />
+                                            {/* Class selector — hidden for binary: both classes always shown inline */}
+                                            {!isBinary && (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Class:</span>
+                                                    <select
+                                                        className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5"
+                                                        value={selectedRocClass || ''}
+                                                        onChange={(e) => { setSelectedRocClass(e.target.value); }}
+                                                    >
+                                                        {proba.classes.map((c: string | number, idx: number) => {
+                                                            const label = proba.labels?.[idx] ?? c;
+                                                            return <option key={String(c)} value={String(label)}>{String(label)}</option>;
+                                                        })}
+                                                    </select>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Threshold:</span>
+                                                <input
+                                                    type="range" min={0.01} max={0.99} step={0.01}
+                                                    value={threshold}
+                                                    onChange={(e) => { setThreshold(parseFloat(e.target.value)); }}
+                                                    className="w-28 accent-blue-500"
+                                                />
+                                                <span className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400 w-9">{threshold.toFixed(2)}</span>
+                                            </div>
+                                            {proba.labels && proba.labels.length === proba.classes.length && (
+                                                <div className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                                                    ({proba.classes.map((c, idx) => `${String(c)}→${String(proba.labels?.[idx] ?? c)}`).join(', ')})
+                                                </div>
+                                            )}
+                                            {/* Overall / Per Class toggle — hidden for binary: no separate tab needed */}
+                                            {!isBinary && (
+                                                <>
+                                                    <div className="w-px h-5 bg-gray-200 dark:bg-gray-600" />
+                                                    <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-xs font-medium">
+                                                        <button onClick={() => setCmView('overall')} className={`px-3 py-1.5 transition-colors ${cmView === 'overall' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>Overall</button>
+                                                        <button onClick={() => setCmView('per-class')} className={`px-3 py-1.5 transition-colors border-l border-gray-200 dark:border-gray-700 ${cmView === 'per-class' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>Per Class</button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </>
                                     );
                                 })()}
                             </div>
 
+                            {(evaluationData.problem_type === 'regression' || cmView === 'overall' || evaluationData.splits.train?.y_proba?.classes.length === 2) && (
                             <div className="flex flex-col gap-6">
                             {/* Render charts for each split */}
                             {Object.entries(evaluationData.splits)
@@ -1386,7 +1412,7 @@ export const ExperimentsPage: React.FC = () => {
                                         ) : (
                                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                                 {/* Confusion Matrix */}
-                                                <div className="h-[300px] flex flex-col items-center justify-center relative group" id={`${splitName}-confusion-matrix`}>
+                                                <div className="flex flex-col items-center justify-center relative group" id={`${splitName}-confusion-matrix`}>
                                                     <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
                                                        <button 
                                                          onClick={() => void handleDownload(`${splitName}-confusion-matrix`, `${splitName}_confusion_matrix`)}
@@ -1400,7 +1426,6 @@ export const ExperimentsPage: React.FC = () => {
                                                     {(() => {
                                                         const proba = splitData.y_proba;
                                                         const classOrder = proba?.classes;
-
                                                         let yTrueForCm: (string | number)[] = splitData.y_true;
                                                         let yPredForCm: (string | number)[] = splitData.y_pred;
                                                         if (proba?.labels && proba.labels.length === proba.classes.length) {
@@ -1413,55 +1438,186 @@ export const ExperimentsPage: React.FC = () => {
                                                             yPredForCm = splitData.y_pred.map(y => labelToClass.get(String(y)) ?? y);
                                                         }
 
+                                                        // Apply OvR threshold for the selected class (works for binary and multiclass)
+                                                        if (proba && selectedRocClass) {
+                                                            const labelList = proba.labels && proba.labels.length === proba.classes.length ? proba.labels : undefined;
+                                                            const posIdx = (labelList ?? proba.classes).findIndex(c => String(c) === selectedRocClass);
+                                                            if (posIdx !== -1) {
+                                                                const posVal = proba.classes[posIdx];
+                                                                const origPred = [...yPredForCm];
+                                                                if (posVal !== undefined) {
+                                                                    yPredForCm = proba.values.map((v, i) => {
+                                                                        if ((v[posIdx] ?? 0) >= threshold) return posVal;
+                                                                        // Argmax of all other classes
+                                                                        let bestIdx = -1, bestProb = -Infinity;
+                                                                        v.forEach((p, idx) => {
+                                                                            if (idx !== posIdx && p > bestProb) { bestProb = p; bestIdx = idx; }
+                                                                        });
+                                                                        return bestIdx >= 0 ? (proba.classes[bestIdx] ?? origPred[i]!) : (origPred[i]!);
+                                                                    });
+                                                                }
+                                                            }
+                                                        }
+
                                                         const { classes, matrix } = calculateConfusionMatrix(yTrueForCm, yPredForCm, classOrder);
+
+                                                        // Compute live OvR metrics for the selected class
+                                                        let liveMetrics: { accuracy: number; precision: number; recall: number; f1: number } | null = null;
+                                                        if (selectedRocClass && proba) {
+                                                            const labelList = proba.labels && proba.labels.length === proba.classes.length ? proba.labels : undefined;
+                                                            const posClassIdx = (labelList ?? proba.classes).findIndex(c => String(c) === selectedRocClass);
+                                                            if (posClassIdx !== -1) {
+                                                                const posVal = proba.classes[posClassIdx];
+                                                                const posMatrixIdx = classes.findIndex(c => String(c) === String(posVal));
+                                                                if (posMatrixIdx !== -1) {
+                                                                    const tp = matrix[posMatrixIdx]?.[posMatrixIdx] ?? 0;
+                                                                    const fp = matrix.reduce((s, row, ri) => ri !== posMatrixIdx ? s + (row[posMatrixIdx] ?? 0) : s, 0);
+                                                                    const fn = (matrix[posMatrixIdx] ?? []).reduce((s, v, ci) => ci !== posMatrixIdx ? s + v : s, 0);
+                                                                    const total = matrix.flat().reduce((a, b) => a + b, 0);
+                                                                    const tn = total - tp - fp - fn;
+                                                                    const accuracy = total > 0 ? (tp + tn) / total : 0;
+                                                                    const precision = (tp + fp) > 0 ? tp / (tp + fp) : 0;
+                                                                    const recall = (tp + fn) > 0 ? tp / (tp + fn) : 0;
+                                                                    const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+                                                                    liveMetrics = { accuracy, precision, recall, f1 };
+                                                                }
+                                                            }
+                                                        }
+
+                                                        const cellSize = classes.length <= 3 ? 'w-20 h-16' : classes.length <= 5 ? 'w-14 h-12' : 'w-10 h-9';
+                                                        const cellText = classes.length <= 5 ? 'text-xs' : 'text-[10px]';
+                                                        const cellW = cellSize.split(' ')[0]!;
+                                                        const cellH = cellSize.split(' ')[1]!;
+
                                                         return (
-                                                            <div className="flex flex-col items-center">
-                                                                <div className="flex">
-                                                                    <div className="w-8"></div> {/* Y-axis label spacer */}
-                                                                    <div className="flex ml-2"> {/* Added margin-left to align with matrix */}
+                                                            <div className="flex flex-col items-center w-full">
+                                                                {/* ── OVERALL MATRIX — Actual label lives alongside ONLY the data rows ── */}
+                                                                <div className="flex flex-col">
+                                                                    {/* Predicted header: spacer = row-label (76px) + Actual-label (20px) + gap (4px) = 100px */}
+                                                                    <div className="flex items-center mb-1">
+                                                                        <div className="w-[100px] shrink-0" />
+                                                                        <div className="flex-1 flex items-center justify-center gap-1">
+                                                                            <span className="text-[11px] text-gray-400 dark:text-gray-500">Predicted</span>
+                                                                            <InfoTooltip text="Columns = what the model predicted. Each column is one class. Read a column down ↓ to see all samples predicted as that class." size="sm" />
+                                                                        </div>
+                                                                    </div>
+                                                                    {/* Col-name headers — same 100px spacer so they sit directly above cells */}
+                                                                    <div className="flex mb-0.5">
+                                                                        <div className="w-[100px] shrink-0" />
                                                                         {classes.map(c => (
-                                                                            <div key={String(c)} className="w-16 text-center text-xs font-medium text-gray-500 dark:text-gray-400 pb-2">
-                                                                                Pred {String(c)}
+                                                                            <div key={String(c)} className={`${cellW} text-center text-[11px] font-medium text-gray-500 dark:text-gray-400 pb-1 truncate`} title={String(c)}>
+                                                                                {String(c)}
                                                                             </div>
                                                                         ))}
                                                                     </div>
-                                                                </div>
-                                                                <div className="flex">
-                                                                    <div className="flex flex-col justify-center mr-2">
-                                                                        {classes.map(c => (
-                                                                            <div key={String(c)} className="h-16 flex items-center justify-end text-xs font-medium text-gray-500 dark:text-gray-400 pr-2">
-                                                                                True {String(c)}
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                    <div className="border border-gray-200 dark:border-gray-700">
-                                                                        {matrix.map((row, i) => (
-                                                                            <div key={i} className="flex">
-                                                                                {row.map((count, j) => {
-                                                                                    // Calculate intensity
-                                                                                    const max = Math.max(...matrix.flat());
-                                                                                    const intensity = max > 0 ? count / max : 0;
-                                                                                    return (
-                                                                                        <div 
-                                                                                            key={j} 
-                                                                                            className="w-16 h-16 flex items-center justify-center text-sm font-mono border border-gray-100 dark:border-gray-800"
-                                                                                            style={{
-                                                                                                backgroundColor: `rgba(59, 130, 246, ${intensity * 0.8 + 0.1})`, // Blue base
-                                                                                                color: intensity > 0.5 ? 'white' : 'inherit'
-                                                                                            }}
-                                                                                            title={`True: ${classes[i]}, Pred: ${classes[j]}, Count: ${count}`}
-                                                                                        >
-                                                                                            {count}
+                                                                    {/* Body: Actual label sits inside items-stretch so its height = matrix height → perfectly centered */}
+                                                                    <div className="flex items-stretch">
+                                                                        <div className="flex flex-col items-center justify-center mr-1" style={{ width: '20px' }}>
+                                                                            <InfoTooltip text="Rows = actual / true labels. Read a row across → to see where each true class ended up. Green diagonal = correct; red off-diagonal = misclassification." size="sm" />
+                                                                            <span className="text-[11px] text-gray-400 dark:text-gray-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Actual</span>
+                                                                        </div>
+                                                                        <div className="border border-gray-200 dark:border-gray-700 rounded overflow-hidden">
+                                                                            {matrix.map((row, i) => {
+                                                                                const rowTotal = row.reduce((a, b) => a + b, 0);
+                                                                                return (
+                                                                                    <div key={i} className="flex">
+                                                                                        <div className={`w-[76px] ${cellH} flex items-center justify-end pr-2 text-[11px] font-medium text-gray-500 dark:text-gray-400 truncate border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 shrink-0`} title={String(classes[i])}>
+                                                                                            {String(classes[i])}
                                                                                         </div>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                        ))}
+                                                                                        {row.map((count, j) => {
+                                                                                            const isDiag = i === j;
+                                                                                            const intensity = rowTotal > 0 ? count / rowTotal : 0;
+                                                                                            const bgColor = isDiag
+                                                                                                ? `rgba(34, 197, 94, ${intensity * 0.75 + 0.08})`
+                                                                                                : `rgba(239, 68, 68, ${intensity * 0.65 + 0.04})`;
+                                                                                            const textColor = intensity > 0.45 ? 'white' : undefined;
+                                                                                            const pct = rowTotal > 0 ? ((count / rowTotal) * 100).toFixed(0) : '0';
+                                                                                            return (
+                                                                                                <div
+                                                                                                    key={j}
+                                                                                                    className={`${cellSize} flex flex-col items-center justify-center border border-gray-100 dark:border-gray-800 cursor-default`}
+                                                                                                    style={{ backgroundColor: bgColor, color: textColor }}
+                                                                                                    title={`True: ${classes[i]}, Pred: ${classes[j]}\nCount: ${count}  |  ${pct}% of actual "${classes[i]}"\n${isDiag ? '✓ Correct prediction' : '✗ Misclassification'}`}
+                                                                                                >
+                                                                                                    <span className={`${cellText} font-mono font-bold leading-none`}>{count}</span>
+                                                                                                    <span className="text-[9px] leading-none opacity-75 mt-0.5">{pct}%</span>
+                                                                                                </div>
+                                                                                            );
+                                                                                        })}
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                                <div className="mt-4 text-xs text-gray-400">
-                                                                    Confusion Matrix
+
+                                                                {/* Footer: label + threshold tooltip */}
+                                                                <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-400">
+                                                                    <span>Confusion Matrix</span>
+                                                                    {selectedRocClass && (
+                                                                        <>
+                                                                            <span className="font-mono text-blue-500 dark:text-blue-400">@ t={threshold.toFixed(2)}</span>
+                                                                            <InfoTooltip
+                                                                                text={`Threshold rule (≥): a sample is predicted as "${selectedRocClass}" when P("${selectedRocClass}") ≥ ${threshold.toFixed(2)} (equal or above). Otherwise the class with the highest remaining probability wins.\n↑ Raise threshold → fewer positives predicted, lower recall, higher precision.\n↓ Lower threshold → more positives predicted, higher recall, lower precision.\nGreen cells = correct; red cells = errors. Percentages show % of each actual class row.`}
+                                                                                align="center"
+                                                                            />
+                                                                        </>
+                                                                    )}
                                                                 </div>
+                                                                {/* Live metric tiles */}
+                                                                {liveMetrics && (
+                                                                    <div className="mt-2 grid grid-cols-4 gap-1.5 text-xs w-full">
+                                                                        {([
+                                                                            { label: 'Accuracy', value: liveMetrics.accuracy, tip: 'Overall fraction of correct predictions (OvR: treats selected class as positive).' },
+                                                                            { label: 'Precision', value: liveMetrics.precision, tip: 'Of all samples predicted as this class, how many actually are? High = few false alarms.' },
+                                                                            { label: 'Recall', value: liveMetrics.recall, tip: 'Of all actual samples of this class, how many did the model catch? High = few misses.' },
+                                                                            { label: 'F1', value: liveMetrics.f1, tip: 'Harmonic mean of Precision and Recall. Balances both — best single metric for imbalanced classes.' },
+                                                                        ] as { label: string; value: number; tip: string }[]).map(({ label, value, tip }) => {
+                                                                            const color = value >= 0.8 ? 'text-green-600 dark:text-green-400' : value >= 0.6 ? 'text-yellow-500 dark:text-yellow-400' : 'text-red-500 dark:text-red-400';
+                                                                            return (
+                                                                                <div key={label} className="flex flex-col items-center bg-gray-50 dark:bg-gray-900 rounded px-1.5 py-1.5 gap-0.5">
+                                                                                    <div className="flex items-center gap-0.5">
+                                                                                        <span className="text-gray-500 dark:text-gray-400">{label}</span>
+                                                                                        <InfoTooltip text={tip} size="sm" align="center" />
+                                                                                    </div>
+                                                                                    <span className={`font-mono font-semibold ${color}`}>{value.toFixed(3)}</span>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                                {/* Binary: show both classes' Prec/Rec/F1 inline — no need to switch to Per Class tab */}
+                                                                {classes.length === 2 && (
+                                                                    <div className="mt-3 border-t border-gray-100 dark:border-gray-700 pt-3">
+                                                                        <div className="flex items-center gap-1 mb-2">
+                                                                            <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500">Per Class</span>
+                                                                            <InfoTooltip text="Precision, Recall and F1 for each class individually. For binary problems both classes are always shown here." size="sm" />
+                                                                        </div>
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                            {classes.map((cls, clsIdx) => {
+                                                                                const btp = matrix[clsIdx]?.[clsIdx] ?? 0;
+                                                                                const bfp = matrix.reduce((s, row, ri) => ri !== clsIdx ? s + (row[clsIdx] ?? 0) : s, 0);
+                                                                                const bfn = (matrix[clsIdx] ?? []).reduce((s, v, ci) => ci !== clsIdx ? s + v : s, 0);
+                                                                                const bprec = (btp + bfp) > 0 ? btp / (btp + bfp) : 0;
+                                                                                const brec  = (btp + bfn) > 0 ? btp / (btp + bfn) : 0;
+                                                                                const bf1   = bprec + brec > 0 ? (2 * bprec * brec) / (bprec + brec) : 0;
+                                                                                return (
+                                                                                    <div key={String(cls)} className="flex flex-col items-center p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                                                                                        <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-300 mb-1.5">{String(cls)}</span>
+                                                                                        <div className="grid grid-cols-3 gap-1 text-[10px] w-full">
+                                                                                            {([{ l: 'Prec', v: bprec }, { l: 'Rec', v: brec }, { l: 'F1', v: bf1 }] as { l: string; v: number }[]).map(({ l, v }) => (
+                                                                                                <div key={l} className="flex flex-col items-center bg-white dark:bg-gray-800 rounded py-1">
+                                                                                                    <span className="text-gray-400">{l}</span>
+                                                                                                    <span className={`font-mono font-semibold ${v >= 0.8 ? 'text-green-500' : v >= 0.6 ? 'text-yellow-500' : 'text-red-500'}`}>{v.toFixed(2)}</span>
+                                                                                                </div>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         );
                                                     })()}
@@ -1469,7 +1625,7 @@ export const ExperimentsPage: React.FC = () => {
 
                                                 {/* ROC Curve (if available) */}
                                                 {splitData.y_proba && (
-                                                    <div className="h-[300px] w-full relative group" id={`${splitName}-roc`}>
+                                                    <div className="h-[340px] w-full relative group" id={`${splitName}-roc`}>
                                                         <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
                                                            <button 
                                                              onClick={() => void handleDownload(`${splitName}-roc`, `${splitName}_roc_curve`)}
@@ -1480,24 +1636,127 @@ export const ExperimentsPage: React.FC = () => {
                                                               {downloadingChart === `${splitName}-roc` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-roc` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
                                                            </button>
                                                         </div>
-                                                        <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">ROC Curve</h5>
                                                         {(() => {
                                                             if (!selectedRocClass) return <div className="text-center text-xs text-gray-400">Select a class</div>;
                                                             const rocData = calculateROC(splitData.y_true, splitData.y_proba!, selectedRocClass);
                                                             if (!rocData) return <div className="text-center text-xs text-gray-400">ROC not available (multiclass or missing proba)</div>;
-                                                            
+
+                                                            // AUC via trapezoid rule
+                                                            const auc = rocData.reduce((sum, pt, i) => {
+                                                                if (i === 0) return 0;
+                                                                const prev = rocData[i - 1]!;
+                                                                return sum + Math.abs(pt.fpr - prev.fpr) * (pt.tpr + prev.tpr) / 2;
+                                                            }, 0);
+
+                                                            // Operating point at current threshold
+                                                            const proba = splitData.y_proba!;
+                                                            let operatingPoint: { fpr: number; tpr: number } | null = null;
+                                                            const labelList = proba.labels && proba.labels.length === proba.classes.length ? proba.labels : undefined;
+                                                            const classIndex = (labelList ?? proba.classes).findIndex(c => String(c) === selectedRocClass);
+                                                            if (classIndex !== -1) {
+                                                                const scores = proba.values.map(v => v[classIndex] ?? 0);
+                                                                const actual = splitData.y_true.map(t => String(t) === selectedRocClass ? 1 : 0);
+                                                                const totalPos = actual.filter(a => a === 1).length;
+                                                                const totalNeg = actual.length - totalPos;
+                                                                if (totalPos > 0 && totalNeg > 0) {
+                                                                    let tp = 0, fp = 0;
+                                                                    scores.forEach((s, i) => {
+                                                                        if (s >= threshold) {
+                                                                            if (actual[i] === 1) tp++;
+                                                                            else fp++;
+                                                                        }
+                                                                    });
+                                                                    operatingPoint = { fpr: fp / totalNeg, tpr: tp / totalPos };
+                                                                }
+                                                            }
+
                                                             return (
-                                                                <ResponsiveContainer width="100%" height="100%">
-                                                                    <LineChart data={rocData} margin={{ top: 5, right: 30, bottom: 40, left: 30 }}>
-                                                                        <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                                                                        <XAxis type="number" dataKey="fpr" domain={[0, 1]} label={{ value: 'False Positive Rate', position: 'bottom', offset: 0, fontSize: 12 }} />
-                                                                        <YAxis type="number" dataKey="tpr" domain={[0, 1]} label={{ value: 'True Positive Rate', angle: -90, position: 'left', fontSize: 12 }} />
-                                                                        <Tooltip />
-                                                                        <Line type="monotone" dataKey="tpr" stroke="#8884d8" dot={false} strokeWidth={2} />
-                                                                        {/* Diagonal reference line */}
-                                                                        <Line dataKey="fpr" stroke="#ccc" strokeDasharray="3 3" dot={false} />
-                                                                    </LineChart>
-                                                                </ResponsiveContainer>
+                                                                <>
+                                                                    <div className="flex items-center justify-center gap-1.5 mb-1">
+                                                                        <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">
+                                                                            ROC Curve — {selectedRocClass}
+                                                                            <span className="ml-2 font-mono text-purple-600 dark:text-purple-400">AUC={auc.toFixed(3)}</span>
+                                                                        </h5>
+                                                                        <InfoTooltip
+                                                                            text={`ROC (Receiver Operating Characteristic) curve for class "${selectedRocClass}" vs all others. AUC=${auc.toFixed(3)}: closer to 1.0 is better; 0.5 = random. The red dot marks where the model operates at threshold t=${threshold.toFixed(2)} — drag the slider to move it along the curve and see the precision/recall trade-off in real time.`}
+                                                                            align="center"
+                                                                        />
+                                                                    </div>
+                                                                    {/* TPR / FPR definitions */}
+                                                                    <div className="flex items-center justify-center gap-4 text-[10px] text-gray-400 dark:text-gray-500 mb-1">
+                                                                        <div className="flex items-center gap-0.5">
+                                                                            <span className="font-semibold">TPR</span>
+                                                                            <InfoTooltip text="True Positive Rate (Recall / Sensitivity): TP ÷ (TP + FN). Of all actual positives, how many did the model correctly detect? Higher = fewer misses. This is the Y-axis." size="sm" />
+                                                                            <span className="ml-0.5 font-mono">= TP / (TP+FN)</span>
+                                                                        </div>
+                                                                        <span className="text-gray-300 dark:text-gray-600">·</span>
+                                                                        <div className="flex items-center gap-0.5">
+                                                                            <span className="font-semibold">FPR</span>
+                                                                            <InfoTooltip text="False Positive Rate (Fall-out): FP ÷ (FP + TN). Of all actual negatives, how many were incorrectly flagged as positive? Lower = fewer false alarms. This is the X-axis." size="sm" />
+                                                                            <span className="ml-0.5 font-mono">= FP / (FP+TN)</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <ResponsiveContainer width="100%" height="92%">
+                                                                        <ComposedChart data={rocData} margin={{ top: 5, right: 20, bottom: 42, left: 40 }}>
+                                                                            <defs>
+                                                                                <linearGradient id="aucFill" x1="0" y1="0" x2="0" y2="1">
+                                                                                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.25} />
+                                                                                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.03} />
+                                                                                </linearGradient>
+                                                                            </defs>
+                                                                            <CartesianGrid strokeDasharray="3 3" opacity={0.08} />
+                                                                            <XAxis
+                                                                                type="number"
+                                                                                dataKey="fpr"
+                                                                                domain={[0, 1]}
+                                                                                tickFormatter={(v: number) => v.toFixed(1)}
+                                                                                tick={{ fontSize: 10 }}
+                                                                                label={{ value: 'FPR (Fall-out)', position: 'insideBottom', offset: -8, fontSize: 11, fill: '#9ca3af' }}
+                                                                            />
+                                                                            <YAxis
+                                                                                type="number"
+                                                                                dataKey="tpr"
+                                                                                domain={[0, 1]}
+                                                                                tickFormatter={(v: number) => v.toFixed(1)}
+                                                                                tick={{ fontSize: 10 }}
+                                                                                label={{ value: 'TPR (Recall)', angle: -90, position: 'insideLeft', offset: 10, fontSize: 11, fill: '#9ca3af' }}
+                                                                            />
+                                                                            <Tooltip
+                                                                                content={({ active, payload }) => {
+                                                                                    if (!active || !payload?.length) return null;
+                                                                                    const d = payload[0]?.payload as { fpr: number; tpr: number };
+                                                                                    return (
+                                                                                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-sm p-2 text-xs space-y-0.5">
+                                                                                            <p className="font-semibold text-gray-600 dark:text-gray-300 mb-1">ROC point</p>
+                                                                                            <p className="text-gray-700 dark:text-gray-200">TPR (Recall) <span className="font-mono text-purple-600 dark:text-purple-400">{d.tpr.toFixed(3)}</span></p>
+                                                                                            <p className="text-gray-500 dark:text-gray-400">FPR (Fall-out) <span className="font-mono">{d.fpr.toFixed(3)}</span></p>
+                                                                                            <p className="text-gray-400 dark:text-gray-500 text-[10px] pt-0.5 border-t border-gray-100 dark:border-gray-700">Precision = TP / (TP+FP) &nbsp;·&nbsp; Recall = TP / (TP+FN)</p>
+                                                                                        </div>
+                                                                                    );
+                                                                                }}
+                                                                            />
+                                                                            {/* Gradient fill — AUC area */}
+                                                                            <Area type="monotone" dataKey="tpr" stroke="none" fill="url(#aucFill)" isAnimationActive={false} legendType="none" />
+                                                                            {/* ROC curve */}
+                                                                            <Line type="monotone" dataKey="tpr" stroke="#8b5cf6" dot={false} strokeWidth={2.5} name="ROC" isAnimationActive={false} />
+                                                                            {/* Random classifier diagonal */}
+                                                                            <Line data={[{ fpr: 0, tpr: 0 }, { fpr: 1, tpr: 1 }]} dataKey="tpr" stroke="#d1d5db" strokeDasharray="4 3" dot={false} legendType="none" strokeWidth={1} isAnimationActive={false} />
+                                                                            {/* Operating point at current threshold */}
+                                                                            {operatingPoint && (
+                                                                                <Line
+                                                                                    data={[operatingPoint]}
+                                                                                    dataKey="tpr"
+                                                                                    stroke="#ef4444"
+                                                                                    dot={{ r: 7, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }}
+                                                                                    activeDot={{ r: 9 }}
+                                                                                    isAnimationActive={false}
+                                                                                    legendType="none"
+                                                                                    name={`t=${threshold.toFixed(2)}`}
+                                                                                />
+                                                                            )}
+                                                                        </ComposedChart>
+                                                                    </ResponsiveContainer>
+                                                                </>
                                                             );
                                                         })()}
                                                     </div>
@@ -1508,6 +1767,160 @@ export const ExperimentsPage: React.FC = () => {
                                 );
                             })}
                         </div>
+                        )}
+                        {/* Per-class comparison — multiclass only; binary shows both classes inline in the overall card */}
+                        {evaluationData.problem_type === 'classification' && cmView === 'per-class' && (evaluationData.splits.train?.y_proba?.classes.length ?? 0) > 2 && (() => {
+                            // Compute confusion matrix for a split with OvR threshold applied
+                            const getMatrix = (splitData: EvaluationSplit) => {
+                                const proba = splitData.y_proba;
+                                let yTrue: (string | number)[] = splitData.y_true;
+                                let yPred: (string | number)[] = splitData.y_pred;
+                                if (proba?.labels && proba.labels.length === proba.classes.length) {
+                                    const lm = new Map<string, string | number>();
+                                    proba.labels.forEach((l, i) => { const c = proba.classes[i]; if (c !== undefined) lm.set(String(l), c); });
+                                    yTrue = yTrue.map(y => lm.get(String(y)) ?? y);
+                                    yPred = yPred.map(y => lm.get(String(y)) ?? y);
+                                }
+                                if (proba && selectedRocClass) {
+                                    const ll = proba.labels?.length === proba.classes.length ? proba.labels : undefined;
+                                    const posIdx = (ll ?? proba.classes).findIndex(c => String(c) === selectedRocClass);
+                                    if (posIdx !== -1) {
+                                        const posVal = proba.classes[posIdx];
+                                        const orig = [...yPred];
+                                        if (posVal !== undefined) {
+                                            yPred = proba.values.map((v, i) => {
+                                                if ((v[posIdx] ?? 0) >= threshold) return posVal;
+                                                let bi = -1, bp = -Infinity;
+                                                v.forEach((p, idx) => { if (idx !== posIdx && p > bp) { bp = p; bi = idx; } });
+                                                return bi >= 0 ? (proba.classes[bi] ?? orig[i]!) : (orig[i]!);
+                                            });
+                                        }
+                                    }
+                                }
+                                return calculateConfusionMatrix(yTrue, yPred, proba?.classes);
+                            };
+
+                            const renderSplitPerClass = (splitName: string, splitData: EvaluationSplit) => {
+                                const { classes, matrix } = getMatrix(splitData);
+                                const splitId = `per-class-${splitName}`;
+                                return (
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-1.5 mb-1">
+                                            <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-300 capitalize">{splitName} Set</h4>
+                                            <button
+                                                id={`${splitId}-dl`}
+                                                onClick={() => void handleDownload(splitId, `${splitName}_per_class`)}
+                                                disabled={downloadingChart === splitId}
+                                                className="p-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-400 hover:text-blue-600 disabled:opacity-50"
+                                                title="Download Per-Class View"
+                                            >
+                                                {downloadingChart === splitId ? <Loader2 className="w-3 h-3 animate-spin" /> : doneChart === splitId ? <Check className="w-3 h-3 text-green-500" /> : <Download className="w-3 h-3" />}
+                                            </button>
+                                        </div>
+                                        <div id={splitId} className={`grid ${classes.length <= 4 ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
+                                            {classes.map((cls, clsIdx) => {
+                                                const tp = matrix[clsIdx]?.[clsIdx] ?? 0;
+                                                const fp = matrix.reduce((s, row, ri) => ri !== clsIdx ? s + (row[clsIdx] ?? 0) : s, 0);
+                                                const fn = (matrix[clsIdx] ?? []).reduce((s, v, ci) => ci !== clsIdx ? s + v : s, 0);
+                                                const total = matrix.flat().reduce((a, b) => a + b, 0);
+                                                const tn = total - tp - fp - fn;
+                                                const prec = (tp + fp) > 0 ? tp / (tp + fp) : 0;
+                                                const rec = (tp + fn) > 0 ? tp / (tp + fn) : 0;
+                                                const f1c = prec + rec > 0 ? (2 * prec * rec) / (prec + rec) : 0;
+                                                const isHighlighted = String(cls) === selectedRocClass;
+                                                const otherClasses = classes.filter((_, i) => i !== clsIdx);
+                                                // Binary: use actual other class name; multiclass: 'Others'
+                                                const otherLabel = otherClasses.length === 1 ? String(otherClasses[0]) : 'Others';
+                                                const rowLabels = [String(cls), otherLabel];
+                                                const cellLbls = [['TP', 'FN'], ['FP', 'TN']];
+                                                const recPct = Math.round(rec * 100);
+                                                const fnCount = tp + fn > 0 ? fn : 0;
+                                                const insight =
+                                                    f1c >= 0.8 ? `t=${threshold.toFixed(2)}: catches ${recPct}% of ${String(cls)} — strong.`
+                                                    : f1c >= 0.6 ? `t=${threshold.toFixed(2)}: catches ${recPct}% of ${String(cls)} — room to improve.`
+                                                    : `t=${threshold.toFixed(2)}: only ${recPct}% caught — model struggles here.`;
+                                                const insightTip = [
+                                                    `Out of ${tp + fnCount} actual "${String(cls)}" samples, the model correctly caught ${tp} of them = ${recPct}%.`,
+                                                    ``,
+                                                    `How: Recall = TP ÷ (TP + FN) = ${tp} ÷ ${tp + fnCount} = ${recPct}%`,
+                                                    `  TP ${tp}: labelled "${String(cls)}" and actually "${String(cls)}" ✓`,
+                                                    `  FN ${fnCount}: actually "${String(cls)}" but predicted as something else ✗`,
+                                                    ``,
+                                                    `Threshold (≥ ${threshold.toFixed(2)}): the model predicts "${String(cls)}" only when it is ${Math.round(threshold * 100)}%+ confident.`,
+                                                    `↑ Raise threshold → harder to trigger, fewer catches (recall ↓), more precise (precision ↑).`,
+                                                    `↓ Lower threshold → easier to trigger, more catches (recall ↑), more false alarms (precision ↓).`,
+                                                ].join('\n');
+                                                const insightColor = f1c >= 0.8 ? 'text-green-600 dark:text-green-400' : f1c >= 0.6 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-500 dark:text-red-400';
+                                                return (
+                                                    <div key={String(cls)} className={`flex flex-col items-center p-2 rounded-lg border ${isHighlighted ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}>
+                                                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5 w-full text-center truncate" title={`${String(cls)} vs Rest`}>{String(cls)} vs Rest</span>
+                                                        <div className="flex flex-col">
+                                                            <div className="flex mb-0.5 gap-0.5" style={{ marginLeft: '60px' }}>
+                                                                <span className="w-14 text-center text-[9px] text-gray-500 dark:text-gray-400 truncate font-medium" title={String(cls)}>{String(cls)}</span>
+                                                                <span className="w-14 text-center text-[9px] text-gray-500 dark:text-gray-400 truncate font-medium" title={otherClasses.map(String).join(', ')}>{otherLabel}</span>
+                                                            </div>
+                                                            {[[tp, fn], [fp, tn]].map((row2, ri) => (
+                                                                <div key={ri} className="flex items-center gap-0.5 mb-0.5">
+                                                                    <span className="text-right text-[9px] text-gray-500 dark:text-gray-400 pr-1 truncate font-medium" style={{ width: '60px' }} title={rowLabels[ri]}>{rowLabels[ri]}</span>
+                                                                    {row2.map((count, ci) => {
+                                                                        const isCorrect = ri === ci;
+                                                                        const rowMax = Math.max(...row2, 1);
+                                                                        const bg = isCorrect
+                                                                            ? `rgba(34,197,94,${Math.min((count / rowMax) * 0.75 + 0.1, 0.85)})`
+                                                                            : `rgba(239,68,68,${Math.min((count / rowMax) * 0.65 + 0.05, 0.75)})`;
+                                                                        return (
+                                                                            <div key={ci} className="w-14 h-11 flex flex-col items-center justify-center rounded border border-gray-100 dark:border-gray-700 cursor-default" style={{ backgroundColor: bg }} title={`${cellLbls[ri]?.[ci] ?? ''}=${count}`}>
+                                                                                <span className="text-[11px] font-mono font-bold leading-none">{count}</span>
+                                                                                <span className="text-[9px] font-semibold opacity-80 mt-0.5">{cellLbls[ri]?.[ci]}</span>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <div className="mt-1.5 grid grid-cols-3 gap-1 text-[10px] w-full">
+                                                            {([{ l: 'Prec', v: prec }, { l: 'Rec', v: rec }, { l: 'F1', v: f1c }] as { l: string; v: number }[]).map(({ l, v }) => (
+                                                                <div key={l} className="flex flex-col items-center bg-gray-50 dark:bg-gray-900 rounded py-1">
+                                                                    <span className="text-gray-400">{l}</span>
+                                                                    <span className={`font-mono font-semibold ${v >= 0.8 ? 'text-green-500' : v >= 0.6 ? 'text-yellow-500' : 'text-red-500'}`}>{v.toFixed(2)}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        {/* 1-sentence plain-language verdict with hover explanation of the calculation */}
+                                                        <div className={`mt-1.5 flex items-center justify-center gap-0.5 ${insightColor}`}>
+                                                            <p className="text-[9px] leading-snug text-center">{insight}</p>
+                                                            <InfoTooltip text={insightTip} size="sm" />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            };
+
+                            const allSplitEntries = Object.entries(evaluationData.splits) as [string, EvaluationSplit][];
+                            const trainEntry = showTrainMetrics ? allSplitEntries.find(([n]) => n === 'train') : undefined;
+                            const testEntry  = showTestMetrics  ? allSplitEntries.find(([n]) => n === 'test')  : undefined;
+                            const valEntry   = showValMetrics   ? allSplitEntries.find(([n]) => n === 'validation') : undefined;
+
+                            return (
+                                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {trainEntry && renderSplitPerClass(trainEntry[0], trainEntry[1])}
+                                        {testEntry  && renderSplitPerClass(testEntry[0],  testEntry[1])}
+                                        {!trainEntry && !testEntry && (
+                                            <p className="col-span-2 text-xs text-gray-400 text-center py-8">Enable Train or Test splits above to compare.</p>
+                                        )}
+                                    </div>
+                                    {valEntry && (
+                                        <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                            {renderSplitPerClass(valEntry[0], valEntry[1])}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
                         </div>
                     )}
                 </div>

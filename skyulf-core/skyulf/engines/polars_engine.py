@@ -8,7 +8,7 @@ try:
 except ImportError:
     HAS_POLARS = False
 
-from .registry import BaseEngine, EngineRegistry
+from .registry import BaseEngine, EngineRegistry, EngineName
 from .protocol import SkyulfDataFrame
 
 
@@ -63,7 +63,7 @@ class SkyulfPolarsWrapper:
 
 
 class PolarsEngine(BaseEngine):
-    name = "polars"
+    name = EngineName.POLARS
 
     @classmethod
     def is_compatible(cls, data: Any) -> bool:

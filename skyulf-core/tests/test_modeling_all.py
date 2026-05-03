@@ -403,3 +403,258 @@ class TestXGBRegressor:
             regression_dataset, target_column="target", config={"params": {"n_estimators": 10}}
         )
         assert len(preds["test"]) == 40
+
+
+# ===========================================================================
+# NEW MODELS — ExtraTrees, HistGradientBoosting, LightGBM
+# ===========================================================================
+
+
+class TestExtraTreesClassifier:
+    def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
+        from skyulf.modeling.classification import (
+            ExtraTreesClassifierCalculator,
+            ExtraTreesClassifierApplier,
+        )
+
+        estimator = StatefulEstimator(
+            node_id="etc",
+            calculator=ExtraTreesClassifierCalculator(),
+            applier=ExtraTreesClassifierApplier(),
+        )
+        preds = estimator.fit_predict(
+            classification_dataset, target_column="target", config={"params": {"n_estimators": 10}}
+        )
+        assert len(preds["test"]) == 40
+
+    def test_evaluate(self, classification_dataset: SplitDataset) -> None:
+        from skyulf.modeling.classification import (
+            ExtraTreesClassifierCalculator,
+            ExtraTreesClassifierApplier,
+        )
+
+        estimator = StatefulEstimator(
+            node_id="etc",
+            calculator=ExtraTreesClassifierCalculator(),
+            applier=ExtraTreesClassifierApplier(),
+        )
+        estimator.fit_predict(
+            classification_dataset, target_column="target", config={"params": {"n_estimators": 10}}
+        )
+        report = estimator.evaluate(classification_dataset, target_column="target")
+        assert report["problem_type"] == "classification"
+        assert "accuracy" in report["splits"]["test"].metrics
+
+
+class TestExtraTreesRegressor:
+    def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
+        from skyulf.modeling.regression import (
+            ExtraTreesRegressorCalculator,
+            ExtraTreesRegressorApplier,
+        )
+
+        estimator = StatefulEstimator(
+            node_id="etr",
+            calculator=ExtraTreesRegressorCalculator(),
+            applier=ExtraTreesRegressorApplier(),
+        )
+        preds = estimator.fit_predict(
+            regression_dataset, target_column="target", config={"params": {"n_estimators": 10}}
+        )
+        assert len(preds["test"]) == 40
+
+    def test_evaluate(self, regression_dataset: SplitDataset) -> None:
+        from skyulf.modeling.regression import (
+            ExtraTreesRegressorCalculator,
+            ExtraTreesRegressorApplier,
+        )
+
+        estimator = StatefulEstimator(
+            node_id="etr",
+            calculator=ExtraTreesRegressorCalculator(),
+            applier=ExtraTreesRegressorApplier(),
+        )
+        estimator.fit_predict(
+            regression_dataset, target_column="target", config={"params": {"n_estimators": 10}}
+        )
+        report = estimator.evaluate(regression_dataset, target_column="target")
+        assert report["problem_type"] == "regression"
+        assert "mse" in report["splits"]["test"].metrics
+
+
+class TestHistGradientBoostingClassifier:
+    def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
+        from skyulf.modeling.classification import (
+            HistGradientBoostingClassifierCalculator,
+            HistGradientBoostingClassifierApplier,
+        )
+
+        estimator = StatefulEstimator(
+            node_id="hgbc",
+            calculator=HistGradientBoostingClassifierCalculator(),
+            applier=HistGradientBoostingClassifierApplier(),
+        )
+        preds = estimator.fit_predict(
+            classification_dataset, target_column="target", config={"params": {"max_iter": 20}}
+        )
+        assert len(preds["test"]) == 40
+
+    def test_handles_nan(self, classification_dataset: SplitDataset) -> None:
+        """HistGradientBoosting is natively NaN-tolerant — no imputation needed."""
+        import numpy as np
+        from skyulf.modeling.classification import (
+            HistGradientBoostingClassifierCalculator,
+            HistGradientBoostingClassifierApplier,
+        )
+
+        ds = classification_dataset
+        # Inject NaN into training set
+        import pandas as _pd
+        from typing import cast as _cast
+
+        train_with_nan = _pd.DataFrame(_cast(_pd.DataFrame, ds.train)).copy()
+        train_with_nan.iloc[0, 0] = np.nan
+
+        from skyulf.data.dataset import SplitDataset
+
+        ds_nan = SplitDataset(train=train_with_nan, test=ds.test, validation=None)
+
+        estimator = StatefulEstimator(
+            node_id="hgbc_nan",
+            calculator=HistGradientBoostingClassifierCalculator(),
+            applier=HistGradientBoostingClassifierApplier(),
+        )
+        preds = estimator.fit_predict(
+            ds_nan, target_column="target", config={"params": {"max_iter": 20}}
+        )
+        assert len(preds["test"]) == 40
+
+
+class TestHistGradientBoostingRegressor:
+    def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
+        from skyulf.modeling.regression import (
+            HistGradientBoostingRegressorCalculator,
+            HistGradientBoostingRegressorApplier,
+        )
+
+        estimator = StatefulEstimator(
+            node_id="hgbr",
+            calculator=HistGradientBoostingRegressorCalculator(),
+            applier=HistGradientBoostingRegressorApplier(),
+        )
+        preds = estimator.fit_predict(
+            regression_dataset, target_column="target", config={"params": {"max_iter": 20}}
+        )
+        assert len(preds["test"]) == 40
+
+    def test_evaluate(self, regression_dataset: SplitDataset) -> None:
+        from skyulf.modeling.regression import (
+            HistGradientBoostingRegressorCalculator,
+            HistGradientBoostingRegressorApplier,
+        )
+
+        estimator = StatefulEstimator(
+            node_id="hgbr",
+            calculator=HistGradientBoostingRegressorCalculator(),
+            applier=HistGradientBoostingRegressorApplier(),
+        )
+        estimator.fit_predict(
+            regression_dataset, target_column="target", config={"params": {"max_iter": 20}}
+        )
+        report = estimator.evaluate(regression_dataset, target_column="target")
+        assert report["problem_type"] == "regression"
+        assert "mse" in report["splits"]["test"].metrics
+
+
+class TestLGBMClassifier:
+    def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
+        pytest.importorskip("lightgbm")
+        from skyulf.modeling.classification import LGBMClassifierCalculator, LGBMClassifierApplier
+
+        estimator = StatefulEstimator(
+            node_id="lgbmc",
+            calculator=LGBMClassifierCalculator(),
+            applier=LGBMClassifierApplier(),
+        )
+        preds = estimator.fit_predict(
+            classification_dataset, target_column="target", config={"params": {"n_estimators": 10}}
+        )
+        assert len(preds["test"]) == 40
+
+    def test_evaluate(self, classification_dataset: SplitDataset) -> None:
+        pytest.importorskip("lightgbm")
+        from skyulf.modeling.classification import LGBMClassifierCalculator, LGBMClassifierApplier
+
+        estimator = StatefulEstimator(
+            node_id="lgbmc",
+            calculator=LGBMClassifierCalculator(),
+            applier=LGBMClassifierApplier(),
+        )
+        estimator.fit_predict(
+            classification_dataset, target_column="target", config={"params": {"n_estimators": 10}}
+        )
+        report = estimator.evaluate(classification_dataset, target_column="target")
+        assert report["problem_type"] == "classification"
+        assert "accuracy" in report["splits"]["test"].metrics
+
+
+class TestLGBMRegressor:
+    def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
+        pytest.importorskip("lightgbm")
+        from skyulf.modeling.regression import LGBMRegressorCalculator, LGBMRegressorApplier
+
+        estimator = StatefulEstimator(
+            node_id="lgbmr",
+            calculator=LGBMRegressorCalculator(),
+            applier=LGBMRegressorApplier(),
+        )
+        preds = estimator.fit_predict(
+            regression_dataset, target_column="target", config={"params": {"n_estimators": 10}}
+        )
+        assert len(preds["test"]) == 40
+
+    def test_evaluate(self, regression_dataset: SplitDataset) -> None:
+        pytest.importorskip("lightgbm")
+        from skyulf.modeling.regression import LGBMRegressorCalculator, LGBMRegressorApplier
+
+        estimator = StatefulEstimator(
+            node_id="lgbmr",
+            calculator=LGBMRegressorCalculator(),
+            applier=LGBMRegressorApplier(),
+        )
+        estimator.fit_predict(
+            regression_dataset, target_column="target", config={"params": {"n_estimators": 10}}
+        )
+        report = estimator.evaluate(regression_dataset, target_column="target")
+        assert report["problem_type"] == "regression"
+        assert "mse" in report["splits"]["test"].metrics
+
+
+# ===========================================================================
+# Hyperparameter definitions — smoke test registry completeness
+# ===========================================================================
+
+
+class TestHyperparameterRegistry:
+    NEW_MODELS = [
+        "extra_trees_classifier",
+        "extra_trees_regressor",
+        "hist_gradient_boosting_classifier",
+        "hist_gradient_boosting_regressor",
+        "lgbm_classifier",
+        "lgbm_regressor",
+    ]
+
+    def test_all_new_models_have_hyperparams(self) -> None:
+        from skyulf.modeling.hyperparameters import get_hyperparameters
+
+        for key in self.NEW_MODELS:
+            params = get_hyperparameters(key)
+            assert len(params) > 0, f"No hyperparameters defined for {key!r}"
+
+    def test_all_new_models_have_search_spaces(self) -> None:
+        from skyulf.modeling.hyperparameters import get_default_search_space
+
+        for key in self.NEW_MODELS:
+            space = get_default_search_space(key)
+            assert len(space) > 0, f"No search space defined for {key!r}"

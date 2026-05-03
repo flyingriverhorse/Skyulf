@@ -6,7 +6,7 @@ import pandas as pd
 
 # Use relative imports assuming the structure is preserved
 from ..data.dataset import SplitDataset
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 # Evaluation imports - we will migrate these next
 # from .evaluation.schemas import ModelEvaluationReport, ModelEvaluationSplitPayload
@@ -81,7 +81,7 @@ class StatefulEstimator:
 
         engine = get_engine(data)
 
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             if target_column not in data.columns:
                 raise ValueError(f"Target column '{target_column}' not found in data")
             X = data.drop([target_column])

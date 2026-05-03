@@ -3092,7 +3092,7 @@
 <h3 id="what-data-formats-are-supported">What data formats are supported?</h3>
 <ul>
 <li><strong>skyulf-core library:</strong> Pandas DataFrames and Polars DataFrames (auto-detected).</li>
-<li><strong>Web platform:</strong> CSV upload via the data ingestion API. Database sources (PostgreSQL, etc.) via the ingestion endpoint.</li>
+<li><strong>Web platform:</strong> CSV upload via the data ingestion API, as well as S3 bucket ingestion for remote files.</li>
 </ul>
 <h3 id="how-does-the-hybrid-polarspandas-engine-work">How does the hybrid Polars/Pandas engine work?</h3>
 <p>Skyulf auto-detects whether your data is Polars or Pandas. Simple operations (scaling, imputation) run natively in Polars for speed. Complex operations (feature selection, some sklearn-backed nodes) temporarily bridge to Pandas/NumPy via Apache Arrow (near zero-copy). See <a href="engine_mechanics.html">Engine Mechanics</a>.</p>

@@ -21,7 +21,7 @@ from ..utils import (
 from .base import BaseApplier, BaseCalculator
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class SimpleImputerApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -134,7 +134,7 @@ class SimpleImputerCalculator(BaseCalculator):
             return {}
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -234,7 +234,7 @@ class KNNImputerApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -322,7 +322,7 @@ class KNNImputerCalculator(BaseCalculator):
         imputer = KNNImputer(n_neighbors=n_neighbors, weights=weights)
 
         # Use Bridge for fitting
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             # Polars Path
             X_pl: Any = X
             X_subset = X_pl.select(cols)
@@ -363,7 +363,7 @@ class IterativeImputerApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -445,7 +445,7 @@ class IterativeImputerCalculator(BaseCalculator):
         imputer = IterativeImputer(estimator=estimator, max_iter=max_iter, random_state=0)
 
         # Use Bridge for fitting
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             # Polars Path
             X_pl: Any = X
             X_subset = X_pl.select(cols)

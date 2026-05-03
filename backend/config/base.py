@@ -10,6 +10,8 @@ Each mixin lives in ``backend/config/mixins/`` and owns one domain's fields.
 from typing import Any, List, cast
 
 import logging
+import os
+import urllib.parse
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -92,24 +94,39 @@ class Settings(
     @model_validator(mode="after")
     def validate_database_config(self) -> "Settings":
         """Auto-construct DATABASE_URL from component fields when needed."""
+        # pylint: disable=access-member-before-definition
         if self.DB_TYPE == "postgres":
-            if not self.DATABASE_URL.startswith("postgresql"):
+            if not self.DATABASE_URL.startswith(("postgresql", "postgres")):
                 if not all([self.DB_USER, self.DB_PASSWORD, self.DB_HOST, self.DB_NAME]):
                     raise ValueError(
                         "For PostgreSQL, either provide DATABASE_URL or all of: "
                         "DB_USER, DB_PASSWORD, DB_HOST, DB_NAME"
                     )
                 port = self.DB_PORT or 5432
-                self.DATABASE_URL = (
-                    f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@"
+                pwd = urllib.parse.quote_plus(self.DB_PASSWORD) if self.DB_PASSWORD else ""
+                url = (
+                    f"postgresql+asyncpg://{self.DB_USER}:{pwd}@"
                     f"{self.DB_HOST}:{port}/{self.DB_NAME}"
                 )
+                params = []
                 if self.DB_SSLMODE:
-                    self.DATABASE_URL += f"?sslmode={self.DB_SSLMODE}"
+                    params.append(f"sslmode={self.DB_SSLMODE}")
+                if self.DB_SSLROOTCERT:
+                    params.append(f"sslrootcert={self.DB_SSLROOTCERT}")
+                if self.DB_EXTRA_PARAMS:
+                    params.append(self.DB_EXTRA_PARAMS)
+
+                if params:
+                    url += f"?{'&'.join(params)}"
+
+                self.DATABASE_URL = url
         elif self.DB_TYPE == "sqlite":
             if not self.DATABASE_URL.startswith("sqlite"):
                 db_path = self.DB_PATH or "mlops_database.db"
-                self.DATABASE_URL = f"sqlite+aiosqlite:///./{db_path}"
+                if os.path.isabs(db_path):
+                    self.DATABASE_URL = f"sqlite+aiosqlite:///{db_path}"
+                else:
+                    self.DATABASE_URL = f"sqlite+aiosqlite:///./{db_path}"
         return self
 
     # ── Utility ───────────────────────────────────────────────────────

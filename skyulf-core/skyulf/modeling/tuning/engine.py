@@ -174,15 +174,25 @@ class TuningCalculator(BaseModelCalculator):
         if not model_cls:
             raise ValueError("Model calculator does not have a model_class attribute")
 
-        # Filter params to only include those accepted by the model_class constructor
-        # This prevents "unexpected keyword argument 'random_state'" for models like KNN/GaussianNB
+        # Filter params to only include those accepted by the model_class constructor.
+        # When the constructor accepts **kwargs (e.g. LightGBM, XGBoost), pass everything —
+        # the simple `k in sig.parameters` check would otherwise silently strip params like
+        # verbose=-1 / verbosity=-1 that are forwarded through **kwargs.
         import inspect
 
         sig = inspect.signature(model_cls)
-        valid_final_params = {k: v for k, v in final_params.items() if k in sig.parameters}
+        accepts_kwargs = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        )
+        if accepts_kwargs:
+            valid_final_params = final_params
+        else:
+            valid_final_params = {k: v for k, v in final_params.items() if k in sig.parameters}
 
         model = model_cls(**valid_final_params)
-        model.fit(X_np, y_np)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*valid feature names.*")
+            model.fit(X_np, y_np)
 
         return (model, tuning_result)
 
@@ -291,7 +301,25 @@ class TuningCalculator(BaseModelCalculator):
         # The schema defaults metric to "accuracy". If the user is doing Regression but "accuracy"
         # (or another classification metric) is selected, we raise a clear error instead of crashing deeply in sklearn.
         if self.model_calculator.problem_type == "regression":
-            if metric in ["accuracy", "f1", "precision", "recall", "roc_auc", "f1_weighted"]:
+            if metric in [
+                "accuracy",
+                "f1",
+                "precision",
+                "recall",
+                "roc_auc",
+                "f1_weighted",
+                "balanced_accuracy",
+                "log_loss",
+                "matthews_corrcoef",
+                "roc_auc_weighted",
+                "roc_auc_ovr",
+                "roc_auc_ovo",
+                "roc_auc_ovr_weighted",
+                "roc_auc_ovo_weighted",
+                "pr_auc",
+                "pr_auc_weighted",
+                "g_score",
+            ]:
                 raise ValueError(
                     f"Configuration Error: You selected '{metric}' as the tuning metric, "
                     "but this is a Regression model. "
@@ -307,11 +335,20 @@ class TuningCalculator(BaseModelCalculator):
             "mae": "neg_mean_absolute_error",
             "rmse": "neg_root_mean_squared_error",
             "r2": "r2",
+            "explained_variance": "explained_variance",
             "accuracy": "accuracy",
+            "balanced_accuracy": "balanced_accuracy",
             "f1": "f1",
+            "f1_weighted": "f1_weighted",
             "precision": "precision",
             "recall": "recall",
             "roc_auc": "roc_auc",
+            "roc_auc_ovr": "roc_auc_ovr",
+            "roc_auc_ovo": "roc_auc_ovo",
+            "roc_auc_ovr_weighted": "roc_auc_ovr_weighted",
+            "roc_auc_ovo_weighted": "roc_auc_ovo_weighted",
+            "log_loss": "neg_log_loss",
+            "matthews_corrcoef": "matthews_corrcoef",
         }
 
         if metric in metric_map:
@@ -455,6 +492,31 @@ class TuningCalculator(BaseModelCalculator):
             resource = strategy_params.get("resource", "n_samples")
             min_resources = strategy_params.get("min_resources", "exhaust")
 
+            # Halving search uses sklearn's internal scheduler and does NOT
+            # expose per-trial callbacks (no equivalent of Optuna's callbacks=).
+            # Emit a started log here so the Live Logs panel is never empty
+            # while the search is running. Per-iteration progress is not
+            # available without monkey-patching sklearn internals.
+            if log_callback:
+                space = self._clean_search_space(config.search_space)
+                if config.strategy == "halving_grid":
+                    grid_size = int(np.prod([len(v) for v in space.values()] or [0]))
+                    log_callback(
+                        f"Starting halving_grid search "
+                        f"(grid_size={grid_size}, factor={factor}, "
+                        f"resource={resource}, min_resources={min_resources}). "
+                        f"sklearn HalvingGridSearchCV runs without per-trial callbacks; "
+                        f"this may take a while."
+                    )
+                else:
+                    log_callback(
+                        f"Starting halving_random search "
+                        f"(n_candidates={config.n_trials}, factor={factor}, "
+                        f"resource={resource}, min_resources={min_resources}). "
+                        f"sklearn HalvingRandomSearchCV runs without per-trial callbacks; "
+                        f"this may take a while."
+                    )
+
             if isinstance(min_resources, str) and min_resources.isdigit():
                 min_resources = int(min_resources)
 
@@ -493,10 +555,31 @@ class TuningCalculator(BaseModelCalculator):
                     "Optuna is not installed. Please install 'optuna' and 'optuna-integration'."
                 )
 
-            # Convert search space to Optuna distributions
+            # Convert search space to Optuna distributions.
+            # CMA-ES needs continuous distributions — numeric lists become
+            # IntDistribution or FloatDistribution so CMA-ES samples the full
+            # range instead of treating discrete values as categories.
+            # String / bool / None lists remain CategoricalDistribution; CMA-ES
+            # falls back to RandomSampler for those (unavoidable) but we suppress
+            # the noisy warning via warn_independent_sampling=False.
+            strategy_params = getattr(config, "strategy_params", {})
+            use_cmaes = strategy_params.get("sampler", "tpe") == "cmaes"
             distributions = {}
             for k, v in config.search_space.items():
-                if isinstance(v, list):
+                if (
+                    isinstance(v, list)
+                    and use_cmaes
+                    and v
+                    and all(isinstance(x, (int, float)) for x in v)
+                ):
+                    lo, hi = min(v), max(v)
+                    if all(isinstance(x, int) for x in v):
+                        distributions[k] = optuna.distributions.IntDistribution(lo, hi)
+                    else:
+                        distributions[k] = optuna.distributions.FloatDistribution(
+                            float(lo), float(hi)
+                        )
+                elif isinstance(v, list):
                     distributions[k] = optuna.distributions.CategoricalDistribution(v)
                 else:
                     distributions[k] = v
@@ -519,17 +602,17 @@ class TuningCalculator(BaseModelCalculator):
 
                 callbacks.append(_optuna_callback)
 
-            # Strategy Parameters logic
-            strategy_params = getattr(config, "strategy_params", {})
-
             # Sampler Selection
             sampler_name = strategy_params.get("sampler", "tpe")
             if sampler_name == "random":
                 sampler = optuna.samplers.RandomSampler(seed=config.random_state)
             elif sampler_name == "cmaes":
-                # CMA-ES can fail if search space is not purely continuous, fallback gracefully?
-                # Using it here assuming the user knows what they're doing if they select it.
-                sampler = optuna.samplers.CmaEsSampler(seed=config.random_state)
+                # Suppress the fallback warning for genuinely categorical params
+                # (strings, booleans, None) — those can never be continuous and
+                # the random fallback for them is expected behaviour.
+                sampler = optuna.samplers.CmaEsSampler(
+                    seed=config.random_state, warn_independent_sampling=False
+                )
             else:
                 sampler = optuna.samplers.TPESampler(seed=config.random_state)
 
@@ -572,6 +655,14 @@ class TuningCalculator(BaseModelCalculator):
                 warnings.filterwarnings(
                     "ignore",
                     message="Failed to report cross validation scores for TerminatorCallback",
+                )
+                # LightGBM 4.x sets feature_names_in_ even for numpy input; during
+                # halving/optuna internal CV sklearn's validate_data emits this warning
+                # on every fold's score() call. Suppress it here — the root cause is
+                # already fixed in the LGBM calculator's fit() override.
+                warnings.filterwarnings(
+                    "ignore",
+                    message=".*valid feature names.*",
                 )
                 searcher.fit(X_arr, y_arr)
         except Exception as e:
@@ -628,6 +719,20 @@ class TuningCalculator(BaseModelCalculator):
                             "score": results["mean_test_score"][i],
                         }
                     )
+
+        # Final completion log for strategies that don't emit per-trial callbacks
+        # (halving_grid / halving_random / optuna). The grid/random branch above
+        # already logs completion inside its custom loop.
+        if log_callback and config.strategy in [
+            "halving_grid",
+            "halving_random",
+            "optuna",
+        ]:
+            log_callback(
+                f"Tuning Completed ({config.strategy}). "
+                f"Trials evaluated: {len(trials)}. Best Score: {best_score:.4f}"
+            )
+            log_callback(f"Best Params: {best_params}")
 
         return TuningResult(
             best_params=best_params,

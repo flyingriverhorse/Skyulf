@@ -198,7 +198,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       } else if (node.data.definitionType === 'TextCleaning') {
           stepType = 'TextCleaning';
           params = node.data;
-      } else if (node.data.definitionType === 'ValueReplacement') {
+      } else if (node.data.definitionType === 'ValueReplacement' || node.data.definitionType === 'value_replacement') {
           stepType = 'ValueReplacement';
           params = node.data;
       } else if (node.data.definitionType === 'AliasReplacement') {

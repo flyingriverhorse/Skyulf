@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- **Python 3.9+** (3.10 or 3.11 or newer recommended)
+- **Python 3.12**
 - pip 21 or newer
 
 ## Install from PyPI

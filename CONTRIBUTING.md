@@ -3,7 +3,7 @@
 Thanks for considering contributing! This repo focuses on the backend (FastAPI + Celery + scikit-learn).
 
 ## Dev setup
-- Install Python 3.12 (3.10+ supported).
+- Install Python 3.12.
 - Install uv: `pip install uv`
 - Sync deps (app + dev): `uv sync --dev`
 - Activate the virtualenv if needed: `.venv` is created in the project root by uv.
@@ -20,7 +20,7 @@ Alternatively, without uv:
 ## Lint & typecheck
 - Black/Isort: `uv run black . && uv run isort .`
 - Flake8: `uv run flake8`
-- MyPy: `uv run mypy .`
+- Ty (instead of MyPy): `uv run ty`
 
 ## Commit style
 - Keep diffs focused.
@@ -37,7 +37,7 @@ Branch names:
 - `fix/<short-description>`
 - `docs/<short-description>`
 
-Open a Draft PR early if helpful; CI runs on PRs for Python 3.10 and 3.11.
+Open a Draft PR early if helpful; CI runs on PRs for Python 3.12.
 
 ## Issue triage
 - Include environment, steps to reproduce, expected vs actual.

@@ -1,3 +1,4 @@
+from backend.exceptions.core import SkyulfException
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -11,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
 from backend.data_ingestion.schemas.ingestion import (
-    DataSourceCreate,
     IngestionJobResponse,
 )
 from backend.data_ingestion.tasks import ingest_data_task
@@ -176,7 +176,7 @@ class DataIngestionService:
                     raise HTTPException(
                         status_code=400, detail="S3 access denied or resource not found"
                     )
-                raise HTTPException(status_code=500, detail="Failed to read S3 data sample")
+                raise SkyulfException(message="Failed to read S3 data sample")
 
         if source.type in ["file", "csv", "txt"]:
             if not file_path:
@@ -192,7 +192,7 @@ class DataIngestionService:
                 return await self.data_service.get_sample(abs_path, limit=limit)
             except Exception as e:
                 logger.error(f"Failed to get sample: {e}")
-                raise HTTPException(status_code=500, detail="Failed to read data sample")
+                raise SkyulfException(message="Failed to read data sample")
 
         elif source.type in ["s3", "parquet"]:
             # This block might be redundant now if file_path starts with s3://,
@@ -214,7 +214,7 @@ class DataIngestionService:
                     return df.to_dicts()
                 except Exception:
                     logger.exception("Failed to read local parquet: %s", file_path)
-                    raise HTTPException(status_code=500, detail="Failed to read local parquet file")
+                    raise SkyulfException(message="Failed to read local parquet file")
 
             try:
                 logger.info(
@@ -228,7 +228,7 @@ class DataIngestionService:
                 return df.to_dicts()
             except Exception as e:
                 logger.error(f"Failed to get S3 sample: {e}")
-                raise HTTPException(status_code=500, detail="Failed to read S3 data sample")
+                raise SkyulfException(message="Failed to read S3 data sample")
 
         # TODO: Handle other source types (SQL, etc.)
         return []
@@ -256,7 +256,7 @@ class DataIngestionService:
                     await out_file.write(content)
         except Exception as e:
             logger.error(f"Failed to save file: {e}")
-            raise HTTPException(status_code=500, detail="Failed to save file")
+            raise SkyulfException(message="Failed to save file")
 
         # 3. Create DataSource record
         try:
@@ -306,60 +306,7 @@ class DataIngestionService:
             # Cleanup file if DB fails
             if file_path.exists():
                 file_path.unlink()
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-
-    async def create_database_source(
-        self,
-        data: DataSourceCreate,
-        user_id: int,
-        background_tasks: Optional[BackgroundTasks] = None,
-    ) -> IngestionJobResponse:
-        """
-        Create a database source and trigger ingestion.
-        """
-        try:
-            source_id = str(uuid.uuid4())
-            new_source = DataSource(
-                source_id=source_id,
-                name=data.name,
-                type=data.type,  # 'postgres', 'mysql', etc.
-                config=data.config,
-                created_by=user_id,
-                is_active=True,
-                test_status="untested",
-                description=data.description,
-                source_metadata={
-                    "ingestion_status": {
-                        "status": "pending",
-                        "progress": 0.0,
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                    }
-                },
-            )
-            self.session.add(new_source)
-            await self.session.commit()
-            await self.session.refresh(new_source)
-
-            # Trigger ingestion
-            settings = get_settings()
-            if settings.USE_CELERY:
-                ingest_data_task.delay(new_source.id)
-            elif background_tasks:
-                background_tasks.add_task(ingest_data_task, new_source.id)
-            else:
-                # Fallback: Run in thread
-                import asyncio
-
-                asyncio.create_task(asyncio.to_thread(ingest_data_task, new_source.id))
-
-            return IngestionJobResponse(
-                job_id=str(new_source.id),
-                status="pending",
-                message="Database source created and ingestion started",
-            )
-        except Exception as e:
-            logger.error(f"Failed to create database source: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to create source: {str(e)}")
+            raise SkyulfException(message=f"Database error: {str(e)}")
 
     async def get_ingestion_status(self, source_id: int) -> Dict[str, Any]:
         """

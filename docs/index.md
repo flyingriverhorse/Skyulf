@@ -14,7 +14,7 @@ Skyulf is a self-hosted, privacy-first MLOps platform. Bring your data, clean it
 | **20+ Models** | Classification & Regression (Random Forest, XGBoost, SVM, KNN, and more) |
 | **Advanced Tuning** | Grid, Random, Successive Halving, and Optuna with configurable Samplers & Pruners |
 | **Automated EDA** | Profiling, outlier detection, PCA, causal discovery, drift monitoring |
-| **Hybrid Engine** | Polars for fast ingestion, Pandas/Scikit-Learn for ML compatibility |
+| **Dual Engine** | Polars for fast ingestion/preprocessing, Zero-Copy NumPy/Scikit-Learn via `SklearnBridge` |
 | **Leakage Prevention** | Calculator/Applier architecture ensures train-only statistics |
 | **One-Click Deploy** | Serve models via REST API with built-in inference testing |
 

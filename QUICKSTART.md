@@ -16,9 +16,9 @@ Once running, open: http://127.0.0.1:8000/docs
 
 ## 1. Decide how you want to run it
 
-- **Option A – One-click script (easiest):** Just needs Python 3.10+. Run `start.bat` or `start.sh`. No Docker, no Redis.
+- **Option A – One-click script (easiest):** Just needs Python 3.12. Run `start.bat` or `start.sh`. No Docker, no Redis.
 - **Option B – Docker Compose (recommended for production-like setup):** Needs only Docker Desktop. Launches API + Redis + Celery worker in containers.
-- **Option C – Manual environment:** Full control. Requires Python 3.10+ and optionally Redis.
+- **Option C – Manual environment:** Full control. Requires Python 3.12 and optionally Redis.
 
 Node.js stays optional for all paths—it's only necessary if you plan to build the frontend bundle yourself.
 

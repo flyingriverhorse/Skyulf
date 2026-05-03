@@ -6,7 +6,7 @@ from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
 from ..utils import detect_numeric_columns, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 
 class DatasetProfileApplier(BaseApplier):
@@ -39,7 +39,7 @@ class DatasetProfileCalculator(BaseCalculator):
 
         profile: Dict[str, Any] = {}
 
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             profile["rows"] = len(X)
@@ -118,7 +118,7 @@ class DataSnapshotCalculator(BaseCalculator):
 
         n = config.get("n_rows", 5)
 
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             snapshot = X.head(n).to_dicts()
         else:
             snapshot = X.head(n).to_dict(orient="records")
