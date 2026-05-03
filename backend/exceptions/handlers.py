@@ -9,14 +9,11 @@ import logging
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from backend.exceptions.core import SkyulfException
-
 logger = logging.getLogger(__name__)
 
 
 async def skyulf_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle custom Skyulf app exceptions."""
-    # Type cast for strictly verified properties
     from backend.exceptions.core import SkyulfException
 
     if not isinstance(exc, SkyulfException):

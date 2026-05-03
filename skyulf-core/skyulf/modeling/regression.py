@@ -373,7 +373,7 @@ class HistGradientBoostingRegressorApplier(SklearnApplier):
     id="hist_gradient_boosting_regressor",
     name="Hist Gradient Boosting Regressor",
     category="Modeling",
-    description="Histogram-based gradient boosting — sklearn's fast LightGBM-style implementation. Handles NaN natively.",
+    description="Histogram-based gradient boosting — sklearn's fast LightGBM-style implementation.",
     params={"max_iter": 100, "learning_rate": 0.1, "max_leaf_nodes": 31},
 )
 class HistGradientBoostingRegressorCalculator(SklearnCalculator):
@@ -422,7 +422,7 @@ if LIGHTGBM_AVAILABLE:
         id="lgbm_regressor",
         name="LightGBM Regressor",
         category="Modeling",
-        description="Microsoft LightGBM: leaf-wise gradient boosting, fast and memory-efficient with categorical support.",
+        description="LightGBM: leaf-wise gradient boosting, fast and memory-efficient with categorical support.",
         params={"n_estimators": 100, "num_leaves": 31, "learning_rate": 0.1},
     )
     class LGBMRegressorCalculator(SklearnCalculator):
