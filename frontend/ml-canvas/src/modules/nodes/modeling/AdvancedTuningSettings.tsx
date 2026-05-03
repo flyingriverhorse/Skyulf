@@ -329,14 +329,13 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                           value={config.search_strategy ?? 'random'}
                           onChange={(e) => {
                               const newStrategy = e.target.value;
-                              // Clear strategy params when switching to plain grid/random to avoid passing junk
-                              const newParams = (newStrategy === 'grid' || newStrategy === 'random') 
-                                                ? {} 
-                                                : config.strategy_params || {};
+                              // Always clear strategy_params when changing strategy — prevents stale
+                              // optuna/halving settings (e.g. sampler=cmaes) from silently carrying
+                              // over to a different strategy or a fresh selection.
                               onChange({ 
                                   ...config, 
                                   search_strategy: newStrategy,
-                                  strategy_params: newParams 
+                                  strategy_params: {}
                               });
                           }}
                             className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
@@ -347,6 +346,44 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                             <option value="halving_random">Successive Halving (Randomized)</option>
                             <option value="optuna">Optuna Search</option>
                         </select>
+                      {/* Show active settings summary — configured params or default hint */}
+                      {(config.search_strategy === 'optuna' || config.search_strategy === 'halving_grid' || config.search_strategy === 'halving_random') && (() => {
+                          const hasParams = config.strategy_params && Object.keys(config.strategy_params).length > 0;
+                          if (hasParams) {
+                              // Show compact summary of what's configured
+                              const parts: string[] = [];
+                              const sp = config.strategy_params as Record<string, unknown>;
+                              if (config.search_strategy === 'optuna') {
+                                  parts.push(`sampler: ${sp.sampler ?? 'tpe'}`);
+                                  parts.push(`pruner: ${sp.pruner ?? 'median'}`);
+                                  if (sp.timeout) parts.push(`timeout: ${sp.timeout}s`);
+                              } else {
+                                  if (sp.factor) parts.push(`factor: ${sp.factor}`);
+                                  if (sp.min_resources) parts.push(`min: ${sp.min_resources}`);
+                              }
+                              return (
+                                  <p className="mt-1.5 text-xs text-blue-600 dark:text-blue-400">
+                                      ⚙ {parts.join(' · ')}
+                                  </p>
+                              );
+                          }
+                          // No params configured — show default hint
+                          const defaultHint = config.search_strategy === 'optuna'
+                              ? 'sampler: tpe · pruner: median'
+                              : 'factor: 3 · min: exhaust';
+                          return (
+                              <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                                  Using defaults ({defaultHint}).{' '}
+                                  <button
+                                      type="button"
+                                      onClick={() => setShowStrategyModal(true)}
+                                      className="underline hover:text-blue-500 transition-colors"
+                                  >
+                                      Customize
+                                  </button>
+                              </p>
+                          );
+                      })()}
                     </div>
                     
                     <div>
