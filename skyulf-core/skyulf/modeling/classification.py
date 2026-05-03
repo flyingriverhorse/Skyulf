@@ -2,7 +2,9 @@
 
 from sklearn.ensemble import (
     AdaBoostClassifier,
+    ExtraTreesClassifier,
     GradientBoostingClassifier,
+    HistGradientBoostingClassifier,
     RandomForestClassifier,
 )
 from sklearn.linear_model import LogisticRegression
@@ -17,6 +19,13 @@ try:
     XGBOOST_AVAILABLE = True
 except ImportError:
     XGBOOST_AVAILABLE = False
+
+try:
+    from lightgbm import LGBMClassifier  # ty: ignore[unresolved-import]
+
+    LIGHTGBM_AVAILABLE = True
+except ImportError:
+    LIGHTGBM_AVAILABLE = False
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
@@ -258,6 +267,113 @@ if XGBOOST_AVAILABLE:
                     "colsample_bytree": 0.8,
                     "n_jobs": -1,
                     "random_state": 42,
+                },
+                problem_type="classification",
+            )
+
+
+# --- Extra Trees Classifier ---
+class ExtraTreesClassifierApplier(SklearnApplier):
+    """Extra Trees Classifier Applier."""
+
+
+@NodeRegistry.register("extra_trees_classifier", ExtraTreesClassifierApplier)
+@node_meta(
+    id="extra_trees_classifier",
+    name="Extra Trees Classifier",
+    category="Modeling",
+    description="Extremely randomised trees — faster than Random Forest, often comparably accurate.",
+    params={"n_estimators": 100, "max_depth": None, "min_samples_split": 2},
+)
+class ExtraTreesClassifierCalculator(SklearnCalculator):
+    """Extra Trees Classifier Calculator."""
+
+    def __init__(self):
+        super().__init__(
+            model_class=ExtraTreesClassifier,
+            default_params={
+                "n_estimators": 100,
+                "max_depth": None,
+                "min_samples_split": 2,
+                "min_samples_leaf": 1,
+                "criterion": "gini",
+                "bootstrap": False,
+                "n_jobs": -1,
+                "random_state": 42,
+            },
+            problem_type="classification",
+        )
+
+
+# --- HistGradientBoosting Classifier ---
+class HistGradientBoostingClassifierApplier(SklearnApplier):
+    """HistGradientBoosting Classifier Applier."""
+
+
+@NodeRegistry.register(
+    "hist_gradient_boosting_classifier", HistGradientBoostingClassifierApplier
+)
+@node_meta(
+    id="hist_gradient_boosting_classifier",
+    name="Hist Gradient Boosting Classifier",
+    category="Modeling",
+    description="Histogram-based gradient boosting — sklearn's fast LightGBM-style implementation. Handles NaN natively.",
+    params={"max_iter": 100, "learning_rate": 0.1, "max_leaf_nodes": 31},
+)
+class HistGradientBoostingClassifierCalculator(SklearnCalculator):
+    """HistGradientBoosting Classifier Calculator."""
+
+    def __init__(self):
+        super().__init__(
+            model_class=HistGradientBoostingClassifier,
+            default_params={
+                "max_iter": 100,
+                "learning_rate": 0.1,
+                "max_leaf_nodes": 31,
+                "max_depth": None,
+                "min_samples_leaf": 20,
+                "l2_regularization": 0.0,
+                "max_bins": 255,
+                "random_state": 42,
+            },
+            problem_type="classification",
+        )
+
+
+# --- LightGBM Classifier (optional) ---
+if LIGHTGBM_AVAILABLE:
+
+    class LGBMClassifierApplier(SklearnApplier):
+        """LightGBM Classifier Applier."""
+
+    @NodeRegistry.register("lgbm_classifier", LGBMClassifierApplier)
+    @node_meta(
+        id="lgbm_classifier",
+        name="LightGBM Classifier",
+        category="Modeling",
+        description="Microsoft LightGBM: leaf-wise gradient boosting, fast and memory-efficient with categorical support.",
+        params={"n_estimators": 100, "num_leaves": 31, "learning_rate": 0.1},
+    )
+    class LGBMClassifierCalculator(SklearnCalculator):
+        """LightGBM Classifier Calculator."""
+
+        def __init__(self):
+            super().__init__(
+                model_class=LGBMClassifier,
+                default_params={
+                    "n_estimators": 100,
+                    "num_leaves": 31,
+                    "learning_rate": 0.1,
+                    "max_depth": -1,
+                    "min_child_samples": 20,
+                    "subsample": 1.0,
+                    "colsample_bytree": 1.0,
+                    "reg_alpha": 0.0,
+                    "reg_lambda": 0.0,
+                    "boosting_type": "gbdt",
+                    "n_jobs": -1,
+                    "random_state": 42,
+                    "verbose": -1,
                 },
                 problem_type="classification",
             )

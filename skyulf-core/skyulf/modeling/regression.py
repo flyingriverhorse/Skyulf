@@ -2,7 +2,9 @@
 
 from sklearn.ensemble import (
     AdaBoostRegressor,
+    ExtraTreesRegressor,
     GradientBoostingRegressor,
+    HistGradientBoostingRegressor,
     RandomForestRegressor,
 )
 from sklearn.linear_model import ElasticNet, Lasso, Ridge, LinearRegression
@@ -16,6 +18,13 @@ try:
     XGBOOST_AVAILABLE = True
 except ImportError:
     XGBOOST_AVAILABLE = False
+
+try:
+    from lightgbm import LGBMRegressor  # ty: ignore[unresolved-import]
+
+    LIGHTGBM_AVAILABLE = True
+except ImportError:
+    LIGHTGBM_AVAILABLE = False
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
@@ -305,6 +314,113 @@ class AdaBoostRegressorCalculator(SklearnCalculator):
             },
             problem_type="regression",
         )
+
+
+# --- Extra Trees Regressor ---
+class ExtraTreesRegressorApplier(SklearnApplier):
+    """Extra Trees Regressor Applier."""
+
+
+@NodeRegistry.register("extra_trees_regressor", ExtraTreesRegressorApplier)
+@node_meta(
+    id="extra_trees_regressor",
+    name="Extra Trees Regressor",
+    category="Modeling",
+    description="Extremely randomised trees — faster than Random Forest, often comparably accurate.",
+    params={"n_estimators": 100, "max_depth": None, "min_samples_split": 2},
+)
+class ExtraTreesRegressorCalculator(SklearnCalculator):
+    """Extra Trees Regressor Calculator."""
+
+    def __init__(self):
+        super().__init__(
+            model_class=ExtraTreesRegressor,
+            default_params={
+                "n_estimators": 100,
+                "max_depth": None,
+                "min_samples_split": 2,
+                "min_samples_leaf": 1,
+                "criterion": "squared_error",
+                "bootstrap": False,
+                "n_jobs": -1,
+                "random_state": 42,
+            },
+            problem_type="regression",
+        )
+
+
+# --- HistGradientBoosting Regressor ---
+class HistGradientBoostingRegressorApplier(SklearnApplier):
+    """HistGradientBoosting Regressor Applier."""
+
+
+@NodeRegistry.register(
+    "hist_gradient_boosting_regressor", HistGradientBoostingRegressorApplier
+)
+@node_meta(
+    id="hist_gradient_boosting_regressor",
+    name="Hist Gradient Boosting Regressor",
+    category="Modeling",
+    description="Histogram-based gradient boosting — sklearn's fast LightGBM-style implementation. Handles NaN natively.",
+    params={"max_iter": 100, "learning_rate": 0.1, "max_leaf_nodes": 31},
+)
+class HistGradientBoostingRegressorCalculator(SklearnCalculator):
+    """HistGradientBoosting Regressor Calculator."""
+
+    def __init__(self):
+        super().__init__(
+            model_class=HistGradientBoostingRegressor,
+            default_params={
+                "max_iter": 100,
+                "learning_rate": 0.1,
+                "max_leaf_nodes": 31,
+                "max_depth": None,
+                "min_samples_leaf": 20,
+                "l2_regularization": 0.0,
+                "max_bins": 255,
+                "random_state": 42,
+            },
+            problem_type="regression",
+        )
+
+
+# --- LightGBM Regressor (optional) ---
+if LIGHTGBM_AVAILABLE:
+
+    class LGBMRegressorApplier(SklearnApplier):
+        """LightGBM Regressor Applier."""
+
+    @NodeRegistry.register("lgbm_regressor", LGBMRegressorApplier)
+    @node_meta(
+        id="lgbm_regressor",
+        name="LightGBM Regressor",
+        category="Modeling",
+        description="Microsoft LightGBM: leaf-wise gradient boosting, fast and memory-efficient with categorical support.",
+        params={"n_estimators": 100, "num_leaves": 31, "learning_rate": 0.1},
+    )
+    class LGBMRegressorCalculator(SklearnCalculator):
+        """LightGBM Regressor Calculator."""
+
+        def __init__(self):
+            super().__init__(
+                model_class=LGBMRegressor,
+                default_params={
+                    "n_estimators": 100,
+                    "num_leaves": 31,
+                    "learning_rate": 0.1,
+                    "max_depth": -1,
+                    "min_child_samples": 20,
+                    "subsample": 1.0,
+                    "colsample_bytree": 1.0,
+                    "reg_alpha": 0.0,
+                    "reg_lambda": 0.0,
+                    "boosting_type": "gbdt",
+                    "n_jobs": -1,
+                    "random_state": 42,
+                    "verbose": -1,
+                },
+                problem_type="regression",
+            )
 
 
 # --- XGBoost ---

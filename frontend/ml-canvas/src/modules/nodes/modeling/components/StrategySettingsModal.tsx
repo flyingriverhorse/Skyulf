@@ -16,6 +16,10 @@ const CMAES_PARTIAL_MODELS = new Set([
     'k_neighbors_regressor',
     'decision_tree_classifier',
     'decision_tree_regressor',
+    'extra_trees_classifier',   // criterion (str), bootstrap (bool) in search space
+    'extra_trees_regressor',    // criterion (str), bootstrap (bool) in search space
+    'lgbm_classifier',          // boosting_type (str) in search space
+    'lgbm_regressor',           // boosting_type (str) in search space
 ]);
 
 export interface StrategyConfig {

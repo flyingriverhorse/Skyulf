@@ -40,6 +40,7 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
     "uvicorn[standard]>=0.24.0,<1.0.0",
     "xgboost>=2.1.4",
+    "lightgbm>=4.0.0",
     "optuna>=4.0,<5",
     "optuna-integration>=4.0,<5",
     "skyulf-core>=0.1.2",
