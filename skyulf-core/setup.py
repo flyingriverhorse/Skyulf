@@ -43,12 +43,9 @@ setup(
         "preprocessing-imbalanced": ["imbalanced-learn>=0.13.0"],
         "modeling-xgboost": ["xgboost>=2.1.4"],
     },
-    python_requires=">=3.9",
+    python_requires=">=3.12",
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Operating System :: OS Independent",
     ],
