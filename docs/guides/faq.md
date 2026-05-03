@@ -89,7 +89,7 @@ Absolutely. `skyulf-core` is a standalone PyPI package. Install it with `pip ins
 
 ### What Python version is required?
 
-Python 3.9 or higher. We recommend 3.10 or 3.11 or 3.12.
+Python 3.12.
 
 ### Does Skyulf support GPU training?
 
