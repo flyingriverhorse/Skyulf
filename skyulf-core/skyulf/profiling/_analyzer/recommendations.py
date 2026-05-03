@@ -108,13 +108,8 @@ class RecommendationsMixin(_AnalyzerState):
 
         if target_col and target_col in profiles:
             target_profile = profiles[target_col]
-            if (
-                target_profile.dtype == "Categorical"
-                and target_profile.categorical_stats
-            ):
-                counts = [
-                    item["count"] for item in target_profile.categorical_stats.top_k
-                ]
+            if target_profile.dtype == "Categorical" and target_profile.categorical_stats:
+                counts = [item["count"] for item in target_profile.categorical_stats.top_k]
                 if counts:
                     min_c = min(counts)
                     max_c = max(counts)

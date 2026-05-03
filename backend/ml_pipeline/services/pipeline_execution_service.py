@@ -24,7 +24,9 @@ from backend.realtime.events import JobEvent, publish_job_event
 logger = logging.getLogger(__name__)
 
 
-def execute_pipeline(job_id: str, pipeline_config_dict: dict, session: Session) -> None:  # noqa: C901
+def execute_pipeline(
+    job_id: str, pipeline_config_dict: dict, session: Session
+) -> None:  # noqa: C901
     """Run a full ML pipeline for *job_id* using the supplied sync *session*.
 
     Raises nothing — all exceptions are caught, written to the job row, and
@@ -178,11 +180,7 @@ def _resolve_dataset_name(session: Session, job: object) -> str:
         ds = session.query(DataSource).filter(DataSource.source_id == source_id).first()
         if not ds:
             try:
-                ds = (
-                    session.query(DataSource)
-                    .filter(DataSource.id == int(source_id))
-                    .first()
-                )
+                ds = session.query(DataSource).filter(DataSource.id == int(source_id)).first()
             except ValueError:
                 pass
         if ds:

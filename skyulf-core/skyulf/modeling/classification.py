@@ -324,9 +324,7 @@ class HistGradientBoostingClassifierApplier(SklearnApplier):
     """HistGradientBoosting Classifier Applier."""
 
 
-@NodeRegistry.register(
-    "hist_gradient_boosting_classifier", HistGradientBoostingClassifierApplier
-)
+@NodeRegistry.register("hist_gradient_boosting_classifier", HistGradientBoostingClassifierApplier)
 @node_meta(
     id="hist_gradient_boosting_classifier",
     name="Hist Gradient Boosting Classifier",
@@ -372,18 +370,14 @@ if LIGHTGBM_AVAILABLE:
             import warnings
 
             with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore", message=".*valid feature names.*"
-                )
+                warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 return super().predict(df, model_artifact)
 
         def predict_proba(self, df, model_artifact):
             import warnings
 
             with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore", message=".*valid feature names.*"
-                )
+                warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 return super().predict_proba(df, model_artifact)
 
     @NodeRegistry.register("lgbm_classifier", LGBMClassifierApplier)
@@ -419,14 +413,21 @@ if LIGHTGBM_AVAILABLE:
                 problem_type="classification",
             )
 
-        def fit(self, X, y, config, **kwargs):
+        def fit(
+            self, X, y, config, progress_callback=None, log_callback=None, validation_data=None
+        ):
             import warnings
 
             with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore", message=".*valid feature names.*"
+                warnings.filterwarnings("ignore", message=".*valid feature names.*")
+                return super().fit(
+                    X,
+                    y,
+                    config,
+                    progress_callback=progress_callback,
+                    log_callback=log_callback,
+                    validation_data=validation_data,
                 )
-                return super().fit(X, y, config, **kwargs)
 
 
 # --- Gaussian NB ---

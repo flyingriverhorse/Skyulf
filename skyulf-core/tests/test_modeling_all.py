@@ -509,10 +509,12 @@ class TestHistGradientBoostingClassifier:
 
         ds = classification_dataset
         # Inject NaN into training set
-        train_with_nan = ds.train.copy()
+        import pandas as _pd
+        train_with_nan = _pd.DataFrame(ds.train).copy()
         train_with_nan.iloc[0, 0] = np.nan
 
         from skyulf.data.dataset import SplitDataset
+
         ds_nan = SplitDataset(train=train_with_nan, test=ds.test, validation=None)
 
         estimator = StatefulEstimator(
@@ -520,7 +522,9 @@ class TestHistGradientBoostingClassifier:
             calculator=HistGradientBoostingClassifierCalculator(),
             applier=HistGradientBoostingClassifierApplier(),
         )
-        preds = estimator.fit_predict(ds_nan, target_column="target", config={"params": {"max_iter": 20}})
+        preds = estimator.fit_predict(
+            ds_nan, target_column="target", config={"params": {"max_iter": 20}}
+        )
         assert len(preds["test"]) == 40
 
 

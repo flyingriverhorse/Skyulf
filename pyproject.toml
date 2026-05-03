@@ -160,6 +160,7 @@ exclude = [
     "tmp_repro_artifacts",
     "build",
     "dist",
+    "skyulf-core/skyulf/profiling/analyzer_backup.py",
 ]
 
 [tool.uv.sources]

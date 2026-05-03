@@ -56,10 +56,7 @@ class NumericMixin(_AnalyzerState):
                 # Singular matrix = perfect multicollinearity; flag everything.
                 return {col: 999.0 for col in numeric_cols}
 
-            return {
-                col: max(1.0, float(inv_corr[i, i]))
-                for i, col in enumerate(numeric_cols)
-            }
+            return {col: max(1.0, float(inv_corr[i, i])) for i, col in enumerate(numeric_cols)}
         except Exception as e:
             print(f"Error calculating VIF: {e}")
             return None

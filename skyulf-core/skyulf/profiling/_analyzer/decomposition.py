@@ -61,9 +61,7 @@ class DecompositionMixin(_AnalyzerState):
                         pass
 
             col_expr = (
-                pl.col(col).cast(pl.Utf8)
-                if (is_numeric and isinstance(val, str))
-                else pl.col(col)
+                pl.col(col).cast(pl.Utf8) if (is_numeric and isinstance(val, str)) else pl.col(col)
             )
 
             if op == "==":
@@ -109,9 +107,7 @@ class DecompositionMixin(_AnalyzerState):
             return []
 
         # Surface nulls as "Unknown" rather than dropping them.
-        temp_df = filtered_df.with_columns(
-            pl.col(split_col).fill_null("Unknown").cast(pl.Utf8)
-        )
+        temp_df = filtered_df.with_columns(pl.col(split_col).fill_null("Unknown").cast(pl.Utf8))
 
         if not measure_col:
             agg_df = temp_df.group_by(split_col).agg(pl.len().alias("value"))
@@ -119,21 +115,13 @@ class DecompositionMixin(_AnalyzerState):
             if measure_col not in temp_df.columns:
                 return []
             if measure_agg == "sum":
-                agg_df = temp_df.group_by(split_col).agg(
-                    pl.col(measure_col).sum().alias("value")
-                )
+                agg_df = temp_df.group_by(split_col).agg(pl.col(measure_col).sum().alias("value"))
             elif measure_agg == "mean":
-                agg_df = temp_df.group_by(split_col).agg(
-                    pl.col(measure_col).mean().alias("value")
-                )
+                agg_df = temp_df.group_by(split_col).agg(pl.col(measure_col).mean().alias("value"))
             elif measure_agg == "min":
-                agg_df = temp_df.group_by(split_col).agg(
-                    pl.col(measure_col).min().alias("value")
-                )
+                agg_df = temp_df.group_by(split_col).agg(pl.col(measure_col).min().alias("value"))
             elif measure_agg == "max":
-                agg_df = temp_df.group_by(split_col).agg(
-                    pl.col(measure_col).max().alias("value")
-                )
+                agg_df = temp_df.group_by(split_col).agg(pl.col(measure_col).max().alias("value"))
             else:
                 agg_df = temp_df.group_by(split_col).agg(pl.len().alias("value"))
 
@@ -141,9 +129,7 @@ class DecompositionMixin(_AnalyzerState):
         if total_val == 0 or total_val is None:
             result_df = agg_df.with_columns(pl.lit(0.0).alias("ratio"))
         else:
-            result_df = agg_df.with_columns(
-                (pl.col("value") / total_val).alias("ratio")
-            )
+            result_df = agg_df.with_columns((pl.col("value") / total_val).alias("ratio"))
 
         result_df = result_df.sort("value", descending=True)
 

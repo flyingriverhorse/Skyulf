@@ -22,9 +22,7 @@ class CausalMixin(_AnalyzerState):
             if len(numeric_cols) > 15:
                 # Heuristic: if any column name looks like a target, keep it + top-14 by |corr|.
                 target_candidates = [
-                    c
-                    for c in numeric_cols
-                    if "target" in c.lower() or "label" in c.lower()
+                    c for c in numeric_cols if "target" in c.lower() or "label" in c.lower()
                 ]
                 primary_target = target_candidates[0] if target_candidates else None
 
@@ -87,21 +85,13 @@ class CausalMixin(_AnalyzerState):
                     if end_j == 0 and end_i == 0:
                         continue
                     if end_i == -1 and end_j == 1:
-                        edges.append(
-                            CausalEdge(source=source, target=target, type="directed")
-                        )
+                        edges.append(CausalEdge(source=source, target=target, type="directed"))
                     elif end_i == 1 and end_j == -1:
-                        edges.append(
-                            CausalEdge(source=target, target=source, type="directed")
-                        )
+                        edges.append(CausalEdge(source=target, target=source, type="directed"))
                     elif end_i == -1 and end_j == -1:
-                        edges.append(
-                            CausalEdge(source=source, target=target, type="undirected")
-                        )
+                        edges.append(CausalEdge(source=source, target=target, type="undirected"))
                     elif end_i == 1 and end_j == 1:
-                        edges.append(
-                            CausalEdge(source=source, target=target, type="bidirected")
-                        )
+                        edges.append(CausalEdge(source=source, target=target, type="bidirected"))
 
             return CausalGraph(nodes=nodes, edges=edges)
 

@@ -174,15 +174,25 @@ class TuningCalculator(BaseModelCalculator):
         if not model_cls:
             raise ValueError("Model calculator does not have a model_class attribute")
 
-        # Filter params to only include those accepted by the model_class constructor
-        # This prevents "unexpected keyword argument 'random_state'" for models like KNN/GaussianNB
+        # Filter params to only include those accepted by the model_class constructor.
+        # When the constructor accepts **kwargs (e.g. LightGBM, XGBoost), pass everything —
+        # the simple `k in sig.parameters` check would otherwise silently strip params like
+        # verbose=-1 / verbosity=-1 that are forwarded through **kwargs.
         import inspect
 
         sig = inspect.signature(model_cls)
-        valid_final_params = {k: v for k, v in final_params.items() if k in sig.parameters}
+        accepts_kwargs = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        )
+        if accepts_kwargs:
+            valid_final_params = final_params
+        else:
+            valid_final_params = {k: v for k, v in final_params.items() if k in sig.parameters}
 
         model = model_cls(**valid_final_params)
-        model.fit(X_np, y_np)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*valid feature names.*")
+            model.fit(X_np, y_np)
 
         return (model, tuning_result)
 
@@ -292,11 +302,23 @@ class TuningCalculator(BaseModelCalculator):
         # (or another classification metric) is selected, we raise a clear error instead of crashing deeply in sklearn.
         if self.model_calculator.problem_type == "regression":
             if metric in [
-                "accuracy", "f1", "precision", "recall", "roc_auc", "f1_weighted",
-                "balanced_accuracy", "log_loss", "matthews_corrcoef",
-                "roc_auc_weighted", "roc_auc_ovr", "roc_auc_ovo",
-                "roc_auc_ovr_weighted", "roc_auc_ovo_weighted",
-                "pr_auc", "pr_auc_weighted", "g_score",
+                "accuracy",
+                "f1",
+                "precision",
+                "recall",
+                "roc_auc",
+                "f1_weighted",
+                "balanced_accuracy",
+                "log_loss",
+                "matthews_corrcoef",
+                "roc_auc_weighted",
+                "roc_auc_ovr",
+                "roc_auc_ovo",
+                "roc_auc_ovr_weighted",
+                "roc_auc_ovo_weighted",
+                "pr_auc",
+                "pr_auc_weighted",
+                "g_score",
             ]:
                 raise ValueError(
                     f"Configuration Error: You selected '{metric}' as the tuning metric, "
@@ -544,8 +566,11 @@ class TuningCalculator(BaseModelCalculator):
             use_cmaes = strategy_params.get("sampler", "tpe") == "cmaes"
             distributions = {}
             for k, v in config.search_space.items():
-                if isinstance(v, list) and use_cmaes and v and all(
-                    isinstance(x, (int, float)) for x in v
+                if (
+                    isinstance(v, list)
+                    and use_cmaes
+                    and v
+                    and all(isinstance(x, (int, float)) for x in v)
                 ):
                     lo, hi = min(v), max(v)
                     if all(isinstance(x, int) for x in v):

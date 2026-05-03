@@ -368,9 +368,7 @@ class HistGradientBoostingRegressorApplier(SklearnApplier):
     """HistGradientBoosting Regressor Applier."""
 
 
-@NodeRegistry.register(
-    "hist_gradient_boosting_regressor", HistGradientBoostingRegressorApplier
-)
+@NodeRegistry.register("hist_gradient_boosting_regressor", HistGradientBoostingRegressorApplier)
 @node_meta(
     id="hist_gradient_boosting_regressor",
     name="Hist Gradient Boosting Regressor",
@@ -416,9 +414,7 @@ if LIGHTGBM_AVAILABLE:
             import warnings
 
             with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore", message=".*valid feature names.*"
-                )
+                warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 return super().predict(df, model_artifact)
 
     @NodeRegistry.register("lgbm_regressor", LGBMRegressorApplier)
@@ -454,14 +450,21 @@ if LIGHTGBM_AVAILABLE:
                 problem_type="regression",
             )
 
-        def fit(self, X, y, config, **kwargs):
+        def fit(
+            self, X, y, config, progress_callback=None, log_callback=None, validation_data=None
+        ):
             import warnings
 
             with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore", message=".*valid feature names.*"
+                warnings.filterwarnings("ignore", message=".*valid feature names.*")
+                return super().fit(
+                    X,
+                    y,
+                    config,
+                    progress_callback=progress_callback,
+                    log_callback=log_callback,
+                    validation_data=validation_data,
                 )
-                return super().fit(X, y, config, **kwargs)
 
 
 # --- XGBoost ---
