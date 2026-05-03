@@ -28,7 +28,6 @@ from backend.database.models import (
     BasicTrainingJob,
     DataSource,
     Deployment,
-    PipelineVersion,
 )
 from backend.ml_pipeline.services.pipeline_versions_service import (
     PipelineVersionsService,

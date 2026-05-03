@@ -10,7 +10,6 @@ import logging
 import re
 import traceback
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy.orm import Session
 

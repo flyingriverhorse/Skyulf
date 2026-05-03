@@ -3,7 +3,6 @@ from fastapi.responses import Response
 
 from .dependencies import get_data_service
 from .schemas.ingestion import (
-    DataSourceCreate,
     DataSourceListResponse,
     DataSourceRead,
     DataSourceResponse,

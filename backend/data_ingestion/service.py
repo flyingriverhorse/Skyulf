@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
 from backend.data_ingestion.schemas.ingestion import (
-    DataSourceCreate,
     IngestionJobResponse,
 )
 from backend.data_ingestion.tasks import ingest_data_task
