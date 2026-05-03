@@ -41,10 +41,14 @@ const PAGE_SIZE = 50;
 
 export const useJobStore = create<JobState>((set, get) => {
   let pollingInterval: ReturnType<typeof setInterval> | null = null;
+  let pollingDeadline: number | null = null;   // hard stop timestamp
   let unsubscribeWs: (() => void) | null = null;
   let unsubscribeStatus: (() => void) | null = null;
   let wsConnected = false;
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Hard cap: never poll for more than 30 minutes after startPolling.
+  const MAX_POLL_DURATION_MS = 30 * 60 * 1000;
 
   // Coalesce bursty WS events (a Celery task can publish status +
   // progress + status within a few ms). One refresh per 250ms is enough
@@ -68,6 +72,12 @@ export const useJobStore = create<JobState>((set, get) => {
 
   // The shared poll-tick body: also used as the WS-event refresh.
   const runPollTick = async (): Promise<void> => {
+    // Hard deadline guard: stop polling if we've exceeded the cap.
+    if (pollingDeadline !== null && Date.now() > pollingDeadline) {
+      get().stopPolling();
+      return;
+    }
+
     try {
       const latestJobs = await jobsApi.getJobs(PAGE_SIZE, 0);
 
@@ -79,10 +89,17 @@ export const useJobStore = create<JobState>((set, get) => {
           }
       });
 
-      // Stop polling if no active jobs and drawer is closed. WS still
-      // listens — a fresh `created` event will revive the loop.
-      const hasActive = latestJobs.some(j => j.status === 'running' || j.status === 'queued');
-      if (!hasActive && !get().isDrawerOpen) {
+      // Stop polling as soon as there are no *fresh* active jobs.
+      // "Fresh" = created within the last 2 hours. Jobs stuck in
+      // running/queued from a killed previous session (orphans) must
+      // not block the stop condition indefinitely.
+      const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+      const now = Date.now();
+      const hasActive = latestJobs.some(j =>
+        (j.status === 'running' || j.status === 'queued') &&
+        now - new Date(j.created_at).getTime() < TWO_HOURS_MS
+      );
+      if (!hasActive) {
         get().stopPolling();
       }
 
@@ -177,19 +194,11 @@ export const useJobStore = create<JobState>((set, get) => {
       
       set({ isDrawerOpen: nextOpen });
       
-      // Fetch jobs when opening
+      // Opening: one-time fetch to populate the list. Do NOT start
+      // sustained polling here — that only happens when a job is submitted.
+      // Closing: nothing to do, polling auto-stops via the hasActive check.
       if (nextOpen) {
         get().fetchJobs();
-        get().startPolling();
-      } else {
-        // Stop polling when closing? Maybe keep it running if there are active jobs?
-        // For now, let's keep it simple and stop when closed to save resources, 
-        // unless we want global notifications.
-        // Better: Check if any job is running.
-        const hasRunning = get().jobs.some(j => j.status === 'running' || j.status === 'queued');
-        if (!hasRunning) {
-            get().stopPolling();
-        }
       }
     },
 
@@ -208,6 +217,10 @@ export const useJobStore = create<JobState>((set, get) => {
     },
 
     startPolling: () => {
+      // Arm a hard deadline so the loop can't run indefinitely even if
+      // orphaned backend jobs keep `hasActive` true.
+      pollingDeadline = Date.now() + MAX_POLL_DURATION_MS;
+
       // Subscribe to the realtime channel once; events trigger a
       // (debounced) full refresh so the UI converges without burning
       // a request every 3 seconds.
@@ -239,6 +252,7 @@ export const useJobStore = create<JobState>((set, get) => {
         clearInterval(pollingInterval);
         pollingInterval = null;
       }
+      pollingDeadline = null;
       // Keep the WS subscription alive while the tab is open: a new
       // `created` event from elsewhere should still revive the loop.
     }
