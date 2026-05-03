@@ -431,6 +431,24 @@ GRADIENT_BOOSTING_PARAMS = [
         step=0.1,
         description="The fraction of samples to be used for fitting the individual base learners.",
     ),
+    HyperparameterField(
+        name="min_samples_split",
+        label="Min Samples Split",
+        type="number",
+        default=2,
+        min=2,
+        max=20,
+        description="Minimum samples required to split an internal node.",
+    ),
+    HyperparameterField(
+        name="min_samples_leaf",
+        label="Min Samples Leaf",
+        type="number",
+        default=1,
+        min=1,
+        max=20,
+        description="Minimum samples required at a leaf node.",
+    ),
 ]
 
 # --- AdaBoost ---
@@ -506,6 +524,301 @@ XGBOOST_PARAMS = [
         step=0.1,
         description="Subsample ratio of columns when constructing each tree.",
     ),
+    HyperparameterField(
+        name="min_child_weight",
+        label="Min Child Weight",
+        type="number",
+        default=1,
+        min=0,
+        max=50,
+        step=1,
+        description="Minimum sum of instance weights in a child. Higher values regularize against overfitting.",
+    ),
+    HyperparameterField(
+        name="gamma",
+        label="Gamma (min_split_loss)",
+        type="number",
+        default=0.0,
+        min=0.0,
+        max=10.0,
+        step=0.1,
+        description="Minimum loss reduction required to make a split. Higher = more conservative tree growth.",
+    ),
+    HyperparameterField(
+        name="reg_alpha",
+        label="L1 Regularization (reg_alpha)",
+        type="number",
+        default=0.0,
+        min=0.0,
+        max=10.0,
+        step=0.1,
+        description="L1 regularization term on leaf weights.",
+    ),
+    HyperparameterField(
+        name="reg_lambda",
+        label="L2 Regularization (reg_lambda)",
+        type="number",
+        default=1.0,
+        min=0.0,
+        max=10.0,
+        step=0.1,
+        description="L2 regularization term on leaf weights. Default sklearn XGBoost is 1.",
+    ),
+]
+
+# --- Extra Trees (Classifier & Regressor) ---
+EXTRA_TREES_PARAMS = [
+    HyperparameterField(
+        name="n_estimators",
+        label="Number of Trees",
+        type="number",
+        default=100,
+        min=10,
+        max=1000,
+        step=10,
+        description="Number of trees in the forest.",
+    ),
+    HyperparameterField(
+        name="max_depth",
+        label="Max Depth",
+        type="number",
+        default=None,
+        min=1,
+        max=100,
+        description="Maximum depth of the tree. None = unlimited.",
+    ),
+    HyperparameterField(
+        name="min_samples_split",
+        label="Min Samples Split",
+        type="number",
+        default=2,
+        min=2,
+        max=20,
+        description="Minimum samples required to split an internal node.",
+    ),
+    HyperparameterField(
+        name="min_samples_leaf",
+        label="Min Samples Leaf",
+        type="number",
+        default=1,
+        min=1,
+        max=20,
+        description="Minimum samples required at a leaf node.",
+    ),
+    HyperparameterField(
+        name="bootstrap",
+        label="Bootstrap",
+        type="select",
+        default=False,
+        options=[
+            {"label": "False (default)", "value": False},
+            {"label": "True", "value": True},
+        ],
+        description="Whether bootstrap samples are used (False = use full dataset).",
+    ),
+]
+
+EXTRA_TREES_CLASSIFIER_PARAMS = EXTRA_TREES_PARAMS + [
+    HyperparameterField(
+        name="criterion",
+        label="Criterion",
+        type="select",
+        default="gini",
+        options=[
+            {"label": "Gini", "value": "gini"},
+            {"label": "Entropy", "value": "entropy"},
+            {"label": "Log Loss", "value": "log_loss"},
+        ],
+        description="Function to measure the quality of a split.",
+    )
+]
+
+EXTRA_TREES_REGRESSOR_PARAMS = EXTRA_TREES_PARAMS + [
+    HyperparameterField(
+        name="criterion",
+        label="Criterion",
+        type="select",
+        default="squared_error",
+        options=[
+            {"label": "Squared Error", "value": "squared_error"},
+            {"label": "Absolute Error", "value": "absolute_error"},
+            {"label": "Friedman MSE", "value": "friedman_mse"},
+        ],
+        description="Function to measure the quality of a split.",
+    )
+]
+
+# --- HistGradientBoosting (Classifier & Regressor) ---
+HIST_GRADIENT_BOOSTING_PARAMS = [
+    HyperparameterField(
+        name="max_iter",
+        label="Max Iterations (Trees)",
+        type="number",
+        default=100,
+        min=10,
+        max=1000,
+        step=10,
+        description="Maximum number of iterations (boosting rounds).",
+    ),
+    HyperparameterField(
+        name="learning_rate",
+        label="Learning Rate",
+        type="number",
+        default=0.1,
+        min=0.001,
+        max=1.0,
+        description="Shrinks the contribution of each tree.",
+    ),
+    HyperparameterField(
+        name="max_leaf_nodes",
+        label="Max Leaf Nodes",
+        type="number",
+        default=31,
+        min=2,
+        max=255,
+        description="Maximum number of leaves per tree.",
+    ),
+    HyperparameterField(
+        name="max_depth",
+        label="Max Depth",
+        type="number",
+        default=None,
+        min=1,
+        max=20,
+        description="Maximum depth per tree. None = unlimited (max_leaf_nodes is the effective limit).",
+    ),
+    HyperparameterField(
+        name="min_samples_leaf",
+        label="Min Samples Leaf",
+        type="number",
+        default=20,
+        min=1,
+        max=200,
+        description="Minimum samples at a leaf node.",
+    ),
+    HyperparameterField(
+        name="l2_regularization",
+        label="L2 Regularization",
+        type="number",
+        default=0.0,
+        min=0.0,
+        max=10.0,
+        step=0.1,
+        description="L2 penalty applied to the leaves' values.",
+    ),
+    HyperparameterField(
+        name="max_bins",
+        label="Max Bins",
+        type="number",
+        default=255,
+        min=10,
+        max=255,
+        step=5,
+        description="Maximum number of bins for feature discretisation. Higher = more precise but slower.",
+    ),
+]
+
+# --- LightGBM (Classifier & Regressor) ---
+LGBM_PARAMS = [
+    HyperparameterField(
+        name="n_estimators",
+        label="Number of Estimators",
+        type="number",
+        default=100,
+        min=10,
+        max=2000,
+        step=10,
+        description="Number of boosting rounds.",
+    ),
+    HyperparameterField(
+        name="num_leaves",
+        label="Num Leaves",
+        type="number",
+        default=31,
+        min=2,
+        max=512,
+        step=1,
+        description="Maximum number of leaves per tree. Controls model complexity; increase for more accuracy.",
+    ),
+    HyperparameterField(
+        name="learning_rate",
+        label="Learning Rate",
+        type="number",
+        default=0.1,
+        min=0.001,
+        max=1.0,
+        description="Shrinks the contribution of each tree.",
+    ),
+    HyperparameterField(
+        name="max_depth",
+        label="Max Depth",
+        type="number",
+        default=-1,
+        min=-1,
+        max=50,
+        description="Maximum tree depth. -1 = unlimited (controlled by num_leaves).",
+    ),
+    HyperparameterField(
+        name="min_child_samples",
+        label="Min Child Samples",
+        type="number",
+        default=20,
+        min=1,
+        max=200,
+        description="Minimum samples required in a leaf. Regularises against overfitting.",
+    ),
+    HyperparameterField(
+        name="subsample",
+        label="Subsample (Bagging Fraction)",
+        type="number",
+        default=1.0,
+        min=0.1,
+        max=1.0,
+        step=0.1,
+        description="Fraction of training data sampled per iteration.",
+    ),
+    HyperparameterField(
+        name="colsample_bytree",
+        label="Colsample By Tree (Feature Fraction)",
+        type="number",
+        default=1.0,
+        min=0.1,
+        max=1.0,
+        step=0.1,
+        description="Fraction of features sampled per tree.",
+    ),
+    HyperparameterField(
+        name="reg_alpha",
+        label="L1 Regularization (reg_alpha)",
+        type="number",
+        default=0.0,
+        min=0.0,
+        max=10.0,
+        step=0.1,
+        description="L1 regularization term on leaf weights.",
+    ),
+    HyperparameterField(
+        name="reg_lambda",
+        label="L2 Regularization (reg_lambda)",
+        type="number",
+        default=0.0,
+        min=0.0,
+        max=10.0,
+        step=0.1,
+        description="L2 regularization term on leaf weights.",
+    ),
+    HyperparameterField(
+        name="boosting_type",
+        label="Boosting Type",
+        type="select",
+        default="gbdt",
+        options=[
+            {"label": "GBDT (default)", "value": "gbdt"},
+            {"label": "DART (dropout)", "value": "dart"},
+            {"label": "GOSS (gradient-based sampling)", "value": "goss"},
+        ],
+        description="GBDT is standard gradient boosting. DART adds dropout. GOSS samples by gradient magnitude.",
+    ),
 ]
 
 # --- Gaussian Naive Bayes ---
@@ -544,6 +857,12 @@ MODEL_HYPERPARAMETERS = {
     "adaboost_regressor": ADABOOST_PARAMS,
     "xgboost_classifier": XGBOOST_PARAMS,
     "xgboost_regressor": XGBOOST_PARAMS,
+    "extra_trees_classifier": EXTRA_TREES_CLASSIFIER_PARAMS,
+    "extra_trees_regressor": EXTRA_TREES_REGRESSOR_PARAMS,
+    "hist_gradient_boosting_classifier": HIST_GRADIENT_BOOSTING_PARAMS,
+    "hist_gradient_boosting_regressor": HIST_GRADIENT_BOOSTING_PARAMS,
+    "lgbm_classifier": LGBM_PARAMS,
+    "lgbm_regressor": LGBM_PARAMS,
     "gaussian_nb": GAUSSIAN_NB_PARAMS,
 }
 
@@ -577,6 +896,7 @@ DEFAULT_SEARCH_SPACES = {
         "max_depth": [None, 5, 10, 20, 30, 50],
         "min_samples_split": [2, 5, 10, 20],
         "min_samples_leaf": [1, 2, 4, 8],
+        "criterion": ["squared_error", "friedman_mse", "absolute_error"],
         "bootstrap": [True, False],
     },
     "ridge_regression": {
@@ -631,12 +951,14 @@ DEFAULT_SEARCH_SPACES = {
         "learning_rate": [0.01, 0.05, 0.1, 0.2],
         "max_depth": [3, 5, 7, 9],
         "subsample": [0.6, 0.8, 1.0],
+        "min_samples_leaf": [1, 5, 10, 20],
     },
     "gradient_boosting_regressor": {
         "n_estimators": [50, 100, 200, 500],
         "learning_rate": [0.01, 0.05, 0.1, 0.2],
         "max_depth": [3, 5, 7, 9],
         "subsample": [0.6, 0.8, 1.0],
+        "min_samples_leaf": [1, 5, 10, 20],
     },
     "adaboost_classifier": {
         "n_estimators": [50, 100, 200, 500],
@@ -652,6 +974,9 @@ DEFAULT_SEARCH_SPACES = {
         "learning_rate": [0.01, 0.05, 0.1, 0.3],
         "subsample": [0.6, 0.8, 1.0],
         "colsample_bytree": [0.6, 0.8, 1.0],
+        "min_child_weight": [1, 3, 5, 7],
+        "reg_alpha": [0.0, 0.01, 0.1, 1.0],
+        "reg_lambda": [0.1, 1.0, 5.0, 10.0],
     },
     "xgboost_regressor": {
         "n_estimators": [100, 200, 500, 1000],
@@ -659,12 +984,237 @@ DEFAULT_SEARCH_SPACES = {
         "learning_rate": [0.01, 0.05, 0.1, 0.3],
         "subsample": [0.6, 0.8, 1.0],
         "colsample_bytree": [0.6, 0.8, 1.0],
+        "min_child_weight": [1, 3, 5, 7],
+        "reg_alpha": [0.0, 0.01, 0.1, 1.0],
+        "reg_lambda": [0.1, 1.0, 5.0, 10.0],
     },
     "gaussian_nb": {
         "var_smoothing": [1e-9, 1e-8, 1e-7, 1e-6],
     },
+    "extra_trees_classifier": {
+        "n_estimators": [50, 100, 200, 500],
+        "max_depth": [None, 5, 10, 20, 50],
+        "min_samples_split": [2, 5, 10],
+        "min_samples_leaf": [1, 2, 4],
+        "criterion": ["gini", "entropy", "log_loss"],
+        "bootstrap": [False, True],
+    },
+    "extra_trees_regressor": {
+        "n_estimators": [50, 100, 200, 500],
+        "max_depth": [None, 5, 10, 20, 50],
+        "min_samples_split": [2, 5, 10],
+        "min_samples_leaf": [1, 2, 4],
+        "criterion": ["squared_error", "absolute_error", "friedman_mse"],
+        "bootstrap": [False, True],
+    },
+    "hist_gradient_boosting_classifier": {
+        "max_iter": [50, 100, 200, 500],
+        "learning_rate": [0.01, 0.05, 0.1, 0.2],
+        "max_leaf_nodes": [15, 31, 63, 127],
+        "max_depth": [None, 3, 5, 10],
+        "min_samples_leaf": [10, 20, 50, 100],
+        "l2_regularization": [0.0, 0.01, 0.1, 1.0],
+    },
+    "hist_gradient_boosting_regressor": {
+        "max_iter": [50, 100, 200, 500],
+        "learning_rate": [0.01, 0.05, 0.1, 0.2],
+        "max_leaf_nodes": [15, 31, 63, 127],
+        "max_depth": [None, 3, 5, 10],
+        "min_samples_leaf": [10, 20, 50, 100],
+        "l2_regularization": [0.0, 0.01, 0.1, 1.0],
+    },
+    "lgbm_classifier": {
+        "n_estimators": [100, 200, 500, 1000],
+        "num_leaves": [15, 31, 63, 127, 255],
+        "learning_rate": [0.01, 0.05, 0.1, 0.2],
+        "max_depth": [-1, 5, 10, 20],
+        "min_child_samples": [5, 10, 20, 50],
+        "subsample": [0.6, 0.8, 1.0],
+        "colsample_bytree": [0.6, 0.8, 1.0],
+        "reg_alpha": [0.0, 0.01, 0.1, 1.0],
+        "reg_lambda": [0.0, 0.01, 0.1, 1.0],
+        "boosting_type": ["gbdt", "dart", "goss"],
+    },
+    "lgbm_regressor": {
+        "n_estimators": [100, 200, 500, 1000],
+        "num_leaves": [15, 31, 63, 127, 255],
+        "learning_rate": [0.01, 0.05, 0.1, 0.2],
+        "max_depth": [-1, 5, 10, 20],
+        "min_child_samples": [5, 10, 20, 50],
+        "subsample": [0.6, 0.8, 1.0],
+        "colsample_bytree": [0.6, 0.8, 1.0],
+        "reg_alpha": [0.0, 0.01, 0.1, 1.0],
+        "reg_lambda": [0.0, 0.01, 0.1, 1.0],
+        "boosting_type": ["gbdt", "dart", "goss"],
+    },
 }
 
 
-def get_default_search_space(model_key: str) -> Dict[str, Any]:
+# ---------------------------------------------------------------------------
+# Grid-safe search spaces (grid / halving_grid)
+#
+# These are intentionally trimmed to keep the cartesian product manageable.
+# The full DEFAULT_SEARCH_SPACES above are designed for random/optuna/halving_random
+# where only a subset of combinations is ever evaluated.
+# ---------------------------------------------------------------------------
+GRID_SEARCH_SPACES: Dict[str, Any] = {
+    "logistic_regression": {
+        "C": [0.01, 0.1, 1.0, 10.0],
+        "penalty": ["l1", "l2"],
+        "solver": ["saga"],
+        "max_iter": [200, 500],
+    },
+    "random_forest_classifier": {
+        "n_estimators": [100, 200, 500],
+        "max_depth": [5, 10, 20],
+        "min_samples_split": [2, 10],
+        "min_samples_leaf": [1, 4],
+        "criterion": ["gini", "entropy"],
+    },
+    "random_forest_regressor": {
+        "n_estimators": [100, 200, 500],
+        "max_depth": [5, 10, 20],
+        "min_samples_split": [2, 10],
+        "min_samples_leaf": [1, 4],
+        "criterion": ["squared_error", "friedman_mse"],
+    },
+    "ridge_regression": {
+        "alpha": [0.01, 0.1, 1.0, 10.0, 100.0],
+        "solver": ["auto", "saga"],
+        "fit_intercept": [True, False],
+    },
+    "lasso_regression": {
+        "alpha": [0.001, 0.01, 0.1, 1.0, 10.0],
+    },
+    "elasticnet_regression": {
+        "alpha": [0.01, 0.1, 1.0],
+        "l1_ratio": [0.3, 0.5, 0.7],
+    },
+    "linear_regression": {
+        "fit_intercept": [True, False],
+    },
+    "svc": {
+        "C": [0.1, 1.0, 10.0],
+        "kernel": ["linear", "rbf"],
+        "gamma": ["scale", "auto"],
+    },
+    "svr": {
+        "C": [0.1, 1.0, 10.0],
+        "kernel": ["linear", "rbf"],
+        "gamma": ["scale", "auto"],
+    },
+    "k_neighbors_classifier": {
+        "n_neighbors": [3, 5, 9],
+        "weights": ["uniform", "distance"],
+        "algorithm": ["auto"],
+    },
+    "k_neighbors_regressor": {
+        "n_neighbors": [3, 5, 9],
+        "weights": ["uniform", "distance"],
+        "algorithm": ["auto"],
+    },
+    "decision_tree_classifier": {
+        "max_depth": [5, 10, 20],
+        "min_samples_split": [2, 5, 10],
+        "criterion": ["gini", "entropy"],
+    },
+    "decision_tree_regressor": {
+        "max_depth": [5, 10, 20],
+        "min_samples_split": [2, 5, 10],
+        "criterion": ["squared_error", "friedman_mse"],
+    },
+    "gradient_boosting_classifier": {
+        "n_estimators": [100, 200, 500],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "max_depth": [3, 5],
+        "subsample": [0.8, 1.0],
+        "min_samples_leaf": [1, 5],
+    },
+    "gradient_boosting_regressor": {
+        "n_estimators": [100, 200, 500],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "max_depth": [3, 5],
+        "subsample": [0.8, 1.0],
+        "min_samples_leaf": [1, 5],
+    },
+    "adaboost_classifier": {
+        "n_estimators": [50, 100, 200],
+        "learning_rate": [0.1, 0.5, 1.0],
+    },
+    "adaboost_regressor": {
+        "n_estimators": [50, 100, 200],
+        "learning_rate": [0.1, 0.5, 1.0],
+    },
+    "xgboost_classifier": {
+        "n_estimators": [100, 200, 500],
+        "max_depth": [3, 5, 7],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "subsample": [0.8, 1.0],
+        "min_child_weight": [1, 3, 5],
+        "reg_lambda": [0.1, 1.0, 5.0],
+    },
+    "xgboost_regressor": {
+        "n_estimators": [100, 200, 500],
+        "max_depth": [3, 5, 7],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "subsample": [0.8, 1.0],
+        "min_child_weight": [1, 3, 5],
+        "reg_lambda": [0.1, 1.0, 5.0],
+    },
+    "gaussian_nb": {
+        "var_smoothing": [1e-9, 1e-8, 1e-7, 1e-6],
+    },
+    "extra_trees_classifier": {
+        "n_estimators": [100, 200, 500],
+        "max_depth": [5, 10, 20],
+        "min_samples_split": [2, 5],
+        "criterion": ["gini", "entropy"],
+    },
+    "extra_trees_regressor": {
+        "n_estimators": [100, 200, 500],
+        "max_depth": [5, 10, 20],
+        "min_samples_split": [2, 5],
+        "criterion": ["squared_error", "friedman_mse"],
+    },
+    "hist_gradient_boosting_classifier": {
+        "max_iter": [100, 200, 500],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "max_leaf_nodes": [31, 63],
+        "min_samples_leaf": [20, 50],
+    },
+    "hist_gradient_boosting_regressor": {
+        "max_iter": [100, 200, 500],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "max_leaf_nodes": [31, 63],
+        "min_samples_leaf": [20, 50],
+    },
+    "lgbm_classifier": {
+        "n_estimators": [100, 200, 500],
+        "num_leaves": [31, 63, 127],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "max_depth": [-1, 5, 10],
+        "subsample": [0.8, 1.0],
+    },
+    "lgbm_regressor": {
+        "n_estimators": [100, 200, 500],
+        "num_leaves": [31, 63, 127],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "max_depth": [-1, 5, 10],
+        "subsample": [0.8, 1.0],
+    },
+}
+
+_GRID_STRATEGIES = {"grid", "halving_grid"}
+
+
+def get_default_search_space(model_key: str, strategy: str = "random") -> Dict[str, Any]:
+    """Return the default search space for *model_key*.
+
+    For grid-based strategies (``grid`` / ``halving_grid``) the trimmed
+    ``GRID_SEARCH_SPACES`` dict is used so that the cartesian product stays
+    manageable.  All other strategies (``random``, ``halving_random``,
+    ``optuna``) use the richer ``DEFAULT_SEARCH_SPACES``.
+    """
+    if strategy in _GRID_STRATEGIES:
+        return GRID_SEARCH_SPACES.get(model_key, DEFAULT_SEARCH_SPACES.get(model_key, {}))
     return DEFAULT_SEARCH_SPACES.get(model_key, {})

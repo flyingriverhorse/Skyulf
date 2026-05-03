@@ -6,7 +6,7 @@ from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
 from ..utils import pack_pipeline_output, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 # --- Deduplicate ---
 
@@ -33,7 +33,7 @@ class DeduplicateApplier(BaseApplier):
                 subset = None
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -139,7 +139,7 @@ class DropMissingColumnsApplier(BaseApplier):
         cols_to_drop = params.get("columns_to_drop", [])
 
         # Checking X.columns might be tricky if X is Any, but engine check helps
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             # X is likely Polars, but let's be safe
             X_pl: Any = X
             cols_to_drop_X = [c for c in cols_to_drop if c in X_pl.columns]
@@ -147,7 +147,7 @@ class DropMissingColumnsApplier(BaseApplier):
             cols_to_drop_X = [c for c in cols_to_drop if c in X.columns]
 
         if cols_to_drop_X:
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 X_pl_data: Any = X
                 X = X_pl_data.drop(cols_to_drop_X)
             else:
@@ -182,7 +182,7 @@ class DropMissingColumnsCalculator(BaseCalculator):
         cols_to_drop = set()
 
         # Handle X access depending on engine
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X_pl: Any = X
             if explicit_cols:
                 cols_to_drop.update([c for c in explicit_cols if c in X_pl.columns])
@@ -194,7 +194,7 @@ class DropMissingColumnsCalculator(BaseCalculator):
             try:
                 threshold_val = float(threshold)
                 if threshold_val > 0:
-                    if engine.name == "polars":
+                    if engine.name == EngineName.POLARS:
                         pass
 
                         X_pl_data: Any = X
@@ -241,7 +241,7 @@ class DropMissingRowsApplier(BaseApplier):
         threshold = params.get("threshold")
 
         if subset:
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 X_pl: Any = X
                 subset = [c for c in subset if c in X_pl.columns]
             else:
@@ -251,7 +251,7 @@ class DropMissingRowsApplier(BaseApplier):
                 subset = None
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl_data: Any = X
@@ -357,7 +357,7 @@ class MissingIndicatorApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -403,13 +403,13 @@ class MissingIndicatorCalculator(BaseCalculator):
         explicit_cols = config.get("columns")
 
         if explicit_cols:
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 X_pl_data: Any = X
                 cols = [c for c in explicit_cols if c in X_pl_data.columns]
             else:
                 cols = [c for c in explicit_cols if c in X.columns]
         else:
-            if engine.name == "polars":
+            if engine.name == EngineName.POLARS:
                 pass
 
                 X_pl: Any = X

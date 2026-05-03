@@ -1,3 +1,4 @@
+from skyulf.engines import EngineName
 import logging
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union, cast
 
@@ -63,6 +64,8 @@ def unpack_pipeline_input(
     `Series[Any] | ...`, poisoning every downstream `with_columns` /
     `to_pandas` call. The runtime contract is unchanged.
     """
+    if isinstance(data, (pd.DataFrame, SkyulfDataFrame)):
+        return data, None, False
     if isinstance(data, tuple):
         return data[0], data[1], True
     return data, None, False
@@ -189,7 +192,7 @@ def detect_numeric_columns(
     engine = get_engine(frame)
 
     # Polars Path
-    if engine.name == "polars":
+    if engine.name == EngineName.POLARS:
         import polars as pl
 
         detected: List[str] = []

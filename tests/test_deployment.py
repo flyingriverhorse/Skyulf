@@ -82,10 +82,12 @@ async def test_deployment_flow(async_session, tmp_path):
     # 2. Create Job in DB
     # We need to insert manually because TrainingJob might have required fields not in init
     await async_session.execute(
-        text("""
+        text(
+            """
         INSERT INTO basic_training_jobs (id, pipeline_id, node_id, dataset_source_id, user_id, status, version, model_type, graph, artifact_uri, error_message, progress, current_step, started_at, finished_at, created_at, updated_at)
         VALUES (:id, :pipeline_id, :node_id, :ds_id, :user_id, :status, :version, :model_type, :graph, :artifact_uri, :error_message, :progress, :current_step, :started_at, :finished_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """),
+        """
+        ),
         {
             "id": job_id,
             "pipeline_id": pipeline_id,
@@ -140,10 +142,12 @@ async def test_deployment_predict_decodes_label_encoded_target(async_session, tm
     store.save(job_id, {"feature_engineer": engineer, "model": predictor, "job_id": job_id})
 
     await async_session.execute(
-        text("""
+        text(
+            """
         INSERT INTO basic_training_jobs (id, pipeline_id, node_id, dataset_source_id, user_id, status, version, model_type, graph, artifact_uri, error_message, progress, current_step, started_at, finished_at, created_at, updated_at)
         VALUES (:id, :pipeline_id, :node_id, :ds_id, :user_id, :status, :version, :model_type, :graph, :artifact_uri, :error_message, :progress, :current_step, :started_at, :finished_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """),
+        """
+        ),
         {
             "id": job_id,
             "pipeline_id": pipeline_id,

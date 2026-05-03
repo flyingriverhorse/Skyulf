@@ -89,7 +89,7 @@ Absolutely. `skyulf-core` is a standalone PyPI package. Install it with `pip ins
 
 ### What Python version is required?
 
-Python 3.9 or higher. We recommend 3.10 or 3.11 or 3.12.
+Python 3.12.
 
 ### Does Skyulf support GPU training?
 
@@ -110,7 +110,7 @@ Yes. The preprocessing system includes 30+ nodes: imputation (Simple, KNN, Itera
 ### What data formats are supported?
 
 - **skyulf-core library:** Pandas DataFrames and Polars DataFrames (auto-detected).
-- **Web platform:** CSV upload via the data ingestion API. Database sources (PostgreSQL, etc.) via the ingestion endpoint.
+- **Web platform:** CSV upload via the data ingestion API, as well as S3 bucket ingestion for remote files.
 
 ### How does the hybrid Polars/Pandas engine work?
 

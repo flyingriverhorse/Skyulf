@@ -2,21 +2,14 @@ import logging
 from typing import Any, Dict, Tuple, Union
 
 import numpy as np
+import polars as pl
 import pandas as pd
-from imblearn.combine import SMOTETomek
-from imblearn.over_sampling import ADASYN, SMOTE, SVMSMOTE, BorderlineSMOTE, KMeansSMOTE
-from imblearn.under_sampling import (
-    EditedNearestNeighbours,
-    NearMiss,
-    RandomUnderSampler,
-    TomekLinks,
-)
 
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
 from ..utils import pack_pipeline_output, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +24,13 @@ class OversamplingApplier(BaseApplier):
     ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
-        was_polars = engine.name == "polars"
+        was_polars = engine.name == EngineName.POLARS
         target_col = params.get("target_column")
 
         # Resampling requires y. If not provided in tuple, try to extract from dataframe using target_column
         if y is None:
             if target_col and target_col in X.columns:
                 if was_polars:
-                    import polars as pl
-
                     y = X.select(target_col).to_series()
                     X = X.drop(target_col)
                 else:
@@ -77,6 +68,15 @@ class OversamplingApplier(BaseApplier):
         out_step = params.get("out_step", 0.5)
         cluster_balance_threshold = params.get("cluster_balance_threshold", 0.1)
         density_exponent = params.get("density_exponent", "auto")
+
+        try:
+            from imblearn.combine import SMOTETomek
+            from imblearn.over_sampling import ADASYN, SMOTE, SVMSMOTE, BorderlineSMOTE, KMeansSMOTE
+        except ImportError:
+            logger.error("imblearn is required for oversampling. `pip install imbalanced-learn`")
+            raise ImportError(
+                "imblearn is required for oversampling. `pip install imbalanced-learn`"
+            )
 
         sampler = None
         if method == "smote":
@@ -181,15 +181,13 @@ class UndersamplingApplier(BaseApplier):
     ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
-        was_polars = engine.name == "polars"
+        was_polars = engine.name == EngineName.POLARS
         target_col = params.get("target_column")
 
         # Resampling requires y. If not provided in tuple, try to extract from dataframe using target_column
         if y is None:
             if target_col and target_col in X.columns:
                 if was_polars:
-                    import polars as pl
-
                     y = X.select(target_col).to_series()
                     X = X.drop(target_col)
                 else:
@@ -220,6 +218,19 @@ class UndersamplingApplier(BaseApplier):
         random_state = params.get("random_state", 42)
         replacement = params.get("replacement", False)
         # n_jobs = params.get('n_jobs', -1)
+
+        try:
+            from imblearn.under_sampling import (
+                EditedNearestNeighbours,
+                NearMiss,
+                RandomUnderSampler,
+                TomekLinks,
+            )
+        except ImportError:
+            logger.error("imblearn is required for undersampling. `pip install imbalanced-learn`")
+            raise ImportError(
+                "imblearn is required for undersampling. `pip install imbalanced-learn`"
+            )
 
         sampler = None
         if method == "random_under_sampling":

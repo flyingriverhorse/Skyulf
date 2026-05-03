@@ -58,6 +58,12 @@ async def test_all_transformers(sample_data, tmp_path):
         "elasticnet_regression",
         "xgboost_classifier",
         "xgboost_regressor",
+        "extra_trees_classifier",
+        "extra_trees_regressor",
+        "hist_gradient_boosting_classifier",
+        "hist_gradient_boosting_regressor",
+        "lgbm_classifier",
+        "lgbm_regressor",
         # Splitters
         "TrainTestSplitter",
         "feature_target_split",

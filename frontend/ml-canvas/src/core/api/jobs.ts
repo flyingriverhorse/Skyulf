@@ -149,8 +149,9 @@ export const jobsApi = {
     return response.data;
   },
 
-  getDefaultSearchSpace: async (modelType: string): Promise<Record<string, unknown>> => {
-    const response = await apiClient.get<Record<string, unknown>>(`/pipeline/hyperparameters/${modelType}/defaults`);
+  getDefaultSearchSpace: async (modelType: string, strategy?: string): Promise<Record<string, unknown>> => {
+    const params = strategy ? `?strategy=${encodeURIComponent(strategy)}` : '';
+    const response = await apiClient.get<Record<string, unknown>>(`/pipeline/hyperparameters/${modelType}/defaults${params}`);
     return response.data;
   },
 

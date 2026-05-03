@@ -12,6 +12,25 @@ from fastapi.responses import JSONResponse
 logger = logging.getLogger(__name__)
 
 
+async def skyulf_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle custom Skyulf app exceptions."""
+    from backend.exceptions.core import SkyulfException
+
+    if not isinstance(exc, SkyulfException):
+        raise exc
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "error": exc.error_code,
+            "message": exc.message,
+            "details": exc.details,
+            "request_id": getattr(request.state, "request_id", None),
+        },
+    )
+
+
 async def not_found_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle 404 Not Found errors."""
     return JSONResponse(

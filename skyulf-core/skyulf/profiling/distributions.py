@@ -1,7 +1,10 @@
+import logging
 import polars as pl
 from typing import List, Optional, cast
 from .schemas import HistogramBin
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def _collect(lf: pl.LazyFrame) -> pl.DataFrame:
@@ -18,7 +21,6 @@ def calculate_histogram(
     # We need to execute to get min/max for binning, or use an approximation.
     # For accurate bins, we need min/max.
     try:
-        # print(f"Calculating histogram for {col_name}")
         stats = _collect(
             df.select([pl.col(col_name).min().alias("min"), pl.col(col_name).max().alias("max")])
         )
@@ -51,12 +53,11 @@ def calculate_histogram(
                 # The bin column is Categorical, but iter_rows might return string or int depending on version
                 # We used labels "0", "1", etc.
                 bin_val = row["bin"]
-                # print(f"Bin val: {bin_val} type: {type(bin_val)}")
                 bin_idx = int(bin_val)
                 # The count column is named "len" by default in Polars group_by().len()
                 counts[bin_idx] = row.get("len", row.get("count"))
-            except Exception:
-                # print(f"Error parsing bin: {e}")
+            except Exception as parse_e:
+                logger.debug("Error parsing bin %r: %s", row, parse_e)
                 continue
 
         histogram = []
@@ -69,5 +70,5 @@ def calculate_histogram(
         return histogram
 
     except Exception as e:
-        print(f"Error calculating histogram for {col_name}: {e}")
+        logger.error(f"Error calculating histogram for {col_name}: {e}")
         return None

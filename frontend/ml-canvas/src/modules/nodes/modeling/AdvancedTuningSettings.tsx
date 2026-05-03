@@ -43,6 +43,60 @@ export interface TuningConfig {
 // HyperparameterDef, HelpTooltip, SearchSpaceInput, and BestParamsModal
 // were extracted into ./components/* to keep this file focused on the panel.
 
+/** Renders a compact summary of active strategy params, or a "Using defaults" hint when none are set. */
+const StrategyParamsHint: React.FC<{
+    strategy: string;
+    strategyParams: Record<string, unknown> | undefined;
+    onCustomize: () => void;
+}> = ({ strategy, strategyParams, onCustomize }) => {
+    const hasParams = strategyParams != null && Object.keys(strategyParams).length > 0;
+    if (hasParams) {
+        const parts: string[] = [];
+        if (strategy === 'optuna') {
+            parts.push(`sampler: ${strategyParams!.sampler ?? 'tpe'}`);
+            parts.push(`pruner: ${strategyParams!.pruner ?? 'median'}`);
+            if (strategyParams!.timeout) parts.push(`timeout: ${strategyParams!.timeout}s`);
+        } else {
+            if (strategyParams!.factor) parts.push(`factor: ${strategyParams!.factor}`);
+            if (strategyParams!.min_resources) parts.push(`min: ${strategyParams!.min_resources}`);
+        }
+        return (
+            <>
+                <p className="mt-1.5 text-xs text-blue-600 dark:text-blue-400">
+                    ⚙ {parts.join(' · ')}
+                </p>
+                {strategy === 'halving_grid' && (
+                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                        ⚠️ Evaluates the full grid — large search spaces can take many minutes. Reduce candidate values in the <strong>Search Space</strong> section below, or switch to <strong>halving_random</strong>.
+                    </p>
+                )}
+            </>
+        );
+    }
+    const defaultHint = strategy === 'optuna'
+        ? 'sampler: tpe · pruner: median'
+        : 'factor: 3 · min: exhaust';
+    return (
+        <>
+            <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                Using defaults ({defaultHint}).{' '}
+                <button
+                    type="button"
+                    onClick={onCustomize}
+                    className="underline hover:text-blue-500 transition-colors"
+                >
+                    Customize
+                </button>
+            </p>
+            {strategy === 'halving_grid' && (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                    ⚠️ Evaluates the full grid — large search spaces can take many minutes. Reduce candidate values in the <strong>Search Space</strong> section below, or switch to <strong>halving_random</strong>.
+                </p>
+            )}
+        </>
+    );
+};
+
 export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: (c: TuningConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
@@ -133,40 +187,42 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
 
   // --- Model & Search Space Logic ---
 
-  // We use a ref to track the last model type we successfully loaded defaults for
-  // This prevents infinite loops and ensures we only load defaults when the user actually changes the model
+  // Track last loaded (model, strategy) pair to know when to reload defaults.
   const loadedModelTypeRef = useRef<string | null>(null);
+  const loadedStrategyRef = useRef<string | null>(null);
 
   useEffect(() => {
       const loadModelData = async () => {
           const modelType = config.model_type;
+          const strategy = config.search_strategy ?? 'random';
           if (!modelType) return;
 
-          // If we already loaded data for this model type, just ensure defs are present
-          // But if the user switched models (config.model_type !== loadedModelTypeRef.current), we MUST reload defaults
           const isNewModel = modelType !== loadedModelTypeRef.current;
+          // Also reload when switching between grid and non-grid strategies
+          // so the search space is appropriate for the selected method.
+          const wasGrid = loadedStrategyRef.current === 'grid' || loadedStrategyRef.current === 'halving_grid';
+          const isGrid = strategy === 'grid' || strategy === 'halving_grid';
+          const isStrategyClassChange = wasGrid !== isGrid;
 
-          if (!isNewModel && searchSpaceDefs.length > 0) return;
+          if (!isNewModel && !isStrategyClassChange && searchSpaceDefs.length > 0) return;
 
           setIsLoadingDefs(true);
           try {
-              // 1. Fetch Definitions
-              const defs = await jobsApi.getHyperparameters(modelType);
-              setSearchSpaceDefs(defs as HyperparameterDef[]);
-
-              // 2. Fetch Defaults ONLY if it's a new model selection
+              // 1. Fetch Definitions (only needed when model changes)
               if (isNewModel) {
-                  const defaults = await jobsApi.getDefaultSearchSpace(modelType);
-                  
-                  // Update config with new defaults
-                  // We use a functional update to ensure we don't lose other concurrent changes
-                  // BUT since we are calling onChange from parent prop, we just pass the new object
+                  const defs = await jobsApi.getHyperparameters(modelType);
+                  setSearchSpaceDefs(defs as HyperparameterDef[]);
+              }
+
+              // 2. Fetch Defaults when model or strategy class changes
+              if (isNewModel || isStrategyClassChange) {
+                  const defaults = await jobsApi.getDefaultSearchSpace(modelType, strategy);
                   onChange({
                       ...config,
                       search_space: defaults || {}
                   });
-                  
                   loadedModelTypeRef.current = modelType;
+                  loadedStrategyRef.current = strategy;
               }
           } catch (error) {
               console.error("Failed to load model hyperparameters:", error);
@@ -177,7 +233,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
 
       void loadModelData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.model_type]);
+  }, [config.model_type, config.search_strategy]);
 
 
   const handleTune = async () => {
@@ -329,14 +385,13 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                           value={config.search_strategy ?? 'random'}
                           onChange={(e) => {
                               const newStrategy = e.target.value;
-                              // Clear strategy params when switching to plain grid/random to avoid passing junk
-                              const newParams = (newStrategy === 'grid' || newStrategy === 'random') 
-                                                ? {} 
-                                                : config.strategy_params || {};
+                              // Always clear strategy_params when changing strategy — prevents stale
+                              // optuna/halving settings (e.g. sampler=cmaes) from silently carrying
+                              // over to a different strategy or a fresh selection.
                               onChange({ 
                                   ...config, 
                                   search_strategy: newStrategy,
-                                  strategy_params: newParams 
+                                  strategy_params: {}
                               });
                           }}
                             className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
@@ -347,6 +402,14 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                             <option value="halving_random">Successive Halving (Randomized)</option>
                             <option value="optuna">Optuna Search</option>
                         </select>
+                      {/* Show active settings summary — configured params or default hint */}
+                      {(config.search_strategy === 'optuna' || config.search_strategy === 'halving_grid' || config.search_strategy === 'halving_random') && (
+                          <StrategyParamsHint
+                              strategy={config.search_strategy}
+                              strategyParams={config.strategy_params as Record<string, unknown> | undefined}
+                              onCustomize={() => setShowStrategyModal(true)}
+                          />
+                      )}
                     </div>
                     
                     <div>
@@ -621,6 +684,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         onClose={() => setShowStrategyModal(false)}
         strategy={config.search_strategy || 'random'}
         initialConfig={config.strategy_params as StrategyConfig | undefined}
+        modelKey={config.model_type}
         onSave={(newStrategyParams) => {
             onChange({ ...config, strategy_params: newStrategyParams as Record<string, unknown> });
         }}

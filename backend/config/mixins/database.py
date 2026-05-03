@@ -1,5 +1,7 @@
 """Database and pipeline storage settings."""
 
+import os
+import urllib.parse
 from typing import Any, Dict, Optional
 
 
@@ -34,6 +36,8 @@ class DatabaseMixin:
     def get_sqlite_url(self) -> str:
         """Get SQLite database URL."""
         db_path = self.DB_PATH or "mlops_database.db"  # type: ignore[attr-defined]
+        if os.path.isabs(db_path):
+            return f"sqlite+aiosqlite:///{db_path}"
         return f"sqlite+aiosqlite:///./{db_path}"
 
     def get_postgresql_url(self) -> str:
@@ -44,12 +48,22 @@ class DatabaseMixin:
                 "missing DB_USER, DB_PASSWORD, DB_HOST, or DB_NAME"
             )
         port = self.DB_PORT or 5432  # type: ignore[attr-defined]
+        pwd = urllib.parse.quote_plus(str(self.DB_PASSWORD)) if self.DB_PASSWORD else ""  # type: ignore[attr-defined]
         url = (
-            f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@"  # type: ignore[attr-defined]
+            f"postgresql+asyncpg://{self.DB_USER}:{pwd}@"  # type: ignore[attr-defined]
             f"{self.DB_HOST}:{port}/{self.DB_NAME}"  # type: ignore[attr-defined]
         )
-        if self.DB_SSLMODE:  # type: ignore[attr-defined]
-            url += f"?sslmode={self.DB_SSLMODE}"  # type: ignore[attr-defined]
+        params = []
+        if getattr(self, "DB_SSLMODE", None):
+            params.append(f"sslmode={self.DB_SSLMODE}")
+        if getattr(self, "DB_SSLROOTCERT", None):
+            params.append(f"sslrootcert={self.DB_SSLROOTCERT}")
+        if getattr(self, "DB_EXTRA_PARAMS", None):
+            params.append(str(self.DB_EXTRA_PARAMS))
+
+        if params:
+            url += f"?{'&'.join(params)}"
+
         return url
 
     def get_database_url_for_type(self, db_type: str) -> str:

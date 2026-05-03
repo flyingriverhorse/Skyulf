@@ -1,3 +1,4 @@
+from backend.exceptions.core import SkyulfException
 import json
 import logging
 import os
@@ -27,7 +28,6 @@ from backend.database.models import (
     BasicTrainingJob,
     DataSource,
     Deployment,
-    PipelineVersion,
 )
 from backend.ml_pipeline.services.pipeline_versions_service import (
     PipelineVersionsService,
@@ -584,9 +584,7 @@ async def save_pipeline(
                 json.dump(payload.model_dump(), f, indent=2)
             return {"status": "success", "id": dataset_id, "storage": "json"}
         except Exception as e:
-            raise HTTPException(
-                status_code=500, detail=f"Failed to save pipeline to JSON: {str(e)}"
-            )
+            raise SkyulfException(message=f"Failed to save pipeline to JSON: {str(e)}")
 
     # Default: Database Storage
     try:
@@ -640,7 +638,7 @@ async def save_pipeline(
         return {"status": "success", "id": dataset_id, "storage": "database"}
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to save pipeline: {str(e)}")
+        raise SkyulfException(message=f"Failed to save pipeline: {str(e)}")
 
 
 @router.get("/load/{dataset_id}")
@@ -659,9 +657,7 @@ async def load_pipeline(dataset_id: str, session: AsyncSession = Depends(get_asy
                 data = json.load(f)
             return data
         except Exception as e:
-            raise HTTPException(
-                status_code=500, detail=f"Failed to load pipeline from JSON: {str(e)}"
-            )
+            raise SkyulfException(message=f"Failed to load pipeline from JSON: {str(e)}")
 
     # Default: Database Storage
     try:
@@ -677,7 +673,7 @@ async def load_pipeline(dataset_id: str, session: AsyncSession = Depends(get_asy
 
         return pipeline.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load pipeline: {str(e)}")
+        raise SkyulfException(message=f"Failed to load pipeline: {str(e)}")
 
 
 # --- L7: Server-side pipeline versioning ---
@@ -720,7 +716,7 @@ async def create_pipeline_version(
         return version.to_dict()
     except Exception as e:  # noqa: BLE001
         await session.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to create pipeline version: {str(e)}")
+        raise SkyulfException(message=f"Failed to create pipeline version: {str(e)}")
 
 
 @router.patch("/versions/{dataset_source_id}/{version_id}")
@@ -819,7 +815,7 @@ async def preview_pipeline(  # noqa: C901
         # We need a sync session for SmartCatalog.
 
         if db_engine.sync_session_factory is None:
-            raise HTTPException(status_code=500, detail="Database not initialized")
+            raise SkyulfException(message="Database not initialized")
 
         sync_session = db_engine.sync_session_factory()
 
@@ -1175,7 +1171,7 @@ async def preview_pipeline(  # noqa: C901
 
     except Exception:
         logger.exception("Pipeline preview failed")
-        raise HTTPException(status_code=500, detail="Pipeline preview failed")
+        raise SkyulfException(message="Pipeline preview failed")
     finally:
         # 5. Cleanup
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -1266,7 +1262,7 @@ async def get_job_evaluation(  # noqa: C901
         raise HTTPException(status_code=404, detail=str(e))
     except Exception:
         logger.exception("Failed to retrieve evaluation for job %s", job_id)
-        raise HTTPException(status_code=500, detail="Failed to retrieve evaluation data")
+        raise SkyulfException(message="Failed to retrieve evaluation data")
 
 
 @router.get("/jobs", response_model=List[JobInfo])
@@ -1424,7 +1420,7 @@ async def get_dataset_schema(dataset_id: int, session: AsyncSession = Depends(ge
         return profile
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to profile dataset: {str(e)}")
+        raise SkyulfException(message=f"Failed to profile dataset: {str(e)}")
 
 
 @router.get("/hyperparameters/{model_type}")
@@ -1436,11 +1432,13 @@ def get_model_hyperparameters(model_type: str):
 
 
 @router.get("/hyperparameters/{model_type}/defaults")
-def get_model_default_search_space(model_type: str):
+def get_model_default_search_space(model_type: str, strategy: str = "random"):
     """
     Returns the default search space for a specific model type.
+    Pass ?strategy=halving_grid or ?strategy=grid to get a trimmed space
+    suitable for exhaustive grid evaluation.
     """
-    return get_default_search_space(model_type)
+    return get_default_search_space(model_type, strategy=strategy)
 
 
 @router.get("/datasets/list", response_model=List[Dict[str, Any]])

@@ -2,7 +2,9 @@
 
 from sklearn.ensemble import (
     AdaBoostRegressor,
+    ExtraTreesRegressor,
     GradientBoostingRegressor,
+    HistGradientBoostingRegressor,
     RandomForestRegressor,
 )
 from sklearn.linear_model import ElasticNet, Lasso, Ridge, LinearRegression
@@ -16,6 +18,27 @@ try:
     XGBOOST_AVAILABLE = True
 except ImportError:
     XGBOOST_AVAILABLE = False
+
+try:
+    import lightgbm as _lgb  # ty: ignore[unresolved-import]
+    from lightgbm import LGBMRegressor  # ty: ignore[unresolved-import]
+
+    LIGHTGBM_AVAILABLE = True
+
+    # LightGBM 4.x emits C++ stderr warnings ("No further splits with positive
+    # gain", auto col-wise info, etc.) that the `verbose=-1` constructor param
+    # does not always silence. Register a no-op logger so all native messages
+    # are intercepted by Python and dropped. Safe to call multiple times.
+    class _SilentLgbmLogger:
+        def info(self, msg: str) -> None:  # noqa: D401
+            pass
+
+        def warning(self, msg: str) -> None:  # noqa: D401
+            pass
+
+    _lgb.register_logger(_SilentLgbmLogger())
+except ImportError:
+    LIGHTGBM_AVAILABLE = False
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
@@ -307,6 +330,143 @@ class AdaBoostRegressorCalculator(SklearnCalculator):
         )
 
 
+# --- Extra Trees Regressor ---
+class ExtraTreesRegressorApplier(SklearnApplier):
+    """Extra Trees Regressor Applier."""
+
+
+@NodeRegistry.register("extra_trees_regressor", ExtraTreesRegressorApplier)
+@node_meta(
+    id="extra_trees_regressor",
+    name="Extra Trees Regressor",
+    category="Modeling",
+    description="Extremely randomised trees — faster than Random Forest, often comparably accurate.",
+    params={"n_estimators": 100, "max_depth": None, "min_samples_split": 2},
+)
+class ExtraTreesRegressorCalculator(SklearnCalculator):
+    """Extra Trees Regressor Calculator."""
+
+    def __init__(self):
+        super().__init__(
+            model_class=ExtraTreesRegressor,
+            default_params={
+                "n_estimators": 100,
+                "max_depth": None,
+                "min_samples_split": 2,
+                "min_samples_leaf": 1,
+                "criterion": "squared_error",
+                "bootstrap": False,
+                "n_jobs": -1,
+                "random_state": 42,
+            },
+            problem_type="regression",
+        )
+
+
+# --- HistGradientBoosting Regressor ---
+class HistGradientBoostingRegressorApplier(SklearnApplier):
+    """HistGradientBoosting Regressor Applier."""
+
+
+@NodeRegistry.register("hist_gradient_boosting_regressor", HistGradientBoostingRegressorApplier)
+@node_meta(
+    id="hist_gradient_boosting_regressor",
+    name="Hist Gradient Boosting Regressor",
+    category="Modeling",
+    description="Histogram-based gradient boosting — sklearn's fast LightGBM-style implementation.",
+    params={"max_iter": 100, "learning_rate": 0.1, "max_leaf_nodes": 31},
+)
+class HistGradientBoostingRegressorCalculator(SklearnCalculator):
+    """HistGradientBoosting Regressor Calculator."""
+
+    def __init__(self):
+        super().__init__(
+            model_class=HistGradientBoostingRegressor,
+            default_params={
+                "max_iter": 100,
+                "learning_rate": 0.1,
+                "max_leaf_nodes": 31,
+                "max_depth": None,
+                "min_samples_leaf": 20,
+                "l2_regularization": 0.0,
+                "max_bins": 255,
+                "random_state": 42,
+            },
+            problem_type="regression",
+        )
+
+
+# --- LightGBM Regressor (optional) ---
+if LIGHTGBM_AVAILABLE:
+
+    class LGBMRegressorApplier(SklearnApplier):
+        """LightGBM Regressor Applier.
+
+        LightGBM 4.x sets ``feature_names_in_`` to auto-generated names
+        (``Column_0``, ``Column_1``...) even when fit with numpy arrays, and the
+        property's deleter is intentionally a no-op (see upstream source). That
+        triggers sklearn's ``UserWarning: X does not have valid feature names``
+        on every predict call. We suppress it locally here so the warning never
+        leaks out of the applier boundary.
+        """
+
+        def predict(self, df, model_artifact):
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*valid feature names.*")
+                return super().predict(df, model_artifact)
+
+    @NodeRegistry.register("lgbm_regressor", LGBMRegressorApplier)
+    @node_meta(
+        id="lgbm_regressor",
+        name="LightGBM Regressor",
+        category="Modeling",
+        description="LightGBM: leaf-wise gradient boosting, fast and memory-efficient with categorical support.",
+        params={"n_estimators": 100, "num_leaves": 31, "learning_rate": 0.1},
+    )
+    class LGBMRegressorCalculator(SklearnCalculator):
+        """LightGBM Regressor Calculator."""
+
+        def __init__(self):
+            super().__init__(
+                model_class=LGBMRegressor,
+                default_params={
+                    "n_estimators": 100,
+                    "num_leaves": 31,
+                    "learning_rate": 0.1,
+                    "max_depth": -1,
+                    "min_child_samples": 20,
+                    "subsample": 1.0,
+                    "colsample_bytree": 1.0,
+                    "reg_alpha": 0.0,
+                    "reg_lambda": 0.0,
+                    "boosting_type": "gbdt",
+                    "n_jobs": -1,
+                    "random_state": 42,
+                    "verbose": -1,
+                    "verbosity": -1,
+                },
+                problem_type="regression",
+            )
+
+        def fit(
+            self, X, y, config, progress_callback=None, log_callback=None, validation_data=None
+        ):
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*valid feature names.*")
+                return super().fit(
+                    X,
+                    y,
+                    config,
+                    progress_callback=progress_callback,
+                    log_callback=log_callback,
+                    validation_data=validation_data,
+                )
+
+
 # --- XGBoost ---
 if XGBOOST_AVAILABLE:
 
@@ -331,9 +491,10 @@ if XGBOOST_AVAILABLE:
                     "n_estimators": 100,
                     "max_depth": 6,
                     "learning_rate": 0.3,
+                    "subsample": 0.8,
+                    "colsample_bytree": 0.8,
                     "n_jobs": -1,
                     "random_state": 42,
-                    "eval_metric": "rmse",
                 },
                 problem_type="regression",
             )

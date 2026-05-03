@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { jobsApi } from '../api/jobs';
 import { jobEventsSocket } from '../realtime/jobEventsSocket';
 import { useGraphStore } from '../store/useGraphStore';
+import { useJobStore } from '../store/useJobStore';
 
 /**
  * Keeps `nodeJobSummaries` in the graph store in sync with the
@@ -16,15 +17,37 @@ import { useGraphStore } from '../store/useGraphStore';
  * after every job event (debounced) so trainer cards refresh as soon
  * as a run completes.
  *
- * Cheap: a single small JSON dict per refresh; the WS event already
- * fires only on actual job state changes.
+ * Safety-net poll: only runs while there are active (fresh) jobs so
+ * an idle canvas never hits this endpoint. The WS event stream is the
+ * primary refresh trigger; the 30 s interval is the fallback for when
+ * the WS drops during a real run.
  */
 export function useNodeJobSummaries(): void {
   const setNodeJobSummaries = useGraphStore((s) => s.setNodeJobSummaries);
+  const jobs = useJobStore((s) => s.jobs);
+
+  // Stable ref so the effect closure always sees the latest job list
+  // without needing to re-register the WS subscription on every change.
+  const jobsRef = useRef(jobs);
+  useEffect(() => {
+    jobsRef.current = jobs;
+  }, [jobs]);
 
   useEffect(() => {
     let cancelled = false;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let safetyPoll: ReturnType<typeof setInterval> | null = null;
+
+    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+
+    const hasActiveJobs = (): boolean => {
+      const now = Date.now();
+      return jobsRef.current.some(
+        (j) =>
+          (j.status === 'running' || j.status === 'queued') &&
+          now - new Date(j.created_at).getTime() < TWO_HOURS_MS,
+      );
+    };
 
     const fetchSummaries = async (): Promise<void> => {
       try {
@@ -44,25 +67,36 @@ export function useNodeJobSummaries(): void {
       }, 400);
     };
 
-    void fetchSummaries();
+    // Manage the safety-net interval: start it only when there are
+    // active jobs and clear it as soon as there are none.
+    const syncSafetyPoll = (): void => {
+      if (hasActiveJobs()) {
+        if (!safetyPoll) {
+          safetyPoll = setInterval(() => {
+            if (!hasActiveJobs()) {
+              if (safetyPoll) { clearInterval(safetyPoll); safetyPoll = null; }
+              return;
+            }
+            void fetchSummaries();
+          }, 30_000);
+        }
+      } else {
+        if (safetyPoll) { clearInterval(safetyPoll); safetyPoll = null; }
+      }
+    };
+
+    // On mount: fetch once, then decide if the safety net is needed.
+    void fetchSummaries().then(() => syncSafetyPoll());
+
     const unsubscribe = jobEventsSocket.subscribe(() => {
       scheduleRefresh();
+      syncSafetyPoll();
     });
-
-    // Safety-net poll: the WS event stream is the primary refresh trigger,
-    // but if it drops (Redis bounce, proxy timeout, dev stack without
-    // Celery) the trainer cards would otherwise show stale numbers from
-    // a previous run until the user navigates away. 30 s is rare enough
-    // not to load the API but tight enough that "I just hit Run" feels
-    // live.
-    const safetyPoll = setInterval(() => {
-      void fetchSummaries();
-    }, 30_000);
 
     return () => {
       cancelled = true;
       if (refreshTimer) clearTimeout(refreshTimer);
-      clearInterval(safetyPoll);
+      if (safetyPoll) clearInterval(safetyPoll);
       unsubscribe();
     };
   }, [setNodeJobSummaries]);

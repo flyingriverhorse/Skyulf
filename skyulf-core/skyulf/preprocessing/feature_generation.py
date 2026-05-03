@@ -10,7 +10,7 @@ from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
 from ..utils import detect_numeric_columns, pack_pipeline_output, unpack_pipeline_input
 from .base import BaseApplier, BaseCalculator
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 # --- Optional Dependencies ---
 fuzz: Any = None
@@ -117,21 +117,20 @@ class PolynomialFeaturesApplier(BaseApplier):
         output_prefix = params.get("output_prefix", "poly")
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
 
             # For PolynomialFeatures, we use the pandas/sklearn implementation via conversion
             # to ensure full compatibility with complex degree/interaction logic.
-            X_pd = X_pl.to_pandas()
-
             poly = PolynomialFeatures(
                 degree=degree, interaction_only=interaction_only, include_bias=include_bias
             )
-            poly.fit(X_pd[valid_cols])
+            X_subset = X_pl.select(valid_cols).to_pandas()
+            poly.fit(X_subset)
 
-            transformed = poly.transform(X_pd[valid_cols])
+            transformed = poly.transform(X_subset)
             # sklearn may return a DataFrame when transform_output="pandas" is set
             if hasattr(transformed, "values"):
                 transformed = transformed.values
@@ -252,7 +251,7 @@ class PolynomialFeaturesCalculator(BaseCalculator):
 
         # We use sklearn to get feature names
         # Ensure X is compatible with sklearn (Pandas/Numpy)
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X_pl: Any = X
             X_fit = X_pl.select(cols).to_pandas()
         else:
@@ -295,7 +294,7 @@ class FeatureGenerationApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X

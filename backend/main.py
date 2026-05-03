@@ -29,8 +29,10 @@ from backend.exceptions.handlers import (
     generic_http_exception_handler,
     method_not_allowed_exception_handler,
     not_found_exception_handler,
+    skyulf_exception_handler,
     validation_exception_handler,
 )
+from backend.exceptions.core import SkyulfException
 from backend.health.routes import router as health_router
 from backend.middleware.error_handler import ErrorHandlerMiddleware
 from backend.middleware.logging import LoggingMiddleware
@@ -364,6 +366,9 @@ def _add_exception_handlers(app: FastAPI) -> None:
     # Generic HTTP exception handler for other status codes
     app.add_exception_handler(HTTPException, generic_http_exception_handler)
     app.add_exception_handler(StarletteHTTPException, generic_http_exception_handler)
+
+    # Handle custom Skyulf exceptions
+    app.add_exception_handler(SkyulfException, skyulf_exception_handler)
 
     # Add general exception handler for unhandled Python exceptions
     @app.exception_handler(Exception)

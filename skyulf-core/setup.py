@@ -7,7 +7,7 @@ long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="skyulf-core",
-    version="0.1.14",
+    version="0.1.16",
     description="The core machine learning library for Skyulf.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -42,13 +42,11 @@ setup(
         ],
         "preprocessing-imbalanced": ["imbalanced-learn>=0.13.0"],
         "modeling-xgboost": ["xgboost>=2.1.4"],
+        "modeling-lightgbm": ["lightgbm>=4.0.0"],
     },
-    python_requires=">=3.9",
+    python_requires=">=3.12",
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Operating System :: OS Independent",
     ],

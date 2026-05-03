@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, List, Optional, Union
 
 import numpy as np
@@ -38,11 +39,15 @@ def evaluate_classification_model(
     metrics = calculate_classification_metrics(model, X_test, y_test)
 
     # Generate predictions and probabilities
-    y_pred = model.predict(X_test_np)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*valid feature names.*")
+        y_pred = model.predict(X_test_np)
     y_prob = None
     if hasattr(model, "predict_proba"):
         try:
-            y_prob = model.predict_proba(X_test_np)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*valid feature names.*")
+                y_prob = model.predict_proba(X_test_np)
         except Exception:
             pass
 

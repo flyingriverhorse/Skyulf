@@ -6,6 +6,7 @@ This module handles the auto-detection of the appropriate compute engine
 """
 
 from typing import Any, Dict, Type
+from enum import Enum
 import logging
 
 # We import the protocol for type checking, but we don't strictly need it at runtime here
@@ -15,10 +16,16 @@ from .protocol import SkyulfDataFrame
 logger = logging.getLogger(__name__)
 
 
+class EngineName(str, Enum):
+    PANDAS = "pandas"
+    POLARS = "polars"
+    BASE = "base"
+
+
 class BaseEngine:
     """Abstract base class for all engines."""
 
-    name: str = "base"
+    name: EngineName = EngineName.BASE
 
     @classmethod
     def is_compatible(cls, data: Any) -> bool:

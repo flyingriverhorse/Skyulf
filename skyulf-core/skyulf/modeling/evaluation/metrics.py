@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import math
+import warnings
 from typing import Any, Dict, Union
 
 import numpy as np
@@ -11,7 +12,11 @@ import pandas as pd
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
+    balanced_accuracy_score,
+    explained_variance_score,
     f1_score,
+    log_loss,
+    matthews_corrcoef,
     mean_absolute_error,
     mean_absolute_percentage_error,
     mean_squared_error,
@@ -47,13 +52,16 @@ def calculate_classification_metrics(
     # Use DataFrame directly if possible to preserve feature names
     # Only convert to numpy if model doesn't support pandas or if X is not pandas
 
-    predictions = model.predict(X_np)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*valid feature names.*")
+        predictions = model.predict(X_np)
 
     # For metrics calculation, we might need numpy arrays for y
     y_arr = y_np
 
     metrics: Dict[str, float] = {
         "accuracy": float(accuracy_score(y_arr, predictions)),
+        "balanced_accuracy": float(balanced_accuracy_score(y_arr, predictions)),
         "precision_weighted": float(
             precision_score(y_arr, predictions, average="weighted", zero_division=0)
         ),
@@ -61,6 +69,7 @@ def calculate_classification_metrics(
             recall_score(y_arr, predictions, average="weighted", zero_division=0)
         ),
         "f1_weighted": float(f1_score(y_arr, predictions, average="weighted", zero_division=0)),
+        "matthews_corrcoef": float(matthews_corrcoef(y_arr, predictions)),
     }
 
     # Add unweighted metrics for binary classification
@@ -85,16 +94,35 @@ def calculate_classification_metrics(
 
     try:
         if hasattr(model, "predict_proba"):
-            proba = model.predict_proba(X_np)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*valid feature names.*")
+                proba = model.predict_proba(X_np)
             if proba.ndim == 2 and proba.shape[1] >= 2:
                 class_count = proba.shape[1]
+                try:
+                    metrics["log_loss"] = float(log_loss(y_arr, proba))
+                except Exception:
+                    pass
                 try:
                     if class_count == 2:
                         metrics["roc_auc"] = float(roc_auc_score(y_arr, proba[:, 1]))
                         metrics["pr_auc"] = float(average_precision_score(y_arr, proba[:, 1]))
                     else:
-                        metrics["roc_auc_weighted"] = float(
+                        # OVR variants
+                        ovr_weighted = float(
                             roc_auc_score(y_arr, proba, multi_class="ovr", average="weighted")
+                        )
+                        metrics["roc_auc_weighted"] = ovr_weighted  # kept for backward compat
+                        metrics["roc_auc_ovr_weighted"] = ovr_weighted
+                        metrics["roc_auc_ovr"] = float(
+                            roc_auc_score(y_arr, proba, multi_class="ovr", average="macro")
+                        )
+                        # OVO variants
+                        metrics["roc_auc_ovo"] = float(
+                            roc_auc_score(y_arr, proba, multi_class="ovo", average="macro")
+                        )
+                        metrics["roc_auc_ovo_weighted"] = float(
+                            roc_auc_score(y_arr, proba, multi_class="ovo", average="weighted")
                         )
                         classes = getattr(model, "classes_", None)
                         if classes is None or len(classes) != class_count:
@@ -131,6 +159,7 @@ def calculate_regression_metrics(
         "rmse": float(math.sqrt(mse_value)),
         "r2": float(r2_score(y_arr, predictions)),
         "mape": float(mean_absolute_percentage_error(y_arr, predictions)),
+        "explained_variance": float(explained_variance_score(y_arr, predictions)),
     }
 
     return metrics

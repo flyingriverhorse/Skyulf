@@ -6,12 +6,11 @@
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Commercial](https://img.shields.io/badge/enterprise-support-blueviolet)](COMMERCIAL-LICENSE.md)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](#quick-start)
+[![Python](https://img.shields.io/badge/python-3.12-blue)](#quick-start)
 [![CI](https://github.com/flyingriverhorse/Skyulf/actions/workflows/ci.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/ci.yml)
 [![Docs](https://github.com/flyingriverhorse/Skyulf/actions/workflows/docs.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/docs.yml)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](.pre-commit-config.yaml)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Checked with mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Skyulf](https://img.shields.io/badge/Skyulf-Privacy--First_MLOps_Hub-blueviolet)](#key-features)
 [![codecov](https://codecov.io/github/flyingriverhorse/Skyulf/graph/badge.svg?token=47ED2R6ZHC)](https://codecov.io/github/flyingriverhorse/Skyulf)
@@ -33,7 +32,6 @@ I named it Skyulf after two ideas. Sky is the open space above Earth, where the 
 - [Quick Start](#quick-start)
 - [Using Skyulf as a Library](#using-skyulf-as-a-library)
 - [Key Features](#key-features)
-- [Roadmap](#roadmap)
 - [Version History](#version-history)
 - [Workflow Overview](#workflow-overview)
 - [Development](#development)
@@ -42,7 +40,7 @@ I named it Skyulf after two ideas. Sky is the open space above Earth, where the 
 
 ## Quick Start
 
-Prerequisites: **Python 3.10+**
+Prerequisites: **Python 3.12**
 
 ### Fastest Path (One Command)
 
@@ -175,24 +173,13 @@ For detailed examples including **Time Series**, **Geospatial Analysis**, and **
 *   **🎨 Visual Feature Canvas:** A node-based editor to clean, transform, and engineer features without writing spaghetti code. (25+ built-in nodes).
 *   **Automated EDA:** Professional-grade Exploratory Data Analysis with interactive charts, causal discovery (DAGs), decision trees for rule extraction, segmentation, outlier detection, and statistical alerts.
 *   **Drift Analysis** Built on the EDA engine to monitor data and model drift over time with statistical tests and visualizations.
-*   **High-Performance Engine:** Built on **FastAPI** and **Polars** for lightning-fast data processing and easy API extension.
+*   **High-Performance Dual Engine:** Built on **FastAPI** and **Polars** for lightning-fast ETL (Extract/Transform/Load) operations. Data strictly bypasses Pandas overhead by using zero-copy Apache Arrow conversions directly to NumPy via our `SklearnBridge` for advanced ML nodes.
 *   **⚡ Async by Default:** Heavy training jobs run in the background via Celery & Redis (or background threads)—your UI never freezes.
-*   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or SQL. Start with SQLite (zero-config) and scale to PostgreSQL.
+*   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or S3. Backend storage starts with SQLite (zero-config) and scales to PostgreSQL.
 *   **☁️ S3 Integration:** Full support for S3-compatible storage (AWS, MinIO) for data ingestion, artifact storage, and model registry.
 *   **🧠 Model Training:** Built-in support for Scikit-Learn models with hyperparameter search (Grid/Random/Halving) and optional Optuna integration.
 *   **📦 Model Registry & Deployment:** Version control your models, track metrics, and deploy them to a live inference API with a single click.
 *   **📊 Experiment Tracking:** Compare multiple runs side-by-side with interactive charts, confusion matrices, and ROC curves.
-
-## Roadmap
-
-We have a clear vision to turn Skyulf into a complete **App Hub** for AI.
-
-*   **Phase 1: Polish & Stability** (Done) - Architecturing, type safety, and documentation.
-*   **Phase 2: Deepening Data Science** (Current Focus) - Advanced EDA, Ethics/Fairness checks, Synthetic Data, and Public Data Hubs, more models, NLP and more.
-*   **Phase 3: The "App Hub" Vision** - Plugin system, GenAI/LLM Builders, and Deployment.
-*   **Phase 4: Expansion** - Real-time collaboration, Edge/IoT export, and Audio support.
-
-👉 **[View the full ROADMAP.md](./ROADMAP.md)** for details.
 
 ## Version History
 

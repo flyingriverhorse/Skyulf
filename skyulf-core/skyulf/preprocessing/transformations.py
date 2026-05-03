@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Tuple, Union, cast
+from typing import Any, Dict, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -15,7 +15,7 @@ from ..utils import (
     user_picked_no_columns,
 )
 from .base import BaseApplier, BaseCalculator
-from ..engines import SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class PowerTransformerApplier(BaseApplier):
     ) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
-        was_polars = engine.name == "polars"
+        was_polars = engine.name == EngineName.POLARS
 
         cols = params.get("columns", [])
         lambdas = params.get("lambdas")
@@ -45,17 +45,12 @@ class PowerTransformerApplier(BaseApplier):
         if was_polars:
             import polars as pl
 
-            X_pd = X.to_pandas()
+            X_vals = X.select(valid_cols).to_numpy()
+            df_out = X  # We won't copy whole df here
         else:
             X_pd = X
-
-        df_out = X_pd.copy()
-
-        # Reconstruct PowerTransformer state for application
-        # We manually restore the lambdas and internal scaler to apply the transform
-        # without re-fitting.
-
-        X_vals = df_out[valid_cols].values
+            df_out = X_pd.copy()
+            X_vals = df_out[valid_cols].values
         # Filter lambdas and scaler params to match valid_cols
         col_indices = [cols.index(c) for c in valid_cols]
         lambdas_arr = np.array(lambdas)[col_indices]
@@ -89,14 +84,16 @@ class PowerTransformerApplier(BaseApplier):
             X_trans = pt.transform(X_vals)
             # sklearn can be configured with transform_output="pandas", which returns a DataFrame.
             X_trans_arr = X_trans.to_numpy() if hasattr(X_trans, "to_numpy") else X_trans
-            df_out.loc[:, valid_cols] = np.asarray(X_trans_arr)
+
+            if was_polars:
+                series = [pl.Series(name, X_trans_arr[:, i]) for i, name in enumerate(valid_cols)]
+                df_out = df_out.with_columns(series)
+            else:
+                df_out.loc[:, valid_cols] = np.asarray(X_trans_arr)
 
         except Exception as e:
             logger.error(f"PowerTransformer application failed: {e}")
-            # Fallback?
-
-        if was_polars:
-            df_out = pl.from_pandas(cast(pd.DataFrame, df_out))
+            # Fallback is keeping df_out as it was
 
         return pack_pipeline_output(df_out, y, is_tuple)
 
@@ -117,7 +114,7 @@ class PowerTransformerCalculator(BaseCalculator):
     ) -> Dict[str, Any]:
         X, _, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             X = X.to_pandas()
 
         if user_picked_no_columns(config):
@@ -185,7 +182,7 @@ class SimpleTransformationApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -299,7 +296,7 @@ class GeneralTransformationApplier(BaseApplier):
             return pack_pipeline_output(X, y, is_tuple)
 
         # Polars Path
-        if engine.name == "polars":
+        if engine.name == EngineName.POLARS:
             import polars as pl
 
             X_pl: Any = X
@@ -464,7 +461,7 @@ class GeneralTransformationCalculator(BaseCalculator):
                 # Fit PowerTransformer
                 try:
                     # Prepare data (Pandas Series/DataFrame)
-                    if engine.name == "polars":
+                    if engine.name == EngineName.POLARS:
                         col_series = X[col].to_pandas()
                         col_df = col_series.to_frame()
                     else:

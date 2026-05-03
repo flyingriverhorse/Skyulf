@@ -3,7 +3,6 @@ from fastapi.responses import Response
 
 from .dependencies import get_data_service
 from .schemas.ingestion import (
-    DataSourceCreate,
     DataSourceListResponse,
     DataSourceRead,
     DataSourceResponse,
@@ -81,7 +80,7 @@ async def delete_source(source_id: str, service: DataIngestionService = Depends(
 @sources_router.get("/sources/{source_id}/export")
 async def export_source_data(
     source_id: str,
-    format: str = Query("csv", pattern="^(csv|parquet)$"),
+    format: str = Query("csv", pattern="^(csv|parquet)$"),  # noqa: A002
     limit: int = Query(1000, ge=1, le=50_000),
     service: DataIngestionService = Depends(get_data_service),
 ) -> Response:
@@ -118,21 +117,6 @@ async def export_source_data(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={safe_name}.csv"},
     )
-
-
-@router.post("/database", response_model=IngestionJobResponse)
-async def create_database_source(
-    data: DataSourceCreate,
-    background_tasks: BackgroundTasks,
-    service: DataIngestionService = Depends(get_data_service),
-):
-    """
-    Create a database source and start ingestion.
-    """
-    # KNOWN-GAP: Auth not implemented yet — hardcoded user_id=1.
-    # TODO(auth): Replace with real user ID from auth dependency.
-    user_id = 1
-    return await service.create_database_source(data, user_id, background_tasks)
 
 
 @router.post("/upload", response_model=IngestionJobResponse)

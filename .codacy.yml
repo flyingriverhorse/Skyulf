@@ -1,0 +1,4 @@
+---
+exclude_paths:
+  - "static/ml_canvas/assets/**"
+  - "site/**"

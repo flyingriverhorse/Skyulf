@@ -85,7 +85,7 @@ class FeatureEngineer:
             calculator, applier = self._get_transformer_components(transformer_type)
             step_node_id = f"{node_id_prefix}_{name}"
 
-            current_data, fitted_params = self._run_step(
+            current_data, fitted_params, transformer_inst = self._run_step(
                 transformer_type=transformer_type,
                 name=name,
                 calculator=calculator,
@@ -94,6 +94,13 @@ class FeatureEngineer:
                 current_data=current_data,
                 params=params,
             )
+
+            if transformer_inst is not None:
+                # Add node-level performance metrics directly into `metrics` dictionary
+                metrics["fit_time"] = getattr(transformer_inst, "fit_time", 0.0)
+                metrics["peak_memory_bytes"] = getattr(transformer_inst, "peak_memory_bytes", 0)
+                metrics["rows_in"] = getattr(transformer_inst, "rows_in", 0)
+                metrics["rows_out"] = getattr(transformer_inst, "rows_out", 0)
 
             logger.debug(f"Step {i} complete. New data type: {type(current_data)}")
 
@@ -128,7 +135,7 @@ class FeatureEngineer:
         step_node_id: str,
         current_data: Any,
         params: Dict[str, Any],
-    ) -> tuple:
+    ) -> tuple:  # Returns (data, params, transformer)
         """Execute one pipeline step. Returns (new_data, fitted_params).
 
         Splitters change the data structure (DataFrame -> SplitDataset / (X, y)),
@@ -148,13 +155,13 @@ class FeatureEngineer:
                 logger.warning(
                     "Attempting to split an already split dataset. Skipping TrainTestSplitter."
                 )
-            return current_data, fitted_params
+            return current_data, fitted_params, None
 
         if transformer_type == "feature_target_split":
             logger.debug("Handling feature_target_split")
             params = calculator.fit(current_data, params)
             current_data = applier.apply(current_data, params)
-            return current_data, fitted_params
+            return current_data, fitted_params, None
 
         logger.debug("Handling standard transformer via StatefulTransformer")
         current_data = transformer.fit_transform(current_data, params)
@@ -167,7 +174,7 @@ class FeatureEngineer:
                 "artifact": fitted_params,
             }
         )
-        return current_data, fitted_params
+        return current_data, fitted_params, transformer
 
     # ------------------------------------------------------------------
     # Metrics collection

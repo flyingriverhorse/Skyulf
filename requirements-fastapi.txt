@@ -50,10 +50,13 @@ xlsx2csv>=0.8.0                      # Excel to CSV converter (used by Polars in
 openpyxl>=3.1.0                      # Excel reading support (used by Pandas internally)
 pandas>=2.0.0,<3.0.0
 numpy>=1.24.0
-scikit-learn>=1.4.0,<2.0.0
+scikit-learn>=1.8.0,<2.0.0
+xgboost>=2.1.4                       # XGBoost classifier/regressor models
+lightgbm>=4.0.0                      # LightGBM classifier/regressor models (leaf-wise boosting)
 optuna>=4.0,<5                       # Bayesian/early-stopping hyperparameter search
 optuna-integration>=4.0,<5           # OptunaSearchCV for sklearn hyperparameter tuning
-imbalanced-learn>=0.12.0,<1.0.0     # Sampling strategies for imbalanced datasets
+cmaes>=0.10                          # Required by optuna's CmaEsSampler (not auto-installed)
+imbalanced-learn>=0.14.1,<1.0.0     # Sampling strategies for imbalanced datasets
 rapidfuzz>=3.6.1,<4.0.0             # String similarity metrics for feature engineering
 
 # === NLP ANALYTICS ===
