@@ -52,6 +52,7 @@ pandas>=2.0.0,<3.0.0
 numpy>=1.24.0
 scikit-learn>=1.8.0,<2.0.0
 xgboost>=2.1.4                       # XGBoost classifier/regressor models
+lightgbm>=4.0.0                      # LightGBM classifier/regressor models (leaf-wise boosting)
 optuna>=4.0,<5                       # Bayesian/early-stopping hyperparameter search
 optuna-integration>=4.0,<5           # OptunaSearchCV for sklearn hyperparameter tuning
 cmaes>=0.10                          # Required by optuna's CmaEsSampler (not auto-installed)
