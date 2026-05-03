@@ -8,6 +8,8 @@ const METRIC_BASE_DESCRIPTIONS: Record<string, string> = {
   roc_auc_weighted: 'ROC AUC averaged across classes weighted by support.',
   roc_auc_ovr: 'ROC AUC using one-vs-rest strategy.',
   roc_auc_ovo: 'ROC AUC using one-vs-one strategy.',
+  roc_auc_ovr_weighted: 'ROC AUC (one-vs-rest, weighted by class support) for multiclass. Higher = better.',
+  roc_auc_ovo_weighted: 'ROC AUC (one-vs-one, weighted by class support) for multiclass. Higher = better.',
   precision: 'Of all positive predictions made, how many were actually correct.',
   precision_weighted: 'Precision averaged by class support.',
   recall: 'Of all actual positive samples, how many did the model correctly identify.',
@@ -18,9 +20,12 @@ const METRIC_BASE_DESCRIPTIONS: Record<string, string> = {
   mse: 'Mean squared error. Squares errors so large deviations are penalised heavily.',
   log_loss: 'Negative log-likelihood (log loss). Lower is better. Penalises confident wrong predictions.',
   g_score: 'Geometric mean of sensitivity and specificity. Useful for imbalanced classification.',
+  balanced_accuracy: 'Accuracy averaged equally across classes. Unlike standard accuracy, not skewed by majority class size.',
+  matthews_corrcoef: 'Matthews Correlation Coefficient (MCC). Single number summary of a confusion matrix. +1 = perfect, 0 = random, -1 = inverse. Best metric for imbalanced binary classification.',
   pr_auc: 'Area under Precision-Recall curve. More informative than ROC AUC when the positive class is rare.',
   pr_auc_weighted: 'PR AUC averaged across classes by support.',
   mape: 'Mean absolute percentage error. Expresses average error as a % of the true value. Avoid when targets are near zero.',
+  explained_variance: 'Fraction of target variance explained by the model. Like R² but does not penalise systematic bias.',
   best_score: 'Best cross-validation score found across all tuning trials. This value drove hyperparameter selection.',
 };
 
@@ -135,13 +140,15 @@ export const formatMetricName = (metric?: string | null): string => {
   if (!metric) return '';
   const map: Record<string, string> = {
     accuracy: 'Accuracy', f1: 'F1', precision: 'Precision', recall: 'Recall',
-    roc_auc: 'ROC AUC', r2: 'R²', mse: 'MSE', mae: 'MAE', rmse: 'RMSE',
+    roc_auc: 'ROC AUC', r2: 'R²', mse: 'MSE', mae: 'MAE', rmse: 'RMSE', mape: 'MAPE',
     f1_weighted: 'F1 Weighted', precision_weighted: 'Precision Weighted',
     recall_weighted: 'Recall Weighted', roc_auc_weighted: 'ROC AUC Weighted',
     f1_macro: 'F1 Macro', f1_micro: 'F1 Micro',
     precision_macro: 'Precision Macro', recall_macro: 'Recall Macro',
     roc_auc_ovr: 'ROC AUC OVR', roc_auc_ovo: 'ROC AUC OVO',
     roc_auc_ovr_weighted: 'ROC AUC OVR Weighted', roc_auc_ovo_weighted: 'ROC AUC OVO Weighted',
+    balanced_accuracy: 'Balanced Accuracy', matthews_corrcoef: 'MCC',
+    explained_variance: 'Explained Variance', log_loss: 'Log Loss',
     neg_mean_squared_error: 'MSE', neg_mean_absolute_error: 'MAE',
     neg_root_mean_squared_error: 'RMSE', neg_log_loss: 'Log Loss',
   };
