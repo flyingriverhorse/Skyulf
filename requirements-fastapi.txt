@@ -53,6 +53,7 @@ numpy>=1.24.0
 scikit-learn>=1.4.0,<2.0.0
 optuna>=4.0,<5                       # Bayesian/early-stopping hyperparameter search
 optuna-integration>=4.0,<5           # OptunaSearchCV for sklearn hyperparameter tuning
+cmaes>=0.10                          # Required by optuna's CmaEsSampler (not auto-installed)
 imbalanced-learn>=0.12.0,<1.0.0     # Sampling strategies for imbalanced datasets
 rapidfuzz>=3.6.1,<4.0.0             # String similarity metrics for feature engineering
 

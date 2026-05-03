@@ -621,6 +621,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         onClose={() => setShowStrategyModal(false)}
         strategy={config.search_strategy || 'random'}
         initialConfig={config.strategy_params as StrategyConfig | undefined}
+        modelKey={config.model_type}
         onSave={(newStrategyParams) => {
             onChange({ ...config, strategy_params: newStrategyParams as Record<string, unknown> });
         }}

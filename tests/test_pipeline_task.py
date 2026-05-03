@@ -34,7 +34,7 @@ def mock_session():
 
 @pytest.fixture
 def mock_engine_class():
-    with patch("backend.ml_pipeline.tasks.PipelineEngine") as mock:
+    with patch("backend.ml_pipeline.services.pipeline_execution_service.PipelineEngine") as mock:
         yield mock
 
 

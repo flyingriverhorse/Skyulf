@@ -493,10 +493,28 @@ class TuningCalculator(BaseModelCalculator):
                     "Optuna is not installed. Please install 'optuna' and 'optuna-integration'."
                 )
 
-            # Convert search space to Optuna distributions
+            # Convert search space to Optuna distributions.
+            # CMA-ES needs continuous distributions — numeric lists become
+            # IntDistribution or FloatDistribution so CMA-ES samples the full
+            # range instead of treating discrete values as categories.
+            # String / bool / None lists remain CategoricalDistribution; CMA-ES
+            # falls back to RandomSampler for those (unavoidable) but we suppress
+            # the noisy warning via warn_independent_sampling=False.
+            strategy_params = getattr(config, "strategy_params", {})
+            use_cmaes = strategy_params.get("sampler", "tpe") == "cmaes"
             distributions = {}
             for k, v in config.search_space.items():
-                if isinstance(v, list):
+                if isinstance(v, list) and use_cmaes and v and all(
+                    isinstance(x, (int, float)) for x in v
+                ):
+                    lo, hi = min(v), max(v)
+                    if all(isinstance(x, int) for x in v):
+                        distributions[k] = optuna.distributions.IntDistribution(lo, hi)
+                    else:
+                        distributions[k] = optuna.distributions.FloatDistribution(
+                            float(lo), float(hi)
+                        )
+                elif isinstance(v, list):
                     distributions[k] = optuna.distributions.CategoricalDistribution(v)
                 else:
                     distributions[k] = v
@@ -519,17 +537,17 @@ class TuningCalculator(BaseModelCalculator):
 
                 callbacks.append(_optuna_callback)
 
-            # Strategy Parameters logic
-            strategy_params = getattr(config, "strategy_params", {})
-
             # Sampler Selection
             sampler_name = strategy_params.get("sampler", "tpe")
             if sampler_name == "random":
                 sampler = optuna.samplers.RandomSampler(seed=config.random_state)
             elif sampler_name == "cmaes":
-                # CMA-ES can fail if search space is not purely continuous, fallback gracefully?
-                # Using it here assuming the user knows what they're doing if they select it.
-                sampler = optuna.samplers.CmaEsSampler(seed=config.random_state)
+                # Suppress the fallback warning for genuinely categorical params
+                # (strings, booleans, None) — those can never be continuous and
+                # the random fallback for them is expected behaviour.
+                sampler = optuna.samplers.CmaEsSampler(
+                    seed=config.random_state, warn_independent_sampling=False
+                )
             else:
                 sampler = optuna.samplers.TPESampler(seed=config.random_state)
 

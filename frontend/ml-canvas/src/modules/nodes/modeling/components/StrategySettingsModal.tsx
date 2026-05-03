@@ -1,6 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Save, RotateCcw, HelpCircle } from 'lucide-react';
+import { Save, RotateCcw, HelpCircle, AlertTriangle } from 'lucide-react';
 import { ModalShell } from '../../../../components/shared';
+
+// Models whose search spaces contain string/boolean/None params that CMA-ES
+// cannot optimize natively — it falls back to random sampling for those params.
+const CMAES_PARTIAL_MODELS = new Set([
+    'logistic_regression',
+    'random_forest_classifier',
+    'random_forest_regressor',
+    'ridge_regression',
+    'linear_regression',
+    'svc',
+    'svr',
+    'k_neighbors_classifier',
+    'k_neighbors_regressor',
+    'decision_tree_classifier',
+    'decision_tree_regressor',
+]);
 
 export interface StrategyConfig {
     // Halving
@@ -20,6 +36,7 @@ interface StrategySettingsModalProps {
     onSave: (config: StrategyConfig) => void;
     strategy: string;
     initialConfig?: StrategyConfig | undefined;
+    modelKey?: string | undefined;
 }
 
 const Tooltip: React.FC<{ text: string }> = ({ text }) => (
@@ -37,8 +54,13 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
     onClose,
     onSave,
     strategy,
-    initialConfig
+    initialConfig,
+    modelKey,
 }) => {
+    const showCmaesWarning =
+        strategy === 'optuna' &&
+        modelKey !== undefined &&
+        CMAES_PARTIAL_MODELS.has(modelKey);
     const isHalving = strategy === 'halving_grid' || strategy === 'halving_random';
     const isOptuna = strategy === 'optuna';
 
@@ -179,6 +201,14 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
                                     <option value="cmaes">CMA-ES</option>
                                 </select>
                                 <p className="text-xs text-gray-500 mt-1">Algorithm to suggest new parameters.</p>
+                                {showCmaesWarning && config.sampler === 'cmaes' && (
+                                    <div className="mt-2 flex items-start gap-2 p-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-700 dark:text-amber-400">
+                                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                                        <span>
+                                            <strong>Partial CMA-ES coverage.</strong> This model has string or boolean parameters (e.g. solver, kernel, criterion) that CMA-ES cannot optimize — they will be sampled randomly. For full CMA-ES benefit, use <strong>XGBoost</strong> or <strong>Gradient Boosting</strong>. Alternatively, switch to <strong>TPE</strong> which handles mixed spaces natively.
+                                        </span>
+                                    </div>
+                                )}
                             </div>
 
                             <div>
