@@ -291,7 +291,13 @@ class TuningCalculator(BaseModelCalculator):
         # The schema defaults metric to "accuracy". If the user is doing Regression but "accuracy"
         # (or another classification metric) is selected, we raise a clear error instead of crashing deeply in sklearn.
         if self.model_calculator.problem_type == "regression":
-            if metric in ["accuracy", "f1", "precision", "recall", "roc_auc", "f1_weighted"]:
+            if metric in [
+                "accuracy", "f1", "precision", "recall", "roc_auc", "f1_weighted",
+                "balanced_accuracy", "log_loss", "matthews_corrcoef",
+                "roc_auc_weighted", "roc_auc_ovr", "roc_auc_ovo",
+                "roc_auc_ovr_weighted", "roc_auc_ovo_weighted",
+                "pr_auc", "pr_auc_weighted", "g_score",
+            ]:
                 raise ValueError(
                     f"Configuration Error: You selected '{metric}' as the tuning metric, "
                     "but this is a Regression model. "
@@ -307,11 +313,20 @@ class TuningCalculator(BaseModelCalculator):
             "mae": "neg_mean_absolute_error",
             "rmse": "neg_root_mean_squared_error",
             "r2": "r2",
+            "explained_variance": "explained_variance",
             "accuracy": "accuracy",
+            "balanced_accuracy": "balanced_accuracy",
             "f1": "f1",
+            "f1_weighted": "f1_weighted",
             "precision": "precision",
             "recall": "recall",
             "roc_auc": "roc_auc",
+            "roc_auc_ovr": "roc_auc_ovr",
+            "roc_auc_ovo": "roc_auc_ovo",
+            "roc_auc_ovr_weighted": "roc_auc_ovr_weighted",
+            "roc_auc_ovo_weighted": "roc_auc_ovo_weighted",
+            "log_loss": "neg_log_loss",
+            "matthews_corrcoef": "matthews_corrcoef",
         }
 
         if metric in metric_map:

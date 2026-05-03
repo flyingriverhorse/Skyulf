@@ -7,7 +7,7 @@ long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="skyulf-core",
-    version="0.1.15",
+    version="0.1.16",
     description="The core machine learning library for Skyulf.",
     long_description=long_description,
     long_description_content_type="text/markdown",
