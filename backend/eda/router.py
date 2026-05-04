@@ -1,5 +1,5 @@
 from backend.exceptions.core import SkyulfException
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from pydantic import BaseModel
@@ -13,6 +13,7 @@ from backend.services.data_service import DataService
 from backend.utils.file_utils import extract_file_path_from_source
 from backend.celery_app import celery_app
 from skyulf.profiling.analyzer import EDAAnalyzer
+from backend.middleware.rate_limiter import limiter
 import logging
 import polars as pl
 import pandas as pd
@@ -66,16 +67,18 @@ async def list_all_jobs(limit: int = 50, skip: int = 0, session: AsyncSession = 
 
 
 @router.post("/{dataset_id}/analyze")
+@limiter.limit("20/minute")
 async def trigger_analysis(
     dataset_id: int,
+    request: Request,
     background_tasks: BackgroundTasks,
-    request: Optional[AnalyzeRequest] = None,
+    body: Optional[AnalyzeRequest] = None,
     session: AsyncSession = Depends(get_db),
 ):
     """
     Triggers an EDA analysis job for the given dataset.
     """
-    logger.info("Triggering analysis for dataset %s. Request: %s", dataset_id, request)
+    logger.info("Triggering analysis for dataset %s. Request: %s", dataset_id, body)
 
     # Check if dataset exists
     ds = await session.get(DataSource, dataset_id)
@@ -84,19 +87,19 @@ async def trigger_analysis(
 
     # Create Report entry
     config = {}
-    if request:
-        if request.target_col:
-            logger.debug("Setting target_col to %s", request.target_col)
-            config["target_col"] = request.target_col
-        if request.exclude_cols:
-            logger.debug("Excluding columns: %s", request.exclude_cols)
-            config["exclude_cols"] = request.exclude_cols
-        if request.filters:
-            logger.debug("Applying filters: %s", request.filters)
-            config["filters"] = [f.model_dump() for f in request.filters]
-        if request.task_type:
-            logger.debug("Setting task_type to %s", request.task_type)
-            config["task_type"] = request.task_type
+    if body:
+        if body.target_col:
+            logger.debug("Setting target_col to %s", body.target_col)
+            config["target_col"] = body.target_col
+        if body.exclude_cols:
+            logger.debug("Excluding columns: %s", body.exclude_cols)
+            config["exclude_cols"] = body.exclude_cols
+        if body.filters:
+            logger.debug("Applying filters: %s", body.filters)
+            config["filters"] = [f.model_dump() for f in body.filters]
+        if body.task_type:
+            logger.debug("Setting task_type to %s", body.task_type)
+            config["task_type"] = body.task_type
 
     report = EDAReport(data_source_id=dataset_id, status="PENDING", config=config)
     session.add(report)
@@ -213,8 +216,9 @@ class DecompositionRequest(BaseModel):
 
 
 @router.post("/{dataset_id}/decomposition")
+@limiter.limit("20/minute")
 async def get_decomposition(
-    dataset_id: int, request: DecompositionRequest, session: AsyncSession = Depends(get_db)
+    dataset_id: int, request: Request, body: DecompositionRequest, session: AsyncSession = Depends(get_db)
 ):
     """
     Calculates the breakdown of a measure by a split column for Decomposition Trees.
@@ -295,16 +299,16 @@ async def get_decomposition(
         # 5. Run Analysis
         analyzer = EDAAnalyzer(cast(Any, df))
 
-        filters_dict = [f.model_dump() for f in request.filters] if request.filters else []
+        filters_dict = [f.model_dump() for f in body.filters] if body.filters else []
 
         # Handle empty string split_col from frontend
-        split_col_arg = request.split_col
+        split_col_arg = body.split_col
         if split_col_arg == "":
             split_col_arg = None
 
         result = analyzer.get_decomposition_split(
-            measure_col=request.measure_col,
-            measure_agg=request.measure_agg,
+            measure_col=body.measure_col,
+            measure_agg=body.measure_agg,
             split_col=split_col_arg,
             filters=filters_dict,
         )

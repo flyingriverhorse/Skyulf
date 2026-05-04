@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Literal, Optional, Union, cast
 
 import pandas as pd
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
 from skyulf.data.dataset import SplitDataset
 from skyulf.modeling.hyperparameters import (
@@ -23,6 +23,7 @@ from backend.config import get_settings
 from backend.data_ingestion.service import DataIngestionService
 from backend.database.engine import get_async_session
 import backend.database.engine as db_engine
+from backend.middleware.rate_limiter import limiter
 from backend.database.models import (
     FeatureEngineeringPipeline,
     AdvancedTuningJob,
@@ -283,8 +284,10 @@ class RunPipelineResponse(BaseModel):
 
 
 @router.post("/run", response_model=RunPipelineResponse)
+@limiter.limit("20/minute")
 async def run_pipeline(  # noqa: C901
     config: PipelineConfigModel,
+    request: Request,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_async_session),
 ):
