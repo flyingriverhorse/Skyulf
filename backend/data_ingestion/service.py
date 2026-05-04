@@ -242,27 +242,50 @@ class DataIngestionService:
         """
         Handle file upload and create a data source entry.
         """
-        # 1. Generate unique filename
-        filename = file.filename or "unknown"
-        file_ext = Path(filename).suffix
+        settings = get_settings()
+
+        # 1. Validate filename — reject path traversal attempts
+        raw_name = file.filename or "unknown"
+        if ".." in raw_name or raw_name.startswith(("/", "\\")):
+            raise HTTPException(status_code=400, detail="Invalid filename")
+
+        # 2. Validate extension against allowlist
+        file_ext = Path(raw_name).suffix.lower()
+        allowed = [e.lower() for e in settings.ALLOWED_EXTENSIONS]
+        if file_ext not in allowed:
+            raise HTTPException(
+                status_code=415,
+                detail=f"Unsupported file type '{file_ext}'. Allowed: {', '.join(allowed)}",
+            )
+
+        # 3. Generate unique filename and save, enforcing size limit
         file_id = str(uuid.uuid4())
         safe_filename = f"{file_id}{file_ext}"
         file_path = self.upload_dir / safe_filename
+        bytes_written = 0
 
-        # 2. Save file
         try:
             async with aiofiles.open(file_path, "wb") as out_file:
                 while content := await file.read(1024 * 1024):  # 1MB chunks
+                    bytes_written += len(content)
+                    if bytes_written > settings.MAX_UPLOAD_SIZE:
+                        file_path.unlink(missing_ok=True)
+                        raise HTTPException(
+                            status_code=413,
+                            detail=f"File exceeds maximum allowed size of {settings.MAX_UPLOAD_SIZE // (1024**3)} GB",
+                        )
                     await out_file.write(content)
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Failed to save file: {e}")
             raise SkyulfException(message="Failed to save file")
 
-        # 3. Create DataSource record
+        # 4. Create DataSource record
         try:
             new_source = DataSource(
                 source_id=file_id,
-                name=file.filename,
+                name=raw_name,
                 type="file",
                 config={"file_path": str(file_path.absolute())},
                 created_by=user_id,
@@ -274,7 +297,7 @@ class DataIngestionService:
                         "progress": 0.0,
                         "updated_at": datetime.now(timezone.utc).isoformat(),
                     },
-                    "original_filename": file.filename,
+                    "original_filename": raw_name,
                     "file_size": file_path.stat().st_size,
                 },
             )
@@ -282,8 +305,7 @@ class DataIngestionService:
             await self.session.commit()
             await self.session.refresh(new_source)
 
-            # 4. Trigger Task
-            settings = get_settings()
+            # 5. Trigger Task
             if settings.USE_CELERY:
                 ingest_data_task.delay(new_source.id)
             elif background_tasks:

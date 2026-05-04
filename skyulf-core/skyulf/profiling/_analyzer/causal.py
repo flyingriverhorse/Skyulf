@@ -1,11 +1,14 @@
 """Causal discovery via the PC algorithm (causal-learn)."""
 
+import logging
 from typing import List, Optional
 
 import polars as pl
 
 from ..schemas import CausalEdge, CausalGraph, CausalNode
 from ._utils import _AnalyzerState
+
+logger = logging.getLogger(__name__)
 
 
 class CausalMixin(_AnalyzerState):
@@ -96,5 +99,5 @@ class CausalMixin(_AnalyzerState):
             return CausalGraph(nodes=nodes, edges=edges)
 
         except Exception as e:
-            print(f"Error in causal discovery: {e}")
+            logger.error(f"Error in causal discovery: {e}")
             return None

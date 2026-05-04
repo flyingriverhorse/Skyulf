@@ -1,13 +1,10 @@
 import logging
 import os
 import shutil
-import sys
 
 import numpy as np
 import pandas as pd
-
-# Add project root to path
-sys.path.append(r"c:\Users\Murat\Desktop\skyulf-mlflow")
+import pytest
 
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
@@ -20,7 +17,13 @@ from backend.data.catalog import FileSystemCatalog
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+_LOCAL_WORKSPACE = r"c:\Users\Murat\Desktop\skyulf-mlflow"
 
+
+@pytest.mark.skipif(
+    not os.path.exists(_LOCAL_WORKSPACE),
+    reason="Requires local skyulf-mlflow workspace; skipped on CI",
+)
 def test_full_inference_pipeline():
     # 1. Setup
     base_path = r"c:\Users\Murat\Desktop\skyulf-mlflow\temp_test_artifacts_full"
