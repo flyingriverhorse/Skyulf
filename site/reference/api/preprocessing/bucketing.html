@@ -802,6 +802,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/job_idempotency.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Job Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3020,9 +3048,9 @@ Expects 'bin_edges' in params: Dict[str, List[float]] mapping column names to bi
             <span class="n">processed_cols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">col</span><span class="p">)</span>
 
             <span class="c1"># Determine labels for pd.cut</span>
-            <span class="n">labels</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
-                <span class="n">Literal</span><span class="p">[</span><span class="kc">False</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="kc">None</span>
-            <span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1"># Default for ordinal (returns integers)</span>
+            <span class="n">labels</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Literal</span><span class="p">[</span><span class="kc">False</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="kc">False</span>  <span class="c1"># Default for ordinal (returns integers)</span>
+            <span class="p">)</span>
 
             <span class="c1"># Check for custom labels first</span>
             <span class="n">col_custom_labels</span> <span class="o">=</span> <span class="n">custom_labels_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">col</span><span class="p">)</span>

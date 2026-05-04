@@ -32,6 +32,7 @@ class AdvancedTuningManager:
         user_id: Optional[int] = None,
         model_type: str = "unknown",
         graph: Optional[Dict[str, Any]] = None,
+        branch_index: int = 0,
     ) -> str:
         """Creates a new tuning job in the database (Async)."""
         job_id = str(uuid.uuid4())
@@ -54,6 +55,7 @@ class AdvancedTuningManager:
             model_type=model_type,
             search_strategy=search_strategy,
             graph=graph,
+            job_metadata={"branch_index": branch_index},
             started_at=datetime.now(),
         )
 

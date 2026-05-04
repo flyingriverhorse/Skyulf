@@ -118,7 +118,7 @@ def main():
                 host=settings.HOST,
                 port=settings.PORT,
                 reload=True,
-                reload_dirs=["."],
+                reload_dirs=[".", "skyulf-core/skyulf"],
                 log_level="info",
                 access_log=True,
                 use_colors=True,
