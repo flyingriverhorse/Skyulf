@@ -204,11 +204,8 @@ class PolynomialFeaturesApplier(BaseApplier):
 
         df_poly = pd.DataFrame(cast(Any, transformed), columns=cast(Any, new_names), index=X.index)
 
-        df_out = X.copy()
-        # We no longer need to check include_input_features here as we filtered them above
-
-        # Concatenate
-        df_out = pd.concat(cast(Any, [df_out, df_poly]), axis=1)
+        # Concatenate — pd.concat creates a new DataFrame, no need to copy X first
+        df_out = pd.concat(cast(Any, [X, df_poly]), axis=1)
 
         return pack_pipeline_output(df_out, y, is_tuple)
 
