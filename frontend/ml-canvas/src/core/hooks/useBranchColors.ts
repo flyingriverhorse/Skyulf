@@ -76,6 +76,34 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
       terminals.push(n);
     }
 
+    // Sort terminals to match the BFS topological order that pipelineConverter.ts
+    // and the backend's partition_parallel_pipeline both use (BFS forward from
+    // source/dataset nodes). Without this, the canvas assigns "Path A" to
+    // whichever terminal React Flow stores first (insertion order), while the
+    // backend assigns it to the first terminal in BFS order — causing the canvas
+    // edge labels and Preview Results tab contents to disagree.
+    {
+      const fwdAdj = new Map<string, string[]>();
+      for (const edge of edges) {
+        const list = fwdAdj.get(edge.source) ?? [];
+        list.push(edge.target);
+        fwdAdj.set(edge.source, list);
+      }
+      // Source nodes = nodes with no incoming edges (dataset roots).
+      const srcIds = nodes.filter(n => !edges.some(e => e.target === n.id)).map(n => n.id);
+      const topoOrder = new Map<string, number>();
+      const bfsQ: string[] = [...srcIds];
+      const bfsSeen = new Set<string>(srcIds);
+      while (bfsQ.length > 0) {
+        const nid = bfsQ.shift()!;
+        if (!topoOrder.has(nid)) topoOrder.set(nid, topoOrder.size);
+        for (const child of fwdAdj.get(nid) ?? []) {
+          if (!bfsSeen.has(child)) { bfsSeen.add(child); bfsQ.push(child); }
+        }
+      }
+      terminals.sort((a, b) => (topoOrder.get(a.id) ?? 999999) - (topoOrder.get(b.id) ?? 999999));
+    }
+
     if (terminals.length === 0) return colorMap;
 
     // Build adjacency: target → source edges (for BFS backwards)
