@@ -3,7 +3,7 @@ Job Management for V2 Pipeline.
 Handles persistence of Training and Tuning jobs to the database.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Literal, Optional
 
 from sqlalchemy import select
@@ -14,6 +14,9 @@ from backend.database.models import BasicTrainingJob, AdvancedTuningJob
 from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline.execution.basic_training_manager import BasicTrainingManager
 from backend.ml_pipeline.execution.advanced_tuning_manager import AdvancedTuningManager
+
+# Jobs submitted within this window for the same pipeline+node are considered duplicates.
+_IDEMPOTENCY_WINDOW = timedelta(seconds=30)
 
 
 class JobManager:
@@ -32,6 +35,7 @@ class JobManager:
         user_id: Optional[int] = None,
         model_type: str = "unknown",
         graph: Optional[Dict[str, Any]] = None,
+        branch_index: int = 0,
     ) -> str:
         """Creates a new job in the database (Async)."""
         if job_type == "basic_training":
@@ -43,6 +47,7 @@ class JobManager:
                 user_id,
                 model_type,
                 graph,
+                branch_index=branch_index,
             )
         elif job_type == "advanced_tuning":
             return await AdvancedTuningManager.create_tuning_job(
@@ -53,6 +58,7 @@ class JobManager:
                 user_id,
                 model_type,
                 graph,
+                branch_index=branch_index,
             )
         elif job_type == "preview":
             return await BasicTrainingManager.create_training_job(
@@ -64,9 +70,46 @@ class JobManager:
                 model_type,
                 graph,
                 is_preview=True,
+                branch_index=branch_index,
             )
         else:
             raise ValueError(f"Unknown job_type: {job_type}")
+
+    @staticmethod
+    async def find_active_job(
+        session: AsyncSession,
+        dataset_id: str,
+        node_id: str,
+        branch_index: int = 0,
+    ) -> Optional[str]:
+        """Return the ID of an existing queued/running job for (dataset_id, node_id, branch_index).
+
+        Keyed on (dataset_source_id, node_id, branch_index) so parallel branches
+        that share the same terminal node are never confused with each other.
+        Scoped to jobs created within the last 30 seconds.  Returns None if no
+        active duplicate exists.
+        """
+        cutoff = datetime.now(timezone.utc) - _IDEMPOTENCY_WINDOW
+        active = {JobStatus.QUEUED.value, JobStatus.RUNNING.value}
+        for model in (BasicTrainingJob, AdvancedTuningJob):
+            # Fetch all recent active candidates then filter by branch_index
+            # in Python — avoids cross-db JSON operator differences.
+            stmt = (
+                select(model.id, model.job_metadata)
+                .where(
+                    model.dataset_source_id == dataset_id,
+                    model.node_id == node_id,
+                    model.status.in_(active),
+                    model.created_at >= cutoff,
+                )
+                .limit(20)
+            )
+            rows = (await session.execute(stmt)).all()
+            for job_id, meta in rows:
+                stored_idx = (meta or {}).get("branch_index", 0)
+                if stored_idx == branch_index:
+                    return job_id
+        return None
 
     @staticmethod
     async def cancel_job(session: AsyncSession, job_id: str) -> bool:

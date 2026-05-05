@@ -18,6 +18,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import FileResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from backend.middleware.rate_limiter import limiter
 from fastapi.staticfiles import StaticFiles
 
 # Use absolute imports to fix import issues
@@ -204,6 +207,10 @@ def create_app() -> FastAPI:
 
     # Configure templates and static files
     _setup_templates_and_static(app)
+
+    # Rate limiting
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     # Add middleware (order matters!)
     _add_middleware(app, settings)

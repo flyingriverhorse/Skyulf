@@ -8,29 +8,31 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/index.html">
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/guides/job_idempotency.html">
       
       
+        <link rel="prev" href="engine_mechanics.html">
       
-        <link rel="next" href="guides/getting_started.html">
+      
+        <link rel="next" href="../examples/quickstart.html">
       
       
         
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>Skyulf</title>
+        <title>Job Idempotency - Skyulf</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -49,9 +51,9 @@
       
     
     
-      <link rel="stylesheet" href="assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -76,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#skyulf" class="md-skip">
+        <a href="#job-idempotency-deduplication" class="md-skip">
           Skip to content
         </a>
       
@@ -90,7 +92,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -110,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Home
+              Job Idempotency
             
           </span>
         </div>
@@ -219,11 +221,9 @@
   
   
   
-    
   
-  
-    <li class="md-tabs__item md-tabs__item--active">
-      <a href="index.html" class="md-tabs__link">
+    <li class="md-tabs__item">
+      <a href="../index.html" class="md-tabs__link">
         
   
   
@@ -240,11 +240,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="guides/getting_started.html" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="getting_started.html" class="md-tabs__link">
           
   
   
@@ -264,7 +266,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="examples/quickstart.html" class="md-tabs__link">
+        <a href="../examples/quickstart.html" class="md-tabs__link">
           
   
   
@@ -284,7 +286,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="contributing/writing_docs.html" class="md-tabs__link">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
           
   
   
@@ -304,7 +306,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="user_guide/overview.html" class="md-tabs__link">
+        <a href="../user_guide/overview.html" class="md-tabs__link">
           
   
   
@@ -324,7 +326,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="reference/preprocessing_nodes.html" class="md-tabs__link">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
           
   
   
@@ -360,7 +362,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -387,37 +389,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Home
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
         
   
   
@@ -433,148 +408,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#why-skyulf" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why Skyulf?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quick-install" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Install
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Quick Install">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#skyulf-core-standalone-python-library" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        skyulf-core (standalone Python library)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#full-platform-backend-frontend" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Full platform (backend + frontend)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Architecture
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#where-to-start" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Where to Start
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Where to Start">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#using-the-web-platform" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using the Web Platform
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#using-skyulf-core-as-a-library" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using skyulf-core as a Library
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#going-deeper" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Going Deeper
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#links" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Links
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -583,28 +416,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
             
   
   
@@ -622,7 +458,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -640,7 +476,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guides/getting_started.html" class="md-nav__link">
+      <a href="getting_started.html" class="md-nav__link">
         
   
   
@@ -668,7 +504,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guides/platform_setup.html" class="md-nav__link">
+      <a href="platform_setup.html" class="md-nav__link">
         
   
   
@@ -696,7 +532,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guides/platform_walkthrough.html" class="md-nav__link">
+      <a href="platform_walkthrough.html" class="md-nav__link">
         
   
   
@@ -724,7 +560,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guides/multi_path_pipelines.html" class="md-nav__link">
+      <a href="multi_path_pipelines.html" class="md-nav__link">
         
   
   
@@ -752,7 +588,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guides/faq.html" class="md-nav__link">
+      <a href="faq.html" class="md-nav__link">
         
   
   
@@ -780,7 +616,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guides/recipes.html" class="md-nav__link">
+      <a href="recipes.html" class="md-nav__link">
         
   
   
@@ -808,7 +644,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guides/profiling_comparison.html" class="md-nav__link">
+      <a href="profiling_comparison.html" class="md-nav__link">
         
   
   
@@ -836,7 +672,7 @@
   
   
     <li class="md-nav__item">
-      <a href="architecture.html" class="md-nav__link">
+      <a href="../architecture.html" class="md-nav__link">
         
   
   
@@ -864,7 +700,7 @@
   
   
     <li class="md-nav__item">
-      <a href="data_architecture.html" class="md-nav__link">
+      <a href="../data_architecture.html" class="md-nav__link">
         
   
   
@@ -892,7 +728,7 @@
   
   
     <li class="md-nav__item">
-      <a href="performance.html" class="md-nav__link">
+      <a href="../performance.html" class="md-nav__link">
         
   
   
@@ -920,7 +756,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guides/adding_new_engine.html" class="md-nav__link">
+      <a href="adding_new_engine.html" class="md-nav__link">
         
   
   
@@ -948,7 +784,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guides/engine_mechanics.html" class="md-nav__link">
+      <a href="engine_mechanics.html" class="md-nav__link">
         
   
   
@@ -973,10 +809,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="guides/job_idempotency.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Job Idempotency
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="job_idempotency.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -992,6 +855,81 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-gets-deduplicated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Gets Deduplicated
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parallel-branches-are-not-deduplicated-against-each-other" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parallel Branches Are Not Deduplicated Against Each Other
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-30-second-window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 30-Second Window
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works-internally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works Internally
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#known-limitation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known Limitation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1065,7 +1003,7 @@
   
   
     <li class="md-nav__item">
-      <a href="examples/quickstart.html" class="md-nav__link">
+      <a href="../examples/quickstart.html" class="md-nav__link">
         
   
   
@@ -1093,7 +1031,7 @@
   
   
     <li class="md-nav__item">
-      <a href="examples/leakage_proof.html" class="md-nav__link">
+      <a href="../examples/leakage_proof.html" class="md-nav__link">
         
   
   
@@ -1182,7 +1120,7 @@
   
   
     <li class="md-nav__item">
-      <a href="contributing/writing_docs.html" class="md-nav__link">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
         
   
   
@@ -1271,7 +1209,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/overview.html" class="md-nav__link">
+      <a href="../user_guide/overview.html" class="md-nav__link">
         
   
   
@@ -1299,7 +1237,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/installation.html" class="md-nav__link">
+      <a href="../user_guide/installation.html" class="md-nav__link">
         
   
   
@@ -1327,7 +1265,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/pipeline_quickstart.html" class="md-nav__link">
+      <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
   
@@ -1355,7 +1293,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/step_by_step_no_config.html" class="md-nav__link">
+      <a href="../user_guide/step_by_step_no_config.html" class="md-nav__link">
         
   
   
@@ -1383,7 +1321,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/eda_profiling.html" class="md-nav__link">
+      <a href="../user_guide/eda_profiling.html" class="md-nav__link">
         
   
   
@@ -1411,7 +1349,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/validation_vs_sklearn.html" class="md-nav__link">
+      <a href="../user_guide/validation_vs_sklearn.html" class="md-nav__link">
         
   
   
@@ -1439,7 +1377,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/configuration.html" class="md-nav__link">
+      <a href="../user_guide/configuration.html" class="md-nav__link">
         
   
   
@@ -1467,7 +1405,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/hyperparameter_tuning.html" class="md-nav__link">
+      <a href="../user_guide/hyperparameter_tuning.html" class="md-nav__link">
         
   
   
@@ -1495,7 +1433,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/cross_validation.html" class="md-nav__link">
+      <a href="../user_guide/cross_validation.html" class="md-nav__link">
         
   
   
@@ -1523,7 +1461,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/splitdataset_and_leakage.html" class="md-nav__link">
+      <a href="../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
         
   
   
@@ -1551,7 +1489,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/drift_monitoring.html" class="md-nav__link">
+      <a href="../user_guide/drift_monitoring.html" class="md-nav__link">
         
   
   
@@ -1579,7 +1517,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/serialization.html" class="md-nav__link">
+      <a href="../user_guide/serialization.html" class="md-nav__link">
         
   
   
@@ -1607,7 +1545,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/extending_custom_nodes.html" class="md-nav__link">
+      <a href="../user_guide/extending_custom_nodes.html" class="md-nav__link">
         
   
   
@@ -1635,7 +1573,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/troubleshooting.html" class="md-nav__link">
+      <a href="../user_guide/troubleshooting.html" class="md-nav__link">
         
   
   
@@ -1724,7 +1662,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/preprocessing_nodes.html" class="md-nav__link">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
         
   
   
@@ -1752,7 +1690,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/modeling_nodes.html" class="md-nav__link">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
         
   
   
@@ -1834,7 +1772,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/pipeline.html" class="md-nav__link">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
         
   
   
@@ -1916,7 +1854,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/data/dataset.html" class="md-nav__link">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
         
   
   
@@ -2006,7 +1944,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/index.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
         
   
   
@@ -2034,7 +1972,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/base.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
         
   
   
@@ -2062,7 +2000,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/pipeline.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
         
   
   
@@ -2090,7 +2028,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/split.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
         
   
   
@@ -2118,7 +2056,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/cleaning.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
         
   
   
@@ -2146,7 +2084,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
         
   
   
@@ -2174,7 +2112,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/imputation.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
         
   
   
@@ -2202,7 +2140,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/encoding.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
         
   
   
@@ -2230,7 +2168,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/scaling.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
         
   
   
@@ -2258,7 +2196,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/outliers.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
         
   
   
@@ -2286,7 +2224,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/transformations.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
         
   
   
@@ -2314,7 +2252,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/bucketing.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
         
   
   
@@ -2342,7 +2280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/casting.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
         
   
   
@@ -2370,7 +2308,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/feature_generation.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
         
   
   
@@ -2398,7 +2336,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/feature_selection.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
         
   
   
@@ -2426,7 +2364,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/resampling.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
         
   
   
@@ -2454,7 +2392,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/preprocessing/inspection.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
         
   
   
@@ -2544,7 +2482,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/modeling/index.html" class="md-nav__link">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
         
   
   
@@ -2572,7 +2510,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/modeling/base.html" class="md-nav__link">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
         
   
   
@@ -2600,7 +2538,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
         
   
   
@@ -2628,7 +2566,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/modeling/classification.html" class="md-nav__link">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
         
   
   
@@ -2656,7 +2594,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/modeling/regression.html" class="md-nav__link">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
         
   
   
@@ -2684,7 +2622,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/modeling/cross_validation.html" class="md-nav__link">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
         
   
   
@@ -2712,7 +2650,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/api/modeling/tuning_engine.html" class="md-nav__link">
+      <a href="../reference/api/modeling/tuning_engine.html" class="md-nav__link">
         
   
   
@@ -2776,106 +2714,63 @@
   
 
 
-<h1 id="skyulf">Skyulf</h1>
-<blockquote>
-<p><strong>The Visual MLOps Builder</strong> — Drag-and-drop machine learning without writing code.</p>
-</blockquote>
-<p>Skyulf is a self-hosted, privacy-first MLOps platform. Bring your data, clean it visually, engineer features with a node-based canvas, train models, and deploy — all in one place.</p>
-<hr />
-<h2 id="why-skyulf">Why Skyulf?</h2>
+<h1 id="job-idempotency-deduplication">Job Idempotency (Deduplication)</h1>
+<p>When you click <strong>Run All Experiments</strong> quickly more than once, the backend
+automatically detects the duplicate requests and returns the existing
+in-progress job instead of spawning new Celery tasks.</p>
+<h2 id="what-gets-deduplicated">What Gets Deduplicated</h2>
+<p>A submission is considered a <strong>duplicate</strong> if all three of these match
+a job already in <code>queued</code> or <code>running</code> state created within the last
+<strong>30 seconds</strong>:</p>
 <table>
 <thead>
 <tr>
-<th>Feature</th>
-<th>What you get</th>
+<th>Key</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Visual ML Canvas</strong></td>
-<td>Build end-to-end pipelines by connecting nodes on a React Flow canvas</td>
+<td><code>dataset_source_id</code></td>
+<td>The dataset the pipeline is running on</td>
 </tr>
 <tr>
-<td><strong>20+ Models</strong></td>
-<td>Classification &amp; Regression (Random Forest, XGBoost, SVM, KNN, and more)</td>
+<td><code>node_id</code></td>
+<td>The canvas node ID of the terminal (Training / Tuning) node</td>
 </tr>
 <tr>
-<td><strong>Advanced Tuning</strong></td>
-<td>Grid, Random, Successive Halving, and Optuna with configurable Samplers &amp; Pruners</td>
-</tr>
-<tr>
-<td><strong>Automated EDA</strong></td>
-<td>Profiling, outlier detection, PCA, causal discovery, drift monitoring</td>
-</tr>
-<tr>
-<td><strong>Dual Engine</strong></td>
-<td>Polars for fast ingestion/preprocessing, Zero-Copy NumPy/Scikit-Learn via <code>SklearnBridge</code></td>
-</tr>
-<tr>
-<td><strong>Leakage Prevention</strong></td>
-<td>Calculator/Applier architecture ensures train-only statistics</td>
-</tr>
-<tr>
-<td><strong>One-Click Deploy</strong></td>
-<td>Serve models via REST API with built-in inference testing</td>
+<td><code>branch_index</code></td>
+<td>Which parallel branch (0 = first, 1 = second, …)</td>
 </tr>
 </tbody>
 </table>
-<hr />
-<h2 id="quick-install">Quick Install</h2>
-<h3 id="skyulf-core-standalone-python-library">skyulf-core (standalone Python library)</h3>
-<pre><code class="language-bash">pip install skyulf-core
+<h2 id="parallel-branches-are-not-deduplicated-against-each-other">Parallel Branches Are Not Deduplicated Against Each Other</h2>
+<p>If your canvas has two paths feeding the same training node (parallel
+experiment mode), Branch 0 and Branch 1 get different <code>branch_index</code>
+values from the partitioner and are each allowed to create their own
+job.</p>
+<pre><code>Branch 0: Dataset → Encode → [Train]          branch_index=0
+Branch 1: Dataset → Encode → Scale → [Train]  branch_index=1
 </code></pre>
-<h3 id="full-platform-backend-frontend">Full platform (backend + frontend)</h3>
-<pre><code class="language-bash">git clone https://github.com/flyingriverhorse/Skyulf.git
-cd Skyulf
-pip install -r requirements-fastapi.txt
-python run_skyulf.py
+<p>Clicking twice fires two requests per branch.  Request 2 of Branch 0 is
+deduplicated against Request 1 of Branch 0.  Branch 1 is unaffected.</p>
+<h2 id="the-30-second-window">The 30-Second Window</h2>
+<p>The dedup window is <strong>30 seconds</strong>.  After 30 seconds have passed since
+the last job was created, a new click always starts a fresh run.  This
+prevents accidental blocking of legitimate re-runs.</p>
+<h2 id="how-it-works-internally">How It Works Internally</h2>
+<p>The backend uses a per-key <code>asyncio.Lock</code> to make the
+"check if job exists → create if not" step <strong>atomic</strong>:</p>
+<pre><code>Click 1  →  acquires lock  →  no job found  →  creates job J1  →  releases lock
+Click 2  →  acquires lock  →  J1 found (queued)  →  returns J1  →  releases lock
 </code></pre>
-<p>Open <a href="http://127.0.0.1:8000">http://127.0.0.1:8000</a> to access the dashboard.</p>
-<hr />
-<h2 id="architecture">Architecture</h2>
-<p>Skyulf is built on three components with strict boundaries:</p>
-<ul>
-<li><strong>Frontend</strong>: React + TypeScript + React Flow (visual ML canvas)</li>
-<li><strong>Backend</strong>: FastAPI + Celery + Redis (API, jobs, persistence)</li>
-<li><strong>Core Library</strong>: <code>skyulf-core</code> (standalone Python package on <a href="https://pypi.org/project/skyulf-core/">PyPI</a>)</li>
-<li><strong>Data Engine</strong>: Hybrid Polars (high-performance ingestion) + Pandas (ML ecosystem)</li>
-</ul>
-<pre><code>frontend  →  (HTTP)  →  backend  →  (import)  →  skyulf-core
-</code></pre>
-<p>See <a href="architecture.html">Architecture</a> and <a href="data_architecture.html">Data Architecture</a> for deep dives.</p>
-<hr />
-<h2 id="where-to-start">Where to Start</h2>
-<h3 id="using-the-web-platform">Using the Web Platform</h3>
-<ol>
-<li>Follow the <a href="guides/platform_setup.html">Platform Setup</a> to get the backend running (Docker or manual).</li>
-<li>See the <a href="guides/platform_walkthrough.html">Platform Walkthrough</a> for an 8-step end-to-end guide through the UI.</li>
-<li>Explore the interactive API docs at <a href="http://127.0.0.1:8000/docs">/docs</a> (Swagger UI) or <a href="http://127.0.0.1:8000/redoc">/redoc</a> (ReDoc).</li>
-</ol>
-<h3 id="using-skyulf-core-as-a-library">Using skyulf-core as a Library</h3>
-<ol>
-<li><a href="user_guide/installation.html">Installation</a> — Install from PyPI or editable mode.</li>
-<li><a href="user_guide/overview.html">Overview</a> — Understand the Calculator/Applier pattern.</li>
-<li><a href="user_guide/pipeline_quickstart.html">Pipeline Quickstart</a> — Build your first pipeline in Python.</li>
-<li><a href="user_guide/step_by_step_no_config.html">Step-by-Step (No Config)</a> — Low-level building blocks.</li>
-<li><a href="reference/preprocessing_nodes.html">Reference → Preprocessing Nodes</a> / <a href="reference/modeling_nodes.html">Modeling Nodes</a> — Full node catalog.</li>
-</ol>
-<h3 id="going-deeper">Going Deeper</h3>
-<ul>
-<li><a href="user_guide/eda_profiling.html">Automated EDA &amp; Profiling</a> — Statistical analysis powered by Polars.</li>
-<li><a href="user_guide/hyperparameter_tuning.html">Hyperparameter Tuning</a> — Grid, Random, Halving, Optuna strategies.</li>
-<li><a href="user_guide/drift_monitoring.html">Drift Monitoring</a> — Detect data drift in production.</li>
-<li><a href="user_guide/extending_custom_nodes.html">Extending Skyulf-Core</a> — Add your own nodes.</li>
-<li><a href="user_guide/validation_vs_sklearn.html">Validation vs scikit-learn</a> — Proof that Skyulf avoids leakage.</li>
-</ul>
-<hr />
-<h2 id="links">Links</h2>
-<ul>
-<li><strong>GitHub</strong>: <a href="https://github.com/flyingriverhorse/Skyulf">github.com/flyingriverhorse/Skyulf</a></li>
-<li><strong>PyPI</strong>: <a href="https://pypi.org/project/skyulf-core/">pypi.org/project/skyulf-core</a></li>
-<li><strong>Changelog</strong>: <a href="https://github.com/flyingriverhorse/Skyulf/blob/master/CHANGELOG.md">CHANGELOG.md</a></li>
-</ul>
+<p>Without the lock, both clicks could see an empty table simultaneously
+before either one committed its new row (a classic read-modify-write race).</p>
+<h2 id="known-limitation">Known Limitation</h2>
+<p>The lock lives in-process.  If you run multiple uvicorn workers
+(<code>--workers N</code>) each worker has its own lock dictionary and
+cross-process races are not prevented.  The current default
+single-worker configuration is fully protected.</p>
 
 
 
@@ -2927,10 +2822,10 @@ python run_skyulf.py
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
