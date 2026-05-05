@@ -56,6 +56,7 @@ nav:
     - Performance: performance.md
     - Adding New Engine: guides/adding_new_engine.md
     - Engine Mechanics: guides/engine_mechanics.md
+    - Job Idempotency: guides/job_idempotency.md
   - Examples:
     - Quickstart: examples/quickstart.md
     - Leakage Proof: examples/leakage_proof.md

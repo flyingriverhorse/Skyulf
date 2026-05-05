@@ -120,7 +120,7 @@
 }
 
 /* Inputs */
-input[type=text], input[type=number], input[type=search], input[type=email], input[type=password] {
+input[type=text], input[type=number], input[type=search], input[type=email], input[type=password], textarea {
   border-radius: .65rem;
   border: 1px solid var(--light-border-strong);
   background: var(--light-input-bg);
@@ -130,19 +130,19 @@ input[type=text], input[type=number], input[type=search], input[type=email], inp
   transition: border-color .2s ease, box-shadow .2s ease;
 }
 
-.dark input[type=text], .dark input[type=number], .dark input[type=search], .dark input[type=email], .dark input[type=password] {
+.dark input[type=text], .dark input[type=number], .dark input[type=search], .dark input[type=email], .dark input[type=password], .dark textarea {
   border: 1px solid var(--dark-border-strong);
   background: var(--dark-input-bg);
   color: var(--dark-text-primary);
 }
 
-input[type=text]:focus, input[type=number]:focus, input[type=search]:focus, input[type=email]:focus, input[type=password]:focus {
+input[type=text]:focus, input[type=number]:focus, input[type=search]:focus, input[type=email]:focus, input[type=password]:focus, textarea:focus {
   outline: none;
   border-color: #2dd4bf;
   box-shadow: 0 0 0 3px #2dd4bf40;
 }
 
-.dark input[type=text]:focus, .dark input[type=number]:focus, .dark input[type=search]:focus, .dark input[type=email]:focus, .dark input[type=password]:focus {
+.dark input[type=text]:focus, .dark input[type=number]:focus, .dark input[type=search]:focus, .dark input[type=email]:focus, .dark input[type=password]:focus, .dark textarea:focus {
   border-color: #5eead48c;
 }
 

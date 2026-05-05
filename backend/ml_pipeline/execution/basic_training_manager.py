@@ -31,6 +31,7 @@ class BasicTrainingManager:
         model_type: str = "unknown",
         graph: Optional[Dict[str, Any]] = None,
         is_preview: bool = False,
+        branch_index: int = 0,
     ) -> str:
         """Creates a new training job in the database (Async)."""
         job_id = str(uuid.uuid4())
@@ -55,6 +56,7 @@ class BasicTrainingManager:
             version=version,
             model_type=model_type_val,
             graph=graph,
+            job_metadata={"branch_index": branch_index},
             started_at=datetime.now(),
         )
 

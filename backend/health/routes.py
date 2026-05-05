@@ -97,6 +97,36 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
     )
 
 
+@router.get("/health/ready")
+async def readiness_check():
+    """
+    Readiness probe: fits a tiny sklearn pipeline end-to-end.
+
+    Catches dependency breakage (sklearn/polars upgrade, broken install)
+    that the basic /health check misses. Returns 503 if the fit fails so
+    load balancers can pull the instance.
+    """
+    import time
+
+    import numpy as np
+    from fastapi.responses import JSONResponse
+    from sklearn.preprocessing import StandardScaler
+
+    t0 = time.monotonic()
+    try:
+        X = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+        scaler = StandardScaler()
+        scaler.fit_transform(X)
+        elapsed_ms = round((time.monotonic() - t0) * 1000, 2)
+        return {"status": "ready", "fit_ms": elapsed_ms}
+    except Exception as exc:
+        logging.getLogger(__name__).error("Readiness probe failed: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "error": str(exc)},
+        )
+
+
 @router.get("/ping")
 async def ping():
     """Simple ping endpoint."""

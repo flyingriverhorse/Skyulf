@@ -1,4 +1,5 @@
 from backend.exceptions.core import SkyulfException
+import asyncio
 import json
 import logging
 import os
@@ -8,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Literal, Optional, Union, cast
 
 import pandas as pd
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
 from skyulf.data.dataset import SplitDataset
 from skyulf.modeling.hyperparameters import (
@@ -22,6 +23,7 @@ from backend.config import get_settings
 from backend.data_ingestion.service import DataIngestionService
 from backend.database.engine import get_async_session
 import backend.database.engine as db_engine
+from backend.middleware.rate_limiter import limiter
 from backend.database.models import (
     FeatureEngineeringPipeline,
     AdvancedTuningJob,
@@ -52,6 +54,18 @@ from .execution.schemas import NodeConfig, PipelineConfig, coerce_step_type
 from .node_definitions import NodeRegistry, RegistryItem
 
 logger = logging.getLogger(__name__)
+
+# Per-key asyncio locks prevent two concurrent requests from racing through
+# the find_active_job + create_job check simultaneously (same event loop).
+_submit_locks: Dict[str, asyncio.Lock] = {}
+_submit_locks_guard = asyncio.Lock()
+
+
+async def _get_submit_lock(key: str) -> asyncio.Lock:
+    async with _submit_locks_guard:
+        if key not in _submit_locks:
+            _submit_locks[key] = asyncio.Lock()
+        return _submit_locks[key]
 
 
 # Stubs for deleted modules
@@ -270,8 +284,10 @@ class RunPipelineResponse(BaseModel):
 
 
 @router.post("/run", response_model=RunPipelineResponse)
+@limiter.limit("20/minute")
 async def run_pipeline(  # noqa: C901
     config: PipelineConfigModel,
+    request: Request,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_async_session),
 ):
@@ -390,16 +406,36 @@ async def run_pipeline(  # noqa: C901
             "metadata": sub.metadata,
         }
 
-        # Create Job in DB
-        job_id = await JobManager.create_job(
-            session=db,
-            pipeline_id=sub.pipeline_id,
-            node_id=target_node_id or "unknown",
-            job_type=cast(Literal["basic_training", "advanced_tuning", "preview"], job_type),
-            dataset_id=dataset_id,
-            model_type=model_type,
-            graph=branch_graph,
-        )
+        # Idempotency: if this exact node is already queued/running from a
+        # recent submission, return the existing job id instead of spawning
+        # a duplicate Celery task (e.g. accidental double-click).
+        # The asyncio lock serialises concurrent requests so the check+create
+        # pair is atomic within the event loop — no two coroutines race through
+        # it at the same time.
+        branch_index: int = sub.metadata.get("branch_index", 0)
+        _submit_key = f"{dataset_id}:{target_node_id}:{branch_index}"
+        _lock = await _get_submit_lock(_submit_key)
+        async with _lock:
+            existing_job_id = await JobManager.find_active_job(
+                db, dataset_id, target_node_id or "unknown", branch_index
+            )
+            if existing_job_id:
+                logger.info("Deduplicating submission: returning existing job %s", existing_job_id)
+                all_job_ids.append(existing_job_id)
+                continue
+
+            # Create Job in DB (commits immediately, visible to next waiter)
+            job_id = await JobManager.create_job(
+                session=db,
+                pipeline_id=sub.pipeline_id,
+                node_id=target_node_id or "unknown",
+                job_type=cast(Literal["basic_training", "advanced_tuning", "preview"], job_type),
+                dataset_id=dataset_id,
+                model_type=model_type,
+                graph=branch_graph,
+                branch_index=branch_index,
+            )
+
         all_job_ids.append(job_id)
         publish_job_event(JobEvent(event="created", job_id=job_id, status="queued", progress=0))
 
