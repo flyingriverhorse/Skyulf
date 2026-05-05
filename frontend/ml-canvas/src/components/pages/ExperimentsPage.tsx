@@ -277,7 +277,6 @@ export const ExperimentsPage: React.FC = () => {
     const evalJob = evalJobId ? jobs.find(j => j.job_id === evalJobId) : null;
     const metricName = (evalJob ? getJobScoringMetric(evalJob) : undefined) ?? 'f1';
     return { ...result, splitLabel, metricName };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evaluationData, selectedRocClass, evalJobId, jobs]);
 
   useEffect(() => {

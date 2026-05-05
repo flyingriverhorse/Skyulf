@@ -53,10 +53,15 @@ export const ResultsPanel: React.FC = () => {
     return keys.length > 1 ? keys : [];
   }, [executionResult]);
 
-  const branchColors = useMemo(
-    () => generateBranchColors(branchLabels.length),
-    [branchLabels.length],
-  );
+  // Use the canvas-assigned colors (keyed by label string) so the colored dot
+  // next to each branch tab always matches the edge color the user sees on the
+  // canvas. Falls back to freshly-generated colors when the canvas hasn't been
+  // rendered yet (e.g. loading a saved pipeline for the first time).
+  const branchLabelColors = useGraphStore((s) => s.branchLabelColors);
+  const branchColors = useMemo(() => {
+    const fallback = generateBranchColors(branchLabels.length);
+    return branchLabels.map((l, i) => branchLabelColors[l] ?? fallback[i] ?? '#888');
+  }, [branchLabels, branchLabelColors]);
 
   // Pick default branch when branches change
   React.useEffect(() => {
