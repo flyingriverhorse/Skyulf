@@ -1,4 +1,4 @@
-﻿"""Pipeline Execution Engine."""
+"""Pipeline Execution Engine."""
 
 import logging
 import time
@@ -12,7 +12,7 @@ import pandas as pd
 from skyulf.data.dataset import SplitDataset
 from skyulf.data.catalog import DataCatalog
 from skyulf.modeling.base import StatefulEstimator
-from skyulf.modeling.tuning.engine import TuningApplier, TuningCalculator
+from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
 from skyulf.preprocessing.pipeline import FeatureEngineer
 from skyulf.registry import NodeRegistry
 
@@ -90,7 +90,7 @@ class PipelineEngine:
                 importances = actual_model.feature_importances_
             elif hasattr(actual_model, "coef_"):
                 coef = actual_model.coef_
-                # For multi-class, coef_ is 2D â€” take mean of absolute values
+                # For multi-class, coef_ is 2D — take mean of absolute values
                 if hasattr(coef, "ndim") and coef.ndim > 1:
                     importances = abs(coef).mean(axis=0)
                 else:
@@ -284,11 +284,11 @@ class PipelineEngine:
             # already has the freshly-saved output (every _run_* path
             # writes under node_id), so loading it here is cheap and
             # keeps summary logic out of the per-runner methods. We
-            # tolerate any failure — a missing summary just means the
+            # tolerate any failure � a missing summary just means the
             # card falls back to its static description.
             metadata: Dict[str, Any] = {}
             # Output / upstream loads are best-effort and isolated from
-            # the summary call — for trainers and tuners the summary
+            # the summary call � for trainers and tuners the summary
             # comes purely from `metrics`, so a failed model load (e.g.
             # an artifact bundle that doesn't unpickle cleanly) must not
             # suppress the card line.
@@ -455,9 +455,9 @@ class PipelineEngine:
         Column-overlap behaviour is governed by the per-node merge strategy
         (see :meth:`_get_merge_strategy`):
 
-        * ``last_wins`` (default) â€” later inputs overwrite earlier ones on
+        * ``last_wins`` (default) — later inputs overwrite earlier ones on
           shared columns. Matches topological "downstream wins".
-        * ``first_wins`` â€” earlier inputs are kept; later inputs only add
+        * ``first_wins`` — earlier inputs are kept; later inputs only add
           new columns. Useful when an upstream branch is the source of truth.
         """
         if not frames:
@@ -506,7 +506,7 @@ class PipelineEngine:
             common_cols = common_cols & cs
         if not common_cols:
             raise ValueError(
-                f"{prefix}: cannot row-merge inputs â€” no common columns. "
+                f"{prefix}: cannot row-merge inputs — no common columns. "
                 f"Column sets: {[sorted(cs) for cs in col_sets]}"
             )
         if any(common_cols != cs for cs in col_sets):
@@ -535,7 +535,7 @@ class PipelineEngine:
         )
         self.log(
             f"{prefix}: row-wise merge "
-            f"{' + '.join(str(rc) for rc in row_counts)} rows â†’ {len(merged)} rows"
+            f"{' + '.join(str(rc) for rc in row_counts)} rows → {len(merged)} rows"
         )
         return merged
 
@@ -544,10 +544,10 @@ class PipelineEngine:
 
         Behaviour:
 
-        * Single input â†’ returned as-is (preserves DataFrame / SplitDataset).
-        * All inputs are :class:`SplitDataset` â†’ merge ``train`` / ``test`` /
+        * Single input → returned as-is (preserves DataFrame / SplitDataset).
+        * All inputs are :class:`SplitDataset` → merge ``train`` / ``test`` /
           ``validation`` independently and return a new ``SplitDataset``.
-        * Mixed or all-DataFrame inputs â†’ flatten to DataFrames and merge.
+        * Mixed or all-DataFrame inputs → flatten to DataFrames and merge.
           A warning is logged when SplitDatasets are flattened so the loss of
           held-out splits is visible in job logs.
         """
@@ -559,8 +559,8 @@ class PipelineEngine:
 
         # Sibling fan-in detection: warn only when inputs are TRUE siblings
         # (no input is itself an ancestor of another). The "ancestor + its
-        # descendant" pattern (e.g. Splitter + Splitterâ†’Scaler both feeding
-        # Encoder) is a redundant edge â€” the descendant supersedes the
+        # descendant" pattern (e.g. Splitter + Splitter→Scaler both feeding
+        # Encoder) is a redundant edge — the descendant supersedes the
         # ancestor under last-wins, so the merge is harmless and we don't
         # warn. We DO warn when two genuinely independent siblings off a
         # shared ancestor get fanned in (the "Path A" UX trap), because the
@@ -660,13 +660,13 @@ class PipelineEngine:
                 """Merge one SplitDataset slot (train/test/validation) across branches.
 
                 Preserves ``(X, y)`` tuple shape when every branch produced a
-                tuple â€” this keeps downstream X/y tabs and training contracts
+                tuple — this keeps downstream X/y tabs and training contracts
                 intact. Falls back to flat-DataFrame merging otherwise.
                 """
                 non_empty = [p for p in parts if p is not None]
                 if not non_empty:
                     return None
-                # All branches produced (X, y) tuples â†’ merge X columns,
+                # All branches produced (X, y) tuples → merge X columns,
                 # keep y from the first branch (all branches descend from the
                 # same Splitter, so y is identical).
                 if all(isinstance(p, tuple) and len(p) == 2 for p in non_empty):
@@ -679,7 +679,7 @@ class PipelineEngine:
                         return None
                     merged_x = self._merge_frames(x_frames, node.node_id, part_label)
                     return (merged_x, non_empty[0][1])
-                # Mixed or pure DataFrame parts â†’ flatten and merge as frames.
+                # Mixed or pure DataFrame parts → flatten and merge as frames.
                 frames = [
                     df
                     for df in (self._coerce_to_frame(p, target_col) for p in non_empty)
@@ -712,7 +712,7 @@ class PipelineEngine:
         # Fallback: flatten everything to a single DataFrame.
         if any(isinstance(a, SplitDataset) for a in artifacts):
             self.log(
-                f"Node {node.node_id}: mixed SplitDataset/DataFrame inputs â€” "
+                f"Node {node.node_id}: mixed SplitDataset/DataFrame inputs — "
                 "merging on train portions only; held-out splits are dropped."
             )
 
@@ -1018,7 +1018,7 @@ class PipelineEngine:
         self, node: NodeConfig, job_id: str = "unknown"
     ) -> tuple[str, Dict[str, Any]]:
         # Input: SplitDataset (from Feature Engineering) or DataFrame
-        # Supports multiple inputs â€” merges them before training.
+        # Supports multiple inputs — merges them before training.
 
         target_col = node.params["target_column"]
 
@@ -1193,7 +1193,7 @@ class PipelineEngine:
     def _run_advanced_tuning(  # noqa: C901
         self, node: NodeConfig, job_id: str = "unknown"
     ) -> tuple[str, Dict[str, Any]]:
-        # Input: SplitDataset â€” supports multiple inputs via merge.
+        # Input: SplitDataset — supports multiple inputs via merge.
         target_col = node.params["target_column"]
 
         data = self._get_input(node, target_col)

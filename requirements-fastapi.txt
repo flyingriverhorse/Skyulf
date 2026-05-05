@@ -44,6 +44,9 @@ httpx>=0.25.0,<1.0.0
 # === RATE LIMITING ===
 slowapi>=0.1.9                       # Per-endpoint rate limiting for FastAPI
 
+# === OBSERVABILITY ===
+sentry-sdk[fastapi]>=2.0.0           # Error tracking + release tagging + transaction tracing
+
 # === TERMINAL & LOGGING ===
 rich>=13.0.0                         # Beautiful terminal logging
 

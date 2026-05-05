@@ -14,7 +14,7 @@ from skyulf.modeling.regression import (
     RidgeRegressionApplier,
     RidgeRegressionCalculator,
 )
-from skyulf.modeling.tuning import TuningCalculator, TuningConfig
+from skyulf.modeling._tuning import TuningCalculator, TuningConfig
 
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
@@ -208,8 +208,8 @@ def test_hyperparameter_tuning(classification_data, artifact_store):
 
 def test_halving_strategies(classification_data, artifact_store):
     from skyulf.modeling.classification import LogisticRegressionCalculator
-    from skyulf.modeling.tuning.schemas import TuningConfig
-    from skyulf.modeling.tuning.engine import TuningCalculator
+    from skyulf.modeling._tuning.schemas import TuningConfig
+    from skyulf.modeling._tuning.engine import TuningCalculator
 
     model_calculator = LogisticRegressionCalculator()
     tuner = TuningCalculator(model_calculator)

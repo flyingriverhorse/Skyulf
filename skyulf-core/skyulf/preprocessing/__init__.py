@@ -181,3 +181,11 @@ __all__ = [
     "UndersamplingCalculator",
     "UndersamplingApplier",
 ]
+
+# Auto-import any submodule added to this package so its @NodeRegistry.register
+# decorators run at import time.  New node files need no __init__.py edits.
+import importlib as _importlib
+import pkgutil as _pkgutil
+
+for _mi in _pkgutil.iter_modules(__path__, __name__ + "."):  # type: ignore[name-defined]
+    _importlib.import_module(_mi.name)

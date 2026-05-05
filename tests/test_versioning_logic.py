@@ -3,7 +3,7 @@ from sqlalchemy import delete
 
 from backend.database import engine
 from backend.database.models import AdvancedTuningJob, BasicTrainingJob
-from backend.ml_pipeline.execution.jobs import JobManager
+from backend.ml_pipeline._execution.jobs import JobManager
 from backend.ml_pipeline.constants import StepType
 
 

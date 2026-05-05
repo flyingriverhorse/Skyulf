@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database.models import Deployment
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
-from backend.ml_pipeline.services.job_service import JobService
-from backend.ml_pipeline.services.prediction_utils import extract_target_label_encoder
+from backend.ml_pipeline._services.job_service import JobService
+from backend.ml_pipeline._services.prediction_utils import extract_target_label_encoder
 from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -409,7 +409,7 @@ class DeploymentService:
                     ]
 
             # Extract Target Column from Job Graph
-            from backend.ml_pipeline.execution.jobs import JobManager
+            from backend.ml_pipeline._execution.jobs import JobManager
 
             job = await JobManager.get_job(session, str(deployment.job_id))
             if job and job.graph:

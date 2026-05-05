@@ -9,8 +9,8 @@ import pytest
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
-from backend.ml_pipeline.execution.engine import PipelineEngine
-from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
+from backend.ml_pipeline._execution.engine import PipelineEngine
+from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
 from backend.data.catalog import FileSystemCatalog
 
 # Setup logging

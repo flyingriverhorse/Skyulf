@@ -54,6 +54,21 @@ setup_universal_logging()
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# Sentry — only active when SENTRY_DSN is set in env.
+if settings.SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        release=settings.APP_VERSION,
+        traces_sample_rate=0.1,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        send_default_pii=False,
+    )
+    logger.info("Sentry initialised (release=%s)", settings.APP_VERSION)
+
 OPENAPI_DESCRIPTION = (
     f"{settings.APP_DESCRIPTION}\n\n"
     "### Highlights\n"
@@ -210,7 +225,7 @@ def create_app() -> FastAPI:
 
     # Rate limiting
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
 
     # Add middleware (order matters!)
     _add_middleware(app, settings)

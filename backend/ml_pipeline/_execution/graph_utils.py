@@ -3,7 +3,7 @@ import uuid
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, cast
 
-from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
+from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +23,30 @@ PARTITION_TERMINAL_STEP_TYPES = TERMINAL_STEP_TYPES | {"data_preview"}
 AUTO_PARALLEL_STEP_TYPES = {"data_preview"}
 
 
+def _dedupe_preserve_order(items: List[str]) -> List[str]:
+    """Return ``items`` with duplicates removed, preserving original order."""
+    seen: set[str] = set()
+    out: List[str] = []
+    for x in items:
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
+
+
+def _unique_inputs(node: NodeConfig) -> List[str]:
+    """Multi-handle splitters (TrainTestSplitter, FeatureTargetSplitter) emit
+    several edges from the same source into one downstream node. The frontend
+    converter dedupes ``inputs`` already, but older saved pipelines may still
+    contain duplicates — so the partition logic must also be defensive: count
+    branches by *unique source*, never by raw edge count.
+    """
+    return _dedupe_preserve_order(list(node.inputs))
+
+
 def _is_parallel_terminal(term: NodeConfig) -> bool:
     """Return True when this terminal should split into per-input branches."""
-    if len(term.inputs) <= 1:
+    if len(_unique_inputs(term)) <= 1:
         return False
     if term.params.get("execution_mode") == "parallel":
         return True
@@ -182,7 +203,7 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
 
         # Each input to the terminal is a separate experiment branch
         sub_configs: List[PipelineConfig] = []
-        for idx, branch_root_id in enumerate(term.inputs):
+        for idx, branch_root_id in enumerate(_unique_inputs(term)):
             ancestors = _collect_ancestors(branch_root_id, node_map)
             # Build a copy of the terminal node with only this branch's input
             term_copy = NodeConfig(
@@ -216,7 +237,7 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
         is_parallel = _is_parallel_terminal(term)
         if is_parallel:
             # Parallel mode: each input becomes its own experiment branch
-            for branch_root_id in term.inputs:
+            for branch_root_id in _unique_inputs(term):
                 ancestors = _collect_ancestors(branch_root_id, node_map)
                 term_copy = NodeConfig(
                     node_id=term.node_id,

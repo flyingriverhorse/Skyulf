@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  ScatterChart, Scatter, Line, ReferenceLine, ComposedChart, Area
+  ScatterChart, Scatter, Line, ReferenceLine, ReferenceDot, ComposedChart, Area
 } from 'recharts';
 import { clickableProps } from '../../core/utils/a11y';
 import { Filter, Rocket, ChevronDown, ChevronRight, ChevronLeft, RefreshCw, Download, Loader2, Check, Trophy, GitBranch } from 'lucide-react';
@@ -49,6 +49,185 @@ interface EvaluationData {
   splits: Record<string, EvaluationSplit>;
 }
 
+// Best classification threshold: scans every unique prediction score as a candidate
+// and returns the one that maximises F1 for targetClass (OvR).
+function findBestF1Threshold(
+  y_true: (string | number)[],
+  y_proba: { classes: (string | number)[], labels?: (string | number)[], values: number[][] },
+  targetClass: string | number
+): { threshold: number; f1: number } | null {
+  const targetStr = String(targetClass);
+  const ll = y_proba.labels?.length === y_proba.classes.length ? y_proba.labels : undefined;
+  const classIdx = (ll ?? y_proba.classes).findIndex(c => String(c) === targetStr);
+  if (classIdx === -1) return null;
+  const scores = y_proba.values.map(v => v[classIdx] ?? 0);
+  const actual = y_true.map(y => String(y) === targetStr ? 1 : 0);
+  if (!actual.some(a => a === 1)) return null;
+  const candidates = [...new Set(scores)].sort((a, b) => a - b);
+  let bestF1 = -1, bestT = 0.5;
+  for (const t of candidates) {
+    let tp = 0, fp = 0, fn = 0;
+    for (let i = 0; i < scores.length; i++) {
+      const pred = (scores[i]! >= t) ? 1 : 0;
+      if (pred === 1 && actual[i] === 1) tp++;
+      else if (pred === 1 && actual[i] === 0) fp++;
+      else if (pred === 0 && actual[i] === 1) fn++;
+    }
+    const denom = 2 * tp + fp + fn;
+    const f1 = denom > 0 ? (2 * tp) / denom : 0;
+    if (f1 > bestF1) { bestF1 = f1; bestT = t; }
+  }
+  return { threshold: Math.round(bestT * 100) / 100, f1: bestF1 };
+}
+
+// Q-Q plot: sort residuals and map them to theoretical normal quantiles.
+function getQQData(y_true: number[], y_pred: number[]): { theoretical: number; sample: number }[] {
+  const residuals = y_true.map((y, i) => y - (y_pred[i] ?? 0));
+  const n = residuals.length;
+  if (n < 2) return [];
+  const mean = residuals.reduce((a, b) => a + b, 0) / n;
+  const std = Math.sqrt(residuals.reduce((a, r) => a + (r - mean) ** 2, 0) / n);
+  if (std === 0) return [];
+  const sorted = [...residuals].sort((a, b) => a - b);
+  // Approximation of the standard normal inverse (Beasley-Springer-Moro)
+  const normInv = (p: number): number => {
+    const a = [0, -3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2, 1.383577518672690e2, -3.066479806614716e1, 2.506628277459239];
+    const b = [0, -5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2, 6.680131188771972e1, -1.328068155288572e1];
+    const c = [-7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+    const d = [7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996, 3.754408661907416];
+    const pLow = 0.02425, pHigh = 1 - pLow;
+    if (p <= 0) return -8; if (p >= 1) return 8;
+    if (p < pLow) { const q = Math.sqrt(-2 * Math.log(p)); return (((((c[0]! * q + c[1]!) * q + c[2]!) * q + c[3]!) * q + c[4]!) * q + c[5]!) / ((((d[0]! * q + d[1]!) * q + d[2]!) * q + d[3]!) * q + 1); }
+    if (p <= pHigh) { const q = p - 0.5, r = q * q; return (((((a[1]! * r + a[2]!) * r + a[3]!) * r + a[4]!) * r + a[5]!) * r + a[6]!) * q / (((((b[1]! * r + b[2]!) * r + b[3]!) * r + b[4]!) * r + b[5]!) * r + 1); }
+    const q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0]! * q + c[1]!) * q + c[2]!) * q + c[3]!) * q + c[4]!) * q + c[5]!) / ((((d[0]! * q + d[1]!) * q + d[2]!) * q + d[3]!) * q + 1);
+  };
+  return sorted.map((r, i) => ({
+    theoretical: normInv((i + 0.5) / n) * std + mean,
+    sample: r,
+  }));
+}
+
+// Error percentile chips: P50, P90, P95 absolute error.
+function getErrorPercentiles(y_true: number[], y_pred: number[]): { p50: number; p90: number; p95: number } | null {
+  const errs = y_true.map((y, i) => Math.abs(y - (y_pred[i] ?? 0))).sort((a, b) => a - b);
+  if (errs.length === 0) return null;
+  const pct = (q: number) => errs[Math.min(Math.floor(q * errs.length), errs.length - 1)]!;
+  return { p50: pct(0.5), p90: pct(0.9), p95: pct(0.95) };
+}
+
+// Relative error histogram: (pred − actual) / |actual|, binned, skipping near-zero actuals.
+function getRelativeErrorHist(y_true: number[], y_pred: number[], nBins = 20): { label: string; count: number }[] | null {
+  const relErrs = y_true.map((y, i) => Math.abs(y) > 1e-9 ? (y_pred[i]! - y) / Math.abs(y) : null).filter((v): v is number => v !== null);
+  if (relErrs.length < 2) return null;
+  const min = Math.max(Math.min(...relErrs), -2), max = Math.min(Math.max(...relErrs), 2);
+  if (min === max) return null;
+  const w = (max - min) / nBins;
+  const bins = Array.from({ length: nBins }, (_, i) => ({ label: (min + i * w).toFixed(2), count: 0 }));
+  for (const r of relErrs) { if (r >= min && r <= max) bins[Math.min(Math.floor((r - min) / w), nBins - 1)]!.count++; }
+  return bins;
+}
+
+// Calibration curve: bins model confidence vs actual fraction of positives.
+function getCalibrationData(
+  y_true: (string | number)[],
+  y_proba: { classes: (string | number)[], labels?: (string | number)[], values: number[][] },
+  targetClass: string | number,
+  nBins = 10
+): { midpoint: number; fracPos: number; count: number }[] | null {
+  const targetClassStr = String(targetClass);
+  const labelList = y_proba.labels?.length === y_proba.classes.length ? y_proba.labels : undefined;
+  const classIndex = (labelList ?? y_proba.classes).findIndex(c => String(c) === targetClassStr);
+  if (classIndex === -1) return null;
+  const bins: { pos: number; count: number }[] = Array.from({ length: nBins }, () => ({ pos: 0, count: 0 }));
+  for (let i = 0; i < y_proba.values.length; i++) {
+    const score = y_proba.values[i]![classIndex] ?? 0;
+    const binIdx = Math.min(Math.floor(score * nBins), nBins - 1);
+    bins[binIdx]!.pos += String(y_true[i]) === targetClassStr ? 1 : 0;
+    bins[binIdx]!.count++;
+  }
+  return bins
+    .map((b, i) => ({
+      midpoint: parseFloat(((i + 0.5) / nBins).toFixed(2)),
+      fracPos: b.count > 0 ? parseFloat((b.pos / b.count).toFixed(4)) : 0,
+      count: b.count,
+    }))
+    .filter(b => b.count > 0);
+}
+
+// Cumulative gains: fraction of samples targeted (sorted by score desc) vs fraction of positives captured.
+function getCumulativeGainsData(
+  y_true: (string | number)[],
+  y_proba: { classes: (string | number)[], labels?: (string | number)[], values: number[][] },
+  targetClass: string | number
+): { pct: number; gain: number; lift: number }[] | null {
+  const targetClassStr = String(targetClass);
+  const labelList = y_proba.labels?.length === y_proba.classes.length ? y_proba.labels : undefined;
+  const classIndex = (labelList ?? y_proba.classes).findIndex(c => String(c) === targetClassStr);
+  if (classIndex === -1) return null;
+  const items = y_proba.values.map((v, i) => ({ score: v[classIndex] ?? 0, actual: String(y_true[i]) === targetClassStr ? 1 : 0 }));
+  items.sort((a, b) => b.score - a.score);
+  const totalPos = items.filter(d => d.actual === 1).length;
+  if (totalPos === 0) return null;
+  const n = items.length;
+  const pts: { pct: number; gain: number; lift: number }[] = [{ pct: 0, gain: 0, lift: 1 }];
+  let cumPos = 0;
+  for (let i = 0; i < n; i++) {
+    cumPos += items[i]!.actual;
+    const pct = (i + 1) / n;
+    const gain = cumPos / totalPos;
+    pts.push({ pct: parseFloat(pct.toFixed(3)), gain: parseFloat(gain.toFixed(3)), lift: parseFloat((gain / pct).toFixed(3)) });
+  }
+  const step = Math.max(1, Math.floor(pts.length / 60));
+  return pts.filter((_, i) => i % step === 0 || i === pts.length - 1);
+}
+
+// MCC (Matthews Correlation Coefficient) sweep across thresholds.
+function getMCCByThreshold(
+  y_true: (string | number)[],
+  y_proba: { classes: (string | number)[], labels?: (string | number)[], values: number[][] },
+  targetClass: string | number,
+  nSteps = 50
+): { threshold: number; mcc: number }[] | null {
+  const targetClassStr = String(targetClass);
+  const labelList = y_proba.labels?.length === y_proba.classes.length ? y_proba.labels : undefined;
+  const classIndex = (labelList ?? y_proba.classes).findIndex(c => String(c) === targetClassStr);
+  if (classIndex === -1) return null;
+  const scores = y_proba.values.map(v => v[classIndex] ?? 0);
+  const actual = y_true.map(t => (String(t) === targetClassStr ? 1 : 0));
+  return Array.from({ length: nSteps + 1 }, (_, s) => {
+    const t = s / nSteps;
+    let tp = 0, fp = 0, tn = 0, fn = 0;
+    for (let i = 0; i < scores.length; i++) {
+      const pred = (scores[i]! >= t) ? 1 : 0;
+      if (pred === 1 && actual[i] === 1) tp++;
+      else if (pred === 1 && actual[i] === 0) fp++;
+      else if (pred === 0 && actual[i] === 0) tn++;
+      else fn++;
+    }
+    const denom = Math.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn));
+    return { threshold: parseFloat(t.toFixed(2)), mcc: parseFloat((denom > 0 ? (tp * tn - fp * fn) / denom : 0).toFixed(4)) };
+  });
+}
+
+// Scale-Location: sqrt(|residual|) vs predicted — detects heteroscedasticity.
+function getScaleLocationData(y_true: number[], y_pred: number[]): { predicted: number; sqrtAbsRes: number }[] {
+  return y_true.map((y, i) => ({ predicted: y_pred[i]!, sqrtAbsRes: Math.sqrt(Math.abs(y - y_pred[i]!)) }));
+}
+
+// Sorted actual vs predicted: samples ordered by true value, useful for seeing where model diverges.
+function getSortedActualPred(y_true: number[], y_pred: number[], maxPoints = 200): { idx: number; actual: number; predicted: number }[] {
+  const pairs = y_true.map((y, i) => ({ actual: y, predicted: y_pred[i]! }));
+  pairs.sort((a, b) => a.actual - b.actual);
+  const step = Math.max(1, Math.floor(pairs.length / maxPoints));
+  return pairs.filter((_, i) => i % step === 0 || i === pairs.length - 1).map((p, idx) => ({ idx, actual: p.actual, predicted: p.predicted }));
+}
+
+// Residual lag plot: residual[i] vs residual[i-1] — detects serial correlation.
+function getResidualLagData(y_true: number[], y_pred: number[]): { r0: number; r1: number }[] {
+  const residuals = y_true.map((y, i) => y - y_pred[i]!);
+  return residuals.slice(1).map((r, i) => ({ r0: residuals[i]!, r1: r }));
+}
+
 export const ExperimentsPage: React.FC = () => {
   const { jobs, fetchJobs, hasMore, loadMoreJobs, isLoading, promoteJob, unpromoteJob } = useJobStore();
   const confirm = useConfirm();
@@ -83,6 +262,23 @@ export const ExperimentsPage: React.FC = () => {
   const [selectedRocClass, setSelectedRocClass] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(0.5);
   const [cmView, setCmView] = useState<'overall' | 'per-class'>('overall');
+  const [selectedRegressionSplit, setSelectedRegressionSplit] = useState<string | null>(null);
+
+  // Best F1 threshold — recomputed only when class or evaluation data changes, not on every slider drag
+  const bestF1Info = useMemo(() => {
+    if (!evaluationData || !selectedRocClass) return null;
+    const splits = evaluationData.splits;
+    const refSplit = splits.val ?? splits.test ?? splits.train;
+    const splitLabel = splits.val ? 'val' : splits.test ? 'test' : 'train';
+    if (!refSplit?.y_proba) return null;
+    const result = findBestF1Threshold(refSplit.y_true, refSplit.y_proba, selectedRocClass);
+    if (!result) return null;
+    // Use the job's actual scoring metric name when available
+    const evalJob = evalJobId ? jobs.find(j => j.job_id === evalJobId) : null;
+    const metricName = (evalJob ? getJobScoringMetric(evalJob) : undefined) ?? 'f1';
+    return { ...result, splitLabel, metricName };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evaluationData, selectedRocClass, evalJobId, jobs]);
 
   useEffect(() => {
     fetchJobs();
@@ -242,6 +438,76 @@ export const ExperimentsPage: React.FC = () => {
       }
       
       return rocPoints;
+  };
+
+  // PR (Precision-Recall) curve for one class vs all others.
+  // Returns points sorted by recall (ascending).
+  const calculatePR = (
+    y_true: (string | number)[],
+    y_proba: { classes: (string | number)[], labels?: (string | number)[], values: number[][] },
+    targetClass: string | number
+  ) => {
+    const targetClassStr = String(targetClass);
+    const labelList = y_proba.labels && y_proba.labels.length === y_proba.classes.length
+      ? y_proba.labels : undefined;
+    const classIndex = (labelList ?? y_proba.classes).findIndex(c => String(c) === targetClassStr);
+    if (classIndex === -1) return null;
+    const scores = y_proba.values.map(v => v[classIndex] ?? 0);
+    const items = scores.map((score, i) => ({ score, actual: String(y_true[i]) === targetClassStr ? 1 : 0 }));
+    items.sort((a, b) => b.score - a.score);
+    const totalPos = items.filter(d => d.actual === 1).length;
+    if (totalPos === 0) return null;
+    const points: { recall: number; precision: number; score: number }[] = [{ recall: 0, precision: 1, score: 1 }];
+    let tp = 0, fp = 0;
+    for (const item of items) {
+      if (item.actual === 1) tp++; else fp++;
+      points.push({ recall: tp / totalPos, precision: tp / (tp + fp), score: item.score });
+    }
+    return points;
+  };
+
+  // Overlapping score-distribution histogram: P(target class) binned by actual label.
+  // Returns 20 bins, each with `pos` (actual positives) and `neg` (actual negatives) counts.
+  const getScoreDistribution = (
+    y_true: (string | number)[],
+    y_proba: { classes: (string | number)[], labels?: (string | number)[], values: number[][] },
+    targetClass: string | number,
+    nBins = 20
+  ) => {
+    const targetClassStr = String(targetClass);
+    const labelList = y_proba.labels && y_proba.labels.length === y_proba.classes.length
+      ? y_proba.labels : undefined;
+    const classIndex = (labelList ?? y_proba.classes).findIndex(c => String(c) === targetClassStr);
+    if (classIndex === -1) return null;
+    type Bin = { range: string; pos: number; neg: number };
+    const bins: Bin[] = Array.from({ length: nBins }, (_, i) => ({
+      range: `${(i / nBins).toFixed(2)}`,
+      pos: 0, neg: 0,
+    }));
+    for (let i = 0; i < y_proba.values.length; i++) {
+      const score = y_proba.values[i]![classIndex] ?? 0;
+      const binIdx = Math.min(Math.floor(score * nBins), nBins - 1);
+      if (String(y_true[i]) === targetClassStr) bins[binIdx]!.pos++;
+      else bins[binIdx]!.neg++;
+    }
+    return bins;
+  };
+
+  // Residual histogram for regression: bins of (actual − predicted).
+  const getResidualHistogram = (y_true: number[], y_pred: number[], nBins = 20) => {
+    const residuals = y_true.map((y, i) => y - (y_pred[i] ?? 0));
+    if (residuals.length === 0) return null;
+    const min = Math.min(...residuals), max = Math.max(...residuals);
+    if (min === max) return null;
+    const binWidth = (max - min) / nBins;
+    const bins = Array.from({ length: nBins }, (_, i) => ({
+      label: (min + i * binWidth).toFixed(2), count: 0,
+    }));
+    for (const r of residuals) {
+      bins[Math.min(Math.floor((r - min) / binWidth), nBins - 1)]!.count++;
+    }
+    const mean = residuals.reduce((a, b) => a + b, 0) / residuals.length;
+    return { bins, mean };
   };
 
   // Effect to fetch evaluation data when view changes or selection changes
@@ -1194,7 +1460,31 @@ export const ExperimentsPage: React.FC = () => {
                         <div className="space-y-6">
                             {/* Controls for Evaluation View — sticky so it stays visible while scrolling splits */}
                             <div className="sticky top-0 z-10 flex flex-wrap items-center gap-x-6 gap-y-2 bg-white dark:bg-gray-800 px-4 py-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                                {/* Split visibility toggles */}
+                                {/* Regression: split tabs inline in the control bar */}
+                                {evaluationData.problem_type === 'regression' && (() => {
+                                    const _cs = (Object.keys(evaluationData.splits) as string[]).filter(s => evaluationData.splits[s as keyof typeof evaluationData.splits] != null);
+                                    const _ct = ['train', 'test', 'val'].filter(s => _cs.includes(s));
+                                    const _cl: Record<string, string> = { train: 'Train', test: 'Test', val: 'Validation' };
+                                    const _ca: string = (selectedRegressionSplit != null && _cs.includes(selectedRegressionSplit))
+                                        ? selectedRegressionSplit
+                                        : (_ct.find(t => t === 'val') ?? _ct.find(t => t === 'test') ?? _ct[0] ?? _cs[0]!);
+                                    return (
+                                        <div className="flex items-center gap-0.5">
+                                            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mr-1">Split:</span>
+                                            {_ct.map(tab => (
+                                                <button key={tab} onClick={() => setSelectedRegressionSplit(tab)}
+                                                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                                                        _ca === tab
+                                                            ? 'bg-blue-500 text-white'
+                                                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                    }`}
+                                                >{_cl[tab] ?? tab}</button>
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
+                                {/* Split visibility toggles — classification only */}
+                                {evaluationData.problem_type !== 'regression' && (<>
                                 <div className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Splits:</div>
                                 <label className="flex items-center gap-1.5 cursor-pointer text-sm">
                                     <input type="checkbox" checked={showTrainMetrics} onChange={e => { setShowTrainMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
@@ -1208,6 +1498,7 @@ export const ExperimentsPage: React.FC = () => {
                                     <input type="checkbox" checked={showValMetrics} onChange={e => { setShowValMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                     <span className="text-gray-700 dark:text-gray-300">Validation</span>
                                 </label>
+                                </>)}
 
                                 {/* Classification controls */}
                                 {evaluationData.problem_type === 'classification' && evaluationData.splits.train?.y_proba && (() => {
@@ -1234,6 +1525,10 @@ export const ExperimentsPage: React.FC = () => {
                                             )}
                                             <div className="flex items-center gap-2">
                                                 <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Threshold:</span>
+                                                <InfoTooltip
+                                                    text={`Threshold (t): a sample is predicted as the selected class when P(class) ≥ t.\n\n↑ Raise t → fewer positives predicted → lower recall, higher precision (fewer false alarms, more misses).\n↓ Lower t → more positives predicted → higher recall, lower precision (fewer misses, more false alarms).\n\nDefault 0.5 works well for balanced classes. Adjust for imbalanced data or when the cost of false positives ≠ false negatives.`}
+                                                    align="center"
+                                                />
                                                 <input
                                                     type="range" min={0.01} max={0.99} step={0.01}
                                                     value={threshold}
@@ -1241,6 +1536,22 @@ export const ExperimentsPage: React.FC = () => {
                                                     className="w-28 accent-blue-500"
                                                 />
                                                 <span className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400 w-9">{threshold.toFixed(2)}</span>
+                                                {bestF1Info && (
+                                                    <button
+                                                        onClick={() => { setThreshold(bestF1Info.threshold); }}
+                                                        className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors whitespace-nowrap"
+                                                        title={`Best ${bestF1Info.metricName}=${bestF1Info.f1.toFixed(3)} on ${bestF1Info.splitLabel} split — click to apply`}
+                                                    >
+                                                        ★ best {bestF1Info.metricName}: {bestF1Info.threshold.toFixed(2)}
+                                                        <span className="opacity-50 text-[10px]">({bestF1Info.splitLabel})</span>
+                                                    </button>
+                                                )}
+                                                {bestF1Info && (
+                                                    <InfoTooltip
+                                                        text={`"Best ${bestF1Info.metricName}" is the threshold that maximises ${bestF1Info.metricName} for the selected class on the ${bestF1Info.splitLabel} split.\n\nIt is found by scanning every unique prediction score as a candidate — the same method sklearn uses internally.\n\nThe metric shown matches the scoring metric chosen when the job was trained (${bestF1Info.metricName}). Click the badge to snap the slider to this value.`}
+                                                        align="center"
+                                                    />
+                                                )}
                                             </div>
                                             {proba.labels && proba.labels.length === proba.classes.length && (
                                                 <div className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
@@ -1264,9 +1575,18 @@ export const ExperimentsPage: React.FC = () => {
 
                             {(evaluationData.problem_type === 'regression' || cmView === 'overall' || evaluationData.splits.train?.y_proba?.classes.length === 2) && (
                             <div className="flex flex-col gap-6">
-                            {/* Render charts for each split */}
+                            {/* Charts per split */}
                             {Object.entries(evaluationData.splits)
                                 .filter(([splitName]) => {
+                                    if (evaluationData.problem_type === 'regression') {
+                                        // Only show the active tab split
+                                        const _avail2 = (Object.keys(evaluationData.splits) as string[]).filter(s => evaluationData.splits[s as keyof typeof evaluationData.splits] != null);
+                                        const _tabs2 = ['train', 'test', 'val'].filter(s => _avail2.includes(s));
+                                        const _act2: string = (selectedRegressionSplit != null && _avail2.includes(selectedRegressionSplit))
+                                            ? selectedRegressionSplit
+                                            : (_tabs2.find(t => t === 'val') ?? _tabs2.find(t => t === 'test') ?? _tabs2[0] ?? _avail2[0]!);
+                                        return splitName === _act2;
+                                    }
                                     if (splitName === 'train' && !showTrainMetrics) return false;
                                     if (splitName === 'test' && !showTestMetrics) return false;
                                     if (splitName === 'validation' && !showValMetrics) return false;
@@ -1280,7 +1600,9 @@ export const ExperimentsPage: React.FC = () => {
                                 
                                 return (
                                     <div key={splitName} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4 capitalize">{splitName} Set</h4>
+                                        {evaluationData.problem_type !== 'regression' && (
+                                            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4 capitalize">{splitName} Set</h4>
+                                        )}
                                         
                                         {evaluationData.problem_type === 'regression' ? (
                                             <div className="grid grid-cols-1 gap-8">
@@ -1296,7 +1618,10 @@ export const ExperimentsPage: React.FC = () => {
                                                           {downloadingChart === `${splitName}-actual-pred` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-actual-pred` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
                                                        </button>
                                                     </div>
-                                                    <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">Actual vs Predicted</h5>
+                                                    <div className="flex items-center justify-center gap-1.5 mb-2">
+                                                        <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">Actual vs Predicted</h5>
+                                                        <InfoTooltip text="Scatter plot of true target values (X-axis) vs model predictions (Y-axis). The dashed diagonal = perfect prediction. Points above the line = over-predictions; below = under-predictions. Tight clustering along the diagonal means high accuracy." align="center" size="sm" />
+                                                    </div>
                                                     <ResponsiveContainer width="100%" height="100%">
                                                         <ScatterChart margin={{ top: 20, right: 30, bottom: 40, left: 30 }}>
                                                             <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
@@ -1359,7 +1684,10 @@ export const ExperimentsPage: React.FC = () => {
                                                           {downloadingChart === `${splitName}-residuals` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-residuals` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
                                                        </button>
                                                     </div>
-                                                    <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">Residuals vs Predicted</h5>
+                                                    <div className="flex items-center justify-center gap-1.5 mb-2">
+                                                        <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">Residuals vs Predicted</h5>
+                                                        <InfoTooltip text="Residual (Actual − Predicted) on Y-axis vs predicted value on X-axis. Ideal: a flat cloud of points centred at 0 with no pattern. A funnel shape = variance grows with prediction (heteroscedasticity). A curve = the relationship is non-linear." align="center" size="sm" />
+                                                    </div>
                                                     <ResponsiveContainer width="100%" height="100%">
                                                         <ScatterChart margin={{ top: 20, right: 30, bottom: 40, left: 30 }}>
                                                             <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
@@ -1408,6 +1736,259 @@ export const ExperimentsPage: React.FC = () => {
                                                         </ScatterChart>
                                                     </ResponsiveContainer>
                                                 </div>
+
+                                                {/* Residual Histogram — distribution of (actual − predicted) */}
+                                                {(() => {
+                                                    const hist = getResidualHistogram(
+                                                        splitData.y_true as number[],
+                                                        splitData.y_pred as number[]
+                                                    );
+                                                    if (!hist) return null;
+                                                    // Mean residual reference line position as x-axis index
+                                                    const meanBinLabel = hist.bins.reduce((best, b, i) => {
+                                                        return Math.abs(parseFloat(b.label) - hist.mean) < Math.abs(parseFloat(hist.bins[best]!.label) - hist.mean) ? i : best;
+                                                    }, 0);
+                                                    // Error percentile chips
+                                                    const pct = getErrorPercentiles(splitData.y_true as number[], splitData.y_pred as number[]);
+                                                    // Relative error histogram
+                                                    const relHist = getRelativeErrorHist(splitData.y_true as number[], splitData.y_pred as number[]);
+                                                    // Q-Q data
+                                                    const qqData = getQQData(splitData.y_true as number[], splitData.y_pred as number[]);
+                                                    const qqMin = qqData.length ? Math.min(...qqData.map(d => Math.min(d.theoretical, d.sample))) : 0;
+                                                    const qqMax = qqData.length ? Math.max(...qqData.map(d => Math.max(d.theoretical, d.sample))) : 1;
+                                                    return (
+                                                        <>
+                                                        {/* Error percentile chips */}
+                                                        {pct && (
+                                                            <div className="flex items-center gap-3 flex-wrap">
+                                                                <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">Absolute error percentiles:</span>
+                                                                {([['P50 (median)', pct.p50, 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700'], ['P90', pct.p90, 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700'], ['P95', pct.p95, 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700']] as [string, number, string][]).map(([label, val, cls]) => (
+                                                                    <span key={label} className={`px-2 py-0.5 rounded-full text-xs font-medium border ${cls}`}>
+                                                                        {label}: <span className="font-mono">{val.toFixed(4)}</span>
+                                                                    </span>
+                                                                ))}
+                                                                <InfoTooltip text="Absolute error percentiles show tail behaviour beyond MAE/RMSE.&#10;P50 = median absolute error (robust to outliers).&#10;P90 = 90% of predictions are within this error.&#10;P95 = worst-case error for 95% of samples." align="center" size="sm" />
+                                                            </div>
+                                                        )}
+                                                        {/* Residual histogram */}
+                                                        <div className="h-[260px] relative group" id={`${splitName}-residual-hist`}>
+                                                            <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
+                                                               <button
+                                                                 onClick={() => void handleDownload(`${splitName}-residual-hist`, `${splitName}_residual_histogram`)}
+                                                                 disabled={downloadingChart === `${splitName}-residual-hist`}
+                                                                 className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"
+                                                                 title="Download Graph"
+                                                               >
+                                                                 {downloadingChart === `${splitName}-residual-hist` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-residual-hist` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
+                                                               </button>
+                                                            </div>
+                                                            <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center flex items-center justify-center gap-1">
+                                                                Residual Distribution
+                                                                <InfoTooltip text="Histogram of (Actual − Predicted). A bell-shaped distribution centred at 0 indicates unbiased predictions. A peak offset from 0 signals systematic over- or under-prediction." align="center" size="sm" />
+                                                            </h5>
+                                                            <ResponsiveContainer width="100%" height="88%">
+                                                                <BarChart data={hist.bins} margin={{ top: 5, right: 20, bottom: 28, left: 30 }}>
+                                                                    <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                                                                    <XAxis dataKey="label" tick={{ fontSize: 10 }} label={{ value: 'Residual (Actual − Predicted)', position: 'insideBottom', offset: -8, fontSize: 11, fill: '#9ca3af' }} />
+                                                                    <YAxis tick={{ fontSize: 10 }} label={{ value: 'Count', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 11, fill: '#9ca3af' }} />
+                                                                    <Tooltip
+                                                                        content={({ active, payload }) => {
+                                                                            if (active && payload?.length) {
+                                                                                const p = payload[0]!;
+                                                                                return (
+                                                                                    <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 shadow-sm rounded text-xs">
+                                                                                        <p>Bin start: <span className="font-mono">{String(p.payload.label)}</span></p>
+                                                                                        <p>Count: <span className="font-mono font-semibold">{String(p.value)}</span></p>
+                                                                                    </div>
+                                                                                );
+                                                                            }
+                                                                            return null;
+                                                                        }}
+                                                                    />
+                                                                    {/* Zero residual reference */}
+                                                                    <ReferenceLine x={hist.bins.find(b => parseFloat(b.label) >= 0)?.label ?? ''} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '0', position: 'top', fontSize: 10, fill: '#ef4444' }} />
+                                                                    {/* Mean residual reference */}
+                                                                    <ReferenceLine x={hist.bins[meanBinLabel]?.label ?? ''} stroke="#f59e0b" strokeDasharray="4 2" strokeWidth={1.5} label={{ value: `\u03bc=${hist.mean.toFixed(2)}`, position: 'top', fontSize: 10, fill: '#f59e0b' }} />
+                                                                    <Bar dataKey="count" fill="#6ee7b7" fillOpacity={0.8} isAnimationActive={false} />
+                                                                </BarChart>
+                                                            </ResponsiveContainer>
+                                                        </div>
+                                                        {/* Q-Q Plot */}
+                                                        {qqData.length > 0 && (
+                                                            <div className="h-[280px] relative group" id={`${splitName}-qq`}>
+                                                                <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
+                                                                   <button
+                                                                     onClick={() => void handleDownload(`${splitName}-qq`, `${splitName}_qq_plot`)}
+                                                                     disabled={downloadingChart === `${splitName}-qq`}
+                                                                     className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"
+                                                                     title="Download Graph"
+                                                                   >
+                                                                     {downloadingChart === `${splitName}-qq` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-qq` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
+                                                                   </button>
+                                                                </div>
+                                                                <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center flex items-center justify-center gap-1">
+                                                                    Q-Q Plot (Residuals)
+                                                                    <InfoTooltip text="Quantile-Quantile plot of residuals vs a normal distribution. Points on the diagonal line = residuals are normally distributed (good). S-curves or heavy tails reveal heteroscedasticity or outliers." align="center" size="sm" />
+                                                                </h5>
+                                                                <ResponsiveContainer width="100%" height="88%">
+                                                                    <ScatterChart margin={{ top: 5, right: 20, bottom: 32, left: 40 }}>
+                                                                        <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                                                                        <XAxis type="number" dataKey="theoretical" name="Theoretical" tickFormatter={(v: number) => v.toFixed(2)} tick={{ fontSize: 10 }} label={{ value: 'Theoretical Quantile', position: 'insideBottom', offset: -10, fontSize: 11, fill: '#9ca3af' }} domain={[qqMin, qqMax]} />
+                                                                        <YAxis type="number" dataKey="sample" name="Sample" tickFormatter={(v: number) => v.toFixed(2)} tick={{ fontSize: 10 }} label={{ value: 'Sample Quantile', angle: -90, position: 'insideLeft', offset: 10, fontSize: 11, fill: '#9ca3af' }} domain={[qqMin, qqMax]} />
+                                                                        <Tooltip content={({ active, payload }) => {
+                                                                            if (active && payload?.length) {
+                                                                                const d = payload[0]!.payload as { theoretical: number; sample: number };
+                                                                                return <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 shadow-sm rounded text-xs"><p>Theoretical: <span className="font-mono">{d.theoretical.toFixed(3)}</span></p><p>Sample: <span className="font-mono">{d.sample.toFixed(3)}</span></p></div>;
+                                                                            }
+                                                                            return null;
+                                                                        }} />
+                                                                        {/* 45-degree diagonal reference */}
+                                                                        <Line data={[{ theoretical: qqMin, sample: qqMin }, { theoretical: qqMax, sample: qqMax }]} type="linear" dataKey="sample" stroke="#d1d5db" strokeDasharray="4 3" dot={false} legendType="none" strokeWidth={1} isAnimationActive={false} />
+                                                                        <Scatter data={qqData} fill="#a78bfa" fillOpacity={0.7} isAnimationActive={false} />
+                                                                    </ScatterChart>
+                                                                </ResponsiveContainer>
+                                                            </div>
+                                                        )}
+                                                        {/* Relative Error Histogram */}
+                                                        {relHist && (
+                                                            <div className="h-[260px] relative group" id={`${splitName}-rel-err`}>
+                                                                <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
+                                                                   <button
+                                                                     onClick={() => void handleDownload(`${splitName}-rel-err`, `${splitName}_relative_error`)}
+                                                                     disabled={downloadingChart === `${splitName}-rel-err`}
+                                                                     className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"
+                                                                     title="Download Graph"
+                                                                   >
+                                                                     {downloadingChart === `${splitName}-rel-err` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-rel-err` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
+                                                                   </button>
+                                                                </div>
+                                                                <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center flex items-center justify-center gap-1">
+                                                                    Relative Error Distribution
+                                                                    <InfoTooltip text="Histogram of (Predicted − Actual) / |Actual|. Shows proportional error, useful when targets span orders of magnitude. Capped at ±200% for readability. A spike at 0 = accurate; wide spread = inconsistent predictions." align="center" size="sm" />
+                                                                </h5>
+                                                                <ResponsiveContainer width="100%" height="88%">
+                                                                    <BarChart data={relHist} margin={{ top: 5, right: 20, bottom: 28, left: 30 }}>
+                                                                        <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                                                                        <XAxis dataKey="label" tick={{ fontSize: 10 }} label={{ value: 'Relative Error (Predicted − Actual) / |Actual|', position: 'insideBottom', offset: -8, fontSize: 11, fill: '#9ca3af' }} />
+                                                                        <YAxis tick={{ fontSize: 10 }} label={{ value: 'Count', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 11, fill: '#9ca3af' }} />
+                                                                        <Tooltip content={({ active, payload }) => {
+                                                                            if (active && payload?.length) {
+                                                                                const p = payload[0]!;
+                                                                                return <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 shadow-sm rounded text-xs"><p>Bin ≥ <span className="font-mono">{String(p.payload.label)}</span></p><p>Count: <span className="font-mono font-semibold">{String(p.value)}</span></p></div>;
+                                                                            }
+                                                                            return null;
+                                                                        }} />
+                                                                        <ReferenceLine x={relHist.find(b => parseFloat(b.label) >= 0)?.label ?? ''} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '0', position: 'top', fontSize: 10, fill: '#ef4444' }} />
+                                                                        <Bar dataKey="count" fill="#fbbf24" fillOpacity={0.8} isAnimationActive={false} />
+                                                                    </BarChart>
+                                                                </ResponsiveContainer>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Scale-Location: sqrt(|residual|) vs predicted */}
+                                                        {(() => {
+                                                            const slData = getScaleLocationData(splitData.y_true as number[], splitData.y_pred as number[]);
+                                                            if (slData.length < 3) return null;
+                                                            return (
+                                                                <div className="h-[280px] relative group" id={`${splitName}-scale-loc`}>
+                                                                    <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
+                                                                        <button onClick={() => void handleDownload(`${splitName}-scale-loc`, `${splitName}_scale_location`)} disabled={downloadingChart === `${splitName}-scale-loc`} className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50" title="Download Graph">
+                                                                            {downloadingChart === `${splitName}-scale-loc` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-scale-loc` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
+                                                                        </button>
+                                                                    </div>
+                                                                    <div className="flex items-center justify-center gap-1.5 mb-2">
+                                                                        <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">Scale-Location</h5>
+                                                                        <InfoTooltip text="√|residual| vs predicted value. A flat horizontal band = error variance is constant (homoscedastic — good). A rising trend = error grows as predictions get larger (heteroscedastic). This view amplifies the signal compared to the raw residual plot." align="center" size="sm" />
+                                                                    </div>
+                                                                    <ResponsiveContainer width="100%" height="88%">
+                                                                        <ScatterChart margin={{ top: 10, right: 20, bottom: 35, left: 35 }}>
+                                                                            <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                                                                            <XAxis type="number" dataKey="predicted" tick={{ fontSize: 10 }} label={{ value: 'Predicted', position: 'insideBottom', offset: -8, fontSize: 11, fill: '#9ca3af' }} />
+                                                                            <YAxis type="number" dataKey="sqrtAbsRes" tick={{ fontSize: 10 }} label={{ value: '√|Residual|', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 11, fill: '#9ca3af' }} />
+                                                                            <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => {
+                                                                                if (!active || !payload?.length) return null;
+                                                                                const d = payload[0]!.payload as { predicted?: number; sqrtAbsRes?: number };
+                                                                                if (d.predicted == null || d.sqrtAbsRes == null) return null;
+                                                                                return <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 rounded text-xs shadow-sm"><p>Predicted <span className="font-mono">{d.predicted.toFixed(4)}</span></p><p>√|Res| <span className="font-mono text-teal-600 dark:text-teal-400">{d.sqrtAbsRes.toFixed(4)}</span></p></div>;
+                                                                            }} />
+                                                                            <Scatter data={slData} fill="#14b8a6" fillOpacity={0.5} shape={(props: unknown) => { const p = props as { cx?: number; cy?: number }; return <circle cx={p.cx} cy={p.cy} r={5} fill="#14b8a6" fillOpacity={0.5} stroke="none" />; }} />
+                                                                        </ScatterChart>
+                                                                    </ResponsiveContainer>
+                                                                </div>
+                                                            );
+                                                        })()}
+
+                                                        {/* Sorted Actual vs Predicted */}
+                                                        {(() => {
+                                                            const sortedData = getSortedActualPred(splitData.y_true as number[], splitData.y_pred as number[]);
+                                                            if (sortedData.length < 3) return null;
+                                                            return (
+                                                                <div className="h-[280px] relative group" id={`${splitName}-sorted-pred`}>
+                                                                    <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
+                                                                        <button onClick={() => void handleDownload(`${splitName}-sorted-pred`, `${splitName}_sorted_actual_pred`)} disabled={downloadingChart === `${splitName}-sorted-pred`} className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50" title="Download Graph">
+                                                                            {downloadingChart === `${splitName}-sorted-pred` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-sorted-pred` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
+                                                                        </button>
+                                                                    </div>
+                                                                    <div className="flex items-center justify-center gap-1.5 mb-2">
+                                                                        <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">Sorted Actual vs Predicted</h5>
+                                                                        <InfoTooltip text="Samples sorted by true value (ascending). Blue line = actual target; orange dots = predictions. Where the dots track the line closely, the model is accurate. Divergence at the extremes (low or high values) reveals where the model struggles most." align="center" size="sm" />
+                                                                    </div>
+                                                                    <ResponsiveContainer width="100%" height="88%">
+                                                                        <ComposedChart data={sortedData} margin={{ top: 10, right: 20, bottom: 35, left: 35 }}>
+                                                                            <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                                                                            <XAxis dataKey="idx" tick={{ fontSize: 10 }} label={{ value: 'Sample rank (by actual)', position: 'insideBottom', offset: -8, fontSize: 11, fill: '#9ca3af' }} />
+                                                                            <YAxis tick={{ fontSize: 10 }} label={{ value: 'Value', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 11, fill: '#9ca3af' }} />
+                                                                            <Tooltip content={({ active, payload }) => {
+                                                                                if (!active || !payload?.length) return null;
+                                                                                const d = payload[0]!.payload as { idx: number; actual?: number; predicted?: number };
+                                                                                if (d.actual == null || d.predicted == null) return null;
+                                                                                return <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 rounded text-xs shadow-sm"><p>Actual <span className="font-mono text-blue-600 dark:text-blue-400">{d.actual.toFixed(4)}</span></p><p>Predicted <span className="font-mono text-orange-500">{d.predicted.toFixed(4)}</span></p><p className="text-gray-400 text-[10px]">Error: {(d.predicted - d.actual).toFixed(4)}</p></div>;
+                                                                            }} />
+                                                                            <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={1.5} dot={false} isAnimationActive={false} name="Actual" />
+                                                                            <Line type="monotone" dataKey="predicted" stroke="#f97316" strokeWidth={0} dot={{ r: 2, fill: '#f97316', fillOpacity: 0.6 }} activeDot={{ r: 4 }} isAnimationActive={false} name="Predicted" />
+                                                                            <Legend verticalAlign="top" height={18} iconSize={10} formatter={(value) => <span className="text-xs text-gray-600 dark:text-gray-400">{value}</span>} />
+                                                                        </ComposedChart>
+                                                                    </ResponsiveContainer>
+                                                                </div>
+                                                            );
+                                                        })()}
+
+                                                        {/* Residual Lag Plot */}
+                                                        {(() => {
+                                                            const lagData = getResidualLagData(splitData.y_true as number[], splitData.y_pred as number[]);
+                                                            if (lagData.length < 3) return null;
+                                                            return (
+                                                                <div className="h-[280px] relative group" id={`${splitName}-lag`}>
+                                                                    <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
+                                                                        <button onClick={() => void handleDownload(`${splitName}-lag`, `${splitName}_residual_lag`)} disabled={downloadingChart === `${splitName}-lag`} className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50" title="Download Graph">
+                                                                            {downloadingChart === `${splitName}-lag` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-lag` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
+                                                                        </button>
+                                                                    </div>
+                                                                    <div className="flex items-center justify-center gap-1.5 mb-2">
+                                                                        <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">Residual Lag Plot</h5>
+                                                                        <InfoTooltip text="Residual[i] (Y) vs Residual[i-1] (X). A random scatter centred at (0,0) means errors are independent — ideal. A diagonal pattern = the model consistently over- or under-corrects. Curved or fan-shaped clusters indicate serial correlation (common in time-series data)." align="center" size="sm" />
+                                                                    </div>
+                                                                    <ResponsiveContainer width="100%" height="88%">
+                                                                        <ScatterChart margin={{ top: 10, right: 20, bottom: 35, left: 35 }}>
+                                                                            <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                                                                            <XAxis type="number" dataKey="r0" tick={{ fontSize: 10 }} label={{ value: 'Residual[i-1]', position: 'insideBottom', offset: -8, fontSize: 11, fill: '#9ca3af' }} />
+                                                                            <YAxis type="number" dataKey="r1" tick={{ fontSize: 10 }} label={{ value: 'Residual[i]', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 11, fill: '#9ca3af' }} />
+                                                                            <ReferenceLine y={0} stroke="#d1d5db" strokeDasharray="3 3" />
+                                                                            <ReferenceLine x={0} stroke="#d1d5db" strokeDasharray="3 3" />
+                                                                            <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => {
+                                                                                if (!active || !payload?.length) return null;
+                                                                                const d = payload[0]!.payload as { r0: number; r1: number };
+                                                                                return <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 rounded text-xs shadow-sm"><p>Res[i-1] <span className="font-mono">{d.r0.toFixed(4)}</span></p><p>Res[i] <span className="font-mono text-pink-500">{d.r1.toFixed(4)}</span></p></div>;
+                                                                            }} />
+                                                                            <Scatter data={lagData} fill="#ec4899" fillOpacity={0.45} shape={(props: unknown) => { const p = props as { cx?: number; cy?: number }; return <circle cx={p.cx} cy={p.cy} r={5} fill="#ec4899" fillOpacity={0.45} stroke="none" />; }} />
+                                                                        </ScatterChart>
+                                                                    </ResponsiveContainer>
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                        </>
+                                                    );
+                                                })()}
                                             </div>
                                         ) : (
                                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -1640,6 +2221,8 @@ export const ExperimentsPage: React.FC = () => {
                                                             if (!selectedRocClass) return <div className="text-center text-xs text-gray-400">Select a class</div>;
                                                             const rocData = calculateROC(splitData.y_true, splitData.y_proba!, selectedRocClass);
                                                             if (!rocData) return <div className="text-center text-xs text-gray-400">ROC not available (multiclass or missing proba)</div>;
+                                                            // Embed random-classifier diagonal value so both lines share one data array
+                                                            const rocDataMerged = rocData.map(pt => ({ ...pt, random: pt.fpr }));
 
                                                             // AUC via trapezoid rule
                                                             const auc = rocData.reduce((sum, pt, i) => {
@@ -1697,7 +2280,7 @@ export const ExperimentsPage: React.FC = () => {
                                                                         </div>
                                                                     </div>
                                                                     <ResponsiveContainer width="100%" height="92%">
-                                                                        <ComposedChart data={rocData} margin={{ top: 5, right: 20, bottom: 42, left: 40 }}>
+                                                                        <ComposedChart data={rocDataMerged} margin={{ top: 5, right: 20, bottom: 42, left: 40 }}>
                                                                             <defs>
                                                                                 <linearGradient id="aucFill" x1="0" y1="0" x2="0" y2="1">
                                                                                     <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.25} />
@@ -1738,20 +2321,19 @@ export const ExperimentsPage: React.FC = () => {
                                                                             {/* Gradient fill — AUC area */}
                                                                             <Area type="monotone" dataKey="tpr" stroke="none" fill="url(#aucFill)" isAnimationActive={false} legendType="none" />
                                                                             {/* ROC curve */}
-                                                                            <Line type="monotone" dataKey="tpr" stroke="#8b5cf6" dot={false} strokeWidth={2.5} name="ROC" isAnimationActive={false} />
-                                                                            {/* Random classifier diagonal */}
-                                                                            <Line data={[{ fpr: 0, tpr: 0 }, { fpr: 1, tpr: 1 }]} dataKey="tpr" stroke="#d1d5db" strokeDasharray="4 3" dot={false} legendType="none" strokeWidth={1} isAnimationActive={false} />
-                                                                            {/* Operating point at current threshold */}
+                                                                            <Line type="monotone" dataKey="tpr" stroke="#8b5cf6" dot={false} activeDot={{ r: 5 }} strokeWidth={2.5} name="ROC" isAnimationActive={false} />
+                                                                            {/* Random classifier diagonal — same data array, no separate data prop */}
+                                                                            <Line type="linear" dataKey="random" stroke="#d1d5db" strokeDasharray="4 3" dot={false} tooltipType="none" legendType="none" strokeWidth={1} isAnimationActive={false} />
+                                                                            {/* Operating point at current threshold — ReferenceDot doesn't affect tooltip data domain */}
                                                                             {operatingPoint && (
-                                                                                <Line
-                                                                                    data={[operatingPoint]}
-                                                                                    dataKey="tpr"
-                                                                                    stroke="#ef4444"
-                                                                                    dot={{ r: 7, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }}
-                                                                                    activeDot={{ r: 9 }}
-                                                                                    isAnimationActive={false}
-                                                                                    legendType="none"
-                                                                                    name={`t=${threshold.toFixed(2)}`}
+                                                                                <ReferenceDot
+                                                                                    x={operatingPoint.fpr}
+                                                                                    y={operatingPoint.tpr}
+                                                                                    r={7}
+                                                                                    fill="#ef4444"
+                                                                                    stroke="#fff"
+                                                                                    strokeWidth={2}
+                                                                                    label={{ value: `t=${threshold.toFixed(2)}`, position: 'top', fontSize: 10, fill: '#ef4444' }}
                                                                                 />
                                                                             )}
                                                                         </ComposedChart>
@@ -1763,6 +2345,277 @@ export const ExperimentsPage: React.FC = () => {
                                                 )}
                                             </div>
                                         )}
+                                        {/* PR Curve + Score Distribution — classification only, shown when a class is selected */}
+                                        {evaluationData.problem_type === 'classification' && splitData.y_proba && selectedRocClass && (() => {
+                                            const prData = calculatePR(splitData.y_true, splitData.y_proba, selectedRocClass);
+                                            const scoreDist = getScoreDistribution(splitData.y_true, splitData.y_proba, selectedRocClass);
+                                            if (!prData || !scoreDist) return null;
+                                            // AUC-PR via trapezoidal rule
+                                            let aucPR = 0;
+                                            for (let i = 1; i < prData.length; i++) {
+                                                const dr = (prData[i]!.recall - prData[i - 1]!.recall);
+                                                aucPR += dr * ((prData[i]!.precision + prData[i - 1]!.precision) / 2);
+                                            }
+                                            // Embed no-skill baseline so all lines share one data array
+                                            const prTotal = splitData.y_true.length;
+                                            const prPos = splitData.y_true.filter(y => String(y) === selectedRocClass).length;
+                                            const noSkill = prTotal > 0 ? prPos / prTotal : 0;
+                                            const prDataMerged = prData.map(pt => ({ ...pt, noSkill }));
+                                            return (
+                                                <>
+                                                <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                                    {/* PR Curve */}
+                                                    <div className="h-[280px] relative group" id={`${splitName}-pr-curve`}>
+                                                        <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
+                                                           <button
+                                                             onClick={() => void handleDownload(`${splitName}-pr-curve`, `${splitName}_pr_curve`)}
+                                                             disabled={downloadingChart === `${splitName}-pr-curve`}
+                                                             className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"
+                                                             title="Download Graph"
+                                                           >
+                                                             {downloadingChart === `${splitName}-pr-curve` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-pr-curve` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
+                                                           </button>
+                                                        </div>
+                                                        <div className="flex items-center justify-center gap-1.5 mb-1">
+                                                            <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">
+                                                                PR Curve — {selectedRocClass}
+                                                                <span className="ml-2 font-mono text-blue-600 dark:text-blue-400">AUC-PR={aucPR.toFixed(3)}</span>
+                                                            </h5>
+                                                            <InfoTooltip
+                                                                text={`Precision-Recall curve for class "${selectedRocClass}". AUC-PR=${aucPR.toFixed(3)}: closer to 1.0 is better. Unlike ROC, PR is not inflated by true negatives — prefer PR for imbalanced classes. High precision = few false alarms; high recall = few misses.`}
+                                                                align="center"
+                                                            />
+                                                        </div>
+                                                        <ResponsiveContainer width="100%" height="90%">
+                                                            <ComposedChart data={prDataMerged} margin={{ top: 5, right: 20, bottom: 35, left: 40 }}>
+                                                                <defs>
+                                                                    <linearGradient id="prFill" x1="0" y1="0" x2="0" y2="1">
+                                                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                                                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
+                                                                    </linearGradient>
+                                                                </defs>
+                                                                <CartesianGrid strokeDasharray="3 3" opacity={0.08} />
+                                                                <XAxis type="number" dataKey="recall" domain={[0, 1]} tickFormatter={(v: number) => v.toFixed(1)} tick={{ fontSize: 10 }} label={{ value: 'Recall', position: 'insideBottom', offset: -8, fontSize: 11, fill: '#9ca3af' }} />
+                                                                <YAxis type="number" dataKey="precision" domain={[0, 1]} tickFormatter={(v: number) => v.toFixed(1)} tick={{ fontSize: 10 }} label={{ value: 'Precision', angle: -90, position: 'insideLeft', offset: 10, fontSize: 11, fill: '#9ca3af' }} />
+                                                                <Tooltip
+                                                                    content={({ active, payload }) => {
+                                                                        if (active && payload?.length) {
+                                                                            const entry = payload.find(p => (p.payload as Record<string, unknown>).score != null);
+                                                                            if (!entry) return null;
+                                                                            const d = entry.payload as { recall: number; precision: number };
+                                                                            return (
+                                                                                <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 shadow-sm rounded text-xs">
+                                                                                    <p className="font-semibold text-gray-600 dark:text-gray-300 mb-1">PR point</p>
+                                                                                    <p>Recall <span className="font-mono text-blue-600 dark:text-blue-400">{d.recall.toFixed(3)}</span></p>
+                                                                                    <p>Precision <span className="font-mono">{d.precision.toFixed(3)}</span></p>
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                        return null;
+                                                                    }}
+                                                                />
+                                                                <Area type="monotone" dataKey="precision" stroke="none" fill="url(#prFill)" isAnimationActive={false} legendType="none" />
+                                                                <Line type="monotone" dataKey="precision" stroke="#3b82f6" dot={false} activeDot={{ r: 5 }} strokeWidth={2.5} name="PR" isAnimationActive={false} />
+                                                                {/* No-skill baseline — same data array, no separate data prop */}
+                                                                <Line type="linear" dataKey="noSkill" stroke="#d1d5db" strokeDasharray="4 3" dot={false} tooltipType="none" legendType="none" strokeWidth={1} isAnimationActive={false} />
+                                                                {/* Operating point: last PR point where score >= threshold */}
+                                                                {(() => {
+                                                                    const opPoint = [...prData].reverse().find(p => p.score >= threshold) ?? prData[prData.length - 1];
+                                                                    if (!opPoint) return null;
+                                                                    return (
+                                                                        <ReferenceDot
+                                                                            x={opPoint.recall}
+                                                                            y={opPoint.precision}
+                                                                            r={6}
+                                                                            fill="#ef4444"
+                                                                            stroke="#fff"
+                                                                            strokeWidth={2}
+                                                                            label={{ value: `t=${threshold.toFixed(2)}`, position: 'top', fontSize: 10, fill: '#ef4444' }}
+                                                                        />
+                                                                    );
+                                                                })()}
+                                                            </ComposedChart>
+                                                        </ResponsiveContainer>
+                                                    </div>
+
+                                                    {/* Score Distribution Histogram */}
+                                                    <div className="h-[280px] relative group" id={`${splitName}-score-dist`}>
+                                                        <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
+                                                           <button
+                                                             onClick={() => void handleDownload(`${splitName}-score-dist`, `${splitName}_score_distribution`)}
+                                                             disabled={downloadingChart === `${splitName}-score-dist`}
+                                                             className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"
+                                                             title="Download Graph"
+                                                           >
+                                                             {downloadingChart === `${splitName}-score-dist` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-score-dist` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
+                                                           </button>
+                                                        </div>
+                                                        <div className="flex items-center justify-center gap-1.5 mb-1">
+                                                            <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">
+                                                                Score Distribution — {selectedRocClass}
+                                                            </h5>
+                                                            <InfoTooltip
+                                                                text={`How well does the model separate the two classes? Green bars = samples that truly belong to "${selectedRocClass}"; red = samples that don't. Good separation: green stacks up near score 1, red stacks up near 0, with little overlap in the middle. Heavy overlap around the current threshold (red line) means many borderline predictions — consider raising or lowering t.`}
+                                                                align="center"
+                                                            />
+                                                        </div>
+                                                        <ResponsiveContainer width="100%" height="90%">
+                                                            <BarChart data={scoreDist} barCategoryGap="1%" margin={{ top: 5, right: 20, bottom: 35, left: 40 }}>
+                                                                <CartesianGrid strokeDasharray="3 3" opacity={0.08} />
+                                                                <XAxis dataKey="range" tick={{ fontSize: 9 }} interval={3} label={{ value: `P("${selectedRocClass}")`, position: 'insideBottom', offset: -8, fontSize: 11, fill: '#9ca3af' }} />
+                                                                <YAxis tick={{ fontSize: 10 }} label={{ value: 'Count', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 11, fill: '#9ca3af' }} />
+                                                                <Tooltip
+                                                                    content={({ active, payload }) => {
+                                                                        if (active && payload?.length) {
+                                                                            const d = payload[0]!.payload as { range: string; pos: number; neg: number };
+                                                                            return (
+                                                                                <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 shadow-sm rounded text-xs">
+                                                                                    <p className="font-semibold mb-1">Score bin ≥ {d.range}</p>
+                                                                                    <p className="text-green-600 dark:text-green-400">Actual positive: {d.pos}</p>
+                                                                                    <p className="text-red-500 dark:text-red-400">Actual negative: {d.neg}</p>
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                        return null;
+                                                                    }}
+                                                                />
+                                                                {/* Threshold reference line at closest bin */}
+                                                                <ReferenceLine x={scoreDist[Math.min(Math.floor(threshold * 20), 19)]?.range ?? ''} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: `t=${threshold.toFixed(2)}`, position: 'top', fontSize: 10, fill: '#ef4444' }} />
+                                                                <Bar dataKey="pos" name="Actual +" stackId="a" fill="#22c55e" fillOpacity={0.7} isAnimationActive={false} />
+                                                                <Bar dataKey="neg" name="Actual −" stackId="a" fill="#ef4444" fillOpacity={0.5} isAnimationActive={false} />
+                                                                <Legend verticalAlign="top" height={18} iconSize={10} formatter={(value) => <span className="text-xs text-gray-600 dark:text-gray-400">{value}</span>} />
+                                                            </BarChart>
+                                                        </ResponsiveContainer>
+                                                    </div>
+                                                </div>
+
+                                                {/* Calibration Curve + Cumulative Gains + MCC vs Threshold */}
+                                                <div className="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                                    {/* Calibration Curve */}
+                                                    {(() => {
+                                                        const calRaw = getCalibrationData(splitData.y_true, splitData.y_proba!, selectedRocClass);
+                                                        if (!calRaw || calRaw.length < 2) return null;
+                                                        // Embed perfect-calibration value into every data point so both lines
+                                                        // share one data array — prevents Recharts snapping to the 2-point
+                                                        // diagonal and missing the calibration bins in tooltip payload.
+                                                        const calData = calRaw.map(pt => ({ ...pt, perfect: pt.midpoint }));
+                                                        return (
+                                                            <div className="h-[260px] relative group" id={`${splitName}-calibration`}>
+                                                                <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
+                                                                    <button onClick={() => void handleDownload(`${splitName}-calibration`, `${splitName}_calibration`)} disabled={downloadingChart === `${splitName}-calibration`} className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50" title="Download Graph">
+                                                                        {downloadingChart === `${splitName}-calibration` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-calibration` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
+                                                                    </button>
+                                                                </div>
+                                                                <div className="flex items-center justify-center gap-1.5 mb-1">
+                                                                    <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">Calibration — {selectedRocClass}</h5>
+                                                                    <InfoTooltip text={`Is the model's confidence score trustworthy? X = what score the model gave; Y = how often that class actually appeared at that score. If the model says 80% confidence but only 40% of those samples are truly positive, it is over-confident (point sits below the diagonal). A well-calibrated model's dots hug the diagonal closely.`} align="center" size="sm" />
+                                                                </div>
+                                                                <ResponsiveContainer width="100%" height="90%">
+                                                                    <ComposedChart data={calData} margin={{ top: 5, right: 15, bottom: 32, left: 40 }}>
+                                                                        <CartesianGrid strokeDasharray="3 3" opacity={0.08} />
+                                                                        <XAxis type="number" dataKey="midpoint" domain={[0, 1]} tickFormatter={(v: number) => v.toFixed(1)} tick={{ fontSize: 10 }} label={{ value: 'Mean predicted prob.', position: 'insideBottom', offset: -8, fontSize: 10, fill: '#9ca3af' }} />
+                                                                        <YAxis type="number" domain={[0, 1]} tickFormatter={(v: number) => v.toFixed(1)} tick={{ fontSize: 10 }} label={{ value: 'Fraction positives', angle: -90, position: 'insideLeft', offset: 8, fontSize: 10, fill: '#9ca3af' }} />
+                                                                        <Tooltip content={({ active, payload }) => {
+                                                                            if (!active || !payload?.length) return null;
+                                                                            const d = payload[0]!.payload as { midpoint: number; fracPos: number; count: number; perfect: number };
+                                                                            return <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 rounded text-xs shadow-sm"><p className="font-semibold mb-1">Calibration bin</p><p>Predicted confidence <span className="font-mono text-purple-600 dark:text-purple-400">{d.midpoint.toFixed(2)}</span></p><p>Actual positive rate <span className="font-mono">{d.fracPos.toFixed(3)}</span></p><p className="text-gray-400 text-[10px]">{d.count} samples in this bin</p></div>;
+                                                                        }} />
+                                                                        {/* Perfect calibration diagonal — uses same data array so tooltip fires correctly */}
+                                                                        <Line type="linear" dataKey="perfect" stroke="#d1d5db" strokeDasharray="4 3" dot={false} legendType="none" tooltipType="none" strokeWidth={1} isAnimationActive={false} />
+                                                                        <Line type="linear" dataKey="fracPos" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 5, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 1.5 }} activeDot={{ r: 7 }} isAnimationActive={false} name="Calibration" />
+                                                                    </ComposedChart>
+                                                                </ResponsiveContainer>
+                                                            </div>
+                                                        );
+                                                    })()}
+
+                                                    {/* Cumulative Gains */}
+                                                    {(() => {
+                                                        const gainsData = getCumulativeGainsData(splitData.y_true, splitData.y_proba!, selectedRocClass);
+                                                        if (!gainsData) return null;
+                                                        // Embed random baseline so all lines share one data array
+                                                        const gainsDataMerged = gainsData.map(pt => ({ ...pt, random: pt.pct }));
+                                                        return (
+                                                            <div className="h-[260px] relative group" id={`${splitName}-cum-gains`}>
+                                                                <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
+                                                                    <button onClick={() => void handleDownload(`${splitName}-cum-gains`, `${splitName}_cumulative_gains`)} disabled={downloadingChart === `${splitName}-cum-gains`} className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50" title="Download Graph">
+                                                                        {downloadingChart === `${splitName}-cum-gains` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-cum-gains` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
+                                                                    </button>
+                                                                </div>
+                                                                <div className="flex items-center justify-center gap-1.5 mb-1">
+                                                                    <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">Cumulative Gains — {selectedRocClass}</h5>
+                                                                    <InfoTooltip text={`Samples sorted by score (highest first). X = % of population contacted; Y = % of total positives captured. The diagonal = random. If the blue curve reaches 80% of positives after contacting only 40% — the model has 2× lift there. Useful for targeting campaigns.`} align="center" size="sm" />
+                                                                </div>
+                                                                <ResponsiveContainer width="100%" height="90%">
+                                                                    <ComposedChart data={gainsDataMerged} margin={{ top: 5, right: 15, bottom: 32, left: 40 }}>
+                                                                        <defs>
+                                                                            <linearGradient id="gainsFill" x1="0" y1="0" x2="0" y2="1">
+                                                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                                                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+                                                                            </linearGradient>
+                                                                        </defs>
+                                                                        <CartesianGrid strokeDasharray="3 3" opacity={0.08} />
+                                                                        <XAxis type="number" dataKey="pct" domain={[0, 1]} tickFormatter={(v: number) => `${Math.round(v * 100)}%`} tick={{ fontSize: 10 }} label={{ value: '% Population', position: 'insideBottom', offset: -8, fontSize: 10, fill: '#9ca3af' }} />
+                                                                        <YAxis type="number" dataKey="gain" domain={[0, 1]} tickFormatter={(v: number) => `${Math.round(v * 100)}%`} tick={{ fontSize: 10 }} label={{ value: '% Positives', angle: -90, position: 'insideLeft', offset: 8, fontSize: 10, fill: '#9ca3af' }} />
+                                                                        <Tooltip content={({ active, payload }) => {
+                                                                            if (!active || !payload?.length) return null;
+                                                                            const entry = payload.find(p => (p.payload as Record<string, unknown>).lift != null);
+                                                                            if (!entry) return null;
+                                                                            const d = entry.payload as { pct: number; gain: number; lift: number };
+                                                                            return <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 rounded text-xs shadow-sm"><p className="font-semibold mb-1">Gains point</p><p>Population <span className="font-mono text-green-600 dark:text-green-400">{(d.pct * 100).toFixed(1)}%</span></p><p>Positives caught <span className="font-mono">{(d.gain * 100).toFixed(1)}%</span></p><p className="text-gray-500">Lift <span className="font-mono">{d.lift.toFixed(2)}×</span></p></div>;
+                                                                        }} />
+                                                                        {/* Random baseline — same data array, no separate data prop */}
+                                                                        <Line type="linear" dataKey="random" stroke="#d1d5db" strokeDasharray="4 3" dot={false} tooltipType="none" legendType="none" strokeWidth={1} isAnimationActive={false} />
+                                                                        <Area type="monotone" dataKey="gain" stroke="none" fill="url(#gainsFill)" isAnimationActive={false} legendType="none" />
+                                                                        <Line type="monotone" dataKey="gain" stroke="#10b981" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} isAnimationActive={false} name="Gains" />
+                                                                    </ComposedChart>
+                                                                </ResponsiveContainer>
+                                                            </div>
+                                                        );
+                                                    })()}
+
+                                                    {/* MCC vs Threshold */}
+                                                    {(() => {
+                                                        const mccData = getMCCByThreshold(splitData.y_true, splitData.y_proba!, selectedRocClass);
+                                                        if (!mccData) return null;
+                                                        const bestMCC = mccData.reduce((best, pt) => pt.mcc > best.mcc ? pt : best, mccData[0]!);
+                                                        return (
+                                                            <div className="h-[260px] relative group" id={`${splitName}-mcc`}>
+                                                                <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
+                                                                    <button onClick={() => void handleDownload(`${splitName}-mcc`, `${splitName}_mcc`)} disabled={downloadingChart === `${splitName}-mcc`} className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50" title="Download Graph">
+                                                                        {downloadingChart === `${splitName}-mcc` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : doneChart === `${splitName}-mcc` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Download className="w-3.5 h-3.5" />}
+                                                                    </button>
+                                                                </div>
+                                                                <div className="flex items-center justify-center gap-1.5 mb-1">
+                                                                    <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">
+                                                                        MCC vs Threshold — {selectedRocClass}
+                                                                        <span className="ml-2 font-mono text-orange-500 dark:text-orange-400">best t={bestMCC.threshold.toFixed(2)} (MCC={bestMCC.mcc.toFixed(2)})</span>
+                                                                    </h5>
+                                                                    <InfoTooltip text={`Which threshold gives the best overall balance between precision and recall — even for imbalanced classes? MCC (Matthews Correlation Coefficient) scores from −1 (completely wrong) to +1 (perfect); 0 = random guessing. The orange peak is the threshold where MCC is highest. The red line is your current threshold. If the red line is far from the orange peak, consider moving your threshold there for better overall performance.`} align="center" size="sm" />
+                                                                </div>
+                                                                <ResponsiveContainer width="100%" height="90%">
+                                                                    <ComposedChart data={mccData} margin={{ top: 5, right: 15, bottom: 32, left: 40 }}>
+                                                                        <CartesianGrid strokeDasharray="3 3" opacity={0.08} />
+                                                                        <XAxis type="number" dataKey="threshold" domain={[0, 1]} tickFormatter={(v: number) => v.toFixed(1)} tick={{ fontSize: 10 }} label={{ value: 'Threshold', position: 'insideBottom', offset: -8, fontSize: 10, fill: '#9ca3af' }} />
+                                                                        <YAxis type="number" dataKey="mcc" domain={[-1, 1]} tickFormatter={(v: number) => v.toFixed(1)} tick={{ fontSize: 10 }} label={{ value: 'MCC', angle: -90, position: 'insideLeft', offset: 8, fontSize: 10, fill: '#9ca3af' }} />
+                                                                        <Tooltip content={({ active, payload }) => {
+                                                                            if (!active || !payload?.length) return null;
+                                                                            const d = payload[0]!.payload as { threshold: number; mcc: number };
+                                                                            return <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 rounded text-xs shadow-sm"><p className="font-semibold mb-1">MCC point</p><p>t = <span className="font-mono">{d.threshold.toFixed(2)}</span></p><p>MCC = <span className="font-mono text-orange-500">{d.mcc.toFixed(4)}</span></p></div>;
+                                                                        }} />
+                                                                        <ReferenceLine y={0} stroke="#d1d5db" strokeDasharray="3 3" strokeWidth={1} />
+                                                                        <ReferenceLine x={threshold} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: `t=${threshold.toFixed(2)}`, position: 'top', fontSize: 10, fill: '#ef4444' }} />
+                                                                        <ReferenceLine x={bestMCC.threshold} stroke="#f97316" strokeDasharray="4 2" strokeWidth={1.5} label={{ value: `best`, position: 'insideTopLeft', fontSize: 9, fill: '#f97316' }} />
+                                                                        <Line type="monotone" dataKey="mcc" stroke="#f97316" strokeWidth={2} dot={false} isAnimationActive={false} name="MCC" />
+                                                                    </ComposedChart>
+                                                                </ResponsiveContainer>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 );
                             })}
@@ -1936,7 +2789,10 @@ export const ExperimentsPage: React.FC = () => {
               {/* Feature Importance View */}
               {activeView === 'importance' && hasFeatureImportances && (
                 <div className="space-y-6 animate-in fade-in duration-300">
-                  <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">Feature Importance Comparison</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">Feature Importance Comparison</h3>
+                    <InfoTooltip text="Shows which input features most influence the model's predictions (top 15 by average importance). For tree-based models this is mean impurity decrease or permutation importance. Higher bar = stronger influence. Compare bars across runs to see if the same features matter in different models." align="center" />
+                  </div>
                   {(() => {
                     // Collect all unique features across selected jobs
                     const allFeatures = new Set<string>();
