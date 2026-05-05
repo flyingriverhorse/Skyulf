@@ -4,8 +4,8 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from backend.database.models import MLJob, BasicTrainingJob, AdvancedTuningJob
-from backend.ml_pipeline.execution.schemas import PipelineExecutionResult
-from backend.ml_pipeline.execution.summary import build_summary
+from backend.ml_pipeline._execution.schemas import PipelineExecutionResult
+from backend.ml_pipeline._execution.summary import build_summary
 from backend.ml_pipeline.constants import StepType
 
 

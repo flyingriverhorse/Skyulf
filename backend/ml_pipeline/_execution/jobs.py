@@ -11,9 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from backend.database.models import BasicTrainingJob, AdvancedTuningJob
-from backend.ml_pipeline.execution.schemas import JobInfo, JobStatus
-from backend.ml_pipeline.execution.basic_training_manager import BasicTrainingManager
-from backend.ml_pipeline.execution.advanced_tuning_manager import AdvancedTuningManager
+from backend.ml_pipeline._execution.schemas import JobInfo, JobStatus
+from backend.ml_pipeline._execution.basic_training_manager import BasicTrainingManager
+from backend.ml_pipeline._execution.advanced_tuning_manager import AdvancedTuningManager
 
 # Jobs submitted within this window for the same pipeline+node are considered duplicates.
 _IDEMPOTENCY_WINDOW = timedelta(seconds=30)

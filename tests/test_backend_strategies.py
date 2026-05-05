@@ -1,14 +1,14 @@
 import unittest
 from unittest.mock import MagicMock
 
-from backend.ml_pipeline.execution.strategies import (
+from backend.ml_pipeline._execution.strategies import (
     JobStrategyFactory,
     BasicTrainingStrategy,
     AdvancedTuningStrategy,
 )
 from backend.ml_pipeline.constants import StepType
 from backend.database.models import BasicTrainingJob, AdvancedTuningJob
-from backend.ml_pipeline.execution.schemas import PipelineExecutionResult, NodeExecutionResult
+from backend.ml_pipeline._execution.schemas import PipelineExecutionResult, NodeExecutionResult
 
 
 class TestJobStrategyFactory(unittest.TestCase):

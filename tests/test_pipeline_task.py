@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.database.models import AdvancedTuningJob, BasicTrainingJob
-from backend.ml_pipeline.execution.schemas import (
+from backend.ml_pipeline._execution.schemas import (
     NodeExecutionResult,
     PipelineExecutionResult,
 )
@@ -34,7 +34,7 @@ def mock_session():
 
 @pytest.fixture
 def mock_engine_class():
-    with patch("backend.ml_pipeline.services.pipeline_execution_service.PipelineEngine") as mock:
+    with patch("backend.ml_pipeline._services.pipeline_execution_service.PipelineEngine") as mock:
         yield mock
 
 

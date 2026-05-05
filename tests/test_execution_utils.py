@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock
-from backend.ml_pipeline.execution.utils import resolve_dataset_name, get_dataset_map
+from backend.ml_pipeline._execution.utils import resolve_dataset_name, get_dataset_map
 
 
 @pytest.mark.asyncio

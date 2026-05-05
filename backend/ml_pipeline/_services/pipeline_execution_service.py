@@ -14,9 +14,9 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from backend.database.models import DataSource
-from backend.ml_pipeline.execution.engine import PipelineEngine
-from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
-from backend.ml_pipeline.execution.strategies import JobStrategyFactory
+from backend.ml_pipeline._execution.engine import PipelineEngine
+from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
+from backend.ml_pipeline._execution.strategies import JobStrategyFactory
 from backend.ml_pipeline.constants import StepType
 from backend.realtime.events import JobEvent, publish_job_event
 

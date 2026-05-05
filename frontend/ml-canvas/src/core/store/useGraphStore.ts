@@ -185,8 +185,9 @@ export const useGraphStore = create<GraphState>()(
       // Count UNIQUE source nodes, not edges: multi-output splitters
       // (train_test_split, feature_target_split) legitimately produce
       // several edges from the same source (train/test/X/y handles)
-      // into one downstream node, and that's not fan-in — the engine
-      // dedupes by source id, so no merge happens.
+      // into one downstream node, and that's not fan-in — pipelineConverter
+      // dedupes by source id so the backend sees one logical input,
+      // and useBranchColors groups them into one branch color.
       const existingInputs = edges.filter(e => e.target === connection.target);
       const existingSources = new Set(existingInputs.map(e => e.source));
       const isNewSource = connection.source != null && !existingSources.has(connection.source);

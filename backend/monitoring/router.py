@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 from backend.config import get_settings
 from backend.dependencies import get_db
 from backend.database.models import BasicTrainingJob, AdvancedTuningJob, DriftCheckResult
-from backend.ml_pipeline.execution.graph_utils import extract_job_details
+from backend.ml_pipeline._execution.graph_utils import extract_job_details
 from skyulf.profiling.drift import DriftCalculator
 
 router = APIRouter(prefix="/monitoring", tags=["Monitoring"])

@@ -13,7 +13,7 @@ async def test_artifact_routing_logic():
         patch("backend.ml_pipeline.artifacts.factory.S3ArtifactStore") as MockS3Store,
         patch("backend.ml_pipeline.artifacts.factory.LocalArtifactStore") as MockLocalStore,
         patch(
-            "backend.ml_pipeline.services.pipeline_execution_service.PipelineEngine"
+            "backend.ml_pipeline._services.pipeline_execution_service.PipelineEngine"
         ) as MockEngine,
         patch("os.makedirs"),
     ):

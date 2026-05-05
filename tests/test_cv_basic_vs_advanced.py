@@ -22,8 +22,8 @@ from skyulf.modeling.regression import (
     RidgeRegressionApplier,
     RidgeRegressionCalculator,
 )
-from skyulf.modeling.tuning import TuningCalculator, TuningConfig
-from skyulf.modeling.tuning.engine import TuningApplier
+from skyulf.modeling._tuning import TuningCalculator, TuningConfig
+from skyulf.modeling._tuning.engine import TuningApplier
 
 
 @pytest.fixture

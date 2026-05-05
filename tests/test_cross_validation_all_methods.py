@@ -26,7 +26,7 @@ from skyulf.modeling.regression import (
     RidgeRegressionApplier,
     RidgeRegressionCalculator,
 )
-from skyulf.modeling.tuning import TuningCalculator, TuningConfig
+from skyulf.modeling._tuning import TuningCalculator, TuningConfig
 
 # ---------------------------------------------------------------------------
 # Fixtures — larger datasets so multi-fold CV doesn't starve

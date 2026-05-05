@@ -31,27 +31,64 @@ from backend.database.models import (
     DataSource,
     Deployment,
 )
-from backend.ml_pipeline.services.pipeline_versions_service import (
+from backend.ml_pipeline._services.pipeline_versions_service import (
     PipelineVersionsService,
 )
 from backend.ml_pipeline.constants import StepType
-from backend.ml_pipeline.tasks import run_pipeline_task
+from backend.ml_pipeline.tasks import run_pipeline_batch_task, run_pipeline_task
 from backend.realtime.events import JobEvent, publish_job_event
 from backend.utils.file_utils import extract_file_path_from_source
-from backend.ml_pipeline.services.evaluation_service import EvaluationService
+from backend.ml_pipeline._services.evaluation_service import EvaluationService
 from backend.ml_pipeline.resolution import resolve_pipeline_nodes
 from backend.data.catalog import create_catalog_from_options, FileSystemCatalog
 
 from .artifacts.local import LocalArtifactStore
-from .execution.engine import PipelineEngine
+from ._execution.engine import PipelineEngine
 
 # from .data.profiler import DataProfiler
 # from .recommendations.schemas import Recommendation, AnalysisProfile
-from .execution.jobs import JobInfo, JobManager
-from .execution.schemas import NodeConfig, PipelineConfig, coerce_step_type
+from ._execution.jobs import JobInfo, JobManager
+from ._execution.schemas import NodeConfig, PipelineConfig, coerce_step_type
+from skyulf.registry import NodeRegistry as SkyulfRegistry
+from functools import lru_cache
 
-# from .data.loader import DataLoader
-from .node_definitions import NodeRegistry, RegistryItem
+
+class RegistryItem(BaseModel):
+    """Node metadata shape returned by the /registry endpoint."""
+
+    id: str
+    name: str
+    category: str
+    description: str
+    params: Dict[str, Any] = {}
+    tags: List[str] = []
+
+
+@lru_cache(maxsize=1)
+def _build_node_registry() -> List[RegistryItem]:
+    """Merge the static DATA_LOADER entry with all skyulf-core registered nodes.
+
+    Result is cached so the dict scan runs only once per process lifetime.
+    """
+    static: List[RegistryItem] = [
+        RegistryItem(
+            id=StepType.DATA_LOADER,
+            name="Data Loader",
+            category="Data Source",
+            description="Loads data from a source.",
+            params={"source_id": "string", "date_range": "optional[dict]"},
+        ),
+    ]
+    dynamic: List[RegistryItem] = []
+    for node_id, meta in SkyulfRegistry.get_all_metadata().items():
+        item_data = dict(meta)
+        if "id" not in item_data:
+            item_data["id"] = node_id
+        dynamic.append(RegistryItem(**item_data))
+
+    dynamic_ids = {n.id for n in dynamic}
+    return [n for n in static if n.id not in dynamic_ids] + dynamic
+
 
 logger = logging.getLogger(__name__)
 
@@ -299,7 +336,7 @@ async def run_pipeline(  # noqa: C901
     into independent sub-pipelines. Each sub-pipeline gets its own job and
     runs concurrently. The response includes all ``job_ids``.
     """
-    from backend.ml_pipeline.execution.graph_utils import (
+    from backend.ml_pipeline._execution.graph_utils import (
         partition_parallel_pipeline,
         _split_connected_components,
     )
@@ -445,21 +482,21 @@ async def run_pipeline(  # noqa: C901
         if resolved_s3_options:
             sub_payload["storage_options"] = resolved_s3_options
 
-        # Trigger task
-        if settings.USE_CELERY:
-            task = run_pipeline_task.delay(job_id, sub_payload)
-            # Persist the celery task id so cancel_job can revoke it later.
-            try:
-                await JobManager.attach_celery_task_id(db, job_id, task.id)
-            except Exception:
-                # Best-effort: never let metadata persistence block job submit.
-                logger.warning("Failed to attach celery task id for job %s", job_id)
-        else:
-            task_payloads.append((job_id, sub_payload))
+        # Collect all branches; submitted as a single batch after the loop.
+        task_payloads.append((job_id, sub_payload))
 
-    # Non-Celery: run branches concurrently via ThreadPoolExecutor
-    if not settings.USE_CELERY and task_payloads:
-        if len(task_payloads) == 1:
+    # Submit all branches in one Celery task (B4: one round-trip vs N).
+    # For BackgroundTasks (non-Celery), keep per-branch concurrency.
+    if task_payloads:
+        if settings.USE_CELERY:
+            task = run_pipeline_batch_task.delay(task_payloads)
+            # Attach the same Celery task id to every job so cancel_job can revoke it.
+            for jid, _ in task_payloads:
+                try:
+                    await JobManager.attach_celery_task_id(db, jid, task.id)
+                except Exception:
+                    logger.warning("Failed to attach celery task id for job %s", jid)
+        elif len(task_payloads) == 1:
             background_tasks.add_task(run_pipeline_task, *task_payloads[0])
         else:
 
@@ -865,7 +902,7 @@ async def preview_pipeline(  # noqa: C901
         #      still get separate tabs.
         # Either way, training/tuning nodes are stripped before execution
         # because preview never fits models.
-        from backend.ml_pipeline.execution.graph_utils import (
+        from backend.ml_pipeline._execution.graph_utils import (
             partition_for_preview,
             partition_parallel_pipeline,
         )
@@ -1377,7 +1414,7 @@ def get_node_registry():
     """
     Returns the list of available pipeline nodes (transformers, models, etc.).
     """
-    return NodeRegistry.get_all_nodes()
+    return _build_node_registry()
 
 
 @router.get("/datasets/{dataset_id}/schema", response_model=AnalysisProfile)

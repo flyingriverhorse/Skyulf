@@ -9,9 +9,9 @@ from ..data.dataset import SplitDataset
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 # Evaluation imports - we will migrate these next
-# from .evaluation.schemas import ModelEvaluationReport, ModelEvaluationSplitPayload
-# from .evaluation.classification import build_classification_split_report
-# from .evaluation.regression import build_regression_split_report
+# from ._evaluation.schemas import ModelEvaluationReport, ModelEvaluationSplitPayload
+# from ._evaluation.classification import build_classification_split_report
+# from ._evaluation.regression import build_regression_split_report
 
 logger = logging.getLogger(__name__)
 
@@ -302,8 +302,8 @@ class StatefulEstimator:
         Evaluates the model on all splits and returns a detailed report.
         """
         # Import here to avoid circular dependency
-        from .evaluation.classification import evaluate_classification_model
-        from .evaluation.regression import evaluate_regression_model
+        from ._evaluation.classification import evaluate_classification_model
+        from ._evaluation.regression import evaluate_regression_model
 
         if self.model is None:
             raise ValueError("Model has not been trained yet. Call fit_predict() first.")
