@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Calculator, Trash2, Calendar, Percent, GitCompare, Search, Check, ChevronDown, ChevronRight, FunctionSquare, Info, Lightbulb, Activity } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
@@ -129,6 +129,18 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
       : [];
 
   const [showRecommendations, setShowRecommendations] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isWide, setIsWide] = useState(false);
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setIsWide(entry.contentRect.width > 380);
+      }
+    });
+    ro.observe(containerRef.current);
+    return () => { ro.disconnect(); };
+  }, []);
 
 
 
@@ -202,24 +214,41 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
   };
 
   return (
-    <div className="flex h-full">
-      {/* Left Sidebar: Tools */}
-      <div className="w-20 border-r bg-muted/10 flex flex-col items-center py-4 gap-2 overflow-y-auto shrink-0">
-        <span className="text-[10px] font-bold text-muted-foreground mb-2 uppercase tracking-wider">Add</span>
-        {OPERATION_TYPES.map(t => (
-          <button
-            key={t.value}
-            onClick={() => { addOperation(t.value as MathOperation['operation_type']); }}
-            className="flex flex-col items-center justify-center gap-1 p-1.5 rounded-md border bg-card hover:bg-accent hover:border-primary/50 transition-all group w-16 h-14 shadow-sm"
-            title={t.label}
-          >
-            <t.icon size={18} className="text-muted-foreground group-hover:text-primary" />
-            <span className="text-[9px] font-medium text-muted-foreground group-hover:text-foreground text-center leading-tight line-clamp-2">
-              {t.label.replace(' ', '\n')}
-            </span>
-          </button>
-        ))}
-      </div>
+    <div ref={containerRef} className={isWide ? 'flex min-h-[300px]' : 'flex flex-col min-h-[300px]'}>
+      {/* Add Operations — vertical sidebar when wide, horizontal strip when narrow */}
+      {isWide ? (
+        <div className="w-20 border-r bg-muted/10 flex flex-col items-center py-4 gap-2 overflow-y-auto shrink-0">
+          <span className="text-[10px] font-bold text-muted-foreground mb-2 uppercase tracking-wider">Add</span>
+          {OPERATION_TYPES.map(t => (
+            <button
+              key={t.value}
+              onClick={() => { addOperation(t.value as MathOperation['operation_type']); }}
+              className="flex flex-col items-center justify-center gap-1 p-1.5 rounded-md border bg-card hover:bg-accent hover:border-primary/50 transition-all group w-16 h-14 shadow-sm"
+              title={t.label}
+            >
+              <t.icon size={18} className="text-muted-foreground group-hover:text-primary" />
+              <span className="text-[9px] font-medium text-muted-foreground group-hover:text-foreground text-center leading-tight line-clamp-2">
+                {t.label.replace(' ', '\n')}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 border-b bg-muted/10 px-2 py-2 overflow-x-auto shrink-0">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider shrink-0 mr-1">Add:</span>
+          {OPERATION_TYPES.map(t => (
+            <button
+              key={t.value}
+              onClick={() => { addOperation(t.value as MathOperation['operation_type']); }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded border bg-card hover:bg-accent hover:border-primary/50 transition-all group shrink-0 shadow-sm"
+              title={t.label}
+            >
+              <t.icon size={13} className="text-muted-foreground group-hover:text-primary" />
+              <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground whitespace-nowrap">{t.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Right Main: Content */}
       <div className="flex-1 flex flex-col min-w-0 bg-background">
@@ -252,7 +281,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
 
 
       {/* Main Content Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[240px]">
         {(config.operations || []).map((op, idx) => (
           <div key={idx} className="border rounded-lg bg-card shadow-sm overflow-hidden">
             {/* Header */}
