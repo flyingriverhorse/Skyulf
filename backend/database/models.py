@@ -472,6 +472,8 @@ class ErrorEvent(Base):
     # HTTP status code (0 for background task errors)
     status_code: Mapped[int] = mapped_column(Integer, nullable=False, default=500)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False, index=True)
+    # Set when an operator marks the event as resolved/dismissed
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
 
     def to_dict(self):
         return {
@@ -483,6 +485,7 @@ class ErrorEvent(Base):
             "job_id": self.job_id,
             "status_code": self.status_code,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "resolved_at": self.resolved_at.isoformat() if self.resolved_at else None,
         }
 
 

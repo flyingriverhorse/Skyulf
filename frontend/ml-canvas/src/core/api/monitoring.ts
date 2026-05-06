@@ -83,6 +83,16 @@ export interface ErrorEvent {
     job_id?: string;
     status_code: number;
     created_at: string;
+    resolved_at?: string | null;
+}
+
+export interface GroupedIssue {
+    error_type: string;
+    route: string;
+    count: number;
+    last_seen: string;
+    first_seen: string;
+    sample_id: number;
 }
 
 export const monitoringApi = {
@@ -125,9 +135,10 @@ export const monitoringApi = {
         return response.data;
     },
 
-    getErrors: async (limit = 100, since?: string): Promise<ErrorEvent[]> => {
+    getErrors: async (limit = 100, since?: string, showResolved = false): Promise<ErrorEvent[]> => {
         const params = new URLSearchParams({ limit: String(limit) });
         if (since) params.set('since', since);
+        if (showResolved) params.set('show_resolved', 'true');
         const response = await apiClient.get<ErrorEvent[]>(`/monitoring/errors?${params}`);
         return response.data;
     },
@@ -137,13 +148,35 @@ export const monitoringApi = {
         return response.data.count;
     },
 
+    getTimeline: async (hours = 24): Promise<{ hour: string; count: number }[]> => {
+        const response = await apiClient.get<{ hour: string; count: number }[]>(
+            `/monitoring/errors/timeline?hours=${hours}`
+        );
+        return response.data;
+    },
+
     getError: async (id: number): Promise<ErrorEvent> => {
         const response = await apiClient.get<ErrorEvent>(`/monitoring/errors/${id}`);
         return response.data;
     },
 
+    resolveError: async (id: number): Promise<ErrorEvent> => {
+        const response = await apiClient.patch<ErrorEvent>(`/monitoring/errors/${id}/resolve`);
+        return response.data;
+    },
+
+    unresolveError: async (id: number): Promise<ErrorEvent> => {
+        const response = await apiClient.patch<ErrorEvent>(`/monitoring/errors/${id}/unresolve`);
+        return response.data;
+    },
+
     clearErrors: async (): Promise<{ deleted: number }> => {
         const response = await apiClient.delete<{ deleted: number }>('/monitoring/errors');
+        return response.data;
+    },
+
+    getGrouped: async (): Promise<GroupedIssue[]> => {
+        const response = await apiClient.get<GroupedIssue[]>('/monitoring/errors/grouped');
         return response.data;
     },
 };

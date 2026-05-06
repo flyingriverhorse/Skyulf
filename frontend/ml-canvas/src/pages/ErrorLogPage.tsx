@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import {
   AlertTriangle, Bug, RefreshCw, Search, Trash2,
   ChevronDown, ChevronRight, X, Clock, Route, Server, Download,
 } from 'lucide-react';
-import { monitoringApi, ErrorEvent } from '../core/api/monitoring';
+import { monitoringApi, ErrorEvent, GroupedIssue } from '../core/api/monitoring';
 import { LoadingState, EmptyState } from '../components/shared';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -108,13 +109,18 @@ const TracebackModal: React.FC<{ event: ErrorEvent; onClose: () => void }> = ({ 
 
 // ─── Row ─────────────────────────────────────────────────────────────────────
 
-const ErrorRow: React.FC<{ event: ErrorEvent; onExpand: (e: ErrorEvent) => void }> = ({ event, onExpand }) => {
+const ErrorRow: React.FC<{
+  event: ErrorEvent;
+  onExpand: (e: ErrorEvent) => void;
+  onResolve: (e: ErrorEvent) => void;
+}> = ({ event, onExpand, onResolve }) => {
   const [expanded, setExpanded] = useState(false);
+  const isResolved = !!event.resolved_at;
 
   return (
     <>
       <tr
-        className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+        className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${isResolved ? 'opacity-50' : ''}`}
         onClick={() => setExpanded(x => !x)}
       >
         <td className="px-4 py-3 w-8 text-slate-400">
@@ -125,7 +131,7 @@ const ErrorRow: React.FC<{ event: ErrorEvent; onExpand: (e: ErrorEvent) => void 
             {event.status_code}
           </span>
         </td>
-        <td className="px-4 py-3 font-mono text-sm text-slate-700 dark:text-slate-300 max-w-[200px] truncate">
+        <td className={`px-4 py-3 font-mono text-sm text-slate-700 dark:text-slate-300 max-w-[200px] truncate ${isResolved ? 'line-through' : ''}`}>
           {event.error_type}
         </td>
         <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 max-w-[340px] truncate">
@@ -138,12 +144,25 @@ const ErrorRow: React.FC<{ event: ErrorEvent; onExpand: (e: ErrorEvent) => void 
           {relativeTime(event.created_at)}
         </td>
         <td className="px-4 py-3 text-right">
-          <button
-            className="text-xs text-blue-500 hover:underline"
-            onClick={e => { e.stopPropagation(); onExpand(event); }}
-          >
-            Traceback
-          </button>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              className={`text-xs font-medium px-2 py-0.5 rounded border transition-colors ${
+                isResolved
+                  ? 'border-green-300 dark:border-green-700 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+                  : 'border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+              }`}
+              title={isResolved ? 'Reopen' : 'Mark resolved'}
+              onClick={e => { e.stopPropagation(); onResolve(event); }}
+            >
+              {isResolved ? '↩ Reopen' : '✓ Resolve'}
+            </button>
+            <button
+              className="text-xs text-blue-500 hover:underline"
+              onClick={e => { e.stopPropagation(); onExpand(event); }}
+            >
+              Traceback
+            </button>
+          </div>
         </td>
       </tr>
       {expanded && (
@@ -152,6 +171,9 @@ const ErrorRow: React.FC<{ event: ErrorEvent; onExpand: (e: ErrorEvent) => void 
             <div className="grid grid-cols-2 gap-4 text-xs mb-3 text-slate-500 dark:text-slate-400">
               {event.job_id && <span><strong>Job ID:</strong> {event.job_id}</span>}
               <span><strong>Time:</strong> {new Date(event.created_at).toLocaleString()}</span>
+              {isResolved && event.resolved_at && (
+                <span className="text-green-600 dark:text-green-400"><strong>Resolved:</strong> {new Date(event.resolved_at).toLocaleString()}</span>
+              )}
             </div>
             {event.traceback ? (
               <pre className="text-xs font-mono bg-slate-900 text-slate-200 rounded-lg p-4 overflow-auto max-h-48 whitespace-pre-wrap leading-relaxed">
@@ -167,6 +189,38 @@ const ErrorRow: React.FC<{ event: ErrorEvent; onExpand: (e: ErrorEvent) => void 
   );
 };
 
+// ─── Grouped issue row ──────────────────────────────────────────────────────
+
+const GroupedIssueRow: React.FC<{ issue: GroupedIssue; onViewSample: (id: number) => void }> = ({ issue, onViewSample }) => (
+  <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+    <td className="px-4 py-3">
+      <span className="inline-flex items-center justify-center min-w-[1.75rem] h-6 px-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-bold">
+        {issue.count}
+      </span>
+    </td>
+    <td className="px-4 py-3 font-mono text-sm text-slate-700 dark:text-slate-300 max-w-[200px] truncate">
+      {issue.error_type}
+    </td>
+    <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400 font-mono max-w-[220px] truncate">
+      {issue.route || '—'}
+    </td>
+    <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
+      {relativeTime(issue.last_seen)}
+    </td>
+    <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
+      {relativeTime(issue.first_seen)}
+    </td>
+    <td className="px-4 py-3 text-right">
+      <button
+        className="text-xs text-blue-500 hover:underline"
+        onClick={() => onViewSample(issue.sample_id)}
+      >
+        View sample
+      </button>
+    </td>
+  </tr>
+);
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export const ErrorLogPage: React.FC = () => {
@@ -174,22 +228,32 @@ export const ErrorLogPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [timeRange, setTimeRange] = useState<TimeRange>('24h');
+  const [showResolved, setShowResolved] = useState(false);
   const [modal, setModal] = useState<ErrorEvent | null>(null);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [timeline, setTimeline] = useState<{ hour: string; count: number }[]>([]);
+  const [view, setView] = useState<'events' | 'issues'>('events');
+  const [grouped, setGrouped] = useState<GroupedIssue[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await monitoringApi.getErrors(500, sinceIso(timeRange));
+      const [data, tl, grp] = await Promise.all([
+        monitoringApi.getErrors(500, sinceIso(timeRange), showResolved),
+        monitoringApi.getTimeline(24),
+        monitoringApi.getGrouped(),
+      ]);
       setEvents(data);
+      setTimeline(tl);
+      setGrouped(grp);
     } catch {
       setError('Could not reach the backend. Is the server running?');
     } finally {
       setLoading(false);
     }
-  }, [timeRange]);
+  }, [timeRange, showResolved]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -202,6 +266,20 @@ export const ErrorLogPage: React.FC = () => {
     } finally {
       setClearing(false);
     }
+  };
+
+  const handleViewSample = async (id: number) => {
+    try {
+      const ev = await monitoringApi.getError(id);
+      setModal(ev);
+    } catch { /* silent */ }
+  };
+
+  const handleResolve = async (ev: ErrorEvent) => {
+    const updated = ev.resolved_at
+      ? await monitoringApi.unresolveError(ev.id)
+      : await monitoringApi.resolveError(ev.id);
+    setEvents(prev => prev.map(e => e.id === updated.id ? updated : e));
   };
 
   const filtered = events.filter(e =>
@@ -274,8 +352,55 @@ export const ErrorLogPage: React.FC = () => {
         </div>
       )}
 
+      {/* Timeline chart */}
+      {!loading && timeline.some(t => t.count > 0) && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-6">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-3">Errors per hour — last 24 h</p>
+          <ResponsiveContainer width="100%" height={80}>
+            <BarChart data={timeline} margin={{ top: 0, right: 0, left: -30, bottom: 0 }}>
+              <XAxis
+                dataKey="hour"
+                tickFormatter={h => h.slice(11, 16)}
+                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                interval="preserveStartEnd"
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <Tooltip
+                formatter={(v: number) => [v, 'errors']}
+                labelFormatter={l => `Hour starting ${l}`}
+                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+              />
+              <Bar dataKey="count" radius={[3, 3, 0, 0]}>
+                {timeline.map((t, i) => (
+                  <Cell key={i} fill={t.count > 0 ? '#ef4444' : '#e2e8f0'} fillOpacity={t.count > 0 ? 0.85 : 0.4} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+        {/* View toggle */}
+      <div className="flex items-center gap-1 mb-4">
+        {(['events', 'issues'] as const).map(v => (
+          <button
+            key={v}
+            onClick={() => setView(v)}
+            className={`px-4 py-1.5 text-sm font-medium rounded-lg border transition-colors capitalize ${
+              view === v
+                ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 border-slate-800 dark:border-slate-200'
+                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            {v === 'issues' ? `Issues (${grouped.length})` : `Events (${events.length})`}
+          </button>
+        ))}
+      </div>
+
       {/* Toolbar */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className={`flex items-center gap-3 mb-4 ${view === 'issues' ? 'hidden' : ''}`}>
         <div className="relative flex-1 max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -302,6 +427,17 @@ export const ErrorLogPage: React.FC = () => {
             </button>
           ))}
         </div>
+        {/* Show resolved toggle */}
+        <button
+          onClick={() => setShowResolved(v => !v)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium border transition-colors ${
+            showResolved
+              ? 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700'
+          }`}
+        >
+          {showResolved ? '✓ Showing resolved' : 'Show resolved'}
+        </button>
         {search && (
           <span className="text-xs text-slate-500 dark:text-slate-400">
             {filtered.length} / {events.length} shown
@@ -317,6 +453,34 @@ export const ErrorLogPage: React.FC = () => {
           <AlertTriangle size={16} />
           {error}
         </div>
+      ) : view === 'issues' ? (
+        grouped.length === 0 ? (
+          <EmptyState
+            icon={<Bug size={40} className="text-slate-300" />}
+            title="No open issues"
+            description="All errors have been resolved, or none have been recorded yet."
+          />
+        ) : (
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
+                  <th className="px-4 py-3">Count</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Route</th>
+                  <th className="px-4 py-3">Last seen</th>
+                  <th className="px-4 py-3">First seen</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {grouped.map((g, i) => (
+                  <GroupedIssueRow key={i} issue={g} onViewSample={handleViewSample} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<Bug size={40} className="text-slate-300" />}
@@ -339,7 +503,7 @@ export const ErrorLogPage: React.FC = () => {
             </thead>
             <tbody>
               {filtered.map(e => (
-                <ErrorRow key={e.id} event={e} onExpand={setModal} />
+                <ErrorRow key={e.id} event={e} onExpand={setModal} onResolve={handleResolve} />
               ))}
             </tbody>
           </table>

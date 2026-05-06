@@ -40,6 +40,12 @@ export interface EdgeDiff {
 export interface GraphDiff {
   nodes: Map<string, NodeDiff>;
   edges: Map<string, EdgeDiff>;
+  /** Baseline-id → candidate-id rename map. Populated when nodes
+   *  were paired by `step_type` because their ids differ between
+   *  runs (the engine config persists fresh uuids per run). The
+   *  diff view uses this so matched nodes share a position in the
+   *  unified layout. */
+  aliases: Map<string, string>;
   /** Quick counts for the tab badge / summary banner. */
   summary: {
     nodesAdded: number;
@@ -120,6 +126,19 @@ function edgeKey(e: Edge): string {
   return `${e.source}|${sh}->${e.target}|${th}`;
 }
 
+// Step-type accessor used for fallback matching when ids differ
+// between two graphs (e.g. each training run persists its nodes
+// with a fresh random `node_id`, so id-only matching would tag
+// every node "added"/"removed" even when the pipelines are
+// structurally identical).
+function stepTypeOf(node: Node | undefined): string | null {
+  if (!node) return null;
+  const data = (node.data ?? {}) as Record<string, unknown>;
+  if (typeof data.definitionType === 'string') return data.definitionType;
+  if (typeof data.label === 'string') return data.label;
+  return null;
+}
+
 export function diffGraphs(
   leftNodes: Node[],
   leftEdges: Edge[],
@@ -128,7 +147,51 @@ export function diffGraphs(
 ): GraphDiff {
   const leftById = new Map(leftNodes.map((n) => [n.id, n]));
   const rightById = new Map(rightNodes.map((n) => [n.id, n]));
-  const allNodeIds = new Set<string>([...leftById.keys(), ...rightById.keys()]);
+
+  // First pass: pair nodes by id (covers React-Flow snapshots where
+  // ids are stable across saves). What's left becomes the candidate
+  // pool for the step-type fallback below.
+  const matched: Array<{ left: Node; right: Node }> = [];
+  const unmatchedLeft: Node[] = [];
+  const unmatchedRight: Node[] = [];
+
+  for (const [id, l] of leftById) {
+    const r = rightById.get(id);
+    if (r) matched.push({ left: l, right: r });
+    else unmatchedLeft.push(l);
+  }
+  for (const [id, r] of rightById) {
+    if (!leftById.has(id)) unmatchedRight.push(r);
+  }
+
+  // Second pass: pair leftover nodes by `step_type` in declaration
+  // order. Each persisted run uses fresh per-node uuids; pairing the
+  // Nth "encoding" on the left with the Nth "encoding" on the right
+  // lets us still detect that "the encoding step changed param X".
+  const leftByType = new Map<string, Node[]>();
+  for (const n of unmatchedLeft) {
+    const t = stepTypeOf(n);
+    if (!t) continue;
+    if (!leftByType.has(t)) leftByType.set(t, []);
+    leftByType.get(t)!.push(n);
+  }
+  const stillUnmatchedRight: Node[] = [];
+  for (const r of unmatchedRight) {
+    const t = stepTypeOf(r);
+    const bucket = t ? leftByType.get(t) : undefined;
+    const l = bucket?.shift();
+    if (l) matched.push({ left: l, right: r });
+    else stillUnmatchedRight.push(r);
+  }
+  // Anything still in `leftByType` is a real removal.
+  const stillUnmatchedLeft: Node[] = [];
+  for (const bucket of leftByType.values()) stillUnmatchedLeft.push(...bucket);
+  // ...plus left nodes that never had a step_type (can't fall back).
+  for (const n of unmatchedLeft) {
+    if (!stepTypeOf(n) && !matched.some((m) => m.left === n)) {
+      stillUnmatchedLeft.push(n);
+    }
+  }
 
   const nodes = new Map<string, NodeDiff>();
   let nodesAdded = 0;
@@ -136,59 +199,68 @@ export function diffGraphs(
   let nodesModified = 0;
   let nodesUnchanged = 0;
 
-  for (const id of allNodeIds) {
-    const a = leftById.get(id);
-    const b = rightById.get(id);
-    if (a && !b) {
-      nodes.set(id, {
-        id,
-        status: 'removed',
-        changedKeys: [],
-        changeDescriptions: [],
-        label: nodeLabel(a),
-      });
-      nodesRemoved += 1;
-      continue;
-    }
-    if (!a && b) {
-      nodes.set(id, {
-        id,
-        status: 'added',
-        changedKeys: [],
-        changeDescriptions: [],
-        label: nodeLabel(b),
-      });
-      nodesAdded += 1;
-      continue;
-    }
-    if (a && b) {
-      const { changedKeys, descriptions } = diffNodeData(
-        (a.data ?? {}) as Record<string, unknown>,
-        (b.data ?? {}) as Record<string, unknown>,
-      );
-      if (changedKeys.length === 0) {
-        nodes.set(id, {
-          id,
-          status: 'unchanged',
-          changedKeys: [],
-          changeDescriptions: [],
-          label: nodeLabel(b),
-        });
-        nodesUnchanged += 1;
-      } else {
-        nodes.set(id, {
-          id,
-          status: 'modified',
-          changedKeys,
-          changeDescriptions: descriptions,
-          label: nodeLabel(b),
-        });
-        nodesModified += 1;
-      }
-    }
+  // Helper: register the diff entry under both the left and right
+  // ids so PipelineDiffView's per-side lookup (`diff.nodes.get(n.id)`)
+  // works even when the two sides have different ids for the same
+  // structural step.
+  const registerPair = (left: Node, right: Node) => {
+    const { changedKeys, descriptions } = diffNodeData(
+      (left.data ?? {}) as Record<string, unknown>,
+      (right.data ?? {}) as Record<string, unknown>,
+    );
+    const status: NodeDiffStatus = changedKeys.length === 0 ? 'unchanged' : 'modified';
+    const entry: NodeDiff = {
+      id: right.id,
+      status,
+      changedKeys,
+      changeDescriptions: descriptions,
+      label: nodeLabel(right),
+    };
+    nodes.set(right.id, entry);
+    if (left.id !== right.id) nodes.set(left.id, entry);
+    if (status === 'unchanged') nodesUnchanged += 1;
+    else nodesModified += 1;
+  };
+
+  for (const { left, right } of matched) registerPair(left, right);
+  for (const l of stillUnmatchedLeft) {
+    nodes.set(l.id, {
+      id: l.id,
+      status: 'removed',
+      changedKeys: [],
+      changeDescriptions: [],
+      label: nodeLabel(l),
+    });
+    nodesRemoved += 1;
+  }
+  for (const r of stillUnmatchedRight) {
+    nodes.set(r.id, {
+      id: r.id,
+      status: 'added',
+      changedKeys: [],
+      changeDescriptions: [],
+      label: nodeLabel(r),
+    });
+    nodesAdded += 1;
   }
 
-  const leftEdgesByKey = new Map(leftEdges.map((e) => [edgeKey(e), e]));
+  // Build an id-rename map so edge matching can also bridge the
+  // baseline ids onto candidate ids. Without this every edge would
+  // be flagged added/removed for the same reason node ids drift.
+  const leftIdToRightId = new Map<string, string>();
+  for (const { left, right } of matched) {
+    if (left.id !== right.id) leftIdToRightId.set(left.id, right.id);
+  }
+
+  // Translate baseline edge endpoints onto candidate ids so the
+  // edge keys line up across runs that use different node uuids.
+  const remap = (id: string) => leftIdToRightId.get(id) ?? id;
+  const leftEdgesByKey = new Map(
+    leftEdges.map((e) => [
+      edgeKey({ ...e, source: remap(e.source), target: remap(e.target) } as Edge),
+      e,
+    ]),
+  );
   const rightEdgesByKey = new Map(rightEdges.map((e) => [edgeKey(e), e]));
   const allEdgeKeys = new Set<string>([...leftEdgesByKey.keys(), ...rightEdgesByKey.keys()]);
 
@@ -221,6 +293,7 @@ export function diffGraphs(
   return {
     nodes,
     edges,
+    aliases: leftIdToRightId,
     summary: {
       nodesAdded,
       nodesRemoved,

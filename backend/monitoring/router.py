@@ -8,7 +8,7 @@ import pandas as pd
 import io
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -448,16 +448,21 @@ async def get_drift_status(
 async def list_error_events(
     limit: int = 100,
     since: Optional[str] = None,
+    show_resolved: bool = False,
     db: AsyncSession = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Return the most recent error events (newest first, max 500).
 
-    Pass `since` as an ISO-8601 datetime string to filter to events after that point.
+    By default only unresolved events are returned. Pass ``show_resolved=true``
+    to include resolved/dismissed events. Pass ``since`` as an ISO-8601 datetime
+    string to filter to events after that point.
     """
     from sqlalchemy import and_
 
     limit = min(max(1, limit), 500)
     filters = []
+    if not show_resolved:
+        filters.append(ErrorEvent.resolved_at.is_(None))
     if since:
         try:
             since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
@@ -479,10 +484,14 @@ async def list_error_events(
 async def get_error_count(
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Return total unresolved error count — used for the sidebar badge."""
+    """Return unresolved error count — used for the sidebar badge."""
     from sqlalchemy import func
 
-    stmt = select(func.count()).select_from(ErrorEvent)
+    stmt = (
+        select(func.count())
+        .select_from(ErrorEvent)
+        .where(ErrorEvent.resolved_at.is_(None))
+    )
     result = await db.execute(stmt)
     count = result.scalar() or 0
     return {"count": count}
@@ -498,6 +507,114 @@ async def clear_error_events(
     result = await db.execute(delete(ErrorEvent))
     await db.commit()
     return {"deleted": result.rowcount}
+
+
+@router.get("/errors/grouped")
+async def get_errors_grouped(
+    db: AsyncSession = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """Aggregate error events by (error_type, route) — unresolved only."""
+    from sqlalchemy import func as sa_func
+
+    stmt = (
+        select(
+            ErrorEvent.error_type,
+            ErrorEvent.route,
+            sa_func.count(ErrorEvent.id).label("count"),
+            sa_func.max(ErrorEvent.created_at).label("last_seen"),
+            sa_func.min(ErrorEvent.created_at).label("first_seen"),
+            sa_func.min(ErrorEvent.id).label("sample_id"),
+        )
+        .where(ErrorEvent.resolved_at.is_(None))
+        .group_by(ErrorEvent.error_type, ErrorEvent.route)
+        .order_by(sa_func.count(ErrorEvent.id).desc())
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+    return [
+        {
+            "error_type": r.error_type,
+            "route": r.route,
+            "count": r.count,
+            "last_seen": r.last_seen.isoformat() if r.last_seen else None,
+            "first_seen": r.first_seen.isoformat() if r.first_seen else None,
+            "sample_id": r.sample_id,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/errors/timeline")
+async def get_error_timeline(
+    hours: int = 24,
+    db: AsyncSession = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """Return error count bucketed by hour for the last N hours.
+
+    Returns a list of ``{ hour: <ISO string>, count: N }`` entries,
+    one per hour slot, oldest first. Slots with zero events are included
+    so the chart always has a complete x-axis.
+    """
+    hours = min(max(1, hours), 168)  # cap at 7 days
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=hours)
+
+    stmt = (
+        select(ErrorEvent.created_at)
+        .where(ErrorEvent.created_at >= cutoff)
+    )
+    result = await db.execute(stmt)
+    timestamps = [row[0] for row in result.all()]
+
+    # Build a zero-filled bucket dict: { slot_iso: count }
+    buckets: Dict[str, int] = {}
+    for i in range(hours):
+        slot = (cutoff + timedelta(hours=i)).replace(minute=0, second=0, microsecond=0)
+        buckets[slot.strftime("%Y-%m-%dT%H:00")] = 0
+
+    for ts in timestamps:
+        if ts is None:
+            continue
+        # Normalise to UTC-aware
+        if hasattr(ts, "tzinfo") and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        slot_key = ts.strftime("%Y-%m-%dT%H:00")
+        if slot_key in buckets:
+            buckets[slot_key] += 1
+
+    return [{"hour": h, "count": c} for h, c in sorted(buckets.items())]
+
+
+@router.patch("/errors/{error_id}/resolve")
+async def resolve_error_event(
+    error_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Mark an error event as resolved/dismissed."""
+    stmt = select(ErrorEvent).where(ErrorEvent.id == error_id)
+    result = await db.execute(stmt)
+    event = result.scalar_one_or_none()
+    if event is None:
+        raise HTTPException(status_code=404, detail=f"ErrorEvent {error_id} not found")
+    event.resolved_at = datetime.now(timezone.utc)
+    await db.commit()
+    return event.to_dict()
+
+
+@router.patch("/errors/{error_id}/unresolve")
+async def unresolve_error_event(
+    error_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Clear the resolved flag on an error event."""
+    stmt = select(ErrorEvent).where(ErrorEvent.id == error_id)
+    result = await db.execute(stmt)
+    event = result.scalar_one_or_none()
+    if event is None:
+        raise HTTPException(status_code=404, detail=f"ErrorEvent {error_id} not found")
+    event.resolved_at = None
+    await db.commit()
+    return event.to_dict()
 
 
 @router.get("/errors/{error_id}")

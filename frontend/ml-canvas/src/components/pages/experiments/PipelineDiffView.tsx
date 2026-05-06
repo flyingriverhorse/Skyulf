@@ -252,7 +252,13 @@ function engineGraphToSide(rawNodes: unknown[]): SideGraph {
     id: n.node_id,
     position: { x: 0, y: 0 }, // overwritten by layoutUnified
     data: {
-      label: n.node_id,
+      // Friendly human label = step type (e.g. "outlier_handling").
+      // The raw node_id stays available as `n.id` and is shown as
+      // the sub-label / mono badge by the diff card. Using the
+      // step_type here also makes the Changes panel readable —
+      // otherwise every change row prints a uuid instead of a
+      // recognisable step name.
+      label: n.step_type ?? n.node_id,
       definitionType: n.step_type,
       // params land here so diffGraphs picks them up as the
       // user-meaningful config payload.
@@ -285,16 +291,24 @@ const ROW_GAP = 36;
 function layoutUnified(
   left: SideGraph,
   right: SideGraph,
+  aliases: Map<string, string>,
 ): { positions: Map<string, { x: number; y: number }>; width: number; height: number } {
+  // Canonicalise every id through the alias map so a baseline node
+  // and its step-type-matched candidate node end up at one shared
+  // position. Without this, runs that persist nodes with fresh
+  // uuids would never line up vertically across the two viewers.
+  const canon = (id: string) => aliases.get(id) ?? id;
   const allNodeIds = new Set<string>();
-  left.nodes.forEach((n) => allNodeIds.add(n.id));
-  right.nodes.forEach((n) => allNodeIds.add(n.id));
+  left.nodes.forEach((n) => allNodeIds.add(canon(n.id)));
+  right.nodes.forEach((n) => allNodeIds.add(canon(n.id)));
 
   const inputs = new Map<string, Set<string>>();
   allNodeIds.forEach((id) => inputs.set(id, new Set()));
   [...left.edges, ...right.edges].forEach((e) => {
-    if (allNodeIds.has(e.source) && allNodeIds.has(e.target)) {
-      inputs.get(e.target)?.add(e.source);
+    const s = canon(e.source);
+    const t = canon(e.target);
+    if (allNodeIds.has(s) && allNodeIds.has(t)) {
+      inputs.get(t)?.add(s);
     }
   });
 
@@ -347,9 +361,17 @@ function layoutUnified(
   };
 }
 
-function applyLayout(side: SideGraph, positions: Map<string, { x: number; y: number }>): SideGraph {
+function applyLayout(
+  side: SideGraph,
+  positions: Map<string, { x: number; y: number }>,
+  aliases: Map<string, string>,
+): SideGraph {
+  const canon = (id: string) => aliases.get(id) ?? id;
   return {
-    nodes: side.nodes.map((n) => ({ ...n, position: positions.get(n.id) ?? n.position })),
+    nodes: side.nodes.map((n) => ({
+      ...n,
+      position: positions.get(canon(n.id)) ?? n.position,
+    })),
     edges: side.edges,
   };
 }
@@ -412,10 +434,10 @@ export const PipelineDiffView: React.FC<Props> = ({ jobs }) => {
 
   const styled = useMemo(() => {
     if (!leftGraph || !rightGraph || !diff) return null;
-    const { positions } = layoutUnified(leftGraph, rightGraph);
+    const { positions } = layoutUnified(leftGraph, rightGraph, diff.aliases);
     return {
-      left: applyLayout(applyDiffStylingToSide(leftGraph, diff, 'left'), positions),
-      right: applyLayout(applyDiffStylingToSide(rightGraph, diff, 'right'), positions),
+      left: applyLayout(applyDiffStylingToSide(leftGraph, diff, 'left'), positions, diff.aliases),
+      right: applyLayout(applyDiffStylingToSide(rightGraph, diff, 'right'), positions, diff.aliases),
     };
   }, [leftGraph, rightGraph, diff]);
 
