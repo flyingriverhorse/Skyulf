@@ -17,4 +17,11 @@ celery_app.conf.update(
     accept_content=["json"],
     result_serializer="json",
     timezone="UTC",
+    beat_schedule={
+        # Delete error events older than ERROR_LOG_RETENTION_DAYS once per day.
+        "cleanup-error-events-daily": {
+            "task": "monitoring.cleanup_error_events",
+            "schedule": 86400,  # seconds — every 24 hours
+        },
+    },
 )

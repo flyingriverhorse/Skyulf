@@ -29,6 +29,7 @@ from backend.data_ingestion.router import router as data_ingestion_router
 from backend.data_ingestion.router import sources_router as data_sources_router
 from backend.database.engine import close_db, create_tables, init_db
 from backend.exceptions.handlers import (
+    _record_error,
     generic_http_exception_handler,
     method_not_allowed_exception_handler,
     not_found_exception_handler,
@@ -396,9 +397,20 @@ def _add_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
         """Handle unexpected Python exceptions and convert them to 500 errors."""
-        logger.error(f"Unexpected error: {exc}", exc_info=True)
-        # Convert to HTTPException for consistent handling
-        http_exc = HTTPException(status_code=500, detail=f"Internal server error: {str(exc)}")
+        import traceback as _tb
+        real_type = type(exc).__name__
+        real_message = str(exc)
+        real_traceback = _tb.format_exc()
+        logger.error(f"Unexpected error ({real_type}): {real_message}", exc_info=True)
+        # Record with the real exception metadata before wrapping
+        await _record_error(
+            route=str(request.url.path),
+            error_type=real_type,
+            message=real_message,
+            traceback=real_traceback,
+            status_code=500,
+        )
+        http_exc = HTTPException(status_code=500, detail=f"Internal server error: {real_message}")
         return await generic_http_exception_handler(request, http_exc)
 
 
