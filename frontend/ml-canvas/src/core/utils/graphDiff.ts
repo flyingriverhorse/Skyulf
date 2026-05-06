@@ -52,6 +52,10 @@ export interface GraphDiff {
     nodesRemoved: number;
     nodesModified: number;
     nodesUnchanged: number;
+    /** Pairs that matched by `step_type` rather than id (= the
+     *  `aliases` map's size). Surfaces the otherwise-invisible
+     *  fallback so users know matched nodes had drifting ids. */
+    nodesRenamed: number;
     edgesAdded: number;
     edgesRemoved: number;
     edgesUnchanged: number;
@@ -299,6 +303,7 @@ export function diffGraphs(
       nodesRemoved,
       nodesModified,
       nodesUnchanged,
+      nodesRenamed: leftIdToRightId.size,
       edgesAdded,
       edgesRemoved,
       edgesUnchanged,

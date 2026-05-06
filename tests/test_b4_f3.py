@@ -227,16 +227,29 @@ def client_with_celery():
 
     with (
         patch.object(settings, "USE_CELERY", True),
-        # Patch the name in api.py's namespace so the route handler sees the mock
-        patch("backend.ml_pipeline.api.run_pipeline_batch_task", mock_batch_task),
-        patch("backend.ml_pipeline.api.JobManager.find_active_job", return_value=None),
+        # Patch the names in the run_pipeline sub-router's namespace so the
+        # route handler sees the mocks. (E9 phase 2 moved the handler out of
+        # api.py into backend.ml_pipeline._internal._routers.run_pipeline.)
         patch(
-            "backend.ml_pipeline.api.JobManager.create_job",
+            "backend.ml_pipeline._internal._routers.run_pipeline.run_pipeline_batch_task",
+            mock_batch_task,
+        ),
+        patch(
+            "backend.ml_pipeline._internal._routers.run_pipeline.JobManager.find_active_job",
+            return_value=None,
+        ),
+        patch(
+            "backend.ml_pipeline._internal._routers.run_pipeline.JobManager.create_job",
             return_value="test-job-id",
         ),
-        patch("backend.ml_pipeline.api.JobManager.attach_celery_task_id"),
-        patch("backend.ml_pipeline.api.publish_job_event"),
-        patch("backend.ml_pipeline.api.resolve_pipeline_nodes", return_value=None),
+        patch(
+            "backend.ml_pipeline._internal._routers.run_pipeline.JobManager.attach_celery_task_id"
+        ),
+        patch("backend.ml_pipeline._internal._routers.run_pipeline.publish_job_event"),
+        patch(
+            "backend.ml_pipeline._internal._routers.run_pipeline.resolve_pipeline_nodes",
+            return_value=None,
+        ),
     ):
         with TestClient(app, base_url="http://localhost") as c:
             yield c, mock_batch_task.delay

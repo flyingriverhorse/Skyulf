@@ -486,18 +486,27 @@ export const PipelineDiffView: React.FC<Props> = ({ jobs }) => {
       <div className="rounded-md border bg-card p-4">
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className="font-medium">Diff summary:</span>
-          <span className="inline-flex items-center gap-1.5">
-            <StatusDot status="added" /> {summary.nodesAdded} added
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <StatusDot status="removed" /> {summary.nodesRemoved} removed
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <StatusDot status="modified" /> {summary.nodesModified} modified
-          </span>
+          {summary.nodesAdded > 0 && (
+            <span className="inline-flex items-center gap-1.5">
+              <StatusDot status="added" /> {summary.nodesAdded} added
+            </span>
+          )}
+          {summary.nodesRemoved > 0 && (
+            <span className="inline-flex items-center gap-1.5">
+              <StatusDot status="removed" /> {summary.nodesRemoved} removed
+            </span>
+          )}
+          {summary.nodesModified > 0 && (
+            <span className="inline-flex items-center gap-1.5">
+              <StatusDot status="modified" /> {summary.nodesModified} modified
+            </span>
+          )}
           <span className="text-muted-foreground">
-            {summary.nodesUnchanged} unchanged · edges {summary.edgesAdded}+ /{' '}
-            {summary.edgesRemoved}−
+            {summary.nodesUnchanged} unchanged
+            {summary.nodesRenamed > 0 && ` (${summary.nodesRenamed} renamed across runs)`}
+            {(summary.edgesAdded > 0 || summary.edgesRemoved > 0) && (
+              <> · edges {summary.edgesAdded}+ / {summary.edgesRemoved}−</>
+            )}
           </span>
         </div>
         {modifiedNodes.length === 0 && (

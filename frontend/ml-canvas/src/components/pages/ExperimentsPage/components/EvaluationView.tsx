@@ -70,20 +70,31 @@ export const EvaluationView: React.FC<Props> = ({
     <div className="space-y-6">
       {/* Job Selector if multiple */}
       {selectedJobIds.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {selectedJobIds.map(id => (
-            <button
-              key={id}
-              onClick={() => { void fetchEvaluationData(id); }}
-              className={`px-3 py-1 text-xs font-mono rounded border whitespace-nowrap ${
-                evalJobId === id
-                  ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300'
-                  : 'bg-white border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400'
-              }`}
-            >
-              {id}
-            </button>
-          ))}
+        <div
+          className="flex gap-2 overflow-x-auto pb-2"
+          role="tablist"
+          aria-label="Select run for evaluation"
+        >
+          {selectedJobIds.map(id => {
+            const isActive = evalJobId === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                title={isActive ? `Active run: ${id}` : `Switch to run ${id}`}
+                onClick={() => { void fetchEvaluationData(id); }}
+                className={`px-3 py-1 text-xs font-mono rounded border whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                  isActive
+                    ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300'
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700'
+                }`}
+              >
+                {id.slice(0, 8)}
+              </button>
+            );
+          })}
         </div>
       )}
 
