@@ -16,7 +16,7 @@ from sqlalchemy import select
 logger = logging.getLogger(__name__)
 from backend.config import get_settings
 from backend.dependencies import get_db
-from backend.database.models import BasicTrainingJob, AdvancedTuningJob, DriftCheckResult
+from backend.database.models import BasicTrainingJob, AdvancedTuningJob, DriftCheckResult, ErrorEvent
 from backend.ml_pipeline._execution.graph_utils import extract_job_details
 from skyulf.profiling.drift import DriftCalculator
 
@@ -437,3 +437,79 @@ async def get_drift_status(
         drifted_jobs=drifted_count,
         latest_check=latest_check,
     )
+
+
+# ---------------------------------------------------------------------------
+# In-house error tracker endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/errors")
+async def list_error_events(
+    limit: int = 100,
+    since: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """Return the most recent error events (newest first, max 500).
+
+    Pass `since` as an ISO-8601 datetime string to filter to events after that point.
+    """
+    from sqlalchemy import and_
+
+    limit = min(max(1, limit), 500)
+    filters = []
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+            filters.append(ErrorEvent.created_at >= since_dt)
+        except ValueError:
+            pass  # ignore malformed since param
+
+    stmt = (
+        select(ErrorEvent)
+        .where(and_(*filters) if filters else True)
+        .order_by(ErrorEvent.created_at.desc())
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    return [e.to_dict() for e in result.scalars().all()]
+
+
+@router.get("/errors/count")
+async def get_error_count(
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Return total unresolved error count — used for the sidebar badge."""
+    from sqlalchemy import func
+
+    stmt = select(func.count()).select_from(ErrorEvent)
+    result = await db.execute(stmt)
+    count = result.scalar() or 0
+    return {"count": count}
+
+
+@router.delete("/errors")
+async def clear_error_events(
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Delete all stored error events (admin cleanup)."""
+    from sqlalchemy import delete
+
+    result = await db.execute(delete(ErrorEvent))
+    await db.commit()
+    return {"deleted": result.rowcount}
+
+
+@router.get("/errors/{error_id}")
+async def get_error_event(
+    error_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Return full detail for a single error event, including full traceback."""
+    stmt = select(ErrorEvent).where(ErrorEvent.id == error_id)
+    result = await db.execute(stmt)
+    event = result.scalar_one_or_none()
+    if event is None:
+        raise HTTPException(status_code=404, detail=f"ErrorEvent {error_id} not found")
+    return event.to_dict()
+

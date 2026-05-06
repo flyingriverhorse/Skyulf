@@ -454,6 +454,38 @@ class DriftCheckResult(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
 
 
+class ErrorEvent(Base):
+    """Lightweight in-house error tracker — stores unhandled 500s and pipeline crashes."""
+
+    __tablename__ = "error_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    # HTTP route that produced the error (empty string for Celery/background tasks)
+    route: Mapped[str] = mapped_column(String(500), nullable=False, default="", index=True)
+    # Short exception class name, e.g. "PipelineExecutionException"
+    error_type: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    # Full Python traceback
+    traceback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Optional pipeline job_id when the error originates from a pipeline run
+    job_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    # HTTP status code (0 for background task errors)
+    status_code: Mapped[int] = mapped_column(Integer, nullable=False, default=500)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False, index=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "route": self.route,
+            "error_type": self.error_type,
+            "message": self.message,
+            "traceback": self.traceback,
+            "job_id": self.job_id,
+            "status_code": self.status_code,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 # Unused tables removed: DataIngestionJob, SystemLog
 # These tables were not used anywhere in the application and caused schema differences
 

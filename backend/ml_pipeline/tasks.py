@@ -1,4 +1,5 @@
 import logging
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, nullcontext
 from typing import Generator, List, Tuple
@@ -45,6 +46,10 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict) -> None:
         session = get_db_session()
         try:
             execute_pipeline(job_id, pipeline_config_dict, session)
+        except Exception:
+            from backend.exceptions.handlers import record_pipeline_error
+            record_pipeline_error(job_id, traceback.format_exc().splitlines()[-1], traceback.format_exc())
+            raise
         finally:
             session.close()
 
@@ -62,6 +67,10 @@ def run_pipeline_batch_task(branches: List[Tuple[str, dict]]) -> None:
             session = get_db_session()
             try:
                 execute_pipeline(job_id, config_dict, session)
+            except Exception:
+                from backend.exceptions.handlers import record_pipeline_error
+                record_pipeline_error(job_id, traceback.format_exc().splitlines()[-1], traceback.format_exc())
+                raise
             finally:
                 session.close()
 
