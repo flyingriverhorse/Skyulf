@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard';
 import { DataSources } from './pages/DataSources';
 import { CanvasPage } from './pages/CanvasPage';
 import { JobsPage } from './pages/Jobs';
+import { ErrorLogPage } from './pages/ErrorLogPage';
 import { PageSkeleton, ErrorBoundary } from './components/shared';
 
 // Heavy pages are code-split. EDA + DataDrift drag in Plotly (~9.7 MB raw).
@@ -67,6 +68,7 @@ function App() {
               </LazyRoute>
             }
           />
+          <Route path="errors" element={<ErrorLogPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

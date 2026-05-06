@@ -74,6 +74,17 @@ export interface DriftStatusSummary {
     latest_check?: string;
 }
 
+export interface ErrorEvent {
+    id: number;
+    route: string;
+    error_type: string;
+    message: string;
+    traceback?: string;
+    job_id?: string;
+    status_code: number;
+    created_at: string;
+}
+
 export const monitoringApi = {
     getJobs: async (): Promise<DriftJobOption[]> => {
         const response = await apiClient.get<DriftJobOption[]>('/monitoring/jobs');
@@ -111,6 +122,28 @@ export const monitoringApi = {
 
     getDriftStatus: async (): Promise<DriftStatusSummary> => {
         const response = await apiClient.get<DriftStatusSummary>('/monitoring/drift/status');
+        return response.data;
+    },
+
+    getErrors: async (limit = 100, since?: string): Promise<ErrorEvent[]> => {
+        const params = new URLSearchParams({ limit: String(limit) });
+        if (since) params.set('since', since);
+        const response = await apiClient.get<ErrorEvent[]>(`/monitoring/errors?${params}`);
+        return response.data;
+    },
+
+    getUnresolvedCount: async (): Promise<number> => {
+        const response = await apiClient.get<{ count: number }>('/monitoring/errors/count');
+        return response.data.count;
+    },
+
+    getError: async (id: number): Promise<ErrorEvent> => {
+        const response = await apiClient.get<ErrorEvent>(`/monitoring/errors/${id}`);
+        return response.data;
+    },
+
+    clearErrors: async (): Promise<{ deleted: number }> => {
+        const response = await apiClient.delete<{ deleted: number }>('/monitoring/errors');
         return response.data;
     },
 };
