@@ -627,3 +627,114 @@ async def get_error_event(
     if event is None:
         raise HTTPException(status_code=404, detail=f"ErrorEvent {error_id} not found")
     return event.to_dict()
+
+
+# ---------------------------------------------------------------------------
+# Workspace-wide slow-node telemetry
+# ---------------------------------------------------------------------------
+# Reads `metrics.node_timings` (written by JobStrategy.handle_success) off
+# every completed job in the lookback window and aggregates per `step_type`.
+# Surfaces the same numbers the engine already collects, no extra
+# instrumentation required. Legacy jobs without `node_timings` are simply
+# skipped — the page just shows fewer entries until enough new runs land.
+
+
+class SlowNodeAggregate(BaseModel):
+    step_type: str
+    count: int
+    total_seconds: float
+    avg_seconds: float
+    p95_seconds: float
+    max_seconds: float
+    sample_node_id: Optional[str] = None
+
+
+class SlowNodesResponse(BaseModel):
+    days: int
+    total_jobs_scanned: int
+    total_node_runs: int
+    aggregates: List[SlowNodeAggregate]
+
+
+def _percentile(values: List[float], pct: float) -> float:
+    """Cheap nearest-rank percentile — avoids pulling numpy into the route."""
+    if not values:
+        return 0.0
+    s = sorted(values)
+    if len(s) == 1:
+        return s[0]
+    rank = max(0, min(len(s) - 1, int(round((pct / 100.0) * (len(s) - 1)))))
+    return s[rank]
+
+
+@router.get("/slow-nodes", response_model=SlowNodesResponse)
+async def list_slow_nodes(
+    days: int = 7,
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+) -> SlowNodesResponse:
+    """Aggregate per-step execution time across completed jobs in the window.
+
+    Returns the top `limit` step_types sorted by total cumulative seconds —
+    the most useful "where to invest in optimisation" signal.
+    """
+    days = max(1, min(days, 90))
+    limit = max(1, min(limit, 50))
+
+    cutoff = datetime.now() - timedelta(days=days)
+
+    by_step: Dict[str, List[float]] = {}
+    sample_node: Dict[str, str] = {}
+    jobs_scanned = 0
+    runs_seen = 0
+
+    # Scan both job tables — same metrics shape, different rows.
+    for model in (BasicTrainingJob, AdvancedTuningJob):
+        stmt = select(model).where(
+            model.status == "completed",
+            model.finished_at.isnot(None),
+            model.finished_at >= cutoff,
+        )
+        result = await db.execute(stmt)
+        for job in result.scalars().all():
+            jobs_scanned += 1
+            metrics = job.metrics or {}
+            timings = metrics.get("node_timings") if isinstance(metrics, dict) else None
+            if not isinstance(timings, list):
+                continue
+            for entry in timings:
+                if not isinstance(entry, dict):
+                    continue
+                step = str(entry.get("step_type") or "unknown")
+                try:
+                    secs = float(entry.get("execution_time") or 0.0)
+                except (TypeError, ValueError):
+                    continue
+                if secs <= 0:
+                    continue
+                by_step.setdefault(step, []).append(secs)
+                sample_node.setdefault(step, str(entry.get("node_id") or ""))
+                runs_seen += 1
+
+    aggregates: List[SlowNodeAggregate] = []
+    for step, values in by_step.items():
+        total = sum(values)
+        aggregates.append(
+            SlowNodeAggregate(
+                step_type=step,
+                count=len(values),
+                total_seconds=round(total, 4),
+                avg_seconds=round(total / len(values), 4),
+                p95_seconds=round(_percentile(values, 95), 4),
+                max_seconds=round(max(values), 4),
+                sample_node_id=sample_node.get(step) or None,
+            )
+        )
+
+    aggregates.sort(key=lambda a: a.total_seconds, reverse=True)
+    return SlowNodesResponse(
+        days=days,
+        total_jobs_scanned=jobs_scanned,
+        total_node_runs=runs_seen,
+        aggregates=aggregates[:limit],
+    )

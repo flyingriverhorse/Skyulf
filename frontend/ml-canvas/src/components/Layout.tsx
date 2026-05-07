@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive, BarChart2, Activity, TrendingUp, Bug } from 'lucide-react';
+import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive, BarChart2, Activity, TrendingUp, Bug, Timer } from 'lucide-react';
 import { monitoringApi } from '../core/api/monitoring';
 
 export const Layout: React.FC = () => {
@@ -92,6 +92,9 @@ export const Layout: React.FC = () => {
           </NavLink>
           <NavLink to="/errors" active={isActive('/errors')} icon={<Bug size={20} />} collapsed={isCollapsed} badge={errorAlert}>
             Error Log
+          </NavLink>
+          <NavLink to="/slow-nodes" active={isActive('/slow-nodes')} icon={<Timer size={20} />} collapsed={isCollapsed}>
+            Slow Nodes
           </NavLink>
         </nav>
 
