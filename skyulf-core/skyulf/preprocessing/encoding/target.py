@@ -1,4 +1,5 @@
 """Target Encoder node (Calculator + Applier)."""
+
 import logging
 from typing import Any, Dict, Tuple, Union
 
@@ -48,9 +49,7 @@ class TargetEncoderApplier(BaseApplier):
                 X_np, _ = SklearnBridge.to_sklearn(X_subset)
                 encoded_array = encoder.transform(X_np)
 
-                new_cols = [
-                    pl.Series(col, encoded_array[:, i]) for i, col in enumerate(valid_cols)
-                ]
+                new_cols = [pl.Series(col, encoded_array[:, i]) for i, col in enumerate(valid_cols)]
                 X_out = X_pl.with_columns(new_cols)
                 return pack_pipeline_output(X_out, y, is_tuple)
             except Exception as e:

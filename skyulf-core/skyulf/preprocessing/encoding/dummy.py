@@ -1,4 +1,5 @@
 """Dummy Encoder node (Calculator + Applier)."""
+
 import logging
 from typing import Any, Dict, Tuple, Union
 
@@ -50,9 +51,7 @@ class DummyEncoderApplier(BaseApplier):
                     cats_to_encode = cats_to_encode[1:]
 
                 dummy_exprs = [
-                    (pl.col(col).cast(pl.Utf8) == str(cat))
-                    .cast(pl.Int8)
-                    .alias(f"{col}_{cat}")
+                    (pl.col(col).cast(pl.Utf8) == str(cat)).cast(pl.Int8).alias(f"{col}_{cat}")
                     for cat in cats_to_encode
                 ]
                 X_out = X_out.with_columns(dummy_exprs)
@@ -104,9 +103,7 @@ class DummyEncoderCalculator(BaseCalculator):
 
             X_pl: Any = X
             for col in cols:
-                cats = (
-                    X_pl.select(pl.col(col).cast(pl.Utf8).unique().sort()).to_series().to_list()
-                )
+                cats = X_pl.select(pl.col(col).cast(pl.Utf8).unique().sort()).to_series().to_list()
                 categories[col] = [str(c) for c in cats if c is not None]
         else:
             for col in cols:

@@ -149,9 +149,7 @@ async def preview_pipeline(  # noqa: C901
                 )
 
             paired_subs = [
-                (orig, _strip(orig))
-                for orig in training_subs
-                if not _is_data_preview_sub(orig)
+                (orig, _strip(orig)) for orig in training_subs if not _is_data_preview_sub(orig)
             ]
 
             # Also include preview-only branches (data leaves that don't feed
@@ -178,9 +176,7 @@ async def preview_pipeline(  # noqa: C901
         else:
             preview_subs = partition_for_preview(pipeline_config)
             # No training → no separate label source; reuse the runnable sub.
-            paired_subs = [
-                (sub, sub) for sub in preview_subs if not _is_data_preview_sub(sub)
-            ]
+            paired_subs = [(sub, sub) for sub in preview_subs if not _is_data_preview_sub(sub)]
 
         try:
             catalog = create_catalog_from_options(

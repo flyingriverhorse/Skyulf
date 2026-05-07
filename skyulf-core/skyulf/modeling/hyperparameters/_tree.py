@@ -436,8 +436,7 @@ HIST_GRADIENT_BOOSTING_PARAMS = [
         min=1,
         max=20,
         description=(
-            "Maximum depth per tree. None = unlimited "
-            "(max_leaf_nodes is the effective limit)."
+            "Maximum depth per tree. None = unlimited " "(max_leaf_nodes is the effective limit)."
         ),
     ),
     HyperparameterField(

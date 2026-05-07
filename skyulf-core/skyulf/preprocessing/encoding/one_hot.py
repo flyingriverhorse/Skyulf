@@ -1,4 +1,5 @@
 """One-Hot Encoder node (Calculator + Applier)."""
+
 import logging
 from typing import Any, Dict, List, Tuple, Union, cast
 
@@ -134,9 +135,7 @@ class OneHotEncoderCalculator(BaseCalculator):
 
         drop = "first" if config.get("drop_first", False) else None
         max_categories = config.get("max_categories", 20)
-        handle_unknown = (
-            "ignore" if config.get("handle_unknown", "ignore") == "ignore" else "error"
-        )
+        handle_unknown = "ignore" if config.get("handle_unknown", "ignore") == "ignore" else "error"
         prefix_separator = config.get("prefix_separator", "_")
         drop_original = config.get("drop_original", True)
         include_missing = config.get("include_missing", False)
