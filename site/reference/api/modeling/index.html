@@ -3415,7 +3415,7 @@ Returns DataFrame where columns are classes.</p>
 
 
               <details class="mkdocstrings-source">
-                <summary>Source code in <code>skyulf-core/skyulf/modeling/hyperparameters.py</code></summary>
+                <summary>Source code in <code>skyulf-core/skyulf/modeling/hyperparameters/_field.py</code></summary>
                 <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 7</span>
 <span class="normal"> 8</span>
 <span class="normal"> 9</span>
@@ -6075,29 +6075,29 @@ Returns DataFrame where columns are classes.</p>
 
         <p>Return the default search space for <em>model_key</em>.</p>
 <p>For grid-based strategies (<code>grid</code> / <code>halving_grid</code>) the trimmed
-<code>GRID_SEARCH_SPACES</code> dict is used so that the cartesian product stays
-manageable.  All other strategies (<code>random</code>, <code>halving_random</code>,
+<code>GRID_SEARCH_SPACES</code> dict is used so the cartesian product stays
+manageable. All other strategies (<code>random</code>, <code>halving_random</code>,
 <code>optuna</code>) use the richer <code>DEFAULT_SEARCH_SPACES</code>.</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/modeling/hyperparameters.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1210</span>
-<span class="normal">1211</span>
-<span class="normal">1212</span>
-<span class="normal">1213</span>
-<span class="normal">1214</span>
-<span class="normal">1215</span>
-<span class="normal">1216</span>
-<span class="normal">1217</span>
-<span class="normal">1218</span>
-<span class="normal">1219</span>
-<span class="normal">1220</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_default_search_space</span><span class="p">(</span><span class="n">model_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;random&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+              <summary>Source code in <code>skyulf-core/skyulf/modeling/hyperparameters/_registry.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_default_search_space</span><span class="p">(</span><span class="n">model_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;random&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the default search space for *model_key*.</span>
 
 <span class="sd">    For grid-based strategies (``grid`` / ``halving_grid``) the trimmed</span>
-<span class="sd">    ``GRID_SEARCH_SPACES`` dict is used so that the cartesian product stays</span>
-<span class="sd">    manageable.  All other strategies (``random``, ``halving_random``,</span>
+<span class="sd">    ``GRID_SEARCH_SPACES`` dict is used so the cartesian product stays</span>
+<span class="sd">    manageable. All other strategies (``random``, ``halving_random``,</span>
 <span class="sd">    ``optuna``) use the richer ``DEFAULT_SEARCH_SPACES``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">strategy</span> <span class="ow">in</span> <span class="n">_GRID_STRATEGIES</span><span class="p">:</span>
