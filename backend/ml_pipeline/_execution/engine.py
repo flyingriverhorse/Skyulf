@@ -284,11 +284,11 @@ class PipelineEngine:
             # already has the freshly-saved output (every _run_* path
             # writes under node_id), so loading it here is cheap and
             # keeps summary logic out of the per-runner methods. We
-            # tolerate any failure — a missing summary just means the
+            # tolerate any failure - a missing summary just means the
             # card falls back to its static description.
             metadata: Dict[str, Any] = {}
             # Output / upstream loads are best-effort and isolated from
-            # the summary call — for trainers and tuners the summary
+            # the summary call - for trainers and tuners the summary
             # comes purely from `metrics`, so a failed model load (e.g.
             # an artifact bundle that doesn't unpickle cleanly) must not
             # suppress the card line.

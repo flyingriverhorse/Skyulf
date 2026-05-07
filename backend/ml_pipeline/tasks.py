@@ -13,10 +13,11 @@ from backend.ml_pipeline._services.pipeline_execution_service import execute_pip
 
 logger = logging.getLogger(__name__)
 
+
 def _pipeline_span(job_id: str):
     """Return a Sentry transaction context manager, or a no-op if sentry-sdk is absent."""
     try:
-        import sentry_sdk  # runtime check so tests can patch sys.modules without module reload
+        import sentry_sdk  # runtime check so tests can patch sys.modules without module reload  # ty: ignore[unresolved-import]
 
         @contextmanager
         def _span() -> Generator:
@@ -48,7 +49,10 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict) -> None:
             execute_pipeline(job_id, pipeline_config_dict, session)
         except Exception:
             from backend.exceptions.handlers import record_pipeline_error
-            record_pipeline_error(job_id, traceback.format_exc().splitlines()[-1], traceback.format_exc())
+
+            record_pipeline_error(
+                job_id, traceback.format_exc().splitlines()[-1], traceback.format_exc()
+            )
             raise
         finally:
             session.close()
@@ -69,7 +73,10 @@ def run_pipeline_batch_task(branches: List[Tuple[str, dict]]) -> None:
                 execute_pipeline(job_id, config_dict, session)
             except Exception:
                 from backend.exceptions.handlers import record_pipeline_error
-                record_pipeline_error(job_id, traceback.format_exc().splitlines()[-1], traceback.format_exc())
+
+                record_pipeline_error(
+                    job_id, traceback.format_exc().splitlines()[-1], traceback.format_exc()
+                )
                 raise
             finally:
                 session.close()

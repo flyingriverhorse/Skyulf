@@ -133,8 +133,7 @@ class AdvisorEngine:
                     rule_id="one_hot_encoding",
                     target_columns=cat_cols,
                     message=(
-                        f"Found {len(cat_cols)} categorical columns suitable for "
-                        "OneHotEncoding."
+                        f"Found {len(cat_cols)} categorical columns suitable for " "OneHotEncoding."
                     ),
                     suggestion="Consider OneHotEncoder.",
                 )

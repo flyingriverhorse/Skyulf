@@ -16,7 +16,12 @@ from sqlalchemy import select
 logger = logging.getLogger(__name__)
 from backend.config import get_settings
 from backend.dependencies import get_db
-from backend.database.models import BasicTrainingJob, AdvancedTuningJob, DriftCheckResult, ErrorEvent
+from backend.database.models import (
+    BasicTrainingJob,
+    AdvancedTuningJob,
+    DriftCheckResult,
+    ErrorEvent,
+)
 from backend.ml_pipeline._execution.graph_utils import extract_job_details
 from skyulf.profiling.drift import DriftCalculator
 
@@ -472,7 +477,7 @@ async def list_error_events(
 
     stmt = (
         select(ErrorEvent)
-        .where(and_(*filters) if filters else True)
+        .where(and_(*filters) if filters else True)  # ty: ignore[invalid-argument-type]
         .order_by(ErrorEvent.created_at.desc())
         .limit(limit)
     )
@@ -487,11 +492,7 @@ async def get_error_count(
     """Return unresolved error count — used for the sidebar badge."""
     from sqlalchemy import func
 
-    stmt = (
-        select(func.count())
-        .select_from(ErrorEvent)
-        .where(ErrorEvent.resolved_at.is_(None))
-    )
+    stmt = select(func.count()).select_from(ErrorEvent).where(ErrorEvent.resolved_at.is_(None))
     result = await db.execute(stmt)
     count = result.scalar() or 0
     return {"count": count}
@@ -559,10 +560,7 @@ async def get_error_timeline(
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(hours=hours)
 
-    stmt = (
-        select(ErrorEvent.created_at)
-        .where(ErrorEvent.created_at >= cutoff)
-    )
+    stmt = select(ErrorEvent.created_at).where(ErrorEvent.created_at >= cutoff)
     result = await db.execute(stmt)
     timestamps = [row[0] for row in result.all()]
 
@@ -629,4 +627,3 @@ async def get_error_event(
     if event is None:
         raise HTTPException(status_code=404, detail=f"ErrorEvent {error_id} not found")
     return event.to_dict()
-
