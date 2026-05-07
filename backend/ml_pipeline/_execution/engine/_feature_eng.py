@@ -12,18 +12,29 @@ Relies on ``self.artifact_store``, ``self._node_configs``, ``self._get_input``,
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, TYPE_CHECKING
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
 from ..schemas import NodeConfig
 
+if TYPE_CHECKING:
+    from ...artifacts.store import ArtifactStore
+
 logger = logging.getLogger(__name__)
 
 
 class FeatureEngMixin:
     """Feature-engineer composition + model bundling helpers."""
+
+    # Type-only stubs so ty can resolve attributes/methods provided by
+    # :class:`PipelineEngine` (or its sibling mixins). No runtime impact.
+    artifact_store: "ArtifactStore"
+    _node_configs: Dict[str, NodeConfig]
+    executed_transformers: List[Dict[str, Any]]
+    log: Callable[[str], None]
+    _get_input: Any
 
     def _resolve_feature_engineer_artifact_key(self, node: NodeConfig) -> str | None:
         if not node.inputs:

@@ -11,7 +11,7 @@ Relies on ``self._node_configs``, ``self._resolve_all_inputs``,
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Callable, Dict, List, Optional, cast
 
 import pandas as pd
 
@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 
 class MergeMixin:
+
+    # Type-only stubs so ty can resolve attributes/methods provided by
+    # :class:`PipelineEngine` (or its sibling mixins). No runtime impact.
+    _node_configs: Dict[str, NodeConfig]
+    merge_warnings: List[Dict[str, Any]]
+    log: Callable[[str], None]
+    _resolve_all_inputs: Any
+    _ancestors_of: Any
     """Frame coercion + multi-input merging split out of :class:`PipelineEngine`."""
 
     def _coerce_to_frame(self, payload: Any, target_col: str = "") -> Optional[pd.DataFrame]:
