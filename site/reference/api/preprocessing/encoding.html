@@ -2688,6 +2688,22 @@
 
     <div class="doc doc-contents first">
 
+        <p>Encoding nodes package.</p>
+
+
+<details class="split-from-a-single-832-loc-module-into-per-encoder-files" open>
+  <summary>Split from a single 832-LOC module into per-encoder files</summary>
+  <p>_common.py   — shared helpers (detect_categorical_columns, _exclude_target_column, …)
+one_hot.py   — OneHotEncoder
+ordinal.py   — OrdinalEncoder
+label.py     — LabelEncoder
+target.py    — TargetEncoder
+hash.py      — HashEncoder
+dummy.py     — DummyEncoder</p>
+</details>        <p>All public names are re-exported here so existing imports such as
+<code>from skyulf.preprocessing.encoding import OneHotEncoderCalculator</code>
+continue to work unchanged.</p>
+
 
 
 
