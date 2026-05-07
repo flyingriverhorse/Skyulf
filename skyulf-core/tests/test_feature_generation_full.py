@@ -103,7 +103,8 @@ class TestArithmeticPandas:
         )
         expected = out["a"] / out["b"]
         pd.testing.assert_series_equal(
-            out["arithmetic_0"].reset_index(drop=True), expected.reset_index(drop=True),
+            out["arithmetic_0"].reset_index(drop=True),
+            expected.reset_index(drop=True),
             check_names=False,
         )
 
@@ -162,7 +163,8 @@ class TestRatioPandas:
         assert "ratio_0" in out.columns
         expected = out["a"] / out["b"]
         pd.testing.assert_series_equal(
-            out["ratio_0"].reset_index(drop=True), expected.reset_index(drop=True),
+            out["ratio_0"].reset_index(drop=True),
+            expected.reset_index(drop=True),
             check_names=False,
         )
 
@@ -299,8 +301,18 @@ class TestDatetimeExtractPandas:
 
     def test_no_columns_silently_missing(self) -> None:
         expected_feats = [
-            "year", "quarter", "month", "month_name", "week", "day",
-            "day_name", "weekday", "is_weekend", "hour", "minute", "second",
+            "year",
+            "quarter",
+            "month",
+            "month_name",
+            "week",
+            "day",
+            "day_name",
+            "weekday",
+            "is_weekend",
+            "hour",
+            "minute",
+            "second",
         ]
         for feat in expected_feats:
             col = f"{DATE_COL}_{feat}"
@@ -325,8 +337,16 @@ class TestDatetimeExtractPolars:
                     "operation_type": "datetime_extract",
                     "input_columns": [DATE_COL],
                     "datetime_features": [
-                        "year", "quarter", "month", "month_name", "week",
-                        "day", "day_name", "weekday", "is_weekend", "hour",
+                        "year",
+                        "quarter",
+                        "month",
+                        "month_name",
+                        "week",
+                        "day",
+                        "day_name",
+                        "weekday",
+                        "is_weekend",
+                        "hour",
                     ],
                 }
             ]
@@ -337,8 +357,16 @@ class TestDatetimeExtractPolars:
                     "operation_type": "datetime_extract",
                     "input_columns": [DATE_COL],
                     "datetime_features": [
-                        "year", "quarter", "month", "month_name", "week",
-                        "day", "day_name", "weekday", "is_weekend", "hour",
+                        "year",
+                        "quarter",
+                        "month",
+                        "month_name",
+                        "week",
+                        "day",
+                        "day_name",
+                        "weekday",
+                        "is_weekend",
+                        "hour",
                     ],
                 }
             ]
@@ -398,8 +426,16 @@ class TestDatetimeExtractPolars:
 
     def test_polars_no_columns_missing(self) -> None:
         feats = [
-            "year", "quarter", "month", "month_name", "week",
-            "day", "day_name", "weekday", "is_weekend", "hour",
+            "year",
+            "quarter",
+            "month",
+            "month_name",
+            "week",
+            "day",
+            "day_name",
+            "weekday",
+            "is_weekend",
+            "hour",
         ]
         for feat in feats:
             col = f"{DATE_COL}_{feat}"
