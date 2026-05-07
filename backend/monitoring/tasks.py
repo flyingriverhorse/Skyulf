@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 from backend.celery_app import celery_app
 from backend.config import get_settings
-from backend.database.engine import AsyncSessionLocal
+from backend.database.engine import async_session_factory
 
 logger = logging.getLogger(__name__)
 
@@ -24,16 +24,18 @@ def cleanup_error_events(self) -> dict:  # type: ignore[override]
         from sqlalchemy import delete
         from backend.database.models import ErrorEvent
 
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                delete(ErrorEvent).where(ErrorEvent.created_at < cutoff)
-            )
+        if not async_session_factory:
+            raise RuntimeError("Database not initialized")
+        async with async_session_factory() as session:
+            result = await session.execute(delete(ErrorEvent).where(ErrorEvent.created_at < cutoff))  # ty: ignore[invalid-argument-type]
             await session.commit()
             return result.rowcount  # type: ignore[return-value]
 
     try:
         deleted: int = asyncio.run(_run())
-        logger.info("cleanup_error_events: deleted %d rows older than %d days", deleted, retention_days)
+        logger.info(
+            "cleanup_error_events: deleted %d rows older than %d days", deleted, retention_days
+        )
         return {"deleted": deleted, "retention_days": retention_days}
     except Exception as exc:
         logger.error("cleanup_error_events failed: %s", exc)

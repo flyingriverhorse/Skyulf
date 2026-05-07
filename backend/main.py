@@ -57,9 +57,9 @@ settings = get_settings()
 
 # Sentry — only active when SENTRY_DSN is set in env.
 if settings.SENTRY_DSN:
-    import sentry_sdk
-    from sentry_sdk.integrations.fastapi import FastApiIntegration
-    from sentry_sdk.integrations.starlette import StarletteIntegration
+    import sentry_sdk  # ty: ignore[unresolved-import]
+    from sentry_sdk.integrations.fastapi import FastApiIntegration  # ty: ignore[unresolved-import]
+    from sentry_sdk.integrations.starlette import StarletteIntegration  # ty: ignore[unresolved-import]
 
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
@@ -398,6 +398,7 @@ def _add_exception_handlers(app: FastAPI) -> None:
     async def general_exception_handler(request: Request, exc: Exception):
         """Handle unexpected Python exceptions and convert them to 500 errors."""
         import traceback as _tb
+
         real_type = type(exc).__name__
         real_message = str(exc)
         real_traceback = _tb.format_exc()

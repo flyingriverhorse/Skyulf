@@ -41,8 +41,8 @@ def init_worker(**kwargs):
 
     settings = get_settings()
     if settings.SENTRY_DSN:
-        import sentry_sdk
-        from sentry_sdk.integrations.celery import CeleryIntegration
+        import sentry_sdk  # ty: ignore[unresolved-import]
+        from sentry_sdk.integrations.celery import CeleryIntegration  # ty: ignore[unresolved-import]
 
         sentry_sdk.init(
             dsn=settings.SENTRY_DSN,

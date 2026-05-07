@@ -92,9 +92,7 @@ def get_node_registry():
 
 
 @router.get("/datasets/{dataset_id}/schema", response_model=AnalysisProfile)
-async def get_dataset_schema(
-    dataset_id: int, session: AsyncSession = Depends(get_async_session)
-):
+async def get_dataset_schema(dataset_id: int, session: AsyncSession = Depends(get_async_session)):
     """Return the schema (columns, types, stats) of a dataset.
 
     Prefers the cached profile in `DataSource.source_metadata['profile']`

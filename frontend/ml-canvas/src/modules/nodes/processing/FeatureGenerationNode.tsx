@@ -34,7 +34,22 @@ const OPERATION_TYPES = [
 ];
 
 const ARITHMETIC_METHODS = ['add', 'subtract', 'multiply', 'divide'];
-const DATE_METHODS = ['year', 'month', 'day', 'weekday', 'hour', 'quarter', 'is_weekend'];
+const DATE_METHODS = ['year', 'quarter', 'month', 'month_name', 'week', 'day', 'day_name', 'weekday', 'is_weekend', 'hour'];
+
+// Tooltip descriptions shown on hover for each datetime feature.
+// Both pandas and polars paths produce identical semantics.
+const DATE_METHOD_META: Record<string, { type: string; desc: string }> = {
+  year:       { type: 'int',    desc: 'Calendar year (e.g. 2024)' },
+  quarter:    { type: 'int',    desc: 'Quarter of year — 1 to 4' },
+  month:      { type: 'int',    desc: 'Month number — 1 (Jan) to 12 (Dec)' },
+  month_name: { type: 'string', desc: 'Full month name — "January" … "December"' },
+  week:       { type: 'int',    desc: 'ISO week number — 1 to 53' },
+  day:        { type: 'int',    desc: 'Day of month — 1 to 31' },
+  day_name:   { type: 'string', desc: 'Day of week name — "Monday" … "Sunday"' },
+  weekday:    { type: 'int',    desc: 'Day of week — 0 (Mon) to 6 (Sun)' },
+  is_weekend: { type: 'int',    desc: 'Weekend flag — 1 if Sat/Sun, else 0' },
+  hour:       { type: 'int',    desc: 'Hour of day — 0 to 23' },
+};
 const SIMILARITY_METHODS = ['ratio', 'token_sort_ratio', 'token_set_ratio'];
 const GROUP_AGG_METHODS = ['mean', 'sum', 'count', 'min', 'max', 'std', 'median'];
 
@@ -463,23 +478,42 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                   <div className="space-y-1.5">
                     <span className="text-xs font-medium text-muted-foreground">Features to Extract</span>
                     <div className="grid grid-cols-2 gap-2">
-                      {DATE_METHODS.map(method => (
-                        <label key={method} className="flex items-center gap-2 text-xs p-1.5 border rounded hover:bg-accent cursor-pointer transition-colors">
-                          <input
-                            type="checkbox"
-                            className="rounded border-muted-foreground/40 text-primary focus:ring-0"
-                            checked={(op.datetime_features || []).includes(method)}
-                            onChange={(e) => {
-                              const current = op.datetime_features || [];
-                              const newFeatures = e.target.checked
-                                ? [...current, method]
-                                : current.filter(f => f !== method);
-                              updateOperation(idx, { datetime_features: newFeatures });
-                            }}
-                          />
-                          <span className="capitalize">{method.replace('_', ' ')}</span>
-                        </label>
-                      ))}
+                      {DATE_METHODS.map(method => {
+                        const meta = DATE_METHOD_META[method];
+                        const tooltip = meta ? `${meta.desc}\n→ output type: ${meta.type}` : undefined;
+                        return (
+                          <label
+                            key={method}
+                            title={tooltip}
+                            className="flex items-center gap-2 text-xs p-1.5 border rounded hover:bg-accent cursor-pointer transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              className="rounded border-muted-foreground/40 text-primary focus:ring-0"
+                              checked={(op.datetime_features || []).includes(method)}
+                              onChange={(e) => {
+                                const current = op.datetime_features || [];
+                                const newFeatures = e.target.checked
+                                  ? [...current, method]
+                                  : current.filter(f => f !== method);
+                                updateOperation(idx, { datetime_features: newFeatures });
+                              }}
+                            />
+                            <span className="capitalize">{method.replace(/_/g, ' ')}</span>
+                            {meta && (
+                              <span
+                                className={`ml-auto shrink-0 text-[9px] font-mono px-1 rounded ${
+                                  meta.type === 'string'
+                                    ? 'bg-purple-500/20 text-purple-400'
+                                    : 'bg-sky-500/20 text-sky-400'
+                                }`}
+                              >
+                                {meta.type}
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

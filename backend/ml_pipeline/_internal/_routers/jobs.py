@@ -25,9 +25,7 @@ router = APIRouter(tags=["ML Pipeline"])
 
 
 @router.get("/jobs/node-summaries", response_model=Dict[str, List[Dict[str, Any]]])
-async def get_node_summaries(
-    limit: int = 200, session: AsyncSession = Depends(get_async_session)
-):
+async def get_node_summaries(limit: int = 200, session: AsyncSession = Depends(get_async_session)):
     """Per-node card summaries from the latest completed run group.
 
     Returns ``{ node_id: [entry, ...] }`` where each entry carries a
@@ -121,9 +119,7 @@ async def list_jobs(
 
 
 @router.get("/jobs/tuning/latest/{node_id}", response_model=Optional[JobInfo])
-async def get_latest_tuning_job(
-    node_id: str, session: AsyncSession = Depends(get_async_session)
-):
+async def get_latest_tuning_job(node_id: str, session: AsyncSession = Depends(get_async_session)):
     """Latest completed tuning job for a specific node."""
     return await JobManager.get_latest_tuning_job_for_node(session, node_id)
 

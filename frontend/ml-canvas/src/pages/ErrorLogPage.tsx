@@ -59,14 +59,17 @@ function relativeTime(iso: string): string {
 // ─── Traceback modal ─────────────────────────────────────────────────────────
 
 const TracebackModal: React.FC<{ event: ErrorEvent; onClose: () => void }> = ({ event, onClose }) => (
-  <div
-    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-    onClick={onClose}
-  >
+  <>
+    {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- backdrop dismiss zone */}
     <div
-      className="relative bg-slate-900 text-slate-100 rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col"
-      onClick={e => e.stopPropagation()}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
     >
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- modal panel stopPropagation */}
+      <div
+        className="relative bg-slate-900 text-slate-100 rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
       {/* header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
         <div className="flex items-center gap-3">
@@ -105,6 +108,7 @@ const TracebackModal: React.FC<{ event: ErrorEvent; onClose: () => void }> = ({ 
       </div>
     </div>
   </div>
+  </>
 );
 
 // ─── Row ─────────────────────────────────────────────────────────────────────

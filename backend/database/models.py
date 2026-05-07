@@ -471,7 +471,9 @@ class ErrorEvent(Base):
     job_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     # HTTP status code (0 for background task errors)
     status_code: Mapped[int] = mapped_column(Integer, nullable=False, default=500)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), nullable=False, index=True
+    )
     # Set when an operator marks the event as resolved/dismissed
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
 
