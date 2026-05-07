@@ -19,8 +19,8 @@ from ..engines.sklearn_bridge import SklearnBridge
 if TYPE_CHECKING:
     from .base import BaseModelApplier, BaseModelCalculator
 
-from .evaluation.common import sanitize_metrics
-from .evaluation.metrics import (
+from ._evaluation.common import sanitize_metrics
+from ._evaluation.metrics import (
     calculate_classification_metrics,
     calculate_regression_metrics,
 )

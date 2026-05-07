@@ -83,4 +83,46 @@ describe('diffGraphs', () => {
     );
     expect(diff.nodes.get('a')?.status).toBe('modified');
   });
+
+  // Regression test for the bug where every node in two structurally
+  // identical pipelines was tagged added/removed because each training
+  // run persists nodes with fresh per-run uuids. The diff should fall
+  // back to step-type matching and surface real config changes only.
+  it('matches nodes by step_type when ids drift between runs', () => {
+    const left = [
+      n('drop_missing-old1', { definitionType: 'drop_missing_columns', threshold: 0.5 }),
+      n('encoding-old2', { definitionType: 'encoding', method: 'onehot' }),
+    ];
+    const right = [
+      n('drop_missing-new1', { definitionType: 'drop_missing_columns', threshold: 0.5 }),
+      n('encoding-new2', { definitionType: 'encoding', method: 'ordinal' }),
+    ];
+    const diff = diffGraphs(left, [], right, []);
+    expect(diff.summary.nodesAdded).toBe(0);
+    expect(diff.summary.nodesRemoved).toBe(0);
+    expect(diff.summary.nodesUnchanged).toBe(1);
+    expect(diff.summary.nodesModified).toBe(1);
+    // Both per-side ids resolve to the same diff entry, so each
+    // canvas can colour its own nodes correctly.
+    expect(diff.nodes.get('drop_missing-old1')?.status).toBe('unchanged');
+    expect(diff.nodes.get('drop_missing-new1')?.status).toBe('unchanged');
+    expect(diff.nodes.get('encoding-old2')?.status).toBe('modified');
+    expect(diff.nodes.get('encoding-new2')?.status).toBe('modified');
+    expect(diff.aliases.get('drop_missing-old1')).toBe('drop_missing-new1');
+  });
+
+  it('keeps edges unchanged when their endpoints were renamed by step_type fallback', () => {
+    const left = [
+      n('a-old', { definitionType: 'load_csv' }),
+      n('b-old', { definitionType: 'encoding' }),
+    ];
+    const right = [
+      n('a-new', { definitionType: 'load_csv' }),
+      n('b-new', { definitionType: 'encoding' }),
+    ];
+    const diff = diffGraphs(left, [e('e1', 'a-old', 'b-old')], right, [e('e2', 'a-new', 'b-new')]);
+    expect(diff.summary.edgesUnchanged).toBe(1);
+    expect(diff.summary.edgesAdded).toBe(0);
+    expect(diff.summary.edgesRemoved).toBe(0);
+  });
 });

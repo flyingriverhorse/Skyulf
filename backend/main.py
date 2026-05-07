@@ -29,6 +29,7 @@ from backend.data_ingestion.router import router as data_ingestion_router
 from backend.data_ingestion.router import sources_router as data_sources_router
 from backend.database.engine import close_db, create_tables, init_db
 from backend.exceptions.handlers import (
+    _record_error,
     generic_http_exception_handler,
     method_not_allowed_exception_handler,
     not_found_exception_handler,
@@ -53,6 +54,21 @@ from backend.realtime import connection_manager, router as realtime_router
 setup_universal_logging()
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Sentry — only active when SENTRY_DSN is set in env.
+if settings.SENTRY_DSN:
+    import sentry_sdk  # ty: ignore[unresolved-import]
+    from sentry_sdk.integrations.fastapi import FastApiIntegration  # ty: ignore[unresolved-import]
+    from sentry_sdk.integrations.starlette import StarletteIntegration  # ty: ignore[unresolved-import]
+
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        release=settings.APP_VERSION,
+        traces_sample_rate=0.1,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        send_default_pii=False,
+    )
+    logger.info("Sentry initialised (release=%s)", settings.APP_VERSION)
 
 OPENAPI_DESCRIPTION = (
     f"{settings.APP_DESCRIPTION}\n\n"
@@ -210,7 +226,7 @@ def create_app() -> FastAPI:
 
     # Rate limiting
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
 
     # Add middleware (order matters!)
     _add_middleware(app, settings)
@@ -381,9 +397,21 @@ def _add_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
         """Handle unexpected Python exceptions and convert them to 500 errors."""
-        logger.error(f"Unexpected error: {exc}", exc_info=True)
-        # Convert to HTTPException for consistent handling
-        http_exc = HTTPException(status_code=500, detail=f"Internal server error: {str(exc)}")
+        import traceback as _tb
+
+        real_type = type(exc).__name__
+        real_message = str(exc)
+        real_traceback = _tb.format_exc()
+        logger.error(f"Unexpected error ({real_type}): {real_message}", exc_info=True)
+        # Record with the real exception metadata before wrapping
+        await _record_error(
+            route=str(request.url.path),
+            error_type=real_type,
+            message=real_message,
+            traceback=real_traceback,
+            status_code=500,
+        )
+        http_exc = HTTPException(status_code=500, detail=f"Internal server error: {real_message}")
         return await generic_http_exception_handler(request, http_exc)
 
 

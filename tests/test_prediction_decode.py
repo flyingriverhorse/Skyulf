@@ -8,7 +8,7 @@ under both ``__target__`` (post-split encoding) and by target column name
 import pytest
 from sklearn.preprocessing import LabelEncoder
 
-from backend.ml_pipeline.services.prediction_utils import (
+from backend.ml_pipeline._services.prediction_utils import (
     decode_int_like,
     extract_target_label_encoder,
 )

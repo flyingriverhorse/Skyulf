@@ -5,22 +5,12 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../skyulf-core")))
 
-# Import backend registry
-from backend.ml_pipeline.node_definitions import NodeRegistry, StepType
+from skyulf.registry import NodeRegistry as SkyulfRegistry
+from backend.ml_pipeline.constants import StepType  # noqa: F401
 
-# Fetch static nodes by creating a temporary access to the list inside get_all_nodes
-# Since get_all_nodes instantiates the list inside the function, we have to copy-paste or inspect it.
-# However, we can reconstruct the static list by temporarily disabling SKYULF_AVAILABLE in the module
-# or just manually inspecting.
+dynamic_ids = set(SkyulfRegistry.get_all_metadata().keys())
 
-# Actually, get_all_nodes returns (static - dynamic) + dynamic.
-# If we want to see what WAS in static, we need to inspect the source or trust the dynamic override logic.
-
-# Let's verify what dynamic nodes are currently available.
-dynamic_nodes = NodeRegistry.get_dynamic_nodes()
-dynamic_ids = {n.id for n in dynamic_nodes}
-
-print(f"Dynamic Nodes Found: {len(dynamic_nodes)}")
+print(f"Dynamic Nodes Found: {len(dynamic_ids)}")
 print(f"Dynamic IDs: {sorted(list(dynamic_ids))}")
 
 # I will recreate the list of static IDs based on the user's file content provided in context

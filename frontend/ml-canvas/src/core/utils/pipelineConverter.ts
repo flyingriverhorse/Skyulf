@@ -30,7 +30,15 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       let stepType = 'unknown';
           let params: Record<string, unknown> = {};
       const incomingEdges = edges.filter(e => e.target === nodeId);
-      const inputs = incomingEdges.map(e => e.source);
+      // Deduplicate by source: multi-handle splitters (TrainTestSplitter has
+      // train/test/validation, FeatureTargetSplitter has X/y) emit several
+      // edges from the same source node into one downstream target.
+      // The backend treats each `inputs[]` entry as a distinct branch root,
+      // so duplicates cause partition_parallel_pipeline to spawn spurious
+      // sub-pipelines (“but should be ONE branch, not three”). Dedup here
+      // ensures the backend sees one logical input even though the canvas
+      // shows multiple visual edges from the splitter handles.
+      const inputs = Array.from(new Set(incomingEdges.map(e => e.source)));
 
       if (node.data.definitionType === 'dataset_node') {
         stepType = BackendStepType.DATA_LOADER;

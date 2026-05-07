@@ -1,0 +1,1533 @@
+"""Pipeline Execution Engine."""
+
+import logging
+import time
+import re
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple, cast
+
+import numpy as np
+import pandas as pd
+
+from skyulf.data.dataset import SplitDataset
+from skyulf.data.catalog import DataCatalog
+from skyulf.modeling.base import StatefulEstimator
+from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
+from skyulf.preprocessing.pipeline import FeatureEngineer
+from skyulf.registry import NodeRegistry
+
+from ..artifacts.store import ArtifactStore
+from ..constants import StepType
+from .schemas import (
+    NodeConfig,
+    NodeExecutionResult,
+    PipelineConfig,
+    PipelineExecutionResult,
+)
+from .summary import build_summary
+
+logger = logging.getLogger(__name__)
+
+
+class PipelineEngine:
+    """
+    Orchestrates the execution of ML pipelines.
+    """
+
+    def __init__(
+        self,
+        artifact_store: ArtifactStore,
+        catalog: DataCatalog,
+        log_callback=None,
+    ):
+        self.artifact_store = artifact_store
+        self.catalog = catalog
+        self.log_callback = log_callback
+        self.executed_transformers: List[Any] = (
+            []
+        )  # Track fitted transformers for inference pipeline
+        self._results: Dict[str, NodeExecutionResult] = {}
+        self._node_configs: Dict[str, NodeConfig] = {}
+        # Engine-emitted advisories surfaced via PipelineExecutionResult.
+        # Initialized here (not just in run()) so direct callers of
+        # _merge_inputs / _merge_frames in tests don't hit AttributeError.
+        self.merge_warnings: List[Dict[str, Any]] = []
+
+    def _pipeline_has_training_node(self) -> bool:
+        """Checks if the current pipeline workflow includes a model training step."""
+        return any(
+            node.step_type in [StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING]
+            for node in self._node_configs.values()
+        )
+
+    def _extract_feature_importances(
+        self, model: Any, data: Any, target_col: str
+    ) -> Optional[Dict[str, float]]:
+        """Extract feature importances from a trained sklearn-style model."""
+        try:
+            # Unwrap tuple (model, tuning_result) from advanced tuning
+            actual_model = model[0] if isinstance(model, tuple) else model
+
+            # Get feature names from data
+            feature_names: List[str] = []
+            if isinstance(data, pd.DataFrame):
+                feature_names = [c for c in data.columns if c != target_col]
+            elif hasattr(data, "train"):
+                train = data.train
+                if isinstance(train, pd.DataFrame):
+                    feature_names = [c for c in train.columns if c != target_col]
+                elif isinstance(train, tuple) and len(train) >= 1 and hasattr(train[0], "columns"):
+                    feature_names = list(train[0].columns)
+            elif isinstance(data, tuple) and len(data) >= 1 and hasattr(data[0], "columns"):
+                feature_names = list(data[0].columns)
+
+            if not feature_names:
+                return None
+
+            # Extract importances
+            importances: Optional[Any] = None
+            if hasattr(actual_model, "feature_importances_"):
+                importances = actual_model.feature_importances_
+            elif hasattr(actual_model, "coef_"):
+                coef = actual_model.coef_
+                # For multi-class, coef_ is 2D — take mean of absolute values
+                if hasattr(coef, "ndim") and coef.ndim > 1:
+                    importances = abs(coef).mean(axis=0)
+                else:
+                    importances = abs(coef)
+
+            if importances is not None and len(importances) == len(feature_names):
+                return {name: round(float(val), 6) for name, val in zip(feature_names, importances)}
+        except Exception:
+            pass
+        return None
+
+    def _finalize_training_artifacts(
+        self, data: Any, job_id: str, target_col: str, node_id: str, model_artifact: Any
+    ):
+        """
+        Finalize training by saving standard artifacts:
+        1. Reference Data for Drift Detection (if not already present).
+        2. Model Artifact (node_id and job_id).
+        """
+        # Save Reference Data for Drift Detection
+        # Only overwrite if it doesn't exist (prefer Raw/Splitter data over Scaled/Transformed data)
+        # Construct the key manually to check existence
+        if job_id and job_id != "unknown":
+            safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", self.dataset_name)
+            key = f"reference_data_{safe_name}_{job_id}"
+            if not self.artifact_store.exists(key):
+                self._save_reference_data(data, job_id, target_col)
+        else:
+            self._save_reference_data(data, job_id, target_col)
+
+        # Manually save the model artifact
+        self.artifact_store.save(node_id, model_artifact)
+        if job_id and job_id != "unknown":
+            self.log(f"Saving model artifact to job key: {job_id}")
+            self.artifact_store.save(job_id, model_artifact)
+
+    def _save_reference_data(self, data: Any, job_id: str, target_col: str):
+        """
+        Saves the training data as a reference dataset for future drift detection.
+        Handles SplitDataset (extracts train) and DataFrame/Tuple formats.
+        """
+        if not job_id or job_id == "unknown":
+            return
+
+        try:
+            train_df = None
+
+            # 1. Extract Training Data
+            if isinstance(data, SplitDataset):
+                raw_train = data.train
+            else:
+                raw_train = data  # Assume it's the full dataset if not split
+
+            # 2. Normalize to DataFrame
+            if isinstance(raw_train, pd.DataFrame):
+                train_df = raw_train
+            elif isinstance(raw_train, tuple) and len(raw_train) == 2:
+                # (X, y) tuple
+                X, y = raw_train
+                if isinstance(X, pd.DataFrame):
+                    train_df = X.copy()
+                    # Add target column back if y is compatible
+                    if isinstance(y, (pd.Series, np.ndarray, list)):
+                        train_df[target_col] = y
+
+            # 3. Save if valid
+            if train_df is not None and not train_df.empty:
+                # Sanitize dataset name
+                safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", self.dataset_name)
+                key = f"reference_data_{safe_name}_{job_id}"
+
+                self.log(f"Saving reference training data for drift detection: {key}")
+                self.artifact_store.save(key, train_df)
+            else:
+                logger.warning(f"Could not extract reference data for job {job_id}")
+
+        except Exception as e:
+            logger.warning(f"Failed to save reference data: {e}")
+
+    def log(self, message: str):
+        logger.info(message)
+        if self.log_callback:
+            self.log_callback(message)
+
+    def run(
+        self, config: PipelineConfig, job_id: str = "unknown", dataset_name: str = "dataset"
+    ) -> PipelineExecutionResult:
+        """
+        Executes the pipeline defined by the configuration.
+        """
+        self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
+        self.dataset_name = dataset_name
+        start_time = datetime.now()
+        self.executed_transformers = []  # Reset for new run
+        self._node_configs = {n.node_id: n for n in config.nodes}
+        self._topo_order = {n.node_id: i for i, n in enumerate(config.nodes)}
+        # Per-run merge advisories surfaced to API/UI so the user understands
+        # what fan-in semantics were applied (column union, last-wins, etc.).
+        self.merge_warnings: List[Dict[str, Any]] = []
+
+        self._current_pipeline_id = config.pipeline_id
+        pipeline_result = PipelineExecutionResult(
+            pipeline_id=config.pipeline_id,
+            status="success",  # Optimistic default
+            start_time=start_time,
+        )
+
+        for node in config.nodes:
+            try:
+                node_result = self._execute_node(node, job_id=job_id)
+                pipeline_result.node_results[node.node_id] = node_result
+
+                if node_result.status == "failed":
+                    logger.error(f"Node {node.node_id} failed. Stopping pipeline.")
+                    pipeline_result.status = "failed"
+                    break
+
+            except Exception as e:
+                logger.exception(f"Unexpected error executing node {node.node_id}")
+                pipeline_result.node_results[node.node_id] = NodeExecutionResult(
+                    node_id=node.node_id, status="failed", error=str(e)
+                )
+                pipeline_result.status = "failed"
+                break
+
+        pipeline_result.end_time = datetime.now()
+        # Dedup advisories: a merge node executed in multiple branches/parts
+        # (e.g. FeatureTargetSplit hit once per parallel branch) re-appends
+        # the same advisory each pass. Collapse on (node_id, kind, inputs,
+        # overlap_columns, dropped_columns, part) so the UI shows one row
+        # per logically distinct merge instead of N copies.
+        seen_keys: set = set()
+        deduped: List[Dict[str, Any]] = []
+        for w in self.merge_warnings:
+            key = (
+                w.get("node_id"),
+                w.get("kind"),
+                tuple(sorted(w.get("inputs") or ())),
+                tuple(w.get("overlap_columns") or ()),
+                tuple(w.get("dropped_columns") or ()),
+                w.get("part"),
+            )
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            deduped.append(w)
+        pipeline_result.merge_warnings = deduped
+        return pipeline_result
+
+    def _execute_node(self, node: NodeConfig, job_id: str = "unknown") -> NodeExecutionResult:
+        """Executes a single node based on its type."""
+        self.log(f"Executing node: {node.node_id} ({node.step_type})")
+        start_ts = time.time()
+
+        try:
+            output_artifact_id = None
+            metrics: Dict[str, Any] = {}
+
+            if node.step_type == StepType.DATA_LOADER:
+                output_artifact_id = self._run_data_loader(node, job_id=job_id)
+            elif node.step_type == StepType.FEATURE_ENGINEERING:
+                # Check if it's actually a misconfigured data loader
+                if not node.inputs and "dataset_id" in node.params:
+                    logger.warning(
+                        f"Node {node.node_id} has step_type='feature_engineering' but looks like a data loader. "
+                        "Executing as data loader."
+                    )
+                    output_artifact_id = self._run_data_loader(node, job_id=job_id)
+                else:
+                    output_artifact_id, metrics = self._run_feature_engineering(node)
+            elif node.step_type == StepType.BASIC_TRAINING:
+                output_artifact_id, metrics = self._run_basic_training(node, job_id=job_id)
+            elif node.step_type == StepType.ADVANCED_TUNING:
+                output_artifact_id, metrics = self._run_advanced_tuning(node, job_id=job_id)
+            elif node.step_type == "data_preview":
+                output_artifact_id, metrics = self._run_data_preview(node)
+            else:
+                # Try to run as a single transformer step
+                try:
+                    logger.debug(f"Running as single transformer: {node.step_type}")
+                    output_artifact_id, metrics = self._run_transformer(node, job_id=job_id)
+                except Exception as e:
+                    # If it fails or isn't a valid transformer, re-raise
+                    if "Unknown transformer type" in str(e):
+                        raise ValueError(f"Unknown step type: {node.step_type}")
+                    raise e
+
+            duration = time.time() - start_ts
+
+            # Build the one-line node-card summary. The artifact store
+            # already has the freshly-saved output (every _run_* path
+            # writes under node_id), so loading it here is cheap and
+            # keeps summary logic out of the per-runner methods. We
+            # tolerate any failure - a missing summary just means the
+            # card falls back to its static description.
+            metadata: Dict[str, Any] = {}
+            # Output / upstream loads are best-effort and isolated from
+            # the summary call - for trainers and tuners the summary
+            # comes purely from `metrics`, so a failed model load (e.g.
+            # an artifact bundle that doesn't unpickle cleanly) must not
+            # suppress the card line.
+            output: Any = None
+            try:
+                output = self.artifact_store.load(node.node_id)
+            except Exception:
+                logger.debug("summary: output load skipped for %s", node.node_id, exc_info=True)
+            input_shape: Optional[Tuple[int, int]] = None
+            try:
+                if node.inputs:
+                    upstream = self.artifact_store.load(node.inputs[0])
+                    if isinstance(upstream, pd.DataFrame):
+                        input_shape = upstream.shape
+            except Exception:
+                input_shape = None
+            try:
+                summary = build_summary(
+                    step_type=node.step_type,
+                    output=output,
+                    metrics=metrics,
+                    input_shape=input_shape,
+                    params=node.params or {},
+                )
+                if summary:
+                    metadata["summary"] = summary
+            except Exception:
+                logger.debug("summary skipped for node %s", node.node_id, exc_info=True)
+
+            return NodeExecutionResult(
+                node_id=node.node_id,
+                status="success",
+                output_artifact_id=output_artifact_id,
+                metrics=metrics,
+                execution_time=duration,
+                metadata=metadata,
+            )
+
+        except Exception as e:
+            logger.exception(f"Error in node {node.node_id}")
+            duration = time.time() - start_ts
+            return NodeExecutionResult(
+                node_id=node.node_id,
+                status="failed",
+                error=str(e),
+                execution_time=duration,
+            )
+
+    def _resolve_input(self, node: NodeConfig, index: int = 0) -> Any:
+        """Helper to get input artifact from the previous node."""
+        if not node.inputs or index >= len(node.inputs):
+            raise ValueError(f"Node {node.node_id} requires input at index {index}")
+
+        input_node_id = node.inputs[index]
+        return self.artifact_store.load(input_node_id)
+
+    def _resolve_all_inputs(self, node: NodeConfig) -> List[Any]:
+        """Load artifacts from ALL upstream nodes, ordered by topology.
+
+        Duplicate edges from the same source node (which the frontend can emit
+        when a connection is wired multiple times) are collapsed to a single
+        load to avoid spurious multi-input merging.
+        """
+        if not node.inputs:
+            raise ValueError(f"Node {node.node_id} has no inputs")
+        deduped_ids: List[str] = []
+        seen: set[str] = set()
+        for nid in node.inputs:
+            if nid in seen:
+                continue
+            seen.add(nid)
+            deduped_ids.append(nid)
+        sorted_ids = sorted(
+            deduped_ids,
+            key=lambda nid: self._topo_order.get(nid, 0),
+        )
+        return [self.artifact_store.load(nid) for nid in sorted_ids]
+
+    def _ancestors_of(self, node_id: str) -> set[str]:
+        """Return the set of all ancestor node IDs (transitive parents)."""
+        ancestors: set[str] = set()
+        stack = [node_id]
+        while stack:
+            current = stack.pop()
+            cfg = self._node_configs.get(current)
+            if not cfg or not cfg.inputs:
+                continue
+            for parent in cfg.inputs:
+                if parent in ancestors:
+                    continue
+                ancestors.add(parent)
+                stack.append(parent)
+        return ancestors
+
+    def _coerce_to_frame(self, payload: Any, target_col: str = "") -> Optional[pd.DataFrame]:
+        """Best-effort coercion of a single payload to a DataFrame.
+
+        Returns ``None`` for empty / missing payloads (e.g. an empty test split)
+        so callers can decide whether to skip them.
+        """
+        if payload is None:
+            return None
+        if isinstance(payload, pd.DataFrame):
+            return payload if not payload.empty else None
+        if isinstance(payload, tuple) and len(payload) >= 1:
+            first = payload[0]
+            if isinstance(first, pd.DataFrame):
+                df = first.copy()
+                if len(payload) == 2 and target_col:
+                    df[target_col] = payload[1]
+                return df if not df.empty else None
+        return None
+
+    def _to_dataframe(self, artifact: Any, target_col: str = "") -> pd.DataFrame:
+        """Normalize an artifact to a single DataFrame (train portion only).
+
+        Kept for callers that explicitly want a flat frame. Multi-input merging
+        should prefer :meth:`_merge_inputs`, which preserves SplitDataset shape
+        when possible.
+        """
+        if isinstance(artifact, pd.DataFrame):
+            return artifact
+        if isinstance(artifact, SplitDataset):
+            df = self._coerce_to_frame(artifact.train, target_col)
+            if df is not None:
+                return df
+        df = self._coerce_to_frame(artifact, target_col)
+        if df is not None:
+            return df
+        raise TypeError(
+            f"Cannot convert artifact of type {type(artifact).__name__} to DataFrame. "
+            "Only DataFrame, SplitDataset, and (X, y) tuples are supported."
+        )
+
+    def _get_merge_strategy(self, node_id: str) -> str:
+        """Resolve per-node merge strategy from node params.
+
+        Recognised values: ``last_wins`` (default), ``first_wins``. Anything
+        else falls back to ``last_wins`` with a warning so a typo in the
+        canvas config can't silently change semantics.
+        """
+        cfg = self._node_configs.get(node_id)
+        if cfg is None:
+            return "last_wins"
+        strat = cfg.params.get("_merge_strategy", "last_wins")
+        if strat not in ("last_wins", "first_wins"):
+            self.log(
+                f"Node {node_id}: unknown merge strategy '{strat}', " "falling back to 'last_wins'."
+            )
+            return "last_wins"
+        return strat
+
+    def _merge_frames(
+        self,
+        frames: List[pd.DataFrame],
+        node_id: str,
+        part_label: str = "",
+    ) -> pd.DataFrame:
+        """Concatenate a list of DataFrames column-wise (preferred) or row-wise.
+
+        ``part_label`` is only used in log messages (``"train"``, ``"test"``...)
+        to make multi-split merges easier to follow in job logs.
+
+        Column-overlap behaviour is governed by the per-node merge strategy
+        (see :meth:`_get_merge_strategy`):
+
+        * ``last_wins`` (default) — later inputs overwrite earlier ones on
+          shared columns. Matches topological "downstream wins".
+        * ``first_wins`` — earlier inputs are kept; later inputs only add
+          new columns. Useful when an upstream branch is the source of truth.
+        """
+        if not frames:
+            return pd.DataFrame()
+        if len(frames) == 1:
+            return frames[0]
+
+        prefix = f"Node {node_id}"
+        if part_label:
+            prefix = f"{prefix} [{part_label}]"
+
+        row_counts = [len(df) for df in frames]
+        col_sets = [set(df.columns) for df in frames]
+        same_rows = all(rc == row_counts[0] for rc in row_counts)
+        strategy = self._get_merge_strategy(node_id)
+
+        if same_rows:
+            # Iterate frames in the order dictated by the strategy. The dict
+            # update semantics give us "later writes win", so iterating
+            # forward yields last_wins and reversed yields first_wins.
+            iter_frames = frames if strategy == "last_wins" else list(reversed(frames))
+            result_cols: Dict[str, pd.Series] = {}
+            overwrites: List[str] = []
+            new_only: List[str] = []
+            for df in iter_frames:
+                df_aligned = df.reset_index(drop=True)
+                for col in df.columns:
+                    if col in result_cols:
+                        overwrites.append(col)
+                    else:
+                        new_only.append(col)
+                    result_cols[col] = df_aligned[col]
+            merged = pd.DataFrame(result_cols)
+            shape_log = " + ".join(str(df.shape) for df in frames)
+            if overwrites:
+                self.log(
+                    f"{prefix}: column-wise merge {shape_log} -> {merged.shape} "
+                    f"({strategy} overwrote {sorted(set(overwrites))})"
+                )
+            else:
+                self.log(f"{prefix}: column-wise merge {shape_log} -> {merged.shape}")
+            return merged
+
+        common_cols = col_sets[0]
+        for cs in col_sets[1:]:
+            common_cols = common_cols & cs
+        if not common_cols:
+            raise ValueError(
+                f"{prefix}: cannot row-merge inputs — no common columns. "
+                f"Column sets: {[sorted(cs) for cs in col_sets]}"
+            )
+        if any(common_cols != cs for cs in col_sets):
+            extras = sorted(set().union(*col_sets) - common_cols)
+            self.log(f"{prefix}: row-merge dropping non-shared columns {extras}")
+            # Surface dropped columns to the UI so users see what was lost
+            # instead of having to dig through job logs.
+            self.merge_warnings.append(
+                {
+                    "node_id": node_id,
+                    "kind": "row_concat_drop",
+                    "part": part_label or "rows",
+                    "dropped_columns": extras,
+                    "kept_columns": sorted(common_cols),
+                    "message": (
+                        f"Node '{node_id}': row-wise merge kept only the {len(common_cols)} "
+                        f"shared columns; {len(extras)} column(s) present in some inputs but "
+                        f"not all were dropped: {extras}."
+                    ),
+                }
+            )
+        merged = pd.concat(
+            [df[sorted(common_cols)] for df in frames],
+            axis=0,
+            ignore_index=True,
+        )
+        self.log(
+            f"{prefix}: row-wise merge "
+            f"{' + '.join(str(rc) for rc in row_counts)} rows → {len(merged)} rows"
+        )
+        return merged
+
+    def _merge_inputs(self, node: NodeConfig, target_col: str = "") -> Any:  # noqa: C901
+        """Resolve and merge all upstream inputs for a multi-input node.
+
+        Behaviour:
+
+        * Single input → returned as-is (preserves DataFrame / SplitDataset).
+        * All inputs are :class:`SplitDataset` → merge ``train`` / ``test`` /
+          ``validation`` independently and return a new ``SplitDataset``.
+        * Mixed or all-DataFrame inputs → flatten to DataFrames and merge.
+          A warning is logged when SplitDatasets are flattened so the loss of
+          held-out splits is visible in job logs.
+        """
+        artifacts = self._resolve_all_inputs(node)
+        if len(artifacts) == 1:
+            return artifacts[0]
+
+        self.log(f"Node {node.node_id}: merging {len(artifacts)} inputs")
+
+        # Sibling fan-in detection: warn only when inputs are TRUE siblings
+        # (no input is itself an ancestor of another). The "ancestor + its
+        # descendant" pattern (e.g. Splitter + Splitter→Scaler both feeding
+        # Encoder) is a redundant edge — the descendant supersedes the
+        # ancestor under last-wins, so the merge is harmless and we don't
+        # warn. We DO warn when two genuinely independent siblings off a
+        # shared ancestor get fanned in (the "Path A" UX trap), because the
+        # user likely meant a sequential chain.
+        unique_inputs = list(dict.fromkeys(node.inputs or []))
+        if len(unique_inputs) > 1:
+            ancestors_per_input = [self._ancestors_of(nid) for nid in unique_inputs]
+            shared = set.intersection(*ancestors_per_input) if ancestors_per_input else set()
+
+            # Skip when any input is an ancestor of another input (redundant edge).
+            redundant_edge = any(
+                other in ancestors_per_input[i]
+                for i, this in enumerate(unique_inputs)
+                for j, other in enumerate(unique_inputs)
+                if i != j
+            )
+
+            if shared and not redundant_edge:
+                # Compute concrete overlap columns + winner per artifact pair so
+                # the UI banner can show "Tx overrides DMC on [Id, SepalLengthCm]"
+                # instead of vague "last-wins on overlap".
+                input_cols: List[List[str]] = []
+                for art in artifacts:
+                    if isinstance(art, pd.DataFrame):
+                        input_cols.append(list(art.columns))
+                    elif isinstance(art, SplitDataset) and isinstance(art.train, pd.DataFrame):
+                        input_cols.append(list(art.train.columns))
+                    elif isinstance(art, SplitDataset) and isinstance(art.train, tuple):
+                        X = art.train[0]
+                        input_cols.append(list(X.columns) if hasattr(X, "columns") else [])
+                    elif isinstance(art, tuple) and len(art) == 2 and hasattr(art[0], "columns"):
+                        input_cols.append(list(art[0].columns))
+                    else:
+                        input_cols.append([])
+
+                # Overlap = columns appearing in 2+ inputs (subject to last-wins).
+                seen: Dict[str, int] = {}
+                overlap: List[str] = []
+                for cols in input_cols:
+                    for c in cols:
+                        seen[c] = seen.get(c, 0) + 1
+                for c, cnt in seen.items():
+                    if cnt > 1:
+                        overlap.append(c)
+
+                strategy = self._get_merge_strategy(node.node_id)
+                winner_id = unique_inputs[-1] if strategy == "last_wins" else unique_inputs[0]
+                advisory = {
+                    "node_id": node.node_id,
+                    "kind": "sibling_fan_in",
+                    "inputs": unique_inputs,
+                    "common_ancestors": sorted(shared),
+                    "overlap_columns": sorted(overlap),
+                    "winner_input": winner_id,
+                    "strategy": strategy,
+                    "message": (
+                        f"Node '{node.node_id}' merges {len(unique_inputs)} sibling "
+                        f"branches that share ancestor(s) {sorted(shared)}. "
+                        f"Columns are unioned; on overlap ({len(overlap)} column(s)) "
+                        f"the {strategy} input '{winner_id}' wins. If you wanted sequential "
+                        "application, chain the transformers linearly instead."
+                    ),
+                }
+                self.merge_warnings.append(advisory)
+                self.log(f"WARN: {advisory['message']}")
+
+        # Reject obvious wiring mistakes (model object plugged into a data input).
+        for input_id, art in zip(node.inputs, artifacts):
+            if hasattr(art, "predict") or (hasattr(art, "fit") and not hasattr(art, "transform")):
+                raise ValueError(
+                    f"Node {node.node_id}: input from '{input_id}' is a Model object "
+                    f"(type: {type(art).__name__}). Nodes expect data, not models. "
+                    f"Did you connect a training/tuning output directly?"
+                )
+
+        all_splits = all(isinstance(a, SplitDataset) for a in artifacts)
+        all_xy_tuples = all(isinstance(a, tuple) and len(a) == 2 for a in artifacts)
+        if all_xy_tuples:
+            # Preserve (X, y) shape when every input is an (X, y) tuple.
+            # Merge X column-wise; reuse y from the first edge
+            # (duplicate edges to the same source share the same y).
+            x_frames = [a[0] for a in artifacts if isinstance(a[0], pd.DataFrame)]
+            if not x_frames:
+                raise ValueError(
+                    f"Node {node.node_id}: cannot merge (X, y) tuples - "
+                    "X parts are not DataFrames."
+                )
+            merged_x = self._merge_frames(x_frames, node.node_id, "X")
+            return (merged_x, artifacts[0][1])
+
+        if all_splits:
+            split_artifacts: List[SplitDataset] = [
+                a for a in artifacts if isinstance(a, SplitDataset)
+            ]
+
+            def merge_part(part_label: str, parts: List[Any]) -> Any:
+                """Merge one SplitDataset slot (train/test/validation) across branches.
+
+                Preserves ``(X, y)`` tuple shape when every branch produced a
+                tuple — this keeps downstream X/y tabs and training contracts
+                intact. Falls back to flat-DataFrame merging otherwise.
+                """
+                non_empty = [p for p in parts if p is not None]
+                if not non_empty:
+                    return None
+                # All branches produced (X, y) tuples → merge X columns,
+                # keep y from the first branch (all branches descend from the
+                # same Splitter, so y is identical).
+                if all(isinstance(p, tuple) and len(p) == 2 for p in non_empty):
+                    x_frames: List[pd.DataFrame] = []
+                    for p in non_empty:
+                        x = p[0]
+                        if isinstance(x, pd.DataFrame) and not x.empty:
+                            x_frames.append(x)
+                    if not x_frames:
+                        return None
+                    merged_x = self._merge_frames(x_frames, node.node_id, part_label)
+                    return (merged_x, non_empty[0][1])
+                # Mixed or pure DataFrame parts → flatten and merge as frames.
+                frames = [
+                    df
+                    for df in (self._coerce_to_frame(p, target_col) for p in non_empty)
+                    if df is not None
+                ]
+                if not frames:
+                    return None
+                return self._merge_frames(frames, node.node_id, part_label)
+
+            merged_train = merge_part("train", [sd.train for sd in split_artifacts])
+            if merged_train is None:
+                raise ValueError(
+                    f"Node {node.node_id}: all upstream SplitDataset inputs "
+                    "have empty train splits."
+                )
+            merged_test = merge_part("test", [sd.test for sd in split_artifacts])
+            merged_val = merge_part("validation", [sd.validation for sd in split_artifacts])
+
+            # Empty test defaults to an empty DataFrame for downstream consumers
+            # that assume `.test` is iterable.
+            if merged_test is None:
+                merged_test = pd.DataFrame()
+
+            return SplitDataset(
+                train=cast(Any, merged_train),
+                test=cast(Any, merged_test),
+                validation=merged_val,
+            )
+
+        # Fallback: flatten everything to a single DataFrame.
+        if any(isinstance(a, SplitDataset) for a in artifacts):
+            self.log(
+                f"Node {node.node_id}: mixed SplitDataset/DataFrame inputs — "
+                "merging on train portions only; held-out splits are dropped."
+            )
+
+        dataframes: List[pd.DataFrame] = []
+        for i, art in enumerate(artifacts):
+            df = self._coerce_to_frame(art, target_col)
+            if df is None:
+                df = self._to_dataframe(art, target_col)
+            if df.empty:
+                raise ValueError(
+                    f"Node {node.node_id}: input #{i} produced an empty DataFrame "
+                    "(0 rows). Check upstream preprocessing branches."
+                )
+            dataframes.append(df)
+
+        return self._merge_frames(dataframes, node.node_id)
+
+    def _get_input(self, node: NodeConfig, target_col: str = "") -> Any:
+        """Resolve a node's data input, merging when more than one edge exists.
+
+        Duplicate edges to the same source collapse to one input, so a node
+        wired twice to the same upstream behaves like a single-input node.
+        """
+        unique_inputs = list(dict.fromkeys(node.inputs or []))
+        if len(unique_inputs) > 1:
+            return self._merge_inputs(node, target_col)
+        return self._resolve_input(node)
+
+    def _resolve_feature_engineer_artifact_key(self, node: NodeConfig) -> str | None:
+        if not node.inputs:
+            return None
+
+        for input_node_id in node.inputs:
+            candidate = f"{input_node_id}_pipeline"
+            if self.artifact_store.exists(candidate):
+                return candidate
+
+            candidate = f"exec_{input_node_id}_pipeline"
+            if self.artifact_store.exists(candidate):
+                return candidate
+
+        return None
+
+    def _collect_feature_engineer_artifact_keys(self, node_id: str, visited: set[str]) -> list[str]:
+        if node_id in visited:
+            return []
+        visited.add(node_id)
+
+        keys: list[str] = []
+        node_cfg = self._node_configs.get(node_id)
+        if node_cfg and node_cfg.inputs:
+            for upstream_id in node_cfg.inputs:
+                keys.extend(self._collect_feature_engineer_artifact_keys(upstream_id, visited))
+
+        # Prefer the execution-time pipeline artifact if present.
+        for candidate in (f"exec_{node_id}_pipeline", f"{node_id}_pipeline"):
+            if self.artifact_store.exists(candidate):
+                keys.append(candidate)
+                break
+
+        return keys
+
+    def _build_composite_feature_engineer(self, node: NodeConfig) -> FeatureEngineer | None:
+        """Build a single, ordered FeatureEngineer from all upstream pipeline artifacts.
+
+        Some pipelines are represented as multiple transformer nodes (e.g., encoding -> scaling).
+        Each node saves its own FeatureEngineer artifact with only its fitted step(s).
+        For inference and label decoding we need a single FeatureEngineer that contains the
+        full chain in the correct order.
+        """
+
+        if not node.inputs:
+            return None
+
+        visited: set[str] = set()
+        artifact_keys: list[str] = []
+        for input_node_id in node.inputs:
+            artifact_keys.extend(
+                self._collect_feature_engineer_artifact_keys(input_node_id, visited)
+            )
+
+        if not artifact_keys:
+            return None
+
+        merged_steps: list[dict[str, Any]] = []
+        for key in artifact_keys:
+            try:
+                fe = self.artifact_store.load(key)
+            except Exception as e:
+                logger.debug(f"Failed to load pipeline artifact {key}: {e}")
+                continue
+
+            fitted_steps = getattr(fe, "fitted_steps", None)
+            if isinstance(fitted_steps, list) and fitted_steps:
+                merged_steps.extend(fitted_steps)
+
+        if not merged_steps:
+            return None
+
+        composite = FeatureEngineer([])
+        composite.fitted_steps = merged_steps
+        return composite
+
+    def _bundle_transformers_with_model(
+        self,
+        model_artifact_key: str,
+        job_id: str = "unknown",
+        feature_engineer_artifact_key: str | None = None,
+        feature_engineer_override: Any | None = None,
+        target_column: str | None = None,
+        dropped_columns: List[str] | None = None,
+    ):
+        """Bundles fitted transformers with the model artifact for inference."""
+        try:
+            model_artifact = self.artifact_store.load(model_artifact_key)
+
+            # Handle tuple artifacts from tuning: (model, metadata/tuning_result)
+            if isinstance(model_artifact, tuple) and len(model_artifact) >= 1:
+                model_artifact = model_artifact[0]
+
+            # Collect fitted transformer objects
+            # In the new SDK, the FeatureEngineer object contains all steps.
+            # We should look for the FeatureEngineer artifact.
+
+            feature_engineer = None
+
+            if feature_engineer_override is not None and hasattr(
+                feature_engineer_override, "transform"
+            ):
+                feature_engineer = feature_engineer_override
+
+            # Prefer an explicit FeatureEngineer artifact key (derived from the pipeline graph)
+            # rather than scanning the whole artifacts directory. Scanning can pick a pipeline
+            # from a different run and cause incorrect transforms and label decoding.
+            if feature_engineer_artifact_key:
+                try:
+                    obj = self.artifact_store.load(feature_engineer_artifact_key)
+                    if hasattr(obj, "transform"):
+                        feature_engineer = obj
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to load feature engineer artifact {feature_engineer_artifact_key}: {e}"
+                    )
+
+            if feature_engineer:
+                # Create the new bundle format
+                full_artifact = {
+                    "model": model_artifact,
+                    "feature_engineer": feature_engineer,
+                    "job_id": job_id,
+                    "target_column": target_column,
+                    "dropped_columns": dropped_columns or [],
+                }
+            else:
+                # Fallback to old logic if no FeatureEngineer found (e.g. manual steps)
+                transformers = []
+                transformer_plan = []
+
+                for t_info in self.executed_transformers:
+                    try:
+                        fitted_t = self.artifact_store.load(t_info["artifact_key"])
+                        if fitted_t:
+                            transformers.append(
+                                {
+                                    "node_id": t_info["node_id"],
+                                    "transformer_name": t_info["transformer_name"],
+                                    "column_name": t_info["column_name"],
+                                    "transformer": fitted_t,
+                                }
+                            )
+                            transformer_plan.append(
+                                {
+                                    "node_id": t_info["node_id"],
+                                    "transformer_name": t_info["transformer_name"],
+                                    "column_name": t_info["column_name"],
+                                    "transformer_type": t_info["transformer_type"],
+                                }
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to load transformer artifact {t_info['artifact_key']}: {e}"
+                        )
+
+                full_artifact = {
+                    "model": model_artifact,
+                    "transformers": transformers,
+                    "transformer_plan": transformer_plan,
+                    "job_id": job_id,
+                    "target_column": target_column,
+                    "dropped_columns": dropped_columns or [],
+                }
+
+            # Save to job_id key if available - this is the final artifact for the job
+            if job_id and job_id != "unknown":
+                uri = self.artifact_store.get_artifact_uri(job_id)
+                self.log(f"Saving bundled artifact to {uri}")
+                self.artifact_store.save(job_id, full_artifact)
+
+        except Exception as e:
+            logger.error(f"Failed to bundle transformers with model: {e}")
+
+    # --- Step Implementations ---
+
+    def _run_data_loader(self, node: NodeConfig, job_id: str = "unknown") -> str:
+        # params: {"source": "csv", "path": "...", "sample": True/False, "limit": 1000}
+
+        # Some callers use `dataset_id` as a path.
+        dataset_id = node.params.get("dataset_id")
+        if not dataset_id:
+            dataset_id = node.params.get("path")
+
+        if not dataset_id:
+            raise KeyError(
+                f"Node {node.node_id} missing 'dataset_id' or 'path' in params: {node.params}"
+            )
+
+        limit = None
+        if node.params.get("sample", False):
+            limit = node.params.get("limit", 1000)
+            self.log(f"Loading sample data from {dataset_id} (limit={limit})")
+        else:
+            dataset_name = self.catalog.get_dataset_name(dataset_id)
+            log_msg = (
+                f"Loading full data from {dataset_name}"
+                if dataset_name
+                else f"Loading full data from {dataset_id}"
+            )
+            self.log(log_msg)
+
+        # Use the injected catalog
+        try:
+            df = self.catalog.load(dataset_id, limit=limit)
+        except FileNotFoundError:
+            # Try to resolve name for better error message
+            raise FileNotFoundError(
+                f"Dataset {dataset_id} not found. Please check if the file exists."
+            )
+
+        self.log(
+            f"Data loaded successfully. Shape: {df.shape} ({len(df)} rows, {len(df.columns)} columns)"
+        )
+        self.artifact_store.save(node.node_id, df)
+
+        # Save as Reference Data for Drift Detection (Raw Initial State)
+        if job_id != "unknown" and self._pipeline_has_training_node():
+            # We don't have target_col yet, but _save_reference_data splits X/y if tuple.
+            # Here df is full dataframe.
+            # We'll rely on the fact that target_col is just used to re-assemble if it was a tuple.
+            # Since df is a DataFrame, target_col is ignored inside _save_reference_data logic for DF inputs.
+            self._save_reference_data(df, job_id, target_col="")
+
+        return node.node_id
+
+    def _run_feature_engineering(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
+        # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
+        df = self._get_input(node)
+
+        # params: {"steps": [...]}
+        engineer = FeatureEngineer(node.params.get("steps", []))
+
+        # SDK FeatureEngineer.fit_transform(data) -> (transformed_data, metrics)
+        processed_df, metrics = engineer.fit_transform(df)
+
+        # Manually save state if needed.
+        # The SDK keeps state in engineer.fitted_steps.
+        # For now, we save the whole engineer object as the artifact for this node?
+        # Or we iterate and save individual steps if the artifact store expects that.
+        # The original code passed artifact_store to fit_transform, implying internal saving.
+        # We will save the engineer object itself to preserve the pipeline state.
+        self.artifact_store.save(f"{node.node_id}_pipeline", engineer)
+
+        if hasattr(processed_df, "shape"):
+            self.log(f"Feature engineering completed. Output shape: {processed_df.shape}")
+        elif isinstance(processed_df, SplitDataset):
+            self.log("Feature engineering completed. SplitDataset created.")
+
+        if isinstance(processed_df, tuple):
+            # SplitDataset
+            train_part = processed_df[0]
+            test_part = processed_df[1] if len(processed_df) > 1 else None
+            train_shape = getattr(train_part, "shape", None)
+            test_shape = getattr(test_part, "shape", None) if test_part is not None else None
+            self.log(f"Split details - Train: {train_shape}, " f"Test: {test_shape or 'None'}")
+
+        self.artifact_store.save(node.node_id, processed_df)
+
+        # Track executed transformers
+        for step in node.params.get("steps", []):
+            self.executed_transformers.append(
+                {
+                    "node_id": node.node_id,
+                    "transformer_name": step["name"],
+                    "transformer_type": step["transformer"],
+                    # This key might need adjustment if we save the whole engineer
+                    "artifact_key": f"{node.node_id}_{step['name']}",
+                    "column_name": step.get("params", {}).get("new_column"),
+                }
+            )
+
+        return node.node_id, metrics
+
+    def _run_basic_training(  # noqa: C901
+        self, node: NodeConfig, job_id: str = "unknown"
+    ) -> tuple[str, Dict[str, Any]]:
+        # Input: SplitDataset (from Feature Engineering) or DataFrame
+        # Supports multiple inputs — merges them before training.
+
+        target_col = node.params["target_column"]
+
+        data = self._get_input(node, target_col)
+
+        # Safety check: Ensure data is not a model artifact
+        if hasattr(data, "predict") or hasattr(data, "fit"):
+            raise ValueError(
+                f"Node {node.node_id} received a Model object instead of a Dataset. "
+                "Check your pipeline connections. "
+                "Did you connect a Tuning/Training node output to a Training node input?"
+            )
+
+        target_col = node.params["target_column"]
+        algorithm = node.params.get("algorithm") or node.params.get("model_type")
+        if not algorithm:
+            raise ValueError("Missing 'algorithm' or 'model_type' in node parameters")
+        hyperparameters = node.params.get("hyperparameters", {})
+
+        # Factory logic (simplified)
+        calculator, applier = self._get_model_components(algorithm)
+
+        # SDK StatefulEstimator(calculator, applier, node_id)
+        estimator = StatefulEstimator(calculator, applier, node.node_id)
+
+        # 1. Cross-Validation (Optional)
+        cv_metrics = {}
+        if node.params.get("cv_enabled", False):
+            # Handle DataFrame vs SplitDataset
+            cv_data = data
+            if isinstance(data, pd.DataFrame):
+                from skyulf.data.dataset import SplitDataset
+
+                cv_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+            elif isinstance(data, tuple):
+                from skyulf.data.dataset import SplitDataset
+
+                # Check if it's (train_df, test_df) or (X, y)
+                elem0 = data[0]
+                if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
+                    train_df, test_df = data
+                    cv_data = SplitDataset(train=train_df, test=test_df, validation=None)
+                else:
+                    cv_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+
+            cv_results = estimator.cross_validate(
+                cv_data,
+                target_col,
+                hyperparameters,
+                n_folds=node.params.get("cv_folds", 5),
+                cv_type=node.params.get("cv_type", "k_fold"),
+                shuffle=node.params.get("cv_shuffle", True),
+                random_state=node.params.get("cv_random_state", 42),
+                time_column=node.params.get("cv_time_column") or None,
+                log_callback=self.log,
+            )
+
+            # Aggregate metrics for the return value
+            # cv_results structure: {"aggregated_metrics": {"accuracy": {"mean": 0.9, ...}}, "folds": [...]}
+            agg_metrics = cv_results.get("aggregated_metrics", cv_results)
+            for metric_name, stats in agg_metrics.items():
+                if isinstance(stats, dict) and "mean" in stats:
+                    cv_metrics[f"cv_{metric_name}_mean"] = stats["mean"]
+                    cv_metrics[f"cv_{metric_name}_std"] = stats["std"]
+
+        # 2. Train Final Model
+        self.log(f"Starting model training with algorithm: {algorithm}")
+        # SDK fit_predict(dataset, target_column, config)
+        # config expects {"params": ...} usually
+        # Ensure hyperparameters are passed correctly.
+        # If hyperparameters is already a dict of params, wrap it.
+        fit_config = {"params": hyperparameters}
+
+        # Debug log
+        self.log(f"Fit config params: {fit_config}")
+
+        estimator.fit_predict(data, target_col, fit_config, log_callback=self.log)
+
+        # Finalize and save artifacts
+        self._finalize_training_artifacts(data, job_id, target_col, node.node_id, estimator.model)
+
+        self.log("Model training finished.")
+
+        # Bundle transformers with the model for inference
+        composite_feature_engineer = self._build_composite_feature_engineer(node)
+        feature_engineer_key = None
+        if composite_feature_engineer is None:
+            feature_engineer_key = self._resolve_feature_engineer_artifact_key(node)
+
+        self._bundle_transformers_with_model(
+            node.node_id,
+            job_id=job_id,
+            feature_engineer_artifact_key=feature_engineer_key,
+            feature_engineer_override=composite_feature_engineer,
+            target_column=target_col,
+        )
+
+        # Optional: Evaluate immediately
+        metrics = {}
+        if node.params.get("evaluate", True):
+            # Ensure data is SplitDataset for evaluation
+            eval_data = data
+            if isinstance(data, pd.DataFrame):
+                from skyulf.data.dataset import SplitDataset
+
+                eval_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+            elif isinstance(data, tuple):
+                from skyulf.data.dataset import SplitDataset
+
+                # Check if it's (train_df, test_df) or (X, y)
+                elem0 = data[0]
+                if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
+                    train_df, test_df = data
+                    eval_data = SplitDataset(train=train_df, test=test_df, validation=None)
+                else:
+                    eval_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+
+            report = estimator.evaluate(eval_data, target_col, job_id=job_id)
+
+            # Save evaluation data artifact for API
+            if "raw_data" in report:
+                eval_key = f"{job_id}_evaluation_data"
+                uri = self.artifact_store.get_artifact_uri(eval_key)
+                self.log(f"Saving evaluation data to {uri}")
+                self.artifact_store.save(eval_key, report["raw_data"])
+
+            # Flatten metrics for summary with prefixes
+            # SDK report is a dict, but splits contain Pydantic models
+
+            splits = report["splits"]
+            if "train" in splits and splits["train"]:
+                train_metrics = splits["train"].metrics
+                for k, v in train_metrics.items():
+                    metrics[f"train_{k}"] = v
+
+            if "test" in splits and splits["test"]:
+                test_metrics = splits["test"].metrics
+                for k, v in test_metrics.items():
+                    metrics[f"test_{k}"] = v
+
+            if "validation" in splits and splits["validation"]:
+                val_metrics = splits["validation"].metrics
+                for k, v in val_metrics.items():
+                    metrics[f"val_{k}"] = v
+
+        # Merge CV metrics
+        metrics.update(cv_metrics)
+
+        # Persist feature importances
+        fi = self._extract_feature_importances(estimator.model, data, target_col)
+        if fi:
+            metrics["feature_importances"] = fi
+
+        # Persist data shape for monitoring
+        try:
+            if isinstance(data, pd.DataFrame):
+                metrics["n_rows"] = len(data)
+                metrics["n_features"] = len(data.columns) - 1  # minus target
+            elif hasattr(data, "train") and hasattr(data.train, "shape"):
+                metrics["n_rows"] = data.train.shape[0]
+                metrics["n_features"] = data.train.shape[1] - 1
+            elif isinstance(data, tuple) and len(data) >= 1:
+                first = data[0]
+                if hasattr(first, "shape"):
+                    metrics["n_rows"] = first.shape[0]
+                    metrics["n_features"] = first.shape[1] - 1
+        except Exception:
+            pass
+
+        return node.node_id, metrics
+
+    def _run_advanced_tuning(  # noqa: C901
+        self, node: NodeConfig, job_id: str = "unknown"
+    ) -> tuple[str, Dict[str, Any]]:
+        # Input: SplitDataset — supports multiple inputs via merge.
+        target_col = node.params["target_column"]
+
+        data = self._get_input(node, target_col)
+
+        algorithm = node.params.get("algorithm") or node.params.get("model_type")
+        if not algorithm:
+            raise ValueError("Missing 'algorithm' or 'model_type' in node parameters")
+        tuning_params = node.params["tuning_config"]  # Dict matching TuningConfig
+
+        calculator, applier = self._get_model_components(algorithm)
+
+        # Create Tuner components
+        tuner_calc = TuningCalculator(calculator)
+        tuner_applier = TuningApplier(applier)
+
+        # Create StatefulEstimator wrapping the Tuner
+        # This ensures consistency with how standard models are trained and evaluated
+        estimator = StatefulEstimator(tuner_calc, tuner_applier, node.node_id)
+
+        self.log(
+            f"Starting hyperparameter tuning (Strategy: {tuning_params.get('strategy', 'random')}, "
+            f"Trials: {tuning_params.get('n_trials', 10)})"
+        )
+
+        # Ensure data is SplitDataset
+        if isinstance(data, pd.DataFrame):
+            from skyulf.data.dataset import SplitDataset
+
+            data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+        elif isinstance(data, tuple):
+            from skyulf.data.dataset import SplitDataset
+
+            # Check if it's (train_df, test_df) or (X, y)
+            elem0 = data[0]
+            if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
+                train_df, test_df = data
+                data = SplitDataset(train=train_df, test=test_df, validation=None)
+            else:
+                data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+
+        def progress_callback(current, total, score=None, params=None):
+            msg = f"Tuning progress: Trial {current}/{total}"
+            if score is not None:
+                msg += f" - Score: {score:.4f}"
+            self.log(msg)
+
+        # Run fit_predict
+        # This will:
+        # 1. Run tuning (TunerCalculator.fit)
+        # 2. Refit the best model on the full training set (TunerCalculator.fit)
+        # 3. Generate predictions on train/test/val splits (TunerApplier.predict)
+        estimator.fit_predict(
+            data,
+            target_col,
+            tuning_params,
+            progress_callback=progress_callback,
+            log_callback=self.log,
+            job_id=job_id,
+        )
+
+        # Finalize and save artifacts
+        self._finalize_training_artifacts(data, job_id, target_col, node.node_id, estimator.model)
+
+        self.log("Tuning and final model retraining finished.")
+
+        # Bundle transformers with the model for inference
+        composite_feature_engineer = self._build_composite_feature_engineer(node)
+        feature_engineer_key = None
+        if composite_feature_engineer is None:
+            feature_engineer_key = self._resolve_feature_engineer_artifact_key(node)
+
+        self._bundle_transformers_with_model(
+            node.node_id,
+            job_id=job_id,
+            feature_engineer_artifact_key=feature_engineer_key,
+            feature_engineer_override=composite_feature_engineer,
+            target_column=target_col,
+        )
+
+        # Extract metrics from tuning result
+        # estimator.model is expected to be a tuple (model, tuning_result) for Tuner
+        model_artifact = estimator.model
+        if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
+            _, tuning_result = model_artifact
+        else:
+            tuning_result = None
+
+        if tuning_result:
+            metrics = {
+                "best_score": tuning_result.best_score,
+                "best_params": tuning_result.best_params,
+                "trials": tuning_result.trials,
+                "scoring_metric": tuning_result.scoring_metric
+                or tuning_params.get("tuning_config", {}).get("metric")
+                or tuning_params.get("metric"),
+            }
+        else:
+            metrics = {}
+
+        # Cross-Validation on the tuned model (using best params)
+        cv_metrics: Dict[str, Any] = {}
+        if tuning_params.get("cv_enabled", False):
+            best_params: Dict[str, Any] = tuning_result.best_params if tuning_result else {}
+            cv_estimator = StatefulEstimator(calculator, applier, node.node_id)
+
+            # For advanced tuning, nested_cv's inner loop already ran during
+            # the search. Post-tuning CV only needs the outer evaluation, so
+            # downgrade to stratified_k_fold (classification) or k_fold (regression).
+            post_cv_type = tuning_params.get("cv_type", "k_fold")
+            if post_cv_type == "nested_cv":
+                is_classification = getattr(calculator, "problem_type", "") == "classification"
+                post_cv_type = "stratified_k_fold" if is_classification else "k_fold"
+                self.log(
+                    "Nested CV inner loop already ran during tuning. "
+                    f"Using {post_cv_type} for post-tuning evaluation."
+                )
+
+            self.log("Running cross-validation on tuned model with best parameters...")
+            try:
+                cv_results = cv_estimator.cross_validate(
+                    data,
+                    target_col,
+                    {"params": best_params},
+                    n_folds=tuning_params.get("cv_folds", 5),
+                    cv_type=post_cv_type,
+                    shuffle=tuning_params.get("cv_shuffle", True),
+                    random_state=tuning_params.get("cv_random_state", 42),
+                    time_column=tuning_params.get("cv_time_column") or None,
+                    log_callback=self.log,
+                )
+
+                agg_metrics = cv_results.get("aggregated_metrics", cv_results)
+                for metric_name, stats in agg_metrics.items():
+                    if isinstance(stats, dict) and "mean" in stats:
+                        cv_metrics[f"cv_{metric_name}_mean"] = stats["mean"]
+                        cv_metrics[f"cv_{metric_name}_std"] = stats["std"]
+            except Exception as e:
+                logger.warning(f"Cross-validation failed for tuned model: {e}")
+
+        # Evaluate the tuned model
+        try:
+            report = estimator.evaluate(data, target_col, job_id=job_id)
+
+            # Save evaluation data artifact for API
+            if "raw_data" in report:
+                eval_key = f"{job_id}_evaluation_data"
+                uri = self.artifact_store.get_artifact_uri(eval_key)
+                self.log(f"Saving evaluation data to {uri}")
+                self.artifact_store.save(eval_key, report["raw_data"])
+
+            splits = report["splits"]
+
+            if "train" in splits and splits["train"]:
+                for k, v in splits["train"].metrics.items():
+                    metrics[f"train_{k}"] = v
+
+            if "test" in splits and splits["test"]:
+                for k, v in splits["test"].metrics.items():
+                    metrics[f"test_{k}"] = v
+
+            if "validation" in splits and splits["validation"]:
+                for k, v in splits["validation"].metrics.items():
+                    metrics[f"val_{k}"] = v
+        except Exception as e:
+            logger.warning(f"Failed to evaluate tuned model: {e}")
+
+        # Merge CV metrics
+        metrics.update(cv_metrics)
+
+        # Persist feature importances
+        fi = self._extract_feature_importances(estimator.model, data, target_col)
+        if fi:
+            metrics["feature_importances"] = fi
+
+        # Persist data shape for monitoring
+        try:
+            if isinstance(data, pd.DataFrame):
+                metrics["n_rows"] = len(data)
+                metrics["n_features"] = len(data.columns) - 1
+            elif hasattr(data, "train") and hasattr(data.train, "shape"):
+                train_frame = cast(Any, data.train)
+                metrics["n_rows"] = train_frame.shape[0]
+                metrics["n_features"] = train_frame.shape[1] - 1
+            elif isinstance(data, tuple) and len(data) >= 1:
+                first = cast(Any, data[0])
+                if hasattr(first, "shape"):
+                    metrics["n_rows"] = first.shape[0]
+                    metrics["n_features"] = first.shape[1] - 1
+        except Exception:
+            pass
+
+        return node.node_id, metrics
+
+    def _run_transformer(
+        self, node: NodeConfig, job_id: str = "unknown"
+    ) -> tuple[str, Dict[str, Any]]:
+        """Runs a single transformer node as a 1-step feature engineering pipeline."""
+        # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
+        data = self._get_input(node)
+
+        # Wrap the single node as a 1-step feature engineering pipeline
+        step_config = {
+            "name": "step",  # Generic name, the artifact will be saved by engine anyway
+            "transformer": node.step_type,
+            "params": node.params,
+        }
+
+        engineer = FeatureEngineer([step_config])
+
+        # SDK FeatureEngineer.fit_transform(data)
+        processed_data, run_metrics = engineer.fit_transform(data)
+
+        # Manually save the engineer state if needed
+        self.artifact_store.save(f"exec_{node.node_id}_pipeline", engineer)
+
+        self.artifact_store.save(node.node_id, processed_data)
+
+        # Track executed transformer
+        self.executed_transformers.append(
+            {
+                "node_id": node.node_id,
+                "transformer_name": "step",
+                "transformer_type": node.step_type,
+                "artifact_key": f"exec_{node.node_id}_step",
+                "column_name": node.params.get("new_column"),
+            }
+        )
+
+        # Check if this was a Splitter, if so update Reference Data to be the Train Split
+        if (
+            "Splitter" in node.step_type
+            and job_id != "unknown"
+            and self._pipeline_has_training_node()
+        ):
+            # processed_data is likely a SplitDataset or tuple (train, test)
+            # _save_reference_data handles extraction of train part
+            self._save_reference_data(processed_data, job_id, target_col="")
+
+        # Load fitted params to get metrics (e.g. dropped columns)
+        metrics = run_metrics.copy()
+        # In SDK, metrics are returned directly, so we don't need to load from artifact store.
+        # But we might want to inspect engineer.fitted_steps if metrics are missing.
+
+        return node.node_id, metrics
+
+    def _get_model_components(self, algorithm: str):
+        """Factory for model components."""
+        # Normalize algorithm name to match registry IDs
+        algo = algorithm.lower().replace(" ", "_").replace("-", "_")
+
+        # Map legacy aliases to registry IDs
+        alias_map = {
+            "logisticregression": "logistic_regression",
+            "randomforestclassifier": "random_forest_classifier",
+            "random_forest": "random_forest_classifier",
+            "ridgeregression": "ridge_regression",
+            "ridge": "ridge_regression",
+            "randomforestregressor": "random_forest_regressor",
+        }
+
+        registry_id = alias_map.get(algo, algo)
+
+        try:
+            calculator_cls = NodeRegistry.get_calculator(registry_id)
+            applier_cls = NodeRegistry.get_applier(registry_id)
+            return calculator_cls(), applier_cls()
+        except ValueError:
+            # Fallback: Raise original error if not found in registry
+            raise ValueError(f"Unknown algorithm: {algorithm} (Registry ID: {registry_id})")
+
+    def _run_data_preview(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
+        """
+        Generates a detailed preview of the data and pipeline state.
+        """
+        # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
+        data = self._get_input(node)
+
+        preview_info: Dict[str, Any] = {
+            "timestamp": datetime.now().isoformat(),
+            "data_summary": {},
+            "applied_transformations": [],
+            "operation_mode": "unknown",
+        }
+
+        # 1. Analyze Data
+        def get_df_info(df: pd.DataFrame, name: str):
+            return {
+                "name": name,
+                "shape": df.shape,
+                "columns": list(df.columns),
+                # "dtypes": {k: str(v) for k, v in df.dtypes.items()}, # Optional, can be large
+                "sample": df.head(20).replace({np.nan: None}).to_dict(orient="records"),
+            }
+
+        if isinstance(data, SplitDataset):
+            preview_info["operation_mode"] = "Train: fit_transform | Test/Val: transform"
+
+            # Train
+            if isinstance(data.train, tuple):
+                X, _ = data.train
+                preview_info["data_summary"]["train"] = get_df_info(X, "Train (X)")
+            else:
+                preview_info["data_summary"]["train"] = get_df_info(data.train, "Train")
+
+            # Test
+            if data.test is not None:
+                if isinstance(data.test, tuple):
+                    X_test, _ = data.test
+                    preview_info["data_summary"]["test"] = get_df_info(X_test, "Test (X)")
+                elif isinstance(data.test, pd.DataFrame) and not data.test.empty:
+                    preview_info["data_summary"]["test"] = get_df_info(data.test, "Test")
+
+            # Validation
+            if data.validation is not None:
+                if isinstance(data.validation, tuple):
+                    X_val, _ = data.validation
+                    preview_info["data_summary"]["validation"] = get_df_info(
+                        X_val, "Validation (X)"
+                    )
+                elif isinstance(data.validation, pd.DataFrame):
+                    preview_info["data_summary"]["validation"] = get_df_info(
+                        data.validation, "Validation"
+                    )
+
+        elif isinstance(data, pd.DataFrame):
+            preview_info["operation_mode"] = "fit_transform"
+            preview_info["data_summary"]["full"] = get_df_info(data, "Full Dataset")
+
+        # 2. Get History
+        # Return the list of transformers executed so far
+        preview_info["applied_transformations"] = self.executed_transformers
+
+        # Save the preview artifact
+        self.artifact_store.save(node.node_id, preview_info)
+
+        # Return the preview info directly so it's available in the job result
+        return node.node_id, preview_info

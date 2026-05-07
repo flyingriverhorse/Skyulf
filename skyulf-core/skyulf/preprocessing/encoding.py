@@ -25,9 +25,7 @@ from ..engines.sklearn_bridge import SklearnBridge
 logger = logging.getLogger(__name__)
 
 
-def _parse_categories_order(
-    raw: Any, n_cols: int
-) -> Union[str, List[List[str]]]:
+def _parse_categories_order(raw: Any, n_cols: int) -> Union[str, List[List[str]]]:
     """Convert the frontend categories_order string/list into sklearn-compatible categories.
 
     The frontend sends a newline-separated string where each line holds
@@ -355,7 +353,9 @@ class OrdinalEncoderApplier(BaseApplier):
                     X_subset = X_subset.select([pl.col(c).cast(pl.Utf8) for c in valid_cols])
                     X_np, _ = SklearnBridge.to_sklearn(X_subset)
                     encoded_array = encoder.transform(X_np)
-                    new_cols_pl = [pl.Series(col, encoded_array[:, i]) for i, col in enumerate(valid_cols)]
+                    new_cols_pl = [
+                        pl.Series(col, encoded_array[:, i]) for i, col in enumerate(valid_cols)
+                    ]
                     X_out = X_pl.with_columns(new_cols_pl)
                 except Exception as e:
                     logger.error(f"Ordinal Encoding failed: {e}")
@@ -424,7 +424,9 @@ class OrdinalEncoderCalculator(BaseCalculator):
         # OrdinalEncoder only accepts 'error' or 'use_encoded_value' — not 'ignore'.
         # Sanitise in case the config carries over a value valid for OHE ('ignore').
         _raw_hu = config.get("handle_unknown", "use_encoded_value")
-        handle_unknown = _raw_hu if _raw_hu in ("error", "use_encoded_value") else "use_encoded_value"
+        handle_unknown = (
+            _raw_hu if _raw_hu in ("error", "use_encoded_value") else "use_encoded_value"
+        )
         unknown_value = config.get("unknown_value", -1)
 
         # Detect target column name from config or y (set by Feature/Target Split)
@@ -472,10 +474,7 @@ class OrdinalEncoderCalculator(BaseCalculator):
         # silently discard it. We detect the intent here first.
         cols_raw: List[str] = config.get("columns") or []
         encode_target = bool(
-            target_col
-            and target_col in cols_raw
-            and y is not None
-            and target_col not in X.columns
+            target_col and target_col in cols_raw and y is not None and target_col not in X.columns
         )
 
         cols = resolve_columns(X, config, detect_categorical_columns)

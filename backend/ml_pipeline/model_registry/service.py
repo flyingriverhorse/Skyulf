@@ -10,7 +10,7 @@ from backend.database.models import (
     AdvancedTuningJob,
     BasicTrainingJob,
 )
-from backend.ml_pipeline.services.job_service import JobService
+from backend.ml_pipeline._services.job_service import JobService
 
 from .schemas import ArtifactListResponse, ModelRegistryEntry, ModelVersion, RegistryStats
 

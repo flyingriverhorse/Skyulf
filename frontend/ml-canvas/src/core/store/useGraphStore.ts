@@ -92,6 +92,11 @@ interface GraphState {
   // sees on the canvas without re-deriving the partition logic.
   branchEdgeLabels: Record<string, string>;
   setBranchEdgeLabels: (labels: Record<string, string>) => void;
+
+  // Canvas-derived map: Path label -> branch color (e.g. "Path B · Xgboost" -> "hsl(...)").
+  // Lets ResultsPanel show the exact same colored dots the canvas draws on edges.
+  branchLabelColors: Record<string, string>;
+  setBranchLabelColors: (colors: Record<string, string>) => void;
 }
 
 export const useGraphStore = create<GraphState>()(
@@ -108,6 +113,9 @@ export const useGraphStore = create<GraphState>()(
 
   branchEdgeLabels: {},
   setBranchEdgeLabels: (labels) => set({ branchEdgeLabels: labels }),
+
+  branchLabelColors: {},
+  setBranchLabelColors: (colors) => set({ branchLabelColors: colors }),
   setGraph: (nodes, edges) => set({ nodes, edges }),
 
   onNodesChange: (changes: NodeChange[]) => {
@@ -185,8 +193,9 @@ export const useGraphStore = create<GraphState>()(
       // Count UNIQUE source nodes, not edges: multi-output splitters
       // (train_test_split, feature_target_split) legitimately produce
       // several edges from the same source (train/test/X/y handles)
-      // into one downstream node, and that's not fan-in — the engine
-      // dedupes by source id, so no merge happens.
+      // into one downstream node, and that's not fan-in — pipelineConverter
+      // dedupes by source id so the backend sees one logical input,
+      // and useBranchColors groups them into one branch color.
       const existingInputs = edges.filter(e => e.target === connection.target);
       const existingSources = new Set(existingInputs.map(e => e.source));
       const isNewSource = connection.source != null && !existingSources.has(connection.source);

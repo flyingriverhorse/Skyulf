@@ -1,5 +1,7 @@
 """Core application metadata and server settings."""
 
+from typing import Optional
+
 
 class CoreMixin:
     """App identity and server configuration."""
@@ -18,3 +20,6 @@ class CoreMixin:
     HOST: str = "127.0.0.1"
     PORT: int = 8000
     WORKERS: int = 1
+
+    # Observability — opt-in; no-op when not set
+    SENTRY_DSN: Optional[str] = None
