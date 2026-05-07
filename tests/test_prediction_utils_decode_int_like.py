@@ -5,7 +5,7 @@ from typing import List
 import pytest
 from sklearn.preprocessing import LabelEncoder
 
-from backend.ml_pipeline.services.prediction_utils import decode_int_like
+from backend.ml_pipeline._services.prediction_utils import decode_int_like
 
 
 def _make_label_encoder(classes: List[str]) -> LabelEncoder:

@@ -76,6 +76,34 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
       terminals.push(n);
     }
 
+    // Sort terminals to match the BFS topological order that pipelineConverter.ts
+    // and the backend's partition_parallel_pipeline both use (BFS forward from
+    // source/dataset nodes). Without this, the canvas assigns "Path A" to
+    // whichever terminal React Flow stores first (insertion order), while the
+    // backend assigns it to the first terminal in BFS order — causing the canvas
+    // edge labels and Preview Results tab contents to disagree.
+    {
+      const fwdAdj = new Map<string, string[]>();
+      for (const edge of edges) {
+        const list = fwdAdj.get(edge.source) ?? [];
+        list.push(edge.target);
+        fwdAdj.set(edge.source, list);
+      }
+      // Source nodes = nodes with no incoming edges (dataset roots).
+      const srcIds = nodes.filter(n => !edges.some(e => e.target === n.id)).map(n => n.id);
+      const topoOrder = new Map<string, number>();
+      const bfsQ: string[] = [...srcIds];
+      const bfsSeen = new Set<string>(srcIds);
+      while (bfsQ.length > 0) {
+        const nid = bfsQ.shift()!;
+        if (!topoOrder.has(nid)) topoOrder.set(nid, topoOrder.size);
+        for (const child of fwdAdj.get(nid) ?? []) {
+          if (!bfsSeen.has(child)) { bfsSeen.add(child); bfsQ.push(child); }
+        }
+      }
+      terminals.sort((a, b) => (topoOrder.get(a.id) ?? 999999) - (topoOrder.get(b.id) ?? 999999));
+    }
+
     if (terminals.length === 0) return colorMap;
 
     // Build adjacency: target → source edges (for BFS backwards)
@@ -93,21 +121,65 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
     // index so the Path letter restarts at A for every terminal—keeping the
     // canvas edge labels aligned with the per-terminal tab bars (e.g. the
     // Data Preview node's tabs always read Path A / Path B / …).
-    interface BranchDef { terminal: Node; inputEdge: Edge | null; localIndex: number }
+    //
+    // FTS y-pass-through: FeatureTargetSplit's "y" output handle carries the
+    // TARGET LABEL, not a separate preprocessing experiment. When a user
+    // connects FTS-y → AT directly while also connecting TTS → AT (where
+    // TTS descends from FTS), counting FTS as a second source would
+    // incorrectly split one experiment into two color branches.
+    // Solution: exclude y-pass-through edges from source counting and
+    // parallel detection. Post-BFS, assign them to the branch whose root
+    // is a descendant of that FTS node.
+    const isYPassthrough = (edge: Edge): boolean => {
+      if (edge.sourceHandle !== 'y') return false;
+      const srcNode = nodes.find(n => n.id === edge.source);
+      return (srcNode?.data.definitionType as string | undefined) === 'feature_target_split';
+    };
+
+    interface BranchDef {
+      terminal: Node;
+      inputEdge: Edge | null;
+      allTerminalEdges: Edge[];
+      yHelperEdges: Edge[];  // FTS-y pass-through edges belonging to this terminal
+      localIndex: number;
+    }
     const branches: BranchDef[] = [];
     for (const terminal of terminals) {
       const terminalIncoming = incomingMap.get(terminal.id) || [];
       if (terminalIncoming.length === 0) continue;
-      const sourceCount = new Set(terminalIncoming.map((e) => e.source)).size;
+
+      // Split helpers from real branch edges
+      const mainEdges  = terminalIncoming.filter(e => !isYPassthrough(e));
+      const yHelperEdges = terminalIncoming.filter(e => isYPassthrough(e));
+
+      const sourceCount = new Set(mainEdges.map(e => e.source)).size;
       const isParallel = isParallelExecution(terminal.data, sourceCount);
-      if (isParallel && terminalIncoming.length > 1) {
-        // Parallel mode: each input path is a separate experiment branch
-        terminalIncoming.forEach((edge, localIdx) => {
-          branches.push({ terminal, inputEdge: edge, localIndex: localIdx });
-        });
+      if (isParallel && sourceCount > 1) {
+        // Parallel mode: one branch per unique SOURCE NODE (not per edge).
+        // Multi-handle splitters (TTS train/test/val) emit several edges from
+        // the same source — dedup to one branch per source.
+        // Y-pass-throughs are excluded above and assigned post-BFS so that
+        // e.g. FTS-y → AT does NOT count as a separate parallel experiment.
+        const seenSrc = new Set<string>();
+        let localIdx = 0;
+        for (const edge of mainEdges) {
+          if (seenSrc.has(edge.source)) continue;
+          seenSrc.add(edge.source);
+          const groupEdges = mainEdges.filter(e => e.source === edge.source);
+          branches.push({
+            terminal,
+            inputEdge: edge,
+            allTerminalEdges: groupEdges,
+            yHelperEdges,
+            localIndex: localIdx,
+          });
+          localIdx++;
+        }
       } else {
-        // Merge mode (default): all inputs funnel into one branch
-        branches.push({ terminal, inputEdge: null, localIndex: 0 });
+        // Merge mode (default): all inputs funnel into one branch.
+        // BFS from the terminal naturally visits all incoming edges including
+        // y-helper edges, so no special handling needed here.
+        branches.push({ terminal, inputEdge: null, allTerminalEdges: [], yHelperEdges, localIndex: 0 });
       }
     }
 
@@ -144,7 +216,7 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
     const branchEdgeSets: Set<string>[] = [];
     const branchLabels: string[] = [];
     for (let i = 0; i < branches.length; i++) {
-      const { terminal, inputEdge, localIndex } = branches[i]!;
+      const { terminal, inputEdge, allTerminalEdges, yHelperEdges, localIndex } = branches[i]!;
       const modelType = terminal.data.model_type as string | undefined;
       const modelName = modelType ? prettifyModelType(modelType) : '';
       // Path letter strategy:
@@ -197,10 +269,13 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
       const branchEdges = new Set<string>();
 
       if (inputEdge) {
-        // Parallel branch: BFS from one specific input edge
-        terminalEdgeIds.add(inputEdge.id);
-        branchEdges.add(inputEdge.id);
-        const queue = [inputEdge.source];
+        // Parallel branch: BFS from all edges of this source group at the terminal.
+        const terminalEdges = allTerminalEdges.length > 0 ? allTerminalEdges : [inputEdge];
+        // Only the first (representative) edge shows the Path label.
+        terminalEdgeIds.add(terminalEdges[0]!.id);
+        for (const e of terminalEdges) branchEdges.add(e.id);
+        // BFS backwards from all group source nodes.
+        const queue = terminalEdges.map(e => e.source);
         while (queue.length > 0) {
           const nodeId = queue.shift()!;
           if (visited.has(nodeId)) continue;
@@ -209,6 +284,15 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
           for (const edge of incoming) {
             branchEdges.add(edge.id);
             queue.push(edge.source);
+          }
+        }
+        // Assign FTS y-pass-through edges: if this branch's BFS visited the
+        // FTS node that produced the y-edge, color it the same as this branch.
+        // This way FTS-y → AT renders the same color as TTS → AT when TTS
+        // descends from that same FTS (they're cooperative inputs to one model).
+        for (const yEdge of yHelperEdges) {
+          if (visited.has(yEdge.source)) {
+            branchEdges.add(yEdge.id);
           }
         }
       } else {

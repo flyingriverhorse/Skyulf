@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from backend.ml_pipeline.execution.summary import build_summary
+from backend.ml_pipeline._execution.summary import build_summary
 from skyulf.data.dataset import SplitDataset
 
 # ---------------------------------------------------------------------------

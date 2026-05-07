@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive, BarChart2, Activity, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive, BarChart2, Activity, TrendingUp, Bug } from 'lucide-react';
 import { monitoringApi } from '../core/api/monitoring';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [driftAlert, setDriftAlert] = useState(false);
+  const [errorAlert, setErrorAlert] = useState(false);
 
   useEffect(() => {
     // Check if dark mode is already active
@@ -26,6 +27,16 @@ export const Layout: React.FC = () => {
     monitoringApi.getDriftStatus()
       .then(s => setDriftAlert(s.has_drift))
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const check = () =>
+      monitoringApi.getUnresolvedCount()
+        .then(n => setErrorAlert(n > 0))
+        .catch(() => {});
+    check();
+    const id = setInterval(check, 60_000);
+    return () => clearInterval(id);
   }, []);
 
   const toggleTheme = () => {
@@ -78,6 +89,9 @@ export const Layout: React.FC = () => {
           </NavLink>
           <NavLink to="/deployments" active={isActive('/deployments')} icon={<Rocket size={20} />} collapsed={isCollapsed}>
             Deployments
+          </NavLink>
+          <NavLink to="/errors" active={isActive('/errors')} icon={<Bug size={20} />} collapsed={isCollapsed} badge={errorAlert}>
+            Error Log
           </NavLink>
         </nav>
 

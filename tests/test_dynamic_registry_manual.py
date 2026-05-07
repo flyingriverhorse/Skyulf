@@ -12,14 +12,11 @@ sys.path.append(os.getcwd())
 # Also add skyulf-core specifically if it's not installed in the env
 sys.path.append(os.path.join(os.getcwd(), "skyulf-core"))
 
-from backend.ml_pipeline.node_definitions import NodeRegistry
+from skyulf.registry import NodeRegistry as SkyulfRegistry
 from skyulf.modeling.classification import (
     LogisticRegressionCalculator,
     RandomForestClassifierCalculator,
 )
-
-# Trigger registration by importing (already done via import above, but to be sure)
-# The imports above should trigger the decorators @node_meta and @NodeRegistry.register
 
 
 def test_registry():
@@ -40,27 +37,26 @@ def test_registry():
     else:
         print("❌ RandomForestClassifierCalculator MISSING metadata")
 
-    # Get all nodes from the backend registry abstraction
-    nodes = NodeRegistry.get_all_nodes()
+    # Get all nodes directly from the core registry
+    all_metadata = SkyulfRegistry.get_all_metadata()
 
     # Check if our dynamic nodes are in the list
     dynamic_ids = ["logistic_regression", "random_forest_classifier"]
     found_map = {node_id: False for node_id in dynamic_ids}
 
-    for node in nodes:
-        if node.id in found_map:
-            found_map[node.id] = True
-            print(f"✅ Found dynamic node in backend registry: {node.id} ({node.name})")
-            # Verify params are passed through
-            if node.id == "logistic_regression":
-                if "max_iter" in node.params:
-                    print(f"   -> Params correctly populated: {node.params}")
+    for node_id, meta in all_metadata.items():
+        if node_id in found_map:
+            found_map[node_id] = True
+            print(f"✅ Found dynamic node in registry: {node_id} ({meta.get('name')})")
+            if node_id == "logistic_regression":
+                if "max_iter" in (meta.get("params") or {}):
+                    print(f"   -> Params correctly populated: {meta.get('params')}")
                 else:
-                    print(f"   -> ❌ Params missing: {node.params}")
+                    print(f"   -> ❌ Params missing: {meta.get('params')}")
 
     for id, found in found_map.items():
         if not found:
-            print(f"❌ Failed to find node {id} in NodeRegistry.get_all_nodes()")
+            print(f"❌ Failed to find node {id} in SkyulfRegistry")
 
 
 if __name__ == "__main__":

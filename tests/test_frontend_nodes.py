@@ -3,13 +3,13 @@ import pandas as pd
 import pytest
 
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
-from backend.ml_pipeline.execution.engine import PipelineEngine
-from backend.ml_pipeline.execution.schemas import NodeConfig, PipelineConfig
-from backend.ml_pipeline.node_definitions import NodeRegistry
+from backend.ml_pipeline._execution.engine import PipelineEngine
+from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
+from backend.ml_pipeline.api import RegistryItem, _build_node_registry
 from backend.data.catalog import FileSystemCatalog
 
 # Get all node IDs to ensure we cover them
-ALL_NODES = {node.id: node for node in NodeRegistry.get_all_nodes()}
+ALL_NODES = {node.id: node for node in _build_node_registry()}
 
 
 @pytest.fixture

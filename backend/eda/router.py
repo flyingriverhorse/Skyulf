@@ -218,7 +218,10 @@ class DecompositionRequest(BaseModel):
 @router.post("/{dataset_id}/decomposition")
 @limiter.limit("20/minute")
 async def get_decomposition(
-    dataset_id: int, request: Request, body: DecompositionRequest, session: AsyncSession = Depends(get_db)
+    dataset_id: int,
+    request: Request,
+    body: DecompositionRequest,
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Calculates the breakdown of a measure by a split column for Decomposition Trees.

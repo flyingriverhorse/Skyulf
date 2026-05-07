@@ -92,6 +92,43 @@ def _compute_similarity_score(a: Any, b: Any, method: str) -> float:
     return SequenceMatcher(None, text_a, text_b).ratio() * 100.0
 
 
+def _vectorised_similarity(s_a: pd.Series, s_b: pd.Series, method: str) -> pd.Series:
+    """Vectorised element-wise similarity between two pandas string Series.
+
+    Avoids df.apply(axis=1) overhead by:
+    1. Pre-computing null/empty masks with numpy/pandas ops (vectorised).
+    2. Calling the fuzz scorer only on rows that need it (list-comp over filtered arrays).
+    """
+    a_str = s_a.fillna("").astype(str)
+    b_str = s_b.fillna("").astype(str)
+
+    both_empty = (a_str == "") & (b_str == "")
+    one_empty = (a_str == "") | (b_str == "")
+
+    result = pd.Series(0.0, index=s_a.index)
+    result[both_empty] = 100.0
+
+    needs = ~one_empty
+    if not needs.any():
+        return result
+
+    a_vals = a_str[needs].to_numpy()
+    b_vals = b_str[needs].to_numpy()
+
+    if _HAS_RAPIDFUZZ:
+        if method == "token_sort_ratio":
+            scores = [float(fuzz.token_sort_ratio(a, b)) for a, b in zip(a_vals, b_vals)]
+        elif method == "token_set_ratio":
+            scores = [float(fuzz.token_set_ratio(a, b)) for a, b in zip(a_vals, b_vals)]
+        else:
+            scores = [float(fuzz.ratio(a, b)) for a, b in zip(a_vals, b_vals)]
+    else:
+        scores = [SequenceMatcher(None, a, b).ratio() * 100.0 for a, b in zip(a_vals, b_vals)]
+
+    result[needs] = scores
+    return result
+
+
 # --- Polynomial Features ---
 
 
@@ -413,15 +450,31 @@ class FeatureGenerationApplier(BaseApplier):
                         )
 
                         if col_a and col_b and col_a in X_out.columns and col_b in X_out.columns:
+                            # Guard null/empty rows with polars expressions; map_elements
+                            # only runs for rows where both strings are non-empty.
+                            _a_empty = pl.col(col_a).is_null() | (
+                                pl.col(col_a).cast(pl.String) == ""
+                            )
+                            _b_empty = pl.col(col_b).is_null() | (
+                                pl.col(col_b).cast(pl.String) == ""
+                            )
 
                             def sim_func(struct_val):
                                 a = struct_val.get("a")
                                 b = struct_val.get("b")
                                 return _compute_similarity_score(a, b, method)
 
-                            expr = pl.struct(
-                                [pl.col(col_a).alias("a"), pl.col(col_b).alias("b")]
-                            ).map_elements(sim_func, return_dtype=pl.Float64)
+                            expr = (
+                                pl.when(_a_empty & _b_empty)
+                                .then(pl.lit(100.0))
+                                .when(_a_empty | _b_empty)
+                                .then(pl.lit(0.0))
+                                .otherwise(
+                                    pl.struct(
+                                        [pl.col(col_a).alias("a"), pl.col(col_b).alias("b")]
+                                    ).map_elements(sim_func, return_dtype=pl.Float64)
+                                )
+                            )
 
                     elif op_type == "datetime_extract":
                         valid_inputs = [c for c in input_cols if c in X_out.columns]
@@ -451,10 +504,19 @@ class FeatureGenerationApplier(BaseApplier):
                                     val = base_dt.dt.second()
                                 elif feat == "quarter":
                                     val = base_dt.dt.quarter()
-                                elif feat == "dayofweek" or feat == "weekday":
+                                elif feat == "weekday":
+                                    # Polars dt.weekday() is 1-indexed (ISO); subtract 1 to match
+                                    # pandas dayofweek convention (Mon=0, Sun=6).
                                     val = base_dt.dt.weekday() - 1
                                 elif feat == "is_weekend":
+                                    # Use raw 1-indexed value: Sat=6, Sun=7 → >= 6 catches both.
                                     val = (base_dt.dt.weekday() >= 6).cast(pl.Int64)
+                                elif feat == "week":
+                                    val = base_dt.dt.week()
+                                elif feat == "month_name":
+                                    val = base_dt.dt.strftime("%B")
+                                elif feat == "day_name":
+                                    val = base_dt.dt.strftime("%A")
 
                                 if val is not None:
                                     dt_exprs.append(val.alias(feat_name))
@@ -615,10 +677,7 @@ class FeatureGenerationApplier(BaseApplier):
                     ):
                         continue
 
-                    result = df_out.apply(
-                        lambda row: _compute_similarity_score(row[col_a], row[col_b], method),
-                        axis=1,
-                    )
+                    result = _vectorised_similarity(df_out[col_a], df_out[col_b], method)
 
                 elif op_type == "datetime_extract":
                     valid_inputs = [c for c in input_cols if c in df_out.columns]
@@ -643,10 +702,16 @@ class FeatureGenerationApplier(BaseApplier):
                                     val = dt.dt.second
                                 elif feat == "quarter":
                                     val = dt.dt.quarter
-                                elif feat == "dayofweek" or feat == "weekday":
+                                elif feat == "weekday":
                                     val = dt.dt.dayofweek
                                 elif feat == "is_weekend":
                                     val = (dt.dt.dayofweek >= 5).astype(int)
+                                elif feat == "week":
+                                    val = dt.dt.isocalendar().week.astype(int)
+                                elif feat == "month_name":
+                                    val = dt.dt.month_name()
+                                elif feat == "day_name":
+                                    val = dt.dt.day_name()
                                 else:
                                     continue
 

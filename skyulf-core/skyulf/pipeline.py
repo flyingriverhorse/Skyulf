@@ -22,7 +22,7 @@ from .modeling.regression import (
     RidgeRegressionApplier,
     RidgeRegressionCalculator,
 )
-from .modeling.tuning.engine import TuningApplier, TuningCalculator
+from .modeling._tuning.engine import TuningApplier, TuningCalculator
 from .preprocessing.pipeline import FeatureEngineer
 from .registry import NodeRegistry
 
