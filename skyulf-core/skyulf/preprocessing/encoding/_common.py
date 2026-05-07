@@ -1,4 +1,5 @@
 """Shared helpers and constants for all encoder modules."""
+
 import logging
 from typing import Any, Dict, List, Union
 

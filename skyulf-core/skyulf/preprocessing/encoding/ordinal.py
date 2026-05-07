@@ -1,4 +1,5 @@
 """Ordinal Encoder node (Calculator + Applier)."""
+
 import logging
 from typing import Any, Dict, List, Tuple, Union
 

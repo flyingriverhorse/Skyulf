@@ -1,4 +1,5 @@
 """Hash Encoder node (Calculator + Applier)."""
+
 import logging
 from typing import Any, Dict, Tuple, Union
 
@@ -41,8 +42,7 @@ class HashEncoderApplier(BaseApplier):
 
             X_pl: Any = X
             exprs = [
-                (pl.col(col).cast(pl.Utf8).hash() % n_features).alias(col)
-                for col in valid_cols
+                (pl.col(col).cast(pl.Utf8).hash() % n_features).alias(col) for col in valid_cols
             ]
             X_out = X_pl.with_columns(exprs)
             return pack_pipeline_output(X_out, y, is_tuple)

@@ -91,7 +91,11 @@ describe('useBranchColors', () => {
     expect(b?.shared).toBe(false);
   });
 
-  it('auto-splits data_preview terminal with 2+ inputs (no toggle needed)', () => {
+  it('does not colour edges feeding a data_preview terminal (preview is its own background job, not a branch terminal)', () => {
+    // v0.5.14 deliberately excluded `data_preview` from TERMINAL_TYPES so the
+    // canvas no longer paints "Path X · Data Preview" labels on edges feeding
+    // a preview node — preview is a standalone evaluation node with its own
+    // background job, not a pipeline branch terminal.
     const nodes = [
       node('a', 'dataset_node'),
       node('b', 'dataset_node'),
@@ -102,9 +106,7 @@ describe('useBranchColors', () => {
       edge('b-preview', 'b', 'preview'),
     ];
     const { result } = renderHook(() => useBranchColors(nodes, edges));
-    expect(result.current.size).toBe(2);
-    expect(result.current.get('a-preview')?.label).toMatch(/^Path A/);
-    expect(result.current.get('b-preview')?.label).toMatch(/^Path B/);
+    expect(result.current.size).toBe(0);
   });
 
   it('flags shared upstream edges that feed multiple parallel branches', () => {

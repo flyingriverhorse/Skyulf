@@ -1,4 +1,5 @@
 """Label Encoder node (Calculator + Applier)."""
+
 import logging
 from typing import Any, Dict, List, Tuple, Union
 
@@ -44,8 +45,7 @@ class LabelEncoderApplier(BaseApplier):
                     if col in X_out.columns and col in encoders:
                         le = encoders[col]
                         mapping = {
-                            str(k): int(v)
-                            for k, v in zip(le.classes_, le.transform(le.classes_))
+                            str(k): int(v) for k, v in zip(le.classes_, le.transform(le.classes_))
                         }
                         exprs.append(
                             pl.col(col)
@@ -59,13 +59,9 @@ class LabelEncoderApplier(BaseApplier):
 
             if y_out is not None and "__target__" in encoders:
                 le = encoders["__target__"]
-                mapping = {
-                    str(k): int(v) for k, v in zip(le.classes_, le.transform(le.classes_))
-                }
+                mapping = {str(k): int(v) for k, v in zip(le.classes_, le.transform(le.classes_))}
                 missing_code = params.get("missing_code", -1)
-                y_out = (
-                    y_out.cast(pl.Utf8).replace(mapping, default=missing_code).cast(pl.Int64)
-                )
+                y_out = y_out.cast(pl.Utf8).replace(mapping, default=missing_code).cast(pl.Int64)
 
         else:
             X_out = X.copy()
@@ -127,9 +123,7 @@ class LabelEncoderCalculator(BaseCalculator):
                 valid_cols = [c for c in cols if c in X_pl_data.columns]
                 for col in valid_cols:
                     le = LabelEncoder()
-                    col_data = (
-                        X_pl_data.select(pl.col(col).cast(pl.Utf8)).to_series().to_numpy()
-                    )
+                    col_data = X_pl_data.select(pl.col(col).cast(pl.Utf8)).to_series().to_numpy()
                     le.fit(col_data)
                     encoders[col] = le
                     classes_count[col] = len(le.classes_)
@@ -158,9 +152,7 @@ class LabelEncoderCalculator(BaseCalculator):
             if y is not None:
                 le = LabelEncoder()
                 y_data = (
-                    y.to_numpy().astype(str)
-                    if hasattr(y, "to_numpy")
-                    else np.array(y).astype(str)
+                    y.to_numpy().astype(str) if hasattr(y, "to_numpy") else np.array(y).astype(str)
                 )
                 le.fit(y_data)
                 encoders["__target__"] = le
