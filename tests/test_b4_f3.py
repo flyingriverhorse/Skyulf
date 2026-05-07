@@ -104,13 +104,17 @@ class TestRunPipelineBatchTask:
         session_iter = iter(sessions)
 
         with (
-            patch("backend.ml_pipeline.tasks.get_db_session", side_effect=lambda: next(session_iter)),
+            patch(
+                "backend.ml_pipeline.tasks.get_db_session", side_effect=lambda: next(session_iter)
+            ),
             patch("backend.ml_pipeline.tasks.execute_pipeline", side_effect=_fail_on_b),
             pytest.raises(ValueError, match="branch b failed"),
         ):
             run_pipeline_batch_task(
-                [("job-a", {"pipeline_id": "pa", "nodes": []}),
-                 ("job-b", {"pipeline_id": "pb", "nodes": []})]
+                [
+                    ("job-a", {"pipeline_id": "pa", "nodes": []}),
+                    ("job-b", {"pipeline_id": "pb", "nodes": []}),
+                ]
             )
 
     def test_run_pipeline_task_still_works(self):

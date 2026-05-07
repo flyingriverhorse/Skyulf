@@ -14,6 +14,7 @@ const EDAPage = lazy(() => import('./pages/EDAPage').then(m => ({ default: m.EDA
 const DataDriftPage = lazy(() => import('./pages/DataDriftPage').then(m => ({ default: m.DataDriftPage })));
 const ModelRegistry = lazy(() => import('./pages/ModelRegistry').then(m => ({ default: m.ModelRegistry })));
 const DeploymentsPage = lazy(() => import('./components/pages/DeploymentsPage').then(m => ({ default: m.DeploymentsPage })));
+const SlowNodesPage = lazy(() => import('./pages/SlowNodesPage').then(m => ({ default: m.SlowNodesPage })));
 
 const RouteFallback = () => <PageSkeleton />;
 
@@ -69,6 +70,14 @@ function App() {
             }
           />
           <Route path="errors" element={<ErrorLogPage />} />
+          <Route
+            path="slow-nodes"
+            element={
+              <LazyRoute>
+                <SlowNodesPage />
+              </LazyRoute>
+            }
+          />
         </Route>
       </Routes>
     </BrowserRouter>

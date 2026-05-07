@@ -2,12 +2,16 @@ import { useMemo } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import {
   EXECUTION_MODE_AWARE_TYPES,
-  AUTO_PARALLEL_TYPES,
   isParallelExecution,
 } from '../types/executionMode';
 
-// Terminals = mode-aware modeling nodes plus auto-parallel inspectors.
-const TERMINAL_TYPES = new Set([...EXECUTION_MODE_AWARE_TYPES, ...AUTO_PARALLEL_TYPES]);
+// Terminals = mode-aware modeling nodes (training/tuning) only.
+// DataPreview was previously included via AUTO_PARALLEL_TYPES, but it is a
+// standalone evaluation node that runs as its own background job and never
+// produces a Preview Results tab — so it should not get a colored canvas
+// branch either (otherwise the canvas shows "Path G · Data Preview" with no
+// matching tab in the Results panel).
+const TERMINAL_TYPES = new Set([...EXECUTION_MODE_AWARE_TYPES]);
 
 /** Generate n evenly-spaced, high-saturation HSL colors with a golden-angle offset for variety. */
 export function generateBranchColors(count: number): string[] {
@@ -194,9 +198,17 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
     // no way to tell which terminal each path actually feeds. We assign a
     // 1-based suffix (#1, #2, …) per model-type group, but only when a
     // collision exists — single-terminal-per-model canvases stay clean.
+    //
+    // Key: model_type when present (training nodes), otherwise definitionType
+    // (e.g. "data_preview"). This prevents DataPreview nodes and dangling
+    // preprocessing leaves from being lumped into the same "" group and
+    // incorrectly inheriting each other's #N counter.
     const terminalsByModel = new Map<string, string[]>();
     for (const t of terminals) {
-      const mt = (t.data.model_type as string | undefined) ?? '';
+      const mt =
+        (t.data.model_type as string | undefined) ||
+        (t.data.definitionType as string | undefined) ||
+        '';
       const list = terminalsByModel.get(mt) ?? [];
       list.push(t.id);
       terminalsByModel.set(mt, list);

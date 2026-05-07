@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { Zap, Search, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { clickableProps } from '../../../core/utils/a11y';
 
 interface PolynomialFeaturesConfig {
@@ -111,10 +112,12 @@ export const PolynomialFeaturesNode: NodeDefinition = {
     const upstreamData = useUpstreamData(nodeId || '');
     const datasetId = upstreamData.find((d) => d.datasetId)?.datasetId as string | undefined;
     const { data: schema } = useDatasetSchema(datasetId);
+    const droppedUpstream = useUpstreamDroppedColumns(nodeId);
     
     // Filter for numeric columns as polynomial features usually apply to numbers
     const numericColumns = schema ? Object.values(schema.columns)
       .filter((col) => ['int', 'float', 'number', 'double', 'long'].some(t => col.dtype.toLowerCase().includes(t)))
+      .filter((col) => !droppedUpstream.has(col.name))
       .map((col) => col.name) : [];
 
     const updateConfig = (updates: Partial<PolynomialFeaturesConfig>) => {

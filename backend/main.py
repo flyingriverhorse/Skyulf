@@ -59,7 +59,9 @@ settings = get_settings()
 if settings.SENTRY_DSN:
     import sentry_sdk  # ty: ignore[unresolved-import]
     from sentry_sdk.integrations.fastapi import FastApiIntegration  # ty: ignore[unresolved-import]
-    from sentry_sdk.integrations.starlette import StarletteIntegration  # ty: ignore[unresolved-import]
+    from sentry_sdk.integrations.starlette import (
+        StarletteIntegration,
+    )  # ty: ignore[unresolved-import]
 
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
