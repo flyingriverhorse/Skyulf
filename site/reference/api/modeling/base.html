@@ -3834,8 +3834,8 @@ Returns DataFrame where columns are classes.</p>
 <span class="sd">        Evaluates the model on all splits and returns a detailed report.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># Import here to avoid circular dependency</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">.evaluation.classification</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_classification_model</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">.evaluation.regression</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_regression_model</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">._evaluation.classification</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_classification_model</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">._evaluation.regression</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_regression_model</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Model has not been trained yet. Call fit_predict() first.&quot;</span><span class="p">)</span>
@@ -4188,8 +4188,8 @@ Returns DataFrame where columns are classes.</p>
 <span class="sd">    Evaluates the model on all splits and returns a detailed report.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># Import here to avoid circular dependency</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">.evaluation.classification</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_classification_model</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">.evaluation.regression</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_regression_model</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">._evaluation.classification</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_classification_model</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">._evaluation.regression</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_regression_model</span>
 
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Model has not been trained yet. Call fit_predict() first.&quot;</span><span class="p">)</span>
