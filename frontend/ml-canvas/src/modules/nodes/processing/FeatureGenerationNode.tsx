@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { Calculator, Trash2, Calendar, Percent, GitCompare, Search, Check, ChevronDown, ChevronRight, FunctionSquare, Info, Lightbulb, Activity } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { Recommendation } from '../../../core/api/client';
@@ -131,6 +132,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
+  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
@@ -159,20 +161,23 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
 
 
 
-  const allColumns = schema ? Object.values(schema.columns).map(c => c.name) : [];
+  const allColumns = schema ? Object.values(schema.columns).map(c => c.name).filter(n => !droppedUpstream.has(n)) : [];
   const numericColumns = schema 
     ? Object.values(schema.columns)
         .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
+        .filter(c => !droppedUpstream.has(c.name))
         .map(c => c.name)
     : [];
   const dateColumns = schema
     ? Object.values(schema.columns)
         .filter(c => ['date', 'time'].some(t => c.dtype.toLowerCase().includes(t)))
+        .filter(c => !droppedUpstream.has(c.name))
         .map(c => c.name)
     : [];
   const stringColumns = schema
     ? Object.values(schema.columns)
         .filter(c => ['string', 'object', 'text'].some(t => c.dtype.toLowerCase().includes(t)))
+        .filter(c => !droppedUpstream.has(c.name))
         .map(c => c.name)
     : [];
 

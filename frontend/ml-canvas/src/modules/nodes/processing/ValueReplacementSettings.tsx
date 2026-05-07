@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Search, ArrowRight } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { clickableProps } from '../../../core/utils/a11y';
 
 export interface ReplacementItem {
@@ -197,7 +198,8 @@ export const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find((d: unknown) => (d as Record<string, unknown>)?.datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
-  const availableColumns = schema ? Object.values(schema.columns).map((c) => c.name) : [];
+  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
+  const availableColumns = schema ? Object.values(schema.columns).map((c) => c.name).filter(n => !droppedUpstream.has(n)) : [];
 
   const addReplacement = () => {
     onChange({

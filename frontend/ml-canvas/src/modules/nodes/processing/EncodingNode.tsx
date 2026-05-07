@@ -4,6 +4,7 @@ import { Hash, Activity, Info } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../core/store/useGraphStore';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 
 interface EncodingConfig {
@@ -40,7 +41,8 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
   const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [isWide, setIsWide] = useState(false);
-  
+
+  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
   const metrics: Record<string, unknown> | null =
@@ -75,10 +77,8 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
     return () => { observer.disconnect(); };
   }, []);
 
-  const categoricalColumns = schema 
-    ? Object.values(schema.columns)
-        .filter(c => ['object', 'string', 'category', 'bool'].some(t => c.dtype.toLowerCase().includes(t)))
-        .map(c => c.name)
+  const categoricalColumns = schema
+    ? Object.values(schema.columns).map(c => c.name).filter(name => !droppedUpstream.has(name))
     : [];
 
   const filteredColumns = categoricalColumns.filter(c => 
@@ -257,9 +257,12 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
                 onChange={(e) => onChange({ ...config, target_column: e.target.value })}
               >
                 <option value="">Select a target column...</option>
-                {schema && Object.values(schema.columns).map(col => (
-                  <option key={col.name} value={col.name}>{col.name} ({col.dtype})</option>
-                ))}
+                {categoricalColumns.map(name => {
+                  const col = schema?.columns[name];
+                  return (
+                    <option key={name} value={name}>{name}{col ? ` (${col.dtype})` : ''}</option>
+                  );
+                })}
               </select>
               <div className="space-y-1">
                 <span className="block text-xs font-medium">Smoothing</span>
@@ -422,7 +425,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
           </div>
         ) : (
           <div className="text-xs text-muted-foreground italic border rounded p-4 text-center">
-            No categorical columns found
+            No columns found — connect an upstream dataset node.
           </div>
         )}
       </div>

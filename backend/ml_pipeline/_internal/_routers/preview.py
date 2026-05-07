@@ -125,18 +125,34 @@ async def preview_pipeline(  # noqa: C901
         training_types = {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}
         has_training = any(n.step_type in training_types for n in nodes)
 
+        # DataPreview is a separate evaluation node with its own background
+        # job — it must NOT appear as a Preview Results tab. Filter it out
+        # at every stage so neither partition_parallel_pipeline (which treats
+        # it as a parallel terminal) nor partition_for_preview (which treats
+        # it as a data leaf) can leak it into the tab list.
+        def _is_data_preview_sub(sub: PipelineConfig) -> bool:
+            return bool(sub.nodes) and sub.nodes[-1].step_type == "data_preview"
+
         if has_training:
             training_subs = partition_parallel_pipeline(pipeline_config)
 
             def _strip(sub: PipelineConfig) -> PipelineConfig:
-                stripped = [n for n in sub.nodes if n.step_type not in training_types]
+                stripped = [
+                    n
+                    for n in sub.nodes
+                    if n.step_type not in training_types and n.step_type != "data_preview"
+                ]
                 return PipelineConfig(
                     pipeline_id=sub.pipeline_id,
                     nodes=stripped,
                     metadata=sub.metadata,
                 )
 
-            paired_subs = [(orig, _strip(orig)) for orig in training_subs]
+            paired_subs = [
+                (orig, _strip(orig))
+                for orig in training_subs
+                if not _is_data_preview_sub(orig)
+            ]
 
             # Also include preview-only branches (data leaves that don't feed
             # any training terminal). Without this, a canvas mixing a training
@@ -151,6 +167,8 @@ async def preview_pipeline(  # noqa: C901
             for sub in preview_only_subs:
                 if not sub.nodes:
                     continue
+                if _is_data_preview_sub(sub):
+                    continue
                 leaf = sub.nodes[-1]
                 # Skip sub-pipelines whose leaf is already produced by a
                 # training branch (avoids duplicate tabs for the same data).
@@ -160,13 +178,24 @@ async def preview_pipeline(  # noqa: C901
         else:
             preview_subs = partition_for_preview(pipeline_config)
             # No training → no separate label source; reuse the runnable sub.
-            paired_subs = [(sub, sub) for sub in preview_subs]
+            paired_subs = [
+                (sub, sub) for sub in preview_subs if not _is_data_preview_sub(sub)
+            ]
 
         try:
             catalog = create_catalog_from_options(
                 resolved_s3_options, config.nodes, session=sync_session
             )
             engine = PipelineEngine(artifact_store, catalog=catalog)
+            # Sort paired_subs by BFS position of their terminal node so branch
+            # letters (A, B, C, …) match the canvas edge colors from useBranchColors.
+            node_bfs_pos = {n.node_id: i for i, n in enumerate(pipeline_config.nodes)}
+            paired_subs.sort(
+                key=lambda pair: node_bfs_pos.get(
+                    pair[0].nodes[-1].node_id if pair[0].nodes else "",
+                    len(pipeline_config.nodes),
+                )
+            )
             # Single shared artifact store across branches deduplicates work
             # for ancestor nodes that appear in multiple sub-pipelines.
             sub_results = [(orig, runnable, engine.run(runnable)) for orig, runnable in paired_subs]
@@ -365,11 +394,18 @@ async def preview_pipeline(  # noqa: C901
         for i, (orig_sub, _runnable, _res) in enumerate(sub_results):
             mt = ""
             term_id = ""
-            for n in orig_sub.nodes:
-                if n.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
-                    mt = str(n.params.get("model_type") or n.params.get("algorithm") or "")
-                    term_id = n.node_id
-                    break
+            if orig_sub.nodes:
+                leaf = orig_sub.nodes[-1]
+                if leaf.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
+                    # Training terminal: group by model_type.
+                    mt = str(leaf.params.get("model_type") or leaf.params.get("algorithm") or "")
+                    term_id = leaf.node_id
+                else:
+                    # Non-training terminal (e.g. data_preview): group by
+                    # step_type so multiple Data Preview nodes get #1/#2/#3,
+                    # matching the canvas dup-suffix logic in useBranchColors.
+                    mt = str(leaf.step_type)
+                    term_id = leaf.node_id
             if mt and term_id:
                 terminal_id_per_branch[i] = term_id
                 ids = terminals_by_model.setdefault(mt, [])

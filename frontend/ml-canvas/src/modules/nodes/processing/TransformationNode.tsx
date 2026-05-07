@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { FunctionSquare, Plus, Trash2, Search, ChevronDown, ChevronRight } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { clickableProps } from '../../../core/utils/a11y';
@@ -144,13 +145,15 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
+  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   
   const columns = useMemo(() => {
     if (!schema?.columns) return [];
     return Object.values(schema.columns)
         .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
+        .filter(c => !droppedUpstream.has(c.name))
         .map(c => c.name);
-  }, [schema]);
+  }, [schema, droppedUpstream]);
 
   const addRule = () => {
     const newIndex = transformations.length;
