@@ -1,0 +1,241 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`convertGraphToPipelineConfig — snapshots > KNN imputer routes to KNNImputer step_type with hyperparams 1`] = `
+{
+  "metadata": {
+    "dataset_source_id": "d1",
+  },
+  "nodes": [
+    {
+      "inputs": [],
+      "node_id": "ds",
+      "params": {
+        "dataset_id": "d1",
+      },
+      "step_type": "data_loader",
+    },
+    {
+      "inputs": [
+        "ds",
+      ],
+      "node_id": "knn",
+      "params": {
+        "columns": [
+          "x",
+          "y",
+        ],
+        "n_neighbors": 7,
+        "weights": "distance",
+      },
+      "step_type": "KNNImputer",
+    },
+  ],
+  "pipeline_id": "preview_<uuid>",
+}
+`;
+
+exports[`convertGraphToPipelineConfig — snapshots > canonical training pipeline: dataset → imputer → split → train 1`] = `
+{
+  "metadata": {
+    "dataset_source_id": "d1",
+  },
+  "nodes": [
+    {
+      "inputs": [],
+      "node_id": "ds",
+      "params": {
+        "dataset_id": "d1",
+      },
+      "step_type": "data_loader",
+    },
+    {
+      "inputs": [
+        "ds",
+      ],
+      "node_id": "imp",
+      "params": {
+        "columns": [
+          "x",
+          "y",
+        ],
+        "fill_value": undefined,
+        "strategy": "mean",
+      },
+      "step_type": "SimpleImputer",
+    },
+    {
+      "inputs": [
+        "imp",
+      ],
+      "node_id": "train",
+      "params": {
+        "cv_enabled": true,
+        "cv_folds": 5,
+        "cv_random_state": 42,
+        "cv_shuffle": true,
+        "cv_time_column": undefined,
+        "cv_type": "kfold",
+        "execution_mode": undefined,
+        "hyperparameters": {
+          "n_estimators": 100,
+        },
+        "model_type": "random_forest_classifier",
+        "target_column": "target",
+      },
+      "step_type": "basic_training",
+    },
+  ],
+  "pipeline_id": "preview_<uuid>",
+}
+`;
+
+exports[`convertGraphToPipelineConfig — snapshots > mixed training + dangling preview branch keeps both leaves 1`] = `
+{
+  "metadata": {
+    "dataset_source_id": "d1",
+  },
+  "nodes": [
+    {
+      "inputs": [],
+      "node_id": "ds",
+      "params": {
+        "dataset_id": "d1",
+      },
+      "step_type": "data_loader",
+    },
+    {
+      "inputs": [
+        "ds",
+      ],
+      "node_id": "impA",
+      "params": {
+        "columns": undefined,
+        "fill_value": undefined,
+        "strategy": "mean",
+      },
+      "step_type": "SimpleImputer",
+    },
+    {
+      "inputs": [
+        "ds",
+      ],
+      "node_id": "scaleB",
+      "params": {
+        "columns": [
+          "x",
+        ],
+        "definitionType": "StandardScaler",
+      },
+      "step_type": "Unknown",
+    },
+    {
+      "inputs": [
+        "impA",
+      ],
+      "node_id": "train",
+      "params": {
+        "cv_enabled": false,
+        "cv_folds": 5,
+        "cv_random_state": 0,
+        "cv_shuffle": true,
+        "cv_time_column": undefined,
+        "cv_type": "kfold",
+        "execution_mode": undefined,
+        "hyperparameters": {},
+        "model_type": "rf",
+        "target_column": "y",
+      },
+      "step_type": "basic_training",
+    },
+  ],
+  "pipeline_id": "preview_<uuid>",
+}
+`;
+
+exports[`convertGraphToPipelineConfig — snapshots > non-default merge strategy survives as underscore-prefixed param 1`] = `
+{
+  "metadata": {
+    "dataset_source_id": "d1",
+  },
+  "nodes": [
+    {
+      "inputs": [],
+      "node_id": "ds",
+      "params": {
+        "dataset_id": "d1",
+      },
+      "step_type": "data_loader",
+    },
+    {
+      "inputs": [
+        "ds",
+      ],
+      "node_id": "imp",
+      "params": {
+        "_merge_strategy": "first_wins",
+        "columns": undefined,
+        "fill_value": undefined,
+        "strategy": "mean",
+      },
+      "step_type": "SimpleImputer",
+    },
+  ],
+  "pipeline_id": "preview_<uuid>",
+}
+`;
+
+exports[`convertGraphToPipelineConfig — snapshots > parallel preview branches with different depths are all preserved 1`] = `
+{
+  "metadata": {
+    "dataset_source_id": "d1",
+  },
+  "nodes": [
+    {
+      "inputs": [],
+      "node_id": "ds",
+      "params": {
+        "dataset_id": "d1",
+      },
+      "step_type": "data_loader",
+    },
+    {
+      "inputs": [
+        "ds",
+      ],
+      "node_id": "impA",
+      "params": {
+        "columns": undefined,
+        "fill_value": undefined,
+        "strategy": "mean",
+      },
+      "step_type": "SimpleImputer",
+    },
+    {
+      "inputs": [
+        "ds",
+      ],
+      "node_id": "impB",
+      "params": {
+        "columns": undefined,
+        "fill_value": undefined,
+        "strategy": "median",
+      },
+      "step_type": "SimpleImputer",
+    },
+    {
+      "inputs": [
+        "impB",
+      ],
+      "node_id": "scaleB",
+      "params": {
+        "columns": [
+          "x",
+        ],
+        "definitionType": "StandardScaler",
+      },
+      "step_type": "Unknown",
+    },
+  ],
+  "pipeline_id": "preview_<uuid>",
+}
+`;

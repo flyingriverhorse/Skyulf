@@ -228,6 +228,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
                 output_artifact_id=output_artifact_id,
                 metrics=metrics,
                 execution_time=duration,
+                step_type=node.step_type,
                 metadata=metadata,
             )
 
@@ -239,6 +240,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
                 status="failed",
                 error=str(e),
                 execution_time=duration,
+                step_type=node.step_type,
             )
 
     def _resolve_input(self, node: NodeConfig, index: int = 0) -> Any:

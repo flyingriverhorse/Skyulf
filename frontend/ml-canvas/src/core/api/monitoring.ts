@@ -95,6 +95,23 @@ export interface GroupedIssue {
     sample_id: number;
 }
 
+export interface SlowNodeAggregate {
+    step_type: string;
+    count: number;
+    total_seconds: number;
+    avg_seconds: number;
+    p95_seconds: number;
+    max_seconds: number;
+    sample_node_id?: string | null;
+}
+
+export interface SlowNodesResponse {
+    days: number;
+    total_jobs_scanned: number;
+    total_node_runs: number;
+    aggregates: SlowNodeAggregate[];
+}
+
 export const monitoringApi = {
     getJobs: async (): Promise<DriftJobOption[]> => {
         const response = await apiClient.get<DriftJobOption[]>('/monitoring/jobs');
@@ -177,6 +194,13 @@ export const monitoringApi = {
 
     getGrouped: async (): Promise<GroupedIssue[]> => {
         const response = await apiClient.get<GroupedIssue[]>('/monitoring/errors/grouped');
+        return response.data;
+    },
+
+    getSlowNodes: async (days = 7, limit = 10): Promise<SlowNodesResponse> => {
+        const response = await apiClient.get<SlowNodesResponse>(
+            `/monitoring/slow-nodes?days=${days}&limit=${limit}`,
+        );
         return response.data;
     },
 };
