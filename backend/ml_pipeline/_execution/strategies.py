@@ -39,6 +39,26 @@ class JobStrategy(ABC):
 
             final_metrics = last_result.metrics.copy() if last_result.metrics else {}
 
+            # Per-node execution-time roll-up — surfaces the same slow-step
+            # info the engine already collected, without re-instrumenting.
+            # (Top-N slowest nodes admin view) reads this off completed
+            # jobs to aggregate workspace-wide; if missing the page just
+            # shows an empty state for legacy jobs.
+            node_timings = []
+            for node_res in result.node_results.values():
+                if node_res.execution_time is None:
+                    continue
+                node_timings.append(
+                    {
+                        "node_id": node_res.node_id,
+                        "step_type": node_res.step_type or "unknown",
+                        "execution_time": float(node_res.execution_time),
+                        "status": node_res.status,
+                    }
+                )
+            if node_timings:
+                final_metrics["node_timings"] = node_timings
+
             # Collect dropped columns from all nodes
             all_dropped_columns = []
             for node_res in result.node_results.values():

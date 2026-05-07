@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { Filter } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { getIncomers } from '@xyflow/react';
 
@@ -95,7 +96,8 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
   }, [upstreamDatasetId, upstreamTargetColumn, config.datasetId, config.target_column, onChange]);
 
   const { data: schema, isLoading } = useDatasetSchema(upstreamDatasetId || config.datasetId);
-  const columns = schema ? Object.values(schema.columns).map(c => c.name) : [];
+  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
+  const columns = schema ? Object.values(schema.columns).map(c => c.name).filter(n => !droppedUpstream.has(n)) : [];
 
   // Responsive Layout
   const containerRef = useRef<HTMLDivElement>(null);

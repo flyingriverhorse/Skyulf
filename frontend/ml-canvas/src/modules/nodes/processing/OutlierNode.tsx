@@ -4,6 +4,7 @@ import { Scissors } from 'lucide-react';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { getIncomers } from '@xyflow/react';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { Recommendation } from '../../../core/api/client';
@@ -63,6 +64,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
 
   const datasetId = findUpstreamDatasetId(nodeId || '');
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
+  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   
   const backendRecommendations = useRecommendations(nodeId || '', {
     types: ['outlier_removal', 'cleaning'],
@@ -93,6 +95,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
   const numericColumns = schema 
     ? Object.values(schema.columns)
         .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
+        .filter(c => !droppedUpstream.has(c.name))
         .map(c => c.name)
     : [];
 

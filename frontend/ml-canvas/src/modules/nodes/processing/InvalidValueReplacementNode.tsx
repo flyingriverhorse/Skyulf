@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { AlertTriangle, Search, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { clickableProps } from '../../../core/utils/a11y';
 
 // --- Types ---
@@ -87,11 +88,13 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find((d: unknown) => (d as Record<string, unknown>).datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
+  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   
   // Filter for numeric columns only
   const numericColumns: string[] = schema 
     ? Object.values(schema.columns)
         .filter((c: unknown) => ['int', 'float', 'number'].some(t => ((c as Record<string, unknown>).dtype as string).toLowerCase().includes(t)))
+        .filter((c: unknown) => !droppedUpstream.has(String((c as Record<string, unknown>).name)))
         .map((c: unknown) => String((c as Record<string, unknown>).name))
     : [];
 

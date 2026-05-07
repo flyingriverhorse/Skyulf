@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { BarChart3 } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 
 interface BinningConfig {
   columns: string[];
@@ -55,6 +56,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
+  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   
   // Responsive Layout
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,6 +78,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
   const numericColumns = schema 
     ? Object.values(schema.columns)
         .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
+        .filter(c => !droppedUpstream.has(c.name))
         .map(c => c.name)
     : [];
 

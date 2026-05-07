@@ -27,7 +27,9 @@ def cleanup_error_events(self) -> dict:  # type: ignore[override]
         if not async_session_factory:
             raise RuntimeError("Database not initialized")
         async with async_session_factory() as session:
-            result = await session.execute(delete(ErrorEvent).where(ErrorEvent.created_at < cutoff))  # ty: ignore[invalid-argument-type]
+            result = await session.execute(
+                delete(ErrorEvent).where(ErrorEvent.created_at < cutoff)
+            )  # ty: ignore[invalid-argument-type]
             await session.commit()
             return result.rowcount  # type: ignore[return-value]
 

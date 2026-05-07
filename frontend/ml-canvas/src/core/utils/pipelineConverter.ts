@@ -114,19 +114,14 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       } else if (node.data.definitionType === 'encoding') {
           const method = node.data.method;
           if (method === 'onehot') stepType = 'OneHotEncoder';
-          else if (method === 'dummy') {
-              stepType = 'DummyEncoder';
-              params = { ...node.data, drop_first: true };
-          }
+          else if (method === 'dummy') stepType = 'DummyEncoder';
           else if (method === 'label') stepType = 'LabelEncoder';
           else if (method === 'ordinal') stepType = 'OrdinalEncoder';
           else if (method === 'target') stepType = 'TargetEncoder';
           else if (method === 'hash') stepType = 'HashEncoder';
           else stepType = 'OneHotEncoder'; // Default
-          
-          if (stepType !== 'DummyEncoder') {
-              params = node.data;
-          }
+
+          params = node.data;
       } else if (node.data.definitionType === 'TrainTestSplitter') {
           stepType = 'TrainTestSplitter';
           params = node.data || {};

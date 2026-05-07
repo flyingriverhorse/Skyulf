@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { FileType2, Plus, Trash2, Activity } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 
 interface CastTypeConfig {
@@ -26,7 +27,8 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
-  const columns = schema ? Object.values(schema.columns).map(c => c.name) : [];
+  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
+  const columns = schema ? Object.values(schema.columns).map(c => c.name).filter(n => !droppedUpstream.has(n)) : [];
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;

@@ -33,13 +33,19 @@ def branch_label(index: int, sub_config: PipelineConfig, dup_suffix: str = "") -
     """Build a 'Path A · <suffix>' label for a branch sub-pipeline.
 
     Suffix priority (most specific first):
-      1. Model name when a training/tuning node is present.
+      1. Model name when the terminal node itself is a training/tuning node.
       2. The leaf node's `_display_name` (canvas label, sent by the
          frontend converter) so preview tabs read "Encoding" /
          "Scaling" rather than the raw step type "LabelEncoder" /
          "RobustScaler".
       3. Friendly version of the leaf node's `step_type` as a last
          resort.
+
+    Note: model_type is only read when the TERMINAL (last node) is a
+    training/tuning node. If a DataPreview or other non-training terminal
+    happens to have a training node as an ancestor (e.g. Best Model output
+    wired into DataPreview), those training nodes are intentionally ignored
+    so the label reflects the actual terminal, not an upstream model.
 
     `dup_suffix` is appended to disambiguate sibling branches that
     share the same `model_type` (e.g. two XGBoost training nodes get
@@ -49,12 +55,14 @@ def branch_label(index: int, sub_config: PipelineConfig, dup_suffix: str = "") -
     model_type = ""
     leaf_step = ""
     leaf_display = ""
-    for n in sub_config.nodes:
-        if n.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
-            model_type = n.params.get("model_type") or n.params.get("algorithm") or ""
     if sub_config.nodes:
         leaf = sub_config.nodes[-1]
-        if leaf.step_type not in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
+        if leaf.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
+            # Only scan for model_type when the terminal IS a training/tuning node.
+            for n in sub_config.nodes:
+                if n.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
+                    model_type = n.params.get("model_type") or n.params.get("algorithm") or ""
+        else:
             leaf_step = str(leaf.step_type)
             leaf_display = str(leaf.params.get("_display_name") or "")
     pretty = prettify_model_type(str(model_type))

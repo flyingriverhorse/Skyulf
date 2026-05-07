@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { Eraser, Plus, Trash2, Search, Wand2, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { clickableProps } from '../../../core/utils/a11y';
 
 // --- Types ---
@@ -224,6 +225,7 @@ const TextCleaningSettings: React.FC<{ config: TextCleaningConfig; onChange: (c:
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find((d: Record<string, unknown>) => d.datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
+  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   
   // Filter for text columns only
   const textColumns = schema 
@@ -232,6 +234,7 @@ const TextCleaningSettings: React.FC<{ config: TextCleaningConfig; onChange: (c:
         const dtype = String(c.dtype).toLowerCase();
         return dtype.includes('object') || dtype.includes('string') || dtype.includes('category') || dtype.includes('text');
       })
+      .filter((c) => !droppedUpstream.has(c.name))
       .map((c) => c.name)
     : [];
 

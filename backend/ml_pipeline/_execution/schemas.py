@@ -92,6 +92,10 @@ class NodeExecutionResult:
     metrics: Dict[str, Any] = field(default_factory=dict)
     error: Optional[str] = None
     execution_time: float = 0.0  # Seconds
+    # Carried through so cross-cutting consumers (slow-nodes admin view,
+    # debug logs) can identify the node without joining back to the
+    # original PipelineConfig. Optional to keep older callsites valid.
+    step_type: Optional[str] = None
     # Free-form per-node metadata surfaced to the canvas. `summary` is a
     # short one-line human string the node card renders post-run
     # (e.g. "7,000 / 1,500 / 1,500" for a split, "acc 0.87" for a

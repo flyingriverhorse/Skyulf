@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { Eraser } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 
 interface DataCleaningConfig {
   dropColumns: string[];
@@ -21,7 +22,8 @@ const DataCleaningSettings: React.FC<{ config: DataCleaningConfig; onChange: (c:
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
-  const columns = schema ? Object.values(schema.columns).map(c => c.name) : [];
+  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
+  const columns = schema ? Object.values(schema.columns).map(c => c.name).filter(n => !droppedUpstream.has(n)) : [];
 
   return (
     <div className="p-4 space-y-4">
