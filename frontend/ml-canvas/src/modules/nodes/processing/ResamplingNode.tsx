@@ -7,6 +7,7 @@ import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { Recommendation, ColumnProfile } from '../../../core/api/client';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 
 // --- Types ---
 
@@ -115,6 +116,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
         | string
         | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
+  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   
   // Try to find a target column from upstream nodes configuration
     const upstreamTarget = upstreamData.find((d) => {
@@ -249,7 +251,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     />
                     {schema?.columns && (
                         <datalist id="target-column-suggestions">
-                            {Object.values(schema.columns).map((col: ColumnProfile) => (
+                            {Object.values(schema.columns).filter((col: ColumnProfile) => !droppedUpstream.has(col.name)).map((col: ColumnProfile) => (
                                 <option key={col.name} value={col.name} />
                             ))}
                         </datalist>

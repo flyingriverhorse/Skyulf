@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { Trash2, Activity } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { Recommendation } from '../../../core/api/client';
@@ -21,7 +22,11 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
-  const availableColumns = useMemo(() => schema ? Object.values(schema.columns).map(c => c.name) : [], [schema]);
+  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
+  const availableColumns = useMemo(
+    () => schema ? Object.values(schema.columns).map(c => c.name).filter(n => !droppedUpstream.has(n)) : [],
+    [schema, droppedUpstream]
+  );
   
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
