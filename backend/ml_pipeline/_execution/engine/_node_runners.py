@@ -17,11 +17,12 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, cast
+from typing import Any, Callable, Dict, Optional, TYPE_CHECKING, cast
 
 import numpy as np
 import pandas as pd
 
+from skyulf.data.catalog import DataCatalog
 from skyulf.data.dataset import SplitDataset
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
 from skyulf.modeling.base import StatefulEstimator
@@ -30,11 +31,29 @@ from skyulf.registry import NodeRegistry
 
 from ..schemas import NodeConfig
 
+if TYPE_CHECKING:
+    from ...artifacts.store import ArtifactStore
+
 logger = logging.getLogger(__name__)
 
 
 class NodeRunnersMixin:
     """Concrete per-step runner implementations."""
+
+    # Type-only stubs so ty can resolve attributes/methods provided by
+    # :class:`PipelineEngine` (or its sibling mixins). No runtime impact.
+    artifact_store: "ArtifactStore"
+    catalog: DataCatalog
+    executed_transformers: list[Dict[str, Any]]
+    log: Callable[[str], None]
+    _get_input: Any
+    _save_reference_data: Any
+    _finalize_training_artifacts: Any
+    _build_composite_feature_engineer: Any
+    _resolve_feature_engineer_artifact_key: Any
+    _bundle_transformers_with_model: Any
+    _extract_feature_importances: Any
+    _pipeline_has_training_node: Any
 
     def _run_data_loader(self, node: NodeConfig, job_id: str = "unknown") -> str:
         # params: {"source": "csv", "path": "...", "sample": True/False, "limit": 1000}
