@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict
 
 import numpy as np
 import polars as pl
@@ -7,9 +7,10 @@ import pandas as pd
 
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
-from ..utils import pack_pipeline_output, unpack_pipeline_input
-from .base import BaseApplier, BaseCalculator
-from ..engines import EngineName, SkyulfDataFrame, get_engine
+from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ._artifacts import OversamplingArtifact, UndersamplingArtifact
+from ._schema import SkyulfSchema
+from ..engines import EngineName, get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +18,13 @@ logger = logging.getLogger(__name__)
 
 
 class OversamplingApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
         was_polars = engine.name == EngineName.POLARS
         target_col = params.get("target_column")
@@ -38,7 +40,7 @@ class OversamplingApplier(BaseApplier):
                     X = X.drop(columns=[target_col])
             else:
                 # Cannot resample without target
-                return pack_pipeline_output(X, y, is_tuple)
+                return X, y
 
         # Convert to Pandas for imblearn
         if was_polars:
@@ -119,7 +121,7 @@ class OversamplingApplier(BaseApplier):
             sampler = SMOTETomek(sampling_strategy=strategy, random_state=random_state)
 
         if not sampler:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X, y
 
         X_res, y_res = sampler.fit_resample(X_pd, y_pd)
 
@@ -134,7 +136,7 @@ class OversamplingApplier(BaseApplier):
             X_res = pl.from_pandas(X_res)
             y_res = pl.from_pandas(y_res)
 
-        return pack_pipeline_output(X_res, y_res, is_tuple)
+        return X_res, y_res
 
 
 @NodeRegistry.register("Oversampling", OversamplingApplier)
@@ -146,11 +148,19 @@ class OversamplingApplier(BaseApplier):
     params={"method": "smote", "target_column": "target", "sampling_strategy": "auto"},
 )
 class OversamplingCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Resampling changes row counts only; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        _X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> OversamplingArtifact:
         # Config: {'method': 'smote', 'target_column': 'target', 'sampling_strategy': 'auto', ...}
         return {
             "type": "oversampling",
@@ -174,12 +184,13 @@ class OversamplingCalculator(BaseCalculator):
 
 
 class UndersamplingApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
         was_polars = engine.name == EngineName.POLARS
         target_col = params.get("target_column")
@@ -195,7 +206,7 @@ class UndersamplingApplier(BaseApplier):
                     X = X.drop(columns=[target_col])
             else:
                 # Cannot resample without target
-                return pack_pipeline_output(X, y, is_tuple)
+                return X, y
 
         # Convert to Pandas for imblearn
         if was_polars:
@@ -252,7 +263,7 @@ class UndersamplingApplier(BaseApplier):
             )
 
         if not sampler:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X, y
 
         X_res, y_res = sampler.fit_resample(X_pd, y_pd)
 
@@ -267,7 +278,7 @@ class UndersamplingApplier(BaseApplier):
             X_res = pl.from_pandas(X_res)
             y_res = pl.from_pandas(y_res)
 
-        return pack_pipeline_output(X_res, y_res, is_tuple)
+        return X_res, y_res
 
 
 @NodeRegistry.register("Undersampling", UndersamplingApplier)
@@ -283,11 +294,19 @@ class UndersamplingApplier(BaseApplier):
     },
 )
 class UndersamplingCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Resampling changes row counts only; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        _X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> UndersamplingArtifact:
         return {
             "type": "undersampling",
             "method": config.get("method", "random_under_sampling"),

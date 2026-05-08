@@ -1,4 +1,5 @@
 from .base import BaseApplier, BaseCalculator, StatefulTransformer
+from ._schema import SkyulfSchema
 from .bucketing import (
     CustomBinningApplier,
     CustomBinningCalculator,
@@ -103,6 +104,7 @@ __all__ = [
     "BaseCalculator",
     "BaseApplier",
     "StatefulTransformer",
+    "SkyulfSchema",
     "FeatureEngineer",
     "SplitCalculator",
     "SplitApplier",

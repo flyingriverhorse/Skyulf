@@ -8,16 +8,25 @@ subscribes to the Redis pub/sub channel and broadcasts every message.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-from typing import Optional, Set
+from typing import Any, Optional, Set
 
+import orjson
 from fastapi import WebSocket
 
 from backend.config import get_settings
 from backend.realtime.events import JOB_EVENTS_CHANNEL
 
 logger = logging.getLogger(__name__)
+
+
+def _wrap_payload(raw: str) -> str:
+    """Wrap a raw JSON event string in the typed channel envelope.
+
+    Shared by both the Redis subscriber loop and the local-bus loop.
+    Returns the final string ready for ``broadcast()``.
+    """
+    return orjson.dumps({"channel": "jobs", "data": orjson.loads(raw)}).decode()
 
 
 class ConnectionManager:
@@ -86,6 +95,18 @@ class ConnectionManager:
             except Exception:
                 pass
 
+    async def _drain_pubsub(self, pubsub: Any) -> None:
+        """Forward messages from a Redis pubsub stream until stop is set."""
+        async for message in pubsub.listen():
+            if self._stop.is_set():
+                break
+            if message.get("type") != "message":
+                continue
+            data = message.get("data")
+            if not isinstance(data, str):
+                continue
+            await self.broadcast(_wrap_payload(data))
+
     async def _subscriber_loop(self) -> None:
         """Subscribe to Redis and broadcast messages until stopped.
 
@@ -106,19 +127,7 @@ class ConnectionManager:
                 await pubsub.subscribe(JOB_EVENTS_CHANNEL)
                 logger.info("Realtime subscriber attached to %s", JOB_EVENTS_CHANNEL)
                 backoff = 1.0  # reset after a successful connect
-
-                async for message in pubsub.listen():
-                    if self._stop.is_set():
-                        break
-                    if message.get("type") != "message":
-                        continue
-                    data = message.get("data")
-                    if not isinstance(data, str):
-                        continue
-                    # Wrap in a typed envelope so the frontend can
-                    # discriminate future channels (drift alerts, etc.)
-                    payload = json.dumps({"channel": "jobs", "data": json.loads(data)})
-                    await self.broadcast(payload)
+                await self._drain_pubsub(pubsub)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -142,8 +151,7 @@ class ConnectionManager:
                 except asyncio.TimeoutError:
                     continue
                 try:
-                    payload = json.dumps({"channel": "jobs", "data": json.loads(raw)})
-                    await self.broadcast(payload)
+                    await self.broadcast(_wrap_payload(raw))
                 except Exception as exc:  # pragma: no cover - defensive
                     logger.warning("LocalBus broadcast error: %s", exc)
         finally:

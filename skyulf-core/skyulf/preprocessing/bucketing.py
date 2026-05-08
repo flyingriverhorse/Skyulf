@@ -7,12 +7,11 @@ from sklearn.preprocessing import KBinsDiscretizer
 from ..core.meta.decorators import node_meta
 from ..utils import (
     detect_numeric_columns,
-    pack_pipeline_output,
     resolve_columns,
-    unpack_pipeline_input,
     user_picked_no_columns,
 )
-from .base import BaseApplier, BaseCalculator
+from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ._artifacts import GeneralBinningArtifact
 from ..registry import NodeRegistry
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 
@@ -25,17 +24,18 @@ class BaseBinningApplier(BaseApplier):
     Expects 'bin_edges' in params: Dict[str, List[float]] mapping column names to bin edges.
     """
 
+    @apply_method
     def apply(  # noqa: C901
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         bin_edges_map = params.get("bin_edges", {})
         if not bin_edges_map:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         output_suffix = params.get("output_suffix", "_binned")
         drop_original = params.get("drop_original", False)
@@ -95,7 +95,7 @@ class BaseBinningApplier(BaseApplier):
             if drop_original:
                 X_out = X_out.drop(cols_to_drop)
 
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         df_out = X.copy()
@@ -192,7 +192,7 @@ class BaseBinningApplier(BaseApplier):
         if drop_original:
             df_out = df_out.drop(columns=processed_cols)
 
-        return pack_pipeline_output(df_out, y, is_tuple)
+        return df_out
 
 
 # --- General Binning Calculator ---
@@ -215,11 +215,8 @@ class GeneralBinningCalculator(BaseCalculator):
     Master calculator that handles mixed strategies and overrides.
     """
 
-    def fit(  # noqa: C901
-        self, df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any], config: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
-
+    @fit_method
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> GeneralBinningArtifact:  # noqa: C901
         if user_picked_no_columns(config):
             return {}
 
@@ -360,13 +357,13 @@ class CustomBinningCalculator(BaseCalculator):
     Applies specific bin edges to selected columns.
     """
 
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
-
+    ) -> GeneralBinningArtifact:
         if user_picked_no_columns(config):
             return {}
 

@@ -1,21 +1,20 @@
 """Target Encoder node (Calculator + Applier)."""
 
 import logging
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Optional
 
-import pandas as pd
 from sklearn.preprocessing import TargetEncoder
 
 from ...utils import (
-    pack_pipeline_output,
     resolve_columns,
-    unpack_pipeline_input,
     user_picked_no_columns,
 )
-from ..base import BaseApplier, BaseCalculator
+from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
+from .._artifacts import TargetEncoderArtifact
+from .._schema import SkyulfSchema
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...engines import EngineName, SkyulfDataFrame, get_engine
+from ...engines import EngineName, get_engine
 from ...engines.sklearn_bridge import SklearnBridge
 from ._common import detect_categorical_columns, _exclude_target_column
 
@@ -23,12 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 class TargetEncoderApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
@@ -36,7 +36,7 @@ class TargetEncoderApplier(BaseApplier):
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or not encoder:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -51,10 +51,10 @@ class TargetEncoderApplier(BaseApplier):
 
                 new_cols = [pl.Series(col, encoded_array[:, i]) for i, col in enumerate(valid_cols)]
                 X_out = X_pl.with_columns(new_cols)
-                return pack_pipeline_output(X_out, y, is_tuple)
+                return X_out
             except Exception as e:
                 logger.error(f"Target Encoding failed: {e}")
-                return pack_pipeline_output(X, y, is_tuple)
+                return X
 
         # Pandas Path
         X_out = X.copy()
@@ -67,7 +67,7 @@ class TargetEncoderApplier(BaseApplier):
         except Exception as e:
             logger.error(f"Target Encoding failed: {e}")
 
-        return pack_pipeline_output(X_out, y, is_tuple)
+        return X_out
 
 
 @NodeRegistry.register("TargetEncoder", TargetEncoderApplier)
@@ -79,12 +79,13 @@ class TargetEncoderApplier(BaseApplier):
     params={"smooth": "auto", "target_type": "auto", "columns": []},
 )
 class TargetEncoderCalculator(BaseCalculator):
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, y, _ = unpack_pipeline_input(df)
+    ) -> TargetEncoderArtifact:
         engine = get_engine(X)
 
         target_col = config.get("target_column")
@@ -131,6 +132,16 @@ class TargetEncoderCalculator(BaseCalculator):
         encoder.fit(X_np, y_np)
 
         return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}
+
+    def infer_output_schema(
+        self,
+        input_schema: SkyulfSchema,
+        config: Dict[str, Any],
+    ) -> Optional[SkyulfSchema]:
+        # Target encoder replaces values in source columns in place — same
+        # column names, dtype becomes float (per-column dtype is best-effort
+        # so we don't bother rewriting it).
+        return input_schema
 
 
 __all__ = ["TargetEncoderApplier", "TargetEncoderCalculator"]

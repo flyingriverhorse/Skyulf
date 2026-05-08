@@ -1,9 +1,12 @@
 from backend.exceptions.core import SkyulfException
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from pydantic import BaseModel
 from typing import Optional, List, Any, cast
+
+import orjson
 
 from backend.dependencies import get_db
 from backend.database.models import EDAReport, DataSource
@@ -181,6 +184,9 @@ async def get_report_history(dataset_id: int, session: AsyncSession = Depends(ge
 async def get_latest_report(dataset_id: int, session: AsyncSession = Depends(get_db)):
     """
     Returns the most recent report for a dataset, regardless of status.
+
+    Uses orjson serialisation + raw Response to avoid double-buffering the
+    profile_data blob (can be 2-10 MB for wide datasets).
     """
     query = (
         select(EDAReport)
@@ -194,18 +200,21 @@ async def get_latest_report(dataset_id: int, session: AsyncSession = Depends(get
     if not report:
         raise HTTPException(status_code=404, detail="No analysis found for this dataset")
 
-    return report.to_dict()
+    return Response(content=orjson.dumps(report.to_dict()), media_type="application/json")
 
 
 @router.get("/reports/{report_id}")
 async def get_report(report_id: int, session: AsyncSession = Depends(get_db)):
     """
     Get a specific report by ID.
+
+    Uses orjson serialisation + raw Response to avoid double-buffering the
+    profile_data blob (can be 2-10 MB for wide datasets).
     """
     report = await session.get(EDAReport, report_id)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
-    return report.to_dict()
+    return Response(content=orjson.dumps(report.to_dict()), media_type="application/json")
 
 
 class DecompositionRequest(BaseModel):

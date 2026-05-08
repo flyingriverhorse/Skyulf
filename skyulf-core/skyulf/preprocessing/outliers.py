@@ -1,20 +1,26 @@
 import logging
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict
 
 import pandas as pd
 from sklearn.covariance import EllipticEnvelope
 
 from ..utils import (
     detect_numeric_columns,
-    pack_pipeline_output,
     resolve_columns,
-    unpack_pipeline_input,
     user_picked_no_columns,
 )
-from .base import BaseApplier, BaseCalculator
+from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ._artifacts import (
+    EllipticEnvelopeArtifact,
+    IQRArtifact,
+    ManualBoundsArtifact,
+    WinsorizeArtifact,
+    ZScoreArtifact,
+)
+from ._schema import SkyulfSchema
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
-from ..engines import EngineName, SkyulfDataFrame, get_engine
+from ..engines import EngineName, get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -22,17 +28,18 @@ logger = logging.getLogger(__name__)
 
 
 class IQRApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         bounds = params.get("bounds", {})
         if not bounds:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X, y
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -66,7 +73,7 @@ class IQRApplier(BaseApplier):
                 else:
                     y_filtered = y
 
-            return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
+            return X_filtered, y_filtered
 
         # Pandas Path
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
@@ -94,9 +101,9 @@ class IQRApplier(BaseApplier):
         if y is not None:
             y_pd: Any = y
             y_filtered = y_pd[mask]
-            return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
+            return X_filtered, y_filtered
 
-        return pack_pipeline_output(X_filtered, y, is_tuple)
+        return X_filtered, y
 
 
 @NodeRegistry.register("IQR", IQRApplier)
@@ -108,13 +115,19 @@ class IQRApplier(BaseApplier):
     params={"factor": 1.5, "columns": []},
 )
 class IQRCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # IQR removes outlier *rows*; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
-
+    ) -> IQRArtifact:
         if user_picked_no_columns(config):
             return {}
 
@@ -158,19 +171,20 @@ class IQRCalculator(BaseCalculator):
 
 
 class ZScoreApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         stats = params.get("stats", {})
         threshold = params.get("threshold", 3.0)
 
         if not stats:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X, y
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -208,7 +222,7 @@ class ZScoreApplier(BaseApplier):
                 else:
                     y_filtered = y
 
-            return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
+            return X_filtered, y_filtered
 
         # Pandas Path
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
@@ -238,9 +252,9 @@ class ZScoreApplier(BaseApplier):
         if y is not None:
             y_pd: Any = y
             y_filtered = y_pd[mask]
-            return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
+            return X_filtered, y_filtered
 
-        return pack_pipeline_output(X_filtered, y, is_tuple)
+        return X_filtered, y
 
 
 @NodeRegistry.register("ZScore", ZScoreApplier)
@@ -252,13 +266,19 @@ class ZScoreApplier(BaseApplier):
     params={"threshold": 3.0, "columns": []},
 )
 class ZScoreCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Z-score removes outlier *rows*; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
-
+    ) -> ZScoreArtifact:
         if user_picked_no_columns(config):
             return {}
 
@@ -302,17 +322,18 @@ class ZScoreCalculator(BaseCalculator):
 
 
 class WinsorizeApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         bounds = params.get("bounds", {})
         if not bounds:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X, y
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -332,7 +353,7 @@ class WinsorizeApplier(BaseApplier):
                 exprs.append(pl.col(col).cast(pl.Float64).clip(lower, upper).alias(col))
 
             X_out = X_pl.with_columns(exprs)
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out, y
 
         # Pandas Path
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
@@ -349,7 +370,7 @@ class WinsorizeApplier(BaseApplier):
             if pd.api.types.is_numeric_dtype(df_out[col]):
                 df_out[col] = df_out[col].clip(lower=lower, upper=upper)
 
-        return pack_pipeline_output(df_out, y, is_tuple)
+        return df_out, y
 
 
 @NodeRegistry.register("Winsorize", WinsorizeApplier)
@@ -361,13 +382,19 @@ class WinsorizeApplier(BaseApplier):
     params={"limits": [0.05, 0.05], "columns": []},
 )
 class WinsorizeCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Winsorize clips values in place; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
-
+    ) -> WinsorizeArtifact:
         if user_picked_no_columns(config):
             return {}
 
@@ -409,17 +436,18 @@ class WinsorizeCalculator(BaseCalculator):
 
 
 class ManualBoundsApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         bounds = params.get("bounds", {})
         if not bounds:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X, y
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -454,7 +482,7 @@ class ManualBoundsApplier(BaseApplier):
                 else:
                     y_filtered = y
 
-            return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
+            return X_filtered, y_filtered
 
         # Pandas Path
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
@@ -483,9 +511,9 @@ class ManualBoundsApplier(BaseApplier):
         if y is not None:
             y_pd: Any = y
             y_filtered = y_pd[mask]
-            return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
+            return X_filtered, y_filtered
 
-        return pack_pipeline_output(X_filtered, y, is_tuple)
+        return X_filtered, y
 
 
 @NodeRegistry.register("ManualBounds", ManualBoundsApplier)
@@ -497,11 +525,19 @@ class ManualBoundsApplier(BaseApplier):
     params={"bounds": {}},
 )
 class ManualBoundsCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Manual bounds filter rows; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        _X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> ManualBoundsArtifact:
         # Config: {'bounds': {'col1': {'lower': 0, 'upper': 100}, ...}}
         bounds = config.get("bounds", {})
 
@@ -512,17 +548,18 @@ class ManualBoundsCalculator(BaseCalculator):
 
 
 class EllipticEnvelopeApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         models = params.get("models", {})
         if not models:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X, y
 
         # Polars Path: Convert to Pandas because we use sklearn models
         if engine.name == EngineName.POLARS:
@@ -585,20 +622,19 @@ class EllipticEnvelopeApplier(BaseApplier):
             if engine.name == EngineName.POLARS:
                 import polars as pl
 
-                return pack_pipeline_output(
+                return (
                     pl.from_pandas(X_filtered),
                     pl.from_pandas(y_filtered) if y_filtered is not None else None,
-                    is_tuple,
                 )
 
-            return pack_pipeline_output(X_filtered, y_filtered, is_tuple)
+            return X_filtered, y_filtered
 
         if engine.name == EngineName.POLARS:
             import polars as pl
 
-            return pack_pipeline_output(pl.from_pandas(X_filtered), y, is_tuple)
+            return pl.from_pandas(X_filtered), y
 
-        return pack_pipeline_output(X_filtered, y, is_tuple)
+        return X_filtered, y
 
 
 @NodeRegistry.register("EllipticEnvelope", EllipticEnvelopeApplier)
@@ -610,13 +646,19 @@ class EllipticEnvelopeApplier(BaseApplier):
     params={"contamination": 0.01, "columns": []},
 )
 class EllipticEnvelopeCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Elliptic envelope filters outlier *rows*; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
-
+    ) -> EllipticEnvelopeArtifact:
         if user_picked_no_columns(config):
             return {}
 

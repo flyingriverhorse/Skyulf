@@ -1,23 +1,28 @@
-from typing import Any, Dict, Tuple, Union
-
-import pandas as pd
+from typing import Any, Dict, Optional
 
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
-from ..utils import pack_pipeline_output, unpack_pipeline_input
-from .base import BaseApplier, BaseCalculator
-from ..engines import EngineName, SkyulfDataFrame, get_engine
+from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ._artifacts import (
+    DeduplicateArtifact,
+    DropMissingColumnsArtifact,
+    DropMissingRowsArtifact,
+    MissingIndicatorArtifact,
+)
+from ._schema import SkyulfSchema
+from ..engines import EngineName, get_engine
 
 # --- Deduplicate ---
 
 
 class DeduplicateApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         subset = params.get("subset")
@@ -45,7 +50,7 @@ class DeduplicateApplier(BaseApplier):
             if keep is False:
                 pl_keep = "none"
 
-            if is_tuple and y is not None:
+            if y is not None:
                 # We need to sync X and y
                 # Combine them
                 # We need to ensure y name doesn't conflict
@@ -81,21 +86,21 @@ class DeduplicateApplier(BaseApplier):
                     y_dedup = y
 
                 X_out = X_dedup.drop("__idx__")
-                return pack_pipeline_output(X_out, y_dedup, is_tuple)
+                return X_out, y_dedup
 
             else:
                 X_out = X_pl.unique(subset=subset, keep=pl_keep, maintain_order=True)
-                return pack_pipeline_output(X_out, y, is_tuple)
+                return X_out, y
 
         # Pandas Path
         X_dedup = X.drop_duplicates(subset=subset, keep=keep)
 
-        if is_tuple and y is not None:
+        if y is not None:
             # Align y with X
             y_dedup = y.loc[X_dedup.index]
-            return pack_pipeline_output(X_dedup, y_dedup, is_tuple)
+            return X_dedup, y_dedup
 
-        return pack_pipeline_output(X_dedup, y, is_tuple)
+        return X_dedup, y
 
 
 @NodeRegistry.register("Deduplicate", DeduplicateApplier)
@@ -107,13 +112,19 @@ class DeduplicateApplier(BaseApplier):
     params={"subset": [], "keep": "first"},
 )
 class DeduplicateCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Deduplication removes rows; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
-
+    ) -> DeduplicateArtifact:
         # Config: {'subset': [...], 'keep': 'first'|'last'|False}
         # Deduplication is an operation that doesn't learn parameters from data,
         # it just applies logic. So fit just passes through the config.
@@ -128,12 +139,13 @@ class DeduplicateCalculator(BaseCalculator):
 
 
 class DropMissingColumnsApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols_to_drop = params.get("columns_to_drop", [])
@@ -153,7 +165,7 @@ class DropMissingColumnsApplier(BaseApplier):
             else:
                 X = X.drop(columns=cols_to_drop_X)
 
-        return pack_pipeline_output(X, y, is_tuple)
+        return X, y
 
 
 @NodeRegistry.register("DropMissingColumns", DropMissingColumnsApplier)
@@ -165,12 +177,30 @@ class DropMissingColumnsApplier(BaseApplier):
     params={"threshold": 0.5},
 )
 class DropMissingColumnsCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> Optional[SkyulfSchema]:
+        # Threshold path is data-dependent; we can only predict the schema
+        # when the user supplied an explicit column list and no threshold.
+        threshold = config.get("missing_threshold")
+        explicit = config.get("columns", []) or []
+        if threshold is not None:
+            try:
+                if float(threshold) > 0:
+                    return None
+            except (TypeError, ValueError):
+                pass
+        if not explicit:
+            return input_schema
+        return input_schema.drop(explicit)
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> DropMissingColumnsArtifact:
         engine = get_engine(X)
 
         # Config: {'threshold': 50.0 (percent), 'columns': [...]}
@@ -228,12 +258,13 @@ class DropMissingColumnsCalculator(BaseCalculator):
 
 
 class DropMissingRowsApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         subset = params.get("subset")
@@ -279,7 +310,7 @@ class DropMissingRowsApplier(BaseApplier):
 
             kept_indices = X_clean["__idx__"]
 
-            if is_tuple and y is not None:
+            if y is not None:
                 if isinstance(y, pl.DataFrame):
                     y_clean = (
                         y.with_row_index("__idx__")
@@ -292,10 +323,10 @@ class DropMissingRowsApplier(BaseApplier):
                     y_clean = y
 
                 X_out = X_clean.drop("__idx__")
-                return pack_pipeline_output(X_out, y_clean, is_tuple)
+                return X_out, y_clean
 
             X_out = X_clean.drop("__idx__")
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out, y
 
         # Pandas Path
         # Pandas dropna forbids setting both 'how' and 'thresh'.
@@ -305,11 +336,11 @@ class DropMissingRowsApplier(BaseApplier):
         else:
             X_clean = X.dropna(axis=0, how=how, subset=subset)
 
-        if is_tuple and y is not None:
+        if y is not None:
             y_clean = y.loc[X_clean.index]
-            return pack_pipeline_output(X_clean, y_clean, is_tuple)
+            return X_clean, y_clean
 
-        return pack_pipeline_output(X_clean, y, is_tuple)
+        return X_clean, y
 
 
 @NodeRegistry.register("DropMissingRows", DropMissingRowsApplier)
@@ -321,11 +352,19 @@ class DropMissingRowsApplier(BaseApplier):
     params={"subset": [], "how": "any"},
 )
 class DropMissingRowsCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Drops rows; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        _X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> DropMissingRowsArtifact:
         # Config: {'subset': [...], 'how': 'any'|'all', 'threshold': int}
         subset = config.get("subset")
         how = config.get("how", "any")
@@ -343,18 +382,19 @@ class DropMissingRowsCalculator(BaseCalculator):
 
 
 class MissingIndicatorApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
 
         if not cols:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X, y
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -369,10 +409,10 @@ class MissingIndicatorApplier(BaseApplier):
                     exprs.append(pl.col(col).is_null().cast(pl.Int64).alias(f"{col}_missing"))
 
             if not exprs:
-                return pack_pipeline_output(X, y, is_tuple)
+                return X, y
 
             X_out = X_pl.with_columns(exprs)
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out, y
 
         # Pandas Path
         X_out = X.copy()
@@ -380,7 +420,7 @@ class MissingIndicatorApplier(BaseApplier):
             if col in X.columns:
                 X_out[f"{col}_missing"] = X[col].isna().astype(int)
 
-        return pack_pipeline_output(X_out, y, is_tuple)
+        return X_out, y
 
 
 @NodeRegistry.register("MissingIndicator", MissingIndicatorApplier)
@@ -392,12 +432,27 @@ class MissingIndicatorApplier(BaseApplier):
     params={"features": "missing-only", "sparse": "auto"},
 )
 class MissingIndicatorCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> Optional[SkyulfSchema]:
+        # Adds one boolean column "<col>_missing" per indicator column.
+        # Only predictable when the user supplied an explicit column list;
+        # otherwise the set depends on which columns actually contain NaNs.
+        explicit = config.get("columns") or []
+        if not explicit:
+            return None
+        new_schema = input_schema
+        for col in explicit:
+            new_schema = new_schema.add(f"{col}_missing", "bool")
+        return new_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> MissingIndicatorArtifact:
         engine = get_engine(X)
 
         explicit_cols = config.get("columns")

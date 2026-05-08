@@ -8,8 +8,9 @@ from sklearn.preprocessing import PolynomialFeatures
 
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
-from ..utils import detect_numeric_columns, pack_pipeline_output, unpack_pipeline_input
-from .base import BaseApplier, BaseCalculator
+from ..utils import detect_numeric_columns
+from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ._artifacts import PolynomialFeaturesArtifact
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 # --- Optional Dependencies ---
@@ -133,19 +134,20 @@ def _vectorised_similarity(s_a: pd.Series, s_b: pd.Series, method: str) -> pd.Se
 
 
 class PolynomialFeaturesApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
         valid_cols = [c for c in cols if c in X.columns]
 
         if not valid_cols:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         degree = params.get("degree", 2)
         interaction_only = params.get("interaction_only", False)
@@ -182,7 +184,7 @@ class PolynomialFeaturesApplier(BaseApplier):
                 indices_to_keep.append(i)
 
             if not indices_to_keep:
-                return pack_pipeline_output(X, y, is_tuple)
+                return X
 
             transformed = transformed[:, indices_to_keep]
             feature_names = feature_names[indices_to_keep]
@@ -198,7 +200,7 @@ class PolynomialFeaturesApplier(BaseApplier):
             # Horizontal concat
             X_out = pl.concat([X_pl, df_poly], how="horizontal")
 
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         poly = PolynomialFeatures(
@@ -225,7 +227,7 @@ class PolynomialFeaturesApplier(BaseApplier):
             indices_to_keep.append(i)
 
         if not indices_to_keep:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         transformed = transformed[:, indices_to_keep]
         feature_names = feature_names[indices_to_keep]
@@ -244,7 +246,7 @@ class PolynomialFeaturesApplier(BaseApplier):
         # Concatenate — pd.concat creates a new DataFrame, no need to copy X first
         df_out = pd.concat(cast(Any, [X, df_poly]), axis=1)
 
-        return pack_pipeline_output(df_out, y, is_tuple)
+        return df_out
 
 
 @NodeRegistry.register("PolynomialFeatures", PolynomialFeaturesApplier)
@@ -257,15 +259,16 @@ class PolynomialFeaturesApplier(BaseApplier):
     params={"degree": 2, "interaction_only": False, "include_bias": False},
 )
 class PolynomialFeaturesCalculator(BaseCalculator):
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> PolynomialFeaturesArtifact:
         # Extract configuration parameters
         # We support standard polynomial features settings like degree and interaction_only
 
-        X, _, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = config.get("columns", [])
@@ -312,12 +315,13 @@ class PolynomialFeaturesCalculator(BaseCalculator):
 
 
 class FeatureGenerationApplier(BaseApplier):
+    @apply_method
     def apply(  # noqa: C901
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         operations = params.get("operations", [])
@@ -325,7 +329,7 @@ class FeatureGenerationApplier(BaseApplier):
         allow_overwrite = params.get("allow_overwrite", False)
 
         if not operations:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -533,7 +537,7 @@ class FeatureGenerationApplier(BaseApplier):
                 except Exception:
                     pass
 
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         df_out = X.copy()
@@ -730,7 +734,7 @@ class FeatureGenerationApplier(BaseApplier):
             except Exception:
                 pass
 
-        return pack_pipeline_output(df_out, y, is_tuple)
+        return df_out
 
 
 @NodeRegistry.register("FeatureGeneration", FeatureGenerationApplier)

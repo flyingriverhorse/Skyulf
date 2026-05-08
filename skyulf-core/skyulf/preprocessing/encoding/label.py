@@ -1,31 +1,29 @@
 """Label Encoder node (Calculator + Applier)."""
 
 import logging
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List
 
 import numpy as np
-import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 
-from ...utils import (
-    pack_pipeline_output,
-    unpack_pipeline_input,
-)
-from ..base import BaseApplier, BaseCalculator
+from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
+from .._artifacts import LabelEncoderArtifact
+from .._schema import SkyulfSchema
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...engines import EngineName, SkyulfDataFrame, get_engine
+from ...engines import EngineName, get_engine
 
 logger = logging.getLogger(__name__)
 
 
 class LabelEncoderApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         encoders = params.get("encoders", {})
@@ -81,7 +79,7 @@ class LabelEncoderApplier(BaseApplier):
                 missing_code = params.get("missing_code", -1)
                 y_out = y_out.astype(str).map(mapping).fillna(missing_code)
 
-        return pack_pipeline_output(X_out, y_out, is_tuple)
+        return X_out, y_out
 
 
 @NodeRegistry.register("LabelEncoder", LabelEncoderApplier)
@@ -93,12 +91,20 @@ class LabelEncoderApplier(BaseApplier):
     params={"columns": [], "missing_code": -1},
 )
 class LabelEncoderCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Label encoding replaces categorical values with ints in place;
+        # column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, y, _ = unpack_pipeline_input(df)
+    ) -> LabelEncoderArtifact:
         engine = get_engine(X)
 
         target_col = config.get("target_column")
