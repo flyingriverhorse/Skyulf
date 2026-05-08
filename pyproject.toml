@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.5.9"
+version = "0.5.15"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -25,6 +25,7 @@ dependencies = [
     "fastapi>=0.104.0,<1.0.0",
     "httpx>=0.25.0,<1.0.0",
     "numpy>=1.24.0",
+    "orjson>=3.9.0",
     "pandas>=2.0.0",
     "polars>=1.36.0",
     "pyarrow>=21.0.0",
@@ -96,6 +97,8 @@ dev = [
     "pytest>=7.4.0,<10.0.0",
     "pytest-asyncio>=0.21.0,<2.0.0",
     "pytest-cov>=4.1.0,<5.0.0",
+    "hypothesis>=6.100,<7.0.0",
+    "syrupy>=4.0.0",
 
     # Linters/formatters/typecheckers
     "black==24.10.0",

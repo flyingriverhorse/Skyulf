@@ -1,0 +1,302 @@
+# serializer version: 1
+# name: test_linear_pipeline_snapshot
+  dict({
+    'job_type': <StepType.BASIC_TRAINING: 'basic_training'>,
+    'metadata': dict({
+      'label': 'snapshot linear',
+    }),
+    'nodes': list([
+      dict({
+        'inputs': list([
+        ]),
+        'node_id': 'n1',
+        'params': dict({
+          'source_id': '42',
+        }),
+        'step_type': 'data_loader',
+      }),
+      dict({
+        'inputs': list([
+          'n1',
+        ]),
+        'node_id': 'n2',
+        'params': dict({
+        }),
+        'step_type': 'StandardScaler',
+      }),
+      dict({
+        'inputs': list([
+          'n2',
+        ]),
+        'node_id': 'n3',
+        'params': dict({
+          'n_estimators': 100,
+          'target_column': 'label',
+        }),
+        'step_type': 'random_forest_classifier',
+      }),
+    ]),
+    'pipeline_id': 'snap_linear',
+    'target_node_id': None,
+  })
+# ---
+# name: test_node_registry_data_loader_item
+  dict({
+    'category': 'Data Source',
+    'description': 'Loads data from a source.',
+    'id': 'data_loader',
+    'name': 'Data Loader',
+    'params': dict({
+      'date_range': 'optional[dict]',
+      'source_id': 'string',
+    }),
+    'tags': list([
+    ]),
+  })
+# ---
+# name: test_node_registry_random_forest_classifier_item
+  dict({
+    'category': 'Modeling',
+    'description': 'Ensemble of decision trees.',
+    'id': 'random_forest_classifier',
+    'name': 'Random Forest Classifier',
+    'params': dict({
+      'max_depth': 10,
+      'min_samples_split': 5,
+      'n_estimators': 50,
+    }),
+    'tags': list([
+    ]),
+  })
+# ---
+# name: test_node_registry_standard_scaler_item
+  dict({
+    'category': 'Preprocessing',
+    'description': 'Standardize features by removing the mean and scaling to unit variance.',
+    'id': 'StandardScaler',
+    'name': 'Standard Scaler',
+    'params': dict({
+      'columns': list([
+      ]),
+      'with_mean': True,
+      'with_std': True,
+    }),
+    'tags': list([
+    ]),
+  })
+# ---
+# name: test_parallel_branches_pipeline_snapshot
+  dict({
+    'job_type': <StepType.BASIC_TRAINING: 'basic_training'>,
+    'metadata': dict({
+      'job_type': 'basic_training',
+    }),
+    'nodes': list([
+      dict({
+        'inputs': list([
+        ]),
+        'node_id': 'ds',
+        'params': dict({
+          'source_id': '3',
+        }),
+        'step_type': 'data_loader',
+      }),
+      dict({
+        'inputs': list([
+          'ds',
+        ]),
+        'node_id': 'sc',
+        'params': dict({
+        }),
+        'step_type': 'StandardScaler',
+      }),
+      dict({
+        'inputs': list([
+          'sc',
+        ]),
+        'node_id': 'spl_a',
+        'params': dict({
+          'target_column': 'y',
+          'test_size': 0.2,
+        }),
+        'step_type': 'TrainTestSplitter',
+      }),
+      dict({
+        'inputs': list([
+          'spl_a',
+        ]),
+        'node_id': 'rf',
+        'params': dict({
+          'n_estimators': 50,
+          'target_column': 'y',
+        }),
+        'step_type': 'random_forest_classifier',
+      }),
+      dict({
+        'inputs': list([
+          'sc',
+        ]),
+        'node_id': 'spl_b',
+        'params': dict({
+          'target_column': 'y',
+          'test_size': 0.2,
+        }),
+        'step_type': 'TrainTestSplitter',
+      }),
+      dict({
+        'inputs': list([
+          'spl_b',
+        ]),
+        'node_id': 'lr',
+        'params': dict({
+          'C': 1.0,
+          'target_column': 'y',
+        }),
+        'step_type': 'logistic_regression',
+      }),
+    ]),
+    'pipeline_id': 'snap_parallel',
+    'target_node_id': None,
+  })
+# ---
+# name: test_pipeline_config_model_json_schema
+  dict({
+    '$defs': dict({
+      'NodeConfigModel': dict({
+        'properties': dict({
+          'inputs': dict({
+            'default': list([
+            ]),
+            'items': dict({
+              'type': 'string',
+            }),
+            'title': 'Inputs',
+            'type': 'array',
+          }),
+          'node_id': dict({
+            'title': 'Node Id',
+            'type': 'string',
+          }),
+          'params': dict({
+            'additionalProperties': True,
+            'default': dict({
+            }),
+            'title': 'Params',
+            'type': 'object',
+          }),
+          'step_type': dict({
+            'title': 'Step Type',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'node_id',
+          'step_type',
+        ]),
+        'title': 'NodeConfigModel',
+        'type': 'object',
+      }),
+    }),
+    'properties': dict({
+      'job_type': dict({
+        'anyOf': list([
+          dict({
+            'type': 'string',
+          }),
+          dict({
+            'type': 'null',
+          }),
+        ]),
+        'default': 'basic_training',
+        'title': 'Job Type',
+      }),
+      'metadata': dict({
+        'additionalProperties': True,
+        'default': dict({
+        }),
+        'title': 'Metadata',
+        'type': 'object',
+      }),
+      'nodes': dict({
+        'items': dict({
+          '$ref': '#/$defs/NodeConfigModel',
+        }),
+        'title': 'Nodes',
+        'type': 'array',
+      }),
+      'pipeline_id': dict({
+        'title': 'Pipeline Id',
+        'type': 'string',
+      }),
+      'target_node_id': dict({
+        'anyOf': list([
+          dict({
+            'type': 'string',
+          }),
+          dict({
+            'type': 'null',
+          }),
+        ]),
+        'default': None,
+        'title': 'Target Node Id',
+      }),
+    }),
+    'required': list([
+      'pipeline_id',
+      'nodes',
+    ]),
+    'title': 'PipelineConfigModel',
+    'type': 'object',
+  })
+# ---
+# name: test_preprocessing_pipeline_snapshot
+  dict({
+    'job_type': <StepType.BASIC_TRAINING: 'basic_training'>,
+    'metadata': dict({
+    }),
+    'nodes': list([
+      dict({
+        'inputs': list([
+        ]),
+        'node_id': 'ds',
+        'params': dict({
+          'source_id': '7',
+        }),
+        'step_type': 'data_loader',
+      }),
+      dict({
+        'inputs': list([
+          'ds',
+        ]),
+        'node_id': 'imp',
+        'params': dict({
+          'strategy': 'median',
+        }),
+        'step_type': 'simple_imputer',
+      }),
+      dict({
+        'inputs': list([
+          'imp',
+        ]),
+        'node_id': 'win',
+        'params': dict({
+          'lower': 0.05,
+          'upper': 0.95,
+        }),
+        'step_type': 'winsorize',
+      }),
+      dict({
+        'inputs': list([
+          'win',
+        ]),
+        'node_id': 'spl',
+        'params': dict({
+          'target_column': 'price',
+        }),
+        'step_type': 'feature_target_split',
+      }),
+    ]),
+    'pipeline_id': 'snap_prep',
+    'target_node_id': None,
+  })
+# ---

@@ -1,7 +1,6 @@
 import logging
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict
 
-import pandas as pd
 from sklearn.ensemble import ExtraTreesRegressor
 
 # Enable experimental IterativeImputer
@@ -13,15 +12,15 @@ from sklearn.tree import DecisionTreeRegressor
 
 from ..utils import (
     detect_numeric_columns,
-    pack_pipeline_output,
     resolve_columns,
-    unpack_pipeline_input,
     user_picked_no_columns,
 )
-from .base import BaseApplier, BaseCalculator
+from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ._artifacts import IterativeImputerArtifact, KNNImputerArtifact, SimpleImputerArtifact
+from ._schema import SkyulfSchema
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
-from ..engines import EngineName, SkyulfDataFrame, get_engine
+from ..engines import EngineName, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
@@ -30,19 +29,20 @@ logger = logging.getLogger(__name__)
 
 
 class SimpleImputerApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
         fill_values = params.get("fill_values", {})
 
         if not cols:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -70,7 +70,7 @@ class SimpleImputerApplier(BaseApplier):
                     exprs.append(pl.lit(val).alias(col))
 
             X_out = X_pl.select(exprs)
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         X_out = X.copy()
@@ -88,7 +88,7 @@ class SimpleImputerApplier(BaseApplier):
                 # Fill existing NaNs
                 X_out[col] = X_out[col].fillna(val)
 
-        return pack_pipeline_output(X_out, y, is_tuple)
+        return X_out
 
 
 @NodeRegistry.register("SimpleImputer", SimpleImputerApplier)
@@ -100,12 +100,19 @@ class SimpleImputerApplier(BaseApplier):
     params={"strategy": "mean", "fill_value": None, "columns": []},
 )
 class SimpleImputerCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Imputers fill NaNs in place; column set and order are preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> SimpleImputerArtifact:
         engine = get_engine(X)
 
         if user_picked_no_columns(config):
@@ -218,12 +225,13 @@ class SimpleImputerCalculator(BaseCalculator):
 
 
 class KNNImputerApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
@@ -231,7 +239,7 @@ class KNNImputerApplier(BaseApplier):
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or not imputer:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -249,11 +257,11 @@ class KNNImputerApplier(BaseApplier):
                 # Update columns
                 new_cols = [pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)]
                 X_out = X_pl.with_columns(new_cols)
-                return pack_pipeline_output(X_out, y, is_tuple)
+                return X_out
 
             except Exception as e:
                 logger.error(f"KNN Imputation failed: {e}")
-                return pack_pipeline_output(X, y, is_tuple)
+                return X
 
         # Pandas Path
         X_out = X.copy()
@@ -283,7 +291,7 @@ class KNNImputerApplier(BaseApplier):
             logger.error(f"KNN Imputation failed: {e}")
             # Fallback? Or raise?
 
-        return pack_pipeline_output(X_out, y, is_tuple)
+        return X_out
 
 
 @NodeRegistry.register("KNNImputer", KNNImputerApplier)
@@ -295,12 +303,19 @@ class KNNImputerApplier(BaseApplier):
     params={"n_neighbors": 5, "weights": "uniform", "columns": []},
 )
 class KNNImputerCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # KNN imputation fills NaNs in place; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> KNNImputerArtifact:
         engine = get_engine(X)
 
         if user_picked_no_columns(config):
@@ -347,12 +362,13 @@ class KNNImputerCalculator(BaseCalculator):
 
 
 class IterativeImputerApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
@@ -360,7 +376,7 @@ class IterativeImputerApplier(BaseApplier):
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or not imputer:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -377,10 +393,10 @@ class IterativeImputerApplier(BaseApplier):
 
                 new_cols = [pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)]
                 X_out = X_pl.with_columns(new_cols)
-                return pack_pipeline_output(X_out, y, is_tuple)
+                return X_out
             except Exception as e:
                 logger.error(f"Iterative Imputation failed: {e}")
-                return pack_pipeline_output(X, y, is_tuple)
+                return X
 
         # Pandas Path
         X_out = X.copy()
@@ -399,7 +415,7 @@ class IterativeImputerApplier(BaseApplier):
         except Exception as e:
             logger.error(f"Iterative Imputation failed: {e}")
 
-        return pack_pipeline_output(X_out, y, is_tuple)
+        return X_out
 
 
 @NodeRegistry.register("IterativeImputer", IterativeImputerApplier)
@@ -411,12 +427,19 @@ class IterativeImputerApplier(BaseApplier):
     params={"max_iter": 10, "random_state": 0, "estimator": "bayesian_ridge", "columns": []},
 )
 class IterativeImputerCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # MICE imputation fills NaNs in place; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> IterativeImputerArtifact:
         engine = get_engine(X)
 
         if user_picked_no_columns(config):

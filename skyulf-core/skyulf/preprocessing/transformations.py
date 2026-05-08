@@ -9,12 +9,15 @@ from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ..utils import (
     detect_numeric_columns,
-    pack_pipeline_output,
     resolve_columns,
-    unpack_pipeline_input,
     user_picked_no_columns,
 )
-from .base import BaseApplier, BaseCalculator
+from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ._artifacts import (
+    GeneralTransformationArtifact,
+    PowerTransformerArtifact,
+)
+from ._schema import SkyulfSchema
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 logger = logging.getLogger(__name__)
@@ -23,12 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 class PowerTransformerApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
         was_polars = engine.name == EngineName.POLARS
 
@@ -40,7 +44,7 @@ class PowerTransformerApplier(BaseApplier):
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or lambdas is None:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         if was_polars:
             import polars as pl
@@ -95,7 +99,7 @@ class PowerTransformerApplier(BaseApplier):
             logger.error(f"PowerTransformer application failed: {e}")
             # Fallback is keeping df_out as it was
 
-        return pack_pipeline_output(df_out, y, is_tuple)
+        return df_out
 
 
 @NodeRegistry.register("PowerTransformer", PowerTransformerApplier)
@@ -107,12 +111,19 @@ class PowerTransformerApplier(BaseApplier):
     params={"method": "yeo-johnson", "standardize": True, "columns": []},
 )
 class PowerTransformerCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Power transforms are applied in place on the same columns.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> PowerTransformerArtifact:
         engine = get_engine(X)
         if engine.name == EngineName.POLARS:
             X = X.to_pandas()
@@ -169,17 +180,18 @@ class PowerTransformerCalculator(BaseCalculator):
 
 
 class SimpleTransformationApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         transformations = params.get("transformations", [])
         if not transformations:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -214,7 +226,7 @@ class SimpleTransformationApplier(BaseApplier):
 
                 X_out = X_out.with_columns(expr.alias(col))
 
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         df_out = X.copy()
@@ -255,7 +267,7 @@ class SimpleTransformationApplier(BaseApplier):
                 series_clipped = series.clip(upper=threshold)
                 df_out[col] = np.exp(series_clipped)
 
-        return pack_pipeline_output(df_out, y, is_tuple)
+        return df_out
 
 
 @NodeRegistry.register("SimpleTransformation", SimpleTransformationApplier)
@@ -267,6 +279,12 @@ class SimpleTransformationApplier(BaseApplier):
     params={"func": "log", "columns": []},
 )
 class SimpleTransformationCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Simple transformations replace values in place; column set is preserved.
+        return input_schema
+
     def fit(
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
@@ -283,17 +301,18 @@ class SimpleTransformationCalculator(BaseCalculator):
 
 
 class GeneralTransformationApplier(BaseApplier):
+    @apply_method
     def apply(  # noqa: C901
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         transformations = params.get("transformations", [])
         if not transformations:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -361,7 +380,7 @@ class GeneralTransformationApplier(BaseApplier):
 
                     X_out = X_out.with_columns(expr.alias(col))
 
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         df_out = X.copy()
@@ -423,7 +442,7 @@ class GeneralTransformationApplier(BaseApplier):
                 series_clipped = series.clip(upper=threshold)
                 df_out[col] = np.exp(series_clipped)
 
-        return pack_pipeline_output(df_out, y, is_tuple)
+        return df_out
 
 
 @NodeRegistry.register("GeneralTransformation", GeneralTransformationApplier)
@@ -435,14 +454,22 @@ class GeneralTransformationApplier(BaseApplier):
     params={"transformations": []},
 )
 class GeneralTransformationCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Transformations are keyed by source column and replace it in place;
+        # column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> GeneralTransformationArtifact:
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'},
         #                              {'column': 'col2', 'method': 'yeo-johnson'}]}
-        X, _, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         transformations_config = config.get("transformations", [])

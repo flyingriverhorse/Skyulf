@@ -449,13 +449,47 @@ async def get_drift_status(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/errors")
+class ErrorEventResponse(BaseModel):
+    id: int
+    route: str
+    error_type: str
+    message: str
+    traceback: Optional[str] = None
+    job_id: Optional[str] = None
+    status_code: int
+    created_at: Optional[str] = None
+    resolved_at: Optional[str] = None
+
+
+class ErrorCountResponse(BaseModel):
+    count: int
+
+
+class ErrorDeleteResponse(BaseModel):
+    deleted: int
+
+
+class ErrorGroupedEntry(BaseModel):
+    error_type: str
+    route: str
+    count: int
+    last_seen: Optional[str] = None
+    first_seen: Optional[str] = None
+    sample_id: Optional[int] = None
+
+
+class ErrorTimelineEntry(BaseModel):
+    hour: str
+    count: int
+
+
+@router.get("/errors", response_model=List[ErrorEventResponse])
 async def list_error_events(
     limit: int = 100,
     since: Optional[str] = None,
     show_resolved: bool = False,
     db: AsyncSession = Depends(get_db),
-) -> List[Dict[str, Any]]:
+) -> List[ErrorEventResponse]:
     """Return the most recent error events (newest first, max 500).
 
     By default only unresolved events are returned. Pass ``show_resolved=true``
@@ -482,38 +516,38 @@ async def list_error_events(
         .limit(limit)
     )
     result = await db.execute(stmt)
-    return [e.to_dict() for e in result.scalars().all()]
+    return [ErrorEventResponse(**e.to_dict()) for e in result.scalars().all()]
 
 
-@router.get("/errors/count")
+@router.get("/errors/count", response_model=ErrorCountResponse)
 async def get_error_count(
     db: AsyncSession = Depends(get_db),
-) -> Dict[str, Any]:
+) -> ErrorCountResponse:
     """Return unresolved error count — used for the sidebar badge."""
     from sqlalchemy import func
 
     stmt = select(func.count()).select_from(ErrorEvent).where(ErrorEvent.resolved_at.is_(None))
     result = await db.execute(stmt)
     count = result.scalar() or 0
-    return {"count": count}
+    return ErrorCountResponse(count=int(count))
 
 
-@router.delete("/errors")
+@router.delete("/errors", response_model=ErrorDeleteResponse)
 async def clear_error_events(
     db: AsyncSession = Depends(get_db),
-) -> Dict[str, Any]:
+) -> ErrorDeleteResponse:
     """Delete all stored error events (admin cleanup)."""
     from sqlalchemy import delete
 
     result = await db.execute(delete(ErrorEvent))
     await db.commit()
-    return {"deleted": result.rowcount}
+    return ErrorDeleteResponse(deleted=result.rowcount or 0)
 
 
-@router.get("/errors/grouped")
+@router.get("/errors/grouped", response_model=List[ErrorGroupedEntry])
 async def get_errors_grouped(
     db: AsyncSession = Depends(get_db),
-) -> List[Dict[str, Any]]:
+) -> List[ErrorGroupedEntry]:
     """Aggregate error events by (error_type, route) — unresolved only."""
     from sqlalchemy import func as sa_func
 
@@ -521,7 +555,7 @@ async def get_errors_grouped(
         select(
             ErrorEvent.error_type,
             ErrorEvent.route,
-            sa_func.count(ErrorEvent.id).label("count"),
+            sa_func.count(ErrorEvent.id).label("error_count"),
             sa_func.max(ErrorEvent.created_at).label("last_seen"),
             sa_func.min(ErrorEvent.created_at).label("first_seen"),
             sa_func.min(ErrorEvent.id).label("sample_id"),
@@ -533,23 +567,23 @@ async def get_errors_grouped(
     result = await db.execute(stmt)
     rows = result.all()
     return [
-        {
-            "error_type": r.error_type,
-            "route": r.route,
-            "count": r.count,
-            "last_seen": r.last_seen.isoformat() if r.last_seen else None,
-            "first_seen": r.first_seen.isoformat() if r.first_seen else None,
-            "sample_id": r.sample_id,
-        }
+        ErrorGroupedEntry(
+            error_type=r.error_type,
+            route=r.route,
+            count=int(r.error_count),
+            last_seen=r.last_seen.isoformat() if r.last_seen else None,
+            first_seen=r.first_seen.isoformat() if r.first_seen else None,
+            sample_id=r.sample_id,
+        )
         for r in rows
     ]
 
 
-@router.get("/errors/timeline")
+@router.get("/errors/timeline", response_model=List[ErrorTimelineEntry])
 async def get_error_timeline(
     hours: int = 24,
     db: AsyncSession = Depends(get_db),
-) -> List[Dict[str, Any]]:
+) -> List[ErrorTimelineEntry]:
     """Return error count bucketed by hour for the last N hours.
 
     Returns a list of ``{ hour: <ISO string>, count: N }`` entries,
@@ -580,14 +614,14 @@ async def get_error_timeline(
         if slot_key in buckets:
             buckets[slot_key] += 1
 
-    return [{"hour": h, "count": c} for h, c in sorted(buckets.items())]
+    return [ErrorTimelineEntry(hour=h, count=c) for h, c in sorted(buckets.items())]
 
 
-@router.patch("/errors/{error_id}/resolve")
+@router.patch("/errors/{error_id}/resolve", response_model=ErrorEventResponse)
 async def resolve_error_event(
     error_id: int,
     db: AsyncSession = Depends(get_db),
-) -> Dict[str, Any]:
+) -> ErrorEventResponse:
     """Mark an error event as resolved/dismissed."""
     stmt = select(ErrorEvent).where(ErrorEvent.id == error_id)
     result = await db.execute(stmt)
@@ -596,14 +630,14 @@ async def resolve_error_event(
         raise HTTPException(status_code=404, detail=f"ErrorEvent {error_id} not found")
     event.resolved_at = datetime.now(timezone.utc)
     await db.commit()
-    return event.to_dict()
+    return ErrorEventResponse(**event.to_dict())
 
 
-@router.patch("/errors/{error_id}/unresolve")
+@router.patch("/errors/{error_id}/unresolve", response_model=ErrorEventResponse)
 async def unresolve_error_event(
     error_id: int,
     db: AsyncSession = Depends(get_db),
-) -> Dict[str, Any]:
+) -> ErrorEventResponse:
     """Clear the resolved flag on an error event."""
     stmt = select(ErrorEvent).where(ErrorEvent.id == error_id)
     result = await db.execute(stmt)
@@ -612,21 +646,21 @@ async def unresolve_error_event(
         raise HTTPException(status_code=404, detail=f"ErrorEvent {error_id} not found")
     event.resolved_at = None
     await db.commit()
-    return event.to_dict()
+    return ErrorEventResponse(**event.to_dict())
 
 
-@router.get("/errors/{error_id}")
+@router.get("/errors/{error_id}", response_model=ErrorEventResponse)
 async def get_error_event(
     error_id: int,
     db: AsyncSession = Depends(get_db),
-) -> Dict[str, Any]:
+) -> ErrorEventResponse:
     """Return full detail for a single error event, including full traceback."""
     stmt = select(ErrorEvent).where(ErrorEvent.id == error_id)
     result = await db.execute(stmt)
     event = result.scalar_one_or_none()
     if event is None:
         raise HTTPException(status_code=404, detail=f"ErrorEvent {error_id} not found")
-    return event.to_dict()
+    return ErrorEventResponse(**event.to_dict())
 
 
 # ---------------------------------------------------------------------------

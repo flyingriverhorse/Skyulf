@@ -1,16 +1,21 @@
 import string
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Union
 
 import numpy as np
 import pandas as pd
 
 from ..utils import (
-    pack_pipeline_output,
     resolve_columns,
-    unpack_pipeline_input,
     user_picked_no_columns,
 )
-from .base import BaseApplier, BaseCalculator
+from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ._artifacts import (
+    AliasReplacementArtifact,
+    InvalidValueReplacementArtifact,
+    TextCleaningArtifact,
+    ValueReplacementArtifact,
+)
+from ._schema import SkyulfSchema
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
 from ..engines import EngineName, SkyulfDataFrame, get_engine
@@ -110,23 +115,24 @@ def _auto_detect_datetime_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> L
 
 
 class TextCleaningApplier(BaseApplier):
+    @apply_method
     def apply(  # noqa: C901
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         if not params or not params.get("columns"):
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         cols = params["columns"]
         operations = params.get("operations", [])
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or not operations:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -199,7 +205,7 @@ class TextCleaningApplier(BaseApplier):
                 exprs.append(expr.alias(col))
 
             X_out = X.with_columns(exprs)
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         df_out = X.copy()
@@ -268,7 +274,7 @@ class TextCleaningApplier(BaseApplier):
 
             df_out[col] = series
 
-        return pack_pipeline_output(df_out, y, is_tuple)
+        return df_out
 
 
 @NodeRegistry.register("TextCleaning", TextCleaningApplier)
@@ -280,11 +286,19 @@ class TextCleaningApplier(BaseApplier):
     params={"columns": [], "operations": []},
 )
 class TextCleaningCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Text cleaning rewrites string values in place; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> TextCleaningArtifact:
         # Config:
         # columns: List[str]
         # operations: List[Dict]
@@ -294,8 +308,6 @@ class TextCleaningCalculator(BaseCalculator):
         #    'replacement': ''}
         #   {'op': 'regex', 'mode': 'custom'|'collapse_whitespace'|'extract_digits'|'normalize_slash_dates',
         #    'pattern': '...', 'repl': '...'}
-
-        X, _, _ = unpack_pipeline_input(df)
 
         if user_picked_no_columns(config):
             return {}
@@ -314,12 +326,13 @@ class TextCleaningCalculator(BaseCalculator):
 
 
 class InvalidValueReplacementApplier(BaseApplier):
+    @apply_method
     def apply(  # noqa: C901  # dispatch over many invalid-value strategies
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
@@ -339,7 +352,7 @@ class InvalidValueReplacementApplier(BaseApplier):
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -375,7 +388,7 @@ class InvalidValueReplacementApplier(BaseApplier):
                 exprs.append(expr.alias(col))
 
             X_out = X.with_columns(exprs)
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         df_out = X.copy()
@@ -415,7 +428,7 @@ class InvalidValueReplacementApplier(BaseApplier):
             if mask is not None:
                 df_out.loc[mask, col] = final_replacement
 
-        return pack_pipeline_output(df_out, y, is_tuple)
+        return df_out
 
 
 @NodeRegistry.register("InvalidValueReplacement", InvalidValueReplacementApplier)
@@ -427,12 +440,19 @@ class InvalidValueReplacementApplier(BaseApplier):
     params={"columns": [], "invalid_values": []},
 )
 class InvalidValueReplacementCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Replaces invalid sentinel values with NaN in place; columns preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> InvalidValueReplacementArtifact:
 
         if user_picked_no_columns(config):
             return {}
@@ -453,12 +473,13 @@ class InvalidValueReplacementCalculator(BaseCalculator):
 
 
 class ValueReplacementApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
@@ -468,7 +489,7 @@ class ValueReplacementApplier(BaseApplier):
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -517,8 +538,8 @@ class ValueReplacementApplier(BaseApplier):
 
             if exprs:
                 X_out = X.with_columns(exprs)
-                return pack_pipeline_output(X_out, y, is_tuple)
-            return pack_pipeline_output(X, y, is_tuple)
+                return X_out
+            return X
 
         # Pandas Path
         df_out = X.copy()
@@ -548,7 +569,7 @@ class ValueReplacementApplier(BaseApplier):
                     else:
                         df_out[col] = df_out[col].replace(to_replace, value)
 
-        return pack_pipeline_output(df_out, y, is_tuple)
+        return df_out
 
 
 @NodeRegistry.register("ValueReplacement", ValueReplacementApplier)
@@ -560,12 +581,19 @@ class ValueReplacementApplier(BaseApplier):
     params={"columns": [], "mapping": {}},
 )
 class ValueReplacementCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Value mapping replaces values in place; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> ValueReplacementArtifact:
 
         # Config: {'columns': [...], 'mapping': {col: {old: new}}}
         # OR {'columns': [...], 'to_replace': '?', 'value': np.nan}
@@ -594,12 +622,13 @@ class ValueReplacementCalculator(BaseCalculator):
 
 
 class AliasReplacementApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
@@ -608,7 +637,7 @@ class AliasReplacementApplier(BaseApplier):
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Prepare the mapping
         mapping = {}
@@ -668,7 +697,7 @@ class AliasReplacementApplier(BaseApplier):
                 exprs.append(final_expr.alias(col))
 
             X_out = X.with_columns(exprs)
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         df_out = X.copy()
@@ -701,7 +730,7 @@ class AliasReplacementApplier(BaseApplier):
             # 3. Fill NaNs (unmapped) with original values
             df_out[col] = mapped_series.fillna(df_out[col])
 
-        return pack_pipeline_output(df_out, y, is_tuple)
+        return df_out
 
 
 @NodeRegistry.register("AliasReplacement", AliasReplacementApplier)
@@ -713,12 +742,19 @@ class AliasReplacementApplier(BaseApplier):
     params={"columns": [], "domain": "boolean"},
 )
 class AliasReplacementCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Alias normalization replaces values in place; column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> AliasReplacementArtifact:
 
         if user_picked_no_columns(config):
             return {}
