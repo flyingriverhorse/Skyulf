@@ -1,16 +1,23 @@
-from typing import Any, Dict, Optional, cast
+"""Type-casting node — routes apply through the dual-engine dispatcher.
+
+The fit step is config-only (no per-engine math), so it stays single-path.
+The pandas apply path was previously a single CCN-busting function; it is now
+split per dtype family (`float / int / bool / datetime / other`).
+"""
+
+from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
 
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from .dispatcher import apply_dual_engine
 from ._artifacts import CastingArtifact
 from ._schema import SkyulfSchema
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
-from ..engines import EngineName, get_engine
 
-# Map common aliases to pandas types
+# Map common aliases to canonical pandas dtype labels.
 TYPE_ALIASES = {
     "float": "float64",
     "float32": "float32",
@@ -35,180 +42,169 @@ TYPE_ALIASES = {
 }
 
 
+# -----------------------------------------------------------------------------
+# Polars apply
+# -----------------------------------------------------------------------------
+
+
+def _resolve_polars_dtype(dtype_str: str) -> Any:
+    """Map a string dtype to a Polars type, or ``None`` if unsupported."""
+    import polars as pl
+
+    # Use a small alias table so the function stays low-CCN. Datetime variants
+    # ("date", "datetime[...]") are handled by the prefix check below.
+    table = {
+        "float": pl.Float64,
+        "float64": pl.Float64,
+        "double": pl.Float64,
+        "numeric": pl.Float64,
+        "float32": pl.Float32,
+        "int": pl.Int64,
+        "int64": pl.Int64,
+        "integer": pl.Int64,
+        "int32": pl.Int32,
+        "string": pl.String,
+        "str": pl.String,
+        "text": pl.String,
+        "bool": pl.Boolean,
+        "boolean": pl.Boolean,
+        "category": pl.Categorical,
+        "categorical": pl.Categorical,
+        "date": pl.Datetime,
+    }
+    if dtype_str in table:
+        return table[dtype_str]
+    if dtype_str.startswith("datetime"):
+        return pl.Datetime
+    return None
+
+
+def _casting_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Any:
+    import polars as pl
+
+    type_map = params.get("type_map", {})
+    if not type_map:
+        return X, y
+    coerce_on_error = params.get("coerce_on_error", True)
+
+    exprs = []
+    for col, target_dtype in type_map.items():
+        if col not in X.columns:
+            continue
+        pl_dtype = _resolve_polars_dtype(str(target_dtype).lower())
+        if pl_dtype is None:
+            continue
+        exprs.append(pl.col(col).cast(pl_dtype, strict=not coerce_on_error).alias(col))
+
+    return (X.with_columns(exprs) if exprs else X), y
+
+
+# -----------------------------------------------------------------------------
+# Pandas apply — split per dtype family to keep CCN low
+# -----------------------------------------------------------------------------
+
+
 def _coerce_boolean_value(value: Any) -> Optional[bool]:
-    """
-    Robustly coerce a value to a boolean.
-    Returns None if coercion fails.
-    """
+    """Robustly coerce a single value to bool; ``None`` if undecidable."""
     if pd.isna(value):
         return None
-
     if isinstance(value, (bool, np.bool_)):
         return bool(value)
-
     if isinstance(value, (int, float, np.number)):
         if value == 1:
             return True
         if value == 0:
             return False
         return None
-
     s = str(value).strip().lower()
     if s in ("true", "yes", "1", "on", "y", "t"):
         return True
     if s in ("false", "no", "0", "off", "n", "f"):
         return False
-
     return None
+
+
+def _cast_float(series: pd.Series, target_dtype: Any, coerce_on_error: bool) -> pd.Series:
+    numeric = pd.to_numeric(series, errors="coerce" if coerce_on_error else "raise")
+    return numeric.astype(target_dtype)
+
+
+def _drop_fractional_or_raise(numeric: pd.Series, col: str, coerce_on_error: bool) -> pd.Series:
+    """Mask fractional values to NaN (coerce) or raise."""
+    valid = numeric.notna()
+    fractional_mask = valid & ~np.isclose(numeric, np.round(numeric))
+    if not fractional_mask.any():
+        return numeric
+    if not coerce_on_error:
+        raise ValueError(f"Column {col} contains fractional values, cannot cast to integer.")
+    numeric.loc[fractional_mask] = np.nan
+    return numeric
+
+
+def _cast_int(series: pd.Series, col: str, target_dtype: Any, coerce_on_error: bool) -> pd.Series:
+    numeric = pd.to_numeric(series, errors="coerce" if coerce_on_error else "raise")
+    numeric = _drop_fractional_or_raise(numeric, col, coerce_on_error)
+    if numeric.isna().any() and target_dtype in ("int32", "int64", "int"):
+        # NaNs require pandas' nullable Int64 container.
+        return numeric.astype("Int64")
+    return numeric.astype(target_dtype)
+
+
+def _cast_bool(series: pd.Series, coerce_on_error: bool) -> pd.Series:
+    try:
+        return series.astype("boolean")
+    except (TypeError, ValueError):
+        if not coerce_on_error:
+            raise
+        coerced = [
+            (pd.NA if (result := _coerce_boolean_value(val)) is None else result) for val in series
+        ]
+        return pd.Series(coerced, index=series.index, dtype="boolean")
+
+
+def _cast_datetime(series: pd.Series, coerce_on_error: bool) -> pd.Series:
+    return pd.to_datetime(series, errors="coerce" if coerce_on_error else "raise")
+
+
+def _cast_one_column(
+    series: pd.Series, col: str, target_dtype: Any, coerce_on_error: bool
+) -> pd.Series:
+    """Dispatch a single column to the right family caster."""
+    dtype_str = str(target_dtype).lower()
+    if dtype_str.startswith("float"):
+        return _cast_float(series, target_dtype, coerce_on_error)
+    if dtype_str.startswith("int"):
+        return _cast_int(series, col, target_dtype, coerce_on_error)
+    if dtype_str.startswith("bool"):
+        return _cast_bool(series, coerce_on_error)
+    if dtype_str.startswith("datetime"):
+        return _cast_datetime(series, coerce_on_error)
+    return series.astype(target_dtype)
+
+
+def _casting_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Any:
+    type_map = params.get("type_map", {})
+    if not type_map:
+        return X, y
+    coerce_on_error = params.get("coerce_on_error", True)
+
+    df_out = X.copy()
+    for col, target_dtype in type_map.items():
+        if col not in df_out.columns:
+            continue
+        try:
+            df_out[col] = _cast_one_column(df_out[col], col, target_dtype, coerce_on_error)
+        except Exception:
+            if not coerce_on_error:
+                raise
+            # Best-effort: leave the column as-is when coerce_on_error is True.
+    return df_out, y
 
 
 class CastingApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
-
-        type_map = params.get("type_map", {})
-        coerce_on_error = params.get("coerce_on_error", True)
-
-        if not type_map:
-            return X
-
-        # Polars Path
-        if engine.name == EngineName.POLARS:
-            import polars as pl
-
-            exprs = []
-            for col, target_dtype in type_map.items():
-                if col not in X.columns:
-                    continue
-
-                dtype_str = str(target_dtype).lower()
-                pl_dtype = None
-
-                # Map to Polars types
-                if dtype_str in ["float", "float64", "double", "numeric"]:
-                    pl_dtype = pl.Float64
-                elif dtype_str == "float32":
-                    pl_dtype = pl.Float32
-                elif dtype_str in ["int", "int64", "integer"]:
-                    pl_dtype = pl.Int64
-                elif dtype_str == "int32":
-                    pl_dtype = pl.Int32
-                elif dtype_str in ["string", "str", "text"]:
-                    pl_dtype = pl.String
-                elif dtype_str in ["bool", "boolean"]:
-                    pl_dtype = pl.Boolean
-                elif dtype_str in ["category", "categorical"]:
-                    pl_dtype = pl.Categorical
-                elif dtype_str.startswith("datetime") or dtype_str == "date":
-                    pl_dtype = pl.Datetime
-
-                if pl_dtype:
-                    # Handle coercion if needed (strict=False returns null on error)
-                    if coerce_on_error:
-                        exprs.append(pl.col(col).cast(pl_dtype, strict=False).alias(col))
-                    else:
-                        exprs.append(pl.col(col).cast(pl_dtype, strict=True).alias(col))
-                else:
-                    # Fallback or unknown type
-                    pass
-
-            if exprs:
-                X = X.with_columns(exprs)
-
-            return X
-
-        # Pandas Path
-        return self._apply_dataframe(cast(pd.DataFrame, X), params)
-
-    def _apply_dataframe(  # noqa: C901
-        self, df: pd.DataFrame, params: Dict[str, Any]
-    ) -> pd.DataFrame:
-        type_map = params.get("type_map", {})
-        coerce_on_error = params.get("coerce_on_error", True)
-
-        df_out = df.copy()
-
-        for col, target_dtype in type_map.items():
-            if col not in df_out.columns:
-                continue
-
-            try:
-                series = df_out[col]
-
-                # Determine family
-                dtype_str = str(target_dtype).lower()
-
-                if dtype_str.startswith("float"):
-                    # Float Family
-                    numeric = pd.to_numeric(series, errors="coerce" if coerce_on_error else "raise")
-                    df_out[col] = numeric.astype(target_dtype)
-
-                elif dtype_str.startswith("int"):
-                    # Int Family
-                    numeric = pd.to_numeric(series, errors="coerce" if coerce_on_error else "raise")
-
-                    # Check for fractional values
-                    if coerce_on_error:
-                        # If coercing, we set fractional to NaN
-                        valid_mask = numeric.notna()
-                        fractional_mask = valid_mask & ~np.isclose(numeric, np.round(numeric))
-                        if fractional_mask.any():
-                            numeric.loc[fractional_mask] = np.nan
-                    else:
-                        # If not coercing, we raise error on fractional
-                        fractional_mask = numeric.notna() & ~np.isclose(numeric, np.round(numeric))
-                        if fractional_mask.any():
-                            raise ValueError(
-                                f"Column {col} contains fractional values, cannot cast to integer."
-                            )
-
-                    # Handle NaNs -> Nullable Int64
-                    if numeric.isna().any():
-                        # Use nullable Int64 if target is standard int
-                        # If target is already nullable (Int64), use it.
-                        # If target is numpy int (int64), we must upgrade to Int64 to hold NaNs
-                        if target_dtype in ["int32", "int64", "int"]:
-                            df_out[col] = numeric.astype("Int64")
-                        else:
-                            df_out[col] = numeric.astype(target_dtype)
-                    else:
-                        df_out[col] = numeric.astype(target_dtype)
-
-                elif dtype_str.startswith("bool"):
-                    # Boolean Family
-                    try:
-                        df_out[col] = series.astype("boolean")
-                    except (TypeError, ValueError):
-                        if not coerce_on_error:
-                            raise
-                        # Robust coercion
-                        coerced_values = [
-                            (pd.NA if (result := _coerce_boolean_value(val)) is None else result)
-                            for val in series
-                        ]
-                        df_out[col] = pd.Series(coerced_values, index=series.index, dtype="boolean")
-
-                elif dtype_str.startswith("datetime"):
-                    # Datetime Family
-                    errors = "coerce" if coerce_on_error else "raise"
-                    df_out[col] = pd.to_datetime(series, errors=errors)
-
-                else:
-                    # String / Category / Other
-                    df_out[col] = series.astype(target_dtype)
-
-            except Exception:
-                if not coerce_on_error:
-                    raise
-                # If coercion is on, we might leave it as is or try best effort?
-
-        return df_out
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, _casting_apply_polars, _casting_apply_pandas)
 
 
 @NodeRegistry.register("Casting", CastingApplier)
@@ -223,7 +219,7 @@ class CastingCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: Dict[str, Any]
     ) -> SkyulfSchema:
-        # Casting preserves column set but rewrites dtype labels.
+        # Casting preserves the column set but rewrites dtype labels.
         column_types = dict(config.get("column_types", {}) or {})
         target_type = config.get("target_type")
         columns = config.get("columns", []) or []
@@ -237,32 +233,19 @@ class CastingCalculator(BaseCalculator):
         return new_schema
 
     @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> CastingArtifact:
-        # Config: {'columns': ['col1'], 'target_type': 'float'}
-        # OR {'column_types': {'col1': 'float', 'col2': 'int'}}
-
-        # We don't need to convert to pandas just to check columns,
-        # but let's keep it consistent if we need complex logic.
-        # Here we just check columns existence.
-
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> CastingArtifact:
+        # Config supports two shapes:
+        #   {'columns': ['col1'], 'target_type': 'float'}
+        #   {'column_types': {'col1': 'float', 'col2': 'int'}}
         target_type = config.get("target_type")
         columns = config.get("columns", [])
         column_types = config.get("column_types", {})
 
-        # Normalize to column_types map
-        final_map = {}
-
-        # 1. Process explicit map
+        final_map: Dict[str, Any] = {}
         for col, dtype in column_types.items():
             if col in X.columns:
                 final_map[col] = TYPE_ALIASES.get(str(dtype).lower(), dtype)
 
-        # 2. Process list + single type
         if target_type and columns:
             resolved_type = TYPE_ALIASES.get(str(target_type).lower(), target_type)
             for col in columns:

@@ -1,5 +1,14 @@
+"""Transformation nodes (PowerTransformer / SimpleTransformation / GeneralTransformation).
+
+Per-engine apply paths are split into ``_apply_polars`` / ``_apply_pandas``
+static helpers and dispatched via ``apply_dual_engine``. The per-method
+expression builders for the simple and general transformations live in
+module-level dispatch dicts (``_POLARS_OPS`` / ``_PANDAS_OPS``) so each
+helper stays at low CCN.
+"""
+
 import logging
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Callable, Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -13,94 +22,135 @@ from ..utils import (
     user_picked_no_columns,
 )
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from .dispatcher import apply_dual_engine
 from ._artifacts import (
     GeneralTransformationArtifact,
     PowerTransformerArtifact,
     SimpleTransformationArtifact,
 )
+from ._helpers import to_pandas
 from ._schema import SkyulfSchema
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 logger = logging.getLogger(__name__)
 
-# --- Power Transformer (Box-Cox, Yeo-Johnson) ---
+
+# =============================================================================
+# Power Transformer (Box-Cox / Yeo-Johnson)
+# =============================================================================
+
+
+def _build_pretrained_power_transformer(
+    method: str,
+    standardize: bool,
+    lambdas_arr: np.ndarray,
+    scaler_params: Dict[str, Any],
+    col_indices: List[int],
+    n_total_cols: int,
+) -> PowerTransformer:
+    """Reconstruct a fitted PowerTransformer from stored lambdas + scaler params."""
+    pt = PowerTransformer(method=method, standardize=standardize)
+    pt.lambdas_ = lambdas_arr
+    if not standardize:
+        return pt
+
+    scaler = StandardScaler()
+    mean = np.array(scaler_params.get("mean"))
+    scale = np.array(scaler_params.get("scale"))
+    if len(mean) == n_total_cols:
+        mean = mean[col_indices]
+    if len(scale) == n_total_cols:
+        scale = scale[col_indices]
+    scaler.mean_ = mean
+    scaler.scale_ = scale
+    scaler.var_ = np.square(scale)
+    pt._scaler = scaler
+    return pt
+
+
+def _power_transform_array(
+    X_vals: np.ndarray, params: Dict[str, Any], cols: List[str], valid_cols: List[str]
+) -> np.ndarray:
+    """Run the rebuilt PowerTransformer over a numpy array; return transformed array."""
+    col_indices = [cols.index(c) for c in valid_cols]
+    lambdas_arr = np.array(params["lambdas"])[col_indices]
+    pt = _build_pretrained_power_transformer(
+        method=params.get("method", "yeo-johnson"),
+        standardize=params.get("standardize", True),
+        lambdas_arr=lambdas_arr,
+        scaler_params=params.get("scaler_params", {}) or {},
+        col_indices=col_indices,
+        n_total_cols=len(cols),
+    )
+    X_trans = pt.transform(X_vals)
+    # sklearn may be configured with transform_output="pandas".
+    return X_trans.to_numpy() if hasattr(X_trans, "to_numpy") else X_trans
+
+
+def _filter_power_columns(X_pd: pd.DataFrame, cols: List[str], method: str) -> List[str]:
+    """Box-Cox requires strictly positive data — drop columns that violate it."""
+    if not cols:
+        return []
+    if method == "box-cox":
+        return [c for c in cols if not (X_pd[c] <= 0).any()]
+    return cols
+
+
+def _extract_scaler_params(transformer: PowerTransformer, standardize: bool) -> Dict[str, Any]:
+    """Pull mean/scale arrays out of a fitted PowerTransformer's internal scaler."""
+    if not standardize:
+        return {}
+    scaler = getattr(transformer, "_scaler", None)
+    if scaler is None:
+        return {}
+    return {
+        "mean": scaler.mean_.tolist() if scaler.mean_ is not None else None,
+        "scale": scaler.scale_.tolist() if scaler.scale_ is not None else None,
+    }
 
 
 class PowerTransformerApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
-        was_polars = engine.name == EngineName.POLARS
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
+
+    @staticmethod
+    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+        import polars as pl
 
         cols = params.get("columns", [])
-        lambdas = params.get("lambdas")
-        method = params.get("method", "yeo-johnson")
-        standardize = params.get("standardize", True)
-        scaler_params = params.get("scaler_params", {})
-
+        if params.get("lambdas") is None:
+            return X, _y
         valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols or lambdas is None:
-            return X
-
-        if was_polars:
-            import polars as pl
-
-            X_vals = X.select(valid_cols).to_numpy()
-            df_out = X  # We won't copy whole df here
-        else:
-            X_pd = X
-            df_out = X_pd.copy()
-            X_vals = df_out[valid_cols].values
-        # Filter lambdas and scaler params to match valid_cols
-        col_indices = [cols.index(c) for c in valid_cols]
-        lambdas_arr = np.array(lambdas)[col_indices]
-
-        # 1. Power Transform
+        if not valid_cols:
+            return X, _y
 
         try:
-            pt = PowerTransformer(method=method, standardize=standardize)
-            pt.lambdas_ = lambdas_arr
-
-            if standardize:
-                scaler = StandardScaler()
-
-                mean = np.array(scaler_params.get("mean"))
-                scale = np.array(scaler_params.get("scale"))
-
-                if len(mean) == len(cols):
-                    mean = mean[col_indices]
-                if len(scale) == len(cols):
-                    scale = scale[col_indices]
-
-                scaler.mean_ = mean
-                scaler.scale_ = scale
-                scaler.var_ = np.square(scaler.scale_)  # Approximate if not stored
-                pt._scaler = scaler
-
-            # We need to trick sklearn into thinking it's fitted
-            # Usually setting attributes is enough, but let's see.
-            # PowerTransformer checks hasattr(self, "lambdas_")
-
-            X_trans = pt.transform(X_vals)
-            # sklearn can be configured with transform_output="pandas", which returns a DataFrame.
-            X_trans_arr = X_trans.to_numpy() if hasattr(X_trans, "to_numpy") else X_trans
-
-            if was_polars:
-                series = [pl.Series(name, X_trans_arr[:, i]) for i, name in enumerate(valid_cols)]
-                df_out = df_out.with_columns(series)
-            else:
-                df_out.loc[:, valid_cols] = np.asarray(X_trans_arr)
-
+            X_vals = X.select(valid_cols).to_numpy()
+            X_trans = _power_transform_array(X_vals, params, cols, valid_cols)
+            series = [pl.Series(name, X_trans[:, i]) for i, name in enumerate(valid_cols)]
+            return X.with_columns(series), _y
         except Exception as e:
-            logger.error(f"PowerTransformer application failed: {e}")
-            # Fallback is keeping df_out as it was
+            logger.error(f"PowerTransformer (Polars) application failed: {e}")
+            return X, _y
 
-        return df_out
+    @staticmethod
+    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+        cols = params.get("columns", [])
+        if params.get("lambdas") is None:
+            return X, _y
+        valid_cols = [c for c in cols if c in X.columns]
+        if not valid_cols:
+            return X, _y
+
+        df_out = X.copy()
+        try:
+            X_vals = df_out[valid_cols].values
+            X_trans = _power_transform_array(X_vals, params, cols, valid_cols)
+            df_out.loc[:, valid_cols] = np.asarray(X_trans)
+        except Exception as e:
+            logger.error(f"PowerTransformer (Pandas) application failed: {e}")
+        return df_out, _y
 
 
 @NodeRegistry.register("PowerTransformer", PowerTransformerApplier)
@@ -119,53 +169,20 @@ class PowerTransformerCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> PowerTransformerArtifact:
-        engine = get_engine(X)
-        if engine.name == EngineName.POLARS:
-            X = X.to_pandas()
-
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> PowerTransformerArtifact:
         if user_picked_no_columns(config):
             return {}
 
-        # Config: {'method': 'yeo-johnson' | 'box-cox', 'standardize': True, 'columns': [...]}
+        X_pd = to_pandas(X)
         method = config.get("method", "yeo-johnson")
         standardize = config.get("standardize", True)
-
-        cols = resolve_columns(X, config, detect_numeric_columns)
-
-        if not cols:
-            return {}
-
-        valid_cols = []
-        if method == "box-cox":
-            for col in cols:
-                # Box-Cox requires strictly positive data
-                if (X[col] <= 0).any():
-                    continue
-                valid_cols.append(col)
-        else:
-            valid_cols = cols
-
+        cols = resolve_columns(X_pd, config, detect_numeric_columns)
+        valid_cols = _filter_power_columns(X_pd, cols, method)
         if not valid_cols:
             return {}
 
         transformer = PowerTransformer(method=method, standardize=standardize)
-        transformer.fit(X[valid_cols])
-
-        # Capture internal scaler parameters if standardization is enabled
-        scaler_params = {}
-        if standardize and hasattr(transformer, "_scaler"):
-            scaler = transformer._scaler
-            if scaler:
-                scaler_params = {
-                    "mean": scaler.mean_.tolist() if scaler.mean_ is not None else None,
-                    "scale": (scaler.scale_.tolist() if scaler.scale_ is not None else None),
-                }
+        transformer.fit(X_pd[valid_cols])
 
         return {
             "type": "power_transformer",
@@ -173,102 +190,153 @@ class PowerTransformerCalculator(BaseCalculator):
             "method": method,
             "standardize": standardize,
             "columns": valid_cols,
-            "scaler_params": scaler_params,
+            "scaler_params": _extract_scaler_params(transformer, standardize),
         }
 
 
-# --- Simple Transformations (Log, Sqrt, etc.) ---
+# =============================================================================
+# Per-method dispatch tables (used by Simple + General transformations)
+# =============================================================================
+
+
+def _polars_log(item: Dict[str, Any]) -> Any:
+    import polars as pl
+
+    col = item["column"]
+    return pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).log1p()
+
+
+def _polars_sqrt(item: Dict[str, Any]) -> Any:
+    import polars as pl
+
+    col = item["column"]
+    return pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).sqrt()
+
+
+def _polars_cbrt(item: Dict[str, Any]) -> Any:
+    import polars as pl
+
+    return pl.col(item["column"]).cbrt()
+
+
+def _polars_reciprocal(item: Dict[str, Any]) -> Any:
+    import polars as pl
+
+    col = item["column"]
+    return 1.0 / pl.when(pl.col(col) == 0).then(None).otherwise(pl.col(col))
+
+
+def _polars_square(item: Dict[str, Any]) -> Any:
+    import polars as pl
+
+    return pl.col(item["column"]).pow(2)
+
+
+def _polars_exp(item: Dict[str, Any]) -> Any:
+    import polars as pl
+
+    threshold = item.get("clip_threshold", 700)
+    return pl.col(item["column"]).clip(upper_bound=threshold).exp()
+
+
+_POLARS_OPS: Dict[str, Callable[[Dict[str, Any]], Any]] = {
+    "log": _polars_log,
+    "sqrt": _polars_sqrt,
+    "square_root": _polars_sqrt,
+    "cube_root": _polars_cbrt,
+    "reciprocal": _polars_reciprocal,
+    "square": _polars_square,
+    "exp": _polars_exp,
+    "exponential": _polars_exp,
+}
+
+
+def _pandas_log(series: pd.Series, _item: Dict[str, Any]) -> Any:
+    if (series < 0).any():
+        series = series.where(series >= 0, np.nan)
+    return np.log1p(series)
+
+
+def _pandas_sqrt(series: pd.Series, _item: Dict[str, Any]) -> Any:
+    if (series < 0).any():
+        series = series.where(series >= 0, np.nan)
+    return np.sqrt(series)
+
+
+def _pandas_cbrt(series: pd.Series, _item: Dict[str, Any]) -> Any:
+    return np.cbrt(series)
+
+
+def _pandas_reciprocal(series: pd.Series, _item: Dict[str, Any]) -> Any:
+    return 1.0 / series.replace(0, np.nan)
+
+
+def _pandas_square(series: pd.Series, _item: Dict[str, Any]) -> Any:
+    return np.square(series)
+
+
+def _pandas_exp(series: pd.Series, item: Dict[str, Any]) -> Any:
+    threshold = item.get("clip_threshold", 700)
+    return np.exp(series.clip(upper=threshold))
+
+
+_PANDAS_OPS: Dict[str, Callable[[pd.Series, Dict[str, Any]], Any]] = {
+    "log": _pandas_log,
+    "sqrt": _pandas_sqrt,
+    "square_root": _pandas_sqrt,
+    "cube_root": _pandas_cbrt,
+    "reciprocal": _pandas_reciprocal,
+    "square": _pandas_square,
+    "exp": _pandas_exp,
+    "exponential": _pandas_exp,
+}
+
+
+# =============================================================================
+# Simple Transformations
+# =============================================================================
 
 
 class SimpleTransformationApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
+    @staticmethod
+    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
         transformations = params.get("transformations", [])
         if not transformations:
-            return X
+            return X, _y
 
-        # Polars Path
-        if engine.name == EngineName.POLARS:
-            import polars as pl
-
-            X_pl: Any = X
-            X_out = X_pl
-
-            for item in transformations:
-                col = item.get("column")
-                method = item.get("method")
-                if col not in X_out.columns:
-                    continue
-
-                expr = pl.col(col)
-
-                if method == "log":
-                    expr = pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).log1p()
-                elif method == "square_root":
-                    # sqrt of neg is nan
-                    expr = pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).sqrt()
-                elif method == "cube_root":
-                    expr = pl.col(col).cbrt()
-                elif method == "reciprocal":
-                    # 1/0 is inf in polars, typically nan in pandas logic above (replace(0, nan))
-                    expr = 1.0 / pl.when(pl.col(col) == 0).then(None).otherwise(pl.col(col))
-                elif method == "square":
-                    expr = pl.col(col).pow(2)
-                elif method == "exponential":
-                    threshold = item.get("clip_threshold", 700)
-                    expr = pl.col(col).clip(upper_bound=threshold).exp()
-
-                X_out = X_out.with_columns(expr.alias(col))
-
-            return X_out
-
-        # Pandas Path
-        df_out = X.copy()
-
+        X_out = X
         for item in transformations:
             col = item.get("column")
             method = item.get("method")
+            if col not in X_out.columns:
+                continue
+            op = _POLARS_OPS.get(method)
+            if op is None:
+                continue
+            X_out = X_out.with_columns(op(item).alias(col))
+        return X_out, _y
 
+    @staticmethod
+    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+        transformations = params.get("transformations", [])
+        if not transformations:
+            return X, _y
+
+        df_out = X.copy()
+        for item in transformations:
+            col = item.get("column")
+            method = item.get("method")
             if col not in df_out.columns:
                 continue
-
-            series = pd.to_numeric(df_out[col], errors="coerce")
-
-            if method == "log":
-                # log1p is safer for zeros
-                if (series < 0).any():
-                    series[series < 0] = np.nan
-                df_out[col] = np.log1p(series)
-
-            elif method == "square_root":
-                if (series < 0).any():
-                    series[series < 0] = np.nan
-                df_out[col] = np.sqrt(series)
-
-            elif method == "cube_root":
-                df_out[col] = np.cbrt(series)
-
-            elif method == "reciprocal":
-                df_out[col] = 1.0 / series.replace(0, np.nan)
-
-            elif method == "square":
-                df_out[col] = np.square(series)
-
-            elif method == "exponential":
-                # Clip to avoid overflow (exp(709) ~ max float64)
-                # We use a slightly lower bound to be safe, or user provided threshold
-                threshold = item.get("clip_threshold", 700)
-                series_clipped = series.clip(upper=threshold)
-                df_out[col] = np.exp(series_clipped)
-
-        return df_out
+            op = _PANDAS_OPS.get(method)
+            if op is None:
+                continue
+            df_out[col] = op(pd.to_numeric(df_out[col], errors="coerce"), item)
+        return df_out, _y
 
 
 @NodeRegistry.register("SimpleTransformation", SimpleTransformationApplier)
@@ -298,152 +366,155 @@ class SimpleTransformationCalculator(BaseCalculator):
         }
 
 
-# --- General Transformation (Combined) ---
+# =============================================================================
+# General Transformation (Simple ops + power transforms)
+# =============================================================================
+
+
+def _apply_power_to_polars_col(X_out: Any, item: Dict[str, Any]) -> Any:
+    """Apply a fitted Box-Cox / Yeo-Johnson to one Polars column in place."""
+    import polars as pl
+
+    col = item["column"]
+    method = item["method"]
+    lambdas = item.get("lambdas")
+    if lambdas is None:
+        return X_out
+
+    try:
+        pt = PowerTransformer(method=method, standardize=True)
+        pt.lambdas_ = np.array(lambdas)
+        scaler_params = item.get("scaler_params")
+        if scaler_params:
+            scaler = StandardScaler()
+            m = scaler_params.get("mean")
+            s = scaler_params.get("scale")
+            if m is not None:
+                scaler.mean_ = np.array(m)
+            if s is not None:
+                scaler.scale_ = np.array(s)
+                scaler.var_ = np.square(scaler.scale_)
+            pt._scaler = scaler
+
+        vals = X_out[col].to_numpy().reshape(-1, 1)
+        flat = pt.transform(vals).ravel()
+        return X_out.with_columns(pl.Series(flat).alias(col))
+    except Exception as e:
+        logger.warning(f"Failed to apply {method} for column {col}: {e}")
+        return X_out
+
+
+def _apply_power_to_pandas_col(df_out: Any, item: Dict[str, Any]) -> Any:
+    """Apply a fitted Box-Cox / Yeo-Johnson to one Pandas column in place."""
+    col = item["column"]
+    method = item["method"]
+    lambdas = item.get("lambdas")
+    if lambdas is None:
+        return df_out
+
+    try:
+        pt = PowerTransformer(method=method, standardize=True)
+        pt.lambdas_ = np.array(lambdas)
+        scaler_params = item.get("scaler_params")
+        if scaler_params:
+            scaler = StandardScaler()
+            scaler.mean_ = np.array(scaler_params.get("mean"))
+            scaler.scale_ = np.array(scaler_params.get("scale"))
+            scaler.var_ = np.square(scaler.scale_)
+            pt._scaler = scaler
+
+        series = pd.to_numeric(df_out[col], errors="coerce")
+        vals = series.values.reshape(-1, 1)
+        trans_vals = pt.transform(vals)
+        # sklearn may be configured with transform_output="pandas".
+        trans_arr = trans_vals.to_numpy() if hasattr(trans_vals, "to_numpy") else trans_vals
+        df_out[col] = np.asarray(trans_arr).ravel()
+    except Exception as e:
+        logger.warning(f"Failed to apply {method} for column {col}: {e}")
+    return df_out
+
+
+_POWER_METHODS = {"box-cox", "yeo-johnson"}
 
 
 class GeneralTransformationApplier(BaseApplier):
     @apply_method
-    def apply(  # noqa: C901
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
+    @staticmethod
+    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
         transformations = params.get("transformations", [])
         if not transformations:
-            return X
+            return X, _y
 
-        # Polars Path
-        if engine.name == EngineName.POLARS:
-            import polars as pl
-
-            X_pl: Any = X
-            X_out = X_pl
-
-            for item in transformations:
-                col = item.get("column")
-                method = item.get("method")
-
-                if col not in X_out.columns:
-                    continue
-
-                if method in ["box-cox", "yeo-johnson"]:
-                    lambdas = item.get("lambdas")
-                    scaler_params = item.get("scaler_params")
-                    if lambdas is None:
-                        continue
-
-                    try:
-                        pt = PowerTransformer(method=method, standardize=True)
-                        pt.lambdas_ = np.array(lambdas)
-
-                        if scaler_params:
-                            scaler = StandardScaler()
-                            # Handle potential None or list
-                            m = scaler_params.get("mean")
-                            s = scaler_params.get("scale")
-                            if m is not None:
-                                scaler.mean_ = np.array(m)
-                            if s is not None:
-                                scaler.scale_ = np.array(s)
-                                scaler.var_ = np.square(scaler.scale_)
-                            pt._scaler = scaler
-
-                        # Get numpy array from polars col
-                        vals = X_out[col].to_numpy().reshape(-1, 1)
-                        trans_vals = pt.transform(vals)
-                        # flatten
-                        flat_vals = trans_vals.ravel()
-
-                        X_out = X_out.with_columns(pl.Series(flat_vals).alias(col))
-
-                    except Exception as e:
-                        logger.warning(f"Failed to apply {method} for column {col}: {e}")
-
-                # Simple Transformations (Polars native)
-                else:
-                    expr = pl.col(col)
-                    if method == "log":
-                        expr = pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).log1p()
-                    elif method in ["sqrt", "square_root"]:
-                        expr = pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).sqrt()
-                    elif method == "cube_root":
-                        expr = pl.col(col).cbrt()
-                    elif method == "reciprocal":
-                        expr = 1.0 / pl.when(pl.col(col) == 0).then(None).otherwise(pl.col(col))
-                    elif method == "square":
-                        expr = pl.col(col).pow(2)
-                    elif method in ["exp", "exponential"]:
-                        threshold = item.get("clip_threshold", 700)
-                        expr = pl.col(col).clip(upper_bound=threshold).exp()
-
-                    X_out = X_out.with_columns(expr.alias(col))
-
-            return X_out
-
-        # Pandas Path
-        df_out = X.copy()
-
+        X_out = X
         for item in transformations:
             col = item.get("column")
             method = item.get("method")
+            if col not in X_out.columns:
+                continue
+            if method in _POWER_METHODS:
+                X_out = _apply_power_to_polars_col(X_out, item)
+                continue
+            op = _POLARS_OPS.get(method)
+            if op is None:
+                continue
+            X_out = X_out.with_columns(op(item).alias(col))
+        return X_out, _y
 
+    @staticmethod
+    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+        transformations = params.get("transformations", [])
+        if not transformations:
+            return X, _y
+
+        df_out = X.copy()
+        for item in transformations:
+            col = item.get("column")
+            method = item.get("method")
             if col not in df_out.columns:
                 continue
+            if method in _POWER_METHODS:
+                df_out = _apply_power_to_pandas_col(df_out, item)
+                continue
+            op = _PANDAS_OPS.get(method)
+            if op is None:
+                continue
+            df_out[col] = op(pd.to_numeric(df_out[col], errors="coerce"), item)
+        return df_out, _y
 
-            series = pd.to_numeric(df_out[col], errors="coerce")
 
-            if method in ["box-cox", "yeo-johnson"]:
-                lambdas = item.get("lambdas")
-                scaler_params = item.get("scaler_params")
+# -----------------------------------------------------------------------------
+# General Transformation Calculator
+# -----------------------------------------------------------------------------
 
-                if lambdas is None:
-                    continue
 
-                try:
-                    pt = PowerTransformer(method=method, standardize=True)
-                    pt.lambdas_ = np.array(lambdas)
+def _fit_power_for_column(X: Any, col: str, method: str, is_polars: bool) -> Dict[str, Any]:
+    """Fit a PowerTransformer for one column; return the per-column artifact dict."""
+    if is_polars:
+        col_series = X[col].to_pandas()
+        col_df = col_series.to_frame()
+    else:
+        col_series = X[col]
+        col_df = X[[col]]
 
-                    if scaler_params:
-                        scaler = StandardScaler()
-                        scaler.mean_ = np.array(scaler_params.get("mean"))
-                        scaler.scale_ = np.array(scaler_params.get("scale"))
-                        scaler.var_ = np.square(scaler.scale_)
-                        pt._scaler = scaler
+    if method == "box-cox" and (col_series <= 0).any():
+        logger.warning(
+            f"Skipping Box-Cox for column {col} because it contains non-positive values."
+        )
+        return {}
 
-                    # Reshape for sklearn
-                    vals = series.values.reshape(-1, 1)
-                    trans_vals = pt.transform(vals)
-                    # sklearn can be configured with transform_output="pandas", which returns a DataFrame.
-                    trans_vals_arr = (
-                        trans_vals.to_numpy() if hasattr(trans_vals, "to_numpy") else trans_vals
-                    )
-                    df_out[col] = np.asarray(trans_vals_arr).ravel()
-                except Exception as e:
-                    logger.warning(f"Failed to apply {method} for column {col}: {e}")
+    pt = PowerTransformer(method=method, standardize=True)
+    pt.fit(col_df)
 
-            elif method == "log":
-                if (series < 0).any():
-                    series[series < 0] = np.nan
-                df_out[col] = np.log1p(series)
-            elif method == "sqrt" or method == "square_root":
-                if (series < 0).any():
-                    series[series < 0] = np.nan
-                df_out[col] = np.sqrt(series)
-            elif method == "cube_root":
-                df_out[col] = np.cbrt(series)
-            elif method == "reciprocal":
-                df_out[col] = 1.0 / series.replace(0, np.nan)
-            elif method == "square":
-                df_out[col] = np.square(series)
-            elif method == "exp" or method == "exponential":
-                threshold = item.get("clip_threshold", 700)
-                series_clipped = series.clip(upper=threshold)
-                df_out[col] = np.exp(series_clipped)
-
-        return df_out
+    fitted: Dict[str, Any] = {"lambdas": pt.lambdas_.tolist()}
+    if hasattr(pt, "_scaler") and pt._scaler:
+        fitted["scaler_params"] = {
+            "mean": pt._scaler.mean_.tolist() if pt._scaler.mean_ is not None else None,
+            "scale": pt._scaler.scale_.tolist() if pt._scaler.scale_ is not None else None,
+        }
+    return fitted
 
 
 @NodeRegistry.register("GeneralTransformation", GeneralTransformationApplier)
@@ -463,66 +534,29 @@ class GeneralTransformationCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> GeneralTransformationArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> GeneralTransformationArtifact:
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'},
         #                              {'column': 'col2', 'method': 'yeo-johnson'}]}
-        engine = get_engine(X)
+        is_polars = get_engine(X).name == EngineName.POLARS
+        fitted_transformations: List[Dict[str, Any]] = []
 
-        transformations_config = config.get("transformations", [])
-        fitted_transformations = []
-
-        for item in transformations_config:
+        for item in config.get("transformations", []):
             col = item.get("column")
             method = item.get("method")
-
             if col not in X.columns:
                 continue
 
-            fitted_item = {"column": col, "method": method}
+            fitted_item: Dict[str, Any] = {"column": col, "method": method}
 
-            if method in ["box-cox", "yeo-johnson"]:
-                # Fit PowerTransformer
+            if method in _POWER_METHODS:
                 try:
-                    # Prepare data (Pandas Series/DataFrame)
-                    if engine.name == EngineName.POLARS:
-                        col_series = X[col].to_pandas()
-                        col_df = col_series.to_frame()
-                    else:
-                        col_series = X[col]
-                        col_df = X[[col]]
-
-                    # Box-Cox requires strictly positive
-                    if method == "box-cox" and (col_series <= 0).any():
-                        logger.warning(
-                            f"Skipping Box-Cox for column {col} because it contains non-positive values."
-                        )
-                        continue
-
-                    # Default to standardize=True for power transforms
-                    pt = PowerTransformer(method=method, standardize=True)
-                    pt.fit(col_df)
-
-                    fitted_item["lambdas"] = pt.lambdas_.tolist()
-
-                    if hasattr(pt, "_scaler") and pt._scaler:
-                        fitted_item["scaler_params"] = {
-                            "mean": (
-                                pt._scaler.mean_.tolist() if pt._scaler.mean_ is not None else None
-                            ),
-                            "scale": (
-                                pt._scaler.scale_.tolist()
-                                if pt._scaler.scale_ is not None
-                                else None
-                            ),
-                        }
+                    extras = _fit_power_for_column(X, col, method, is_polars)
                 except Exception as e:
                     logger.warning(f"Failed to fit {method} for column {col}: {e}")
                     continue
+                if not extras:
+                    continue  # box-cox skipped on non-positive data
+                fitted_item.update(extras)
 
             fitted_transformations.append(fitted_item)
 

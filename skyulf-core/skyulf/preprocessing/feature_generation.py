@@ -1,7 +1,18 @@
+"""Feature-generation nodes (PolynomialFeatures + FeatureGeneration math).
+
+Per-engine apply paths are split into small handlers and dispatched via
+:func:`apply_dual_engine`. The per-operation logic (``arithmetic`` /
+``ratio`` / ``similarity`` / ``datetime_extract``) lives in module-level
+helpers indexed by ``_FEATGEN_OPS_POLARS`` / ``_FEATGEN_OPS_PANDAS``.
+
+Calculator ``fit`` paths are sklearn-bound, so they use :func:`to_pandas`
+once at the top instead of going through ``fit_dual_engine``.
+"""
+
 import builtins
 import math
 from difflib import SequenceMatcher
-from typing import Any, Dict, Optional, Tuple, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
 import pandas as pd
 from sklearn.preprocessing import PolynomialFeatures
@@ -11,7 +22,9 @@ from ..core.meta.decorators import node_meta
 from ..utils import detect_numeric_columns
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ._artifacts import FeatureGenerationArtifact, PolynomialFeaturesArtifact
-from ..engines import EngineName, SkyulfDataFrame, get_engine
+from ._helpers import to_pandas
+from .dispatcher import apply_dual_engine
+from ..engines import SkyulfDataFrame
 
 # --- Optional Dependencies ---
 fuzz: Any = None
@@ -67,11 +80,16 @@ def _safe_divide(numerator: pd.Series, denominator: pd.Series, epsilon: float) -
     adjusted = denominator.copy()
     adjusted = adjusted.replace({0: epsilon, -0.0: epsilon})
     adjusted = adjusted.fillna(epsilon)
-    # Avoid division by zero or near-zero
     mask = adjusted.abs() < epsilon
     if mask.any():
         adjusted[mask] = epsilon
     return numerator / adjusted
+
+
+_FUZZ_METHODS: Dict[str, str] = {
+    "token_sort_ratio": "token_sort_ratio",
+    "token_set_ratio": "token_set_ratio",
+}
 
 
 def _compute_similarity_score(a: Any, b: Any, method: str) -> float:
@@ -81,15 +99,9 @@ def _compute_similarity_score(a: Any, b: Any, method: str) -> float:
         return 100.0
     if not text_a or not text_b:
         return 0.0
-
     if _HAS_RAPIDFUZZ:
-        if method == "token_sort_ratio":
-            return float(fuzz.token_sort_ratio(text_a, text_b))
-        if method == "token_set_ratio":
-            return float(fuzz.token_set_ratio(text_a, text_b))
-        return float(fuzz.ratio(text_a, text_b))
-
-    # Fallback
+        attr = _FUZZ_METHODS.get(method, "ratio")
+        return float(getattr(fuzz, attr)(text_a, text_b))
     return SequenceMatcher(None, text_a, text_b).ratio() * 100.0
 
 
@@ -98,155 +110,94 @@ def _vectorised_similarity(s_a: pd.Series, s_b: pd.Series, method: str) -> pd.Se
 
     Avoids df.apply(axis=1) overhead by:
     1. Pre-computing null/empty masks with numpy/pandas ops (vectorised).
-    2. Calling the fuzz scorer only on rows that need it (list-comp over filtered arrays).
+    2. Only invoking the per-pair Python similarity for rows that need it.
     """
     a_str = s_a.fillna("").astype(str)
     b_str = s_b.fillna("").astype(str)
+    a_empty = a_str.eq("")
+    b_empty = b_str.eq("")
+    both_empty = a_empty & b_empty
+    one_empty = (a_empty | b_empty) & ~both_empty
+    needs_compute = ~(a_empty | b_empty)
 
-    both_empty = (a_str == "") & (b_str == "")
-    one_empty = (a_str == "") | (b_str == "")
+    result = pd.Series(0.0, index=s_a.index, dtype=float)
+    result.loc[both_empty] = 100.0
+    result.loc[one_empty] = 0.0
 
-    result = pd.Series(0.0, index=s_a.index)
-    result[both_empty] = 100.0
+    if needs_compute.any():
+        idx = needs_compute[needs_compute].index
+        for i in idx:
+            result.loc[i] = _compute_similarity_score(a_str.at[i], b_str.at[i], method)
 
-    needs = ~one_empty
-    if not needs.any():
-        return result
-
-    a_vals = a_str[needs].to_numpy()
-    b_vals = b_str[needs].to_numpy()
-
-    if _HAS_RAPIDFUZZ:
-        if method == "token_sort_ratio":
-            scores = [float(fuzz.token_sort_ratio(a, b)) for a, b in zip(a_vals, b_vals)]
-        elif method == "token_set_ratio":
-            scores = [float(fuzz.token_set_ratio(a, b)) for a, b in zip(a_vals, b_vals)]
-        else:
-            scores = [float(fuzz.ratio(a, b)) for a, b in zip(a_vals, b_vals)]
-    else:
-        scores = [SequenceMatcher(None, a, b).ratio() * 100.0 for a, b in zip(a_vals, b_vals)]
-
-    result[needs] = scores
     return result
 
 
-# --- Polynomial Features ---
+# -----------------------------------------------------------------------------
+# Polynomial Features — shared sklearn helper
+# -----------------------------------------------------------------------------
+
+
+def _polynomial_compute(
+    X_subset: pd.DataFrame, valid_cols: List[str], params: Dict[str, Any]
+) -> Optional[Tuple[Any, List[str]]]:
+    """Run sklearn PolynomialFeatures + name normalisation; ``None`` ⇒ skip."""
+    poly = PolynomialFeatures(
+        degree=params.get("degree", 2),
+        interaction_only=params.get("interaction_only", False),
+        include_bias=params.get("include_bias", False),
+    )
+    poly.fit(X_subset)
+    transformed = poly.transform(X_subset)
+    if hasattr(transformed, "values"):
+        transformed = transformed.values
+    feature_names = poly.get_feature_names_out(valid_cols)
+
+    include_input = params.get("include_input_features", False)
+    keep = [i for i, p in enumerate(poly.powers_) if not (sum(p) == 1 and not include_input)]
+    if not keep:
+        return None
+
+    transformed = transformed[:, keep]
+    feature_names = feature_names[keep]
+    output_prefix = params.get("output_prefix", "poly")
+    new_names = [
+        f"{output_prefix}_{name.replace(' ', '_').replace('^', '_pow_')}" for name in feature_names
+    ]
+    return transformed, new_names
+
+
+def _polynomial_apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    import polars as pl
+
+    valid_cols = [c for c in params.get("columns", []) if c in X.columns]
+    if not valid_cols:
+        return X, _y
+
+    result = _polynomial_compute(X.select(valid_cols).to_pandas(), valid_cols, params)
+    if result is None:
+        return X, _y
+    transformed, new_names = result
+    df_poly = pl.DataFrame(transformed, schema=new_names)
+    return pl.concat([X, df_poly], how="horizontal"), _y
+
+
+def _polynomial_apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    valid_cols = [c for c in params.get("columns", []) if c in X.columns]
+    if not valid_cols:
+        return X, _y
+
+    result = _polynomial_compute(X[valid_cols], valid_cols, params)
+    if result is None:
+        return X, _y
+    transformed, new_names = result
+    df_poly = pd.DataFrame(cast(Any, transformed), columns=cast(Any, new_names), index=X.index)
+    return pd.concat(cast(Any, [X, df_poly]), axis=1), _y
 
 
 class PolynomialFeaturesApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
-
-        cols = params.get("columns", [])
-        valid_cols = [c for c in cols if c in X.columns]
-
-        if not valid_cols:
-            return X
-
-        degree = params.get("degree", 2)
-        interaction_only = params.get("interaction_only", False)
-        include_bias = params.get("include_bias", False)
-        include_input_features = params.get("include_input_features", False)
-        output_prefix = params.get("output_prefix", "poly")
-
-        # Polars Path
-        if engine.name == EngineName.POLARS:
-            import polars as pl
-
-            X_pl: Any = X
-
-            # For PolynomialFeatures, we use the pandas/sklearn implementation via conversion
-            # to ensure full compatibility with complex degree/interaction logic.
-            poly = PolynomialFeatures(
-                degree=degree, interaction_only=interaction_only, include_bias=include_bias
-            )
-            X_subset = X_pl.select(valid_cols).to_pandas()
-            poly.fit(X_subset)
-
-            transformed = poly.transform(X_subset)
-            # sklearn may return a DataFrame when transform_output="pandas" is set
-            if hasattr(transformed, "values"):
-                transformed = transformed.values
-            feature_names = poly.get_feature_names_out(valid_cols)
-
-            # Filter logic
-            indices_to_keep = []
-            for i, p in enumerate(poly.powers_):
-                deg = sum(p)
-                if deg == 1 and not include_input_features:
-                    continue
-                indices_to_keep.append(i)
-
-            if not indices_to_keep:
-                return X
-
-            transformed = transformed[:, indices_to_keep]
-            feature_names = feature_names[indices_to_keep]
-
-            new_names = []
-            for name in feature_names:
-                clean_name = name.replace(" ", "_").replace("^", "_pow_")
-                new_names.append(f"{output_prefix}_{clean_name}")
-
-            # Create Polars DataFrame
-            df_poly = pl.DataFrame(transformed, schema=new_names)
-
-            # Horizontal concat
-            X_out = pl.concat([X_pl, df_poly], how="horizontal")
-
-            return X_out
-
-        # Pandas Path
-        poly = PolynomialFeatures(
-            degree=degree, interaction_only=interaction_only, include_bias=include_bias
-        )
-        poly.fit(X[valid_cols])  # Cheap fit
-
-        transformed = poly.transform(X[valid_cols])
-
-        # Handle case where sklearn is configured to output pandas DataFrames
-        if hasattr(transformed, "iloc"):
-            transformed = transformed.values
-
-        feature_names = poly.get_feature_names_out(valid_cols)
-
-        # Filter out original features (degree 1) if not requested
-        # We use powers_ to determine the degree of each output feature
-        indices_to_keep = []
-        for i, p in enumerate(poly.powers_):
-            deg = sum(p)
-            # If degree is 1 (linear term) and we don't want to include input features, skip it
-            if deg == 1 and not include_input_features:
-                continue
-            indices_to_keep.append(i)
-
-        if not indices_to_keep:
-            return X
-
-        transformed = transformed[:, indices_to_keep]
-        feature_names = feature_names[indices_to_keep]
-
-        # Rename features to be more readable and avoid collisions
-        # We convert sklearn's "col1 col2" format to "prefix_col1_col2"
-
-        new_names = []
-        for name in feature_names:
-            # Clean up name
-            clean_name = name.replace(" ", "_").replace("^", "_pow_")
-            new_names.append(f"{output_prefix}_{clean_name}")
-
-        df_poly = pd.DataFrame(cast(Any, transformed), columns=cast(Any, new_names), index=X.index)
-
-        # Concatenate — pd.concat creates a new DataFrame, no need to copy X first
-        df_out = pd.concat(cast(Any, [X, df_poly]), axis=1)
-
-        return df_out
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, _polynomial_apply_polars, _polynomial_apply_pandas)
 
 
 @NodeRegistry.register("PolynomialFeatures", PolynomialFeaturesApplier)
@@ -260,481 +211,545 @@ class PolynomialFeaturesApplier(BaseApplier):
 )
 class PolynomialFeaturesCalculator(BaseCalculator):
     @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> PolynomialFeaturesArtifact:
-        # Extract configuration parameters
-        # We support standard polynomial features settings like degree and interaction_only
-
-        engine = get_engine(X)
-
-        cols = config.get("columns", [])
-        auto_detect = config.get("auto_detect", False)
-
-        if not cols and auto_detect:
-            cols = detect_numeric_columns(X)
-
-        cols = [c for c in cols if c in X.columns]
-
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> PolynomialFeaturesArtifact:
+        X_pd = to_pandas(X)
+        cols = list(config.get("columns", []))
+        if not cols and config.get("auto_detect", False):
+            cols = detect_numeric_columns(X_pd)
+        cols = [c for c in cols if c in X_pd.columns]
         if not cols:
-            return {}
+            return cast(PolynomialFeaturesArtifact, {})
 
         degree = config.get("degree", 2)
         interaction_only = config.get("interaction_only", False)
         include_bias = config.get("include_bias", False)
 
-        # We use sklearn to get feature names
-        # Ensure X is compatible with sklearn (Pandas/Numpy)
-        if engine.name == EngineName.POLARS:
-            X_pl: Any = X
-            X_fit = X_pl.select(cols).to_pandas()
-        else:
-            X_fit = X[cols]
-
         poly = PolynomialFeatures(
             degree=degree, interaction_only=interaction_only, include_bias=include_bias
         )
-        poly.fit(X_fit)
+        poly.fit(X_pd[cols])
+        return cast(
+            PolynomialFeaturesArtifact,
+            {
+                "type": "polynomial_features",
+                "columns": cols,
+                "degree": degree,
+                "interaction_only": interaction_only,
+                "include_bias": include_bias,
+                "include_input_features": config.get("include_input_features", False),
+                "output_prefix": config.get("output_prefix", "poly"),
+                "feature_names": poly.get_feature_names_out(cols).tolist(),
+            },
+        )
 
-        return {
-            "type": "polynomial_features",
-            "columns": cols,
-            "degree": degree,
-            "interaction_only": interaction_only,
-            "include_bias": include_bias,
-            "include_input_features": config.get("include_input_features", False),
-            "output_prefix": config.get("output_prefix", "poly"),
-            "feature_names": poly.get_feature_names_out(cols).tolist(),
+
+# -----------------------------------------------------------------------------
+# Feature Generation — per-op handlers
+# -----------------------------------------------------------------------------
+
+
+def _resolve_output_col(
+    op: Dict[str, Any], i: int, existing: List[str], allow_overwrite: bool
+) -> str:
+    """Pick a non-colliding output column name for op ``i``."""
+    output_col = op.get("output_column")
+    if not output_col:
+        base = f"{op.get('operation_type', 'arithmetic')}_{i}"
+        prefix = op.get("output_prefix")
+        output_col = f"{prefix}_{base}" if prefix else base
+    if output_col in existing and not allow_overwrite:
+        j = 1
+        while f"{output_col}_{j}" in existing:
+            j += 1
+        output_col = f"{output_col}_{j}"
+    return output_col
+
+
+# --- Polars op handlers ---
+
+
+def _polars_arith_terms(op: Dict[str, Any], existing: List[str]) -> Tuple[List[Any], List[float]]:
+    import polars as pl
+
+    valid = [
+        c for c in op.get("input_columns", []) + op.get("secondary_columns", []) if c in existing
+    ]
+    fill_val = op.get("fillna") if op.get("fillna") is not None else 0
+    col_exprs = [pl.col(c).cast(pl.Float64).fill_null(fill_val) for c in valid]
+    const_vals = [float(c) for c in op.get("constants", [])]
+    return col_exprs, const_vals
+
+
+def _polars_add(col_exprs: List[Any], const_vals: List[float], _epsilon: float) -> Any:
+    import polars as pl
+
+    return pl.sum_horizontal(col_exprs) + sum(const_vals) if col_exprs else pl.lit(sum(const_vals))
+
+
+def _polars_subtract(col_exprs: List[Any], const_vals: List[float], _epsilon: float) -> Any:
+    import polars as pl
+
+    expr = col_exprs[0] if col_exprs else pl.lit(0.0)
+    for e in col_exprs[1:]:
+        expr = expr - e
+    for c in const_vals:
+        expr = expr - c
+    return expr
+
+
+def _polars_multiply(col_exprs: List[Any], const_vals: List[float], _epsilon: float) -> Any:
+    import polars as pl
+
+    expr = pl.lit(1.0)
+    for e in col_exprs:
+        expr = expr * e
+    for c in const_vals:
+        expr = expr * c
+    return expr
+
+
+_POLARS_ARITH_BUILDERS: Dict[str, Callable[[List[Any], List[float], float], Optional[Any]]] = {
+    "add": _polars_add,
+    "subtract": _polars_subtract,
+    "multiply": _polars_multiply,
+    "divide": lambda col_exprs, const_vals, eps: _polars_divide(col_exprs, const_vals, eps),
+}
+
+
+def _polars_arith(op: Dict[str, Any], existing: List[str], epsilon: float) -> Optional[Any]:
+    method = op.get("method")
+    col_exprs, const_vals = _polars_arith_terms(op, existing)
+    if not col_exprs and not const_vals:
+        return None
+    builder = _POLARS_ARITH_BUILDERS.get(method or "")
+    return builder(col_exprs, const_vals, epsilon) if builder else None
+
+
+def _polars_divide(col_exprs: List[Any], const_vals: List[float], epsilon: float) -> Optional[Any]:
+    import polars as pl
+
+    if col_exprs:
+        expr = col_exprs[0]
+        others = col_exprs[1:]
+    elif const_vals:
+        expr = pl.lit(const_vals[0])
+        others = []
+        const_vals = const_vals[1:]
+    else:
+        return None
+
+    def safe_denom(d: Any) -> Any:
+        return pl.when(d.abs() < epsilon).then(epsilon).otherwise(d)
+
+    for e in others:
+        expr = expr / safe_denom(e)
+    for c in const_vals:
+        expr = expr / (c if abs(c) > epsilon else epsilon)
+    return expr
+
+
+def _polars_ratio(op: Dict[str, Any], existing: List[str], epsilon: float) -> Optional[Any]:
+    import polars as pl
+
+    nums = [
+        pl.col(c).cast(pl.Float64).fill_null(0)
+        for c in op.get("input_columns", [])
+        if c in existing
+    ]
+    dens = [
+        pl.col(c).cast(pl.Float64).fill_null(0)
+        for c in op.get("secondary_columns", [])
+        if c in existing
+    ]
+    if not nums or not dens:
+        return None
+    num_sum = pl.sum_horizontal(nums)
+    den_sum = pl.sum_horizontal(dens)
+    return num_sum / pl.when(den_sum.abs() < epsilon).then(epsilon).otherwise(den_sum)
+
+
+def _resolve_similarity_pair(op: Dict[str, Any], existing: List[str]) -> Optional[Tuple[str, str]]:
+    """Return ``(col_a, col_b)`` for similarity ops, or ``None`` if unresolved."""
+    inputs = op.get("input_columns", [])
+    secondary = op.get("secondary_columns", [])
+    col_a = inputs[0] if inputs else None
+    col_b = secondary[0] if secondary else (inputs[1] if len(inputs) > 1 else None)
+    if not col_a or not col_b or col_a not in existing or col_b not in existing:
+        return None
+    return col_a, col_b
+
+
+def _polars_similarity(op: Dict[str, Any], existing: List[str], _eps: float) -> Optional[Any]:
+    import polars as pl
+
+    pair = _resolve_similarity_pair(op, existing)
+    if pair is None:
+        return None
+    col_a, col_b = pair
+    method = op.get("method") or "ratio"
+    a_empty = pl.col(col_a).is_null() | (pl.col(col_a).cast(pl.String) == "")
+    b_empty = pl.col(col_b).is_null() | (pl.col(col_b).cast(pl.String) == "")
+
+    def sim_func(struct_val: Any) -> float:
+        return _compute_similarity_score(struct_val.get("a"), struct_val.get("b"), method)
+
+    return (
+        pl.when(a_empty & b_empty)
+        .then(pl.lit(100.0))
+        .when(a_empty | b_empty)
+        .then(pl.lit(0.0))
+        .otherwise(
+            pl.struct([pl.col(col_a).alias("a"), pl.col(col_b).alias("b")]).map_elements(
+                sim_func, return_dtype=pl.Float64
+            )
+        )
+    )
+
+
+_POLARS_DT_FEATURES: Dict[str, Callable[[Any], Any]] = {}
+
+
+def _register_polars_dt() -> None:
+    import polars as pl
+
+    _POLARS_DT_FEATURES.update(
+        {
+            "year": lambda d: d.dt.year(),
+            "month": lambda d: d.dt.month(),
+            "day": lambda d: d.dt.day(),
+            "hour": lambda d: d.dt.hour(),
+            "minute": lambda d: d.dt.minute(),
+            "second": lambda d: d.dt.second(),
+            "quarter": lambda d: d.dt.quarter(),
+            # Polars dt.weekday() is ISO 1-indexed; subtract 1 to match
+            # pandas dayofweek (Mon=0, Sun=6).
+            "weekday": lambda d: d.dt.weekday() - 1,
+            # Use raw 1-indexed value: Sat=6, Sun=7 ⇒ ``>= 6`` catches both.
+            "is_weekend": lambda d: (d.dt.weekday() >= 6).cast(pl.Int64),
+            "week": lambda d: d.dt.week(),
+            "month_name": lambda d: d.dt.strftime("%B"),
+            "day_name": lambda d: d.dt.strftime("%A"),
         }
+    )
 
 
-# --- Feature Generation ---
+def _build_polars_dt_exprs(col: str, base_dt: Any, features: List[str]) -> List[Any]:
+    """Return the per-feature Polars expressions for one datetime column."""
+    exprs: List[Any] = []
+    for feat in features:
+        builder = _POLARS_DT_FEATURES.get(feat)
+        if builder is not None:
+            exprs.append(builder(base_dt).alias(f"{col}_{feat}"))
+    return exprs
+
+
+def _polars_datetime_apply(op: Dict[str, Any], X_out: Any) -> Any:
+    """Materialise datetime-extract feature columns onto ``X_out`` (Polars)."""
+    import polars as pl
+
+    if not _POLARS_DT_FEATURES:
+        _register_polars_dt()
+
+    valid = [c for c in op.get("input_columns", []) if c in X_out.columns]
+    features = op.get("datetime_features", [])
+    dt_exprs: List[Any] = []
+    for col in valid:
+        base_dt = pl.col(col)
+        if X_out.schema[col] == pl.String:
+            base_dt = pl.col(col).str.to_datetime(strict=False)
+        dt_exprs.extend(_build_polars_dt_exprs(col, base_dt, features))
+    if dt_exprs:
+        X_out = X_out.with_columns(dt_exprs)
+    return X_out
+
+
+_POLARS_AGG_BUILDERS: Dict[str, Callable[[Any], Any]] = {
+    "mean": lambda c: c.mean(),
+    "sum": lambda c: c.sum(),
+    "count": lambda c: c.count(),
+    "min": lambda c: c.min(),
+    "max": lambda c: c.max(),
+    "std": lambda c: c.std(),
+    "median": lambda c: c.median(),
+}
+
+
+def _resolve_group_agg_cols(
+    op: Dict[str, Any], existing: List[str]
+) -> Optional[Tuple[str, str, str]]:
+    """Return ``(group_col, target_col, method)`` if op is well-formed, else None."""
+    group_cols = [c for c in op.get("input_columns", []) if c in existing]
+    target_cols = [c for c in op.get("secondary_columns", []) if c in existing]
+    if not group_cols or not target_cols:
+        return None
+    return group_cols[0], target_cols[0], op.get("method") or "mean"
+
+
+def _polars_group_agg(op: Dict[str, Any], existing: List[str], _epsilon: float) -> Optional[Any]:
+    """Group-by aggregation broadcast back per row via Polars window ``over``."""
+    import polars as pl
+
+    resolved = _resolve_group_agg_cols(op, existing)
+    if resolved is None:
+        return None
+    group_col, target_col, method = resolved
+    builder = _POLARS_AGG_BUILDERS.get(method)
+    if builder is None:
+        return None
+    target = pl.col(target_col)
+    if method != "count":
+        target = target.cast(pl.Float64)
+    return builder(target).over(group_col)
+
+
+_POLARS_OP_HANDLERS: Dict[str, Callable[[Dict[str, Any], List[str], float], Optional[Any]]] = {
+    "arithmetic": _polars_arith,
+    "ratio": _polars_ratio,
+    "similarity": _polars_similarity,
+    "group_agg": _polars_group_agg,
+}
+
+
+def _featgen_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    operations = params.get("operations", [])
+    if not operations:
+        return X, y
+    epsilon = params.get("epsilon", DEFAULT_EPSILON)
+    allow_overwrite = params.get("allow_overwrite", False)
+
+    X_out = X
+    for i, op in enumerate(operations):
+        op_type = op.get("operation_type", "arithmetic")
+        try:
+            if op_type == "datetime_extract":
+                X_out = _polars_datetime_apply(op, X_out)
+                continue
+            handler = _POLARS_OP_HANDLERS.get(op_type)
+            if handler is None:
+                continue
+            expr = handler(op, list(X_out.columns), epsilon)
+            if expr is None:
+                continue
+            output_col = _resolve_output_col(op, i, list(X_out.columns), allow_overwrite)
+            round_digits = op.get("round_digits")
+            if round_digits is not None:
+                expr = expr.round(round_digits)
+            X_out = X_out.with_columns(expr.alias(output_col))
+        except Exception:
+            pass
+    return X_out, y
+
+
+# --- Pandas op handlers ---
+
+
+def _pandas_arith_terms(op: Dict[str, Any], df_out: Any) -> Tuple[List[pd.Series], List[float]]:
+    valid = [
+        c
+        for c in op.get("input_columns", []) + op.get("secondary_columns", [])
+        if c in df_out.columns
+    ]
+    fill_val = op.get("fillna") if op.get("fillna") is not None else 0
+    series_list = [pd.to_numeric(df_out[c], errors="coerce").fillna(fill_val) for c in valid]
+    const_vals = [builtins.float(c) for c in op.get("constants", [])]
+    return series_list, const_vals
+
+
+def _pandas_add(
+    series_list: List[pd.Series], const_vals: List[float], idx: Any, _eps: float
+) -> pd.Series:
+    res = _sum_pandas_series(series_list, idx)
+    for c in const_vals:
+        res = res.add(c)
+    return res
+
+
+def _pandas_subtract(
+    series_list: List[pd.Series], const_vals: List[float], idx: Any, _eps: float
+) -> pd.Series:
+    res = series_list[0].copy() if series_list else pd.Series(0.0, index=idx)
+    for s in series_list[1:]:
+        res = res.subtract(s, fill_value=0)
+    for c in const_vals:
+        res = res.sub(c)
+    return res
+
+
+def _pandas_multiply(
+    series_list: List[pd.Series], const_vals: List[float], idx: Any, _eps: float
+) -> pd.Series:
+    res = pd.Series(1.0, index=idx)
+    for s in series_list:
+        res = res.multiply(s, fill_value=1)
+    for c in const_vals:
+        res = res.mul(c)
+    return res
+
+
+_PANDAS_ARITH_BUILDERS: Dict[
+    str, Callable[[List[pd.Series], List[float], Any, float], Optional[pd.Series]]
+] = {
+    "add": _pandas_add,
+    "subtract": _pandas_subtract,
+    "multiply": _pandas_multiply,
+    "divide": lambda s, c, idx, eps: _pandas_divide(s, c, idx, eps),
+}
+
+
+def _pandas_arith(op: Dict[str, Any], df_out: Any, epsilon: float) -> Optional[pd.Series]:
+    method = op.get("method")
+    series_list, const_vals = _pandas_arith_terms(op, df_out)
+    if not series_list and not const_vals:
+        return None
+    builder = _PANDAS_ARITH_BUILDERS.get(method or "")
+    return builder(series_list, const_vals, df_out.index, epsilon) if builder else None
+
+
+def _pandas_divide(
+    series_list: List[pd.Series], const_vals: List[float], idx: Any, epsilon: float
+) -> Optional[pd.Series]:
+    if series_list:
+        res = series_list[0].copy()
+        others = series_list[1:]
+    elif const_vals:
+        res = pd.Series(const_vals[0], index=idx)
+        others = []
+        const_vals = const_vals[1:]
+    else:
+        return None
+    for s in others:
+        res = _safe_divide(res, s, epsilon)
+    for c in const_vals:
+        denom = c if abs(c) > epsilon else epsilon
+        res = res.div(denom)
+    return res
+
+
+def _sum_pandas_series(series_list: List[pd.Series], idx: Any) -> pd.Series:
+    """Sum a list of pandas series with index ``idx``; empty list ⇒ zero series."""
+    res = pd.Series(0.0, index=idx)
+    for s in series_list:
+        res = res.add(s, fill_value=0)
+    return res
+
+
+def _pandas_ratio(op: Dict[str, Any], df_out: Any, epsilon: float) -> Optional[pd.Series]:
+    nums = [
+        pd.to_numeric(df_out[c], errors="coerce").fillna(0)
+        for c in op.get("input_columns", [])
+        if c in df_out.columns
+    ]
+    dens = [
+        pd.to_numeric(df_out[c], errors="coerce").fillna(0)
+        for c in op.get("secondary_columns", [])
+        if c in df_out.columns
+    ]
+    if not nums or not dens:
+        return None
+    return _safe_divide(
+        _sum_pandas_series(nums, df_out.index), _sum_pandas_series(dens, df_out.index), epsilon
+    )
+
+
+def _pandas_similarity(op: Dict[str, Any], df_out: Any, _eps: float) -> Optional[pd.Series]:
+    pair = _resolve_similarity_pair(op, list(df_out.columns))
+    if pair is None:
+        return None
+    col_a, col_b = pair
+    return _vectorised_similarity(df_out[col_a], df_out[col_b], op.get("method") or "ratio")
+
+
+_PANDAS_DT_FEATURES: Dict[str, Callable[[Any], Any]] = {
+    "year": lambda d: d.dt.year,
+    "month": lambda d: d.dt.month,
+    "day": lambda d: d.dt.day,
+    "hour": lambda d: d.dt.hour,
+    "minute": lambda d: d.dt.minute,
+    "second": lambda d: d.dt.second,
+    "quarter": lambda d: d.dt.quarter,
+    "weekday": lambda d: d.dt.dayofweek,
+    "is_weekend": lambda d: (d.dt.dayofweek >= 5).astype(int),
+    "week": lambda d: d.dt.isocalendar().week.astype(int),
+    "month_name": lambda d: d.dt.month_name(),
+    "day_name": lambda d: d.dt.day_name(),
+}
+
+
+def _pandas_datetime_apply(op: Dict[str, Any], df_out: Any) -> None:
+    """Materialise datetime-extract features onto ``df_out`` in place."""
+    valid = [c for c in op.get("input_columns", []) if c in df_out.columns]
+    features = op.get("datetime_features", [])
+    for col in valid:
+        try:
+            dt = pd.to_datetime(df_out[col], errors="coerce")
+            for feat in features:
+                builder = _PANDAS_DT_FEATURES.get(feat)
+                if builder is None:
+                    continue
+                df_out[f"{col}_{feat}"] = builder(dt)
+        except Exception:
+            pass
+
+
+_PANDAS_AGG_METHODS = {"mean", "sum", "count", "min", "max", "std", "median"}
+
+
+def _pandas_group_agg(op: Dict[str, Any], df_out: Any, _eps: float) -> Optional[pd.Series]:
+    """Group-by aggregation broadcast back per row via ``groupby().transform()``."""
+    resolved = _resolve_group_agg_cols(op, list(df_out.columns))
+    if resolved is None:
+        return None
+    group_col, target_col, method = resolved
+    if method not in _PANDAS_AGG_METHODS:
+        return None
+    target = df_out[target_col]
+    if method != "count":
+        target = pd.to_numeric(target, errors="coerce")
+    return target.groupby(df_out[group_col]).transform(method)
+
+
+_PANDAS_OP_HANDLERS: Dict[str, Callable[[Dict[str, Any], Any, float], Optional[pd.Series]]] = {
+    "arithmetic": _pandas_arith,
+    "ratio": _pandas_ratio,
+    "similarity": _pandas_similarity,
+    "group_agg": _pandas_group_agg,
+}
+
+
+def _featgen_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    operations = params.get("operations", [])
+    if not operations:
+        return X, y
+    epsilon = params.get("epsilon", DEFAULT_EPSILON)
+    allow_overwrite = params.get("allow_overwrite", False)
+
+    df_out = X.copy()
+    for i, op in enumerate(operations):
+        op_type = op.get("operation_type", "arithmetic")
+        try:
+            if op_type == "datetime_extract":
+                _pandas_datetime_apply(op, df_out)
+                continue
+            handler = _PANDAS_OP_HANDLERS.get(op_type)
+            if handler is None:
+                continue
+            result = handler(op, df_out, epsilon)
+            if result is None:
+                continue
+            output_col = _resolve_output_col(op, i, list(df_out.columns), allow_overwrite)
+            round_digits = op.get("round_digits")
+            if round_digits is not None:
+                result = result.round(round_digits)
+            df_out[output_col] = result
+        except Exception:
+            pass
+    return df_out, y
 
 
 class FeatureGenerationApplier(BaseApplier):
     @apply_method
-    def apply(  # noqa: C901
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
-
-        operations = params.get("operations", [])
-        epsilon = params.get("epsilon", DEFAULT_EPSILON)
-        allow_overwrite = params.get("allow_overwrite", False)
-
-        if not operations:
-            return X
-
-        # Polars Path
-        if engine.name == EngineName.POLARS:
-            import polars as pl
-
-            X_pl: Any = X
-
-            X_out = X_pl
-
-            for i, op in enumerate(operations):
-                op_type = op.get("operation_type", "arithmetic")
-                method = op.get("method")
-                input_cols = op.get("input_columns", [])
-                secondary_cols = op.get("secondary_columns", [])
-                constants = op.get("constants", [])
-                output_col = op.get("output_column")
-                output_prefix = op.get("output_prefix")
-                fillna = op.get("fillna")
-                round_digits = op.get("round_digits")
-
-                # Resolve output name
-                if not output_col:
-                    base = f"{op_type}_{i}"
-                    if output_prefix:
-                        base = f"{output_prefix}_{base}"
-                    output_col = base
-
-                if output_col in X_out.columns and not allow_overwrite:
-                    j = 1
-                    while f"{output_col}_{j}" in X_out.columns:
-                        j += 1
-                    output_col = f"{output_col}_{j}"
-
-                try:
-                    expr = None
-
-                    if op_type == "arithmetic":
-                        valid_inputs = [c for c in input_cols if c in X_out.columns]
-                        valid_secondary = [c for c in secondary_cols if c in X_out.columns]
-                        all_cols = valid_inputs + valid_secondary
-
-                        if not all_cols and not constants:
-                            continue
-
-                        fill_val = fillna if fillna is not None else 0
-                        col_exprs = [
-                            pl.col(c).cast(pl.Float64).fill_null(fill_val) for c in all_cols
-                        ]
-                        const_vals = [float(c) for c in constants]
-
-                        if method == "add":
-                            expr = pl.sum_horizontal(col_exprs) + sum(const_vals)
-
-                        elif method == "subtract":
-                            if col_exprs:
-                                expr = col_exprs[0]
-                                others = col_exprs[1:]
-                            else:
-                                expr = pl.lit(0.0)
-                                others = []
-
-                            for e in others:
-                                expr = expr - e
-                            for c in const_vals:
-                                expr = expr - c
-
-                        elif method == "multiply":
-                            expr = pl.lit(1.0)
-                            for e in col_exprs:
-                                expr = expr * e
-                            for c in const_vals:
-                                expr = expr * c
-
-                        elif method == "divide":
-                            if col_exprs:
-                                expr = col_exprs[0]
-                                others = col_exprs[1:]
-                            elif const_vals:
-                                expr = pl.lit(const_vals[0])
-                                others = []
-                                const_vals = const_vals[1:]
-                            else:
-                                continue
-
-                            def safe_denom(d):
-                                return pl.when(d.abs() < epsilon).then(epsilon).otherwise(d)
-
-                            for e in others:
-                                expr = expr / safe_denom(e)
-                            for c in const_vals:
-                                c_val = c if abs(c) > epsilon else epsilon
-                                expr = expr / c_val
-
-                    elif op_type == "ratio":
-                        nums = [
-                            pl.col(c).cast(pl.Float64).fill_null(0)
-                            for c in input_cols
-                            if c in X_out.columns
-                        ]
-                        dens = [
-                            pl.col(c).cast(pl.Float64).fill_null(0)
-                            for c in secondary_cols
-                            if c in X_out.columns
-                        ]
-
-                        if not nums or not dens:
-                            continue
-
-                        num_sum = pl.sum_horizontal(nums)
-                        den_sum = pl.sum_horizontal(dens)
-
-                        expr = num_sum / pl.when(den_sum.abs() < epsilon).then(epsilon).otherwise(
-                            den_sum
-                        )
-
-                    elif op_type == "similarity":
-                        col_a = input_cols[0] if input_cols else None
-                        col_b = (
-                            secondary_cols[0]
-                            if secondary_cols
-                            else (input_cols[1] if len(input_cols) > 1 else None)
-                        )
-
-                        if col_a and col_b and col_a in X_out.columns and col_b in X_out.columns:
-                            # Guard null/empty rows with polars expressions; map_elements
-                            # only runs for rows where both strings are non-empty.
-                            _a_empty = pl.col(col_a).is_null() | (
-                                pl.col(col_a).cast(pl.String) == ""
-                            )
-                            _b_empty = pl.col(col_b).is_null() | (
-                                pl.col(col_b).cast(pl.String) == ""
-                            )
-
-                            def sim_func(struct_val):
-                                a = struct_val.get("a")
-                                b = struct_val.get("b")
-                                return _compute_similarity_score(a, b, method)
-
-                            expr = (
-                                pl.when(_a_empty & _b_empty)
-                                .then(pl.lit(100.0))
-                                .when(_a_empty | _b_empty)
-                                .then(pl.lit(0.0))
-                                .otherwise(
-                                    pl.struct(
-                                        [pl.col(col_a).alias("a"), pl.col(col_b).alias("b")]
-                                    ).map_elements(sim_func, return_dtype=pl.Float64)
-                                )
-                            )
-
-                    elif op_type == "datetime_extract":
-                        valid_inputs = [c for c in input_cols if c in X_out.columns]
-                        features = op.get("datetime_features", [])
-
-                        dt_exprs = []
-                        for col in valid_inputs:
-                            dtype = X_out.schema[col]
-                            base_dt = pl.col(col)
-                            if dtype == pl.String:
-                                base_dt = pl.col(col).str.to_datetime(strict=False)
-
-                            for feat in features:
-                                feat_name = f"{col}_{feat}"
-                                val = None
-                                if feat == "year":
-                                    val = base_dt.dt.year()
-                                elif feat == "month":
-                                    val = base_dt.dt.month()
-                                elif feat == "day":
-                                    val = base_dt.dt.day()
-                                elif feat == "hour":
-                                    val = base_dt.dt.hour()
-                                elif feat == "minute":
-                                    val = base_dt.dt.minute()
-                                elif feat == "second":
-                                    val = base_dt.dt.second()
-                                elif feat == "quarter":
-                                    val = base_dt.dt.quarter()
-                                elif feat == "weekday":
-                                    # Polars dt.weekday() is 1-indexed (ISO); subtract 1 to match
-                                    # pandas dayofweek convention (Mon=0, Sun=6).
-                                    val = base_dt.dt.weekday() - 1
-                                elif feat == "is_weekend":
-                                    # Use raw 1-indexed value: Sat=6, Sun=7 → >= 6 catches both.
-                                    val = (base_dt.dt.weekday() >= 6).cast(pl.Int64)
-                                elif feat == "week":
-                                    val = base_dt.dt.week()
-                                elif feat == "month_name":
-                                    val = base_dt.dt.strftime("%B")
-                                elif feat == "day_name":
-                                    val = base_dt.dt.strftime("%A")
-
-                                if val is not None:
-                                    dt_exprs.append(val.alias(feat_name))
-
-                        if dt_exprs:
-                            X_out = X_out.with_columns(dt_exprs)
-                        continue
-
-                    if expr is not None:
-                        if round_digits is not None:
-                            expr = expr.round(round_digits)
-                        X_out = X_out.with_columns(expr.alias(output_col))
-
-                except Exception:
-                    pass
-
-            return X_out
-
-        # Pandas Path
-        df_out = X.copy()
-
-        for i, op in enumerate(operations):
-            op_type = op.get("operation_type", "arithmetic")
-            method = op.get("method")
-            input_cols = op.get("input_columns", [])
-            secondary_cols = op.get("secondary_columns", [])
-            constants = op.get("constants", [])
-            output_col = op.get("output_column")
-            output_prefix = op.get("output_prefix")
-            fillna = op.get("fillna")
-            round_digits = op.get("round_digits")
-
-            # Resolve output name
-            if not output_col:
-                # Generate fallback
-                base = f"{op_type}_{i}"
-                if output_prefix:
-                    base = f"{output_prefix}_{base}"
-                output_col = base
-
-            if output_col in df_out.columns and not allow_overwrite:
-                # Avoid overwriting existing columns by appending a numeric suffix
-                j = 1
-                while f"{output_col}_{j}" in df_out.columns:
-                    j += 1
-                output_col = f"{output_col}_{j}"
-
-            try:
-                result = None
-
-                if op_type == "arithmetic":
-                    # Ensure inputs exist
-                    valid_inputs = [c for c in input_cols if c in df_out.columns]
-                    valid_secondary = [c for c in secondary_cols if c in df_out.columns]
-                    all_cols = valid_inputs + valid_secondary
-                    if not all_cols and not constants:
-                        continue
-
-                    series_list = [
-                        pd.to_numeric(df_out[c], errors="coerce").fillna(
-                            fillna if fillna is not None else 0
-                        )
-                        for c in all_cols
-                    ]
-
-                    if method == "add":
-                        res: pd.Series = pd.Series(0.0, index=df_out.index)
-                        for s in series_list:
-                            res = res.add(s, fill_value=0)
-                        for c in constants:
-                            val = builtins.float(c)
-                            res = res.add(val)
-                        result = res
-                    elif method == "subtract":
-                        res_sub: pd.Series
-                        if series_list:
-                            res_sub = series_list[0].copy()
-                            others = series_list[1:]
-                        else:
-                            res_sub = pd.Series(0.0, index=df_out.index)
-                            others = []
-                        for s in others:
-                            res_sub = res_sub.subtract(s, fill_value=0)
-                        for c in constants:
-                            val = builtins.float(c)
-                            res_sub = res_sub.sub(val)
-                        result = res_sub
-                    elif method == "multiply":
-                        res_mul: pd.Series = pd.Series(1.0, index=df_out.index)
-                        for s in series_list:
-                            res_mul = res_mul.multiply(s, fill_value=1)
-                        for c in constants:
-                            val = builtins.float(c)
-                            res_mul = res_mul.mul(val)
-                        result = res_mul
-                    elif method == "divide":
-                        if series_list:
-                            res = series_list[0].copy()
-                            others = series_list[1:]
-                        elif constants:
-                            res = pd.Series(constants[0], index=df_out.index)
-                            others = []
-                            constants = constants[1:]
-                        else:
-                            continue
-
-                        for s in others:
-                            res = _safe_divide(res, s, epsilon)
-                        for c in constants:
-                            c_val = builtins.float(c)
-                            # For division, we need to handle epsilon check
-                            # res = res / (c_val if abs(c_val) > epsilon else epsilon)
-                            denom = c_val if abs(c_val) > epsilon else epsilon
-                            res = res.div(denom)
-                        result = res
-
-                elif op_type == "ratio":
-                    # input_cols (numerator) / secondary_cols (denominator)
-                    # Sum of numerators / Sum of denominators
-                    nums = [
-                        pd.to_numeric(df_out[c], errors="coerce").fillna(0)
-                        for c in input_cols
-                        if c in df_out.columns
-                    ]
-                    dens = [
-                        pd.to_numeric(df_out[c], errors="coerce").fillna(0)
-                        for c in secondary_cols
-                        if c in df_out.columns
-                    ]
-
-                    if not nums or not dens:
-                        continue
-
-                    num_sum = pd.Series(0.0, index=df_out.index)
-                    for s in nums:
-                        num_sum = num_sum.add(s, fill_value=0)
-
-                    den_sum = pd.Series(0.0, index=df_out.index)
-                    for s in dens:
-                        den_sum = den_sum.add(s, fill_value=0)
-
-                    result = _safe_divide(num_sum, den_sum, epsilon)
-
-                elif op_type == "similarity":
-                    # input_cols[0] vs secondary_cols[0] (or input_cols[1])
-                    col_a = input_cols[0] if input_cols else None
-                    col_b = (
-                        secondary_cols[0]
-                        if secondary_cols
-                        else (input_cols[1] if len(input_cols) > 1 else None)
-                    )
-
-                    if (
-                        not col_a
-                        or not col_b
-                        or col_a not in df_out.columns
-                        or col_b not in df_out.columns
-                    ):
-                        continue
-
-                    result = _vectorised_similarity(df_out[col_a], df_out[col_b], method)
-
-                elif op_type == "datetime_extract":
-                    valid_inputs = [c for c in input_cols if c in df_out.columns]
-                    features = op.get("datetime_features", [])
-
-                    for col in valid_inputs:
-                        try:
-                            dt = pd.to_datetime(df_out[col], errors="coerce")
-                            for feat in features:
-                                feat_name = f"{col}_{feat}"
-                                if feat == "year":
-                                    val = dt.dt.year
-                                elif feat == "month":
-                                    val = dt.dt.month
-                                elif feat == "day":
-                                    val = dt.dt.day
-                                elif feat == "hour":
-                                    val = dt.dt.hour
-                                elif feat == "minute":
-                                    val = dt.dt.minute
-                                elif feat == "second":
-                                    val = dt.dt.second
-                                elif feat == "quarter":
-                                    val = dt.dt.quarter
-                                elif feat == "weekday":
-                                    val = dt.dt.dayofweek
-                                elif feat == "is_weekend":
-                                    val = (dt.dt.dayofweek >= 5).astype(int)
-                                elif feat == "week":
-                                    val = dt.dt.isocalendar().week.astype(int)
-                                elif feat == "month_name":
-                                    val = dt.dt.month_name()
-                                elif feat == "day_name":
-                                    val = dt.dt.day_name()
-                                else:
-                                    continue
-
-                                df_out[feat_name] = val
-                        except Exception:
-                            pass
-                    # datetime_extract usually generates multiple columns, so we might not set "result"
-                    # unless we want to return one specific thing. V1 generates multiple.
-                    continue
-
-                if result is not None:
-                    if round_digits is not None:
-                        result = result.round(round_digits)
-                    df_out[output_col] = result
-
-            except Exception:
-                pass
-
-        return df_out
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, _featgen_apply_polars, _featgen_apply_pandas)
 
 
 @NodeRegistry.register("FeatureGeneration", FeatureGenerationApplier)
@@ -753,11 +768,6 @@ class FeatureGenerationCalculator(BaseCalculator):
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
     ) -> FeatureGenerationArtifact:
-        # Config:
-        # operations: List[Dict]
-        # epsilon: float
-        # allow_overwrite: bool
-
         return {
             "type": "feature_generation",
             "operations": config.get("operations", []),
