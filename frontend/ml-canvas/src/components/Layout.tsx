@@ -5,22 +5,17 @@ import { monitoringApi } from '../core/api/monitoring';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    if (typeof document === 'undefined') return false;
+    return document.documentElement.classList.contains('dark');
+  });
   const [driftAlert, setDriftAlert] = useState(false);
   const [errorAlert, setErrorAlert] = useState(false);
 
   useEffect(() => {
-    // Check if dark mode is already active
-    if (document.documentElement.classList.contains('dark')) {
-      setIsDarkMode(true);
-    } else {
-      // Check system preference
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (isDark) {
-        document.documentElement.classList.add('dark');
-        setIsDarkMode(true);
-      }
-    }
+    // Inline script in index.html already applied the right class before mount;
+    // this effect only keeps state in sync if something else mutated the class.
+    setIsDarkMode(document.documentElement.classList.contains('dark'));
   }, []);
 
   useEffect(() => {
@@ -47,6 +42,9 @@ export const Layout: React.FC = () => {
     } else {
       document.documentElement.classList.remove('dark');
     }
+    try {
+      localStorage.setItem('skyulf-theme', newMode ? 'dark' : 'light');
+    } catch { /* ignore quota / privacy errors */ }
   };
 
   const isActive = (path: string) => location.pathname === path;

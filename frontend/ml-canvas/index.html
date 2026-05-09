@@ -5,6 +5,23 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ML Canvas</title>
+    <script>
+      // Apply dark class BEFORE React mounts to avoid white-flash on hard refresh.
+      (function () {
+        try {
+          var stored = localStorage.getItem('skyulf-theme');
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var dark = stored ? stored === 'dark' : prefersDark;
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) { /* ignore */ }
+      })();
+    </script>
+    <style>
+      /* Background applied immediately so the page is never white before React mounts. */
+      html { background: #f8fafc; }
+      html.dark { background: #0f172a; }
+      html, body { margin: 0; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
