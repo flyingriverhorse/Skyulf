@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Dict, Optional, cast
+from typing import Any, Callable, Dict, Mapping, Optional, cast
 
 import numpy as np
 import pandas as pd
@@ -692,7 +692,7 @@ class FeatureSelectionCalculator(BaseCalculator):
         self,
         df: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         method = config.get("method", "select_k_best")
 
         calculator: Optional[BaseCalculator] = None

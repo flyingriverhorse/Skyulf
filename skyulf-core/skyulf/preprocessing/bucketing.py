@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Tuple, Union
+from typing import Any, Dict, List, Literal, Mapping, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -417,7 +417,7 @@ class KBinsDiscretizerCalculator(GeneralBinningCalculator):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> GeneralBinningArtifact:
         new_config = config.copy()
         new_config["strategy"] = "kbins"
 
