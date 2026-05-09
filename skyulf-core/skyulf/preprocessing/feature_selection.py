@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Dict, Optional, Tuple, Union, cast
+from typing import Any, Callable, Dict, Optional, cast
 
 import numpy as np
 import pandas as pd
@@ -25,14 +25,18 @@ from sklearn.linear_model import LinearRegression, LogisticRegression
 
 from ..utils import (
     detect_numeric_columns,
-    pack_pipeline_output,
     resolve_columns,
-    unpack_pipeline_input,
 )
-from .base import BaseApplier, BaseCalculator
+from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ._artifacts import (
+    CorrelationThresholdArtifact,
+    ModelBasedSelectionArtifact,
+    UnivariateSelectionArtifact,
+    VarianceThresholdArtifact,
+)
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
-from ..engines import EngineName, SkyulfDataFrame, get_engine
+from ..engines import EngineName, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
@@ -90,12 +94,13 @@ def _resolve_estimator(key: Optional[str], problem_type: str) -> Any:
 
 
 class VarianceThresholdApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         selected_cols = params.get("selected_columns")
@@ -103,7 +108,7 @@ class VarianceThresholdApplier(BaseApplier):
         drop_columns = params.get("drop_columns", True)
 
         if selected_cols is None:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         cols_to_drop_set = set(candidate_columns) - set(selected_cols)
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
@@ -116,7 +121,7 @@ class VarianceThresholdApplier(BaseApplier):
                 X = X_pl.drop(cols_to_drop_list)
             else:
                 X = X.drop(columns=cols_to_drop_list)
-        return pack_pipeline_output(X, y, is_tuple)
+        return X
 
 
 @NodeRegistry.register("VarianceThreshold", VarianceThresholdApplier)
@@ -128,12 +133,13 @@ class VarianceThresholdApplier(BaseApplier):
     params={"threshold": 0.0},
 )
 class VarianceThresholdCalculator(BaseCalculator):
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> VarianceThresholdArtifact:
         engine = get_engine(X)
 
         # Config: {"threshold": 0.0, "columns": [...]}
@@ -183,12 +189,13 @@ class VarianceThresholdCalculator(BaseCalculator):
 
 
 class CorrelationThresholdApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols_to_drop = params.get("columns_to_drop", [])
@@ -196,7 +203,7 @@ class CorrelationThresholdApplier(BaseApplier):
 
         cols_to_drop = [c for c in cols_to_drop if c in X.columns]
         if not cols_to_drop:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         if drop_columns:
             if engine.name == EngineName.POLARS:
@@ -206,7 +213,7 @@ class CorrelationThresholdApplier(BaseApplier):
                 X = X_pl.drop(cols_to_drop)
             else:
                 X = X.drop(columns=cols_to_drop)
-        return pack_pipeline_output(X, y, is_tuple)
+        return X
 
 
 @NodeRegistry.register("CorrelationThreshold", CorrelationThresholdApplier)
@@ -218,12 +225,13 @@ class CorrelationThresholdApplier(BaseApplier):
     params={"threshold": 0.95, "method": "pearson"},
 )
 class CorrelationThresholdCalculator(BaseCalculator):
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> CorrelationThresholdArtifact:
         engine = get_engine(X)
 
         # Ensure pandas for correlation logic
@@ -260,12 +268,13 @@ class CorrelationThresholdCalculator(BaseCalculator):
 
 
 class UnivariateSelectionApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         selected_cols = params.get("selected_columns")
@@ -273,7 +282,7 @@ class UnivariateSelectionApplier(BaseApplier):
         drop_columns = params.get("drop_columns", True)
 
         if selected_cols is None:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         cols_to_drop_set = set(candidate_columns) - set(selected_cols)
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
@@ -285,7 +294,7 @@ class UnivariateSelectionApplier(BaseApplier):
                 X = X_pl.drop(cols_to_drop_list)
             else:
                 X = X.drop(columns=cols_to_drop_list)
-        return pack_pipeline_output(X, y, is_tuple)
+        return X
 
 
 @NodeRegistry.register("UnivariateSelection", UnivariateSelectionApplier)
@@ -297,18 +306,19 @@ class UnivariateSelectionApplier(BaseApplier):
     params={"method": "SelectKBest", "score_func": "f_classif", "k": 10},
 )
 class UnivariateSelectionCalculator(BaseCalculator):
+    @fit_method
     def fit(  # noqa: C901
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> UnivariateSelectionArtifact:
         # Config: method, k, percentile, alpha, score_func, target_column
         target_col = config.get("target_column")
 
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
-        if not is_tuple:
+        if y is None:
             if not target_col or target_col not in X.columns:
                 logger.error(
                     f"UnivariateSelection requires target column '{target_col}' to be present in training data."
@@ -463,12 +473,13 @@ class UnivariateSelectionCalculator(BaseCalculator):
 
 
 class ModelBasedSelectionApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         selected_cols = params.get("selected_columns")
@@ -476,7 +487,7 @@ class ModelBasedSelectionApplier(BaseApplier):
         drop_columns = params.get("drop_columns", True)
 
         if selected_cols is None:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         cols_to_drop_set = set(candidate_columns) - set(selected_cols)
         cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
@@ -488,7 +499,7 @@ class ModelBasedSelectionApplier(BaseApplier):
                 X = X_pl.drop(cols_to_drop_list)
             else:
                 X = X.drop(columns=cols_to_drop_list)
-        return pack_pipeline_output(X, y, is_tuple)
+        return X
 
 
 @NodeRegistry.register("ModelBasedSelection", ModelBasedSelectionApplier)
@@ -500,18 +511,19 @@ class ModelBasedSelectionApplier(BaseApplier):
     params={"estimator": "RandomForest", "threshold": "mean", "max_features": None},
 )
 class ModelBasedSelectionCalculator(BaseCalculator):
+    @fit_method
     def fit(  # noqa: C901
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> ModelBasedSelectionArtifact:
         # Config: method (select_from_model, rfe), estimator, target_column
         target_col = config.get("target_column")
 
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
-        if not is_tuple:
+        if y is None:
             if not target_col or target_col not in X.columns:
                 logger.error(
                     f"ModelBasedSelection requires target column '{target_col}' to be present in training data."
@@ -644,7 +656,7 @@ class ModelBasedSelectionCalculator(BaseCalculator):
 class FeatureSelectionApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        df: Any,
         params: Dict[str, Any],
     ) -> Any:
         # The params returned by the specific calculator will have a "type" field
@@ -663,7 +675,8 @@ class FeatureSelectionApplier(BaseApplier):
 
         if applier:
             return applier.apply(df, params)
-        return pack_pipeline_output(*unpack_pipeline_input(df))
+        # Identity passthrough: return df unchanged.
+        return df
 
 
 @NodeRegistry.register("feature_selection", FeatureSelectionApplier)
@@ -677,7 +690,7 @@ class FeatureSelectionApplier(BaseApplier):
 class FeatureSelectionCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        df: Any,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         method = config.get("method", "select_k_best")

@@ -38,6 +38,7 @@ from ..schemas import (
     PipelineConfig,
     PipelineExecutionResult,
 )
+from .._schema_graph import predict_schemas, schemas_to_dict
 from ..summary import build_summary
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,19 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             for node in self._node_configs.values()
         )
 
+    def _predict_schemas_safe(
+        self, config: PipelineConfig
+    ) -> Dict[str, Optional[Dict[str, Any]]]:
+        """C7 Phase B helper: best-effort pre-run schema prediction.
+
+        Errors are swallowed so a broken predictor never blocks a real run.
+        """
+        try:
+            return schemas_to_dict(predict_schemas(config))
+        except Exception:  # noqa: BLE001 - best-effort, never block a run
+            logger.exception("Schema prediction failed; continuing without predictions")
+            return {}
+
     def log(self, message: str):
         logger.info(message)
         if self.log_callback:
@@ -101,6 +115,13 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             status="success",  # Optimistic default
             start_time=start_time,
         )
+
+        # C7 Phase B: walk the topology once and ask each Calculator's
+        # ``infer_output_schema`` what its output columns/dtypes will be.
+        # Pure addition — does not change runtime behaviour. Loaders are
+        # opaque without a catalog seed, so downstream entries will be
+        # ``None`` until Phase C wires in dataset-catalog seeding.
+        pipeline_result.predicted_schemas = self._predict_schemas_safe(config)
 
         for node in config.nodes:
             try:

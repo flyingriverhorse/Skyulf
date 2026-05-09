@@ -15,6 +15,7 @@ const DataDriftPage = lazy(() => import('./pages/DataDriftPage').then(m => ({ de
 const ModelRegistry = lazy(() => import('./pages/ModelRegistry').then(m => ({ default: m.ModelRegistry })));
 const DeploymentsPage = lazy(() => import('./components/pages/DeploymentsPage').then(m => ({ default: m.DeploymentsPage })));
 const SlowNodesPage = lazy(() => import('./pages/SlowNodesPage').then(m => ({ default: m.SlowNodesPage })));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage').then(m => ({ default: m.AuditLogPage })));
 
 const RouteFallback = () => <PageSkeleton />;
 
@@ -75,6 +76,14 @@ function App() {
             element={
               <LazyRoute>
                 <SlowNodesPage />
+              </LazyRoute>
+            }
+          />
+          <Route
+            path="audit"
+            element={
+              <LazyRoute>
+                <AuditLogPage />
               </LazyRoute>
             }
           />

@@ -15,19 +15,26 @@ from backend.database.models import DataSource
 
 logger = logging.getLogger(__name__)
 
-# Helper to get sync session
+# Module-level cache — same rationale as ml_pipeline/tasks.py.
+_sync_engine = None
+_sync_session_factory = None
 
 
 def get_db_session():
-    settings = get_settings()
-    if settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
-        sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
-    else:
-        sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
-
-    engine = create_engine(sync_url)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    return SessionLocal()
+    global _sync_engine, _sync_session_factory
+    if _sync_session_factory is None:
+        settings = get_settings()
+        if settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
+            sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
+        else:
+            sync_url = settings.DATABASE_URL.replace(
+                "postgresql+asyncpg://", "postgresql+psycopg2://"
+            )
+        _sync_engine = create_engine(sync_url, pool_pre_ping=True)
+        _sync_session_factory = sessionmaker(
+            autocommit=False, autoflush=False, bind=_sync_engine
+        )
+    return _sync_session_factory()
 
 
 @shared_task(name="core.data_ingestion.tasks.ingest_data_task")

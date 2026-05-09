@@ -114,3 +114,9 @@ class PipelineExecutionResult:
     start_time: datetime = field(default_factory=datetime.now)
     end_time: Optional[datetime] = None
     merge_warnings: List[Dict[str, Any]] = field(default_factory=list)
+    # Pre-execution schema predictions (C7 Phase B). One entry per node;
+    # value is ``{"columns": [...], "dtypes": {...}}`` when the node's
+    # Calculator overrides ``infer_output_schema`` and an upstream schema
+    # was available, ``None`` otherwise. Populated in ``PipelineEngine.run``
+    # before the per-node loop runs.
+    predicted_schemas: Dict[str, Optional[Dict[str, Any]]] = field(default_factory=dict)

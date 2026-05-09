@@ -1,13 +1,14 @@
-from typing import Any, Dict, Optional, Tuple, Union, cast
+from typing import Any, Dict, Optional, cast
 
 import numpy as np
 import pandas as pd
 
-from .base import BaseApplier, BaseCalculator
+from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ._artifacts import CastingArtifact
+from ._schema import SkyulfSchema
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
-from ..engines import EngineName, SkyulfDataFrame, get_engine
-from ..utils import pack_pipeline_output, unpack_pipeline_input
+from ..engines import EngineName, get_engine
 
 # Map common aliases to pandas types
 TYPE_ALIASES = {
@@ -62,19 +63,20 @@ def _coerce_boolean_value(value: Any) -> Optional[bool]:
 
 
 class CastingApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, tuple],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         type_map = params.get("type_map", {})
         coerce_on_error = params.get("coerce_on_error", True)
 
         if not type_map:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -119,14 +121,14 @@ class CastingApplier(BaseApplier):
             if exprs:
                 X = X.with_columns(exprs)
 
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Pandas Path
-        return self._apply_dataframe(cast(pd.DataFrame, X), params, y, is_tuple)
+        return self._apply_dataframe(cast(pd.DataFrame, X), params)
 
     def _apply_dataframe(  # noqa: C901
-        self, df: pd.DataFrame, params: Dict[str, Any], y=None, is_tuple=False
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, Any]]:
+        self, df: pd.DataFrame, params: Dict[str, Any]
+    ) -> pd.DataFrame:
         type_map = params.get("type_map", {})
         coerce_on_error = params.get("coerce_on_error", True)
 
@@ -206,10 +208,7 @@ class CastingApplier(BaseApplier):
                     raise
                 # If coercion is on, we might leave it as is or try best effort?
 
-        return cast(
-            Union[pd.DataFrame, Tuple[pd.DataFrame, Any]],
-            pack_pipeline_output(df_out, y, is_tuple),
-        )
+        return df_out
 
 
 @NodeRegistry.register("Casting", CastingApplier)
@@ -221,15 +220,32 @@ class CastingApplier(BaseApplier):
     params={"type_map": {}, "coerce_on_error": True},
 )
 class CastingCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Casting preserves column set but rewrites dtype labels.
+        column_types = dict(config.get("column_types", {}) or {})
+        target_type = config.get("target_type")
+        columns = config.get("columns", []) or []
+        if target_type and columns:
+            for col in columns:
+                column_types.setdefault(col, target_type)
+        new_schema = input_schema
+        for col, dtype in column_types.items():
+            resolved = TYPE_ALIASES.get(str(dtype).lower(), str(dtype))
+            new_schema = new_schema.with_dtype(col, resolved)
+        return new_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, tuple],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> CastingArtifact:
         # Config: {'columns': ['col1'], 'target_type': 'float'}
         # OR {'column_types': {'col1': 'float', 'col2': 'int'}}
 
-        X, _, _ = unpack_pipeline_input(df)
         # We don't need to convert to pandas just to check columns,
         # but let's keep it consistent if we need complex logic.
         # Here we just check columns existence.

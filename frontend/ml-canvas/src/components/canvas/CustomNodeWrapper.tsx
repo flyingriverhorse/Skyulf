@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
 import { registry } from '../../core/registry/NodeRegistry';
-import { AlertCircle, X, CheckCircle2, XCircle, Merge, GitFork } from 'lucide-react';
+import { AlertCircle, AlertTriangle, X, CheckCircle2, XCircle, Merge, GitFork } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
@@ -45,6 +45,30 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
     (state) => new Set(state.edges.filter((e) => e.target === id).map((e) => e.source)).size,
     (a, b) => a === b
   );
+
+  // C7: pre-execution schema prediction.
+  // - `predictedSchema` powers the `↳ N cols` badge in the header.
+  //   `null` means data-dependent / unknown — we hide the badge.
+  // - `brokenRefs` flags column references in this node's `params`
+  //   that don't exist in the upstream's predicted schema (typo,
+  //   deleted feature, etc.). Triggers a red border + alert chip.
+  const predictedSchema = useGraphStore((state) => state.predictedSchemas[id]);
+  const brokenRefs = useGraphStore((state) => state.brokenSchemaRefs[id]);
+  const hasBrokenRefs = (brokenRefs?.length ?? 0) > 0;
+  const brokenRefTooltip = hasBrokenRefs
+    ? `⚠ Column name not found in upstream output\n` +
+      (brokenRefs ?? [])
+        .map((r) => `  • "${r.column}" (in field '${r.field}')`)
+        .join('\n') +
+      `\n\nThe canvas automatically previews each node's output schema in the background.\n` +
+      `These column names were not found in the predicted upstream output — they may be\n` +
+      `misspelled or the upstream step may have renamed / dropped them.\n\n` +
+      `The pipeline can still run, but may fail at this step.`
+    : null;
+  // predictedSchema is `null` (not undefined) when the server explicitly
+  // returned null — meaning this calculator is data-dependent (e.g. encoders,
+  // feature-selection). `undefined` means the API hasn't responded yet.
+  const schemaIsDataDependent = predictedSchema === null && definitionType !== 'dataset_node';
 
   // L4 perf overlay. When the user toggles the Toolbar gauge, every
   // card whose last run has a known wall-clock duration grows a
@@ -218,6 +242,8 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         ? 'border-primary shadow-lg shadow-primary/30 scale-[1.02]'
         : validationMessage
         ? 'border-red-500/40 hover:border-red-500/60'
+        : hasBrokenRefs
+        ? 'border-amber-500/40 hover:border-amber-500/60'
         : 'border-border hover:border-primary/50'}
       ${isPulsing ? 'animate-validation-pulse' : ''}
       ${perfRingClass}
@@ -242,7 +268,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
           titles and out of the right edge so they can't collide with
           output-handle labels (which absolute-position at 25/50/75%
           of the card height for multi-output nodes like splitters). */}
-      {(nodeResult || validationMessage) && (
+      {(nodeResult || validationMessage || hasBrokenRefs) && (
         <div className="absolute -top-2 -left-2 z-10 flex items-center gap-1">
           {nodeResult && (
             <span
@@ -264,6 +290,15 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
               className="flex items-center justify-center w-5 h-5 rounded-full bg-red-50 text-red-600 border border-red-200 shadow-sm dark:bg-red-900/40 dark:text-red-400 dark:border-red-900"
             >
               <AlertCircle size={11} />
+            </span>
+          )}
+          {hasBrokenRefs && !validationMessage && (
+            <span
+              title={brokenRefTooltip ?? undefined}
+              aria-label={`Column mismatch: ${brokenRefs?.length ?? 0} column${(brokenRefs?.length ?? 0) > 1 ? 's' : ''} not found in upstream output`}
+              className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 shadow-sm dark:bg-amber-900/40 dark:text-amber-400 dark:border-amber-800"
+            >
+              <AlertTriangle size={11} />
             </span>
           )}
         </div>
@@ -295,6 +330,27 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
               >
                 {isParallel ? <GitFork size={10} /> : <Merge size={10} />}
                 {incomingSourceCount}
+              </span>
+            )}
+            {predictedSchema && (
+              <span
+                className="shrink-0 flex items-center text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-muted/60 text-muted-foreground border border-border/60"
+                title={
+                  `Canvas schema preview — predicted output before running:\n` +
+                  `${predictedSchema.columns.length} column${predictedSchema.columns.length === 1 ? '' : 's'}:\n` +
+                  predictedSchema.columns.slice(0, 12).join(', ') +
+                  (predictedSchema.columns.length > 12 ? `, … (+${predictedSchema.columns.length - 12} more)` : '')
+                }
+              >
+                ↳ {predictedSchema.columns.length} col{predictedSchema.columns.length === 1 ? '' : 's'}
+              </span>
+            )}
+            {schemaIsDataDependent && (
+              <span
+                className="shrink-0 flex items-center text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-muted/30 text-muted-foreground/60 border border-dashed border-border/50"
+                title="Schema depends on data — this step's output columns can only be known after running the pipeline (e.g. one-hot encoding adds one column per category). Everything is fine; run the pipeline to see the actual output."
+              >
+                ↳ ?
               </span>
             )}
           </div>

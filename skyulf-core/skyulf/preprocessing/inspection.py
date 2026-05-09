@@ -4,8 +4,10 @@ import pandas as pd
 
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
-from ..utils import detect_numeric_columns, unpack_pipeline_input
-from .base import BaseApplier, BaseCalculator
+from ..utils import detect_numeric_columns
+from .base import BaseApplier, BaseCalculator, fit_method
+from ._artifacts import DatasetProfileArtifact, DataSnapshotArtifact
+from ._schema import SkyulfSchema
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 
@@ -28,13 +30,20 @@ class DatasetProfileApplier(BaseApplier):
     params={},
 )
 class DatasetProfileCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Inspection nodes are read-only; schema is unchanged.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> DatasetProfileArtifact:
         # Generate a lightweight dataset profile
-        X, _, _ = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         profile: Dict[str, Any] = {}
@@ -108,12 +117,19 @@ class DataSnapshotApplier(BaseApplier):
     params={"n_rows": 5},
 )
 class DataSnapshotCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Inspection nodes are read-only; schema is unchanged.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> DataSnapshotArtifact:
         engine = get_engine(X)
 
         n = config.get("n_rows", 5)

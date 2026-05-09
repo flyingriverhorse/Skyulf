@@ -165,4 +165,42 @@ export const pipelineVersionsApi = {
       `/pipeline/versions/${encodeURIComponent(datasetId)}/${versionId}`,
     );
   },
+
+  /** G4 audit trail. Walks the same append-only history this API
+   *  already manages and returns each save augmented with a per-node
+   *  diff against its predecessor (newest first, capped by `limit`). */
+  async audit(
+    datasetId: string,
+    limit = 50,
+  ): Promise<AuditLogResponse> {
+    const response = await apiClient.get<AuditLogResponse>(
+      `/pipeline/versions/${encodeURIComponent(datasetId)}/audit?limit=${limit}`,
+    );
+    return response.data;
+  },
 };
+
+/** One row in the audit response. Mirrors the backend `entries[]` shape. */
+export interface AuditLogEntry {
+  id: number;
+  version_int: number;
+  name: string;
+  note: string | null;
+  kind: string;
+  user_id: number | null;
+  created_at: string;
+  node_count: number;
+  edge_count: number;
+  diff: {
+    nodes_added: string[];
+    nodes_removed: string[];
+    nodes_modified: string[];
+    delta_node_count: number;
+  };
+}
+
+export interface AuditLogResponse {
+  dataset_source_id: string;
+  total: number;
+  entries: AuditLogEntry[];
+}

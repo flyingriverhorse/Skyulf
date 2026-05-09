@@ -8,10 +8,10 @@ sidesteps the partial-update problem.
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any, Literal, Optional
 
+import orjson
 from pydantic import BaseModel
 
 from backend.config import get_settings
@@ -63,7 +63,7 @@ def publish_job_event(event: JobEvent) -> None:
     crash the actual job execution. Worst case the frontend falls back
     to its polling safety net.
     """
-    payload = json.dumps(event.model_dump(exclude_none=True))
+    payload = orjson.dumps(event.model_dump(exclude_none=True)).decode()
     settings = get_settings()
     if not settings.USE_CELERY:
         # Lazy import avoids a hard cycle (manager imports events).

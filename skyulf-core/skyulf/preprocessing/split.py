@@ -8,6 +8,7 @@ from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
 from ..data.dataset import SplitDataset
 from .base import BaseApplier, BaseCalculator
+from ._schema import SkyulfSchema
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,15 @@ class SplitCalculator(BaseCalculator):
     ) -> Dict[str, Any]:
         # No learning from data, just pass through config
         return config
+
+    def infer_output_schema(
+        self,
+        input_schema: SkyulfSchema,
+        config: Dict[str, Any],
+    ) -> Optional[SkyulfSchema]:
+        # Split produces a SplitDataset whose train/test/val frames carry
+        # the full input schema. Downstream consumers see the same columns.
+        return input_schema
 
 
 class DataSplitter:
@@ -340,3 +350,17 @@ class FeatureTargetSplitCalculator(BaseCalculator):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         return config
+
+    def infer_output_schema(
+        self,
+        input_schema: SkyulfSchema,
+        config: Dict[str, Any],
+    ) -> Optional[SkyulfSchema]:
+        # Output is (X, y); X loses the target column. Downstream "main"
+        # consumers see the X-side schema. If the target column isn't
+        # present (already dropped, typo) we return the input unchanged
+        # rather than crashing — Phase D's validator will flag the typo.
+        target = config.get("target_column") or config.get("target")
+        if isinstance(target, str) and target in input_schema:
+            return input_schema.drop([target])
+        return input_schema

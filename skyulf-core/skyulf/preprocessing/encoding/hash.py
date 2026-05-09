@@ -1,32 +1,31 @@
 """Hash Encoder node (Calculator + Applier)."""
 
 import logging
-from typing import Any, Dict, Tuple, Union
-
-import pandas as pd
+from typing import Any, Dict, Optional
 
 from ...utils import (
-    pack_pipeline_output,
     resolve_columns,
-    unpack_pipeline_input,
     user_picked_no_columns,
 )
-from ..base import BaseApplier, BaseCalculator
+from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
+from .._artifacts import HashEncoderArtifact
+from .._schema import SkyulfSchema
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...engines import EngineName, SkyulfDataFrame, get_engine
+from ...engines import EngineName, get_engine
 from ._common import detect_categorical_columns, _exclude_target_column
 
 logger = logging.getLogger(__name__)
 
 
 class HashEncoderApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
@@ -34,7 +33,7 @@ class HashEncoderApplier(BaseApplier):
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path — uses Polars native hash for speed.
         if engine.name == EngineName.POLARS:
@@ -45,14 +44,14 @@ class HashEncoderApplier(BaseApplier):
                 (pl.col(col).cast(pl.Utf8).hash() % n_features).alias(col) for col in valid_cols
             ]
             X_out = X_pl.with_columns(exprs)
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         X_out = X.copy()
         for col in valid_cols:
             X_out[col] = X_out[col].astype(str).apply(lambda x: hash(x) % n_features)
 
-        return pack_pipeline_output(X_out, y, is_tuple)
+        return X_out
 
 
 @NodeRegistry.register("HashEncoder", HashEncoderApplier)
@@ -64,12 +63,13 @@ class HashEncoderApplier(BaseApplier):
     params={"n_features": 8, "columns": []},
 )
 class HashEncoderCalculator(BaseCalculator):
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, y, _ = unpack_pipeline_input(df)
+    ) -> HashEncoderArtifact:
 
         if user_picked_no_columns(config):
             return {}
@@ -81,6 +81,15 @@ class HashEncoderCalculator(BaseCalculator):
 
         n_features = config.get("n_features", 10)
         return {"type": "hash_encoder", "columns": cols, "n_features": n_features}
+
+    def infer_output_schema(
+        self,
+        input_schema: SkyulfSchema,
+        config: Dict[str, Any],
+    ) -> Optional[SkyulfSchema]:
+        # Hash encoder replaces values in source columns in place
+        # (`pl.col(col)...alias(col)`). Schema is unchanged.
+        return input_schema
 
 
 __all__ = ["HashEncoderApplier", "HashEncoderCalculator"]
