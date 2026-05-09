@@ -1,57 +1,61 @@
 """Hash Encoder node (Calculator + Applier)."""
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-from ...utils import (
-    resolve_columns,
-    user_picked_no_columns,
-)
-from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from .._artifacts import HashEncoderArtifact
-from .._schema import SkyulfSchema
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...engines import EngineName, get_engine
-from ._common import detect_categorical_columns, _exclude_target_column
+from ...utils import resolve_columns, user_picked_no_columns
+from .._artifacts import HashEncoderArtifact
+from .._schema import SkyulfSchema
+from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ..dispatcher import apply_dual_engine
+from ._common import _exclude_target_column, detect_categorical_columns
 
 logger = logging.getLogger(__name__)
 
 
+def _resolve_valid_cols(X: Any, params: Dict[str, Any]) -> List[str]:
+    """Filter requested columns down to those present in ``X``."""
+    cols = params.get("columns", [])
+    return [c for c in cols if c in X.columns]
+
+
+def _hash_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    """Polars apply path — uses Polars native ``hash()`` for speed."""
+    import polars as pl
+
+    valid_cols = _resolve_valid_cols(X, params)
+    if not valid_cols:
+        return X, y
+
+    n_features = params.get("n_features", 10)
+    exprs = [(pl.col(col).cast(pl.Utf8).hash() % n_features).alias(col) for col in valid_cols]
+    return X.with_columns(exprs), y
+
+
+def _hash_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    """Pandas apply path — Python's built-in ``hash`` per value."""
+    valid_cols = _resolve_valid_cols(X, params)
+    if not valid_cols:
+        return X, y
+
+    n_features = params.get("n_features", 10)
+    X_out = X.copy()
+    for col in valid_cols:
+        X_out[col] = X_out[col].astype(str).apply(lambda x: hash(x) % n_features)
+    return X_out, y
+
+
 class HashEncoderApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
-
-        cols = params.get("columns", [])
-        n_features = params.get("n_features", 10)
-
-        valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols:
-            return X
-
-        # Polars Path — uses Polars native hash for speed.
-        if engine.name == EngineName.POLARS:
-            import polars as pl
-
-            X_pl: Any = X
-            exprs = [
-                (pl.col(col).cast(pl.Utf8).hash() % n_features).alias(col) for col in valid_cols
-            ]
-            X_out = X_pl.with_columns(exprs)
-            return X_out
-
-        # Pandas Path
-        X_out = X.copy()
-        for col in valid_cols:
-            X_out[col] = X_out[col].astype(str).apply(lambda x: hash(x) % n_features)
-
-        return X_out
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(
+            (X, y) if y is not None else X,
+            params,
+            polars_func=_hash_apply_polars,
+            pandas_func=_hash_apply_pandas,
+        )
 
 
 @NodeRegistry.register("HashEncoder", HashEncoderApplier)
@@ -64,13 +68,7 @@ class HashEncoderApplier(BaseApplier):
 )
 class HashEncoderCalculator(BaseCalculator):
     @fit_method
-    def fit(
-        self,
-        X: Any,
-        y: Any,
-        config: Dict[str, Any],
-    ) -> HashEncoderArtifact:
-
+    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> HashEncoderArtifact:
         if user_picked_no_columns(config):
             return {}
 
@@ -79,8 +77,11 @@ class HashEncoderCalculator(BaseCalculator):
         if not cols:
             return {}
 
-        n_features = config.get("n_features", 10)
-        return {"type": "hash_encoder", "columns": cols, "n_features": n_features}
+        return {
+            "type": "hash_encoder",
+            "columns": cols,
+            "n_features": config.get("n_features", 10),
+        }
 
     def infer_output_schema(
         self,

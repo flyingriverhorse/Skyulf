@@ -1,8 +1,17 @@
-from typing import Any, Dict, Optional
+"""Drop / missing-value nodes (Deduplicate / DropMissingColumns / DropMissingRows / MissingIndicator).
+
+Appliers route through :func:`apply_dual_engine`; fits that need engine-divergent
+math (column null-percentage scans) route through :func:`fit_dual_engine`. The
+two splitter-friendly nodes (Deduplicate, DropMissingRows) require a
+keep-indices y-sync — handled by :func:`_polars_filter_y_by_kept_indices`.
+"""
+
+from typing import Any, Dict, Optional, Tuple, cast
 
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
-from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from .base import BaseApplier, BaseCalculator, apply_method
+from .dispatcher import apply_dual_engine, fit_dual_engine
 from ._artifacts import (
     DeduplicateArtifact,
     DropMissingColumnsArtifact,
@@ -10,97 +19,90 @@ from ._artifacts import (
     MissingIndicatorArtifact,
 )
 from ._schema import SkyulfSchema
-from ..engines import EngineName, get_engine
 
-# --- Deduplicate ---
+
+# -----------------------------------------------------------------------------
+# Shared polars helpers
+# -----------------------------------------------------------------------------
+
+
+def _polars_filter_y_by_kept_indices(y: Any, kept_indices: Any) -> Any:
+    """Filter ``y`` (Polars Series / DataFrame) to the rows kept in ``X``.
+
+    ``kept_indices`` is a Polars Series of integer row indices that survived
+    a filter on ``X``. Used by Deduplicate + DropMissingRows so dropping rows
+    in ``X`` propagates to a paired ``y``.
+    """
+    import polars as pl
+
+    if y is None:
+        return None
+    if isinstance(y, pl.DataFrame):
+        return (
+            y.with_row_index("__idx__")
+            .filter(pl.col("__idx__").is_in(kept_indices))
+            .drop("__idx__")
+        )
+    if isinstance(y, pl.Series):
+        return y.gather(kept_indices)
+    return y
+
+
+def _normalize_subset(subset: Any, existing_cols: list) -> Optional[list]:
+    """Filter ``subset`` to columns that actually exist; return ``None`` if empty."""
+    if not subset:
+        return None
+    filtered = [c for c in subset if c in existing_cols]
+    return filtered if filtered else None
+
+
+# -----------------------------------------------------------------------------
+# Deduplicate
+# -----------------------------------------------------------------------------
+
+
+def _normalize_keep(keep: Any) -> Any:
+    """Map config ``"none"`` to pandas ``False`` (deduplicate keeps that semantic)."""
+    return False if keep == "none" else keep
+
+
+def _dedup_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    keep = _normalize_keep(params.get("keep", "first"))
+    subset = _normalize_subset(params.get("subset"), list(X.columns))
+
+    # Polars uses "none" string where pandas uses False.
+    pl_keep = "none" if keep is False else keep
+
+    if y is None:
+        return X.unique(subset=subset, keep=pl_keep, maintain_order=True), None
+
+    X_with_idx = X.with_row_index("__idx__")
+    X_dedup = X_with_idx.unique(subset=subset, keep=pl_keep, maintain_order=True)
+    kept = X_dedup["__idx__"]
+    return X_dedup.drop("__idx__"), _polars_filter_y_by_kept_indices(y, kept)
+
+
+def _dedup_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    keep = _normalize_keep(params.get("keep", "first"))
+    subset = _normalize_subset(params.get("subset"), list(X.columns))
+
+    X_dedup = X.drop_duplicates(subset=subset, keep=keep)
+    if y is None:
+        return X_dedup, None
+    return X_dedup, y.loc[X_dedup.index]
 
 
 class DeduplicateApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
-
-        subset = params.get("subset")
-        keep = params.get("keep", "first")
-
-        # Handle 'none' string from config
-        if keep == "none":
-            keep = False
-
-        if subset:
-            subset = [c for c in subset if c in X.columns]
-            if not subset:
-                subset = None
-
-        # Polars Path
-        if engine.name == EngineName.POLARS:
-            import polars as pl
-
-            X_pl: Any = X
-
-            # Map keep parameter
-            # Pandas: 'first', 'last', False
-            # Polars: 'first', 'last', 'none' (if False)
-            pl_keep = keep
-            if keep is False:
-                pl_keep = "none"
-
-            if y is not None:
-                # We need to sync X and y
-                # Combine them
-                # We need to ensure y name doesn't conflict
-                # Assuming y is a Series or DataFrame with 1 col
-
-                # If y is a Series/DataFrame, we can hstack
-                # But we need to know which columns belong to X and which to y
-                X_pl.columns
-
-                # If y is unnamed or has name collision, rename it temporarily?
-                # Or just use index? Polars has no index.
-                # Best way: add a row index, filter X, get kept indices, filter y.
-
-                X_with_idx = X_pl.with_row_index("__idx__")
-                X_dedup = X_with_idx.unique(subset=subset, keep=pl_keep, maintain_order=True)
-                kept_indices = X_dedup["__idx__"]
-
-                # Filter y
-                # y must be a DataFrame or Series. If it's a Series, convert to DF to filter?
-                # Or use filter/take
-                if isinstance(y, pl.DataFrame):
-                    y_dedup = (
-                        y.with_row_index("__idx__")
-                        .filter(pl.col("__idx__").is_in(kept_indices))
-                        .drop("__idx__")
-                    )
-                elif isinstance(y, pl.Series):
-                    # Series doesn't have with_row_index directly in same way?
-                    # Actually Series has no index. We can use take/gather.
-                    y_dedup = y.gather(kept_indices)
-                else:
-                    # Should not happen if unpack works correctly
-                    y_dedup = y
-
-                X_out = X_dedup.drop("__idx__")
-                return X_out, y_dedup
-
-            else:
-                X_out = X_pl.unique(subset=subset, keep=pl_keep, maintain_order=True)
-                return X_out, y
-
-        # Pandas Path
-        X_dedup = X.drop_duplicates(subset=subset, keep=keep)
-
-        if y is not None:
-            # Align y with X
-            y_dedup = y.loc[X_dedup.index]
-            return X_dedup, y_dedup
-
-        return X_dedup, y
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+        # Note: dedup must propagate row drops to y, so we route X+y as a tuple
+        # through apply_dual_engine which handles unpack/pack.
+        return apply_dual_engine(
+            (X, y) if y is not None else X,
+            params,
+            _dedup_apply_polars,
+            _dedup_apply_pandas,
+        )
 
 
 @NodeRegistry.register("Deduplicate", DeduplicateApplier)
@@ -118,54 +120,89 @@ class DeduplicateCalculator(BaseCalculator):
         # Deduplication removes rows; column set is preserved.
         return input_schema
 
-    @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> DeduplicateArtifact:
-        # Config: {'subset': [...], 'keep': 'first'|'last'|False}
-        # Deduplication is an operation that doesn't learn parameters from data,
-        # it just applies logic. So fit just passes through the config.
-
-        subset = config.get("subset")
-        keep = config.get("keep", "first")
-
-        return {"type": "deduplicate", "subset": subset, "keep": keep}
+    def fit(self, df: Any, config: Dict[str, Any]) -> DeduplicateArtifact:
+        return {
+            "type": "deduplicate",
+            "subset": config.get("subset"),
+            "keep": config.get("keep", "first"),
+        }
 
 
-# --- Drop Missing Columns ---
+# -----------------------------------------------------------------------------
+# Drop Missing Columns
+# -----------------------------------------------------------------------------
+
+
+def _drop_missing_cols_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    cols = [c for c in params.get("columns_to_drop", []) if c in X.columns]
+    return (X.drop(cols) if cols else X), y
+
+
+def _drop_missing_cols_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    cols = [c for c in params.get("columns_to_drop", []) if c in X.columns]
+    return (X.drop(columns=cols) if cols else X), y
 
 
 class DropMissingColumnsApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(
+            X, params, _drop_missing_cols_apply_polars, _drop_missing_cols_apply_pandas
+        )
 
-        cols_to_drop = params.get("columns_to_drop", [])
 
-        # Checking X.columns might be tricky if X is Any, but engine check helps
-        if engine.name == EngineName.POLARS:
-            # X is likely Polars, but let's be safe
-            X_pl: Any = X
-            cols_to_drop_X = [c for c in cols_to_drop if c in X_pl.columns]
-        else:
-            cols_to_drop_X = [c for c in cols_to_drop if c in X.columns]
+def _resolve_threshold(raw: Any) -> Optional[float]:
+    """Parse a missing-percentage threshold; ``None`` if absent or non-numeric."""
+    if raw is None:
+        return None
+    try:
+        val = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return val if val > 0 else None
 
-        if cols_to_drop_X:
-            if engine.name == EngineName.POLARS:
-                X_pl_data: Any = X
-                X = X_pl_data.drop(cols_to_drop_X)
-            else:
-                X = X.drop(columns=cols_to_drop_X)
 
-        return X, y
+def _high_missing_cols_polars(X: Any, threshold_pct: float) -> list:
+    """Polars: list of columns whose missing-% ≥ ``threshold_pct``."""
+    null_counts = X.null_count()
+    total = X.height or 1
+    return [c for c in X.columns if (null_counts[c][0] / total) * 100 >= threshold_pct]
+
+
+def _high_missing_cols_pandas(X: Any, threshold_pct: float) -> list:
+    """Pandas: list of columns whose missing-% ≥ ``threshold_pct``."""
+    pct = X.isna().mean() * 100
+    return pct[pct >= threshold_pct].index.tolist()
+
+
+def _drop_missing_cols_fit_polars(
+    X: Any, _y: Any, config: Dict[str, Any]
+) -> DropMissingColumnsArtifact:
+    explicit = config.get("columns", []) or []
+    cols = {c for c in explicit if c in X.columns}
+    threshold = _resolve_threshold(config.get("missing_threshold"))
+    if threshold is not None:
+        cols.update(_high_missing_cols_polars(X, threshold))
+    return {
+        "type": "drop_missing_columns",
+        "columns_to_drop": list(cols),
+        "threshold": config.get("missing_threshold"),
+    }
+
+
+def _drop_missing_cols_fit_pandas(
+    X: Any, _y: Any, config: Dict[str, Any]
+) -> DropMissingColumnsArtifact:
+    explicit = config.get("columns", []) or []
+    cols = {c for c in explicit if c in X.columns}
+    threshold = _resolve_threshold(config.get("missing_threshold"))
+    if threshold is not None:
+        cols.update(_high_missing_cols_pandas(X, threshold))
+    return {
+        "type": "drop_missing_columns",
+        "columns_to_drop": list(cols),
+        "threshold": config.get("missing_threshold"),
+    }
 
 
 @NodeRegistry.register("DropMissingColumns", DropMissingColumnsApplier)
@@ -180,167 +217,79 @@ class DropMissingColumnsCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: Dict[str, Any]
     ) -> Optional[SkyulfSchema]:
-        # Threshold path is data-dependent; we can only predict the schema
-        # when the user supplied an explicit column list and no threshold.
-        threshold = config.get("missing_threshold")
+        # Threshold path is data-dependent; only predictable when the user
+        # supplied an explicit column list and no positive threshold.
+        if _resolve_threshold(config.get("missing_threshold")) is not None:
+            return None
         explicit = config.get("columns", []) or []
-        if threshold is not None:
-            try:
-                if float(threshold) > 0:
-                    return None
-            except (TypeError, ValueError):
-                pass
-        if not explicit:
-            return input_schema
-        return input_schema.drop(explicit)
+        return input_schema if not explicit else input_schema.drop(explicit)
 
-    @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> DropMissingColumnsArtifact:
-        engine = get_engine(X)
-
-        # Config: {'threshold': 50.0 (percent), 'columns': [...]}
-        # Threshold is percentage of missing values allowed. If missing > threshold, drop.
-
-        threshold = config.get("missing_threshold")
-        explicit_cols = config.get("columns", [])
-
-        cols_to_drop = set()
-
-        # Handle X access depending on engine
-        if engine.name == EngineName.POLARS:
-            X_pl: Any = X
-            if explicit_cols:
-                cols_to_drop.update([c for c in explicit_cols if c in X_pl.columns])
-        else:
-            if explicit_cols:
-                cols_to_drop.update([c for c in explicit_cols if c in X.columns])
-
-        if threshold is not None:
-            try:
-                threshold_val = float(threshold)
-                if threshold_val > 0:
-                    if engine.name == EngineName.POLARS:
-                        pass
-
-                        X_pl_data: Any = X
-                        # Calculate missing percentage for all columns
-                        # null_count() returns a DF with 1 row
-                        null_counts = X_pl_data.null_count()
-                        total_rows = X_pl_data.height
-
-                        for col in X_pl_data.columns:
-                            # Get null count for this column
-                            # null_counts[col] is a Series of length 1
-                            n_null = null_counts[col][0]
-                            pct = (n_null / total_rows) * 100
-                            if pct >= threshold_val:
-                                cols_to_drop.add(col)
-                    else:
-                        missing_pct = X.isna().mean() * 100
-                        auto_dropped = missing_pct[missing_pct >= threshold_val].index.tolist()
-                        cols_to_drop.update(auto_dropped)
-            except (TypeError, ValueError):
-                pass
-
-        return {
-            "type": "drop_missing_columns",
-            "columns_to_drop": list(cols_to_drop),
-            "threshold": threshold,
-        }
+    def fit(self, df: Any, config: Dict[str, Any]) -> DropMissingColumnsArtifact:
+        return cast(
+            DropMissingColumnsArtifact,
+            fit_dual_engine(
+                df, config, _drop_missing_cols_fit_polars, _drop_missing_cols_fit_pandas
+            ),
+        )
 
 
-# --- Drop Missing Rows ---
+# -----------------------------------------------------------------------------
+# Drop Missing Rows
+# -----------------------------------------------------------------------------
+
+
+def _polars_dropna_filter(X: Any, check_cols: list, how: str, threshold: Optional[int]) -> Any:
+    """Build the polars filter for dropna with optional threshold/how."""
+    import polars as pl
+
+    if threshold is not None:
+        return X.filter(pl.sum_horizontal(pl.col(check_cols).is_not_null()) >= threshold)
+    if how == "all":
+        return X.filter(~pl.all_horizontal(pl.col(check_cols).is_null()))
+    return X.drop_nulls(subset=check_cols)
+
+
+def _drop_missing_rows_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    subset = _normalize_subset(params.get("subset"), list(X.columns))
+    how = params.get("how", "any")
+    threshold = params.get("threshold")
+
+    X_with_idx = X.with_row_index("__idx__")
+    check_cols = subset if subset else [c for c in X.columns if c != "__idx__"]
+    X_clean = _polars_dropna_filter(X_with_idx, check_cols, how, threshold)
+    kept = X_clean["__idx__"]
+    X_out = X_clean.drop("__idx__")
+
+    if y is None:
+        return X_out, None
+    return X_out, _polars_filter_y_by_kept_indices(y, kept)
+
+
+def _drop_missing_rows_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    subset = _normalize_subset(params.get("subset"), list(X.columns))
+    how = params.get("how", "any")
+    threshold = params.get("threshold")
+
+    # Pandas dropna forbids both 'how' and 'thresh'; thresh takes precedence.
+    if threshold is not None:
+        X_clean = X.dropna(axis=0, thresh=threshold, subset=subset)
+    else:
+        X_clean = X.dropna(axis=0, how=how, subset=subset)
+
+    if y is None:
+        return X_clean, None
+    return X_clean, y.loc[X_clean.index]
 
 
 class DropMissingRowsApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
-
-        subset = params.get("subset")
-        how = params.get("how", "any")
-        threshold = params.get("threshold")
-
-        if subset:
-            if engine.name == EngineName.POLARS:
-                X_pl: Any = X
-                subset = [c for c in subset if c in X_pl.columns]
-            else:
-                subset = [c for c in subset if c in X.columns]
-
-            if not subset:
-                subset = None
-
-        # Polars Path
-        if engine.name == EngineName.POLARS:
-            import polars as pl
-
-            X_pl_data: Any = X
-
-            # We need to sync X and y, so we use the index trick
-            X_with_idx = X_pl_data.with_row_index("__idx__")
-
-            # Determine columns to check
-            check_cols = subset if subset else [c for c in X_pl_data.columns if c != "__idx__"]
-
-            if threshold is not None:
-                # Keep rows with at least 'threshold' non-null values in check_cols
-                # sum_horizontal of is_not_null
-                X_clean = X_with_idx.filter(
-                    pl.sum_horizontal(pl.col(check_cols).is_not_null()) >= threshold
-                )
-            elif how == "all":
-                # Drop if ALL are null
-                # Keep if NOT ALL are null
-                X_clean = X_with_idx.filter(~pl.all_horizontal(pl.col(check_cols).is_null()))
-            else:
-                # how == "any" (default)
-                # Drop if ANY is null
-                X_clean = X_with_idx.drop_nulls(subset=check_cols)
-
-            kept_indices = X_clean["__idx__"]
-
-            if y is not None:
-                if isinstance(y, pl.DataFrame):
-                    y_clean = (
-                        y.with_row_index("__idx__")
-                        .filter(pl.col("__idx__").is_in(kept_indices))
-                        .drop("__idx__")
-                    )
-                elif isinstance(y, pl.Series):
-                    y_clean = y.gather(kept_indices)
-                else:
-                    y_clean = y
-
-                X_out = X_clean.drop("__idx__")
-                return X_out, y_clean
-
-            X_out = X_clean.drop("__idx__")
-            return X_out, y
-
-        # Pandas Path
-        # Pandas dropna forbids setting both 'how' and 'thresh'.
-        # If 'thresh' is provided (not None), it takes precedence over 'how'.
-        if threshold is not None:
-            X_clean = X.dropna(axis=0, thresh=threshold, subset=subset)
-        else:
-            X_clean = X.dropna(axis=0, how=how, subset=subset)
-
-        if y is not None:
-            y_clean = y.loc[X_clean.index]
-            return X_clean, y_clean
-
-        return X_clean, y
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(
+            (X, y) if y is not None else X,
+            params,
+            _drop_missing_rows_apply_polars,
+            _drop_missing_rows_apply_pandas,
+        )
 
 
 @NodeRegistry.register("DropMissingRows", DropMissingRowsApplier)
@@ -358,69 +307,74 @@ class DropMissingRowsCalculator(BaseCalculator):
         # Drops rows; column set is preserved.
         return input_schema
 
-    @fit_method
-    def fit(
-        self,
-        _X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> DropMissingRowsArtifact:
-        # Config: {'subset': [...], 'how': 'any'|'all', 'threshold': int}
-        subset = config.get("subset")
-        how = config.get("how", "any")
-        threshold = config.get("threshold")
-
+    def fit(self, df: Any, config: Dict[str, Any]) -> DropMissingRowsArtifact:
         return {
             "type": "drop_missing_rows",
-            "subset": subset,
-            "how": how,
-            "threshold": threshold,
+            "subset": config.get("subset"),
+            "how": config.get("how", "any"),
+            "threshold": config.get("threshold"),
         }
 
 
-# --- Missing Indicator ---
+# -----------------------------------------------------------------------------
+# Missing Indicator
+# -----------------------------------------------------------------------------
+
+
+def _missing_indicator_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    import polars as pl
+
+    cols = params.get("columns", [])
+    if not cols:
+        return X, y
+    exprs = [
+        pl.col(c).is_null().cast(pl.Int64).alias(f"{c}_missing") for c in cols if c in X.columns
+    ]
+    return (X.with_columns(exprs) if exprs else X), y
+
+
+def _missing_indicator_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    cols = params.get("columns", [])
+    if not cols:
+        return X, y
+    X_out = X.copy()
+    for col in cols:
+        if col in X.columns:
+            X_out[f"{col}_missing"] = X[col].isna().astype(int)
+    return X_out, y
 
 
 class MissingIndicatorApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(
+            X, params, _missing_indicator_apply_polars, _missing_indicator_apply_pandas
+        )
 
-        cols = params.get("columns", [])
 
-        if not cols:
-            return X, y
+def _missing_cols_polars(X: Any) -> list:
+    null_counts = X.null_count()
+    return [c for c in X.columns if null_counts[c][0] > 0]
 
-        # Polars Path
-        if engine.name == EngineName.POLARS:
-            import polars as pl
 
-            X_pl: Any = X
+def _missing_cols_pandas(X: Any) -> list:
+    return X.columns[X.isna().any()].tolist()
 
-            exprs = []
-            for col in cols:
-                # X_pl.columns check
-                if col in X_pl.columns:
-                    exprs.append(pl.col(col).is_null().cast(pl.Int64).alias(f"{col}_missing"))
 
-            if not exprs:
-                return X, y
+def _missing_indicator_fit_polars(
+    X: Any, _y: Any, config: Dict[str, Any]
+) -> MissingIndicatorArtifact:
+    explicit = config.get("columns")
+    cols = [c for c in explicit if c in X.columns] if explicit else _missing_cols_polars(X)
+    return {"type": "missing_indicator", "columns": cols}
 
-            X_out = X_pl.with_columns(exprs)
-            return X_out, y
 
-        # Pandas Path
-        X_out = X.copy()
-        for col in cols:
-            if col in X.columns:
-                X_out[f"{col}_missing"] = X[col].isna().astype(int)
-
-        return X_out, y
+def _missing_indicator_fit_pandas(
+    X: Any, _y: Any, config: Dict[str, Any]
+) -> MissingIndicatorArtifact:
+    explicit = config.get("columns")
+    cols = [c for c in explicit if c in X.columns] if explicit else _missing_cols_pandas(X)
+    return {"type": "missing_indicator", "columns": cols}
 
 
 @NodeRegistry.register("MissingIndicator", MissingIndicatorApplier)
@@ -446,31 +400,10 @@ class MissingIndicatorCalculator(BaseCalculator):
             new_schema = new_schema.add(f"{col}_missing", "bool")
         return new_schema
 
-    @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> MissingIndicatorArtifact:
-        engine = get_engine(X)
-
-        explicit_cols = config.get("columns")
-
-        if explicit_cols:
-            if engine.name == EngineName.POLARS:
-                X_pl_data: Any = X
-                cols = [c for c in explicit_cols if c in X_pl_data.columns]
-            else:
-                cols = [c for c in explicit_cols if c in X.columns]
-        else:
-            if engine.name == EngineName.POLARS:
-                pass
-
-                X_pl: Any = X
-                null_counts = X_pl.null_count()
-                cols = [c for c in X_pl.columns if null_counts[c][0] > 0]
-            else:
-                cols = X.columns[X.isna().any()].tolist()
-
-        return {"type": "missing_indicator", "columns": cols}
+    def fit(self, df: Any, config: Dict[str, Any]) -> MissingIndicatorArtifact:
+        return cast(
+            MissingIndicatorArtifact,
+            fit_dual_engine(
+                df, config, _missing_indicator_fit_polars, _missing_indicator_fit_pandas
+            ),
+        )

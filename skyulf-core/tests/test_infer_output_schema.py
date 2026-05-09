@@ -243,18 +243,20 @@ def test_missing_indicator_no_columns_returns_none() -> None:
 # ---------- Phase A follow-up: split.py ----------
 
 
-def test_feature_target_split_drops_target() -> None:
+def test_feature_target_split_keeps_target_in_schema() -> None:
+    # FT split outputs (X, y); the target lives in the y slot but is still
+    # part of the dataset, so downstream column pickers must still see it.
     s = SkyulfSchema.from_columns(["a", "b", "label"])
     out = FeatureTargetSplitCalculator().infer_output_schema(s, {"target_column": "label"})
     assert out is not None
-    assert out.column_list() == ["a", "b"]
+    assert out.column_list() == ["a", "b", "label"]
 
 
 def test_feature_target_split_target_alias() -> None:
     s = SkyulfSchema.from_columns(["a", "y"])
     out = FeatureTargetSplitCalculator().infer_output_schema(s, {"target": "y"})
     assert out is not None
-    assert out.column_list() == ["a"]
+    assert out.column_list() == ["a", "y"]
 
 
 def test_feature_target_split_unknown_target_passes_through() -> None:
