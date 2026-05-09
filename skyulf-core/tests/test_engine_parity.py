@@ -57,7 +57,7 @@ def _numeric_frame(draw: st.DrawFn, *, min_rows: int = 5, max_rows: int = 50) ->
 # ---------------------------------------------------------------------------
 
 
-def _assert_artifacts_equal(pd_params: Dict[str, Any], pl_params: Dict[str, Any]) -> None:
+def _assert_artifacts_equal(pd_params: Any, pl_params: Any) -> None:
     """Compare two params dicts, treating numeric lists as approx-equal."""
     assert set(pd_params.keys()) == set(
         pl_params.keys()
@@ -98,7 +98,7 @@ def _assert_bounds_equal(
             )
 
 
-def _assert_fill_values_equal(pd_params: Dict[str, Any], pl_params: Dict[str, Any]) -> None:
+def _assert_fill_values_equal(pd_params: Any, pl_params: Any) -> None:
     """Compare SimpleImputer fill_values dicts."""
     assert pd_params.get("type") == pl_params.get("type")
     assert pd_params.get("strategy") == pl_params.get("strategy")

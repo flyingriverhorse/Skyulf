@@ -18,6 +18,7 @@ import {
   Sparkles,
   Gauge,
   MoreHorizontal,
+  BookOpen,
 } from 'lucide-react';
 import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
@@ -123,6 +124,8 @@ export const Toolbar: React.FC = () => {
     cancelRename,
     handleDeleteRecent,
     formatRelativeTime,
+    currentDatasetId,
+    exportNotebook,
   } = usePipelineActions();
 
   const [showLegend, setShowLegend] = useState(false);
@@ -322,6 +325,25 @@ export const Toolbar: React.FC = () => {
               >
                 <Download className="w-4 h-4" /> Export SVG
               </button>
+              {currentDatasetId && (
+                <>
+                  <div className="border-t my-1" />
+                  <button
+                    role="menuitem"
+                    onClick={() => { setShowMoreMenu(false); void exportNotebook('compact'); }}
+                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
+                  >
+                    <BookOpen className="w-4 h-4" /> Notebook (compact)
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => { setShowMoreMenu(false); void exportNotebook('full'); }}
+                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
+                  >
+                    <BookOpen className="w-4 h-4" /> Notebook (full)
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -501,6 +523,25 @@ export const Toolbar: React.FC = () => {
               >
                 SVG (vector)
               </button>
+              {currentDatasetId && (
+                <>
+                  <div className="border-t my-1" />
+                  <button
+                    role="menuitem"
+                    onClick={() => { setShowExportMenu(false); void exportNotebook('compact'); }}
+                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
+                  >
+                    <BookOpen className="w-4 h-4" /> Notebook (compact)
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => { setShowExportMenu(false); void exportNotebook('full'); }}
+                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
+                  >
+                    <BookOpen className="w-4 h-4" /> Notebook (full)
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

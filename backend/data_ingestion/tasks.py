@@ -31,9 +31,7 @@ def get_db_session():
                 "postgresql+asyncpg://", "postgresql+psycopg2://"
             )
         _sync_engine = create_engine(sync_url, pool_pre_ping=True)
-        _sync_session_factory = sessionmaker(
-            autocommit=False, autoflush=False, bind=_sync_engine
-        )
+        _sync_session_factory = sessionmaker(autocommit=False, autoflush=False, bind=_sync_engine)
     return _sync_session_factory()
 
 

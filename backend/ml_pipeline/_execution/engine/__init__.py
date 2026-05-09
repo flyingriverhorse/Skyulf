@@ -32,6 +32,7 @@ from ._artifacts import ArtifactsMixin
 from ._feature_eng import FeatureEngMixin
 from ._merge import MergeMixin
 from ._node_runners import NodeRunnersMixin
+from ._warning_capture import WarningCaptureHandler
 from ..schemas import (
     NodeConfig,
     NodeExecutionResult,
@@ -75,9 +76,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             for node in self._node_configs.values()
         )
 
-    def _predict_schemas_safe(
-        self, config: PipelineConfig
-    ) -> Dict[str, Optional[Dict[str, Any]]]:
+    def _predict_schemas_safe(self, config: PipelineConfig) -> Dict[str, Optional[Dict[str, Any]]]:
         """C7 Phase B helper: best-effort pre-run schema prediction.
 
         Errors are swallowed so a broken predictor never blocks a real run.
@@ -123,23 +122,41 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         # ``None`` until Phase C wires in dataset-catalog seeding.
         pipeline_result.predicted_schemas = self._predict_schemas_safe(config)
 
-        for node in config.nodes:
-            try:
-                node_result = self._execute_node(node, job_id=job_id)
-                pipeline_result.node_results[node.node_id] = node_result
+        # Capture per-node `logger.warning(...)` calls (e.g. TargetEncoder
+        # coercion notices, OneHotEncoder degenerate-category warnings) so
+        # the UI can surface them as toasts / a notification panel instead
+        # of silently dropping them in the server log. Tagged with the
+        # currently-executing node id via `set_current_node`.
+        warn_handler = WarningCaptureHandler().attach()
+        try:
+            for node in config.nodes:
+                warn_handler.set_current_node(node.node_id, node.step_type)
+                try:
+                    node_result = self._execute_node(node, job_id=job_id)
+                    pipeline_result.node_results[node.node_id] = node_result
 
-                if node_result.status == "failed":
-                    logger.error(f"Node {node.node_id} failed. Stopping pipeline.")
+                    if node_result.status == "failed":
+                        # Emit the real error via warning so the capture handler
+                        # surfaces it in the UI notification (not just the server log).
+                        error_detail = node_result.error or "Unknown error"
+                        logger.warning("Node %s: %s", node.node_id, error_detail)
+                        pipeline_result.status = "failed"
+                        break
+
+                except Exception as e:
+                    # Full traceback goes to the server log; captured message gets
+                    # the human-readable str(e) so the UI toast is useful.
+                    logger.exception("Unexpected error executing node %s", node.node_id)
+                    logger.warning("Node %s: %s", node.node_id, e)
+                    pipeline_result.node_results[node.node_id] = NodeExecutionResult(
+                        node_id=node.node_id, status="failed", error=str(e)
+                    )
                     pipeline_result.status = "failed"
                     break
-
-            except Exception as e:
-                logger.exception(f"Unexpected error executing node {node.node_id}")
-                pipeline_result.node_results[node.node_id] = NodeExecutionResult(
-                    node_id=node.node_id, status="failed", error=str(e)
-                )
-                pipeline_result.status = "failed"
-                break
+        finally:
+            warn_handler.set_current_node(None, None)
+            pipeline_result.node_warnings = warn_handler.drain()
+            warn_handler.detach()
 
         pipeline_result.end_time = datetime.now()
         # Dedup advisories: a merge node executed in multiple branches/parts

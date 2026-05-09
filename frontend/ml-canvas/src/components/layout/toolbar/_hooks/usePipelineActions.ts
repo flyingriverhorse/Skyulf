@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import { useGraphStore } from '../../../../core/store/useGraphStore';
-import { savePipeline } from '../../../../core/api/client';
+import { savePipeline, apiClient } from '../../../../core/api/client';
 import { pipelineVersionsApi, type PipelineVersionEntry } from '../../../../core/api/pipelineVersions';
 import {
   getRecentPipelines,
@@ -18,6 +18,7 @@ import { useConfirm } from '../../../shared';
 export interface PipelineActions {
   isSaving: boolean;
   currentDatasetId: string | undefined;
+  exportNotebook: (mode: 'compact' | 'full') => Promise<void>;
   hasServerVersions: boolean;
   showLoadMenu: boolean;
   setShowLoadMenu: (v: boolean) => void;
@@ -66,6 +67,27 @@ export function usePipelineActions(): PipelineActions {
     const datasetNode = nodes.find((n) => n.data.definitionType === 'dataset_node');
     return datasetNode?.data.datasetId as string | undefined;
   }, [nodes]);
+
+  const exportNotebook = async (mode: 'compact' | 'full'): Promise<void> => {
+    if (!currentDatasetId) return;
+    try {
+      const resp = await apiClient.get<Blob>(
+        `/pipeline/pipeline/${currentDatasetId}/export-notebook?mode=${mode}`,
+        { responseType: 'blob' },
+      );
+      const url = URL.createObjectURL(resp.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `skyulf_pipeline_${currentDatasetId}_${mode}.ipynb`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Notebook (${mode}) downloaded`);
+    } catch (err) {
+      toast.error('Notebook export failed', String(err));
+    }
+  };
 
   // Hydrate recent pipelines on mount so the button count is correct.
   useEffect(() => {
@@ -285,6 +307,7 @@ export function usePipelineActions(): PipelineActions {
   return {
     isSaving,
     currentDatasetId,
+    exportNotebook,
     hasServerVersions,
     showLoadMenu,
     setShowLoadMenu,

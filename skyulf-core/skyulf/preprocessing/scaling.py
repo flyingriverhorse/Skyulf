@@ -263,7 +263,9 @@ class MinMaxScalerCalculator(BaseCalculator):
 
 
 def _fit_minmax(X_subset: Any, cols: List[str], config: Dict[str, Any]) -> Dict[str, Any]:
-    feature_range = config.get("feature_range", (0, 1))
+    # `feature_range` may arrive as a JSON-loaded list (e.g. ``[0, 1]``) from the
+    # frontend or pipeline config; sklearn enforces ``tuple`` via param validation.
+    feature_range = tuple(config.get("feature_range", (0, 1)))
     scaler = MinMaxScaler(feature_range=feature_range)
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
     scaler.fit(X_np)
@@ -380,7 +382,8 @@ class RobustScalerCalculator(BaseCalculator):
 
 
 def _fit_robust(X_subset: Any, cols: List[str], config: Dict[str, Any]) -> Dict[str, Any]:
-    quantile_range = config.get("quantile_range", (25.0, 75.0))
+    # Same JSON list -> tuple coercion as MinMaxScaler.
+    quantile_range = tuple(config.get("quantile_range", (25.0, 75.0)))
     with_centering = config.get("with_centering", True)
     with_scaling = config.get("with_scaling", True)
     scaler = RobustScaler(
