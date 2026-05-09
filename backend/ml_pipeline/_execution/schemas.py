@@ -114,6 +114,13 @@ class PipelineExecutionResult:
     start_time: datetime = field(default_factory=datetime.now)
     end_time: Optional[datetime] = None
     merge_warnings: List[Dict[str, Any]] = field(default_factory=list)
+    # Soft, advisory warnings emitted by individual nodes during their
+    # `Calculator.fit` / `Applier.apply` (e.g. TargetEncoder coercing a
+    # float multiclass target to int, OneHotEncoder seeing a degenerate
+    # category). Each entry is `{"node_id": str, "node_type": str,
+    # "level": "warning"|"info", "message": str}`. Captured by the
+    # `WarningCaptureHandler` attached during `PipelineEngine.run`.
+    node_warnings: List[Dict[str, Any]] = field(default_factory=list)
     # Pre-execution schema predictions (C7 Phase B). One entry per node;
     # value is ``{"columns": [...], "dtypes": {...}}`` when the node's
     # Calculator overrides ``infer_output_schema`` and an upstream schema

@@ -68,9 +68,7 @@ def _polars_one_col_expr(
     return cut_expr.alias(target_col_name)
 
 
-def _build_polars_exprs(
-    X: Any, params: Dict[str, Any]
-) -> Tuple[List[Any], List[str]]:
+def _build_polars_exprs(X: Any, params: Dict[str, Any]) -> Tuple[List[Any], List[str]]:
     """Build cut exprs and the list of original columns to drop."""
     bin_edges_map = params.get("bin_edges", {})
     output_suffix = params.get("output_suffix", "_binned")

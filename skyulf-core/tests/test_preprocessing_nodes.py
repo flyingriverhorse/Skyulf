@@ -8,6 +8,7 @@ feature_generation, drop_and_missing, bucketing, transformations, casting.
 import numpy as np
 import pandas as pd
 import pytest
+from typing import cast, List
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -94,8 +95,8 @@ class TestStandardScaler:
         assert "mean" in params
         assert "scale" in params
         assert "columns" in params
-        assert len(params["mean"]) == 2
-        assert len(params["scale"]) == 2
+        assert len(cast(List[float], params["mean"])) == 2
+        assert len(cast(List[float], params["scale"])) == 2
 
     def test_apply_centers_and_scales(self, numeric_df: pd.DataFrame) -> None:
         from skyulf.preprocessing.scaling import StandardScalerCalculator, StandardScalerApplier
@@ -333,6 +334,7 @@ class TestTargetEncoder:
 
 
 class TestHashEncoder:
+
     def test_fit_and_apply(self, categorical_df: pd.DataFrame) -> None:
         from skyulf.preprocessing.encoding import HashEncoderCalculator, HashEncoderApplier
 
