@@ -1,35 +1,36 @@
 """Ordinal Encoder node (Calculator + Applier)."""
 
 import logging
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Union
 
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OrdinalEncoder
 
 from ...utils import (
-    pack_pipeline_output,
     resolve_columns,
-    unpack_pipeline_input,
     user_picked_no_columns,
 )
-from ..base import BaseApplier, BaseCalculator
+from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
+from .._artifacts import OrdinalArtifact
+from .._schema import SkyulfSchema
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...engines import EngineName, SkyulfDataFrame, get_engine
+from ...engines import EngineName, get_engine
 from ...engines.sklearn_bridge import SklearnBridge
-from ._common import detect_categorical_columns, _exclude_target_column, _parse_categories_order
+from ._common import detect_categorical_columns, _parse_categories_order
 
 logger = logging.getLogger(__name__)
 
 
 class OrdinalEncoderApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
@@ -38,7 +39,7 @@ class OrdinalEncoderApplier(BaseApplier):
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols and "__target__" not in target_encoders:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         X_out: Any = X
 
@@ -96,7 +97,7 @@ class OrdinalEncoderApplier(BaseApplier):
             except Exception as e:
                 logger.error(f"Ordinal Encoding target failed: {e}")
 
-        return pack_pipeline_output(X_out, y_out, is_tuple)
+        return X_out, y_out
 
 
 @NodeRegistry.register("OrdinalEncoder", OrdinalEncoderApplier)
@@ -113,12 +114,20 @@ class OrdinalEncoderApplier(BaseApplier):
     },
 )
 class OrdinalEncoderCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Ordinal encoding replaces categorical values with ints in place;
+        # column set is preserved.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, y, _ = unpack_pipeline_input(df)
+    ) -> OrdinalArtifact:
         engine = get_engine(X)
 
         # OrdinalEncoder only accepts 'error' or 'use_encoded_value'.

@@ -97,6 +97,29 @@ interface GraphState {
   // Lets ResultsPanel show the exact same colored dots the canvas draws on edges.
   branchLabelColors: Record<string, string>;
   setBranchLabelColors: (colors: Record<string, string>) => void;
+
+  // C7: pre-execution schema prediction. Populated by `useSchemaPreview`
+  // (debounced POST to `/api/pipeline/schema-preview`). Per-node predicted
+  // output schema; `null` means the calculator is data-dependent or the
+  // upstream prediction was unknown — treat as "don't paint a badge".
+  predictedSchemas: Record<string, { columns: string[]; dtypes: Record<string, string> } | null>;
+  setPredictedSchemas: (
+    schemas: Record<string, { columns: string[]; dtypes: Record<string, string> } | null>,
+  ) => void;
+
+  // C7 Phase D: column references in node `params` that don't exist in the
+  // upstream's predicted schema. Keyed by `node_id` so the wrapper can
+  // O(1) look up its own broken refs and paint a red border.
+  brokenSchemaRefs: Record<
+    string,
+    Array<{ field: string; column: string; upstream_node_id: string | null }>
+  >;
+  setBrokenSchemaRefs: (
+    refs: Record<
+      string,
+      Array<{ field: string; column: string; upstream_node_id: string | null }>
+    >,
+  ) => void;
 }
 
 export const useGraphStore = create<GraphState>()(
@@ -116,6 +139,12 @@ export const useGraphStore = create<GraphState>()(
 
   branchLabelColors: {},
   setBranchLabelColors: (colors) => set({ branchLabelColors: colors }),
+
+  predictedSchemas: {},
+  setPredictedSchemas: (schemas) => set({ predictedSchemas: schemas }),
+
+  brokenSchemaRefs: {},
+  setBrokenSchemaRefs: (refs) => set({ brokenSchemaRefs: refs }),
   setGraph: (nodes, edges) => set({ nodes, edges }),
 
   onNodesChange: (changes: NodeChange[]) => {

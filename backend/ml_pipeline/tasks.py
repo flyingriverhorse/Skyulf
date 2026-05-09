@@ -30,14 +30,27 @@ def _pipeline_span(job_id: str):
         return nullcontext()
 
 
+# Module-level cache — building a SQLAlchemy engine on every task call is expensive.
+# Celery workers are long-lived processes; one engine per worker is correct.
+_sync_engine = None
+_sync_session_factory = None
+
+
 def get_db_session():
-    settings = get_settings()
-    if settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
-        sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
-    else:
-        sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
-    engine = create_engine(sync_url)
-    return sessionmaker(autocommit=False, autoflush=False, bind=engine)()
+    global _sync_engine, _sync_session_factory
+    if _sync_session_factory is None:
+        settings = get_settings()
+        if settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
+            sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
+        else:
+            sync_url = settings.DATABASE_URL.replace(
+                "postgresql+asyncpg://", "postgresql+psycopg2://"
+            )
+        _sync_engine = create_engine(sync_url, pool_pre_ping=True)
+        _sync_session_factory = sessionmaker(
+            autocommit=False, autoflush=False, bind=_sync_engine
+        )
+    return _sync_session_factory()
 
 
 @shared_task(name="core.ml_pipeline.tasks.run_pipeline_task")

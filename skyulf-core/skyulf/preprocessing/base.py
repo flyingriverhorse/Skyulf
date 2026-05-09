@@ -1,13 +1,70 @@
+import functools
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Union, cast
+from typing import Any, Callable, Dict, Optional, TypeVar, Union, cast
 
 import pandas as pd
 import time
 import tracemalloc
-from ..utils import get_data_stats
+from ..utils import get_data_stats, pack_pipeline_output, unpack_pipeline_input
 
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
+from ._schema import SkyulfSchema
+
+# TypeVar lets the specific NodeArtifact TypedDict flow through fit_method
+# so callers see the concrete return type, not just Dict[str, Any].
+_NodeParams = TypeVar("_NodeParams", bound=Dict[str, Any])
+
+
+def apply_method(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """Decorator that handles unpack/pack boilerplate around an Applier's `apply`.
+
+    The decorated method is written with signature ``(self, X, y, params)``
+    instead of ``(self, df, params)``. The wrapper:
+
+    1. Calls ``unpack_pipeline_input(df)`` to get ``(X, y, is_tuple)``.
+    2. Invokes the user's method with the unpacked ``X`` and ``y``.
+    3. If the method returns a 2-tuple ``(X_out, y_out)``, that pair is
+       packed; otherwise the result is treated as ``X_out`` and the
+       original ``y`` is reused.
+    4. Calls ``pack_pipeline_output`` to restore the original input shape.
+
+    Useful for ~50 Appliers that share the same boilerplate. Skip it for
+    splitters (which return ``SplitDataset`` directly) or analyzers that
+    don't transform the frame.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(self: Any, df: Any, params: Dict[str, Any]) -> Any:
+        X, y, is_tuple = unpack_pipeline_input(df)
+        result = fn(self, X, y, params)
+        if isinstance(result, tuple) and len(result) == 2:
+            X_out, y_out = result
+        else:
+            X_out, y_out = result, y
+        return pack_pipeline_output(X_out, y_out, is_tuple)
+
+    return wrapper
+
+
+def fit_method(fn: Callable[..., _NodeParams]) -> Callable[..., _NodeParams]:
+    """Decorator that handles unpack boilerplate around a Calculator's `fit`.
+
+    The decorated method is written as ``(self, X, y, config)`` and may
+    ignore ``y`` for X-only fits. No packing is done — `fit` returns a
+    params dict, not a frame.
+
+    The TypeVar ``_NodeParams`` preserves the specific TypedDict return type
+    (see ``preprocessing._artifacts``) so callers see the concrete shape.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(self: Any, df: Any, config: Dict[str, Any]) -> _NodeParams:
+        X, y, _ = unpack_pipeline_input(df)
+        return fn(self, X, y, config)
+
+    return wrapper  # type: ignore[return-value]
+
 
 # from ..artifacts.store import ArtifactStore # Removed dependency on ArtifactStore for now
 
@@ -21,6 +78,25 @@ class BaseCalculator(ABC):
         Calculates parameters from the training data.
         Returns a dictionary of fitted parameters (serializable).
         """
+
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> Optional[SkyulfSchema]:
+        """Best-effort prediction of the output schema from config alone.
+
+        Override this in concrete Calculators when the output columns/dtypes
+        can be derived purely from ``input_schema`` and ``config`` (i.e.
+        without seeing data). Examples:
+
+        * Scalers — pass through (output == input).
+        * Drop columns by name — drop the configured names.
+        * One-hot — adds K columns per categorical (K is data-dependent →
+          return ``None``).
+
+        Default returns ``None`` to signal "unknown / data-dependent";
+        callers should fall back to runtime introspection.
+        """
+        return None
 
 
 class BaseApplier(ABC):

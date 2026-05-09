@@ -223,4 +223,102 @@ async def delete_pipeline_version(
     return {"status": "success" if ok else "not_found", "id": version_id}
 
 
+# ---------------------------------------------------------------------------
+# Audit log (read-only).
+#
+# We already store every save as an append-only `PipelineVersion` row with
+# `user_id` + `created_at`. The audit endpoint walks that history in order
+# and returns a per-version diff against the immediately-prior version, so
+# admins can answer "who broke this pipeline, and when?" without a separate
+# audit table or DB migration.
+# ---------------------------------------------------------------------------
+
+
+def _node_set(graph: Any) -> Dict[str, Dict[str, Any]]:
+    """Index a saved graph by node id for O(1) diff lookups.
+
+    Tolerates both the canonical `{nodes: [...], edges: [...]}` shape and
+    legacy graphs missing the wrapper. Unknown shapes return an empty dict
+    so the diff degrades to "no changes" rather than raising.
+    """
+    if not isinstance(graph, dict):
+        return {}
+    nodes = graph.get("nodes")
+    if not isinstance(nodes, list):
+        return {}
+    indexed: Dict[str, Dict[str, Any]] = {}
+    for n in nodes:
+        if isinstance(n, dict):
+            nid = n.get("id")
+            if isinstance(nid, str):
+                indexed[nid] = n
+    return indexed
+
+
+def _diff_versions(prev: Any, curr: Any) -> Dict[str, Any]:
+    """Compute a compact node-level diff between two saved graphs."""
+    a = _node_set(prev)
+    b = _node_set(curr)
+    added = sorted(set(b) - set(a))
+    removed = sorted(set(a) - set(b))
+    modified: List[str] = []
+    for nid in set(a) & set(b):
+        # Cheap structural compare — sufficient because saved graphs are
+        # JSON round-tripped (no datetimes, no sets, no class instances).
+        if json.dumps(a[nid], sort_keys=True) != json.dumps(b[nid], sort_keys=True):
+            modified.append(nid)
+    return {
+        "nodes_added": added,
+        "nodes_removed": removed,
+        "nodes_modified": sorted(modified),
+        "delta_node_count": len(b) - len(a),
+    }
+
+
+@router.get("/versions/{dataset_source_id}/audit")
+async def get_pipeline_audit_log(
+    dataset_source_id: str,
+    limit: int = 50,
+    session: AsyncSession = Depends(get_async_session),
+) -> Dict[str, Any]:
+    """Return a chronological audit trail for one dataset's pipeline.
+
+    Each entry is a saved `PipelineVersion` augmented with a per-node diff
+    against its immediate predecessor. The first version has no predecessor
+    so its diff lists every node as `added`.
+    """
+    capped_limit = max(1, min(int(limit or 50), 200))
+    versions = await PipelineVersionsService.list_versions(session, dataset_source_id)
+    # Service returns newest-first; walk oldest->newest so each diff sees the
+    # prior version, then re-reverse for the response.
+    chronological = list(reversed(versions))
+    entries: List[Dict[str, Any]] = []
+    prev_graph: Any = None
+    for v in chronological:
+        diff = _diff_versions(prev_graph, v.graph)
+        entries.append(
+            {
+                "id": v.id,
+                "version_int": v.version_int,
+                "name": v.name,
+                "note": v.note,
+                "kind": v.kind,
+                "user_id": v.user_id,
+                "created_at": v.created_at.isoformat() if v.created_at else None,
+                "node_count": v.node_count,
+                "edge_count": v.edge_count,
+                "diff": diff,
+            }
+        )
+        prev_graph = v.graph
+    # Newest-first for UI consumption; cap after the diff walk so each
+    # `diff` is computed against its true predecessor, not a window edge.
+    entries.reverse()
+    return {
+        "dataset_source_id": dataset_source_id,
+        "total": len(entries),
+        "entries": entries[:capped_limit],
+    }
+
+
 __all__ = ["router"]

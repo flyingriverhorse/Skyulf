@@ -15,6 +15,7 @@ import { useClipboard } from '../../core/hooks/useClipboard';
 import { useBranchColors } from '../../core/hooks/useBranchColors';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import { useNodeJobSummaries } from '../../core/hooks/useNodeJobSummaries';
+import { useSchemaPreview } from '../../core/hooks/useSchemaPreview';
 import { CustomNodeWrapper } from './CustomNodeWrapper';
 import { CustomEdge } from './CustomEdge';
 import { useConfirm } from '../shared';
@@ -87,6 +88,11 @@ const FlowCanvasContent: React.FC = () => {
   // though their jobs run via Celery (so the inline preview path
   // never populates `executionResult.node_results` for them).
   useNodeJobSummaries();
+
+  // C7: pre-execution schema prediction. Debounced POST to
+  // `/api/pipeline/schema-preview`; results power the `↳ N cols`
+  // badge and red-border-on-broken-refs in `CustomNodeWrapper`.
+  useSchemaPreview();
 
   const branchColorMap = useBranchColors(nodes, edges);
 

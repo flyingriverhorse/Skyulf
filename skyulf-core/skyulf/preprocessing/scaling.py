@@ -1,8 +1,7 @@
-import logging
-from typing import Any, Dict, Tuple, Union, cast
+﻿import logging
+from typing import Any, Dict, cast
 
 import numpy as np
-import pandas as pd
 from sklearn.preprocessing import (
     MaxAbsScaler,
     MinMaxScaler,
@@ -12,15 +11,20 @@ from sklearn.preprocessing import (
 
 from ..utils import (
     detect_numeric_columns,
-    pack_pipeline_output,
     resolve_columns,
-    unpack_pipeline_input,
     user_picked_no_columns,
 )
-from .base import BaseApplier, BaseCalculator
+from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ._artifacts import (
+    MaxAbsScalerArtifact,
+    MinMaxScalerArtifact,
+    RobustScalerArtifact,
+    StandardScalerArtifact,
+)
+from ._schema import SkyulfSchema
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
-from ..engines import EngineName, SkyulfDataFrame, get_engine
+from ..engines import EngineName, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
@@ -29,12 +33,13 @@ logger = logging.getLogger(__name__)
 
 
 class StandardScalerApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
 
         cols = params.get("columns", [])
         mean = params.get("mean")
@@ -43,7 +48,7 @@ class StandardScalerApplier(BaseApplier):
         # Check valid cols (works for both Pandas and Polars/Wrapper)
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or mean is None or scale is None:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Check Engine
         engine = get_engine(X)
@@ -73,7 +78,7 @@ class StandardScalerApplier(BaseApplier):
             # Apply transformations
             X_out = X_pl.with_columns(exprs)
 
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas/Numpy Implementation (Legacy)
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
@@ -92,7 +97,7 @@ class StandardScalerApplier(BaseApplier):
             vals = vals / safe_scale
 
         X_out[valid_cols] = vals
-        return pack_pipeline_output(X_out, y, is_tuple)
+        return X_out
 
 
 @NodeRegistry.register("StandardScaler", StandardScalerApplier)
@@ -104,12 +109,19 @@ class StandardScalerApplier(BaseApplier):
     params={"columns": [], "with_mean": True, "with_std": True},
 )
 class StandardScalerCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        # Scalers preserve column set; values change but names/order do not.
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> StandardScalerArtifact:
         engine = get_engine(X)
 
         if user_picked_no_columns(config):
@@ -158,12 +170,13 @@ class StandardScalerCalculator(BaseCalculator):
 
 
 class MinMaxScalerApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
@@ -172,7 +185,7 @@ class MinMaxScalerApplier(BaseApplier):
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or min_val is None or scale is None:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -187,7 +200,7 @@ class MinMaxScalerApplier(BaseApplier):
                     exprs.append((pl.col(col_name) * scale[i] + min_val[i]).alias(col_name))
 
             X_out = X_pl.with_columns(exprs)
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
@@ -200,7 +213,7 @@ class MinMaxScalerApplier(BaseApplier):
         vals = X_out[valid_cols].values
         vals = vals * scale_arr[col_indices] + min_arr[col_indices]
         X_out[valid_cols] = vals
-        return pack_pipeline_output(X_out, y, is_tuple)
+        return X_out
 
 
 @NodeRegistry.register("MinMaxScaler", MinMaxScalerApplier)
@@ -212,12 +225,18 @@ class MinMaxScalerApplier(BaseApplier):
     params={"feature_range": [0, 1], "columns": []},
 )
 class MinMaxScalerCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> MinMaxScalerArtifact:
         engine = get_engine(X)
 
         if user_picked_no_columns(config):
@@ -261,12 +280,13 @@ class MinMaxScalerCalculator(BaseCalculator):
 
 
 class RobustScalerApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
@@ -275,7 +295,7 @@ class RobustScalerApplier(BaseApplier):
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -300,7 +320,7 @@ class RobustScalerApplier(BaseApplier):
                     exprs.append(expr.alias(col_name))
 
             X_out = X_pl.with_columns(exprs)
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
@@ -321,7 +341,7 @@ class RobustScalerApplier(BaseApplier):
             vals = vals / safe_scale
 
         X_out[valid_cols] = vals
-        return pack_pipeline_output(X_out, y, is_tuple)
+        return X_out
 
 
 @NodeRegistry.register("RobustScaler", RobustScalerApplier)
@@ -338,12 +358,18 @@ class RobustScalerApplier(BaseApplier):
     },
 )
 class RobustScalerCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> RobustScalerArtifact:
         engine = get_engine(X)
 
         if user_picked_no_columns(config):
@@ -393,12 +419,13 @@ class RobustScalerCalculator(BaseCalculator):
 
 
 class MaxAbsScalerApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
@@ -406,7 +433,7 @@ class MaxAbsScalerApplier(BaseApplier):
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols or scale is None:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -423,7 +450,7 @@ class MaxAbsScalerApplier(BaseApplier):
                     exprs.append((pl.col(col_name) / s).alias(col_name))
 
             X_out = X_pl.with_columns(exprs)
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
@@ -439,7 +466,7 @@ class MaxAbsScalerApplier(BaseApplier):
         vals = vals / safe_scale
 
         X_out[valid_cols] = vals
-        return pack_pipeline_output(X_out, y, is_tuple)
+        return X_out
 
 
 @NodeRegistry.register("MaxAbsScaler", MaxAbsScalerApplier)
@@ -451,12 +478,18 @@ class MaxAbsScalerApplier(BaseApplier):
     params={"columns": []},
 )
 class MaxAbsScalerCalculator(BaseCalculator):
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+    ) -> SkyulfSchema:
+        return input_schema
+
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
+    ) -> MaxAbsScalerArtifact:
         engine = get_engine(X)
 
         if user_picked_no_columns(config):

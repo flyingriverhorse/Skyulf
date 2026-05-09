@@ -11,18 +11,28 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
 from skyulf.data.dataset import SplitDataset
 
+if TYPE_CHECKING:
+    from ...artifacts.store import ArtifactStore
+
 logger = logging.getLogger(__name__)
 
 
 class ArtifactsMixin:
     """Persistence helpers split out of :class:`PipelineEngine`."""
+
+    # Type-only stubs so ty resolves attributes/methods supplied by
+    # the concrete :class:`PipelineEngine` (or its sibling mixins) at
+    # runtime via the cooperative-mixin pattern. No runtime impact.
+    artifact_store: "ArtifactStore"
+    dataset_name: Optional[str]
+    log: Callable[[str], None]
 
     def _extract_feature_importances(
         self, model: Any, data: Any, target_col: str
@@ -78,7 +88,7 @@ class ArtifactsMixin:
         # Only overwrite if it doesn't exist (prefer Raw/Splitter data over Scaled/Transformed data)
         # Construct the key manually to check existence
         if job_id and job_id != "unknown":
-            safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", self.dataset_name)
+            safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", self.dataset_name or "")
             key = f"reference_data_{safe_name}_{job_id}"
             if not self.artifact_store.exists(key):
                 self._save_reference_data(data, job_id, target_col)
@@ -123,7 +133,7 @@ class ArtifactsMixin:
             # 3. Save if valid
             if train_df is not None and not train_df.empty:
                 # Sanitize dataset name
-                safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", self.dataset_name)
+                safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", self.dataset_name or "")
                 key = f"reference_data_{safe_name}_{job_id}"
 
                 self.log(f"Saving reference training data for drift detection: {key}")

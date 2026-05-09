@@ -18,6 +18,16 @@ import {
     Timer,
     TrendingUp,
 } from 'lucide-react';
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    ResponsiveContainer,
+    Tooltip as RechartsTooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 import { monitoringApi, SlowNodesResponse } from '../core/api/monitoring';
 import { toast } from '../core/toast';
 
@@ -25,6 +35,21 @@ type SortKey = 'total_seconds' | 'avg_seconds' | 'p95_seconds' | 'count' | 'max_
 
 const WINDOW_OPTIONS: ReadonlyArray<number> = [1, 7, 30, 90];
 const LIMIT_OPTIONS: ReadonlyArray<number> = [10, 25, 50];
+
+// Palette cycled across the bar chart so neighbouring step-types are
+// visually distinct without overwhelming the eye.
+const BAR_COLORS = [
+    '#3b82f6',
+    '#8b5cf6',
+    '#ec4899',
+    '#f59e0b',
+    '#10b981',
+    '#06b6d4',
+    '#ef4444',
+    '#a855f7',
+    '#eab308',
+    '#14b8a6',
+];
 
 const formatSeconds = (s: number): string => {
     if (s < 1) return `${(s * 1000).toFixed(0)} ms`;
@@ -159,6 +184,75 @@ export const SlowNodesPage: React.FC = () => {
                 <div className="mb-4 flex items-start gap-2 p-3 rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm">
                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                     <span>{error}</span>
+                </div>
+            )}
+
+            {sortedAggregates.length > 0 && (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                        <BarChart3 className="w-4 h-4 text-blue-500" />
+                        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                            Total time by step type
+                        </h2>
+                        <span className="text-[11px] text-gray-400">
+                            ({sortKey === 'total_seconds' ? 'sorted by total' : `sorted by ${sortKey.replace('_seconds', '')}`})
+                        </span>
+                    </div>
+                    <div className="h-56">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={sortedAggregates.map(a => ({
+                                    step_type: a.step_type,
+                                    total: Number(a.total_seconds.toFixed(3)),
+                                    avg: Number(a.avg_seconds.toFixed(3)),
+                                    runs: a.count,
+                                }))}
+                                margin={{ top: 4, right: 8, left: 8, bottom: 28 }}
+                            >
+                                <CartesianGrid
+                                    strokeDasharray="3 3"
+                                    className="stroke-gray-200 dark:stroke-slate-700"
+                                    vertical={false}
+                                />
+                                <XAxis
+                                    dataKey="step_type"
+                                    tick={{ fill: '#64748b', fontSize: 10 }}
+                                    angle={-25}
+                                    textAnchor="end"
+                                    interval={0}
+                                    height={50}
+                                />
+                                <YAxis
+                                    tick={{ fill: '#64748b', fontSize: 10 }}
+                                    tickFormatter={(v: number) => formatSeconds(v)}
+                                    width={64}
+                                />
+                                <RechartsTooltip
+                                    contentStyle={{
+                                        backgroundColor: '#1e293b',
+                                        borderColor: '#334155',
+                                        color: '#f8fafc',
+                                        borderRadius: 6,
+                                        fontSize: 12,
+                                    }}
+                                    itemStyle={{ color: '#f8fafc' }}
+                                    labelStyle={{ color: '#94a3b8' }}
+                                    formatter={(value: number, name: string) => {
+                                        if (name === 'runs') return [value, 'Runs'];
+                                        return [formatSeconds(value), name === 'total' ? 'Total time' : 'Avg per run'];
+                                    }}
+                                />
+                                <Bar dataKey="total" radius={[3, 3, 0, 0]}>
+                                    {sortedAggregates.map((_, idx) => (
+                                        <Cell
+                                            key={`bar-${idx}`}
+                                            fill={BAR_COLORS[idx % BAR_COLORS.length]}
+                                        />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
             )}
 

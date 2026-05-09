@@ -3,12 +3,14 @@ import { getIncomers, Node, Edge } from '@xyflow/react';
 import { useGraphStore } from '../store/useGraphStore';
 
 /**
- * Walk upstream from `node` and collect every column name that was
- * explicitly configured for removal by a DropColumnsNode
- * (definitionType === 'drop_missing_columns').
+ * Walk upstream from `node` and collect every column name that has been
+ * removed from the feature set by:
+ *   - DropColumnsNode (definitionType === 'drop_missing_columns')
+ *   - FeatureTargetSplitter (definitionType === 'feature_target_split') —
+ *     its target_column is separated into y and no longer in X.
  *
- * Used at config-time (before a pipeline run) to hide already-dropped
- * columns from column selectors in downstream processing nodes.
+ * Used at config-time to hide already-removed columns from downstream
+ * column selectors (e.g. encoding column picker).
  */
 export function collectDroppedColumns(
   node: Node,
@@ -24,6 +26,15 @@ export function collectDroppedColumns(
     Array.isArray(node.data.columns)
   ) {
     (node.data.columns as string[]).forEach((c) => dropped.add(c));
+  }
+  // FeatureTargetSplitter moves target_column from X → y; treat it as dropped
+  // so downstream column pickers (e.g. encoding) don't show it as available.
+  if (
+    node.data?.definitionType === 'feature_target_split' &&
+    typeof node.data.target_column === 'string' &&
+    node.data.target_column
+  ) {
+    dropped.add(node.data.target_column as string);
   }
   for (const incomer of getIncomers(node, nodes, edges)) {
     collectDroppedColumns(incomer, nodes, edges, visited).forEach((c) => dropped.add(c));

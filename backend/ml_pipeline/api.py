@@ -31,6 +31,7 @@ from ._internal._routers.pipelines_io import router as _pipelines_io_router
 from ._internal._routers.preview import router as _preview_router
 from ._internal._routers.run_pipeline import _get_submit_lock  # noqa: F401  (re-exported)
 from ._internal._routers.run_pipeline import router as _run_router
+from ._internal._routers.schema_preview import router as _schema_preview_router
 
 # Schema / helper / advisor re-exports — used by tests and callers that
 # imported these directly from `backend.ml_pipeline.api` before the E9 split.
@@ -61,6 +62,7 @@ router.include_router(_run_router)
 router.include_router(_preview_router)
 router.include_router(_jobs_router)
 router.include_router(_meta_router)
+router.include_router(_schema_preview_router)
 
 __all__ = [
     "router",

@@ -1,32 +1,32 @@
 """Dummy Encoder node (Calculator + Applier)."""
 
 import logging
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict
 
 import pandas as pd
 
 from ...utils import (
-    pack_pipeline_output,
     resolve_columns,
-    unpack_pipeline_input,
     user_picked_no_columns,
 )
-from ..base import BaseApplier, BaseCalculator
+from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
+from .._artifacts import DummyEncoderArtifact
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...engines import EngineName, SkyulfDataFrame, get_engine
+from ...engines import EngineName, get_engine
 from ._common import detect_categorical_columns, _exclude_target_column
 
 logger = logging.getLogger(__name__)
 
 
 class DummyEncoderApplier(BaseApplier):
+    @apply_method
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        _y: Any,
         params: Dict[str, Any],
     ) -> Any:
-        X, y, is_tuple = unpack_pipeline_input(df)
         engine = get_engine(X)
 
         cols = params.get("columns", [])
@@ -35,7 +35,7 @@ class DummyEncoderApplier(BaseApplier):
 
         valid_cols = [c for c in cols if c in X.columns]
         if not valid_cols:
-            return pack_pipeline_output(X, y, is_tuple)
+            return X
 
         # Polars Path
         if engine.name == EngineName.POLARS:
@@ -57,7 +57,7 @@ class DummyEncoderApplier(BaseApplier):
                 X_out = X_out.with_columns(dummy_exprs)
 
             X_out = X_out.drop(valid_cols)
-            return pack_pipeline_output(X_out, y, is_tuple)
+            return X_out
 
         # Pandas Path
         X_out = X.copy()
@@ -70,7 +70,7 @@ class DummyEncoderApplier(BaseApplier):
         X_out = X_out.drop(columns=valid_cols)
         X_out = pd.concat([X_out, dummies], axis=1)
 
-        return pack_pipeline_output(X_out, y, is_tuple)
+        return X_out
 
 
 @NodeRegistry.register("DummyEncoder", DummyEncoderApplier)
@@ -82,12 +82,13 @@ class DummyEncoderApplier(BaseApplier):
     params={"columns": [], "drop_first": False},
 )
 class DummyEncoderCalculator(BaseCalculator):
+    @fit_method
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...]],
+        X: Any,
+        y: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        X, y, _ = unpack_pipeline_input(df)
+    ) -> DummyEncoderArtifact:
         engine = get_engine(X)
 
         if user_picked_no_columns(config):
