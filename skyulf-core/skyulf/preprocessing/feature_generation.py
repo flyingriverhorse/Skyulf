@@ -10,7 +10,7 @@ from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
 from ..utils import detect_numeric_columns
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ._artifacts import PolynomialFeaturesArtifact
+from ._artifacts import FeatureGenerationArtifact, PolynomialFeaturesArtifact
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 # --- Optional Dependencies ---
@@ -752,7 +752,7 @@ class FeatureGenerationCalculator(BaseCalculator):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> FeatureGenerationArtifact:
         # Config:
         # operations: List[Dict]
         # epsilon: float

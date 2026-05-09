@@ -1,6 +1,6 @@
 import functools
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Mapping, Optional, TypeVar, Union, cast
 
 import pandas as pd
 import time
@@ -12,8 +12,9 @@ from ..engines import SkyulfDataFrame
 from ._schema import SkyulfSchema
 
 # TypeVar lets the specific NodeArtifact TypedDict flow through fit_method
-# so callers see the concrete return type, not just Dict[str, Any].
-_NodeParams = TypeVar("_NodeParams", bound=Dict[str, Any])
+# so callers see the concrete return type. Bound to Mapping (not Dict) so
+# TypedDicts — which are not LSP-substitutable for Dict — are valid returns.
+_NodeParams = TypeVar("_NodeParams", bound=Mapping[str, Any])
 
 
 def apply_method(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -73,10 +74,13 @@ class BaseCalculator(ABC):
     @abstractmethod
     def fit(
         self, df: Union[pd.DataFrame, SkyulfDataFrame, tuple], config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """
         Calculates parameters from the training data.
-        Returns a dictionary of fitted parameters (serializable).
+        Returns a Mapping of fitted parameters (typically a TypedDict
+        ``*Artifact`` declared in ``preprocessing._artifacts``). The return
+        type is ``Mapping`` rather than ``Dict`` so concrete TypedDict
+        subclasses are valid LSP-substitutable returns.
         """
 
     def infer_output_schema(
@@ -169,17 +173,19 @@ class StatefulTransformer:
             # Fit on the whole dataframe (be careful about leakage!)
             # ty can't narrow a Union through hasattr — cast once for both calls.
             frame = cast(Any, dataset)
-            self.params = self.calculator.fit(frame, config)
+            # Calculator.fit returns Mapping (TypedDicts allowed); cast to Dict
+            # for storage so Appliers continue to receive a concrete Dict.
+            self.params = cast(Dict[str, Any], self.calculator.fit(frame, config))
             return self.applier.apply(frame, self.params)
 
         # If dataset is a tuple (e.g. from FeatureTargetSplitter), pass it through.
         # This allows nodes like TrainTestSplitter to accept (X, y) tuples.
         if isinstance(dataset, tuple):
-            self.params = self.calculator.fit(dataset, config)
+            self.params = cast(Dict[str, Any], self.calculator.fit(dataset, config))
             return self.applier.apply(dataset, self.params)
 
         # 1. Calculate on Train
-        self.params = self.calculator.fit(dataset.train, config)
+        self.params = cast(Dict[str, Any], self.calculator.fit(dataset.train, config))
 
         # 2. Apply to all splits
         new_train = self.applier.apply(dataset.train, self.params)

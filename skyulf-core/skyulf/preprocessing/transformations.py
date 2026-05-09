@@ -16,6 +16,7 @@ from .base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ._artifacts import (
     GeneralTransformationArtifact,
     PowerTransformerArtifact,
+    SimpleTransformationArtifact,
 )
 from ._schema import SkyulfSchema
 from ..engines import EngineName, SkyulfDataFrame, get_engine
@@ -289,7 +290,7 @@ class SimpleTransformationCalculator(BaseCalculator):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> SimpleTransformationArtifact:
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'}, ...]}
         return {
             "type": "simple_transformation",

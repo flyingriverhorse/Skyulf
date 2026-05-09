@@ -397,3 +397,25 @@ class DummyEncoderArtifact(TypedDict, total=False):
     columns: List[str]
     categories: Dict[str, List[str]]
     drop_first: bool
+
+
+# ── Splitters ────────────────────────────────────────────────────────────────
+
+
+class SplitArtifact(TypedDict, total=False):
+    """Train/test/validation split parameters (passed through from config)."""
+
+    type: str
+    test_size: float
+    validation_size: float
+    random_state: int
+    shuffle: bool
+    stratify: bool
+    target_column: Optional[str]
+
+
+class FeatureTargetSplitArtifact(TypedDict, total=False):
+    """Feature/target split parameters (passed through from config)."""
+
+    type: str
+    target_column: str

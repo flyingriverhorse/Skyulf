@@ -8,6 +8,7 @@ from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
 from ..data.dataset import SplitDataset
 from .base import BaseApplier, BaseCalculator
+from ._artifacts import FeatureTargetSplitArtifact, SplitArtifact
 from ._schema import SkyulfSchema
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 
@@ -75,9 +76,22 @@ class SplitApplier(BaseApplier):
 class SplitCalculator(BaseCalculator):
     def fit(
         self, df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any], config: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        # No learning from data, just pass through config
-        return config
+    ) -> SplitArtifact:
+        # No learning from data; pass through known split params from config.
+        # Constructed explicitly so the artifact shape matches SplitArtifact
+        # rather than echoing arbitrary user keys back into the params dict.
+        artifact: SplitArtifact = {"type": "split"}
+        for key in (
+            "test_size",
+            "validation_size",
+            "random_state",
+            "shuffle",
+            "stratify",
+            "target_column",
+        ):
+            if key in config:
+                artifact[key] = config[key]  # type: ignore[literal-required]
+        return artifact
 
     def infer_output_schema(
         self,
@@ -348,8 +362,13 @@ class FeatureTargetSplitCalculator(BaseCalculator):
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, SplitDataset, Tuple[Any, ...], Any],
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        return config
+    ) -> FeatureTargetSplitArtifact:
+        # Only ``target_column`` is consumed downstream by the Applier.
+        # Build a typed artifact rather than echoing the raw config dict.
+        artifact: FeatureTargetSplitArtifact = {"type": "feature_target_split"}
+        if "target_column" in config and config["target_column"] is not None:
+            artifact["target_column"] = str(config["target_column"])
+        return artifact
 
     def infer_output_schema(
         self,
