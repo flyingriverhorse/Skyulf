@@ -2688,6 +2688,14 @@
 
     <div class="doc doc-contents first">
 
+        <p>Feature-generation nodes (PolynomialFeatures + FeatureGeneration math).</p>
+<p>Per-engine apply paths are split into small handlers and dispatched via
+:func:<code>apply_dual_engine</code>. The per-operation logic (<code>arithmetic</code> /
+<code>ratio</code> / <code>similarity</code> / <code>datetime_extract</code>) lives in module-level
+helpers indexed by <code>_FEATGEN_OPS_POLARS</code> / <code>_FEATGEN_OPS_PANDAS</code>.</p>
+<p>Calculator <code>fit</code> paths are sklearn-bound, so they use :func:<code>to_pandas</code>
+once at the top instead of going through <code>fit_dual_engine</code>.</p>
+
 
 
 

@@ -1485,6 +1485,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#notebook-export-seeing-tuning-in-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notebook export — seeing tuning in action
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Notebook export — seeing tuning in action">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-tuning-directly-without-the-canvas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using tuning directly (without the canvas)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#tips" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3041,12 +3069,85 @@
 <li>The best parameters are used to refit the model on the full training set.</li>
 <li>The fitted model is stored in the pipeline and used for <code>predict()</code> / <code>save()</code>.</li>
 </ol>
+<h2 id="notebook-export-seeing-tuning-in-action">Notebook export — seeing tuning in action</h2>
+<p>When you export a canvas pipeline that includes an <strong>Advanced Tuning</strong> node, Skyulf generates a fully self-contained Jupyter notebook. The exported training cell mirrors exactly what the backend engine does:</p>
+<ul>
+<li>Wraps the base calculator/applier in <code>TuningCalculator</code> / <code>TuningApplier</code> so <code>fit_predict</code> actually runs the search (Optuna, grid, random, etc.) instead of a single default fit.</li>
+<li>Passes a <code>progress_callback</code> that prints <code>Trial N/M — score=0.9306</code> for each completed trial directly in the notebook output.</li>
+<li>Passes <code>log_callback=print</code> so the engine's own log lines (<code>Tuning Completed (optuna). Best Score: …</code>, <code>Best Params: {…}</code>, <code>Refitting best model…</code>) appear in the cell output too.</li>
+</ul>
+<p>Example output you'll see while the cell runs:</p>
+<pre><code>Trial 1/10 — score=0.9221
+Trial 2/10 — score=0.9306
+...
+Tuning Completed (optuna). Trials evaluated: 10. Best Score: 0.9497
+Best Params: {'n_estimators': 500, 'max_depth': 3, 'learning_rate': 0.05, ...}
+Refitting best model with params: {...}
+</code></pre>
+<p>After <code>fit_predict</code> completes, the cell calls <code>estimator.evaluate()</code> and renders a coloured <code>train vs test</code> metrics DataFrame (accuracy, F1, ROC-AUC, PR-AUC, and more) using pandas Styler <code>background_gradient</code>.</p>
+<h3 id="using-tuning-directly-without-the-canvas">Using tuning directly (without the canvas)</h3>
+<p>If you want to run tuning in a plain Python script or existing notebook:</p>
+<pre><code class="language-python">from skyulf.data.dataset import SplitDataset
+from skyulf.modeling.base import StatefulEstimator
+from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
+from skyulf.registry import NodeRegistry
+
+ALGORITHM = &quot;xgboost_classifier&quot;
+base_calc = NodeRegistry.get_calculator(ALGORITHM)()
+base_apply = NodeRegistry.get_applier(ALGORITHM)()
+
+# Wrapping is required — without it, tuning_config is silently ignored.
+tuner_calc = TuningCalculator(base_calc)
+tuner_apply = TuningApplier(base_apply)
+estimator = StatefulEstimator(node_id=&quot;my_tuner&quot;, calculator=tuner_calc, applier=tuner_apply)
+
+dataset = SplitDataset(
+    train=X_train.assign(**{&quot;target&quot;: y_train}),
+    test=X_test.assign(**{&quot;target&quot;: y_test}),
+    validation=None,
+)
+
+tuning_config = {
+    &quot;strategy&quot;: &quot;optuna&quot;,
+    &quot;metric&quot;: &quot;f1&quot;,
+    &quot;n_trials&quot;: 25,
+    &quot;search_space&quot;: {
+        &quot;n_estimators&quot;: [100, 200, 500],
+        &quot;max_depth&quot;: [3, 5, 7],
+        &quot;learning_rate&quot;: [0.01, 0.05, 0.1, 0.3],
+    },
+    &quot;cv_enabled&quot;: True,
+    &quot;cv_folds&quot;: 5,
+    &quot;cv_type&quot;: &quot;stratified_k_fold&quot;,
+    &quot;random_state&quot;: 42,
+}
+
+def _on_trial(current, total, score=None, params=None):
+    msg = f&quot;Trial {current}/{total}&quot;
+    if score is not None:
+        msg += f&quot; — score={score:.4f}&quot;
+    print(msg)
+
+_ = estimator.fit_predict(
+    dataset=dataset,
+    target_column=&quot;target&quot;,
+    config=tuning_config,
+    progress_callback=_on_trial,
+    log_callback=print,
+)
+
+metrics = estimator.evaluate(dataset=dataset, target_column=&quot;target&quot;)
+</code></pre>
+<blockquote>
+<p><strong>Important:</strong> Always pass <code>TuningCalculator(base_calc)</code> — not the raw base calculator. The <code>TuningConfig</code> keyword filter inside <code>TuningCalculator.fit</code> reads <code>strategy</code>, <code>n_trials</code>, <code>metric</code>, <code>search_space</code>, <code>cv_*</code>, etc. directly from the config dict. If you pass the unwrapped base calculator, <code>tuning_config</code> is ignored and a single default-param fit runs instead.</p>
+</blockquote>
 <h2 id="tips">Tips</h2>
 <ul>
 <li>Start with <code>"strategy": "random"</code> and <code>"n_trials": 20</code> for a quick baseline.</li>
 <li>Switch to <code>"optuna"</code> when you want smarter exploration (Bayesian optimization).</li>
 <li>Use <code>"halving_random"</code> for large search spaces where grid search is infeasible.</li>
 <li>Always run a <code>TrainTestSplitter</code> before tuning to avoid data leakage.</li>
+<li>When exporting to a notebook, use the <strong>Export → Full</strong> mode to get per-branch training cells with live trial output; the <strong>Compact</strong> mode runs all branches in a loop and shows a coloured <code>(branch × split)</code> comparison table at the end.</li>
 </ul>
 
 

@@ -2688,6 +2688,13 @@
 
     <div class="doc doc-contents first">
 
+        <p>Feature-selection nodes (Variance / Correlation / Univariate / Model-based).</p>
+<p>Each Applier dispatches on engine via :func:<code>apply_dual_engine</code> (see
+<code>dispatcher.py</code>); per-engine logic lives in small <code>_apply_polars</code> /
+<code>_apply_pandas</code> static helpers. Calculator <code>fit</code> paths are sklearn-bound,
+so they use :func:<code>to_pandas</code> once at the top instead of going through
+<code>fit_dual_engine</code>.</p>
+
 
 
 

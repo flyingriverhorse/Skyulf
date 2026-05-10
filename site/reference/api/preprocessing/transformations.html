@@ -2688,6 +2688,13 @@
 
     <div class="doc doc-contents first">
 
+        <p>Transformation nodes (PowerTransformer / SimpleTransformation / GeneralTransformation).</p>
+<p>Per-engine apply paths are split into <code>_apply_polars</code> / <code>_apply_pandas</code>
+static helpers and dispatched via <code>apply_dual_engine</code>. The per-method
+expression builders for the simple and general transformations live in
+module-level dispatch dicts (<code>_POLARS_OPS</code> / <code>_PANDAS_OPS</code>) so each
+helper stays at low CCN.</p>
+
 
 
 

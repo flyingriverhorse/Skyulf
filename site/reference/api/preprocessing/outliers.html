@@ -2688,6 +2688,13 @@
 
     <div class="doc doc-contents first">
 
+        <p>Outlier-handling nodes (IQR / ZScore / Winsorize / ManualBounds / EllipticEnvelope).</p>
+<p>Per-engine apply paths are split into <code>_apply_polars</code> / <code>_apply_pandas</code>
+static helpers and dispatched via <code>apply_dual_engine</code> (see
+<code>dispatcher.py</code>). Fit paths are pandas-only here (we always coerce to
+Pandas before computing quantiles / fitting sklearn models), so there is
+no fit-time dispatch needed.</p>
+
 
 
 

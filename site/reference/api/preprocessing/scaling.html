@@ -2688,6 +2688,13 @@
 
     <div class="doc doc-contents first">
 
+        <p>Scaling nodes (Standard / MinMax / Robust / MaxAbs).</p>
+<p>Each Applier/Calculator dispatches on engine via <code>apply_dual_engine</code> /
+<code>fit_dual_engine</code> (see <code>dispatcher.py</code>) so per-engine logic lives in
+small, individually testable <code>_apply_polars</code> / <code>_apply_pandas</code> /
+<code>_fit_polars</code> / <code>_fit_pandas</code> static helpers. This keeps the public
+<code>apply</code> / <code>fit</code> methods at CCN 1 (Codacy <code>lizard_ccn-medium</code>).</p>
+
 
 
 
