@@ -1,5 +1,14 @@
-﻿import logging
-from typing import Any, Dict, cast
+﻿"""Scaling nodes (Standard / MinMax / Robust / MaxAbs).
+
+Each Applier/Calculator dispatches on engine via ``apply_dual_engine`` /
+``fit_dual_engine`` (see ``dispatcher.py``) so per-engine logic lives in
+small, individually testable ``_apply_polars`` / ``_apply_pandas`` /
+``_fit_polars`` / ``_fit_pandas`` static helpers. This keeps the public
+``apply`` / ``fit`` methods at CCN 1 (Codacy ``lizard_ccn-medium``).
+"""
+
+import logging
+from typing import Any, Dict, List, Tuple, cast
 
 import numpy as np
 from sklearn.preprocessing import (
@@ -15,89 +24,101 @@ from ..utils import (
     user_picked_no_columns,
 )
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from .dispatcher import apply_dual_engine, fit_dual_engine
 from ._artifacts import (
     MaxAbsScalerArtifact,
     MinMaxScalerArtifact,
     RobustScalerArtifact,
     StandardScalerArtifact,
 )
+from ._helpers import resolve_valid_columns, safe_scale
 from ._schema import SkyulfSchema
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
-from ..engines import EngineName, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
 
-# --- Standard Scaler ---
+
+# -----------------------------------------------------------------------------
+# Shared fit helpers (engine-specific subset selection)
+# -----------------------------------------------------------------------------
+
+
+def _select_subset_polars(X: Any, config: Dict[str, Any]) -> Tuple[List[str], Any]:
+    """Resolve numeric columns and return (cols, X[cols]) for a Polars frame."""
+    cols = resolve_columns(X, config, detect_numeric_columns)
+    if not cols:
+        return [], None
+    return cols, X.select(cols)
+
+
+def _select_subset_pandas(X: Any, config: Dict[str, Any]) -> Tuple[List[str], Any]:
+    """Resolve numeric columns and return (cols, X[cols]) for a Pandas frame."""
+    cols = resolve_columns(X, config, detect_numeric_columns)
+    if not cols:
+        return [], None
+    return cols, X[cols]
+
+
+# -----------------------------------------------------------------------------
+# Standard Scaler
+# -----------------------------------------------------------------------------
 
 
 class StandardScalerApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
+
+    @staticmethod
+    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+        import polars as pl
 
         cols = params.get("columns", [])
         mean = params.get("mean")
         scale = params.get("scale")
+        valid = resolve_valid_columns(X, cols)
+        if not valid or mean is None or scale is None:
+            return X, _y
 
-        # Check valid cols (works for both Pandas and Polars/Wrapper)
-        valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols or mean is None or scale is None:
-            return X
-
-        # Check Engine
-        engine = get_engine(X)
-
-        if engine.name == EngineName.POLARS:
-            import polars as pl
-
-            # Polars Native Implementation
-
-            X_pl: Any = X
-
-            mean_arr = np.array(mean)
-            scale_arr = np.array(scale)
-            col_indices = [cols.index(c) for c in valid_cols]
-
-            exprs = []
-            for idx, col_name in zip(col_indices, valid_cols):
-                e = pl.col(col_name)
-                if params.get("with_mean", True):
-                    e = e - mean_arr[idx]
-                if params.get("with_std", True):
-                    s = scale_arr[idx]
-                    s = s if s != 0 else 1.0
-                    e = e / s
-                exprs.append(e)
-
-            # Apply transformations
-            X_out = X_pl.with_columns(exprs)
-
-            return X_out
-
-        # Pandas/Numpy Implementation (Legacy)
-        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
-        X_out = X_pd.copy()
-
+        with_mean = params.get("with_mean", True)
+        with_std = params.get("with_std", True)
         mean_arr = np.array(mean)
         scale_arr = np.array(scale)
-        col_indices = [cols.index(c) for c in valid_cols]
 
-        vals = X_out[valid_cols].values
+        exprs = []
+        for col_name in valid:
+            idx = cols.index(col_name)
+            e = pl.col(col_name)
+            if with_mean:
+                e = e - mean_arr[idx]
+            if with_std:
+                s = scale_arr[idx]
+                e = e / (s if s != 0 else 1.0)
+            exprs.append(e.alias(col_name))
+        return X.with_columns(exprs), _y
+
+    @staticmethod
+    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+        cols = params.get("columns", [])
+        mean = params.get("mean")
+        scale = params.get("scale")
+        valid = resolve_valid_columns(X, cols)
+        if not valid or mean is None or scale is None:
+            return X, _y
+
+        X_out = X.copy()
+        col_indices = [cols.index(c) for c in valid]
+        vals = X_out[valid].values
+
         if params.get("with_mean", True):
-            vals = vals - mean_arr[col_indices]
+            vals = vals - np.array(mean)[col_indices]
         if params.get("with_std", True):
-            safe_scale = scale_arr[col_indices]
-            safe_scale[safe_scale == 0] = 1.0
-            vals = vals / safe_scale
+            vals = vals / safe_scale(np.array(scale)[col_indices].copy())
 
-        X_out[valid_cols] = vals
-        return X_out
+        X_out[valid] = vals
+        return X_out, _y
 
 
 @NodeRegistry.register("StandardScaler", StandardScalerApplier)
@@ -116,104 +137,91 @@ class StandardScalerCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> StandardScalerArtifact:
-        engine = get_engine(X)
-
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> StandardScalerArtifact:
         if user_picked_no_columns(config):
+            return cast(StandardScalerArtifact, {})
+        return cast(
+            StandardScalerArtifact,
+            fit_dual_engine(X, config, self._fit_polars, self._fit_pandas),
+        )
+
+    @staticmethod
+    def _fit_polars(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+        cols, X_subset = _select_subset_polars(X, config)
+        if not cols:
             return {}
+        return _fit_standard(X_subset, cols, config)
 
-        # Config: {'with_mean': True, 'with_std': True, 'columns': [...]}
-        with_mean = config.get("with_mean", True)
-        with_std = config.get("with_std", True)
-
-        # Casting for strict type checking
-        if engine.name == EngineName.POLARS:
-            X_pl: Any = X
-            cols = resolve_columns(X_pl, config, detect_numeric_columns)
-            if not cols:
-                return {}
-            X_subset = X_pl.select(cols)
-        else:
-            X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
-            cols = resolve_columns(X_pd, config, detect_numeric_columns)
-            if not cols:
-                return {}
-            X_subset = X_pd[cols]
-
-        scaler = StandardScaler(with_mean=with_mean, with_std=with_std)
-
-        # Use Bridge for fitting
-        X_np, _ = SklearnBridge.to_sklearn(X_subset)
-
-        scaler.fit(X_np)
-
-        # sklearn stubs widen mean_/var_ to include int|float; cast to keep .tolist().
-        mean_ = cast(Any, scaler.mean_)
-        var_ = cast(Any, scaler.var_)
-        return {
-            "type": "standard_scaler",
-            "mean": mean_.tolist() if hasattr(mean_, "tolist") else mean_,
-            "scale": scaler.scale_.tolist() if scaler.scale_ is not None else None,
-            "var": var_.tolist() if hasattr(var_, "tolist") else var_,
-            "with_mean": with_mean,
-            "with_std": with_std,
-            "columns": cols,
-        }
+    @staticmethod
+    def _fit_pandas(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+        cols, X_subset = _select_subset_pandas(X, config)
+        if not cols:
+            return {}
+        return _fit_standard(X_subset, cols, config)
 
 
-# --- MinMax Scaler ---
+def _fit_standard(X_subset: Any, cols: List[str], config: Dict[str, Any]) -> Dict[str, Any]:
+    with_mean = config.get("with_mean", True)
+    with_std = config.get("with_std", True)
+    scaler = StandardScaler(with_mean=with_mean, with_std=with_std)
+    X_np, _ = SklearnBridge.to_sklearn(X_subset)
+    scaler.fit(X_np)
+
+    # sklearn stubs widen mean_/var_ to include int|float; cast to keep .tolist().
+    mean_ = cast(Any, scaler.mean_)
+    var_ = cast(Any, scaler.var_)
+    return {
+        "type": "standard_scaler",
+        "mean": mean_.tolist() if hasattr(mean_, "tolist") else mean_,
+        "scale": scaler.scale_.tolist() if scaler.scale_ is not None else None,
+        "var": var_.tolist() if hasattr(var_, "tolist") else var_,
+        "with_mean": with_mean,
+        "with_std": with_std,
+        "columns": cols,
+    }
+
+
+# -----------------------------------------------------------------------------
+# MinMax Scaler
+# -----------------------------------------------------------------------------
 
 
 class MinMaxScalerApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
+
+    @staticmethod
+    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+        import polars as pl
 
         cols = params.get("columns", [])
         min_val = params.get("min")
         scale = params.get("scale")
+        valid = resolve_valid_columns(X, cols)
+        if not valid or min_val is None or scale is None:
+            return X, _y
 
-        valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols or min_val is None or scale is None:
-            return X
+        exprs = [
+            (pl.col(c) * scale[cols.index(c)] + min_val[cols.index(c)]).alias(c) for c in valid
+        ]
+        return X.with_columns(exprs), _y
 
-        # Polars Path
-        if engine.name == EngineName.POLARS:
-            import polars as pl
+    @staticmethod
+    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+        cols = params.get("columns", [])
+        min_val = params.get("min")
+        scale = params.get("scale")
+        valid = resolve_valid_columns(X, cols)
+        if not valid or min_val is None or scale is None:
+            return X, _y
 
-            X_pl: Any = X
-
-            exprs = []
-            for i, col_name in enumerate(cols):
-                if col_name in valid_cols:
-                    # X * scale + min
-                    exprs.append((pl.col(col_name) * scale[i] + min_val[i]).alias(col_name))
-
-            X_out = X_pl.with_columns(exprs)
-            return X_out
-
-        # Pandas Path
-        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
-        X_out = X_pd.copy()
-
-        min_arr = np.array(min_val)
-        scale_arr = np.array(scale)
-        col_indices = [cols.index(c) for c in valid_cols]
-
-        vals = X_out[valid_cols].values
-        vals = vals * scale_arr[col_indices] + min_arr[col_indices]
-        X_out[valid_cols] = vals
-        return X_out
+        X_out = X.copy()
+        col_indices = [cols.index(c) for c in valid]
+        vals = X_out[valid].values
+        vals = vals * np.array(scale)[col_indices] + np.array(min_val)[col_indices]
+        X_out[valid] = vals
+        return X_out, _y
 
 
 @NodeRegistry.register("MinMaxScaler", MinMaxScalerApplier)
@@ -231,117 +239,103 @@ class MinMaxScalerCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> MinMaxScalerArtifact:
-        engine = get_engine(X)
-
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> MinMaxScalerArtifact:
         if user_picked_no_columns(config):
+            return cast(MinMaxScalerArtifact, {})
+        return cast(
+            MinMaxScalerArtifact,
+            fit_dual_engine(X, config, self._fit_polars, self._fit_pandas),
+        )
+
+    @staticmethod
+    def _fit_polars(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+        cols, X_subset = _select_subset_polars(X, config)
+        if not cols:
             return {}
+        return _fit_minmax(X_subset, cols, config)
 
-        # Config: {'feature_range': (0, 1), 'columns': [...]}
-        feature_range = config.get("feature_range", (0, 1))
-
-        if engine.name == EngineName.POLARS:
-            X_pl: Any = X
-            cols = resolve_columns(X_pl, config, detect_numeric_columns)
-            if not cols:
-                return {}
-            X_subset = X_pl.select(cols)
-        else:
-            X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
-            cols = resolve_columns(X_pd, config, detect_numeric_columns)
-            if not cols:
-                return {}
-            X_subset = X_pd[cols]
-
-        scaler = MinMaxScaler(feature_range=feature_range)
-
-        # Use Bridge for fitting
-        X_np, _ = SklearnBridge.to_sklearn(X_subset)
-
-        scaler.fit(X_np)
-
-        return {
-            "type": "minmax_scaler",
-            "min": scaler.min_.tolist(),
-            "scale": scaler.scale_.tolist(),
-            "data_min": scaler.data_min_.tolist(),
-            "data_max": scaler.data_max_.tolist(),
-            "feature_range": feature_range,
-            "columns": cols,
-        }
+    @staticmethod
+    def _fit_pandas(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+        cols, X_subset = _select_subset_pandas(X, config)
+        if not cols:
+            return {}
+        return _fit_minmax(X_subset, cols, config)
 
 
-# --- Robust Scaler ---
+def _fit_minmax(X_subset: Any, cols: List[str], config: Dict[str, Any]) -> Dict[str, Any]:
+    # `feature_range` may arrive as a JSON-loaded list (e.g. ``[0, 1]``) from the
+    # frontend or pipeline config; sklearn enforces ``tuple`` via param validation.
+    feature_range = tuple(config.get("feature_range", (0, 1)))
+    scaler = MinMaxScaler(feature_range=feature_range)
+    X_np, _ = SklearnBridge.to_sklearn(X_subset)
+    scaler.fit(X_np)
+    return {
+        "type": "minmax_scaler",
+        "min": scaler.min_.tolist(),
+        "scale": scaler.scale_.tolist(),
+        "data_min": scaler.data_min_.tolist(),
+        "data_max": scaler.data_max_.tolist(),
+        "feature_range": feature_range,
+        "columns": cols,
+    }
+
+
+# -----------------------------------------------------------------------------
+# Robust Scaler
+# -----------------------------------------------------------------------------
 
 
 class RobustScalerApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
+
+    @staticmethod
+    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+        import polars as pl
 
         cols = params.get("columns", [])
         center = params.get("center")
         scale = params.get("scale")
+        valid = resolve_valid_columns(X, cols)
+        if not valid:
+            return X, _y
 
-        valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols:
-            return X
+        with_centering = params.get("with_centering", True)
+        with_scaling = params.get("with_scaling", True)
 
-        # Polars Path
-        if engine.name == EngineName.POLARS:
-            import polars as pl
+        exprs = []
+        for col_name in valid:
+            i = cols.index(col_name)
+            e = pl.col(col_name)
+            if with_centering and center is not None:
+                e = e - center[i]
+            if with_scaling and scale is not None:
+                s = scale[i]
+                e = e / (s if s != 0 else 1.0)
+            exprs.append(e.alias(col_name))
+        return X.with_columns(exprs), _y
 
-            X_pl: Any = X
+    @staticmethod
+    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+        cols = params.get("columns", [])
+        center = params.get("center")
+        scale = params.get("scale")
+        valid = resolve_valid_columns(X, cols)
+        if not valid:
+            return X, _y
 
-            exprs = []
-            for i, col_name in enumerate(cols):
-                if col_name in valid_cols:
-                    expr = pl.col(col_name)
-
-                    if params.get("with_centering", True) and center is not None:
-                        expr = expr - center[i]
-
-                    if params.get("with_scaling", True) and scale is not None:
-                        s = scale[i]
-                        if s == 0:
-                            s = 1.0
-                        expr = expr / s
-
-                    exprs.append(expr.alias(col_name))
-
-            X_out = X_pl.with_columns(exprs)
-            return X_out
-
-        # Pandas Path
-        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
-        X_out = X_pd.copy()
-
-        col_indices = [cols.index(c) for c in valid_cols]
-        vals = X_out[valid_cols].values
+        X_out = X.copy()
+        col_indices = [cols.index(c) for c in valid]
+        vals = X_out[valid].values
 
         if params.get("with_centering", True) and center is not None:
-            center_arr = np.array(center)
-            vals = vals - center_arr[col_indices]
-
+            vals = vals - np.array(center)[col_indices]
         if params.get("with_scaling", True) and scale is not None:
-            scale_arr = np.array(scale)
-            # Avoid division by zero
-            safe_scale = scale_arr[col_indices]
-            safe_scale[safe_scale == 0] = 1.0
-            vals = vals / safe_scale
+            vals = vals / safe_scale(np.array(scale)[col_indices].copy())
 
-        X_out[valid_cols] = vals
-        return X_out
+        X_out[valid] = vals
+        return X_out, _y
 
 
 @NodeRegistry.register("RobustScaler", RobustScalerApplier)
@@ -364,109 +358,92 @@ class RobustScalerCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> RobustScalerArtifact:
-        engine = get_engine(X)
-
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> RobustScalerArtifact:
         if user_picked_no_columns(config):
-            return {}
-
-        # Config: {'quantile_range': (25.0, 75.0), 'with_centering': True, 'with_scaling': True, 'columns': [...]}
-        quantile_range = config.get("quantile_range", (25.0, 75.0))
-        with_centering = config.get("with_centering", True)
-        with_scaling = config.get("with_scaling", True)
-
-        if engine.name == EngineName.POLARS:
-            X_pl: Any = X
-            cols = resolve_columns(X_pl, config, detect_numeric_columns)
-            if not cols:
-                return {}
-            X_subset = X_pl.select(cols)
-        else:
-            X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
-            cols = resolve_columns(X_pd, config, detect_numeric_columns)
-            if not cols:
-                return {}
-            X_subset = X_pd[cols]
-
-        scaler = RobustScaler(
-            quantile_range=quantile_range,
-            with_centering=with_centering,
-            with_scaling=with_scaling,
+            return cast(RobustScalerArtifact, {})
+        return cast(
+            RobustScalerArtifact,
+            fit_dual_engine(X, config, self._fit_polars, self._fit_pandas),
         )
 
-        # Use Bridge for fitting
-        X_np, _ = SklearnBridge.to_sklearn(X_subset)
+    @staticmethod
+    def _fit_polars(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+        cols, X_subset = _select_subset_polars(X, config)
+        if not cols:
+            return {}
+        return _fit_robust(X_subset, cols, config)
 
-        scaler.fit(X_np)
-
-        return {
-            "type": "robust_scaler",
-            "center": scaler.center_.tolist() if scaler.center_ is not None else None,
-            "scale": scaler.scale_.tolist() if scaler.scale_ is not None else None,
-            "quantile_range": quantile_range,
-            "with_centering": with_centering,
-            "with_scaling": with_scaling,
-            "columns": cols,
-        }
+    @staticmethod
+    def _fit_pandas(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+        cols, X_subset = _select_subset_pandas(X, config)
+        if not cols:
+            return {}
+        return _fit_robust(X_subset, cols, config)
 
 
-# --- MaxAbs Scaler ---
+def _fit_robust(X_subset: Any, cols: List[str], config: Dict[str, Any]) -> Dict[str, Any]:
+    # Same JSON list -> tuple coercion as MinMaxScaler.
+    quantile_range = tuple(config.get("quantile_range", (25.0, 75.0)))
+    with_centering = config.get("with_centering", True)
+    with_scaling = config.get("with_scaling", True)
+    scaler = RobustScaler(
+        quantile_range=quantile_range,
+        with_centering=with_centering,
+        with_scaling=with_scaling,
+    )
+    X_np, _ = SklearnBridge.to_sklearn(X_subset)
+    scaler.fit(X_np)
+    return {
+        "type": "robust_scaler",
+        "center": scaler.center_.tolist() if scaler.center_ is not None else None,
+        "scale": scaler.scale_.tolist() if scaler.scale_ is not None else None,
+        "quantile_range": quantile_range,
+        "with_centering": with_centering,
+        "with_scaling": with_scaling,
+        "columns": cols,
+    }
+
+
+# -----------------------------------------------------------------------------
+# MaxAbs Scaler
+# -----------------------------------------------------------------------------
 
 
 class MaxAbsScalerApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
+
+    @staticmethod
+    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+        import polars as pl
 
         cols = params.get("columns", [])
         scale = params.get("scale")
+        valid = resolve_valid_columns(X, cols)
+        if not valid or scale is None:
+            return X, _y
 
-        valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols or scale is None:
-            return X
+        exprs = []
+        for col_name in valid:
+            s = scale[cols.index(col_name)]
+            exprs.append((pl.col(col_name) / (s if s != 0 else 1.0)).alias(col_name))
+        return X.with_columns(exprs), _y
 
-        # Polars Path
-        if engine.name == EngineName.POLARS:
-            import polars as pl
+    @staticmethod
+    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+        cols = params.get("columns", [])
+        scale = params.get("scale")
+        valid = resolve_valid_columns(X, cols)
+        if not valid or scale is None:
+            return X, _y
 
-            X_pl: Any = X
-
-            exprs = []
-            for i, col_name in enumerate(cols):
-                if col_name in valid_cols:
-                    s = scale[i]
-                    if s == 0:
-                        s = 1.0
-                    exprs.append((pl.col(col_name) / s).alias(col_name))
-
-            X_out = X_pl.with_columns(exprs)
-            return X_out
-
-        # Pandas Path
-        X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
-        X_out = X_pd.copy()
-
-        scale_arr = np.array(scale)
-        col_indices = [cols.index(c) for c in valid_cols]
-
-        vals = X_out[valid_cols].values
-        # Avoid division by zero
-        safe_scale = scale_arr[col_indices]
-        safe_scale[safe_scale == 0] = 1.0
-        vals = vals / safe_scale
-
-        X_out[valid_cols] = vals
-        return X_out
+        X_out = X.copy()
+        col_indices = [cols.index(c) for c in valid]
+        vals = X_out[valid].values
+        vals = vals / safe_scale(np.array(scale)[col_indices].copy())
+        X_out[valid] = vals
+        return X_out, _y
 
 
 @NodeRegistry.register("MaxAbsScaler", MaxAbsScalerApplier)
@@ -484,40 +461,36 @@ class MaxAbsScalerCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> MaxAbsScalerArtifact:
-        engine = get_engine(X)
-
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> MaxAbsScalerArtifact:
         if user_picked_no_columns(config):
+            return cast(MaxAbsScalerArtifact, {})
+        return cast(
+            MaxAbsScalerArtifact,
+            fit_dual_engine(X, config, self._fit_polars, self._fit_pandas),
+        )
+
+    @staticmethod
+    def _fit_polars(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+        cols, X_subset = _select_subset_polars(X, config)
+        if not cols:
             return {}
+        return _fit_maxabs(X_subset, cols)
 
-        if engine.name == EngineName.POLARS:
-            X_pl: Any = X
-            cols = resolve_columns(X_pl, config, detect_numeric_columns)
-            if not cols:
-                return {}
-            X_subset = X_pl.select(cols)
-        else:
-            X_pd: Any = X.to_pandas() if hasattr(X, "to_pandas") else X
-            cols = resolve_columns(X_pd, config, detect_numeric_columns)
-            if not cols:
-                return {}
-            X_subset = X_pd[cols]
+    @staticmethod
+    def _fit_pandas(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+        cols, X_subset = _select_subset_pandas(X, config)
+        if not cols:
+            return {}
+        return _fit_maxabs(X_subset, cols)
 
-        scaler = MaxAbsScaler()
 
-        # Use Bridge for fitting
-        X_np, _ = SklearnBridge.to_sklearn(X_subset)
-
-        scaler.fit(X_np)
-
-        return {
-            "type": "maxabs_scaler",
-            "scale": scaler.scale_.tolist() if scaler.scale_ is not None else None,
-            "max_abs": (scaler.max_abs_.tolist() if scaler.max_abs_ is not None else None),
-            "columns": cols,
-        }
+def _fit_maxabs(X_subset: Any, cols: List[str]) -> Dict[str, Any]:
+    scaler = MaxAbsScaler()
+    X_np, _ = SklearnBridge.to_sklearn(X_subset)
+    scaler.fit(X_np)
+    return {
+        "type": "maxabs_scaler",
+        "scale": scaler.scale_.tolist() if scaler.scale_ is not None else None,
+        "max_abs": (scaler.max_abs_.tolist() if scaler.max_abs_ is not None else None),
+        "columns": cols,
+    }

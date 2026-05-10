@@ -240,6 +240,8 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
       relative group min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all duration-150
       ${selected
         ? 'border-primary shadow-lg shadow-primary/30 scale-[1.02]'
+        : nodeResult?.status === 'failed'
+        ? 'border-red-500 shadow-sm shadow-red-500/20 hover:border-red-500'
         : validationMessage
         ? 'border-red-500/40 hover:border-red-500/60'
         : hasBrokenRefs
@@ -272,7 +274,10 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         <div className="absolute -top-2 -left-2 z-10 flex items-center gap-1">
           {nodeResult && (
             <span
-              title={nodeResult.status === 'success' ? 'Last run: success' : 'Last run: failed'}
+              title={nodeResult.status === 'success'
+                ? 'Last run: success'
+                : `Last run failed: Check Notifications or Error Page for details.`
+              }
               aria-label={nodeResult.status === 'success' ? 'Last run: success' : 'Last run: failed'}
               className={`flex items-center justify-center w-5 h-5 rounded-full border shadow-sm ${
                 nodeResult.status === 'success'

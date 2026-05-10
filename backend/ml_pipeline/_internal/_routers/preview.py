@@ -476,6 +476,22 @@ async def preview_pipeline(  # noqa: C901
             seen_warning_keys.add(key)
             deduped_warnings.append(w)
 
+        # Aggregate per-node soft warnings (TargetEncoder coercion notices,
+        # OneHotEncoder degenerate-category warnings, ...) across branches.
+        # Dedup on (node_id, message) so the same warning emitted in N
+        # parallel branches surfaces once in the UI.
+        all_node_warnings = [
+            w for _orig, _runnable, res in sub_results for w in getattr(res, "node_warnings", [])
+        ]
+        seen_node_warn_keys: set = set()
+        deduped_node_warnings: List[Dict[str, Any]] = []
+        for w in all_node_warnings:
+            key = (w.get("node_id"), w.get("message"))
+            if key in seen_node_warn_keys:
+                continue
+            seen_node_warn_keys.add(key)
+            deduped_node_warnings.append(w)
+
         return PreviewResponse(
             pipeline_id=pipeline_config.pipeline_id,
             status=agg_status,
@@ -487,6 +503,7 @@ async def preview_pipeline(  # noqa: C901
             branch_node_ids=branch_node_ids,
             recommendations=recommendations,
             merge_warnings=deduped_warnings,
+            node_warnings=deduped_node_warnings,
         )
 
     except Exception:

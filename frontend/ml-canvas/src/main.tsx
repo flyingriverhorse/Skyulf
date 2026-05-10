@@ -35,7 +35,7 @@ if (rootElement) {
         <QueryClientProvider client={queryClient}>
           <ConfirmProvider>
             <App />
-            <Toaster richColors closeButton position="top-right" />
+            <Toaster richColors closeButton position="top-right" duration={5000} />
             {ReactQueryDevtools && (
               <React.Suspense fallback={null}>
                 <ReactQueryDevtools initialIsOpen={false} />

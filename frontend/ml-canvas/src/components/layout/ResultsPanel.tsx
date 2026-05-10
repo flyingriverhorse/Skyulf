@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { ChevronUp, ChevronDown, ChevronRight, Table, Layers, GitBranch, AlertTriangle, Wand2 } from 'lucide-react';
-import type { NodeExecutionResult, PreviewDataRows, PreviewData } from '../../core/api/client';
+import type { PreviewDataRows, PreviewData } from '../../core/api/client';
 import { generateBranchColors } from '../../core/hooks/useBranchColors';
 import { clickableProps } from '../../core/utils/a11y';
 import { useConfirm } from '../shared';
@@ -171,14 +171,6 @@ export const ResultsPanel: React.FC = () => {
     ? branchNodeIds[activeBranch]
     : allNodeIds;
 
-  // Check for errors
-  const nodeResults = executionResult.node_results || {};
-  const errorNodeId = Object.keys(nodeResults).find((nodeId) => {
-    const result: NodeExecutionResult | undefined = nodeResults[nodeId];
-    return result?.status === 'failed';
-  });
-  const error = errorNodeId ? nodeResults[errorNodeId]?.error : null;
-
   return (
     <div 
       className={`absolute bottom-0 left-0 right-0 bg-background border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] transition-all duration-300 z-20 flex flex-col ${
@@ -217,18 +209,12 @@ export const ResultsPanel: React.FC = () => {
       {/* Content */}
       {isResultsPanelExpanded && (
         <div className="flex-1 overflow-hidden flex flex-col">
-          {/* Error Message */}
-          {executionResult.status === 'failed' && (
-             <div className="p-4 bg-red-50 border-b text-red-800 text-sm overflow-auto max-h-32">
-                <div className="font-bold mb-1">Pipeline Execution Failed</div>
-                <div className="font-mono text-xs whitespace-pre-wrap">{error || 'Unknown error occurred during execution.'}</div>
-             </div>
-          )}
 
           {/* Branch Tabs (multi-branch parallel runs only) */}
           {branchLabels.length > 0 && (
-            <div className="flex items-center gap-1 px-2 pt-2 border-b bg-muted/10">
-              <GitBranch className="w-3 h-3 text-muted-foreground mr-1" />
+            <div className="flex items-center border-b bg-muted/10 px-2 pt-2">
+              <GitBranch className="w-3 h-3 text-muted-foreground mr-1 shrink-0" />
+              <div className="flex items-center gap-1 overflow-x-auto pb-0 scrollbar-thin scrollbar-thumb-muted/50">
               {branchLabels.map((label, idx) => {
                 const isActive = activeBranch === label;
                 const advisoryCount = branchAdvisoryCounts[label] ?? 0;
@@ -236,7 +222,7 @@ export const ResultsPanel: React.FC = () => {
                   <button
                     key={label}
                     onClick={() => { setActiveBranch(label); }}
-                    className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-t-md border-t border-l border-r transition-colors ${
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-t-md border-t border-l border-r transition-colors ${
                       isActive
                         ? 'bg-background text-foreground border-b-background translate-y-[1px]'
                         : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border-transparent'
@@ -264,13 +250,15 @@ export const ResultsPanel: React.FC = () => {
                   </button>
                 );
               })}
+              </div>
             </div>
           )}
 
           {/* Split Tabs (train / test / X / y …) */}
           {tabNames.length > 1 && (
-            <div className="flex items-center gap-1 px-2 pt-2 border-b bg-muted/5">
-              <Layers className="w-3 h-3 text-muted-foreground mr-1" />
+            <div className="flex items-center border-b bg-muted/5 px-2 pt-2">
+              <Layers className="w-3 h-3 text-muted-foreground mr-1 shrink-0" />
+              <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin scrollbar-thumb-muted/50">
               {tabNames.map(name => {
                 const rows = datasets[name];
                 const previewCount = Array.isArray(rows) ? rows.length : 0;
@@ -280,7 +268,7 @@ export const ResultsPanel: React.FC = () => {
                   <button
                     key={name}
                     onClick={() => { setActiveTab(name); }}
-                    className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-t-md border-t border-l border-r transition-colors ${
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-t-md border-t border-l border-r transition-colors ${
                       effectiveTab === name
                         ? 'bg-background text-primary border-b-background translate-y-[1px]'
                         : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border-transparent'
@@ -304,6 +292,7 @@ export const ResultsPanel: React.FC = () => {
                   </button>
                 );
               })}
+              </div>
             </div>
           )}
 

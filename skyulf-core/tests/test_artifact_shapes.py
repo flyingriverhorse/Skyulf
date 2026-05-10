@@ -484,71 +484,31 @@ def test_artifact_shape(
     )
 
 
-# ---------- Dict[str, Any] holdouts (no TypedDict annotation yet) ----------
-#
-# These 4 calculators keep ``-> Dict[str, Any]`` because their ``fit`` is
-# undecorated (no ``@fit_method``) and ``ty`` enforces LSP against
-# ``BaseCalculator.fit -> Dict[str, Any]``: a TypedDict return would
-# violate that contract. The TypedDicts ARE defined in ``_artifacts.py``;
-# only the annotation site is deferred. We still validate the runtime
-# shape against those TypedDicts here.
+# ---------- Split calculators (typed Artifact since C8) ----------
 
 
-HOLDOUT_CASES = [
-    (
-        FeatureGenerationCalculator,
-        art.FeatureGenerationArtifact,
-        "feature_generation",
-        _numeric_df,
-        {"operations": []},
-    ),
-    (
-        SimpleTransformationCalculator,
-        art.SimpleTransformationArtifact,
-        "simple_transformation",
-        _numeric_df,
-        {"transformations": [{"column": "a", "method": "log"}]},
-    ),
-]
-
-
-@pytest.mark.parametrize(
-    "calc_cls,artifact_cls,expected_type,make_data,config",
-    HOLDOUT_CASES,
-    ids=[c[0].__name__ for c in HOLDOUT_CASES],
-)
-def test_holdout_artifact_shape(
-    calc_cls: Type[BaseCalculator],
-    artifact_cls: Type[Any],
-    expected_type: str,
-    make_data: Callable[[], Any],
-    config: Dict[str, Any],
-) -> None:
-    """Even though these aren't typed at the call site, runtime shape
-    should still match the documented TypedDict."""
-    result = calc_cls().fit(make_data(), config)
-    assert isinstance(result, dict)
-    assert result.get("type") == expected_type
-    extra_keys = set(result.keys()) - set(artifact_cls.__annotations__.keys())
-    assert not extra_keys, f"{calc_cls.__name__}: undeclared keys {sorted(extra_keys)}"
-
-
-# ---------- Split calculators (return raw config) ----------
-
-
-def test_split_calculator_returns_dict() -> None:
-    """Split passes config through unchanged. No TypedDict — assert dict only."""
+def test_split_calculator_returns_typed_artifact() -> None:
+    """SplitCalculator builds a typed SplitArtifact from known config keys."""
     cfg = {"test_size": 0.2, "random_state": 42, "shuffle": True}
     result = SplitCalculator().fit(_numeric_df(), cfg)
     assert isinstance(result, dict)
-    assert result == cfg  # passthrough
+    assert result["type"] == "split"
+    # Known keys are forwarded; extra config keys are dropped.
+    assert result["test_size"] == 0.2
+    assert result["random_state"] == 42
+    assert result["shuffle"] is True
+    extra = set(result.keys()) - set(art.SplitArtifact.__annotations__.keys())
+    assert not extra, f"SplitCalculator produced undeclared keys: {sorted(extra)}"
 
 
-def test_feature_target_split_calculator_returns_dict() -> None:
+def test_feature_target_split_calculator_returns_typed_artifact() -> None:
     cfg = {"target_column": "target"}
     result = FeatureTargetSplitCalculator().fit(_mixed_with_target_df(), cfg)
     assert isinstance(result, dict)
-    assert result == cfg  # passthrough
+    assert result["type"] == "feature_target_split"
+    assert result["target_column"] == "target"
+    extra = set(result.keys()) - set(art.FeatureTargetSplitArtifact.__annotations__.keys())
+    assert not extra, f"FeatureTargetSplitCalculator produced undeclared keys: {sorted(extra)}"
 
 
 # ---------- Cross-cutting: every TypedDict has a "type" field ----------

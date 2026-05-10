@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import {
   AlertTriangle, Bug, RefreshCw, Search, Trash2,
   ChevronDown, ChevronRight, X, Clock, Route, Server, Download,
 } from 'lucide-react';
-import { monitoringApi, ErrorEvent, GroupedIssue } from '../core/api/monitoring';
+import { monitoringApi, ErrorEvent, GroupedIssue, PipelineRunLog } from '../core/api/monitoring';
 import { LoadingState, EmptyState } from '../components/shared';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -54,6 +54,17 @@ function relativeTime(iso: string): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
+}
+
+/** Format a naive server datetime string ("YYYY-MM-DDTHH:MM:SS") to HH:MM. */
+function clockTime(iso: string): string {
+  return iso.slice(11, 16);
+}
+
+/** Local-time ISO prefix "YYYY-MM-DDTHH" for bucket matching. */
+function localHourPrefix(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}`;
 }
 
 // ─── Traceback modal ─────────────────────────────────────────────────────────
@@ -193,6 +204,67 @@ const ErrorRow: React.FC<{
   );
 };
 
+// ─── Pipeline event row ─────────────────────────────────────────────────────
+
+const PipelineRow: React.FC<{ log: PipelineRunLog }> = ({ log }) => {
+  const [expanded, setExpanded] = useState(false);
+  const isError = log.level === 'error';
+  return (
+    <>
+      <tr
+        className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+        onClick={() => setExpanded(x => !x)}
+      >
+        <td className="px-4 py-3 w-8 text-slate-400">
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </td>
+        <td className="px-4 py-3">
+          <span className={`text-xs font-mono px-2 py-0.5 rounded font-semibold ${
+            isError
+              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+          }`}>
+            {isError ? 'FAIL' : 'WARN'}
+          </span>
+        </td>
+        <td className="px-4 py-3 font-mono text-sm text-slate-700 dark:text-slate-300 max-w-[200px] truncate">
+          {log.node_type ?? 'pipeline'}
+        </td>
+        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 max-w-[340px] truncate">
+          {log.message}
+        </td>
+        <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400 font-mono max-w-[180px] truncate">
+          {log.node_id ?? '—'}
+        </td>
+        <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
+          {log.run_at ? (
+            <span title={relativeTime(log.run_at)}>{clockTime(log.run_at)}</span>
+          ) : '\u2014'}
+        </td>
+        <td className="px-4 py-3 text-right">
+          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+            pipeline
+          </span>
+        </td>
+      </tr>
+      {expanded && (
+        <tr className="bg-slate-50 dark:bg-slate-800/40">
+          <td colSpan={7} className="px-6 py-4">
+            <div className="grid grid-cols-2 gap-4 text-xs mb-3 text-slate-500 dark:text-slate-400">
+              {log.node_id && <span><strong>Node ID:</strong> {log.node_id}</span>}
+              {log.pipeline_id && <span><strong>Pipeline:</strong> {log.pipeline_id}</span>}
+              {log.run_at && <span><strong>Time:</strong> {new Date(log.run_at).toLocaleString()}</span>}
+            </div>
+            <pre className="text-xs font-mono bg-slate-900 text-slate-200 rounded-lg p-4 overflow-auto max-h-48 whitespace-pre-wrap leading-relaxed">
+              {log.message}
+            </pre>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+};
+
 // ─── Grouped issue row ──────────────────────────────────────────────────────
 
 const GroupedIssueRow: React.FC<{ issue: GroupedIssue; onViewSample: (id: number) => void }> = ({ issue, onViewSample }) => (
@@ -225,6 +297,38 @@ const GroupedIssueRow: React.FC<{ issue: GroupedIssue; onViewSample: (id: number
   </tr>
 );
 
+// ─── Pipeline grouped issue row ───────────────────────────────────────────
+
+interface PipelineIssue {
+  node_type: string;
+  count: number;
+  last_seen: string;
+  first_seen: string;
+}
+
+const PipelineIssueRow: React.FC<{ issue: PipelineIssue }> = ({ issue }) => (
+  <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+    <td className="px-4 py-3">
+      <span className="inline-flex items-center justify-center min-w-[1.75rem] h-6 px-1.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold">
+        {issue.count}
+      </span>
+    </td>
+    <td className="px-4 py-3 font-mono text-sm text-slate-700 dark:text-slate-300 max-w-[200px] truncate">
+      {issue.node_type}
+    </td>
+    <td className="px-4 py-3 text-xs text-amber-600 dark:text-amber-400 font-medium">
+      pipeline
+    </td>
+    <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
+      {issue.last_seen ? relativeTime(issue.last_seen) : '\u2014'}
+    </td>
+    <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
+      {issue.first_seen ? relativeTime(issue.first_seen) : '\u2014'}
+    </td>
+    <td className="px-4 py-3" />
+  </tr>
+);
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export const ErrorLogPage: React.FC = () => {
@@ -240,6 +344,25 @@ export const ErrorLogPage: React.FC = () => {
   const [view, setView] = useState<'events' | 'issues'>('events');
   const [grouped, setGrouped] = useState<GroupedIssue[]>([]);
 
+  // --- Backend-persisted pipeline run log ---
+  const [pipelineLogs, setPipelineLogs] = useState<PipelineRunLog[]>([]);
+
+  const fetchPipelineLogs = useCallback(async () => {
+    try {
+      const logs = await monitoringApi.getPipelineLogs(200);
+      setPipelineLogs(logs);
+    } catch {
+      // backend may be unavailable; silently skip
+    }
+  }, []);
+
+  const handleClearPipelineLogs = useCallback(async () => {
+    try {
+      await monitoringApi.clearPipelineLogs();
+      setPipelineLogs([]);
+    } catch { /* ignore */ }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -252,12 +375,14 @@ export const ErrorLogPage: React.FC = () => {
       setEvents(data);
       setTimeline(tl);
       setGrouped(grp);
+      // also refresh pipeline logs so they appear in Events tab
+      void fetchPipelineLogs();
     } catch {
       setError('Could not reach the backend. Is the server running?');
     } finally {
       setLoading(false);
     }
-  }, [timeRange, showResolved]);
+  }, [timeRange, showResolved, fetchPipelineLogs]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -294,8 +419,62 @@ export const ErrorLogPage: React.FC = () => {
     (e.job_id ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
+  const filteredPipeline = pipelineLogs.filter(l =>
+    !search ||
+    l.message.toLowerCase().includes(search.toLowerCase()) ||
+    (l.node_type ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (l.node_id ?? '').toLowerCase().includes(search.toLowerCase())
+  );
+
   // summary stats
   const total500 = events.filter(e => e.status_code >= 500).length;
+
+  const pipelineIssues = useMemo<PipelineIssue[]>(() => {
+    const map = new Map<string, PipelineIssue>();
+    pipelineLogs.filter(l => l.level === 'error').forEach(l => {
+      const key = l.node_type ?? 'unknown';
+      const entry = map.get(key);
+      if (!entry) {
+        map.set(key, { node_type: key, count: 1, last_seen: l.run_at ?? '', first_seen: l.run_at ?? '' });
+      } else {
+        entry.count++;
+        if (l.run_at) {
+          if (l.run_at > entry.last_seen) entry.last_seen = l.run_at;
+          if (l.run_at < entry.first_seen) entry.first_seen = l.run_at;
+        }
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [pipelineLogs]);
+
+  const mergedTimeline = useMemo(() => {
+    // Always build 24 local-time buckets; merge BOTH the HTTP timeline (UTC strings,
+    // converted to local) and pipeline logs (local naive strings) into them.
+    const buckets = Array.from({ length: 24 }, (_, i) => {
+      const d = new Date();
+      d.setMinutes(0, 0, 0);
+      d.setHours(d.getHours() - (23 - i));
+      return { hour: localHourPrefix(d) + ':00:00', _key: localHourPrefix(d), count: 0 };
+    });
+    const byKey = new Map(buckets.map(b => [b._key, b]));
+    // HTTP timeline: hour is "YYYY-MM-DDTHH:00" in UTC.
+    timeline.forEach(t => {
+      const utcStr = t.hour.length >= 13 ? t.hour.slice(0, 13) + ':00:00Z' : t.hour;
+      const d = new Date(utcStr);
+      if (Number.isNaN(d.getTime())) return;
+      const key = localHourPrefix(d);
+      const b = byKey.get(key);
+      if (b) b.count += t.count;
+    });
+    // Pipeline logs: run_at is "YYYY-MM-DDTHH:MM:SS" (server local time, no Z).
+    pipelineLogs.forEach(l => {
+      if (!l.run_at) return;
+      const key = l.run_at.replace(' ', 'T').slice(0, 13);
+      const b = byKey.get(key);
+      if (b) b.count += 1;
+    });
+    return buckets;
+  }, [timeline, pipelineLogs]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -318,6 +497,15 @@ export const ErrorLogPage: React.FC = () => {
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Refresh
           </button>
+          {pipelineLogs.length > 0 && (
+            <button
+              onClick={() => void handleClearPipelineLogs()}
+              className="flex items-center gap-2 px-3 py-2 text-sm bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors text-amber-600 dark:text-amber-400"
+            >
+              <Trash2 size={14} />
+              Clear pipeline
+            </button>
+          )}
           {events.length > 0 && (
             <button
               onClick={handleClear}
@@ -325,7 +513,7 @@ export const ErrorLogPage: React.FC = () => {
               className="flex items-center gap-2 px-3 py-2 text-sm bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors text-red-600 dark:text-red-400"
             >
               <Trash2 size={14} />
-              Clear all
+              Clear HTTP
             </button>
           )}
           {events.length > 0 && (
@@ -341,12 +529,12 @@ export const ErrorLogPage: React.FC = () => {
       </div>
 
       {/* Stats */}
-      {!loading && events.length > 0 && (
+      {!loading && (events.length > 0 || pipelineLogs.length > 0) && (
         <div className="grid grid-cols-3 gap-4 mb-6">
           {[
-            { label: 'Total events', value: events.length, color: 'text-slate-700 dark:text-slate-200' },
+            { label: 'HTTP events', value: events.length, color: 'text-slate-700 dark:text-slate-200' },
             { label: 'Server errors (5xx)', value: total500, color: 'text-red-600 dark:text-red-400' },
-            { label: 'Most recent', value: events[0]?.created_at ? relativeTime(events[0].created_at) : '—', color: 'text-slate-600 dark:text-slate-300' },
+            { label: 'Pipeline failures', value: pipelineLogs.filter(l => l.level === 'error').length, color: 'text-amber-600 dark:text-amber-400' },
           ].map(s => (
             <div key={s.label} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{s.label}</p>
@@ -357,11 +545,11 @@ export const ErrorLogPage: React.FC = () => {
       )}
 
       {/* Timeline chart */}
-      {!loading && timeline.some(t => t.count > 0) && (
+      {!loading && (events.length > 0 || pipelineLogs.length > 0) && (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-6">
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-3">Errors per hour — last 24 h</p>
           <ResponsiveContainer width="100%" height={80}>
-            <BarChart data={timeline} margin={{ top: 0, right: 0, left: -30, bottom: 0 }}>
+            <BarChart data={mergedTimeline} margin={{ top: 0, right: 0, left: -30, bottom: 0 }}>
               <XAxis
                 dataKey="hour"
                 tickFormatter={h => h.slice(11, 16)}
@@ -377,7 +565,7 @@ export const ErrorLogPage: React.FC = () => {
                 contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
               />
               <Bar dataKey="count" radius={[3, 3, 0, 0]}>
-                {timeline.map((t, i) => (
+                {mergedTimeline.map((t, i) => (
                   <Cell key={i} fill={t.count > 0 ? '#ef4444' : '#e2e8f0'} fillOpacity={t.count > 0 ? 0.85 : 0.4} />
                 ))}
               </Bar>
@@ -392,17 +580,18 @@ export const ErrorLogPage: React.FC = () => {
           <button
             key={v}
             onClick={() => setView(v)}
-            className={`px-4 py-1.5 text-sm font-medium rounded-lg border transition-colors capitalize ${
+            className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg border transition-colors capitalize ${
               view === v
                 ? 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 border-slate-800 dark:border-slate-200'
                 : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50'
             }`}
           >
-            {v === 'issues' ? `Issues (${grouped.length})` : `Events (${events.length})`}
+            {v === 'issues' ? `Issues (${grouped.length + pipelineIssues.length})` : `Events (${events.length + pipelineLogs.length})`}
           </button>
         ))}
       </div>
 
+      {/* ── HTTP Events / Issues tabs ──────────────────────────────────── */}
       {/* Toolbar */}
       <div className={`flex items-center gap-3 mb-4 ${view === 'issues' ? 'hidden' : ''}`}>
         <div className="relative flex-1 max-w-sm">
@@ -444,7 +633,7 @@ export const ErrorLogPage: React.FC = () => {
         </button>
         {search && (
           <span className="text-xs text-slate-500 dark:text-slate-400">
-            {filtered.length} / {events.length} shown
+            {filtered.length + filteredPipeline.length} / {events.length + pipelineLogs.length} shown
           </span>
         )}
       </div>
@@ -458,7 +647,7 @@ export const ErrorLogPage: React.FC = () => {
           {error}
         </div>
       ) : view === 'issues' ? (
-        grouped.length === 0 ? (
+        grouped.length === 0 && pipelineIssues.length === 0 ? (
           <EmptyState
             icon={<Bug size={40} className="text-slate-300" />}
             title="No open issues"
@@ -478,6 +667,9 @@ export const ErrorLogPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
+                {pipelineIssues.map((p, i) => (
+                  <PipelineIssueRow key={`pi-${i}`} issue={p} />
+                ))}
                 {grouped.map((g, i) => (
                   <GroupedIssueRow key={i} issue={g} onViewSample={handleViewSample} />
                 ))}
@@ -485,7 +677,7 @@ export const ErrorLogPage: React.FC = () => {
             </table>
           </div>
         )
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && filteredPipeline.length === 0 ? (
         <EmptyState
           icon={<Bug size={40} className="text-slate-300" />}
           title={search ? 'No matching errors' : 'No errors recorded'}
@@ -500,12 +692,15 @@ export const ErrorLogPage: React.FC = () => {
                 <th className="px-4 py-3">Code</th>
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Message</th>
-                <th className="px-4 py-3">Route</th>
+                <th className="px-4 py-3">Node / Route</th>
                 <th className="px-4 py-3">When</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
+              {filteredPipeline.map(l => (
+                <PipelineRow key={`pl-${l.id}`} log={l} />
+              ))}
               {filtered.map(e => (
                 <ErrorRow key={e.id} event={e} onExpand={setModal} onResolve={handleResolve} />
               ))}
@@ -513,7 +708,6 @@ export const ErrorLogPage: React.FC = () => {
           </table>
         </div>
       )}
-
       {modal && <TracebackModal event={modal} onClose={() => setModal(null)} />}
     </div>
   );

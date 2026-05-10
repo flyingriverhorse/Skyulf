@@ -1,142 +1,226 @@
+"""Resampling nodes (`Oversampling`, `Undersampling`).
+
+Both Appliers route through :func:`apply_dual_engine`. Imblearn is purely
+pandas/numpy-bound, so the Polars path round-trips through pandas (convert in,
+run sampler, convert back) while keeping all engine handling out of class
+bodies. Sampler construction is split per-method and per-family so each helper
+stays at low CCN.
+"""
+
 import logging
-from typing import Any, Dict
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import numpy as np
-import polars as pl
 import pandas as pd
+import polars as pl
 
-from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
-from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ..registry import NodeRegistry
 from ._artifacts import OversamplingArtifact, UndersamplingArtifact
 from ._schema import SkyulfSchema
-from ..engines import EngineName, get_engine
+from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from .dispatcher import apply_dual_engine
 
 logger = logging.getLogger(__name__)
 
-# --- Oversampling (SMOTE variants) ---
+
+# -----------------------------------------------------------------------------
+# Shared helpers
+# -----------------------------------------------------------------------------
+
+
+SamplerBuilder = Callable[[str, Dict[str, Any]], Optional[Any]]
+
+
+def _extract_y_polars(X: Any, y: Any, target_col: Optional[str]) -> Tuple[Any, Any]:
+    """When ``y`` is missing, lift it out of the Polars frame using ``target_col``."""
+    if y is not None:
+        return X, y
+    if target_col and target_col in X.columns:
+        return X.drop(target_col), X.select(target_col).to_series()
+    return X, None
+
+
+def _extract_y_pandas(X: Any, y: Any, target_col: Optional[str]) -> Tuple[Any, Any]:
+    """When ``y`` is missing, lift it out of the Pandas frame using ``target_col``."""
+    if y is not None:
+        return X, y
+    if target_col and target_col in X.columns:
+        return X.drop(columns=[target_col]), X[target_col]
+    return X, None
+
+
+def _to_pandas_y(y: Any) -> Any:
+    """Best-effort conversion of ``y`` to a pandas Series."""
+    if y is None:
+        return None
+    if hasattr(y, "to_pandas"):
+        return y.to_pandas()
+    return y
+
+
+def _validate_numeric(X_pd: pd.DataFrame) -> None:
+    """Reject non-numeric feature columns — imblearn requires all-numeric input."""
+    non_numeric = X_pd.select_dtypes(exclude=[np.number]).columns
+    if len(non_numeric) > 0:
+        raise ValueError(
+            f"Resampling requires all features to be numeric. Found non-numeric columns: "
+            f"{list(non_numeric)}. Please use an Encoder node "
+            "(e.g., OneHotEncoder, OrdinalEncoder) before Resampling."
+        )
+
+
+def _finalize_resampled(
+    X_res: Any, y_res: Any, columns: Any, fallback_name: Optional[str]
+) -> Tuple[pd.DataFrame, pd.Series]:
+    """Wrap raw imblearn output back into named DataFrame/Series."""
+    if not isinstance(X_res, pd.DataFrame):
+        X_res = pd.DataFrame(X_res, columns=columns)
+    if not isinstance(y_res, pd.Series):
+        y_res = pd.Series(y_res, name=fallback_name)
+    return X_res, y_res
+
+
+def _run_sampler(
+    X_pd: pd.DataFrame,
+    y_pd: Any,
+    params: Dict[str, Any],
+    builder: SamplerBuilder,
+    default_method: str,
+) -> Optional[Tuple[pd.DataFrame, pd.Series]]:
+    """Run the sampler chosen by ``builder``; return ``None`` if no sampler matches."""
+    _validate_numeric(X_pd)
+    method = params.get("method", default_method)
+    sampler = builder(method, params)
+    if sampler is None:
+        return None
+    X_res, y_res = sampler.fit_resample(X_pd, y_pd)
+    fallback_name = getattr(y_pd, "name", None) if y_pd is not None else params.get("target_column")
+    return _finalize_resampled(X_res, y_res, X_pd.columns, fallback_name)
+
+
+def _resample_polars(
+    X: Any,
+    y: Any,
+    params: Dict[str, Any],
+    builder: SamplerBuilder,
+    default_method: str,
+) -> Tuple[Any, Any]:
+    """Polars apply path: convert → resample → convert back."""
+    target_col = params.get("target_column")
+    X, y = _extract_y_polars(X, y, target_col)
+    if y is None:
+        return X, y
+    X_pd = X.to_pandas()
+    y_pd = _to_pandas_y(y)
+    out = _run_sampler(X_pd, y_pd, params, builder, default_method)
+    if out is None:
+        return X, y
+    X_res, y_res = out
+    return pl.from_pandas(X_res), pl.from_pandas(y_res)
+
+
+def _resample_pandas(
+    X: Any,
+    y: Any,
+    params: Dict[str, Any],
+    builder: SamplerBuilder,
+    default_method: str,
+) -> Tuple[Any, Any]:
+    """Pandas apply path: resample in place."""
+    target_col = params.get("target_column")
+    X, y = _extract_y_pandas(X, y, target_col)
+    if y is None:
+        return X, y
+    out = _run_sampler(X, y, params, builder, default_method)
+    if out is None:
+        return X, y
+    return out
+
+
+# -----------------------------------------------------------------------------
+# Oversampling
+# -----------------------------------------------------------------------------
+
+
+def _import_over_samplers() -> Dict[str, Any]:
+    """Lazy import of imblearn oversampling classes."""
+    try:
+        from imblearn.combine import SMOTETomek
+        from imblearn.over_sampling import (
+            ADASYN,
+            SMOTE,
+            SVMSMOTE,
+            BorderlineSMOTE,
+            KMeansSMOTE,
+        )
+    except ImportError as exc:
+        logger.error("imblearn is required for oversampling. `pip install imbalanced-learn`")
+        raise ImportError(
+            "imblearn is required for oversampling. `pip install imbalanced-learn`"
+        ) from exc
+    return {
+        "smote": SMOTE,
+        "adasyn": ADASYN,
+        "borderline_smote": BorderlineSMOTE,
+        "svm_smote": SVMSMOTE,
+        "kmeans_smote": KMeansSMOTE,
+        "smote_tomek": SMOTETomek,
+    }
+
+
+def _build_oversampler(method: str, params: Dict[str, Any]) -> Optional[Any]:
+    """Construct an over-sampler by ``method`` name; return ``None`` if unknown."""
+    classes = _import_over_samplers()
+    cls = classes.get(method)
+    if cls is None:
+        return None
+
+    strategy = params.get("sampling_strategy", "auto")
+    random_state = params.get("random_state", 42)
+    k_neighbors = params.get("k_neighbors", 5)
+
+    if method == "smote":
+        return cls(sampling_strategy=strategy, random_state=random_state, k_neighbors=k_neighbors)
+    if method == "adasyn":
+        return cls(sampling_strategy=strategy, random_state=random_state, n_neighbors=k_neighbors)
+    if method == "borderline_smote":
+        return cls(
+            sampling_strategy=strategy,
+            random_state=random_state,
+            k_neighbors=k_neighbors,
+            m_neighbors=params.get("m_neighbors", 10),
+            kind=params.get("kind", "borderline-1"),
+        )
+    if method == "svm_smote":
+        return cls(
+            sampling_strategy=strategy,
+            random_state=random_state,
+            k_neighbors=k_neighbors,
+            m_neighbors=params.get("m_neighbors", 10),
+            out_step=params.get("out_step", 0.5),
+        )
+    if method == "kmeans_smote":
+        return cls(
+            sampling_strategy=strategy,
+            random_state=random_state,
+            k_neighbors=k_neighbors,
+            cluster_balance_threshold=params.get("cluster_balance_threshold", 0.1),
+            density_exponent=params.get("density_exponent", "auto"),
+        )
+    # smote_tomek
+    return cls(sampling_strategy=strategy, random_state=random_state)
 
 
 class OversamplingApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
-        was_polars = engine.name == EngineName.POLARS
-        target_col = params.get("target_column")
-
-        # Resampling requires y. If not provided in tuple, try to extract from dataframe using target_column
-        if y is None:
-            if target_col and target_col in X.columns:
-                if was_polars:
-                    y = X.select(target_col).to_series()
-                    X = X.drop(target_col)
-                else:
-                    y = X[target_col]
-                    X = X.drop(columns=[target_col])
-            else:
-                # Cannot resample without target
-                return X, y
-
-        # Convert to Pandas for imblearn
-        if was_polars:
-            X_pd = X.to_pandas()
-            y_pd = y.to_pandas() if hasattr(y, "to_pandas") else y
-        else:
-            X_pd = X
-            y_pd = y
-
-        # Check for non-numeric columns
-        non_numeric_cols = X_pd.select_dtypes(exclude=[np.number]).columns
-        if len(non_numeric_cols) > 0:
-            raise ValueError(
-                f"Resampling requires all features to be numeric. Found non-numeric columns: {list(non_numeric_cols)}. "
-                "Please use an Encoder node (e.g., OneHotEncoder, OrdinalEncoder) before Resampling."
-            )
-
-        method = params.get("method", "smote")
-        strategy = params.get("sampling_strategy", "auto")
-        random_state = params.get("random_state", 42)
-        k_neighbors = params.get("k_neighbors", 5)
-        # n_jobs = params.get('n_jobs', -1)
-
-        # Additional params
-        m_neighbors = params.get("m_neighbors", 10)
-        kind = params.get("kind", "borderline-1")
-        out_step = params.get("out_step", 0.5)
-        cluster_balance_threshold = params.get("cluster_balance_threshold", 0.1)
-        density_exponent = params.get("density_exponent", "auto")
-
-        try:
-            from imblearn.combine import SMOTETomek
-            from imblearn.over_sampling import ADASYN, SMOTE, SVMSMOTE, BorderlineSMOTE, KMeansSMOTE
-        except ImportError:
-            logger.error("imblearn is required for oversampling. `pip install imbalanced-learn`")
-            raise ImportError(
-                "imblearn is required for oversampling. `pip install imbalanced-learn`"
-            )
-
-        sampler = None
-        if method == "smote":
-            sampler = SMOTE(
-                sampling_strategy=strategy,
-                random_state=random_state,
-                k_neighbors=k_neighbors,
-            )
-        elif method == "adasyn":
-            sampler = ADASYN(
-                sampling_strategy=strategy,
-                random_state=random_state,
-                n_neighbors=k_neighbors,
-            )
-        elif method == "borderline_smote":
-            sampler = BorderlineSMOTE(
-                sampling_strategy=strategy,
-                random_state=random_state,
-                k_neighbors=k_neighbors,
-                m_neighbors=m_neighbors,
-                kind=kind,
-            )
-        elif method == "svm_smote":
-            sampler = SVMSMOTE(
-                sampling_strategy=strategy,
-                random_state=random_state,
-                k_neighbors=k_neighbors,
-                m_neighbors=m_neighbors,
-                out_step=out_step,
-            )
-        elif method == "kmeans_smote":
-            sampler = KMeansSMOTE(
-                sampling_strategy=strategy,
-                random_state=random_state,
-                k_neighbors=k_neighbors,
-                cluster_balance_threshold=cluster_balance_threshold,
-                density_exponent=density_exponent,
-            )
-        elif method == "smote_tomek":
-            sampler = SMOTETomek(sampling_strategy=strategy, random_state=random_state)
-
-        if not sampler:
-            return X, y
-
-        X_res, y_res = sampler.fit_resample(X_pd, y_pd)
-
-        # Ensure we return DataFrame/Series with correct names/columns
-        if not isinstance(X_res, pd.DataFrame):
-            X_res = pd.DataFrame(X_res, columns=X_pd.columns)
-        if not isinstance(y_res, pd.Series):
-            y_res = pd.Series(y_res, name=y_pd.name if y_pd is not None else target_col)
-
-        # Convert back if needed
-        if was_polars:
-            X_res = pl.from_pandas(X_res)
-            y_res = pl.from_pandas(y_res)
-
-        return X_res, y_res
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(
+            (X, y) if y is not None else X,
+            params,
+            polars_func=lambda Xi, yi, p: _resample_polars(Xi, yi, p, _build_oversampler, "smote"),
+            pandas_func=lambda Xi, yi, p: _resample_pandas(Xi, yi, p, _build_oversampler, "smote"),
+        )
 
 
 @NodeRegistry.register("Oversampling", OversamplingApplier)
@@ -155,13 +239,7 @@ class OversamplingCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(
-        self,
-        _X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> OversamplingArtifact:
-        # Config: {'method': 'smote', 'target_column': 'target', 'sampling_strategy': 'auto', ...}
+    def fit(self, _X: Any, _y: Any, config: Dict[str, Any]) -> OversamplingArtifact:
         return {
             "type": "oversampling",
             "method": config.get("method", "smote"),
@@ -180,105 +258,73 @@ class OversamplingCalculator(BaseCalculator):
         }
 
 
-# --- Undersampling ---
+# -----------------------------------------------------------------------------
+# Undersampling
+# -----------------------------------------------------------------------------
+
+
+def _import_under_samplers() -> Dict[str, Any]:
+    """Lazy import of imblearn undersampling classes."""
+    try:
+        from imblearn.under_sampling import (
+            EditedNearestNeighbours,
+            NearMiss,
+            RandomUnderSampler,
+            TomekLinks,
+        )
+    except ImportError as exc:
+        logger.error("imblearn is required for undersampling. `pip install imbalanced-learn`")
+        raise ImportError(
+            "imblearn is required for undersampling. `pip install imbalanced-learn`"
+        ) from exc
+    return {
+        "random_under_sampling": RandomUnderSampler,
+        "nearmiss": NearMiss,
+        "tomek_links": TomekLinks,
+        "edited_nearest_neighbours": EditedNearestNeighbours,
+    }
+
+
+def _build_undersampler(method: str, params: Dict[str, Any]) -> Optional[Any]:
+    """Construct an under-sampler by ``method`` name; return ``None`` if unknown."""
+    classes = _import_under_samplers()
+    cls = classes.get(method)
+    if cls is None:
+        return None
+
+    strategy = params.get("sampling_strategy", "auto")
+
+    if method == "random_under_sampling":
+        return cls(
+            sampling_strategy=strategy,
+            random_state=params.get("random_state", 42),
+            replacement=params.get("replacement", False),
+        )
+    if method == "nearmiss":
+        return cls(sampling_strategy=strategy, version=params.get("version", 1))
+    if method == "tomek_links":
+        return cls(sampling_strategy=strategy)
+    # edited_nearest_neighbours
+    return cls(
+        sampling_strategy=strategy,
+        n_neighbors=params.get("n_neighbors", 3),
+        kind_sel=params.get("kind_sel", "all"),
+    )
 
 
 class UndersamplingApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
-        was_polars = engine.name == EngineName.POLARS
-        target_col = params.get("target_column")
-
-        # Resampling requires y. If not provided in tuple, try to extract from dataframe using target_column
-        if y is None:
-            if target_col and target_col in X.columns:
-                if was_polars:
-                    y = X.select(target_col).to_series()
-                    X = X.drop(target_col)
-                else:
-                    y = X[target_col]
-                    X = X.drop(columns=[target_col])
-            else:
-                # Cannot resample without target
-                return X, y
-
-        # Convert to Pandas for imblearn
-        if was_polars:
-            X_pd = X.to_pandas()
-            y_pd = y.to_pandas() if hasattr(y, "to_pandas") else y
-        else:
-            X_pd = X
-            y_pd = y
-
-        # Check for non-numeric columns
-        non_numeric_cols = X_pd.select_dtypes(exclude=[np.number]).columns
-        if len(non_numeric_cols) > 0:
-            raise ValueError(
-                f"Resampling requires all features to be numeric. Found non-numeric columns: {list(non_numeric_cols)}. "
-                "Please use an Encoder node (e.g., OneHotEncoder, OrdinalEncoder) before Resampling."
-            )
-
-        method = params.get("method", "random_under_sampling")
-        strategy = params.get("sampling_strategy", "auto")
-        random_state = params.get("random_state", 42)
-        replacement = params.get("replacement", False)
-        # n_jobs = params.get('n_jobs', -1)
-
-        try:
-            from imblearn.under_sampling import (
-                EditedNearestNeighbours,
-                NearMiss,
-                RandomUnderSampler,
-                TomekLinks,
-            )
-        except ImportError:
-            logger.error("imblearn is required for undersampling. `pip install imbalanced-learn`")
-            raise ImportError(
-                "imblearn is required for undersampling. `pip install imbalanced-learn`"
-            )
-
-        sampler = None
-        if method == "random_under_sampling":
-            sampler = RandomUnderSampler(
-                sampling_strategy=strategy,
-                random_state=random_state,
-                replacement=replacement,
-            )
-        elif method == "nearmiss":
-            version = params.get("version", 1)
-            sampler = NearMiss(sampling_strategy=strategy, version=version)
-        elif method == "tomek_links":
-            sampler = TomekLinks(sampling_strategy=strategy)
-        elif method == "edited_nearest_neighbours":
-            n_neighbors = params.get("n_neighbors", 3)
-            kind_sel = params.get("kind_sel", "all")
-            sampler = EditedNearestNeighbours(
-                sampling_strategy=strategy, n_neighbors=n_neighbors, kind_sel=kind_sel
-            )
-
-        if not sampler:
-            return X, y
-
-        X_res, y_res = sampler.fit_resample(X_pd, y_pd)
-
-        # Ensure we return DataFrame/Series with correct names/columns
-        if not isinstance(X_res, pd.DataFrame):
-            X_res = pd.DataFrame(X_res, columns=X_pd.columns)
-        if not isinstance(y_res, pd.Series):
-            y_res = pd.Series(y_res, name=y_pd.name if y_pd is not None else target_col)
-
-        # Convert back if needed
-        if was_polars:
-            X_res = pl.from_pandas(X_res)
-            y_res = pl.from_pandas(y_res)
-
-        return X_res, y_res
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(
+            (X, y) if y is not None else X,
+            params,
+            polars_func=lambda Xi, yi, p: _resample_polars(
+                Xi, yi, p, _build_undersampler, "random_under_sampling"
+            ),
+            pandas_func=lambda Xi, yi, p: _resample_pandas(
+                Xi, yi, p, _build_undersampler, "random_under_sampling"
+            ),
+        )
 
 
 @NodeRegistry.register("Undersampling", UndersamplingApplier)
@@ -301,12 +347,7 @@ class UndersamplingCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(
-        self,
-        _X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> UndersamplingArtifact:
+    def fit(self, _X: Any, _y: Any, config: Dict[str, Any]) -> UndersamplingArtifact:
         return {
             "type": "undersampling",
             "method": config.get("method", "random_under_sampling"),

@@ -98,9 +98,7 @@ async def _seed_loader_schemas(
         if not dataset_id:
             continue
         try:
-            row = await session.scalar(
-                select(DataSource).where(DataSource.id == int(dataset_id))
-            )
+            row = await session.scalar(select(DataSource).where(DataSource.id == int(dataset_id)))
         except (ValueError, TypeError):
             # dataset_id is not an integer — try source_id UUID fallback
             row = await session.scalar(
@@ -111,9 +109,7 @@ async def _seed_loader_schemas(
         schema_meta: Dict[str, str] = row.source_metadata.get("schema", {})
         if not schema_meta:
             continue
-        seeds[node.node_id] = SkyulfSchema.from_columns(
-            list(schema_meta.keys()), dict(schema_meta)
-        )
+        seeds[node.node_id] = SkyulfSchema.from_columns(list(schema_meta.keys()), dict(schema_meta))
     return seeds
 
 

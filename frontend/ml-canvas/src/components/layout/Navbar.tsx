@@ -4,6 +4,7 @@ import { useViewStore } from '../../core/store/useViewStore';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import { useViewport } from '../../core/hooks/useViewport';
 import { Breadcrumb } from './Breadcrumb';
+import { NotificationCenter } from './NotificationCenter';
 
 export const Navbar: React.FC = () => {
   const { activeView, setView } = useViewStore();
@@ -24,7 +25,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <div className="h-14 border-b bg-card px-4 flex items-center justify-center shrink-0 relative">
+    <div className="h-14 border-b bg-card px-4 flex items-center justify-center shrink-0 relative z-30">
       <Breadcrumb />
       {/* Navigation */}
       <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg" data-testid="navbar-views">
@@ -71,7 +72,7 @@ export const Navbar: React.FC = () => {
               ? 'Read-only canvas (tablet view). Click to enable editing.'
               : 'Editing enabled. Click to switch to read-only.'
           }
-          className={`absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
+          className={`absolute right-14 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
             readOnly
               ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
               : 'bg-secondary/50 text-muted-foreground border-transparent hover:bg-secondary'
@@ -82,6 +83,10 @@ export const Navbar: React.FC = () => {
           <span className="hidden sm:inline">{readOnly ? 'Read-only' : 'Editing'}</span>
         </button>
       )}
+
+      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+        <NotificationCenter />
+      </div>
     </div>
   );
 };

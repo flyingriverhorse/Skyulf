@@ -34,6 +34,18 @@ export const JobsDrawer: React.FC = () => {
     if (isDrawerOpen) setSelectedJob(null);
   }, [isDrawerOpen]);
 
+  // Auto-load more when the current tab shows fewer than 5 jobs but the
+  // server still has more.  The store fetches all job types together, so
+  // a tab that is sparse (e.g. 2 advanced-tuning among 50 basic-training)
+  // keeps fetching until it reaches the threshold or exhausts the server.
+  useEffect(() => {
+    if (!isDrawerOpen || isLoading || !hasMore) return;
+    const tabCount = jobs.filter(j => j.job_type === activeTab).length;
+    if (tabCount < 5) {
+      void loadMoreJobs();
+    }
+  }, [isDrawerOpen, activeTab, jobs, hasMore, isLoading, loadMoreJobs]);
+
   if (!isDrawerOpen) return null;
 
   const tabJobs = jobs.filter(job => job.job_type === activeTab);

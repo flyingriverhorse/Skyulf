@@ -1,5 +1,14 @@
+"""Feature-selection nodes (Variance / Correlation / Univariate / Model-based).
+
+Each Applier dispatches on engine via :func:`apply_dual_engine` (see
+``dispatcher.py``); per-engine logic lives in small ``_apply_polars`` /
+``_apply_pandas`` static helpers. Calculator ``fit`` paths are sklearn-bound,
+so they use :func:`to_pandas` once at the top instead of going through
+``fit_dual_engine``.
+"""
+
 import logging
-from typing import Any, Callable, Dict, Optional, cast
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, cast
 
 import numpy as np
 import pandas as pd
@@ -28,15 +37,16 @@ from ..utils import (
     resolve_columns,
 )
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from .dispatcher import apply_dual_engine
 from ._artifacts import (
     CorrelationThresholdArtifact,
     ModelBasedSelectionArtifact,
     UnivariateSelectionArtifact,
     VarianceThresholdArtifact,
 )
+from ._helpers import to_pandas
 from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
-from ..engines import EngineName, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
@@ -69,8 +79,7 @@ def _resolve_score_function(name: Optional[str], problem_type: str) -> Any:
 
     if problem_type == "classification":
         return f_classif
-    else:
-        return f_regression
+    return f_regression
 
 
 def _resolve_estimator(key: Optional[str], problem_type: str) -> Any:
@@ -90,38 +99,208 @@ def _resolve_estimator(key: Optional[str], problem_type: str) -> Any:
     return None
 
 
+# -----------------------------------------------------------------------------
+# Shared apply helpers (drop unselected columns)
+# -----------------------------------------------------------------------------
+
+
+def _resolve_drop_list(params: Dict[str, Any], existing_cols: List[str]) -> List[str]:
+    """Compute the column-drop list from selected/candidate params."""
+    selected = params.get("selected_columns")
+    candidates = params.get("candidate_columns", [])
+    if selected is None:
+        return []
+    return [c for c in (set(candidates) - set(selected)) if c in existing_cols]
+
+
+def _drop_selected_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    """Polars apply path for selectors that drop ``candidate \\ selected`` columns."""
+    if not params.get("drop_columns", True):
+        return X, y
+    to_drop = _resolve_drop_list(params, list(X.columns))
+    if to_drop:
+        X = X.drop(to_drop)
+    return X, y
+
+
+def _drop_selected_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    """Pandas apply path for selectors that drop ``candidate \\ selected`` columns."""
+    if not params.get("drop_columns", True):
+        return X, y
+    to_drop = _resolve_drop_list(params, list(X.columns))
+    if to_drop:
+        X = X.drop(columns=to_drop)
+    return X, y
+
+
+# -----------------------------------------------------------------------------
+# Shared fit helpers (target extraction + sklearn subset prep)
+# -----------------------------------------------------------------------------
+
+
+def _extract_target(X_pd: pd.DataFrame, y: Any, target_col: Optional[str]) -> Optional[pd.Series]:
+    """Return ``y`` if provided; else pull ``target_col`` from the (pandas) frame."""
+    if y is not None:
+        return y
+    if not target_col or target_col not in X_pd.columns:
+        return None
+    return X_pd[target_col]
+
+
+def _prepare_sklearn_y(y: Any, problem_type: str) -> np.ndarray:
+    """Convert ``y`` to a numpy array, factorising non-numeric classification targets."""
+    y_np = y.to_numpy() if hasattr(y, "to_numpy") else np.array(y)
+    if problem_type == "classification" and not np.issubdtype(y_np.dtype, np.number):
+        y_factorized, _ = pd.factorize(y_np)
+        return y_factorized
+    return y_np
+
+
+def _resolve_problem_type(declared: str, y: Any) -> str:
+    """Resolve ``"auto"`` problem-type using ``y``; defaults to classification."""
+    if declared != "auto":
+        return declared
+    if y is None:
+        return "classification"
+    return _infer_problem_type(y)
+
+
+_GENERIC_PARAM_KEYS: Dict[str, Tuple[str, Any]] = {
+    "k_best": ("k", 10),
+    "percentile": ("percentile", 10),
+}
+
+
+def _resolve_generic_param(config: Dict[str, Any]) -> Any:
+    """Pick the GenericUnivariateSelect ``param`` from explicit or mode-derived config."""
+    if "param" in config:
+        return config.get("param")
+    mode = config.get("mode", "k_best")
+    key, default = _GENERIC_PARAM_KEYS.get(mode, ("alpha", 0.05))
+    return config.get(key, default)
+
+
+_UNIVARIATE_SELECTOR_BUILDERS: Dict[str, Callable[[Any, Dict[str, Any]], Any]] = {
+    "select_k_best": lambda sf, cfg: SelectKBest(score_func=sf, k=cfg.get("k", 10)),
+    "select_percentile": lambda sf, cfg: SelectPercentile(
+        score_func=sf, percentile=cfg.get("percentile", 10)
+    ),
+    "select_fpr": lambda sf, cfg: SelectFpr(score_func=sf, alpha=cfg.get("alpha", 0.05)),
+    "select_fdr": lambda sf, cfg: SelectFdr(score_func=sf, alpha=cfg.get("alpha", 0.05)),
+    "select_fwe": lambda sf, cfg: SelectFwe(score_func=sf, alpha=cfg.get("alpha", 0.05)),
+    "generic_univariate_select": lambda sf, cfg: GenericUnivariateSelect(
+        score_func=sf, mode=cfg.get("mode", "k_best"), param=_resolve_generic_param(cfg)
+    ),
+}
+
+
+def _build_univariate_selector(
+    method: str, score_func: Any, config: Dict[str, Any]
+) -> Optional[Any]:
+    """Construct the sklearn univariate selector named by ``method``."""
+    builder = _UNIVARIATE_SELECTOR_BUILDERS.get(method)
+    return builder(score_func, config) if builder else None
+
+
+def _build_model_selector(method: str, estimator: Any, config: Dict[str, Any]) -> Optional[Any]:
+    """Construct the sklearn model-based selector named by ``method``."""
+    if method == "select_from_model":
+        threshold = config.get("threshold", "mean")
+        if isinstance(threshold, str):
+            try:
+                threshold = float(threshold)
+            except ValueError:
+                pass  # Keep as string (e.g. "mean", "1.25*mean")
+        return SelectFromModel(
+            estimator=estimator,
+            threshold=threshold,
+            max_features=config.get("max_features", None),
+        )
+    if method == "rfe":
+        return RFE(
+            estimator=estimator,
+            n_features_to_select=config.get("n_features_to_select", None),
+            step=config.get("step", 1),
+        )
+    return None
+
+
+def _maybe_chi2_rescale(X_np: np.ndarray, score_func_name: Optional[str]) -> np.ndarray:
+    """Apply MinMax rescale when chi2 is requested but features contain negatives."""
+    if score_func_name != "chi2" or not (X_np < 0).any():
+        return X_np
+    logger.warning(
+        "Chi-squared statistic requires non-negative feature values. "
+        "Applying MinMaxScaler to features for selection."
+    )
+    from sklearn.preprocessing import MinMaxScaler
+
+    return MinMaxScaler().fit_transform(X_np)
+
+
+def _resolve_candidate_columns(
+    X_pd: pd.DataFrame, config: Dict[str, Any], target_col: Optional[str]
+) -> List[str]:
+    """Return numeric candidate columns minus the target."""
+    cols = resolve_columns(X_pd, config, lambda d: detect_numeric_columns(d, exclude_binary=False))
+    return [c for c in cols if c != target_col]
+
+
+def _univariate_score_dicts(
+    selector: Any, cols: List[str]
+) -> Tuple[Dict[str, float], Dict[str, float]]:
+    """Pull (scores, pvalues) off a fitted univariate selector, NaN-safe."""
+    scores: Dict[str, float] = {}
+    pvalues: Dict[str, float] = {}
+    if hasattr(selector, "scores_"):
+        safe_scores = np.nan_to_num(selector.scores_, nan=0.0, posinf=0.0, neginf=0.0)
+        scores = dict(zip(cols, safe_scores.tolist()))
+    if hasattr(selector, "pvalues_"):
+        safe_pvalues = np.nan_to_num(cast(Any, selector.pvalues_), nan=1.0)
+        pvalues = dict(zip(cols, safe_pvalues.tolist()))
+    return scores, pvalues
+
+
+def _univariate_no_target_artifact(
+    cols: List[str], method: str, config: Dict[str, Any]
+) -> "UnivariateSelectionArtifact":
+    """Artifact returned when the selector ran without a target (passthrough)."""
+    return cast(
+        UnivariateSelectionArtifact,
+        {
+            "type": "univariate_selection",
+            "selected_columns": cols,
+            "candidate_columns": cols,
+            "method": method,
+            "drop_columns": config.get("drop_columns", True),
+            "scores": {},
+            "pvalues": {},
+        },
+    )
+
+
+def _model_feature_importances(selector: Any, cols: List[str]) -> Dict[str, float]:
+    """Pull importances or |coef| off a fitted model-based selector."""
+    estimator = getattr(selector, "estimator_", None)
+    if estimator is None:
+        return {}
+    if hasattr(estimator, "feature_importances_"):
+        return dict(zip(cols, estimator.feature_importances_.tolist()))
+    if hasattr(estimator, "coef_"):
+        coef = estimator.coef_
+        if coef.ndim > 1:
+            coef = coef[0]
+        return dict(zip(cols, np.abs(coef).tolist()))
+    return {}
+
+
 # --- Variance Threshold ---
 
 
 class VarianceThresholdApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
-
-        selected_cols = params.get("selected_columns")
-        candidate_columns = params.get("candidate_columns", [])
-        drop_columns = params.get("drop_columns", True)
-
-        if selected_cols is None:
-            return X
-
-        cols_to_drop_set = set(candidate_columns) - set(selected_cols)
-        cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
-
-        if cols_to_drop_list and drop_columns:
-            if engine.name == EngineName.POLARS:
-                pass
-
-                X_pl: Any = X
-                X = X_pl.drop(cols_to_drop_list)
-            else:
-                X = X.drop(columns=cols_to_drop_list)
-        return X
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, _drop_selected_polars, _drop_selected_pandas)
 
 
 @NodeRegistry.register("VarianceThreshold", VarianceThresholdApplier)
@@ -134,86 +313,68 @@ class VarianceThresholdApplier(BaseApplier):
 )
 class VarianceThresholdCalculator(BaseCalculator):
     @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> VarianceThresholdArtifact:
-        engine = get_engine(X)
-
-        # Config: {"threshold": 0.0, "columns": [...]}
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> VarianceThresholdArtifact:
         threshold = config.get("threshold", 0.0)
         drop_columns = config.get("drop_columns", True)
 
+        X_pd = to_pandas(X)
         cols = resolve_columns(
-            X,
+            X_pd,
             config,
             lambda d: detect_numeric_columns(d, exclude_binary=False, exclude_constant=False),
         )
-
         if not cols:
-            return {}
+            return cast(VarianceThresholdArtifact, {})
 
         selector = VarianceThreshold(threshold=threshold)
-
-        # Use Bridge for fitting
-        if engine.name == EngineName.POLARS:
-            X_pl: Any = X
-            X_subset = X_pl.select(cols)
-        else:
-            X_subset = X[cols]
-
-        X_np, _ = SklearnBridge.to_sklearn(X_subset)
-
+        X_np, _ = SklearnBridge.to_sklearn(X_pd[cols])
         selector.fit(X_np)
 
         support = selector.get_support()
         selected_cols = [c for c, s in zip(cols, support) if s]
-
-        variances = {}
-        if hasattr(selector, "variances_"):
-            variances = dict(zip(cols, selector.variances_.tolist()))
-
-        return {
-            "type": "variance_threshold",
-            "selected_columns": selected_cols,
-            "candidate_columns": cols,
-            "threshold": threshold,
-            "drop_columns": drop_columns,
-            "variances": variances,
-        }
+        variances = (
+            dict(zip(cols, selector.variances_.tolist())) if hasattr(selector, "variances_") else {}
+        )
+        return cast(
+            VarianceThresholdArtifact,
+            {
+                "type": "variance_threshold",
+                "selected_columns": selected_cols,
+                "candidate_columns": cols,
+                "threshold": threshold,
+                "drop_columns": drop_columns,
+                "variances": variances,
+            },
+        )
 
 
 # --- Correlation Threshold ---
 
 
+def _corr_drop_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    """Polars apply path: drop the precomputed ``columns_to_drop`` list."""
+    if not params.get("drop_columns", True):
+        return X, y
+    to_drop = [c for c in params.get("columns_to_drop", []) if c in X.columns]
+    if to_drop:
+        X = X.drop(to_drop)
+    return X, y
+
+
+def _corr_drop_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    """Pandas apply path: drop the precomputed ``columns_to_drop`` list."""
+    if not params.get("drop_columns", True):
+        return X, y
+    to_drop = [c for c in params.get("columns_to_drop", []) if c in X.columns]
+    if to_drop:
+        X = X.drop(columns=to_drop)
+    return X, y
+
+
 class CorrelationThresholdApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
-
-        cols_to_drop = params.get("columns_to_drop", [])
-        drop_columns = params.get("drop_columns", True)
-
-        cols_to_drop = [c for c in cols_to_drop if c in X.columns]
-        if not cols_to_drop:
-            return X
-
-        if drop_columns:
-            if engine.name == EngineName.POLARS:
-                pass
-
-                X_pl: Any = X
-                X = X_pl.drop(cols_to_drop)
-            else:
-                X = X.drop(columns=cols_to_drop)
-        return X
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, _corr_drop_polars, _corr_drop_pandas)
 
 
 @NodeRegistry.register("CorrelationThreshold", CorrelationThresholdApplier)
@@ -226,42 +387,33 @@ class CorrelationThresholdApplier(BaseApplier):
 )
 class CorrelationThresholdCalculator(BaseCalculator):
     @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> CorrelationThresholdArtifact:
-        engine = get_engine(X)
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> CorrelationThresholdArtifact:
+        X_pd = to_pandas(X)
 
-        # Ensure pandas for correlation logic
-        if engine.name == EngineName.POLARS:
-            X = X.to_pandas()
-
-        # Config: {"threshold": 0.95, "correlation_method": "pearson"}
         threshold = config.get("threshold", 0.95)
         drop_columns = config.get("drop_columns", True)
-        # Prefer "correlation_method" to avoid conflict with facade's "method"
-        # FIX: Do NOT fallback to config.get("method") because it might be
-        # "correlation_threshold" (the facade method name)
+        # Prefer "correlation_method" — falling back to "method" can collide with the
+        # facade's own "method" key (e.g. "correlation_threshold").
         method = config.get("correlation_method", "pearson")
 
-        cols = resolve_columns(X, config, detect_numeric_columns)
-
+        cols = resolve_columns(X_pd, config, detect_numeric_columns)
         if len(cols) < 2:
-            return {}
+            return cast(CorrelationThresholdArtifact, {})
 
-        corr_matrix = X[cols].corr(method=method).abs()
+        corr_matrix = X_pd[cols].corr(method=method).abs()
         upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
         to_drop = [column for column in upper.columns if any(upper[column] > threshold)]
 
-        return {
-            "type": "correlation_threshold",
-            "columns_to_drop": to_drop,
-            "threshold": threshold,
-            "method": method,
-            "drop_columns": drop_columns,
-        }
+        return cast(
+            CorrelationThresholdArtifact,
+            {
+                "type": "correlation_threshold",
+                "columns_to_drop": to_drop,
+                "threshold": threshold,
+                "method": method,
+                "drop_columns": drop_columns,
+            },
+        )
 
 
 # --- Univariate Selection ---
@@ -269,32 +421,8 @@ class CorrelationThresholdCalculator(BaseCalculator):
 
 class UnivariateSelectionApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
-
-        selected_cols = params.get("selected_columns")
-        candidate_columns = params.get("candidate_columns", [])
-        drop_columns = params.get("drop_columns", True)
-
-        if selected_cols is None:
-            return X
-
-        cols_to_drop_set = set(candidate_columns) - set(selected_cols)
-        cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
-        if cols_to_drop_list and drop_columns:
-            if engine.name == EngineName.POLARS:
-                pass
-
-                X_pl: Any = X
-                X = X_pl.drop(cols_to_drop_list)
-            else:
-                X = X.drop(columns=cols_to_drop_list)
-        return X
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, _drop_selected_polars, _drop_selected_pandas)
 
 
 @NodeRegistry.register("UnivariateSelection", UnivariateSelectionApplier)
@@ -307,166 +435,54 @@ class UnivariateSelectionApplier(BaseApplier):
 )
 class UnivariateSelectionCalculator(BaseCalculator):
     @fit_method
-    def fit(  # noqa: C901
-        self,
-        X: Any,
-        y: Any,
-        config: Dict[str, Any],
-    ) -> UnivariateSelectionArtifact:
-        # Config: method, k, percentile, alpha, score_func, target_column
+    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> UnivariateSelectionArtifact:
         target_col = config.get("target_column")
+        X_pd = to_pandas(X)
 
-        engine = get_engine(X)
+        y = _extract_target(X_pd, y, target_col)
+        if y is None and not config.get("allow_missing_target", False):
+            logger.error(
+                f"UnivariateSelection requires target column '{target_col}' "
+                "to be present in training data."
+            )
+            return cast(UnivariateSelectionArtifact, {})
 
-        if y is None:
-            if not target_col or target_col not in X.columns:
-                logger.error(
-                    f"UnivariateSelection requires target column '{target_col}' to be present in training data."
-                )
-                return {}
-            if engine.name == EngineName.POLARS:
-                pass
-
-                y = X.select(target_col).to_series().to_pandas()
-            else:
-                y = X[target_col]
-
-        cols = resolve_columns(X, config, lambda d: detect_numeric_columns(d, exclude_binary=False))
-
-        # Ensure target is not in candidate columns
-        if target_col in cols:
-            cols = [c for c in cols if c != target_col]
-
+        cols = _resolve_candidate_columns(X_pd, config, target_col)
         if not cols:
-            return {}
+            return cast(UnivariateSelectionArtifact, {})
 
         method = config.get("method", "select_k_best")
         score_func_name = config.get("score_func")
-        problem_type = config.get("problem_type", "auto")
-
-        if problem_type == "auto":
-            if y is None:
-                problem_type = "classification"  # Default fallback
-            else:
-                problem_type = _infer_problem_type(y)
-
+        problem_type = _resolve_problem_type(config.get("problem_type", "auto"), y)
         score_func = _resolve_score_function(score_func_name, problem_type)
 
-        selector = None
-        if method == "select_k_best":
-            k = config.get("k", 10)
-            # logger.info(f"SelectKBest k={k}")
-            selector = SelectKBest(score_func=score_func, k=k)
-        elif method == "select_percentile":
-            p = config.get("percentile", 10)
-            selector = SelectPercentile(score_func=score_func, percentile=p)
-        elif method == "select_fpr":
-            alpha = config.get("alpha", 0.05)
-            selector = SelectFpr(score_func=score_func, alpha=alpha)
-        elif method == "select_fdr":
-            alpha = config.get("alpha", 0.05)
-            selector = SelectFdr(score_func=score_func, alpha=alpha)
-        elif method == "select_fwe":
-            alpha = config.get("alpha", 0.05)
-            selector = SelectFwe(score_func=score_func, alpha=alpha)
-        elif method == "generic_univariate_select":
-            mode = config.get("mode", "k_best")
-            # Prioritize explicit 'param' from config (Frontend sends this)
-            if "param" in config:
-                param = config.get("param")
-            else:
-                # Fallback to mapping from specific keys (Legacy/Alternative)
-                if mode == "k_best":
-                    param = config.get("k", 10)
-                elif mode == "percentile":
-                    param = config.get("percentile", 10)
-                else:
-                    param = config.get("alpha", 0.05)
+        selector = _build_univariate_selector(method, score_func, config)
+        if selector is None:
+            return cast(UnivariateSelectionArtifact, {})
 
-            selector = GenericUnivariateSelect(score_func=score_func, mode=mode, param=param)
+        X_np, _ = SklearnBridge.to_sklearn(X_pd[cols].fillna(0))
+        X_np = _maybe_chi2_rescale(X_np, score_func_name)
 
-        if not selector:
-            return {}
+        if y is None:
+            return _univariate_no_target_artifact(cols, method, config)
 
-        # Use Bridge for fitting
-        if engine.name == EngineName.POLARS:
-            # Cast X for safety
-            X_pl: Any = X
-            X_subset = X_pl.select(cols).fill_null(0)
-        else:
-            X_subset = X[cols].fillna(0)
+        selector.fit(X_np, _prepare_sklearn_y(y, problem_type))
+        support = selector.get_support()
+        selected_cols = [c for c, s in zip(cols, support) if s]
+        scores, pvalues = _univariate_score_dicts(selector, cols)
 
-        X_np, _ = SklearnBridge.to_sklearn(X_subset)
-
-        # Handle Chi2 negative values
-        if score_func_name == "chi2" and (X_np < 0).any():
-            logger.warning(
-                "Chi-squared statistic requires non-negative feature values. "
-                "Applying MinMaxScaler to features for selection."
-            )
-            from sklearn.preprocessing import MinMaxScaler
-
-            X_np = MinMaxScaler().fit_transform(X_np)
-
-        # Handle classification target encoding if needed
-        y_fit = y
-
-        # Convert y to numpy for inspection
-        if hasattr(y, "to_numpy"):
-            y_np = y.to_numpy()
-        else:
-            y_np = np.array(y)
-
-        if (
-            problem_type == "classification"
-            and y is not None
-            # Check if numeric
-            and not np.issubdtype(y_np.dtype, np.number)
-        ):
-            y_factorized, _ = pd.factorize(y_np)
-            y_fit = y_factorized
-        else:
-            y_fit = y_np
-
-        if y is not None:
-            selector.fit(X_np, y_fit)
-            support = selector.get_support()
-            selected_cols = [c for c, s in zip(cols, support) if s]
-        else:
-            selected_cols = cols  # Fallback if no target
-            scores: Dict[str, float] = {}
-            pvalues: Dict[str, float] = {}
-            return {
+        return cast(
+            UnivariateSelectionArtifact,
+            {
                 "type": "univariate_selection",
                 "selected_columns": selected_cols,
                 "candidate_columns": cols,
                 "method": method,
                 "drop_columns": config.get("drop_columns", True),
-                "scores": scores,
-                "pvalues": pvalues,
-            }
-
-        scores = {}
-        pvalues = {}
-        if hasattr(selector, "scores_"):
-            # Handle potential NaN/Inf in scores
-            safe_scores = np.nan_to_num(selector.scores_, nan=0.0, posinf=0.0, neginf=0.0)
-            scores = dict(zip(cols, safe_scores.tolist()))
-
-        if hasattr(selector, "pvalues_"):
-            # Handle potential NaN in pvalues
-            safe_pvalues = np.nan_to_num(cast(Any, selector.pvalues_), nan=1.0)
-            pvalues = dict(zip(cols, safe_pvalues.tolist()))
-
-        return {
-            "type": "univariate_selection",
-            "selected_columns": selected_cols,
-            "candidate_columns": cols,
-            "method": method,
-            "drop_columns": config.get("drop_columns", True),
-            "feature_scores": scores,
-            "p_values": pvalues,
-        }
+                "feature_scores": scores,
+                "p_values": pvalues,
+            },
+        )
 
 
 # --- Model Based Selection ---
@@ -474,32 +490,8 @@ class UnivariateSelectionCalculator(BaseCalculator):
 
 class ModelBasedSelectionApplier(BaseApplier):
     @apply_method
-    def apply(
-        self,
-        X: Any,
-        _y: Any,
-        params: Dict[str, Any],
-    ) -> Any:
-        engine = get_engine(X)
-
-        selected_cols = params.get("selected_columns")
-        candidate_columns = params.get("candidate_columns", [])
-        drop_columns = params.get("drop_columns", True)
-
-        if selected_cols is None:
-            return X
-
-        cols_to_drop_set = set(candidate_columns) - set(selected_cols)
-        cols_to_drop_list = [c for c in cols_to_drop_set if c in X.columns]
-        if cols_to_drop_list and drop_columns:
-            if engine.name == EngineName.POLARS:
-                pass
-
-                X_pl: Any = X
-                X = X_pl.drop(cols_to_drop_list)
-            else:
-                X = X.drop(columns=cols_to_drop_list)
-        return X
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+        return apply_dual_engine(X, params, _drop_selected_polars, _drop_selected_pandas)
 
 
 @NodeRegistry.register("ModelBasedSelection", ModelBasedSelectionApplier)
@@ -512,144 +504,53 @@ class ModelBasedSelectionApplier(BaseApplier):
 )
 class ModelBasedSelectionCalculator(BaseCalculator):
     @fit_method
-    def fit(  # noqa: C901
-        self,
-        X: Any,
-        y: Any,
-        config: Dict[str, Any],
-    ) -> ModelBasedSelectionArtifact:
-        # Config: method (select_from_model, rfe), estimator, target_column
+    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> ModelBasedSelectionArtifact:
         target_col = config.get("target_column")
+        X_pd = to_pandas(X)
 
-        engine = get_engine(X)
-
+        y = _extract_target(X_pd, y, target_col)
         if y is None:
-            if not target_col or target_col not in X.columns:
-                logger.error(
-                    f"ModelBasedSelection requires target column '{target_col}' to be present in training data."
-                )
-                return {}
-            if engine.name == EngineName.POLARS:
-                pass
+            logger.error(
+                f"ModelBasedSelection requires target column '{target_col}' "
+                "to be present in training data."
+            )
+            return cast(ModelBasedSelectionArtifact, {})
 
-                y = X.select(target_col).to_series().to_pandas()
-            else:
-                y = X[target_col]
-
-        cols = resolve_columns(X, config, lambda d: detect_numeric_columns(d, exclude_binary=False))
-
-        # Ensure target is not in candidate columns
-        if target_col in cols:
-            cols = [c for c in cols if c != target_col]
-
+        cols = _resolve_candidate_columns(X_pd, config, target_col)
         if not cols:
-            return {}
+            return cast(ModelBasedSelectionArtifact, {})
 
         method = config.get("method", "select_from_model")
         estimator_name = config.get("estimator", "auto")
-        problem_type = config.get("problem_type", "auto")
-
-        if problem_type == "auto":
-            if y is None:
-                problem_type = "classification"
-            else:
-                problem_type = _infer_problem_type(y)
+        problem_type = _resolve_problem_type(config.get("problem_type", "auto"), y)
 
         estimator = _resolve_estimator(estimator_name, problem_type)
         if estimator is None:
             logger.error(
                 f"Could not resolve estimator '{estimator_name}' for problem type '{problem_type}'"
             )
-            return {}
+            return cast(ModelBasedSelectionArtifact, {})
 
-        selector = None
-        if method == "select_from_model":
-            threshold = config.get("threshold", "mean")
-            # Try to convert string number to float
-            if isinstance(threshold, str):
-                try:
-                    threshold = float(threshold)
-                except ValueError:
-                    pass  # Keep as string (e.g. "mean", "1.25*mean")
+        selector = _build_model_selector(method, estimator, config)
+        if selector is None:
+            return cast(ModelBasedSelectionArtifact, {})
 
-            max_features = config.get("max_features", None)
-            selector = SelectFromModel(
-                estimator=estimator, threshold=threshold, max_features=max_features
-            )
-        elif method == "rfe":
-            n_features_to_select = config.get("n_features_to_select", None)
-            step = config.get("step", 1)
-            selector = RFE(
-                estimator=estimator,
-                n_features_to_select=n_features_to_select,
-                step=step,
-            )
+        X_np, _ = SklearnBridge.to_sklearn(X_pd[cols].fillna(0))
+        selector.fit(X_np, _prepare_sklearn_y(y, problem_type))
+        support = selector.get_support()
+        selected_cols = [c for c, s in zip(cols, support) if s]
 
-        if not selector:
-            return {}
-
-        # Use Bridge for fitting
-        if engine.name == EngineName.POLARS:
-            X_pl: Any = X
-            X_subset = X_pl.select(cols).fill_null(0)
-        else:
-            X_subset = X[cols].fillna(0)
-
-        X_np, _ = SklearnBridge.to_sklearn(X_subset)
-
-        # Handle classification target encoding if needed
-        y_fit = y
-
-        # Convert y to numpy for inspection
-        if hasattr(y, "to_numpy"):
-            y_np = y.to_numpy()
-        else:
-            y_np = np.array(y)
-
-        if (
-            problem_type == "classification"
-            and y is not None
-            # Check if numeric
-            and not np.issubdtype(y_np.dtype, np.number)
-        ):
-            y_factorized, _ = pd.factorize(y_np)
-            y_fit = y_factorized
-        else:
-            y_fit = y_np
-
-        if y is not None:
-            selector.fit(X_np, y_fit)
-            support = selector.get_support()
-            selected_cols = [c for c, s in zip(cols, support) if s]
-        else:
-            selected_cols = cols  # Fallback
-            return {
+        return cast(
+            ModelBasedSelectionArtifact,
+            {
                 "type": "model_based_selection",
                 "selected_columns": selected_cols,
                 "candidate_columns": cols,
                 "method": method,
                 "drop_columns": config.get("drop_columns", True),
-                "feature_importances": {},
-            }
-
-        feature_importances = {}
-        if hasattr(selector, "estimator_") and hasattr(selector.estimator_, "feature_importances_"):
-            feature_importances = dict(zip(cols, selector.estimator_.feature_importances_.tolist()))
-        elif hasattr(selector, "estimator_") and hasattr(selector.estimator_, "coef_"):
-            # For linear models, use coef_
-            coef = selector.estimator_.coef_
-            if coef.ndim > 1:
-                coef = coef[0]  # Take first class or flatten
-            feature_importances = dict(zip(cols, np.abs(coef).tolist()))
-
-        return {
-            "type": "model_based_selection",
-            "selected_columns": selected_cols,
-            "candidate_columns": cols,
-            "method": method,
-            "drop_columns": config.get("drop_columns", True),
-            "feature_importances": feature_importances,
-        }
+                "feature_importances": _model_feature_importances(selector, cols),
+            },
+        )
 
 
 # --- Unified Feature Selection (Facade) ---
@@ -659,8 +560,8 @@ class FeatureSelectionApplier(BaseApplier):
         df: Any,
         params: Dict[str, Any],
     ) -> Any:
-        # The params returned by the specific calculator will have a "type" field
-        # corresponding to the specific calculator's return value.
+        # The params returned by the specific calculator carry a "type" tag
+        # that selects the right concrete applier.
         type_name = params.get("type")
 
         applier: Optional[BaseApplier] = None
@@ -675,8 +576,22 @@ class FeatureSelectionApplier(BaseApplier):
 
         if applier:
             return applier.apply(df, params)
-        # Identity passthrough: return df unchanged.
+        # Identity passthrough when no concrete applier matches.
         return df
+
+
+_FS_CALCULATORS: Dict[str, Callable[[], BaseCalculator]] = {
+    "variance_threshold": VarianceThresholdCalculator,
+    "correlation_threshold": CorrelationThresholdCalculator,
+    "select_k_best": UnivariateSelectionCalculator,
+    "select_percentile": UnivariateSelectionCalculator,
+    "generic_univariate_select": UnivariateSelectionCalculator,
+    "select_fpr": UnivariateSelectionCalculator,
+    "select_fdr": UnivariateSelectionCalculator,
+    "select_fwe": UnivariateSelectionCalculator,
+    "select_from_model": ModelBasedSelectionCalculator,
+    "rfe": ModelBasedSelectionCalculator,
+}
 
 
 @NodeRegistry.register("feature_selection", FeatureSelectionApplier)
@@ -692,30 +607,10 @@ class FeatureSelectionCalculator(BaseCalculator):
         self,
         df: Any,
         config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         method = config.get("method", "select_k_best")
-
-        calculator: Optional[BaseCalculator] = None
-        if method == "variance_threshold":
-            calculator = VarianceThresholdCalculator()
-        elif method == "correlation_threshold":
-            calculator = CorrelationThresholdCalculator()
-        elif method in [
-            "select_k_best",
-            "select_percentile",
-            "generic_univariate_select",
-            "select_fpr",
-            "select_fdr",
-            "select_fwe",
-        ]:
-            calculator = UnivariateSelectionCalculator()
-        elif method in ["select_from_model", "rfe"]:
-            calculator = ModelBasedSelectionCalculator()
-
-        if calculator:
-            return calculator.fit(df, config)
-
-        logger.warning(f"Unknown feature selection method: {method}")
-        return {}
-
-        return df
+        ctor = _FS_CALCULATORS.get(method)
+        if ctor is None:
+            logger.warning(f"Unknown feature selection method: {method}")
+            return {}
+        return ctor().fit(df, config)

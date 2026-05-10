@@ -21,6 +21,10 @@ export const toast = {
   warning: (message: string, description?: string): void => {
     sonner.warning(message, description ? { description } : undefined);
   },
+  /** Dismiss all visible toasts at once. */
+  dismissAll: (): void => {
+    sonner.dismiss();
+  },
   /** Escape hatch for callers that need full sonner options (custom JSX, etc.). */
   raw: sonner,
 };

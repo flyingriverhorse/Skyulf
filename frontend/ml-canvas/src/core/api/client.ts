@@ -121,7 +121,19 @@ export interface PreviewResponse {
   branch_node_ids?: BranchNodeIds | null;
   /** Advisories surfaced when the engine had to merge sibling fan-in inputs. */
   merge_warnings?: MergeWarning[];
+  /** Soft per-node warnings (e.g. TargetEncoder coerced a float multiclass
+   *  target, OneHotEncoder saw a degenerate category). Captured by the
+   *  backend `WarningCaptureHandler` during the run. */
+  node_warnings?: NodeWarning[];
   recommendations: Recommendation[];
+}
+
+export interface NodeWarning {
+  node_id: string | null;
+  node_type: string | null;
+  level: string;
+  logger: string;
+  message: string;
 }
 
 // --- Functions ---

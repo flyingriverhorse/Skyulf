@@ -112,6 +112,25 @@ export interface SlowNodesResponse {
     aggregates: SlowNodeAggregate[];
 }
 
+export interface PipelineLogEntry {
+    node_id?: string | null;
+    node_type?: string | null;
+    level: string;
+    logger?: string | null;
+    message: string;
+}
+
+export interface PipelineRunLog {
+    id: number;
+    pipeline_id?: string | null;
+    node_id?: string | null;
+    node_type?: string | null;
+    level: string;
+    logger?: string | null;
+    message: string;
+    run_at?: string | null;
+}
+
 export const monitoringApi = {
     getJobs: async (): Promise<DriftJobOption[]> => {
         const response = await apiClient.get<DriftJobOption[]>('/monitoring/jobs');
@@ -202,5 +221,23 @@ export const monitoringApi = {
             `/monitoring/slow-nodes?days=${days}&limit=${limit}`,
         );
         return response.data;
+    },
+
+    // ── Pipeline run logs ──────────────────────────────────────────────
+    logPipelineRun: async (pipelineId: string | null, entries: PipelineLogEntry[]): Promise<void> => {
+        if (entries.length === 0) return;
+        await apiClient.post('/monitoring/pipeline-logs', { pipeline_id: pipelineId, entries });
+    },
+
+    getPipelineLogs: async (limit = 200, since?: string, pipelineId?: string): Promise<PipelineRunLog[]> => {
+        const params = new URLSearchParams({ limit: String(limit) });
+        if (since) params.set('since', since);
+        if (pipelineId) params.set('pipeline_id', pipelineId);
+        const response = await apiClient.get<PipelineRunLog[]>(`/monitoring/pipeline-logs?${params}`);
+        return response.data;
+    },
+
+    clearPipelineLogs: async (): Promise<void> => {
+        await apiClient.delete('/monitoring/pipeline-logs');
     },
 };

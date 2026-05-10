@@ -17,7 +17,7 @@ export const JobsPage: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [skip, setSkip] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const LIMIT = 20;
+  const LIMIT = 25;  // match drawer PAGE_SIZE so both show the same number of rows per tab
 
   const [cache, setCache] = useState<Record<TabType, { data: JobInfo[], skip: number, hasMore: boolean }>>({
     training: { data: [], skip: 0, hasMore: true },
