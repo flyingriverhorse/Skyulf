@@ -2688,6 +2688,12 @@
 
     <div class="doc doc-contents first">
 
+        <p>Drop / missing-value nodes (Deduplicate / DropMissingColumns / DropMissingRows / MissingIndicator).</p>
+<p>Appliers route through :func:<code>apply_dual_engine</code>; fits that need engine-divergent
+math (column null-percentage scans) route through :func:<code>fit_dual_engine</code>. The
+two splitter-friendly nodes (Deduplicate, DropMissingRows) require a
+keep-indices y-sync — handled by :func:<code>_polars_filter_y_by_kept_indices</code>.</p>
+
 
 
 

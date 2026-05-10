@@ -747,6 +747,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#step-5b-export-to-jupyter-notebook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5b: Export to Jupyter Notebook
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 5b: Export to Jupyter Notebook">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-exported-notebook-contains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the exported notebook contains
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-branch-pipelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-branch pipelines
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#step-6-deploy-the-model" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3047,6 +3086,48 @@ skyulf-core (ML engine)
 <p><strong>API equivalent:</strong></p>
 <pre><code class="language-bash">curl http://127.0.0.1:8000/api/pipeline/jobs/{job_id}/evaluation
 </code></pre>
+<hr />
+<h2 id="step-5b-export-to-jupyter-notebook">Step 5b: Export to Jupyter Notebook</h2>
+<p><strong>From the canvas:</strong> Click the <strong>Export Notebook</strong> button (toolbar, top-right area) to download a ready-to-run <code>.ipynb</code> file for any completed or configured pipeline.</p>
+<p>Two export modes are available:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Full</strong></td>
+<td>One section per preprocessing node + one training section per branch. Best for exploration and debugging — each preprocessing step is its own cell so you can tweak parameters and inspect intermediate state.</td>
+</tr>
+<tr>
+<td><strong>Compact</strong></td>
+<td>All preprocessing steps collapsed into a single <code>SkyulfPipeline.fit()</code> call per branch. Best for sharing clean, readable notebooks or running in CI.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-the-exported-notebook-contains">What the exported notebook contains</h3>
+<ol>
+<li><strong>Imports &amp; helper cell</strong> — injects <code>_summarize_metrics(m)</code> which flattens Skyulf's nested metric return shapes into a tidy <code>(split × metric)</code> DataFrame.</li>
+<li><strong>Data loading</strong> — loads the same dataset you used on the canvas via <code>pd.read_csv</code> / Parquet.</li>
+<li><strong>Preprocessing cells</strong> — one cell per node (Full mode) or a single pipeline config block (Compact mode).</li>
+<li><strong>Training cell</strong> — wired up to run the same algorithm the canvas node was configured for:</li>
+<li><strong>Basic Training nodes</strong> call <code>estimator.fit_predict()</code> with <code>log_callback=print</code>.</li>
+<li><strong>Advanced Tuning nodes</strong> automatically use <code>TuningCalculator</code>/<code>TuningApplier</code> wrappers so the Optuna / grid / random search actually runs. Each trial prints its progress in the notebook output:
+     <code>Trial 1/10 — score=0.9221
+     Trial 2/10 — score=0.9306
+     ...
+     Tuning Completed (optuna). Best Score: 0.9497
+     Best Params: {'n_estimators': 500, ...}
+     Refitting best model with params: {...}</code></li>
+<li><strong>Metrics cell</strong> — renders a coloured <code>train vs test</code> table (green = high, red = low) via pandas Styler <code>background_gradient</code>.</li>
+<li><strong>Multi-branch comparison</strong> (if 2+ training nodes) — a <code>(branch × split)</code> metrics table after all branches have run, so you can compare experiments side-by-side.</li>
+<li><strong>Inference cell</strong> — shows how to reload the saved <code>.pkl</code> artifact and call <code>estimator.predict(new_df)</code>.</li>
+</ol>
+<h3 id="multi-branch-pipelines">Multi-branch pipelines</h3>
+<p>If your canvas has multiple training nodes (e.g., five parallel XGBoost variants), the exporter detects each branch independently — including branches produced by <strong>parallel</strong> trainer nodes (one branch per incoming data path). Every branch gets its own labelled section (<code>## Branch A</code>, <code>## Branch B</code>, …) so metrics are never mixed.</p>
 <hr />
 <h2 id="step-6-deploy-the-model">Step 6: Deploy the model</h2>
 <p><strong>Page:</strong> <code>/deployments</code> (Deployments)</p>

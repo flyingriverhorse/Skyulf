@@ -2688,6 +2688,13 @@
 
     <div class="doc doc-contents first">
 
+        <p>Cleaning nodes (Text / InvalidValue / ValueReplacement / AliasReplacement).</p>
+<p>Each Applier dispatches on engine via <code>apply_dual_engine</code> so per-engine
+logic lives in small <code>_apply_polars</code> / <code>_apply_pandas</code> static helpers.
+Per-operation work is further split into module-level helpers (<code>_trim_*</code>,
+<code>_case_*</code>, <code>_remove_special_*</code>, <code>_regex_*</code>, <code>_invalid_rule_*</code>) plus
+small dispatch dicts so individual methods stay at CCN ≤ 8.</p>
+
 
 
 

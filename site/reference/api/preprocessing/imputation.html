@@ -2688,6 +2688,13 @@
 
     <div class="doc doc-contents first">
 
+        <p>Imputation nodes (Simple / KNN / Iterative).</p>
+<p>Each Applier/Calculator dispatches on engine via <code>apply_dual_engine</code> /
+<code>fit_dual_engine</code> (see <code>dispatcher.py</code>). Per-engine logic lives in
+small <code>_apply_polars</code> / <code>_apply_pandas</code> / <code>_fit_polars</code> /
+<code>_fit_pandas</code> static helpers so the public <code>apply</code> / <code>fit</code> methods
+stay at CCN 1 (Codacy <code>lizard_ccn-medium</code>).</p>
+
 
 
 

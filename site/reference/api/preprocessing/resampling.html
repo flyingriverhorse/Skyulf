@@ -2688,6 +2688,13 @@
 
     <div class="doc doc-contents first">
 
+        <p>Resampling nodes (<code>Oversampling</code>, <code>Undersampling</code>).</p>
+<p>Both Appliers route through :func:<code>apply_dual_engine</code>. Imblearn is purely
+pandas/numpy-bound, so the Polars path round-trips through pandas (convert in,
+run sampler, convert back) while keeping all engine handling out of class
+bodies. Sampler construction is split per-method and per-family so each helper
+stays at low CCN.</p>
+
 
 
 

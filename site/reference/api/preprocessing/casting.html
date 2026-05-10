@@ -2688,6 +2688,11 @@
 
     <div class="doc doc-contents first">
 
+        <p>Type-casting node — routes apply through the dual-engine dispatcher.</p>
+<p>The fit step is config-only (no per-engine math), so it stays single-path.
+The pandas apply path was previously a single CCN-busting function; it is now
+split per dtype family (<code>float / int / bool / datetime / other</code>).</p>
+
 
 
 
