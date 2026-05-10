@@ -180,6 +180,10 @@ For detailed examples including **Time Series**, **Geospatial Analysis**, and **
 *   **🧠 Model Training:** Built-in support for Scikit-Learn models with hyperparameter search (Grid/Random/Halving) and optional Optuna integration.
 *   **📦 Model Registry & Deployment:** Version control your models, track metrics, and deploy them to a live inference API with a single click.
 *   **📊 Experiment Tracking:** Compare multiple runs side-by-side with interactive charts, confusion matrices, and ROC curves.
+*   **📓 Notebook Export:** Export any canvas pipeline to a fully self-contained Jupyter notebook with one click — two modes available:
+    *   **Full mode** — one cell per preprocessing node so you can tweak parameters, inspect intermediate state, and understand every transformation.
+    *   **Compact mode** — single `SkyulfPipeline.fit()` call per branch, ideal for sharing reproducible results or running in CI. Multi-branch canvases get a coloured `(branch × split)` comparison table.
+    *   **Advanced Tuning nodes** are properly wired with `TuningCalculator`/`TuningApplier` wrappers so Optuna/grid/random search actually runs in the notebook — with per-trial progress printed to cell output.
 
 ## Version History
 

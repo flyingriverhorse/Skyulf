@@ -1,4 +1,4 @@
-# © 2025 Murat Unsal — Skyulf Project
+# Â© 2025 Murat Unsal â€” Skyulf Project
 
 # === Python ===
 __pycache__/
@@ -133,3 +133,6 @@ temp_test_artifacts*/
 
 #Ignore vscode AI rules
 .github\instructions\codacy.instructions.md
+
+# MkDocs generated output — built by CI and deployed to GitHub Pages
+site/

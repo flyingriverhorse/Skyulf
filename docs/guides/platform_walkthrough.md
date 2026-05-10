@@ -176,6 +176,43 @@ curl http://127.0.0.1:8000/api/pipeline/jobs/{job_id}/evaluation
 
 ---
 
+## Step 5b: Export to Jupyter Notebook
+
+**From the canvas:** Click the **Export Notebook** button (toolbar, top-right area) to download a ready-to-run `.ipynb` file for any completed or configured pipeline.
+
+Two export modes are available:
+
+| Mode | When to use |
+|---|---|
+| **Full** | One section per preprocessing node + one training section per branch. Best for exploration and debugging — each preprocessing step is its own cell so you can tweak parameters and inspect intermediate state. |
+| **Compact** | All preprocessing steps collapsed into a single `SkyulfPipeline.fit()` call per branch. Best for sharing clean, readable notebooks or running in CI. |
+
+### What the exported notebook contains
+
+1. **Imports & helper cell** — injects `_summarize_metrics(m)` which flattens Skyulf's nested metric return shapes into a tidy `(split × metric)` DataFrame.
+2. **Data loading** — loads the same dataset you used on the canvas via `pd.read_csv` / Parquet.
+3. **Preprocessing cells** — one cell per node (Full mode) or a single pipeline config block (Compact mode).
+4. **Training cell** — wired up to run the same algorithm the canvas node was configured for:
+   - **Basic Training nodes** call `estimator.fit_predict()` with `log_callback=print`.
+   - **Advanced Tuning nodes** automatically use `TuningCalculator`/`TuningApplier` wrappers so the Optuna / grid / random search actually runs. Each trial prints its progress in the notebook output:
+     ```
+     Trial 1/10 — score=0.9221
+     Trial 2/10 — score=0.9306
+     ...
+     Tuning Completed (optuna). Best Score: 0.9497
+     Best Params: {'n_estimators': 500, ...}
+     Refitting best model with params: {...}
+     ```
+5. **Metrics cell** — renders a coloured `train vs test` table (green = high, red = low) via pandas Styler `background_gradient`.
+6. **Multi-branch comparison** (if 2+ training nodes) — a `(branch × split)` metrics table after all branches have run, so you can compare experiments side-by-side.
+7. **Inference cell** — shows how to reload the saved `.pkl` artifact and call `estimator.predict(new_df)`.
+
+### Multi-branch pipelines
+
+If your canvas has multiple training nodes (e.g., five parallel XGBoost variants), the exporter detects each branch independently — including branches produced by **parallel** trainer nodes (one branch per incoming data path). Every branch gets its own labelled section (`## Branch A`, `## Branch B`, …) so metrics are never mixed.
+
+---
+
 ## Step 6: Deploy the model
 
 **Page:** `/deployments` (Deployments)

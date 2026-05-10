@@ -14,6 +14,7 @@ import {
 } from '../../../../core/utils/recentPipelines';
 import { toast } from '../../../../core/toast';
 import { useConfirm } from '../../../shared';
+import { convertGraphToPipelineConfig } from '../../../../core/utils/pipelineConverter';
 
 export interface PipelineActions {
   isSaving: boolean;
@@ -71,8 +72,12 @@ export function usePipelineActions(): PipelineActions {
   const exportNotebook = async (mode: 'compact' | 'full'): Promise<void> => {
     if (!currentDatasetId) return;
     try {
-      const resp = await apiClient.get<Blob>(
+      // Send the same canonical PipelineConfig the engine consumes so the
+      // backend doesn't have to re-derive it from raw React Flow JSON.
+      const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
+      const resp = await apiClient.post<Blob>(
         `/pipeline/pipeline/${currentDatasetId}/export-notebook?mode=${mode}`,
+        pipelineConfig,
         { responseType: 'blob' },
       );
       const url = URL.createObjectURL(resp.data);

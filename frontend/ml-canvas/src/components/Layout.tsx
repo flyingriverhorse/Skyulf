@@ -25,14 +25,24 @@ export const Layout: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Drives the red dot on the "Errors" nav link. We don't need a live
+    // counter — the dot just signals "there's something to look at", so
+    // a 5-minute poll is plenty. Skip entirely when the user is already
+    // on /errors (they're seeing the live list) or when the tab is
+    // hidden (saves a request per inactive tab per cycle).
     const check = () =>
       monitoringApi.getUnresolvedCount()
         .then(n => setErrorAlert(n > 0))
         .catch(() => {});
-    check();
-    const id = setInterval(check, 60_000);
+    const tick = () => {
+      if (document.hidden) return;
+      if (location.pathname === '/errors') return;
+      check();
+    };
+    tick();
+    const id = setInterval(tick, 300_000);
     return () => clearInterval(id);
-  }, []);
+  }, [location.pathname]);
 
   const toggleTheme = () => {
     const newMode = !isDarkMode;
