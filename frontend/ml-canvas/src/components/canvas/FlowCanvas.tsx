@@ -42,7 +42,7 @@ const FlowCanvasContent: React.FC = () => {
     onEdgesChange, 
     onConnect,
     addNode,
-    executionResult
+    executionResult,
   } = useGraphStore(
     useShallow((state) => ({
       nodes: state.nodes,
@@ -51,7 +51,7 @@ const FlowCanvasContent: React.FC = () => {
       onEdgesChange: state.onEdgesChange,
       onConnect: state.onConnect,
       addNode: state.addNode,
-      executionResult: state.executionResult
+      executionResult: state.executionResult,
     }))
   );
 
