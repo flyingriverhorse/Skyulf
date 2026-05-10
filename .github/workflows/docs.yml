@@ -49,6 +49,7 @@ jobs:
           mkdir -p deploy
           cp index.html deploy/
           cp CNAME deploy/
+          cp robots.txt deploy/
           cp .gitattributes deploy/
           cp -r static deploy/
           # Rename site/ -> manual/ to avoid GitHub Pages suppressing it
