@@ -49,7 +49,7 @@ class JobInfo(BaseModel):
     parent_pipeline_id: Optional[str] = None
 
 
-from backend.ml_pipeline.constants import StepType
+from backend.ml_pipeline.constants import StepType  # noqa: E402
 
 
 def coerce_step_type(value: Any) -> Any:

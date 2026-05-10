@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING, cast
+from typing import Any, Callable, Dict, TYPE_CHECKING, cast
 
 import numpy as np
 import pandas as pd
