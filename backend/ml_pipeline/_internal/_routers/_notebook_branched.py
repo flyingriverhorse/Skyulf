@@ -8,7 +8,6 @@ rather than a single ambiguous block. Imported by ``notebook_export`` when
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
 

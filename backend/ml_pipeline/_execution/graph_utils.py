@@ -442,7 +442,7 @@ def _parse_node_info(node: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any]]:
     return nid, ntype, params
 
 
-from backend.ml_pipeline.constants import StepType
+from backend.ml_pipeline.constants import StepType  # noqa: E402
 
 
 def _extract_columns(ntype: str, params: Dict[str, Any]) -> List[str]:

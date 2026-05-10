@@ -542,7 +542,8 @@ async def clear_error_events(
 
     result = await db.execute(delete(ErrorEvent))
     await db.commit()
-    return ErrorDeleteResponse(deleted=result.rowcount or 0)
+    deleted = getattr(result, "rowcount", None) or 0
+    return ErrorDeleteResponse(deleted=deleted)
 
 
 @router.get("/errors/grouped", response_model=List[ErrorGroupedEntry])

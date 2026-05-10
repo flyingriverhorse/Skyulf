@@ -4,7 +4,9 @@
   <img src="static/img/logo.png" alt="Skyulf Logo" width="200">
 </p>
 
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Backend License](https://img.shields.io/badge/backend-AGPLv3-blue)](LICENSE)
+[![Frontend License](https://img.shields.io/badge/frontend-AGPLv3-blue)](frontend/ml-canvas/LICENSE)
+[![Core License](https://img.shields.io/badge/skyulf--core-Apache--2.0-green)](skyulf-core/LICENSE)
 [![Commercial](https://img.shields.io/badge/enterprise-support-blueviolet)](COMMERCIAL-LICENSE.md)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](#quick-start)
 [![CI](https://github.com/flyingriverhorse/Skyulf/actions/workflows/ci.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/ci.yml)
@@ -215,12 +217,15 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and w
 
 Skyulf uses a split licensing model to balance open standards with sustainable development:
 
-*   **Backend & Core:** [Apache 2.0](LICENSE) (Permissive) - Ideal for integration and enterprise use.
-*   **Frontend (ML Canvas):** [GNU AGPLv3](frontend/ml-canvas/LICENSE) (Copyleft) - Ensures UI improvements are shared back to the community.
+*   **Backend (FastAPI / API server):** [GNU AGPLv3](LICENSE) (Copyleft) - If you run this as a network service you must release your full stack's source code, or obtain a commercial license.
+*   **Frontend (ML Canvas):** [GNU AGPLv3](frontend/ml-canvas/LICENSE) (Copyleft) - Same network-service copyleft requirement.
+*   **Core Library (`skyulf-core`):** [Apache 2.0](skyulf-core/LICENSE) (Permissive) - Use freely in any project, open or commercial.
 
 **Commercial Use:**
-No separate commercial license is required for internal use or building proprietary plugins on the backend.
-However, if you are building a proprietary SaaS that modifies the frontend and cannot comply with AGPLv3, please see [`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md) for partnership options.
+If you want to run the backend or frontend as part of a proprietary product or SaaS **without** open-sourcing your stack, you need a commercial license exception.
+See [`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md) for partnership options.
+
+**Existing versions:** Releases v0.5.15 and earlier were published under Apache 2.0. Those versions remain under their original license. AGPLv3 applies from v0.5.16 onwards.
 
 ---
 
@@ -241,6 +246,6 @@ Let's build the simplest, most powerful MLOps hub together.
 
 ---
 
-© 2025 Murat Unsal — Skyulf Project  
-SPDX-License-Identifier: Apache-2.0
+© 2025–2026 Murat Unsal — Skyulf Project  
+SPDX-License-Identifier: AGPL-3.0-or-later (backend/frontend) AND Apache-2.0 (skyulf-core)
 

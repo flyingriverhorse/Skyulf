@@ -569,7 +569,7 @@ def _pandas_subtract(
 ) -> pd.Series:
     res = series_list[0].copy() if series_list else pd.Series(0.0, index=idx)
     for s in series_list[1:]:
-        res = res.subtract(s, fill_value=0)
+        res = res.subtract(s, fill_value=0)  # type: ignore[call-overload]
     for c in const_vals:
         res = res.sub(c)
     return res
@@ -580,9 +580,9 @@ def _pandas_multiply(
 ) -> pd.Series:
     res = pd.Series(1.0, index=idx)
     for s in series_list:
-        res = res.multiply(s, fill_value=1)
+        res = res.multiply(s, fill_value=1)  # type: ignore[call-overload]
     for c in const_vals:
-        res = res.mul(c)
+        res = res.mul(c)  # type: ignore[call-overload]
     return res
 
 

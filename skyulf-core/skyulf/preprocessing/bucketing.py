@@ -249,7 +249,7 @@ def _fit_equal_width(series: pd.Series, n_bins: int) -> np.ndarray:
 
 
 def _fit_equal_frequency(series: pd.Series, n_bins: int, duplicates: str) -> np.ndarray:
-    _, edges = pd.qcut(series, q=n_bins, retbins=True, duplicates=duplicates)
+    _, edges = pd.qcut(series, q=n_bins, labels=None, retbins=True, duplicates=duplicates)  # type: ignore[call-overload]
     if len(edges) > 0 and edges[0] < series.min():
         edges[0] = series.min()
     return edges
