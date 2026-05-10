@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Play,
   Save,
@@ -18,6 +18,8 @@ import {
   Sparkles,
   Gauge,
   MoreHorizontal,
+  BookOpen,
+  Trash2,
 } from 'lucide-react';
 import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
 import { useJobStore } from '../../core/store/useJobStore';
@@ -32,6 +34,7 @@ import {
 import { exportCanvasToPng, exportCanvasToSvg } from '../../core/utils/canvasExport';
 import { toast } from '../../core/toast';
 import { TemplatesGalleryModal } from '../canvas/TemplatesGalleryModal';
+import { useConfirm } from '../shared';
 import { useDismissable } from './toolbar/_hooks/useDismissable';
 import { useRunControls } from './toolbar/_hooks/useRunControls';
 import { usePipelineActions } from './toolbar/_hooks/usePipelineActions';
@@ -57,6 +60,22 @@ export const Toolbar: React.FC = () => {
   const redo = useTemporalStore((s) => s.redo);
   const canUndo = useTemporalStore((s) => s.pastStates.length > 0);
   const canRedo = useTemporalStore((s) => s.futureStates.length > 0);
+
+  // Clear Canvas: wipe every node + edge after explicit confirmation.
+  // Lives next to Undo/Redo because it's the canonical "reset" action;
+  // Ctrl+Z still restores the previous state via zundo so this is recoverable.
+  const confirm = useConfirm();
+  const canClear = !readOnly && (nodes.length > 0 || edges.length > 0);
+  const handleClearCanvas = useCallback(async (): Promise<void> => {
+    if (nodes.length === 0 && edges.length === 0) return;
+    const ok = await confirm({
+      title: 'Clear the canvas?',
+      message: `Remove all ${nodes.length} node(s) and ${edges.length} edge(s)? You can undo with Ctrl+Z.`,
+      confirmLabel: 'Clear canvas',
+      variant: 'danger',
+    });
+    if (ok) setGraph([], []);
+  }, [nodes.length, edges.length, confirm, setGraph]);
 
   // Global undo/redo hotkeys. Skip when focus is in a text input so we
   // don't fight native input undo.
@@ -123,6 +142,8 @@ export const Toolbar: React.FC = () => {
     cancelRename,
     handleDeleteRecent,
     formatRelativeTime,
+    currentDatasetId,
+    exportNotebook,
   } = usePipelineActions();
 
   const [showLegend, setShowLegend] = useState(false);
@@ -236,6 +257,18 @@ export const Toolbar: React.FC = () => {
             <Undo2 className="w-4 h-4" />
           </button>
         )}
+        {!readOnly && (
+          <button
+            onClick={() => { void handleClearCanvas(); }}
+            disabled={!canClear}
+            title="Clear canvas (Ctrl+Z to undo)"
+            aria-label="Clear canvas"
+            data-testid="toolbar-clear-canvas"
+            className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:hover:bg-red-950/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
         {showLegend && <CanvasLegend onClose={() => setShowLegend(false)} />}
       </div>
 
@@ -322,6 +355,25 @@ export const Toolbar: React.FC = () => {
               >
                 <Download className="w-4 h-4" /> Export SVG
               </button>
+              {currentDatasetId && (
+                <>
+                  <div className="border-t my-1" />
+                  <button
+                    role="menuitem"
+                    onClick={() => { setShowMoreMenu(false); void exportNotebook('compact'); }}
+                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
+                  >
+                    <BookOpen className="w-4 h-4" /> Notebook (compact)
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => { setShowMoreMenu(false); void exportNotebook('full'); }}
+                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
+                  >
+                    <BookOpen className="w-4 h-4" /> Notebook (full)
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -501,6 +553,25 @@ export const Toolbar: React.FC = () => {
               >
                 SVG (vector)
               </button>
+              {currentDatasetId && (
+                <>
+                  <div className="border-t my-1" />
+                  <button
+                    role="menuitem"
+                    onClick={() => { setShowExportMenu(false); void exportNotebook('compact'); }}
+                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
+                  >
+                    <BookOpen className="w-4 h-4" /> Notebook (compact)
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => { setShowExportMenu(false); void exportNotebook('full'); }}
+                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
+                  >
+                    <BookOpen className="w-4 h-4" /> Notebook (full)
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

@@ -5,22 +5,17 @@ import { monitoringApi } from '../core/api/monitoring';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    if (typeof document === 'undefined') return false;
+    return document.documentElement.classList.contains('dark');
+  });
   const [driftAlert, setDriftAlert] = useState(false);
   const [errorAlert, setErrorAlert] = useState(false);
 
   useEffect(() => {
-    // Check if dark mode is already active
-    if (document.documentElement.classList.contains('dark')) {
-      setIsDarkMode(true);
-    } else {
-      // Check system preference
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (isDark) {
-        document.documentElement.classList.add('dark');
-        setIsDarkMode(true);
-      }
-    }
+    // Inline script in index.html already applied the right class before mount;
+    // this effect only keeps state in sync if something else mutated the class.
+    setIsDarkMode(document.documentElement.classList.contains('dark'));
   }, []);
 
   useEffect(() => {
@@ -30,14 +25,24 @@ export const Layout: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Drives the red dot on the "Errors" nav link. We don't need a live
+    // counter — the dot just signals "there's something to look at", so
+    // a 5-minute poll is plenty. Skip entirely when the user is already
+    // on /errors (they're seeing the live list) or when the tab is
+    // hidden (saves a request per inactive tab per cycle).
     const check = () =>
       monitoringApi.getUnresolvedCount()
         .then(n => setErrorAlert(n > 0))
         .catch(() => {});
-    check();
-    const id = setInterval(check, 60_000);
+    const tick = () => {
+      if (document.hidden) return;
+      if (location.pathname === '/errors') return;
+      check();
+    };
+    tick();
+    const id = setInterval(tick, 300_000);
     return () => clearInterval(id);
-  }, []);
+  }, [location.pathname]);
 
   const toggleTheme = () => {
     const newMode = !isDarkMode;
@@ -47,6 +52,9 @@ export const Layout: React.FC = () => {
     } else {
       document.documentElement.classList.remove('dark');
     }
+    try {
+      localStorage.setItem('skyulf-theme', newMode ? 'dark' : 'light');
+    } catch { /* ignore quota / privacy errors */ }
   };
 
   const isActive = (path: string) => location.pathname === path;

@@ -1,4 +1,11 @@
-from typing import Any, Dict, Tuple, Union
+"""Inspection nodes (DatasetProfile, DataSnapshot).
+
+Both nodes are read-only; the appliers are pure passthroughs. Only the fits
+collect engine-specific summary statistics, so they route through
+:func:`fit_dual_engine`.
+"""
+
+from typing import Any, Dict, Tuple, Union, cast
 
 import pandas as pd
 
@@ -6,9 +13,64 @@ from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
 from ..utils import detect_numeric_columns
 from .base import BaseApplier, BaseCalculator, fit_method
+from .dispatcher import fit_dual_engine
 from ._artifacts import DatasetProfileArtifact, DataSnapshotArtifact
 from ._schema import SkyulfSchema
-from ..engines import EngineName, SkyulfDataFrame, get_engine
+from ..engines import SkyulfDataFrame
+
+
+# -----------------------------------------------------------------------------
+# DatasetProfile
+# -----------------------------------------------------------------------------
+
+
+def _extract_polars_numeric_stats(X: Any, numeric_cols: list) -> Dict[str, Dict[str, object]]:
+    """Convert Polars ``describe()`` output into a per-column stats dict."""
+    if not numeric_cols:
+        return {}
+    desc_df = X.select(numeric_cols).describe()
+    stats: Dict[str, Dict[str, object]] = {col: {} for col in numeric_cols}
+    for row in desc_df.to_dicts():
+        # Polars < 0.19 uses "describe", newer versions use "statistic".
+        metric = row.get("describe") or row.get("statistic")
+        if not metric:
+            continue
+        for col in numeric_cols:
+            if col in row:
+                stats[col][metric] = row[col]
+    return stats
+
+
+def _profile_fit_polars(X: Any, _y: Any, _config: Dict[str, Any]) -> DatasetProfileArtifact:
+    import polars as pl
+
+    profile: Dict[str, Any] = {
+        "rows": len(X),
+        "columns": len(X.columns),
+        "dtypes": {col: str(dtype) for col, dtype in zip(X.columns, X.dtypes)},
+        "missing": {col: X[col].null_count() for col in X.columns},
+    }
+    numeric_cols = [
+        col
+        for col, dtype in zip(X.columns, X.dtypes)
+        if dtype in (pl.Float64, pl.Float32, pl.Int64, pl.Int32)
+    ]
+    if numeric_cols:
+        profile["numeric_stats"] = _extract_polars_numeric_stats(X, numeric_cols)
+    return {"type": "dataset_profile", "profile": profile}
+
+
+def _profile_fit_pandas(X: Any, _y: Any, _config: Dict[str, Any]) -> DatasetProfileArtifact:
+    profile: Dict[str, Any] = {
+        "rows": len(X),
+        "columns": len(X.columns),
+        "dtypes": X.dtypes.astype(str).to_dict(),
+        "missing": X.isna().sum().to_dict(),
+    }
+    numeric_cols = detect_numeric_columns(X)
+    if numeric_cols:
+        profile["numeric_stats"] = X[numeric_cols].describe().to_dict()
+    return {"type": "dataset_profile", "profile": profile}
 
 
 class DatasetProfileApplier(BaseApplier):
@@ -17,7 +79,7 @@ class DatasetProfileApplier(BaseApplier):
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         params: Dict[str, Any],
     ) -> Any:
-        # Inspection nodes do not modify data
+        # Inspection nodes do not modify data.
         return df
 
 
@@ -37,66 +99,26 @@ class DatasetProfileCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> DatasetProfileArtifact:
-        # Generate a lightweight dataset profile
-        engine = get_engine(X)
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> DatasetProfileArtifact:
+        return cast(
+            DatasetProfileArtifact,
+            fit_dual_engine(X, config, _profile_fit_polars, _profile_fit_pandas),
+        )
 
-        profile: Dict[str, Any] = {}
 
-        if engine.name == EngineName.POLARS:
-            import polars as pl
+# -----------------------------------------------------------------------------
+# DataSnapshot
+# -----------------------------------------------------------------------------
 
-            profile["rows"] = len(X)
-            profile["columns"] = len(X.columns)
-            profile["dtypes"] = {col: str(dtype) for col, dtype in zip(X.columns, X.dtypes)}
-            profile["missing"] = {col: X[col].null_count() for col in X.columns}
 
-            # Numeric stats
-            numeric_cols = [
-                col
-                for col, dtype in zip(X.columns, X.dtypes)
-                if dtype in [pl.Float64, pl.Float32, pl.Int64, pl.Int32]
-            ]
-            if numeric_cols:
-                # Polars describe returns a DataFrame
-                desc_df = X.select(numeric_cols).describe()
-                # Convert to list of dicts
-                desc_dicts = desc_df.to_dicts()
+def _snapshot_fit_polars(X: Any, _y: Any, config: Dict[str, Any]) -> DataSnapshotArtifact:
+    n = config.get("n_rows", 5)
+    return {"type": "data_snapshot", "snapshot": X.head(n).to_dicts()}
 
-                stats: dict[str, dict[str, object]] = {}
-                # Initialize stats dicts
-                for col in numeric_cols:
-                    stats[col] = {}
 
-                for row in desc_dicts:
-                    # Polars < 0.19 uses "describe", newer uses "statistic"
-                    metric = row.get("describe") or row.get("statistic")
-                    if not metric:
-                        continue
-
-                    for col in numeric_cols:
-                        if col in row:
-                            stats[col][metric] = row[col]
-
-                profile["numeric_stats"] = stats
-        else:
-            # Pandas logic
-            profile["rows"] = len(X)
-            profile["columns"] = len(X.columns)
-            profile["dtypes"] = X.dtypes.astype(str).to_dict()
-            profile["missing"] = X.isna().sum().to_dict()
-
-            numeric_cols = detect_numeric_columns(X)
-            if numeric_cols:
-                desc = X[numeric_cols].describe().to_dict()
-                profile["numeric_stats"] = desc
-
-        return {"type": "dataset_profile", "profile": profile}
+def _snapshot_fit_pandas(X: Any, _y: Any, config: Dict[str, Any]) -> DataSnapshotArtifact:
+    n = config.get("n_rows", 5)
+    return {"type": "data_snapshot", "snapshot": X.head(n).to_dict(orient="records")}
 
 
 class DataSnapshotApplier(BaseApplier):
@@ -124,19 +146,8 @@ class DataSnapshotCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(
-        self,
-        X: Any,
-        _y: Any,
-        config: Dict[str, Any],
-    ) -> DataSnapshotArtifact:
-        engine = get_engine(X)
-
-        n = config.get("n_rows", 5)
-
-        if engine.name == EngineName.POLARS:
-            snapshot = X.head(n).to_dicts()
-        else:
-            snapshot = X.head(n).to_dict(orient="records")
-
-        return {"type": "data_snapshot", "snapshot": snapshot}
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> DataSnapshotArtifact:
+        return cast(
+            DataSnapshotArtifact,
+            fit_dual_engine(X, config, _snapshot_fit_polars, _snapshot_fit_pandas),
+        )

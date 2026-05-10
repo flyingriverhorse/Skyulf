@@ -66,7 +66,3 @@ class NodeRegistry:
     def get_all_metadata(cls) -> Dict[str, Dict[str, Any]]:
         """Return a snapshot of all registered node metadata, keyed by node ID."""
         return dict(cls._metadata)
-
-    @classmethod
-    def get_all_metadata(cls) -> Dict[str, Dict[str, Any]]:
-        return cls._metadata

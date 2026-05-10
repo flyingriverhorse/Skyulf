@@ -73,6 +73,12 @@ class PreviewResponse(BaseModel):
     # Advisory messages from the engine about merge semantics applied during
     # this preview (e.g. sibling fan-in detected).
     merge_warnings: List[Dict[str, Any]] = []
+    # Soft per-node warnings captured by `WarningCaptureHandler` during
+    # the run (e.g. TargetEncoder coerced a float multiclass target,
+    # OneHotEncoder saw a degenerate category). Each entry is
+    # `{"node_id", "node_type", "level", "logger", "message"}`. Surfaced
+    # by the frontend as toasts + an in-app notification panel.
+    node_warnings: List[Dict[str, Any]] = []
 
 
 class SavedPipelineModel(BaseModel):

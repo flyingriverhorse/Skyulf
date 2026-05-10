@@ -1,0 +1,35 @@
+Skyulf
+Copyright 2025–2026 Murat Unsal
+
+---
+
+LICENSE HISTORY
+===============
+
+Versions v0.1.x through v0.5.15 (inclusive) were released under the
+Apache License, Version 2.0. Those releases remain available under their
+original terms. See the Git tag for each release to obtain the source and
+the license that applied at that time.
+
+From v0.5.16 onwards, the backend (backend/) and frontend (frontend/)
+components are licensed under the GNU Affero General Public License,
+Version 3 (AGPLv3). The text of the AGPLv3 is in the LICENSE file at the
+root of this repository.
+
+The skyulf-core library (skyulf-core/) continues to be licensed under the
+Apache License, Version 2.0. Its license is in skyulf-core/LICENSE.
+
+---
+
+THIRD-PARTY SOFTWARE
+====================
+
+This project incorporates third-party software. Their licenses are
+documented in the respective package metadata under the .venv/ and
+frontend/ml-canvas/node_modules/ directories. Notable dependencies:
+
+- FastAPI (MIT), Pydantic (MIT), SQLAlchemy (MIT)
+- scikit-learn (BSD-3-Clause), pandas (BSD-3-Clause), numpy (BSD-3-Clause)
+- Polars (MIT), Optuna (MIT)
+- React (MIT), ReactFlow (MIT), Tailwind CSS (MIT)
+- Celery (BSD-3-Clause), Redis client (MIT)

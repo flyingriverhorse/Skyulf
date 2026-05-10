@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Mapping, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 # They receive (X, y, params)
 # Apply returns (X_transformed, y_transformed)
 ApplyFunction = Callable[[Any, Optional[Any], Dict[str, Any]], Tuple[Any, Optional[Any]]]
-# Fit returns configuration dict
-FitFunction = Callable[[Any, Optional[Any], Dict[str, Any]], Dict[str, Any]]
+# Fit returns a mapping (TypedDicts are accepted via Mapping invariance).
+FitFunction = Callable[[Any, Optional[Any], Dict[str, Any]], Mapping[str, Any]]
 
 
 def apply_dual_engine(
@@ -88,7 +88,7 @@ def fit_dual_engine(
 
     if engine.name == EngineName.POLARS:
         try:
-            return polars_func(X, y, params)
+            return dict(polars_func(X, y, params))
         except Exception as e:
             # logger.error(f"Polars Engine Fit Failed: {e}")
             raise e
@@ -98,7 +98,7 @@ def fit_dual_engine(
         else:
             X_pd = X
         try:
-            return pandas_func(X_pd, y, params)
+            return dict(pandas_func(X_pd, y, params))
         except Exception as e:
             # logger.error(f"Pandas Engine Fit Failed: {e}")
             raise e

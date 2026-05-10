@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def _pipeline_span(job_id: str):
     """Return a Sentry transaction context manager, or a no-op if sentry-sdk is absent."""
     try:
-        import sentry_sdk  # runtime check so tests can patch sys.modules without module reload  # ty: ignore[unresolved-import]
+        import sentry_sdk  # ty: ignore[unresolved-import]  # noqa: E501
 
         @contextmanager
         def _span() -> Generator:
@@ -47,9 +47,7 @@ def get_db_session():
                 "postgresql+asyncpg://", "postgresql+psycopg2://"
             )
         _sync_engine = create_engine(sync_url, pool_pre_ping=True)
-        _sync_session_factory = sessionmaker(
-            autocommit=False, autoflush=False, bind=_sync_engine
-        )
+        _sync_session_factory = sessionmaker(autocommit=False, autoflush=False, bind=_sync_engine)
     return _sync_session_factory()
 
 

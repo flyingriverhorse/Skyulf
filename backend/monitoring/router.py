@@ -21,6 +21,7 @@ from backend.database.models import (
     AdvancedTuningJob,
     DriftCheckResult,
     ErrorEvent,
+    PipelineRunLog,
 )
 from backend.ml_pipeline._execution.graph_utils import extract_job_details
 from skyulf.profiling.drift import DriftCalculator
@@ -541,7 +542,8 @@ async def clear_error_events(
 
     result = await db.execute(delete(ErrorEvent))
     await db.commit()
-    return ErrorDeleteResponse(deleted=result.rowcount or 0)
+    deleted = getattr(result, "rowcount", None) or 0
+    return ErrorDeleteResponse(deleted=deleted)
 
 
 @router.get("/errors/grouped", response_model=List[ErrorGroupedEntry])
@@ -772,3 +774,100 @@ async def list_slow_nodes(
         total_node_runs=runs_seen,
         aggregates=aggregates[:limit],
     )
+
+
+# ---------------------------------------------------------------------------
+# Pipeline run logs — node failures & warnings persisted from the frontend
+# ---------------------------------------------------------------------------
+
+
+class PipelineLogEntry(BaseModel):
+    node_id: Optional[str] = None
+    node_type: Optional[str] = None
+    level: str = "error"
+    logger: Optional[str] = None
+    message: str
+
+
+class PipelineLogBatch(BaseModel):
+    pipeline_id: Optional[str] = None
+    entries: List[PipelineLogEntry]
+
+
+class PipelineRunLogResponse(BaseModel):
+    id: int
+    pipeline_id: Optional[str] = None
+    node_id: Optional[str] = None
+    node_type: Optional[str] = None
+    level: str
+    logger: Optional[str] = None
+    message: str
+    run_at: Optional[str] = None
+
+
+@router.post("/pipeline-logs", response_model=List[PipelineRunLogResponse], status_code=201)
+async def create_pipeline_logs(
+    batch: PipelineLogBatch,
+    db: AsyncSession = Depends(get_db),
+) -> List[PipelineRunLogResponse]:
+    """Persist a batch of node failures / warnings from a pipeline preview run."""
+    if not batch.entries:
+        return []
+    rows = [
+        PipelineRunLog(
+            pipeline_id=batch.pipeline_id,
+            node_id=e.node_id,
+            node_type=e.node_type,
+            level=e.level,
+            logger=e.logger,
+            message=e.message,
+        )
+        for e in batch.entries
+    ]
+    db.add_all(rows)
+    await db.commit()
+    for row in rows:
+        await db.refresh(row)
+    return [PipelineRunLogResponse(**r.to_dict()) for r in rows]
+
+
+@router.get("/pipeline-logs", response_model=List[PipelineRunLogResponse])
+async def list_pipeline_logs(
+    limit: int = 200,
+    since: Optional[str] = None,
+    pipeline_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+) -> List[PipelineRunLogResponse]:
+    """Return persisted pipeline run logs (newest first, max 500)."""
+    from sqlalchemy import and_
+
+    limit = min(max(1, limit), 500)
+    filters = []
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+            filters.append(PipelineRunLog.run_at >= since_dt)
+        except ValueError:
+            pass
+    if pipeline_id:
+        filters.append(PipelineRunLog.pipeline_id == pipeline_id)
+
+    stmt = (
+        select(PipelineRunLog)
+        .where(and_(*filters) if filters else True)  # ty: ignore[invalid-argument-type]
+        .order_by(PipelineRunLog.run_at.desc())
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    return [PipelineRunLogResponse(**r.to_dict()) for r in result.scalars().all()]
+
+
+@router.delete("/pipeline-logs", status_code=204)
+async def clear_pipeline_logs(
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Delete all pipeline run log entries."""
+    from sqlalchemy import delete as sa_delete
+
+    await db.execute(sa_delete(PipelineRunLog))
+    await db.commit()

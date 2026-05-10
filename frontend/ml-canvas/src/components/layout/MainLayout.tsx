@@ -12,6 +12,7 @@ import { JobsDrawer } from '../panels/JobsDrawer';
 import { useViewStore } from '../../core/store/useViewStore';
 import { useCanvasAutoSave } from '../../core/hooks/useCanvasAutoSave';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
+import { useExecutionWarnings } from '../../core/hooks/useExecutionWarnings';
 import {
   useKeyboardShortcuts,
   SHOW_SHORTCUTS_EVENT,
@@ -29,6 +30,11 @@ export const MainLayout: React.FC = () => {
   // Throttled localStorage autosave of the canvas graph; restore prompt
   // is rendered below in the canvas branch.
   useCanvasAutoSave();
+
+  // Route per-node pipeline warnings (TargetEncoder coercion notices,
+  // OneHotEncoder degenerate categories, …) into the navbar bell + a
+  // toast on the corner. Cheap (single useEffect on executionResult).
+  useExecutionWarnings();
 
   // Global keyboard shortcuts (Ctrl+D duplicate, Ctrl+Enter run,
   // ? cheatsheet, Esc close). Undo/redo stays in Toolbar against the

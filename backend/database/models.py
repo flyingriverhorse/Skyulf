@@ -491,6 +491,36 @@ class ErrorEvent(Base):
         }
 
 
+class PipelineRunLog(Base):
+    """Per-run record of node failures and warnings captured from a pipeline preview."""
+
+    __tablename__ = "pipeline_run_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    pipeline_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    node_id: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    node_type: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    # 'error' for node failures, 'warning' / 'info' for soft advisories
+    level: Mapped[str] = mapped_column(String(20), nullable=False, default="error", index=True)
+    logger: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    run_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), nullable=False, index=True
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "pipeline_id": self.pipeline_id,
+            "node_id": self.node_id,
+            "node_type": self.node_type,
+            "level": self.level,
+            "logger": self.logger,
+            "message": self.message,
+            "run_at": self.run_at.isoformat() if self.run_at else None,
+        }
+
+
 # Unused tables removed: DataIngestionJob, SystemLog
 # These tables were not used anywhere in the application and caused schema differences
 
