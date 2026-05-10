@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
-Sitemap: https://www.skyulf.com/sitemap.xml
+Sitemap: https://www.skyulf.com/manual/sitemap.xml
 
