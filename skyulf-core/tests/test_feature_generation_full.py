@@ -552,7 +552,7 @@ class TestEdgeCases:
     def test_datetime_nan_row_doesnt_crash(self) -> None:
         df = pd.DataFrame(
             {
-                "dt": pd.to_datetime(
+                "dt": pd.to_datetime(  # ty: ignore[no-matching-overload]
                     ["2024-01-15", None, "2023-12-31", "2022-03-07"], errors="coerce"
                 )
             }
