@@ -228,8 +228,8 @@ def create_app() -> FastAPI:
 
     # Rate limiting
     app.state.limiter = limiter
-    app.add_exception_handler(  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
-        RateLimitExceeded, _rate_limit_exceeded_handler
+    app.add_exception_handler(  # type: ignore[arg-type]
+        RateLimitExceeded, _rate_limit_exceeded_handler  # ty: ignore[invalid-argument-type]
     )
 
     # Add middleware (order matters!)
