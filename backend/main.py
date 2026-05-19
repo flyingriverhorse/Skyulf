@@ -156,6 +156,42 @@ def _configure_openapi(app: FastAPI) -> None:
     app.openapi = custom_openapi  # type: ignore
 
 
+def _reset_stale_jobs() -> None:
+    """Mark any jobs left in 'running' or 'queued' state as 'failed'.
+
+    These are orphans from a previous server process that was killed while
+    BackgroundTasks (or a Celery worker) were mid-execution.  Without this
+    reset the frontend polls forever because the status never changes.
+    """
+    try:
+        from sqlalchemy import create_engine, text
+
+        db_url = settings.DATABASE_URL
+        if db_url.startswith("sqlite+aiosqlite://"):
+            sync_url = db_url.replace("sqlite+aiosqlite://", "sqlite://")
+        else:
+            sync_url = db_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+
+        engine = create_engine(sync_url, pool_pre_ping=True)
+        msg = "Server restarted while job was running — marked failed on startup."
+        with engine.begin() as conn:
+            for table in ("basic_training_jobs", "advanced_tuning_jobs"):
+                result = conn.execute(
+                    text(
+                        f"UPDATE {table} SET status='failed', finished_at=CURRENT_TIMESTAMP,"
+                        f" error_message=:msg WHERE status IN ('running','queued')"
+                    ),
+                    {"msg": msg},
+                )
+                if result.rowcount:
+                    logger.warning(
+                        "Reset %d stale job(s) in %s to 'failed'", result.rowcount, table
+                    )
+        engine.dispose()
+    except Exception as exc:
+        logger.warning("Could not reset stale jobs on startup: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
@@ -173,6 +209,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Create database tables if they don't exist
     await create_tables()
     logger.info("✅ Database tables created/verified")
+
+    # Reset any jobs left in 'running'/'queued' from a previous crashed process.
+    _reset_stale_jobs()
+    logger.info("✅ Stale job reset complete")
 
     # Start the realtime job-event subscriber. Failures are non-fatal:
     # the frontend has a polling safety net.
