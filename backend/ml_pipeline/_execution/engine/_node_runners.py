@@ -29,6 +29,7 @@ from skyulf.modeling.base import StatefulEstimator
 from skyulf.preprocessing.pipeline import FeatureEngineer
 from skyulf.registry import NodeRegistry
 
+from backend.config import get_settings
 from ..schemas import NodeConfig
 
 if TYPE_CHECKING:
@@ -284,7 +285,11 @@ class NodeRunnersMixin:
         algorithm = node.params.get("algorithm") or node.params.get("model_type")
         if not algorithm:
             raise ValueError("Missing 'algorithm' or 'model_type' in node parameters")
-        tuning_params = node.params["tuning_config"]  # Dict matching TuningConfig
+        tuning_params = dict(node.params["tuning_config"])  # Dict matching TuningConfig
+        # Inject server-side parallelism from settings (not user-configurable via the UI)
+        _settings = get_settings()
+        tuning_params["n_jobs"] = _settings.TUNING_N_JOBS
+        tuning_params["parallel_backend"] = _settings.TUNING_PARALLEL_BACKEND
 
         calculator, applier = self._get_model_components(algorithm)
 
