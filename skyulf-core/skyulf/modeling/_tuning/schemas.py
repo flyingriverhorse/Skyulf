@@ -24,6 +24,9 @@ class TuningConfig:
     cv_shuffle: bool = True
     cv_random_state: int = 42
     random_state: int = 42
+    # Parallelism — set by the backend from settings, not by the user directly.
+    n_jobs: int = 1
+    parallel_backend: str = ""
 
 
 @dataclass

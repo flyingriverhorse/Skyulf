@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Union, cast
 
 import numpy as np
 import pandas as pd
+from joblib import parallel_backend
 
 # Explicitly enable experimental halving search cv
 from sklearn.experimental import enable_halving_search_cv  # noqa
@@ -526,7 +527,7 @@ class TuningCalculator(BaseModelCalculator):
                     param_grid=self._clean_search_space(config.search_space),
                     scoring=metric,
                     cv=cv,
-                    n_jobs=-1,
+                    n_jobs=config.n_jobs,
                     random_state=config.random_state,
                     refit=False,
                     error_score=np.nan,
@@ -541,7 +542,7 @@ class TuningCalculator(BaseModelCalculator):
                     n_candidates=config.n_trials,
                     scoring=metric,
                     cv=cv,
-                    n_jobs=-1,
+                    n_jobs=config.n_jobs,
                     random_state=config.random_state,
                     refit=False,
                     error_score=np.nan,
@@ -634,7 +635,7 @@ class TuningCalculator(BaseModelCalculator):
                 timeout=config.timeout,
                 cv=cv,
                 scoring=metric,
-                n_jobs=-1,
+                n_jobs=config.n_jobs,
                 refit=False,
                 verbose=0,
                 callbacks=callbacks,
@@ -664,7 +665,11 @@ class TuningCalculator(BaseModelCalculator):
                     "ignore",
                     message=".*valid feature names.*",
                 )
-                searcher.fit(X_arr, y_arr)
+                if config.parallel_backend:
+                    with parallel_backend(config.parallel_backend):
+                        searcher.fit(X_arr, y_arr)
+                else:
+                    searcher.fit(X_arr, y_arr)
         except Exception as e:
             logger.error(f"Hyperparameter tuning failed: {str(e)}")
             error_msg = str(e)
