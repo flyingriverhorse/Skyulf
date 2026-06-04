@@ -91,6 +91,14 @@ from .scaling import (
     StandardScalerCalculator,
 )
 from .split import SplitApplier, SplitCalculator
+from .time_series import (
+    DateFeaturesApplier,
+    DateFeaturesCalculator,
+    LagFeaturesApplier,
+    LagFeaturesCalculator,
+    RollingAggregateApplier,
+    RollingAggregateCalculator,
+)
 from .transformations import (
     GeneralTransformationApplier,
     GeneralTransformationCalculator,
@@ -184,6 +192,12 @@ __all__ = [
     "OversamplingApplier",
     "UndersamplingCalculator",
     "UndersamplingApplier",
+    "LagFeaturesCalculator",
+    "LagFeaturesApplier",
+    "RollingAggregateCalculator",
+    "RollingAggregateApplier",
+    "DateFeaturesCalculator",
+    "DateFeaturesApplier",
 ]
 
 # NOTE: Imports above are intentionally explicit. Every node module is imported

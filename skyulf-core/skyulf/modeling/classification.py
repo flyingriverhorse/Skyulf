@@ -1,5 +1,6 @@
 """Classification models."""
 
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import (
     AdaBoostClassifier,
     ExtraTreesClassifier,
@@ -70,6 +71,38 @@ class LogisticRegressionCalculator(SklearnCalculator):
                 "max_iter": 1000,
                 "solver": "lbfgs",
                 "random_state": 42,
+            },
+            problem_type="classification",
+        )
+
+
+# --- Calibrated Classifier ---
+class CalibratedClassifierApplier(SklearnApplier):
+    """Calibrated Classifier Applier (well-calibrated predict_proba)."""
+
+
+@NodeRegistry.register("calibrated_classifier", CalibratedClassifierApplier)
+@node_meta(
+    id="calibrated_classifier",
+    name="Calibrated Classifier",
+    category="Modeling",
+    description=(
+        "Wraps a base classifier with CalibratedClassifierCV so predicted "
+        "probabilities are well-calibrated (Platt/sigmoid or isotonic)."
+    ),
+    params={"method": "sigmoid", "cv": 5},
+    tags=["requires_scaling"],
+)
+class CalibratedClassifierCalculator(SklearnCalculator):
+    """Calibrated Classifier Calculator (base = Logistic Regression)."""
+
+    def __init__(self):
+        super().__init__(
+            model_class=CalibratedClassifierCV,
+            default_params={
+                "estimator": LogisticRegression(max_iter=1000),
+                "method": "sigmoid",
+                "cv": 5,
             },
             problem_type="classification",
         )
