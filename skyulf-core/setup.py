@@ -19,6 +19,7 @@ setup(
     },
     include_package_data=True,
     packages=find_packages(),
+    package_data={"skyulf": ["py.typed"]},
     install_requires=[
         "pandas>=2.0.0",
         "numpy>=1.24.0",

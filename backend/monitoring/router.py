@@ -1,5 +1,4 @@
 from backend.exceptions.core import SkyulfException
-from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form
 from typing import Optional, List, Dict, Any, cast
 from pydantic import BaseModel
@@ -9,12 +8,11 @@ import io
 import logging
 import re
 from datetime import datetime, timedelta, timezone
-from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.ml_pipeline.artifacts.factory import ArtifactFactory
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
-from backend.config import get_settings
 from backend.dependencies import get_db
 from backend.database.models import (
     BasicTrainingJob,
@@ -48,51 +46,18 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):  # noqa: C901
     List all jobs that have reference data available for drift calculation.
     Scans subdirectories in the artifact folder, enriched with DB metadata.
     """
-    settings = get_settings()
-    base_path = Path(settings.TRAINING_ARTIFACT_DIR)
-
     jobs: List[DriftJobOption] = []
 
-    if not base_path.exists():
-        return []
-
-    # Collect job IDs found on disk
-    found_jobs: List[DriftJobOption] = []
-
-    for item_path in base_path.iterdir():
-        if item_path.is_dir():
-            folder_name = item_path.name
-            created_at_str = "Unknown"
-
-            try:
-                match = re.search(r"(\d{8})_(\d{6})", folder_name)
-                if match:
-                    date_part = match.group(1)
-                    time_part = match.group(2)
-                    dt = datetime.strptime(f"{date_part}{time_part}", "%Y%m%d%H%M%S")
-                    created_at_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-            except Exception:
-                pass
-
-            try:
-                for file_path in item_path.glob("reference_data_*.joblib"):
-                    filename = file_path.name
-                    key = file_path.stem
-                    remainder = key[15:]  # len("reference_data_")
-                    parts = remainder.rsplit("_", 1)
-                    if len(parts) == 2:
-                        dataset_name = parts[0]
-                        job_id = parts[1]
-                        found_jobs.append(
-                            DriftJobOption(
-                                job_id=job_id,
-                                dataset_name=dataset_name,
-                                filename=filename,
-                                created_at=created_at_str,
-                            )
-                        )
-            except Exception:
-                continue
+    # Discover reference artifacts via the storage seam (local today; UC/S3-ready).
+    found_jobs: List[DriftJobOption] = [
+        DriftJobOption(
+            job_id=ref.job_id,
+            dataset_name=ref.dataset_name,
+            filename=ref.filename,
+            created_at=ref.created_at or "Unknown",
+        )
+        for ref in ArtifactFactory.get_discovery().list_reference_artifacts()
+    ]
 
     if not found_jobs:
         return []
@@ -212,23 +177,8 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
     threshold_kl: Optional[float] = Form(None),
     db: AsyncSession = Depends(get_db),
 ) -> EnrichedDriftReport:
-    settings = get_settings()
-    base_path = Path(settings.TRAINING_ARTIFACT_DIR)
-
-    # 1. Find the job folder
-    job_folder = None
-    if base_path.exists():
-        for item_path in base_path.iterdir():
-            if item_path.is_dir() and item_path.name.endswith(f"_{job_id}"):
-                job_folder = str(item_path)
-                break
-
-    if not job_folder:
-        # Fallback: try root if not found in subfolders (backward compatibility)
-        job_folder = str(base_path)
-
-    # Use the job folder (or root) as the artifact store base path
-    artifact_store = LocalArtifactStore(base_path=job_folder)
+    # 1. Find the job folder (via the storage seam) and its artifact store.
+    artifact_store = ArtifactFactory.get_discovery().get_store_for_job(job_id)
 
     # 2. Find Reference Data
     reference_key = None

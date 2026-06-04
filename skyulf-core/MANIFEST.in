@@ -1,3 +1,4 @@
 include README.md
 include LICENSE
+include skyulf/py.typed
 recursive-include skyulf *.py
