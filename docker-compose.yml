@@ -23,6 +23,9 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       REDIS_URL: redis://redis:6379/0
       DATABASE_URL: sqlite+aiosqlite:///./mlops_database.db
+      # Maximum upload size in bytes. Default: 10 GB (10737418240).
+      # Increase for larger datasets, e.g. 21474836480 = 20 GB.
+      MAX_UPLOAD_SIZE: "10737418240"
     ports:
       - "8000:8000"
     depends_on:

@@ -9,7 +9,11 @@ class FilesMixin:
     """Upload limits, allowed extensions, and directory paths."""
 
     UPLOAD_DIR: str = "uploads/data"
-    MAX_UPLOAD_SIZE: int = 1024 * 1024 * 1024  # 1 GB
+    # Configurable via MAX_UPLOAD_SIZE env var (bytes).
+    # Default 10 GB — large enough for real-world datasets while still
+    # protecting against runaway uploads on under-resourced deployments.
+    # Docker Compose users can override with: MAX_UPLOAD_SIZE=5368709120
+    MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024 * 1024  # 10 GB
     ALLOWED_EXTENSIONS: List[str] = [
         ".csv",
         ".xlsx",

@@ -244,6 +244,24 @@ class DataIngestionService:
         """
         settings = get_settings()
 
+        # 0. Reject early via Content-Length if the client declares a size —
+        #    avoids buffering a huge body only to discard it at the end.
+        content_length = file.headers.get("content-length")
+        if content_length is not None:
+            try:
+                declared_size = int(content_length)
+                if declared_size > settings.MAX_UPLOAD_SIZE:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(
+                            f"File too large: declared {declared_size / (1024**3):.1f} GB, "
+                            f"limit is {settings.MAX_UPLOAD_SIZE / (1024**3):.0f} GB. "
+                            "Set the MAX_UPLOAD_SIZE env var (bytes) to raise this limit."
+                        ),
+                    )
+            except ValueError:
+                pass  # Malformed header — let the streaming check catch it
+
         # 1. Validate filename — reject path traversal attempts
         raw_name = file.filename or "unknown"
         if ".." in raw_name or raw_name.startswith(("/", "\\")):
@@ -272,7 +290,11 @@ class DataIngestionService:
                         file_path.unlink(missing_ok=True)
                         raise HTTPException(
                             status_code=413,
-                            detail=f"File exceeds maximum allowed size of {settings.MAX_UPLOAD_SIZE // (1024**3)} GB",
+                            detail=(
+                                f"File too large: {bytes_written / (1024**3):.1f} GB received, "
+                                f"limit is {settings.MAX_UPLOAD_SIZE / (1024**3):.0f} GB. "
+                                "Set the MAX_UPLOAD_SIZE env var (bytes) to raise this limit."
+                            ),
                         )
                     await out_file.write(content)
         except HTTPException:
