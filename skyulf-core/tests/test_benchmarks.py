@@ -25,7 +25,7 @@ try:
 
     _ENGINES = ["pandas", "polars"]
 except ImportError:  # pragma: no cover - polars is a core dep, kept defensive
-    pl = None
+    pl = None  # ty: ignore[invalid-assignment]
     _ENGINES = ["pandas"]
 
 # Skip the whole module unless the user explicitly asks for benchmarks. Without

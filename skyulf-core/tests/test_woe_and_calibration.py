@@ -68,7 +68,9 @@ def test_calibrated_classifier_registered_and_predicts():
     assert "calibrated_classifier" in NodeRegistry.get_all_metadata()
 
     rng = np.random.default_rng(0)
-    X = pd.DataFrame(rng.normal(size=(40, 3)), columns=["a", "b", "c"])
+    X = pd.DataFrame(
+        rng.normal(size=(40, 3)), columns=["a", "b", "c"]  # ty: ignore[invalid-argument-type]
+    )
     y = pd.Series((X["a"] + X["b"] > 0).astype(int))
 
     calc = NodeRegistry.get_calculator("calibrated_classifier")()
@@ -87,7 +89,9 @@ def test_calibrated_classifier_selectable_base_estimator():
     from sklearn.ensemble import RandomForestClassifier
 
     rng = np.random.default_rng(1)
-    X = pd.DataFrame(rng.normal(size=(40, 3)), columns=["a", "b", "c"])
+    X = pd.DataFrame(
+        rng.normal(size=(40, 3)), columns=["a", "b", "c"]  # ty: ignore[invalid-argument-type]
+    )
     y = pd.Series((X["a"] + X["b"] > 0).astype(int))
 
     calc = NodeRegistry.get_calculator("calibrated_classifier")()
@@ -102,7 +106,9 @@ def test_calibrated_classifier_unknown_base_estimator_falls_back():
     from sklearn.linear_model import LogisticRegression
 
     rng = np.random.default_rng(2)
-    X = pd.DataFrame(rng.normal(size=(30, 2)), columns=["a", "b"])
+    X = pd.DataFrame(
+        rng.normal(size=(30, 2)), columns=["a", "b"]  # ty: ignore[invalid-argument-type]
+    )
     y = pd.Series((X["a"] > 0).astype(int))
 
     calc = NodeRegistry.get_calculator("calibrated_classifier")()
