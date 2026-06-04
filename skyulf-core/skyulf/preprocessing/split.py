@@ -25,7 +25,8 @@ from ..data.dataset import SplitDataset
 from .base import BaseApplier, BaseCalculator
 from ._artifacts import FeatureTargetSplitArtifact, SplitArtifact
 from ._schema import SkyulfSchema
-from ..engines import EngineName, SkyulfDataFrame, get_engine
+from ._helpers import is_polars
+from ..engines import SkyulfDataFrame
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,7 @@ def _to_pandas_remember_engine(data: Any) -> Tuple[Any, bool]:
     """Return ``(pandas_data, was_polars)``. Pass through pandas/None unchanged."""
     if data is None:
         return None, False
-    engine = get_engine(data)
-    if engine.name == EngineName.POLARS:
+    if is_polars(data):
         return cast(Any, data).to_pandas(), True
     return data, False
 
@@ -307,8 +307,7 @@ def _split_xy_one_pandas(data: Any, target_col: str) -> Tuple[Any, Any]:
 
 def _split_xy_one(data: Any, target_col: str) -> Tuple[Any, Any]:
     """Engine-aware single-frame X/y split."""
-    engine = get_engine(data)
-    if engine.name == EngineName.POLARS:
+    if is_polars(data):
         return _split_xy_one_polars(data, target_col)
     return _split_xy_one_pandas(data, target_col)
 

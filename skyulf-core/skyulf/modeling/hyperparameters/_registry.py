@@ -3,6 +3,7 @@
 from typing import Any, Dict, List
 
 from ._bayes import GAUSSIAN_NB_PARAMS
+from ._calibration import CALIBRATED_CLASSIFIER_PARAMS
 from ._linear import (
     ELASTICNET_REGRESSION_PARAMS,
     LASSO_REGRESSION_PARAMS,
@@ -53,6 +54,7 @@ MODEL_HYPERPARAMETERS = {
     "lgbm_classifier": LGBM_PARAMS,
     "lgbm_regressor": LGBM_PARAMS,
     "gaussian_nb": GAUSSIAN_NB_PARAMS,
+    "calibrated_classifier": CALIBRATED_CLASSIFIER_PARAMS,
 }
 
 
@@ -180,6 +182,10 @@ DEFAULT_SEARCH_SPACES: Dict[str, Any] = {
     },
     "gaussian_nb": {
         "var_smoothing": [1e-9, 1e-8, 1e-7, 1e-6],
+    },
+    "calibrated_classifier": {
+        "method": ["sigmoid", "isotonic"],
+        "cv": [3, 5, 10],
     },
     "extra_trees_classifier": {
         "n_estimators": [50, 100, 200, 500],
@@ -353,6 +359,10 @@ GRID_SEARCH_SPACES: Dict[str, Any] = {
     },
     "gaussian_nb": {
         "var_smoothing": [1e-9, 1e-8, 1e-7, 1e-6],
+    },
+    "calibrated_classifier": {
+        "method": ["sigmoid", "isotonic"],
+        "cv": [3, 5],
     },
     "extra_trees_classifier": {
         "n_estimators": [100, 200, 500],

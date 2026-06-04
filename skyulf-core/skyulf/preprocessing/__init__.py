@@ -1,5 +1,5 @@
 from .base import BaseApplier, BaseCalculator, StatefulTransformer
-from ._schema import SkyulfSchema
+from ._schema import SchemaMismatchError, SkyulfSchema, validate_schema
 from .bucketing import (
     CustomBinningApplier,
     CustomBinningCalculator,
@@ -91,6 +91,14 @@ from .scaling import (
     StandardScalerCalculator,
 )
 from .split import SplitApplier, SplitCalculator
+from .time_series import (
+    DateFeaturesApplier,
+    DateFeaturesCalculator,
+    LagFeaturesApplier,
+    LagFeaturesCalculator,
+    RollingAggregateApplier,
+    RollingAggregateCalculator,
+)
 from .transformations import (
     GeneralTransformationApplier,
     GeneralTransformationCalculator,
@@ -105,6 +113,8 @@ __all__ = [
     "BaseApplier",
     "StatefulTransformer",
     "SkyulfSchema",
+    "SchemaMismatchError",
+    "validate_schema",
     "FeatureEngineer",
     "SplitCalculator",
     "SplitApplier",
@@ -182,12 +192,17 @@ __all__ = [
     "OversamplingApplier",
     "UndersamplingCalculator",
     "UndersamplingApplier",
+    "LagFeaturesCalculator",
+    "LagFeaturesApplier",
+    "RollingAggregateCalculator",
+    "RollingAggregateApplier",
+    "DateFeaturesCalculator",
+    "DateFeaturesApplier",
 ]
 
-# Auto-import any submodule added to this package so its @NodeRegistry.register
-# decorators run at import time.  New node files need no __init__.py edits.
-import importlib as _importlib
-import pkgutil as _pkgutil
-
-for _mi in _pkgutil.iter_modules(__path__, __name__ + "."):  # type: ignore[name-defined]
-    _importlib.import_module(_mi.name)
+# NOTE: Imports above are intentionally explicit. Every node module is imported
+# by name so its ``@NodeRegistry.register`` decorators run at import time. We do
+# NOT auto-discover submodules with ``pkgutil.iter_modules`` — that previously
+# auto-registered an accidentally-committed ``resampling copy.py`` file. Adding a
+# new node now requires one explicit import line here, which keeps the public
+# surface and the registry deterministic and reviewable.

@@ -106,8 +106,6 @@ async def readiness_check():
     that the basic /health check misses. Returns 503 if the fit fails so
     load balancers can pull the instance.
     """
-    import time
-
     import numpy as np
     from fastapi.responses import JSONResponse
     from sklearn.preprocessing import StandardScaler

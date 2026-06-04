@@ -2,6 +2,8 @@
 
 from .base import BaseModelApplier, BaseModelCalculator, StatefulEstimator
 from .classification import (
+    CalibratedClassifierApplier,
+    CalibratedClassifierCalculator,
     LogisticRegressionApplier,
     LogisticRegressionCalculator,
     RandomForestClassifierApplier,
@@ -29,6 +31,8 @@ __all__ = [
     "SklearnApplier",
     "LogisticRegressionCalculator",
     "LogisticRegressionApplier",
+    "CalibratedClassifierCalculator",
+    "CalibratedClassifierApplier",
     "RandomForestClassifierCalculator",
     "RandomForestClassifierApplier",
     "RidgeRegressionCalculator",
@@ -41,10 +45,8 @@ __all__ = [
     "get_default_search_space",
 ]
 
-# Auto-import any submodule added to this package so its @NodeRegistry.register
-# decorators run at import time.  New node files need no __init__.py edits.
-import importlib as _importlib
-import pkgutil as _pkgutil
-
-for _mi in _pkgutil.iter_modules(__path__, __name__ + "."):  # type: ignore[name-defined]
-    _importlib.import_module(_mi.name)
+# NOTE: Imports above are intentionally explicit. Every node module is imported
+# by name so its ``@NodeRegistry.register`` decorators run at import time. We do
+# NOT auto-discover submodules with ``pkgutil.iter_modules``; explicit imports
+# keep the registry deterministic and prevent stray/duplicate files from being
+# silently registered. Adding a new model node requires one import line here.

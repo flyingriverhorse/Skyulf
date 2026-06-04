@@ -35,40 +35,20 @@ async def test_all_transformers(sample_data, tmp_path):
     """
     # List of nodes that are transformers (take df, return df)
     # We exclude data_loader, models, and splitters for now
-    excluded = [
+    #
+    # Models are excluded dynamically by category ("Modeling") so that any
+    # newly-registered model node (e.g. calibrated_classifier) is automatically
+    # skipped here and exercised by the dedicated modeling tests instead —
+    # rather than silently failing this transformer smoke test.
+    model_nodes = {nid for nid, node in ALL_NODES.items() if node.category == "Modeling"}
+
+    excluded = model_nodes | {
         "data_loader",
-        # Models — tested separately via execution/modeling tests
-        "logistic_regression",
-        "random_forest_classifier",
-        "ridge_regression",
-        "random_forest_regressor",
-        "svc",
-        "svr",
-        "decision_tree_classifier",
-        "decision_tree_regressor",
-        "gradient_boosting_classifier",
-        "gradient_boosting_regressor",
-        "adaboost_classifier",
-        "adaboost_regressor",
-        "gaussian_nb",
-        "k_neighbors_classifier",
-        "k_neighbors_regressor",
-        "lasso_regression",
-        "linear_regression",
-        "elasticnet_regression",
-        "xgboost_classifier",
-        "xgboost_regressor",
-        "extra_trees_classifier",
-        "extra_trees_regressor",
-        "hist_gradient_boosting_classifier",
-        "hist_gradient_boosting_regressor",
-        "lgbm_classifier",
-        "lgbm_regressor",
         # Splitters
         "TrainTestSplitter",
         "feature_target_split",
         "feature_selection",
-    ]
+    }
 
     transformers = [nid for nid in ALL_NODES.keys() if nid not in excluded]
 

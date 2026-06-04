@@ -247,3 +247,44 @@ def test_unknown_columns_short_circuits_in_both_engines(calculator_path: str) ->
     module_name, class_name = calculator_path.split(":")
     module = __import__(module_name, fromlist=[class_name])
     _empty_columns_returns_empty_for(getattr(module, class_name))
+
+
+# ---------------------------------------------------------------------------
+# Encoder tests (third slice)
+# ---------------------------------------------------------------------------
+
+
+@st.composite
+def _categorical_frame(draw: st.DrawFn, *, min_rows: int = 20, max_rows: int = 60) -> pd.DataFrame:
+    """Generate a frame with one categorical feature and a binary target."""
+    n = draw(st.integers(min_value=min_rows, max_value=max_rows))
+    cats = draw(st.lists(st.sampled_from(["x", "y", "z"]), min_size=n, max_size=n))
+    target = draw(st.lists(st.sampled_from([0, 1]), min_size=n, max_size=n))
+    # WOE/IV needs both target classes present and >1 category to be meaningful.
+    assume(len(set(target)) == 2 and len(set(cats)) > 1)
+    return pd.DataFrame({"city": cats, "target": target})
+
+
+@given(df=_categorical_frame())
+def test_woe_encoder_fit_engine_parity(df: pd.DataFrame) -> None:
+    """WOEEncoder yields a plain-dict artifact — pandas/polars must match."""
+    from skyulf.preprocessing.encoding import WOEEncoderCalculator
+
+    config: Dict[str, Any] = {"columns": ["city"]}
+    pd_params = WOEEncoderCalculator().fit((df[["city"]], df["target"]), dict(config))
+    pl_params = WOEEncoderCalculator().fit(
+        (pl.from_pandas(df[["city"]]), pl.Series("target", df["target"])), dict(config)
+    )
+
+    assert pd_params["columns"] == pl_params["columns"]
+    pd_map = pd_params["mappings"]["city"]
+    pl_map = pl_params["mappings"]["city"]
+    assert set(pd_map.keys()) == set(pl_map.keys())
+    for cat in pd_map:
+        np.testing.assert_allclose(pd_map[cat], pl_map[cat], rtol=1e-9, atol=1e-9)
+    np.testing.assert_allclose(
+        pd_params["information_value"]["city"],
+        pl_params["information_value"]["city"],
+        rtol=1e-9,
+        atol=1e-9,
+    )

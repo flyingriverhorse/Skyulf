@@ -22,8 +22,9 @@ from ..utils import (
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
 from .dispatcher import apply_dual_engine
 from ._artifacts import GeneralBinningArtifact
+from ._helpers import to_pandas
 from ..registry import NodeRegistry
-from ..engines import EngineName, SkyulfDataFrame, get_engine
+from ..engines import SkyulfDataFrame
 
 
 # -----------------------------------------------------------------------------
@@ -327,10 +328,7 @@ def _fit_one_column_edges(
 
 def _to_pandas_for_fit(X: Any) -> Any:
     """Always operate on a pandas frame in fit (sklearn-bound)."""
-    engine = get_engine(X)
-    if engine.name == EngineName.POLARS:
-        return X.to_pandas()
-    return X
+    return to_pandas(X)
 
 
 def _passthrough_artifact_options(config: Dict[str, Any]) -> Dict[str, Any]:

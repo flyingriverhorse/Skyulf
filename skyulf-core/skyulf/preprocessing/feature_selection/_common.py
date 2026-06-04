@@ -1,0 +1,271 @@
+"""Shared helpers for feature-selection nodes."""
+
+import logging
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
+
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.feature_selection import (
+    RFE,
+    GenericUnivariateSelect,
+    SelectFdr,
+    SelectFpr,
+    SelectFromModel,
+    SelectFwe,
+    SelectKBest,
+    SelectPercentile,
+    chi2,
+    f_classif,
+    f_regression,
+    mutual_info_classif,
+    mutual_info_regression,
+    r_regression,
+)
+from sklearn.linear_model import LinearRegression, LogisticRegression
+
+from ...utils import detect_numeric_columns, resolve_columns
+from .._artifacts import UnivariateSelectionArtifact
+
+logger = logging.getLogger(__name__)
+
+SCORE_FUNCTIONS: Dict[str, Callable] = {
+    "f_classif": f_classif,
+    "f_regression": f_regression,
+    "mutual_info_classif": mutual_info_classif,
+    "mutual_info_regression": mutual_info_regression,
+    "chi2": chi2,
+    "r_regression": r_regression,
+}
+
+
+def _infer_problem_type(series: pd.Series) -> str:
+    if series.empty:
+        return "classification"
+    if pd.api.types.is_bool_dtype(series) or pd.api.types.is_object_dtype(series):
+        return "classification"
+    unique_values = series.dropna().unique()
+    if len(unique_values) <= 10:
+        return "classification"
+    return "regression"
+
+
+def _resolve_score_function(name: Optional[str], problem_type: str) -> Any:
+    if name and name in SCORE_FUNCTIONS:
+        return SCORE_FUNCTIONS[name]
+
+    if problem_type == "classification":
+        return f_classif
+    return f_regression
+
+
+def _resolve_estimator(key: Optional[str], problem_type: str) -> Any:
+    key = (key or "auto").lower()
+    if problem_type == "classification":
+        if key in {"auto", "logistic_regression", "logisticregression"}:
+            return LogisticRegression(max_iter=1000)
+        if key in {"random_forest", "randomforest"}:
+            return RandomForestClassifier(n_estimators=100, random_state=0, n_jobs=-1)
+        if key in {"linear_regression", "linearregression"}:
+            return LinearRegression()  # Odd for classification but allowed in V1 logic
+    else:
+        if key in {"auto", "linear_regression", "linearregression"}:
+            return LinearRegression()
+        if key in {"random_forest", "randomforest"}:
+            return RandomForestRegressor(n_estimators=100, random_state=0, n_jobs=-1)
+    return None
+
+
+# -----------------------------------------------------------------------------
+# Shared apply helpers (drop unselected columns)
+# -----------------------------------------------------------------------------
+
+
+def _resolve_drop_list(params: Dict[str, Any], existing_cols: List[str]) -> List[str]:
+    """Compute the column-drop list from selected/candidate params."""
+    selected = params.get("selected_columns")
+    candidates = params.get("candidate_columns", [])
+    if selected is None:
+        return []
+    return [c for c in (set(candidates) - set(selected)) if c in existing_cols]
+
+
+def _drop_selected_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    """Polars apply path for selectors that drop ``candidate \\ selected`` columns."""
+    if not params.get("drop_columns", True):
+        return X, y
+    to_drop = _resolve_drop_list(params, list(X.columns))
+    if to_drop:
+        X = X.drop(to_drop)
+    return X, y
+
+
+def _drop_selected_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    """Pandas apply path for selectors that drop ``candidate \\ selected`` columns."""
+    if not params.get("drop_columns", True):
+        return X, y
+    to_drop = _resolve_drop_list(params, list(X.columns))
+    if to_drop:
+        X = X.drop(columns=to_drop)
+    return X, y
+
+
+# -----------------------------------------------------------------------------
+# Shared fit helpers (target extraction + sklearn subset prep)
+# -----------------------------------------------------------------------------
+
+
+def _extract_target(X_pd: pd.DataFrame, y: Any, target_col: Optional[str]) -> Optional[pd.Series]:
+    """Return ``y`` if provided; else pull ``target_col`` from the (pandas) frame."""
+    if y is not None:
+        return y
+    if not target_col or target_col not in X_pd.columns:
+        return None
+    return X_pd[target_col]
+
+
+def _prepare_sklearn_y(y: Any, problem_type: str) -> np.ndarray:
+    """Convert ``y`` to a numpy array, factorising non-numeric classification targets."""
+    y_np = y.to_numpy() if hasattr(y, "to_numpy") else np.array(y)
+    if problem_type == "classification" and not np.issubdtype(y_np.dtype, np.number):
+        y_factorized, _ = pd.factorize(y_np)
+        return y_factorized
+    return y_np
+
+
+def _resolve_problem_type(declared: str, y: Any) -> str:
+    """Resolve ``"auto"`` problem-type using ``y``; defaults to classification."""
+    if declared != "auto":
+        return declared
+    if y is None:
+        return "classification"
+    return _infer_problem_type(y)
+
+
+_GENERIC_PARAM_KEYS: Dict[str, Tuple[str, Any]] = {
+    "k_best": ("k", 10),
+    "percentile": ("percentile", 10),
+}
+
+
+def _resolve_generic_param(config: Dict[str, Any]) -> Any:
+    """Pick the GenericUnivariateSelect ``param`` from explicit or mode-derived config."""
+    if "param" in config:
+        return config.get("param")
+    mode = config.get("mode", "k_best")
+    key, default = _GENERIC_PARAM_KEYS.get(mode, ("alpha", 0.05))
+    return config.get(key, default)
+
+
+_UNIVARIATE_SELECTOR_BUILDERS: Dict[str, Callable[[Any, Dict[str, Any]], Any]] = {
+    "select_k_best": lambda sf, cfg: SelectKBest(score_func=sf, k=cfg.get("k", 10)),
+    "select_percentile": lambda sf, cfg: SelectPercentile(
+        score_func=sf, percentile=cfg.get("percentile", 10)
+    ),
+    "select_fpr": lambda sf, cfg: SelectFpr(score_func=sf, alpha=cfg.get("alpha", 0.05)),
+    "select_fdr": lambda sf, cfg: SelectFdr(score_func=sf, alpha=cfg.get("alpha", 0.05)),
+    "select_fwe": lambda sf, cfg: SelectFwe(score_func=sf, alpha=cfg.get("alpha", 0.05)),
+    "generic_univariate_select": lambda sf, cfg: GenericUnivariateSelect(
+        score_func=sf, mode=cfg.get("mode", "k_best"), param=_resolve_generic_param(cfg)
+    ),
+}
+
+
+def _build_univariate_selector(
+    method: str, score_func: Any, config: Dict[str, Any]
+) -> Optional[Any]:
+    """Construct the sklearn univariate selector named by ``method``."""
+    builder = _UNIVARIATE_SELECTOR_BUILDERS.get(method)
+    return builder(score_func, config) if builder else None
+
+
+def _build_model_selector(method: str, estimator: Any, config: Dict[str, Any]) -> Optional[Any]:
+    """Construct the sklearn model-based selector named by ``method``."""
+    if method == "select_from_model":
+        threshold = config.get("threshold", "mean")
+        if isinstance(threshold, str):
+            try:
+                threshold = float(threshold)
+            except ValueError:
+                pass  # Keep as string (e.g. "mean", "1.25*mean")
+        return SelectFromModel(
+            estimator=estimator,
+            threshold=threshold,
+            max_features=config.get("max_features", None),
+        )
+    if method == "rfe":
+        return RFE(
+            estimator=estimator,
+            n_features_to_select=config.get("n_features_to_select", None),
+            step=config.get("step", 1),
+        )
+    return None
+
+
+def _maybe_chi2_rescale(X_np: np.ndarray, score_func_name: Optional[str]) -> np.ndarray:
+    """Apply MinMax rescale when chi2 is requested but features contain negatives."""
+    if score_func_name != "chi2" or not (X_np < 0).any():
+        return X_np
+    logger.warning(
+        "Chi-squared statistic requires non-negative feature values. "
+        "Applying MinMaxScaler to features for selection."
+    )
+    from sklearn.preprocessing import MinMaxScaler
+
+    return MinMaxScaler().fit_transform(X_np)
+
+
+def _resolve_candidate_columns(
+    X_pd: pd.DataFrame, config: Dict[str, Any], target_col: Optional[str]
+) -> List[str]:
+    """Return numeric candidate columns minus the target."""
+    cols = resolve_columns(X_pd, config, lambda d: detect_numeric_columns(d, exclude_binary=False))
+    return [c for c in cols if c != target_col]
+
+
+def _univariate_score_dicts(
+    selector: Any, cols: List[str]
+) -> Tuple[Dict[str, float], Dict[str, float]]:
+    """Pull (scores, pvalues) off a fitted univariate selector, NaN-safe."""
+    scores: Dict[str, float] = {}
+    pvalues: Dict[str, float] = {}
+    if hasattr(selector, "scores_"):
+        safe_scores = np.nan_to_num(selector.scores_, nan=0.0, posinf=0.0, neginf=0.0)
+        scores = dict(zip(cols, safe_scores.tolist()))
+    if hasattr(selector, "pvalues_"):
+        safe_pvalues = np.nan_to_num(cast(Any, selector.pvalues_), nan=1.0)
+        pvalues = dict(zip(cols, safe_pvalues.tolist()))
+    return scores, pvalues
+
+
+def _univariate_no_target_artifact(
+    cols: List[str], method: str, config: Dict[str, Any]
+) -> "UnivariateSelectionArtifact":
+    """Artifact returned when the selector ran without a target (passthrough)."""
+    return cast(
+        UnivariateSelectionArtifact,
+        {
+            "type": "univariate_selection",
+            "selected_columns": cols,
+            "candidate_columns": cols,
+            "method": method,
+            "drop_columns": config.get("drop_columns", True),
+            "scores": {},
+            "pvalues": {},
+        },
+    )
+
+
+def _model_feature_importances(selector: Any, cols: List[str]) -> Dict[str, float]:
+    """Pull importances or |coef| off a fitted model-based selector."""
+    estimator = getattr(selector, "estimator_", None)
+    if estimator is None:
+        return {}
+    if hasattr(estimator, "feature_importances_"):
+        return dict(zip(cols, estimator.feature_importances_.tolist()))
+    if hasattr(estimator, "coef_"):
+        coef = estimator.coef_
+        if coef.ndim > 1:
+            coef = coef[0]
+        return dict(zip(cols, np.abs(coef).tolist()))
+    return {}

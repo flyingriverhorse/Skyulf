@@ -14,6 +14,7 @@ import { DeduplicationNode } from '../../modules/nodes/processing/DeduplicationN
 import { CastTypeNode } from '../../modules/nodes/processing/CastTypeNode';
 import { MissingIndicatorNode } from '../../modules/nodes/processing/MissingIndicatorNode';
 import { EncodingNode } from '../../modules/nodes/processing/EncodingNode';
+import { TimeSeriesNode } from '../../modules/nodes/processing/TimeSeriesNode';
 import { OutlierNode } from '../../modules/nodes/processing/OutlierNode';
 import { TransformationNode } from '../../modules/nodes/processing/TransformationNode';
 import { BinningNode } from '../../modules/nodes/processing/BinningNode';
@@ -42,6 +43,7 @@ export const initializeRegistry = () => {
   registry.register(AliasReplacementNode);
   registry.register(InvalidValueReplacementNode);
   registry.register(EncodingNode);
+  registry.register(TimeSeriesNode);
   registry.register(FeatureSelectionNode);
   registry.register(TrainTestSplitNode);
   registry.register(FeatureTargetSplitNode);

@@ -4,6 +4,14 @@ These exist to remove a handful of patterns that recur across most
 Appliers/Calculators after the dual-engine dispatch refactor (see
 ``temp/preprocessing_dual_engine_split_plan.md``). Keep this module small
 and dependency-free — anything heavier belongs in ``utils`` or ``engines``.
+
+Boundary with ``dispatcher.py``:
+    * ``dispatcher.py`` owns the *control flow* — ``apply_dual_engine`` picks the
+      Polars vs Pandas branch and packs/unpacks the pipeline I/O for a whole node.
+    * ``_helpers.py`` owns *leaf utilities* called from inside those branches
+      (column resolution, engine predicates like ``is_polars``, ``to_pandas``
+      coercion, safe scaling). Helpers never dispatch a full node; the
+      dispatcher never implements column-level logic.
 """
 
 from typing import Any, Iterable, List, Union
@@ -40,6 +48,16 @@ def to_pandas(X: Any) -> pd.DataFrame:
     paths that bypass the dispatcher (e.g. shared subset-selection helpers).
     """
     return X.to_pandas() if hasattr(X, "to_pandas") else X
+
+
+def is_polars(X: Any) -> bool:
+    """Return ``True`` when ``X`` is backed by the Polars engine.
+
+    Centralises the ``engine.name == EngineName.POLARS`` check so node modules
+    never branch on the engine inline. Node files should call this (or the
+    dual-engine dispatcher) instead of importing ``EngineName`` themselves.
+    """
+    return get_engine(X).name == EngineName.POLARS
 
 
 def auto_detect_text_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:

@@ -156,12 +156,6 @@ class DataService:
         path_str = str(path)
         Path(path_str).parent.mkdir(parents=True, exist_ok=True)
 
-        # Unwrap if it's a Skyulf wrapper
-        if hasattr(data, "_df"):  # Hacky check for wrapper, better to use protocol
-            # If it's our wrapper, we can get the underlying df
-            # But let's try to use the engine registry to handle it cleanly
-            pass
-
         engine = get_engine(data)
 
         # If we have Polars and the data is compatible, use Polars for writing (faster)

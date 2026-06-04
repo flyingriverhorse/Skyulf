@@ -17,6 +17,7 @@ keep working.
 """
 
 from ._bayes import GAUSSIAN_NB_PARAMS
+from ._calibration import CALIBRATED_CLASSIFIER_PARAMS
 from ._field import HyperparameterField
 from ._linear import (
     ELASTICNET_REGRESSION_PARAMS,
@@ -82,4 +83,5 @@ __all__ = [
     "SVM_PARAMS",
     "KNN_PARAMS",
     "GAUSSIAN_NB_PARAMS",
+    "CALIBRATED_CLASSIFIER_PARAMS",
 ]

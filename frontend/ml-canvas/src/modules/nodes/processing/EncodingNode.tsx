@@ -8,7 +8,7 @@ import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppe
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 
 interface EncodingConfig {
-  method: 'onehot' | 'ordinal' | 'label' | 'target' | 'hash' | 'dummy';
+  method: 'onehot' | 'ordinal' | 'label' | 'target' | 'hash' | 'dummy' | 'woe';
   columns: string[];
   // OneHot/Dummy specific
   drop_first?: boolean | undefined;
@@ -23,6 +23,8 @@ interface EncodingConfig {
   target_column?: string | undefined;
   smooth?: number | 'auto' | undefined;
   target_type?: 'auto' | 'continuous' | 'multiclass' | 'binary' | undefined;
+  // WOE specific
+  regularization?: number | undefined;
   // Label/Ordinal specific
   unknown_value?: number | undefined;
   missing_code?: number | undefined;
@@ -121,6 +123,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
             <option value="label">Label Encoding</option>
             <option value="ordinal">Ordinal Encoding</option>
             <option value="target">Target Encoding</option>
+            <option value="woe">Weight of Evidence (WOE)</option>
             <option value="hash">Hash Encoding</option>
           </select>
           <p className="text-xs text-muted-foreground">
@@ -129,6 +132,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
             {config.method === 'label' && "Assigns a unique integer to each category."}
             {config.method === 'ordinal' && "Encodes categories as ordered integers."}
             {config.method === 'target' && "Encodes categories based on target mean."}
+            {config.method === 'woe' && "Replaces each category with its Weight of Evidence (log-odds of a binary target)."}
             {config.method === 'hash' && "Maps categories to a fixed number of features."}
           </p>
 
@@ -156,6 +160,12 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
             <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded px-2 py-1">
               <Info size={10} className="shrink-0" />
               <span>Replaces each category with the <strong>mean of the target</strong>. Select the target column on the right.</span>
+            </div>
+          )}
+          {config.method === 'woe' && (
+            <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded px-2 py-1">
+              <Info size={10} className="shrink-0" />
+              <span>Needs a <strong>binary target</strong> (exactly 2 classes). The target is auto-excluded — use Label Encoder for the target itself. Non-binary targets are <strong>skipped</strong> (columns pass through unchanged), not an error. Records Information Value (IV) per column.</span>
             </div>
           )}
           
@@ -291,6 +301,39 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
                   <option value="binary">Binary classification</option>
                   <option value="multiclass">Multiclass classification</option>
                 </select>
+              </div>
+            </div>
+          )}
+
+          {config.method === 'woe' && (
+            <div className="space-y-2 p-3 bg-muted/20 rounded border h-full">
+              <span className="block text-sm font-medium">Target Column</span>
+              <select
+                className="w-full p-2 border rounded bg-background text-sm"
+                value={config.target_column || ''}
+                onChange={(e) => onChange({ ...config, target_column: e.target.value })}
+              >
+                <option value="">Select a binary target column...</option>
+                {Object.keys(schema?.columns ?? {}).map(name => {
+                  const col = schema?.columns[name];
+                  return (
+                    <option key={name} value={name}>{name}{col ? ` (${col.dtype})` : ''}</option>
+                  );
+                })}
+              </select>
+              <p className="text-[10px] text-muted-foreground">Target must have exactly 2 classes.</p>
+              <div className="space-y-1">
+                <span className="block text-xs font-medium">Regularization</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  className="w-full p-2 border rounded"
+                  value={config.regularization ?? 0.5}
+                  onChange={(e) => onChange({ ...config, regularization: parseFloat(e.target.value) })}
+                  title="Laplace smoothing added to event/non-event counts to avoid division by zero."
+                />
+                <p className="text-[10px] text-muted-foreground">Smoothing for rare categories (default 0.5).</p>
               </div>
             </div>
           )}
@@ -509,6 +552,8 @@ export const EncodingNode: NodeDefinition<EncodingConfig> = {
     // Label and Ordinal intentionally operate on y when no columns selected
     if (config.columns.length === 0 && config.method !== 'label' && config.method !== 'ordinal')
       return { isValid: false, error: 'Select at least one column' };
+    if (config.method === 'woe' && !config.target_column)
+      return { isValid: false, error: 'WOE encoding requires a binary target column' };
     return { isValid: true };
   },
   getDefaultConfig: () => ({
@@ -522,6 +567,7 @@ export const EncodingNode: NodeDefinition<EncodingConfig> = {
     n_features: 8,
     smooth: 'auto',
     target_type: 'auto',
+    regularization: 0.5,
     unknown_value: -1,
     missing_code: -1,
     categories_order: '',
