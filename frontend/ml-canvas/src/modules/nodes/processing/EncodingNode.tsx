@@ -165,7 +165,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
           {config.method === 'woe' && (
             <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded px-2 py-1">
               <Info size={10} className="shrink-0" />
-              <span>Requires a <strong>binary target</strong> (exactly 2 classes). Select the target column on the right. Records Information Value (IV) per column.</span>
+              <span>Needs a <strong>binary target</strong> (exactly 2 classes). The target is auto-excluded — use Label Encoder for the target itself. Non-binary targets are <strong>skipped</strong> (columns pass through unchanged), not an error. Records Information Value (IV) per column.</span>
             </div>
           )}
           
