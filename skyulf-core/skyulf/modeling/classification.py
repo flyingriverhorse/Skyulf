@@ -1,5 +1,9 @@
 """Classification models."""
 
+import logging
+from typing import Any, Callable, Dict, Optional
+
+from sklearn.base import BaseEstimator
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import (
     AdaBoostClassifier,
@@ -46,6 +50,8 @@ from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 
+logger = logging.getLogger(__name__)
+
 
 # --- Logistic Regression ---
 class LogisticRegressionApplier(SklearnApplier):
@@ -90,11 +96,28 @@ class CalibratedClassifierApplier(SklearnApplier):
         "Wraps a base classifier with CalibratedClassifierCV so predicted "
         "probabilities are well-calibrated (Platt/sigmoid or isotonic)."
     ),
-    params={"method": "sigmoid", "cv": 5},
+    params={"base_estimator": "logistic_regression", "method": "sigmoid", "cv": 5},
     tags=["requires_scaling"],
 )
 class CalibratedClassifierCalculator(SklearnCalculator):
-    """Calibrated Classifier Calculator (base = Logistic Regression)."""
+    """Calibrated Classifier Calculator with a selectable base estimator.
+
+    The frontend sends ``base_estimator`` as a string key (e.g.
+    ``"random_forest"``); it is resolved here into a fresh estimator instance
+    before ``CalibratedClassifierCV`` is constructed. Defaults to logistic
+    regression for backward compatibility.
+    """
+
+    # Map of selectable base estimators → factory. Each must support
+    # ``predict_proba`` (or ``decision_function``) so calibration is meaningful.
+    BASE_ESTIMATORS: Dict[str, Callable[[], BaseEstimator]] = {
+        "logistic_regression": lambda: LogisticRegression(max_iter=1000),
+        "random_forest": lambda: RandomForestClassifier(n_estimators=100, random_state=42),
+        "gradient_boosting": lambda: GradientBoostingClassifier(random_state=42),
+        "decision_tree": lambda: DecisionTreeClassifier(random_state=42),
+        "gaussian_nb": lambda: GaussianNB(),
+        "svc": lambda: SVC(probability=True, random_state=42),
+    }
 
     def __init__(self):
         super().__init__(
@@ -106,6 +129,45 @@ class CalibratedClassifierCalculator(SklearnCalculator):
             },
             problem_type="classification",
         )
+
+    def fit(
+        self,
+        X: Any,
+        y: Any,
+        config: Dict[str, Any],
+        progress_callback: Optional[Callable[..., Any]] = None,
+        log_callback: Optional[Callable[..., Any]] = None,
+        validation_data: Any = None,
+    ) -> Any:
+        config = self._resolve_base_estimator(config)
+        return super().fit(X, y, config, progress_callback, log_callback, validation_data)
+
+    @classmethod
+    def _resolve_base_estimator(cls, config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Translate a ``base_estimator`` string key into an estimator instance.
+
+        Supports both the flat config shape and the nested ``{"params": {...}}``
+        shape used by the model-training payload. Unknown keys fall back to
+        logistic regression with a warning.
+        """
+        if not config:
+            return config or {}
+        resolved = dict(config)
+        nested = isinstance(resolved.get("params"), dict)
+        bucket = dict(resolved["params"]) if nested else resolved
+        key = bucket.pop("base_estimator", None)
+        if isinstance(key, str):
+            factory = cls.BASE_ESTIMATORS.get(key)
+            if factory is None:
+                logger.warning(
+                    "Unknown base_estimator '%s'; falling back to logistic_regression.", key
+                )
+                factory = cls.BASE_ESTIMATORS["logistic_regression"]
+            bucket["estimator"] = factory()
+        if nested:
+            resolved["params"] = bucket
+            return resolved
+        return bucket
 
 
 # --- Random Forest Classifier ---

@@ -80,6 +80,8 @@ nav:
   - Reference:
     - Preprocessing Nodes: reference/preprocessing_nodes.md
     - Modeling Nodes: reference/modeling_nodes.md
+    - Data Validation: reference/data_validation.md
+    - Deprecation Policy: reference/deprecation.md
     - API:
       - Pipeline: reference/api/pipeline.md
       - Data:
