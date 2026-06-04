@@ -2,6 +2,8 @@
 
 from .base import BaseModelApplier, BaseModelCalculator, StatefulEstimator
 from .classification import (
+    CalibratedClassifierApplier,
+    CalibratedClassifierCalculator,
     LogisticRegressionApplier,
     LogisticRegressionCalculator,
     RandomForestClassifierApplier,
@@ -29,6 +31,8 @@ __all__ = [
     "SklearnApplier",
     "LogisticRegressionCalculator",
     "LogisticRegressionApplier",
+    "CalibratedClassifierCalculator",
+    "CalibratedClassifierApplier",
     "RandomForestClassifierCalculator",
     "RandomForestClassifierApplier",
     "RidgeRegressionCalculator",

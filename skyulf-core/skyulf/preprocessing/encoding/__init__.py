@@ -8,6 +8,7 @@ Split from a single 832-LOC module into per-encoder files:
   target.py    — TargetEncoder
   hash.py      — HashEncoder
   dummy.py     — DummyEncoder
+  woe.py       — WOEEncoder (Weight-of-Evidence / Information Value)
 
 All public names are re-exported here so existing imports such as
 ``from skyulf.preprocessing.encoding import OneHotEncoderCalculator``
@@ -21,6 +22,7 @@ from .label import LabelEncoderApplier, LabelEncoderCalculator
 from .one_hot import OneHotEncoderApplier, OneHotEncoderCalculator
 from .ordinal import OrdinalEncoderApplier, OrdinalEncoderCalculator
 from .target import TargetEncoderApplier, TargetEncoderCalculator
+from .woe import WOEEncoderApplier, WOEEncoderCalculator
 
 __all__ = [
     "detect_categorical_columns",
@@ -37,4 +39,6 @@ __all__ = [
     "OrdinalEncoderCalculator",
     "TargetEncoderApplier",
     "TargetEncoderCalculator",
+    "WOEEncoderApplier",
+    "WOEEncoderCalculator",
 ]

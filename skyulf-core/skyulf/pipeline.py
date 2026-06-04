@@ -1,5 +1,7 @@
 """Main Skyulf Pipeline."""
 
+import hashlib
+import json
 import logging
 import pickle
 from typing import Any, Dict, Optional, Union, cast
@@ -34,6 +36,19 @@ def _mermaid_escape(text: str) -> str:
     return text.replace('"', "'").replace("[", "(").replace("]", ")")
 
 
+def _artifact_digest(obj: Any) -> bytes:
+    """Stable digest of a fitted artifact.
+
+    Pickle is deterministic for the same fitted estimator (same numpy arrays),
+    which is what we want for a reproducibility seal. Falls back to ``repr`` for
+    the rare object that refuses to pickle.
+    """
+    try:
+        return hashlib.sha256(pickle.dumps(obj)).digest()  # nosec B301
+    except Exception:
+        return hashlib.sha256(repr(obj).encode("utf-8")).digest()
+
+
 class SkyulfPipeline:
     """
     End-to-end ML Pipeline.
@@ -57,6 +72,7 @@ class SkyulfPipeline:
 
         self.feature_engineer = FeatureEngineer(self.preprocessing_steps)
         self.model_estimator: Optional[StatefulEstimator] = None
+        self._fit_metrics: Optional[Dict[str, Any]] = None
 
         # Initialize model estimator if config is present
         if self.modeling_config:
@@ -193,6 +209,7 @@ class SkyulfPipeline:
                 logger.warning(f"Evaluation failed: {e}")
                 metrics["modeling_error"] = str(e)
 
+        self._fit_metrics = metrics
         return metrics
 
     def predict(self, data: Union[pd.DataFrame, SkyulfDataFrame]) -> Any:
@@ -272,6 +289,66 @@ class SkyulfPipeline:
             lines.append(f"    {prev} --> model")
 
         return "\n".join(lines)
+
+    def is_fitted(self) -> bool:
+        """True once preprocessing has been fit (or a model has been trained)."""
+        if self.feature_engineer.fitted_steps:
+            return True
+        return self.model_estimator is not None and self.model_estimator.model is not None
+
+    def fingerprint(self) -> str:
+        """Return a deterministic SHA-256 over topology + fitted artifacts.
+
+        The hash covers the pipeline graph (preprocessing + modeling config) and,
+        once fitted, every fitted artifact and the trained model. Two pipelines
+        with the same hash produce the same predictions, so callers can prove
+        "this prediction came from exactly this pipeline". The digest changes
+        across library versions by design (artifacts pickle differently).
+        """
+        hasher = hashlib.sha256()
+        topology = {
+            "preprocessing": self.preprocessing_steps,
+            "modeling": self.modeling_config,
+        }
+        hasher.update(json.dumps(topology, sort_keys=True, default=str).encode("utf-8"))
+
+        for step in self.feature_engineer.fitted_steps:
+            hasher.update(_artifact_digest(step.get("artifact")))
+
+        if self.model_estimator is not None and self.model_estimator.model is not None:
+            hasher.update(_artifact_digest(self.model_estimator.model))
+
+        return hasher.hexdigest()
+
+    def export_model_card(self) -> Dict[str, Any]:
+        """Return a structured, JSON-friendly summary of the pipeline.
+
+        Captures lineage (preprocessing chain), the model and its hyperparameters,
+        the reproducibility fingerprint, and the metrics from the last :meth:`fit`
+        (``None`` if never fitted). Intended for audit logs and model registries.
+        """
+        model: Optional[Dict[str, Any]] = None
+        if self.modeling_config:
+            model = {
+                "type": self.modeling_config.get("type"),
+                "params": {k: v for k, v in self.modeling_config.items() if k != "type"},
+            }
+
+        return {
+            "schema_version": "1.0",
+            "fitted": self.is_fitted(),
+            "fingerprint": self.fingerprint(),
+            "preprocessing": [
+                {
+                    "name": step.get("name"),
+                    "transformer": step.get("transformer"),
+                    "params": step.get("params", {}),
+                }
+                for step in self.preprocessing_steps
+            ],
+            "model": model,
+            "metrics": self._fit_metrics,
+        }
 
     def save(self, path: str):
         """Save the pipeline to a file."""
