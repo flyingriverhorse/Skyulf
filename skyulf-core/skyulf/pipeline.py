@@ -29,6 +29,11 @@ from .registry import NodeRegistry
 logger = logging.getLogger(__name__)
 
 
+def _mermaid_escape(text: str) -> str:
+    """Escape characters that would break a Mermaid node label."""
+    return text.replace('"', "'").replace("[", "(").replace("]", ")")
+
+
 class SkyulfPipeline:
     """
     End-to-end ML Pipeline.
@@ -210,6 +215,63 @@ class SkyulfPipeline:
             )
         else:
             raise ValueError("Pipeline not fitted or no model configured.")
+
+    def describe(self) -> str:
+        """Return a human-readable, multi-line summary of the pipeline.
+
+        Renders the preprocessing chain (in order) and the model stage with
+        their configured parameters. Pure read-only over ``self.config`` — safe
+        to call before or after :meth:`fit`. Handy in notebooks and CI logs.
+        """
+        lines = ["SkyulfPipeline", "=" * 14]
+
+        steps = list(self.preprocessing_steps)
+        lines.append(f"Preprocessing ({len(steps)} step{'s' if len(steps) != 1 else ''}):")
+        if steps:
+            for i, step in enumerate(steps):
+                name = step.get("name", f"step_{i}")
+                transformer = step.get("transformer", "?")
+                lines.append(f"  {i + 1}. {name} [{transformer}]")
+                for key, value in step.get("params", {}).items():
+                    lines.append(f"       - {key}: {value}")
+        else:
+            lines.append("  (none)")
+
+        lines.append("Modeling:")
+        if self.modeling_config:
+            lines.append(f"  type: {self.modeling_config.get('type', '?')}")
+            for key, value in self.modeling_config.items():
+                if key != "type":
+                    lines.append(f"    - {key}: {value}")
+        else:
+            lines.append("  (none)")
+
+        return "\n".join(lines)
+
+    def to_mermaid(self) -> str:
+        """Render the pipeline as a Mermaid ``flowchart`` string.
+
+        Produces a top-down graph ``data -> [preprocessing steps] -> model``.
+        Useful in docs and PR descriptions. Pure read-only over ``self.config``.
+        """
+        lines = ["flowchart TD", "    data[Input Data]"]
+        prev = "data"
+
+        for i, step in enumerate(self.preprocessing_steps):
+            node = f"pp{i}"
+            name = step.get("name", f"step_{i}")
+            transformer = step.get("transformer", "?")
+            label = _mermaid_escape(f"{name} ({transformer})")
+            lines.append(f"    {node}[{label}]")
+            lines.append(f"    {prev} --> {node}")
+            prev = node
+
+        if self.modeling_config:
+            label = _mermaid_escape(str(self.modeling_config.get("type", "model")))
+            lines.append(f"    model([{label}])")
+            lines.append(f"    {prev} --> model")
+
+        return "\n".join(lines)
 
     def save(self, path: str):
         """Save the pipeline to a file."""

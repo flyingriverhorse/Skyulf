@@ -19,6 +19,38 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 
+class SchemaMismatchError(ValueError):
+    """Raised when an actual frame schema violates an expected ``SkyulfSchema``.
+
+    Carries structured details so callers can render a precise message instead
+    of a generic ``KeyError`` deep inside a transformer:
+
+    Attributes:
+        missing: Expected columns absent from the actual frame.
+        unexpected: Actual columns not present in the expected schema.
+        dtype_mismatches: ``{column: (expected_dtype, actual_dtype)}`` for
+            shared columns whose dtype labels differ (only when dtype checking
+            is requested).
+        order_mismatch: ``True`` when the shared columns appear in a different
+            relative order than expected (only when order checking is requested).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        missing: Optional[List[str]] = None,
+        unexpected: Optional[List[str]] = None,
+        dtype_mismatches: Optional[Dict[str, Tuple[str, str]]] = None,
+        order_mismatch: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.missing = missing or []
+        self.unexpected = unexpected or []
+        self.dtype_mismatches = dtype_mismatches or {}
+        self.order_mismatch = order_mismatch
+
+
 @dataclass(frozen=True)
 class SkyulfSchema:
     """Immutable schema description.
@@ -96,6 +128,129 @@ class SkyulfSchema:
 
     def __len__(self) -> int:
         return len(self.columns)
+
+    # ---- Contract validation ---------------------------------------------
+
+    def assert_compatible(
+        self,
+        actual: "SkyulfSchema",
+        *,
+        check_dtypes: bool = False,
+        check_order: bool = False,
+        where: str = "input",
+    ) -> None:
+        """Validate that ``actual`` satisfies this (expected) schema.
+
+        ``self`` is the expected schema (e.g. what an Applier was fitted on);
+        ``actual`` is the schema observed at apply time. Raises
+        :class:`SchemaMismatchError` describing every discrepancy. Presence of
+        the expected columns is always checked; dtype and column-order checks
+        are opt-in to keep the default contract permissive and non-breaking.
+
+        Args:
+            actual: The schema observed at runtime.
+            check_dtypes: Also compare dtype labels for shared columns.
+            check_order: Also require shared columns in the same relative order.
+            where: Label used in the error message (e.g. ``"input"``).
+        """
+        missing, unexpected = _presence_diff(self, actual)
+        dtype_mismatches = _dtype_mismatches(self, actual) if check_dtypes else {}
+        order_mismatch = _check_order(self, actual, check_order, missing)
+
+        if missing or unexpected or dtype_mismatches or order_mismatch:
+            raise SchemaMismatchError(
+                _format_mismatch(where, missing, unexpected, dtype_mismatches, order_mismatch),
+                missing=missing,
+                unexpected=unexpected,
+                dtype_mismatches=dtype_mismatches,
+                order_mismatch=order_mismatch,
+            )
+
+
+def _presence_diff(expected: "SkyulfSchema", actual: "SkyulfSchema") -> Tuple[List[str], List[str]]:
+    """Return ``(missing, unexpected)`` column-name lists between two schemas."""
+    actual_cols = set(actual.columns)
+    expected_cols = set(expected.columns)
+    missing = [c for c in expected.columns if c not in actual_cols]
+    unexpected = [c for c in actual.columns if c not in expected_cols]
+    return missing, unexpected
+
+
+def _dtype_mismatches(
+    expected: "SkyulfSchema", actual: "SkyulfSchema"
+) -> Dict[str, Tuple[str, str]]:
+    """Return ``{column: (expected_dtype, actual_dtype)}`` for shared columns."""
+    actual_cols = set(actual.columns)
+    out: Dict[str, Tuple[str, str]] = {}
+    for col in expected.columns:
+        if col in actual_cols and col in expected.dtypes and col in actual.dtypes:
+            exp_dt, act_dt = expected.dtypes[col], actual.dtypes[col]
+            if exp_dt != act_dt:
+                out[col] = (exp_dt, act_dt)
+    return out
+
+
+def _check_order(
+    expected: "SkyulfSchema", actual: "SkyulfSchema", check_order: bool, missing: List[str]
+) -> bool:
+    """Return ``True`` when shared columns appear in a different relative order.
+
+    Skipped (returns ``False``) unless ``check_order`` is requested and all
+    expected columns are present (order is meaningless with missing columns).
+    """
+    if not check_order or missing:
+        return False
+    actual_cols = set(actual.columns)
+    expected_cols = set(expected.columns)
+    shared_expected = [c for c in expected.columns if c in actual_cols]
+    shared_actual = [c for c in actual.columns if c in expected_cols]
+    return shared_expected != shared_actual
+
+
+def _format_mismatch(
+    where: str,
+    missing: List[str],
+    unexpected: List[str],
+    dtype_mismatches: Dict[str, Tuple[str, str]],
+    order_mismatch: bool,
+) -> str:
+    """Build a human-readable mismatch message from the collected diffs."""
+    parts: List[str] = [f"Schema mismatch on {where}:"]
+    if missing:
+        parts.append(f" missing columns {missing}")
+    if unexpected:
+        parts.append(f" unexpected columns {unexpected}")
+    if dtype_mismatches:
+        parts.append(f" dtype mismatches {dtype_mismatches}")
+    if order_mismatch:
+        parts.append(" column order differs from expected")
+    return "".join(parts)
+
+
+def validate_schema(
+    expected: SkyulfSchema,
+    actual: Any,
+    *,
+    check_dtypes: bool = False,
+    check_order: bool = False,
+    where: str = "input",
+) -> None:
+    """Validate a live DataFrame against an ``expected`` schema.
+
+    Thin convenience wrapper: builds a :class:`SkyulfSchema` from ``actual``
+    (Pandas/Polars/wrapper frame) and delegates to
+    :meth:`SkyulfSchema.assert_compatible`. Raises
+    :class:`SchemaMismatchError` on any violation.
+    """
+    actual_schema = (
+        actual if isinstance(actual, SkyulfSchema) else SkyulfSchema.from_dataframe(actual)
+    )
+    expected.assert_compatible(
+        actual_schema,
+        check_dtypes=check_dtypes,
+        check_order=check_order,
+        where=where,
+    )
 
 
 def _extract_pandas_dtypes(df: Any) -> Dict[str, str]:
