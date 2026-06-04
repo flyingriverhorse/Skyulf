@@ -1613,6 +1613,62 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../../data_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deprecation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deprecation Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1634,10 +1690,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_6_5" id="__nav_6_5_label" tabindex="">
             
   
   
@@ -1655,8 +1711,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_6_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1716,10 +1772,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_3_2" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_5_2" >
         
           
-          <label class="md-nav__link" for="__nav_6_3_2" id="__nav_6_3_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6_5_2" id="__nav_6_5_2_label" tabindex="0">
             
   
   
@@ -1737,8 +1793,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_3_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6_3_2">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_5_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1806,10 +1862,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_5_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_6_3_3" id="__nav_6_3_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6_5_3" id="__nav_6_5_3_label" tabindex="0">
             
   
   
@@ -1827,8 +1883,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_3_3_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_6_3_3">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_5_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2402,10 +2458,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_3_4" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_6_3_4" id="__nav_6_3_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6_5_4" id="__nav_6_5_4_label" tabindex="0">
             
   
   
@@ -2423,8 +2479,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_3_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6_3_4">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2688,12 +2744,19 @@
 
     <div class="doc doc-contents first">
 
-        <p>Scaling nodes (Standard / MinMax / Robust / MaxAbs).</p>
-<p>Each Applier/Calculator dispatches on engine via <code>apply_dual_engine</code> /
-<code>fit_dual_engine</code> (see <code>dispatcher.py</code>) so per-engine logic lives in
-small, individually testable <code>_apply_polars</code> / <code>_apply_pandas</code> /
-<code>_fit_polars</code> / <code>_fit_pandas</code> static helpers. This keeps the public
-<code>apply</code> / <code>fit</code> methods at CCN 1 (Codacy <code>lizard_ccn-medium</code>).</p>
+        <p>Scaling nodes package.</p>
+
+
+<details class="split-from-a-single-496-loc-module-into-per-scaler-files" open>
+  <summary>Split from a single 496-LOC module into per-scaler files</summary>
+  <p>_common.py   — shared subset-selection helpers
+standard.py  — StandardScaler
+minmax.py    — MinMaxScaler
+robust.py    — RobustScaler
+maxabs.py    — MaxAbsScaler</p>
+</details>        <p>All public names are re-exported here so existing imports such as
+<code>from skyulf.preprocessing.scaling import StandardScalerCalculator</code>
+continue to work unchanged.</p>
 
 
 
