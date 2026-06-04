@@ -81,3 +81,32 @@ def test_calibrated_classifier_registered_and_predicts():
     assert proba is not None
     # Calibrated probabilities must lie in [0, 1].
     assert ((proba.to_numpy() >= 0) & (proba.to_numpy() <= 1)).all()
+
+
+def test_calibrated_classifier_selectable_base_estimator():
+    from sklearn.ensemble import RandomForestClassifier
+
+    rng = np.random.default_rng(1)
+    X = pd.DataFrame(rng.normal(size=(40, 3)), columns=["a", "b", "c"])
+    y = pd.Series((X["a"] + X["b"] > 0).astype(int))
+
+    calc = NodeRegistry.get_calculator("calibrated_classifier")()
+    model = calc.fit(X, y, {"base_estimator": "random_forest", "method": "isotonic", "cv": 3})
+
+    # The string key must be resolved into the matching estimator instance.
+    assert isinstance(model.estimator, RandomForestClassifier)
+    assert model.method == "isotonic"
+
+
+def test_calibrated_classifier_unknown_base_estimator_falls_back():
+    from sklearn.linear_model import LogisticRegression
+
+    rng = np.random.default_rng(2)
+    X = pd.DataFrame(rng.normal(size=(30, 2)), columns=["a", "b"])
+    y = pd.Series((X["a"] > 0).astype(int))
+
+    calc = NodeRegistry.get_calculator("calibrated_classifier")()
+    model = calc.fit(X, y, {"base_estimator": "does_not_exist", "cv": 3})
+
+    # Unknown keys fall back to logistic regression rather than raising.
+    assert isinstance(model.estimator, LogisticRegression)

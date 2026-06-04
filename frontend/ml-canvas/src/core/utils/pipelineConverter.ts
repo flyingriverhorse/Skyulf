@@ -119,6 +119,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           else if (method === 'ordinal') stepType = 'OrdinalEncoder';
           else if (method === 'target') stepType = 'TargetEncoder';
           else if (method === 'hash') stepType = 'HashEncoder';
+          else if (method === 'woe') stepType = 'WOEEncoder';
           else stepType = 'OneHotEncoder'; // Default
 
           params = node.data;
@@ -198,6 +199,12 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               output_prefix: node.data.output_prefix,
               include_input_features: node.data.include_input_features
           };
+      } else if (node.data.definitionType === 'TimeSeriesNode') {
+          const method = node.data.method;
+          if (method === 'rolling') stepType = 'RollingAggregate';
+          else if (method === 'date') stepType = 'DateFeatures';
+          else stepType = 'LagFeatures';
+          params = node.data;
       } else if (node.data.definitionType === 'TextCleaning') {
           stepType = 'TextCleaning';
           params = node.data;
