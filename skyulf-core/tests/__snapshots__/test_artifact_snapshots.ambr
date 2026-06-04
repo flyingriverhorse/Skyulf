@@ -1,0 +1,72 @@
+# serializer version: 1
+# name: test_min_max_scaler_artifact_snapshot
+  dict({
+    'columns': list([
+      'a',
+      'b',
+    ]),
+    'data_max': list([
+      5.0,
+      50.0,
+    ]),
+    'data_min': list([
+      1.0,
+      10.0,
+    ]),
+    'feature_range': list([
+      0,
+      1,
+    ]),
+    'min': list([
+      -0.25,
+      -0.25,
+    ]),
+    'scale': list([
+      0.25,
+      0.025,
+    ]),
+    'type': 'minmax_scaler',
+  })
+# ---
+# name: test_standard_scaler_artifact_snapshot
+  dict({
+    'columns': list([
+      'a',
+      'b',
+    ]),
+    'mean': list([
+      3.0,
+      30.0,
+    ]),
+    'scale': list([
+      1.414214,
+      14.142136,
+    ]),
+    'type': 'standard_scaler',
+    'var': list([
+      2.0,
+      200.0,
+    ]),
+    'with_mean': True,
+    'with_std': True,
+  })
+# ---
+# name: test_woe_encoder_artifact_snapshot
+  dict({
+    'columns': list([
+      'city',
+    ]),
+    'default': 0.0,
+    'information_value': dict({
+      'city': 2.126096,
+    }),
+    'mappings': dict({
+      'city': dict({
+        'x': -1.94591,
+        'y': 0.510826,
+        'z': 1.609438,
+      }),
+    }),
+    'type': 'woe_encoder',
+  })
+# ---

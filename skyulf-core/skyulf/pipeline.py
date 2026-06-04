@@ -1,5 +1,7 @@
 """Main Skyulf Pipeline."""
 
+import hashlib
+import json
 import logging
 import pickle
 from typing import Any, Dict, Optional, Union, cast
@@ -29,6 +31,24 @@ from .registry import NodeRegistry
 logger = logging.getLogger(__name__)
 
 
+def _mermaid_escape(text: str) -> str:
+    """Escape characters that would break a Mermaid node label."""
+    return text.replace('"', "'").replace("[", "(").replace("]", ")")
+
+
+def _artifact_digest(obj: Any) -> bytes:
+    """Stable digest of a fitted artifact.
+
+    Pickle is deterministic for the same fitted estimator (same numpy arrays),
+    which is what we want for a reproducibility seal. Falls back to ``repr`` for
+    the rare object that refuses to pickle.
+    """
+    try:
+        return hashlib.sha256(pickle.dumps(obj)).digest()  # nosec B301
+    except Exception:
+        return hashlib.sha256(repr(obj).encode("utf-8")).digest()
+
+
 class SkyulfPipeline:
     """
     End-to-end ML Pipeline.
@@ -52,6 +72,7 @@ class SkyulfPipeline:
 
         self.feature_engineer = FeatureEngineer(self.preprocessing_steps)
         self.model_estimator: Optional[StatefulEstimator] = None
+        self._fit_metrics: Optional[Dict[str, Any]] = None
 
         # Initialize model estimator if config is present
         if self.modeling_config:
@@ -188,6 +209,7 @@ class SkyulfPipeline:
                 logger.warning(f"Evaluation failed: {e}")
                 metrics["modeling_error"] = str(e)
 
+        self._fit_metrics = metrics
         return metrics
 
     def predict(self, data: Union[pd.DataFrame, SkyulfDataFrame]) -> Any:
@@ -210,6 +232,123 @@ class SkyulfPipeline:
             )
         else:
             raise ValueError("Pipeline not fitted or no model configured.")
+
+    def describe(self) -> str:
+        """Return a human-readable, multi-line summary of the pipeline.
+
+        Renders the preprocessing chain (in order) and the model stage with
+        their configured parameters. Pure read-only over ``self.config`` — safe
+        to call before or after :meth:`fit`. Handy in notebooks and CI logs.
+        """
+        lines = ["SkyulfPipeline", "=" * 14]
+
+        steps = list(self.preprocessing_steps)
+        lines.append(f"Preprocessing ({len(steps)} step{'s' if len(steps) != 1 else ''}):")
+        if steps:
+            for i, step in enumerate(steps):
+                name = step.get("name", f"step_{i}")
+                transformer = step.get("transformer", "?")
+                lines.append(f"  {i + 1}. {name} [{transformer}]")
+                for key, value in step.get("params", {}).items():
+                    lines.append(f"       - {key}: {value}")
+        else:
+            lines.append("  (none)")
+
+        lines.append("Modeling:")
+        if self.modeling_config:
+            lines.append(f"  type: {self.modeling_config.get('type', '?')}")
+            for key, value in self.modeling_config.items():
+                if key != "type":
+                    lines.append(f"    - {key}: {value}")
+        else:
+            lines.append("  (none)")
+
+        return "\n".join(lines)
+
+    def to_mermaid(self) -> str:
+        """Render the pipeline as a Mermaid ``flowchart`` string.
+
+        Produces a top-down graph ``data -> [preprocessing steps] -> model``.
+        Useful in docs and PR descriptions. Pure read-only over ``self.config``.
+        """
+        lines = ["flowchart TD", "    data[Input Data]"]
+        prev = "data"
+
+        for i, step in enumerate(self.preprocessing_steps):
+            node = f"pp{i}"
+            name = step.get("name", f"step_{i}")
+            transformer = step.get("transformer", "?")
+            label = _mermaid_escape(f"{name} ({transformer})")
+            lines.append(f"    {node}[{label}]")
+            lines.append(f"    {prev} --> {node}")
+            prev = node
+
+        if self.modeling_config:
+            label = _mermaid_escape(str(self.modeling_config.get("type", "model")))
+            lines.append(f"    model([{label}])")
+            lines.append(f"    {prev} --> model")
+
+        return "\n".join(lines)
+
+    def is_fitted(self) -> bool:
+        """True once preprocessing has been fit (or a model has been trained)."""
+        if self.feature_engineer.fitted_steps:
+            return True
+        return self.model_estimator is not None and self.model_estimator.model is not None
+
+    def fingerprint(self) -> str:
+        """Return a deterministic SHA-256 over topology + fitted artifacts.
+
+        The hash covers the pipeline graph (preprocessing + modeling config) and,
+        once fitted, every fitted artifact and the trained model. Two pipelines
+        with the same hash produce the same predictions, so callers can prove
+        "this prediction came from exactly this pipeline". The digest changes
+        across library versions by design (artifacts pickle differently).
+        """
+        hasher = hashlib.sha256()
+        topology = {
+            "preprocessing": self.preprocessing_steps,
+            "modeling": self.modeling_config,
+        }
+        hasher.update(json.dumps(topology, sort_keys=True, default=str).encode("utf-8"))
+
+        for step in self.feature_engineer.fitted_steps:
+            hasher.update(_artifact_digest(step.get("artifact")))
+
+        if self.model_estimator is not None and self.model_estimator.model is not None:
+            hasher.update(_artifact_digest(self.model_estimator.model))
+
+        return hasher.hexdigest()
+
+    def export_model_card(self) -> Dict[str, Any]:
+        """Return a structured, JSON-friendly summary of the pipeline.
+
+        Captures lineage (preprocessing chain), the model and its hyperparameters,
+        the reproducibility fingerprint, and the metrics from the last :meth:`fit`
+        (``None`` if never fitted). Intended for audit logs and model registries.
+        """
+        model: Optional[Dict[str, Any]] = None
+        if self.modeling_config:
+            model = {
+                "type": self.modeling_config.get("type"),
+                "params": {k: v for k, v in self.modeling_config.items() if k != "type"},
+            }
+
+        return {
+            "schema_version": "1.0",
+            "fitted": self.is_fitted(),
+            "fingerprint": self.fingerprint(),
+            "preprocessing": [
+                {
+                    "name": step.get("name"),
+                    "transformer": step.get("transformer"),
+                    "params": step.get("params", {}),
+                }
+                for step in self.preprocessing_steps
+            ],
+            "model": model,
+            "metrics": self._fit_metrics,
+        }
 
     def save(self, path: str):
         """Save the pipeline to a file."""

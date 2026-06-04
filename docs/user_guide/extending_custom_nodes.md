@@ -64,7 +64,7 @@ class MyNodeCalculator(BaseCalculator):
 
 ### Real-world reference
 
-See `skyulf/preprocessing/encoding.py` for the `OneHotEncoder` implementation — it follows this exact pattern.
+See `skyulf/preprocessing/encoding/one_hot.py` for the `OneHotEncoder` implementation — it follows this exact pattern.
 
 ## Add a new modeling estimator
 

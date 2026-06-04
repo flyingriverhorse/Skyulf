@@ -109,6 +109,38 @@ This allows us to support *every* ML feature without rewriting Scikit-Learn from
 
 This means you can **train on Pandas** and **predict on Polars** (or vice versa)!
 
+## 5. The Engine-Parity Contract
+
+"Behaves the same on Polars and Pandas" has a precise meaning in Skyulf. A node
+honours the parity contract when, for the *same underlying data*, both engines
+produce the **same fitted artifact** and the **same transformed values**.
+
+### What must be identical
+
+- **Artifact keys and structure.** Both engines return the same dictionary shape
+  (same keys, same nesting). This is asserted in `tests/test_engine_parity.py`.
+- **Numeric results, within floating tolerance.** Stats (means, scales, bounds,
+  WOE values) must match to `rtol=1e-9` for pure arithmetic. Operations that
+  bridge to scikit-learn (e.g. `SimpleImputer`) use a looser `1e-6` because the
+  two code paths sum in a different order.
+- **No-op / short-circuit behaviour.** Selecting no valid columns returns `{}` on
+  both engines.
+
+### What is explicitly allowed to differ
+
+- **NaN ordering and null representation.** Polars `null` and pandas `NaN` are not
+  byte-identical; comparisons normalise them. Do not assert on raw null sentinels.
+- **Group / row ordering.** Aggregations that group by a key may emit rows in a
+  different order. Sort before comparing if order is not part of the contract.
+- **Float ULPs.** The last bit of a float may differ between Rust (Polars) and
+  NumPy (Pandas) reductions. Always compare with a tolerance, never `==`.
+- **dtype labels.** `int64` vs `Int64` (nullable) may surface differently; compare
+  semantic types, not dtype strings.
+
+Property-based tests in `tests/test_engine_parity.py` (hypothesis) enforce this
+contract across scalers, imputers, outlier detectors and encoders;
+`tests/test_artifact_snapshots.py` (syrupy) guards artifact *shape* against drift.
+
 ## Summary
 | Feature | Polars Path | Pandas Path |
 | :--- | :--- | :--- |

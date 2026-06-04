@@ -1,3 +1,16 @@
+"""Dual-engine dispatch for preprocessing nodes.
+
+This module owns the *control flow* that lets a single node run on either the
+Polars or the Pandas engine: ``apply_dual_engine`` (and its fit counterpart)
+unpacks the pipeline input, selects the engine-specific implementation, and
+repacks the output. It is the single place that branches on the engine.
+
+Boundary with ``_helpers.py``: leaf utilities used *inside* the engine branches
+(column resolution, ``is_polars`` / ``to_pandas``, safe scaling) live in
+``_helpers.py``. The dispatcher never implements column-level logic, and the
+helpers never dispatch a whole node.
+"""
+
 import logging
 from typing import Any, Callable, Dict, Mapping, Optional, Tuple, Union
 

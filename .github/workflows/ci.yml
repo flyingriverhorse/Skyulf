@@ -69,8 +69,22 @@ jobs:
         run: |
           ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py
 
+      - name: Complexity gate (lizard, CCN 8)
+        run: |
+          # Hard gate on green-field / known-clean packages so new code stays simple.
+          lizard skyulf-core/skyulf/core skyulf-core/skyulf/engines \
+                 skyulf-core/skyulf/preprocessing/scaling \
+                 skyulf-core/skyulf/preprocessing/transformations --CCN 8 -w
+          # Full-tree report (non-blocking) — surfaces legacy hotspots without failing CI.
+          lizard skyulf-core/skyulf --CCN 8 -w || true
+
       - name: Run tests
         run: pytest -q -s --maxfail=1 --disable-warnings --cov --cov-branch --cov-report=term-missing --cov-report=xml
+
+      - name: Coverage floor (skyulf-core)
+        run: |
+          # Conservative ratchet floor; raise toward 85% as core-only tests grow.
+          pytest skyulf-core/tests -q --cov=skyulf --cov-branch --cov-fail-under=45 --disable-warnings
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5

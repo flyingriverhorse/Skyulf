@@ -1,11 +1,14 @@
 import os
 import logging
-from typing import Tuple, Optional
+from typing import TYPE_CHECKING, Tuple, Optional
 
 from backend.config import get_settings
 from backend.ml_pipeline.artifacts.store import ArtifactStore
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
+
+if TYPE_CHECKING:
+    from backend.ml_pipeline.artifacts.discovery import ArtifactDiscovery
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +32,24 @@ class ArtifactFactory:
             return ArtifactFactory._create_s3_store_from_uri(artifact_uri)
         else:
             return LocalArtifactStore(base_path=artifact_uri)
+
+    @staticmethod
+    def get_discovery() -> "ArtifactDiscovery":
+        """
+        Returns the discovery backend used to enumerate job folders and their
+        reference artifacts at the artifact root.
+
+        Currently local-only; a UC/S3 implementation slots in here for Databricks
+        without touching the routers that consume it.
+        """
+        from backend.ml_pipeline.artifacts.discovery import (
+            ArtifactDiscovery,
+            LocalArtifactDiscovery,
+        )
+
+        settings = get_settings()
+        discovery: ArtifactDiscovery = LocalArtifactDiscovery(settings.TRAINING_ARTIFACT_DIR)
+        return discovery
 
     @staticmethod
     def create_store_for_job(
