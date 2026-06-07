@@ -10,8 +10,8 @@ fastapi>=0.104.0,<1.0.0
 uvicorn[standard]>=0.24.0,<1.0.0
 pydantic>=2.4.0,<3.0.0
 pydantic-settings>=2.0.0,<3.0.0
-python-dotenv>=1.0.0,<2.0.0        # Environment variable loading
-python-multipart>=0.0.6             # Form data / file upload support for FastAPI
+python-dotenv>=1.2.2,<2.0.0        # Environment variable loading
+python-multipart>=0.0.27            # Form data / file upload support for FastAPI
 orjson>=3.9.0                       # High performance JSON serialization
 
 # === ASYNC TASK QUEUE ===
@@ -27,10 +27,10 @@ aiosqlite>=0.19.0,<1.0.0            # Async SQLite support
 asyncpg>=0.29.0,<1.0.0              # Async PostgreSQL support (optional)
 
 # === DATA STORAGE & FORMATS ===
-pyarrow>=21.0.0                      # Parquet support for Pandas/Polars
+pyarrow>=23.0.1                      # Parquet support for Pandas/Polars
 boto3>=1.34.0                        # AWS SDK (transitive via s3fs, pinned for stability)
 s3fs>=2023.12.0                      # S3 Filesystem for Pandas
-aiohttp>=3.9.0,<4.0.0               # Pinned to avoid pip backtracking (transitive via s3fs)
+aiohttp>=3.13.4,<4.0.0              # Pinned to avoid pip backtracking (transitive via s3fs)
 aiofiles>=24.1.0                     # Async file operations
 
 # === STATISTICS & ANALYSIS ===
