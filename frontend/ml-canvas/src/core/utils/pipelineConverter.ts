@@ -142,7 +142,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
 
       if (node.data.definitionType === 'dataset_node') {
         stepType = BackendStepType.DATA_LOADER;
-        params = { 
+        params = {
             dataset_id: node.data.datasetId,
         };
       } else if (node.data.definitionType === 'imputation_node') {
@@ -245,11 +245,11 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           params = node.data;
       } else if (node.data.definitionType === 'TransformationNode') {
           stepType = 'GeneralTransformation';
-          
+
           // Flatten transformations: { columns: ['a', 'b'], method: 'log' } -> [{ column: 'a', method: 'log' }, { column: 'b', method: 'log' }]
           const rawTransformations = (node.data.transformations || []) as unknown[];
           const flattenedTransformations = [];
-          
+
           for (const r of rawTransformations) {
               const rule = r as Record<string, unknown>;
               if (rule.columns && Array.isArray(rule.columns)) {
@@ -262,7 +262,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                   }
               }
           }
-          
+
           params = { transformations: flattenedTransformations };
       } else if (node.data.definitionType === 'BinningNode') {
           stepType = 'GeneralBinning';
@@ -592,4 +592,3 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       metadata: { dataset_source_id: datasetId }
     };
 };
-

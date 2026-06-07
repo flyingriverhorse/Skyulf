@@ -109,7 +109,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
   const [activeTab, setActiveTab] = useState<'config' | 'search_space'>('config');
   const [showCV, setShowCV] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_model_optimizer'));
-  
+
   const [containerRef, { width }] = useElementSize();
   const isWide = width > 450;
 
@@ -276,7 +276,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                             <select
                                 value={config.model_type}
                                 onChange={(e) => {
-                                    // We don't reset loadedModelTypeRef here anymore, 
+                                    // We don't reset loadedModelTypeRef here anymore,
                                     // the useEffect will handle the change detection.
                                     onChange({ ...config, model_type: e.target.value, search_space: {} });
                                 }}
@@ -293,7 +293,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
 
                    {selectedModelItem?.tags?.includes('requires_scaling') && (
                         <div className="mt-2 text-xs border border-blue-200 dark:border-blue-800 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 overflow-hidden transition-all">
-                            <button 
+                            <button
                                 onClick={() => setShowScalingAlert(!showScalingAlert)}
                                 className="w-full flex items-center justify-between p-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
                             >
@@ -306,8 +306,8 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                             {showScalingAlert && (
                                 <div className="p-2 pt-0 opacity-90 animate-in slide-in-from-top-1 pl-7">
                                     <p className="opacity-90">
-                                        This model performs best with scaled features. Consider adding a 
-                                        <span className="font-mono mx-1 bg-white dark:bg-black px-1 rounded border border-blue-200 dark:border-blue-800">Scaler</span> 
+                                        This model performs best with scaled features. Consider adding a
+                                        <span className="font-mono mx-1 bg-white dark:bg-black px-1 rounded border border-blue-200 dark:border-blue-800">Scaler</span>
                                         node before this step.
                                     </p>
                                 </div>
@@ -388,8 +388,8 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                               // Always clear strategy_params when changing strategy — prevents stale
                               // optuna/halving settings (e.g. sampler=cmaes) from silently carrying
                               // over to a different strategy or a fresh selection.
-                              onChange({ 
-                                  ...config, 
+                              onChange({
+                                  ...config,
                                   search_strategy: newStrategy,
                                   strategy_params: {}
                               });
@@ -411,7 +411,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                           />
                       )}
                     </div>
-                    
+
                     <div>
                         <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Metric</span>
                         <select
@@ -445,7 +445,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
 
             {/* Cross Validation Toggle */}
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                <button 
+                <button
                     onClick={() => { setShowCV(!showCV); }}
                     className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
@@ -455,7 +455,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
                     </div>
                     <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${showCV ? 'rotate-90' : ''}`} />
                 </button>
-                
+
                 {showCV && (
                     <div className="p-3 space-y-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 animate-in slide-in-from-top-2 duration-200">
                         <div className="flex items-center gap-2 mb-2">
@@ -599,11 +599,11 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
       {showInfo && (
         <div className="mb-4 p-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded text-xs text-purple-700 dark:text-purple-300 flex justify-between items-start gap-2">
           <span>Automatically explore configurations to find the best performing model.</span>
-          <button 
+          <button
             onClick={() => {
                 setShowInfo(false);
                 sessionStorage.setItem('hide_info_model_optimizer', 'true');
-            }} 
+            }}
             className="text-purple-400 hover:text-purple-600 dark:hover:text-purple-200"
           >
             <X className="w-3 h-3" />
@@ -616,8 +616,8 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
           <button
             className={`flex-1 py-2.5 text-xs font-medium text-center border-b-2 transition-colors ${
-              activeTab === 'config' 
-                ? 'border-purple-500 text-purple-600 dark:text-purple-400' 
+              activeTab === 'config'
+                ? 'border-purple-500 text-purple-600 dark:text-purple-400'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
             onClick={() => { setActiveTab('config'); }}
@@ -626,8 +626,8 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
           </button>
           <button
             className={`flex-1 py-2.5 text-xs font-medium text-center border-b-2 transition-colors ${
-              activeTab === 'search_space' 
-                ? 'border-purple-500 text-purple-600 dark:text-purple-400' 
+              activeTab === 'search_space'
+                ? 'border-purple-500 text-purple-600 dark:text-purple-400'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
             onClick={() => { setActiveTab('search_space'); }}
@@ -662,7 +662,7 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
           <span className="text-sm font-semibold">Start Advanced Training</span>
         </button>
 
-        <button 
+        <button
             onClick={() => { setShowParamsModal(true); }}
             className="text-xs text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 flex items-center gap-1.5 transition-colors px-3 py-1 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800"
         >

@@ -78,7 +78,7 @@ export const ClusteringTab: React.FC<ClusteringTabProps> = ({ profile, downloadC
                         </div>
 
                         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-4">Cluster Profiles (Centroids)</h4>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {analysis.clusters.map((cluster) => (
                                 <div key={cluster.cluster_id} className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
@@ -91,7 +91,7 @@ export const ClusteringTab: React.FC<ClusteringTabProps> = ({ profile, downloadC
                                             {cluster.percentage.toFixed(1)}% ({cluster.size})
                                         </span>
                                     </div>
-                                    
+
                                     <div className="space-y-1">
                                         {Object.entries(cluster.center).slice(0, 5).map(([col, val]) => (
                                             <div key={col} className="flex justify-between text-xs">
@@ -111,11 +111,11 @@ export const ClusteringTab: React.FC<ClusteringTabProps> = ({ profile, downloadC
                     </div>
                 </div>
             </div>
-            
+
             <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm border border-blue-100 dark:border-blue-800">
                 <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
                 <div>
-                     These clusters are found using unsupervised learning (K-Means) on numeric features. 
+                     These clusters are found using unsupervised learning (K-Means) on numeric features.
                      The plot shows a 2D projection (PCA) of the clusters. Use this to identify distinct groups of data points that behave similarly.
                 </div>
             </div>

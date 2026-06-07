@@ -45,10 +45,10 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
   const [showParamsModal, setShowParamsModal] = useState(false);
   const [isLoadingDefs, setIsLoadingDefs] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_model_training'));
-  
+
   const { toggleDrawer: toggleJobDrawer, setTab, setActiveParallelRun, startPolling } = useJobStore();
   const upstreamData = useUpstreamData(nodeId || '');
-  
+
   // Recursive search for datasetId
   const nodes = useGraphStore((state) => state.nodes);
   const edges = useGraphStore((state) => state.edges);
@@ -56,34 +56,34 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
   const findUpstreamDatasetId = (currentNodeId: string): string | undefined => {
     const visited = new Set<string>();
     const queue = [currentNodeId];
-    
+
     while (queue.length > 0) {
       const id = queue.shift();
       if (!id) continue;
       if (visited.has(id)) continue;
       visited.add(id);
-      
+
       const node = nodes.find(n => n.id === id);
       if (!node) continue;
-      
+
       // If this is NOT the current node, check if it has datasetId
       if (id !== currentNodeId) {
         if (node.data?.datasetId) return node.data.datasetId as string;
         if (node.data?.dataset_id) return node.data.dataset_id as string;
-        
+
         if (node.data?.config) {
             const config = node.data.config as Record<string, unknown>;
             if (config.datasetId) return config.datasetId as string;
             if (config.dataset_id) return config.dataset_id as string;
         }
-        
+
         if (node.data?.params) {
             const params = node.data.params as Record<string, unknown>;
             if (params.datasetId) return params.datasetId as string;
             if (params.dataset_id) return params.dataset_id as string;
         }
       }
-      
+
       const incomers = getIncomers(node, nodes, edges);
       for (const incomer of incomers) {
         queue.push(incomer.id);
@@ -97,13 +97,13 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
   const availableColumns = schema ? Object.values(schema.columns) : [];
 
   const [containerRef, { width }] = useElementSize();
-  const isWide = width > 450; 
+  const isWide = width > 450;
   const [activeTab, setActiveTab] = useState<'model' | 'params'>('model');
   const [showCV, setShowCV] = useState(false);
   const [availableModels, setAvailableModels] = useState<RegistryItem[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [showScalingAlert, setShowScalingAlert] = useState(true);
-  
+
   // Find currently selected model item to check tags
   const selectedModelItem = availableModels.find(m => m.id === config.model_type);
   const requiresScaling = selectedModelItem?.tags?.includes('requires_scaling');
@@ -229,10 +229,10 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
                             </select>
                             <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
                         </div>
-                        
+
                         {requiresScaling && (
                            <div className="mt-2 text-xs border border-blue-200 dark:border-blue-800 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 overflow-hidden transition-all">
-                               <button 
+                               <button
                                    onClick={() => setShowScalingAlert(!showScalingAlert)}
                                    className="w-full flex items-center justify-between p-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
                                >
@@ -290,7 +290,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
 
             {/* CV Settings */}
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                <button 
+                <button
                     onClick={() => { setShowCV(!showCV); }}
                     className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
@@ -300,7 +300,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
                     </div>
                     <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${showCV ? 'rotate-90' : ''}`} />
                 </button>
-                
+
                 {showCV && (
                     <div className="p-3 space-y-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 animate-in slide-in-from-top-2 duration-200">
                         <div className="flex items-center gap-2 mb-2">
@@ -427,8 +427,8 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
            </h4>
            <div className="flex items-center gap-2">
                <label className={`text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2 cursor-pointer select-none ${isLoadingDefs ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                   <input 
-                        type="checkbox" 
+                   <input
+                        type="checkbox"
                         checked={useCustomParams}
                         onChange={(e) => { toggleCustomParams(e.target.checked); }}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -438,7 +438,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
                </label>
            </div>
         </div>
-        
+
         {!useCustomParams ? (
             <div className="text-center py-8 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-200 dark:border-gray-700">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -463,7 +463,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
                       Load Best
                    </button>
               </div>
-              
+
               {isLoadingDefs ? (
                   <div className="flex justify-center py-4">
                       <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
@@ -521,11 +521,11 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
       {showInfo && (
         <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded text-xs text-blue-700 dark:text-blue-300 flex justify-between items-start gap-2">
           <span>Train a model using fixed parameters or defaults.</span>
-          <button 
+          <button
             onClick={() => {
                 setShowInfo(false);
                 sessionStorage.setItem('hide_info_model_training', 'true');
-            }} 
+            }}
             className="text-blue-400 hover:text-blue-600 dark:hover:text-blue-200"
           >
             <X className="w-3 h-3" />
@@ -533,8 +533,8 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
         </div>
       )}
 
-      <BestParamsModal 
-        isOpen={showParamsModal} 
+      <BestParamsModal
+        isOpen={showParamsModal}
         onClose={() => { setShowParamsModal(false); }}
         modelType={config.model_type}
         availableModels={availableModels}
@@ -543,24 +543,24 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
             // If model type differs, we update it too
             const res = result as { modelType?: string; params: Record<string, unknown> };
             if (res.modelType && res.modelType !== config.model_type) {
-                onChange({ 
-                    ...config, 
+                onChange({
+                    ...config,
                     model_type: res.modelType,
-                    hyperparameters: res.params 
+                    hyperparameters: res.params
                 });
             } else {
                 onChange({ ...config, hyperparameters: res.params });
             }
         }}
       />
-      
+
       {/* Mobile/Narrow Tabs */}
       {!isWide && (
         <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
           <button
             className={`flex-1 py-2.5 text-xs font-medium text-center border-b-2 transition-colors ${
-              activeTab === 'model' 
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
+              activeTab === 'model'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
             onClick={() => { setActiveTab('model'); }}
@@ -569,8 +569,8 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
           </button>
           <button
             className={`flex-1 py-2.5 text-xs font-medium text-center border-b-2 transition-colors ${
-              activeTab === 'params' 
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
+              activeTab === 'params'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
             onClick={() => { setActiveTab('params'); }}

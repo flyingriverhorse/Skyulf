@@ -16,7 +16,7 @@ export interface JobInfo {
   error: string | null;
   result: Record<string, unknown> | null;
   logs?: string[];
-  
+
   // Extended fields
   model_type?: string;
   hyperparameters?: Record<string, unknown>;

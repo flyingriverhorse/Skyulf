@@ -1,11 +1,11 @@
 :root {
   --feature-canvas-nav-height: 72px;
-  
+
   /* Main Gradient Colors */
   --color-gradient-start: #38bdf8;
   --color-gradient-middle: #6366f1;
   --color-gradient-end: #a855f7;
-  
+
   /* Gradient Utility */
   --main-gradient: linear-gradient(90deg, var(--color-gradient-start), var(--color-gradient-middle), var(--color-gradient-end));
 

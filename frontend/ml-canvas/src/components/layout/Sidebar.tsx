@@ -18,7 +18,7 @@ export const Sidebar: React.FC = () => {
   if (!isSidebarOpen) {
     return (
       <div className="absolute left-4 top-4 z-50">
-        <button 
+        <button
           onClick={() => setSidebarOpen(true)}
           className="p-2 bg-background border shadow-md rounded-md text-muted-foreground hover:text-foreground transition-colors"
           title="Expand Components"
@@ -30,7 +30,7 @@ export const Sidebar: React.FC = () => {
     );
   }
 
-  const filteredNodes = nodes.filter(n => 
+  const filteredNodes = nodes.filter(n =>
     n.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
     n.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -45,7 +45,7 @@ export const Sidebar: React.FC = () => {
             <h2 className="font-semibold tracking-tight">Components</h2>
             <p className="text-xs text-muted-foreground">Drag and drop to canvas</p>
           </div>
-          <button 
+          <button
             onClick={() => setSidebarOpen(false)}
             className="p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
             title="Collapse Sidebar"
@@ -65,7 +65,7 @@ export const Sidebar: React.FC = () => {
           />
         </div>
       </div>
-      
+
       <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin">
         {categories.map((category) => {
           const categoryNodes = filteredNodes.filter(n => n.category === category);

@@ -25,7 +25,7 @@ const ColumnSelector: React.FC<{
   onChange: (selected: string[]) => void;
 }> = ({ columns, selected, onChange }) => {
   const [search, setSearch] = useState('');
-  
+
   const filtered = columns.filter(c => c.toLowerCase().includes(search.toLowerCase()));
 
   const toggle = (col: string) => {
@@ -84,15 +84,15 @@ const TypedInput: React.FC<{
   onChange: (val: unknown, type: ValueReplacementValueType) => void;
   placeholder?: string;
 }> = ({ value, type, onChange, placeholder }) => {
-  
+
   const handleTypeChange = (newType: ValueReplacementValueType) => {
     let newValue = value;
     if (newType === 'number') newValue = Number(value) || 0;
     if (newType === 'boolean') newValue = Boolean(value);
     if (newType === 'string') newValue = String(value);
     if (newType === 'null') newValue = null;
-    if (newType === 'nan') newValue = 'NaN'; 
-    
+    if (newType === 'nan') newValue = 'NaN';
+
     onChange(newValue, newType);
   };
 
@@ -114,7 +114,7 @@ const TypedInput: React.FC<{
         <option value="boolean">Bool</option>
         <option value="null">Null</option>
       </select>
-      
+
       {type === 'string' && (
         <input
           type="text"
@@ -165,14 +165,14 @@ const ReplacementEditor: React.FC<{
           <Trash2 size={14} />
         </button>
       </div>
-      
+
       <TypedInput
         value={item.old}
         type={item.oldType}
         onChange={(val, type) => onChange({ ...item, old: val, oldType: type })}
         placeholder="Value to find"
       />
-      
+
       <div className="flex items-center gap-2">
         <div className="text-gray-400">
           <ArrowRight size={14} className="rotate-90" />
@@ -246,7 +246,7 @@ export const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig
             <Plus size={12} /> Add
           </button>
         </div>
-        
+
         <div className="space-y-3">
           {config.replacements.map((item, i) => (
             <ReplacementEditor

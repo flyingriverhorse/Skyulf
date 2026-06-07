@@ -15,7 +15,7 @@ The pipeline execution involves three main layers:
 Artifacts are files saved to disk that preserve the **state** of a transformer after it has "learned" from the data.
 
 -   **Format**: Python objects serialized using `joblib`.
--   **Location**: 
+-   **Location**:
     -   **Preview Mode**: A temporary directory (e.g., `/tmp/skyulf_preview_xyz/`). Deleted after the request.
     -   **Training Mode**: A persistent directory associated with the model version.
 -   **Content**: The `params` dictionary returned by the `Calculator.fit()` method.

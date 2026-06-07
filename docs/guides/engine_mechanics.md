@@ -31,7 +31,7 @@ from skyulf.engines import get_engine
 
 def fit(self, df: SkyulfDataFrame, ...):
     engine = get_engine(df)
-    
+
     if engine.name == "polars":
         # Run optimized Polars logic
     else:
@@ -86,7 +86,7 @@ from skyulf.engines.sklearn_bridge import SklearnBridge
 def fit(self, df, ...):
     # Doesn't matter if df is Pandas or Polars
     X_matrix, y_vector = SklearnBridge.to_sklearn(df)
-    
+
     model = IsolationForest()
     model.fit(X_matrix, y_vector)
 ```

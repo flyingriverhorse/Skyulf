@@ -65,17 +65,17 @@ Example of a node supporting multiple engines:
 class StandardScalerCalculator(BaseCalculator):
     def fit(self, df, config):
         engine = get_engine(df)
-        
+
         if engine.name == "dask":
             # Use Dask native logic
             mean = df.mean().compute()
             std = df.std().compute()
             return {"mean": mean, "std": std}
-        
+
         elif engine.name == "polars":
             # Use Polars logic
             ...
-        
+
         else:
             # Fallback to Pandas/Sklearn
             ...

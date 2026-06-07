@@ -286,7 +286,7 @@ for cat, enc in zip(categories, encodings):
     print(f"  {cat}: {enc:.6f}")
 
 # Verify
-# Note: Sklearn's TargetEncoder uses cross-fitting and shrinkage (smoothing), 
+# Note: Sklearn's TargetEncoder uses cross-fitting and shrinkage (smoothing),
 # so the learned encodings will NOT equal the raw conditional means of the training set.
 # However, they must be **invariant** to changes in the Test set.
 
@@ -351,11 +351,11 @@ y_test_poisoned = y_test.copy()
 
 # 1. Poison 'age' (Imputation)
 # Set all test ages to a massive number. If leakage exists, the mean will skyrocket.
-X_test_poisoned['age'] = 10000.0 
+X_test_poisoned['age'] = 10000.0
 
 # 2. Poison 'fare' (Scaling)
 # Set all test fares to a massive number.
-X_test_poisoned['fare'] = 1000000.0 
+X_test_poisoned['fare'] = 1000000.0
 
 # 3. Poison 'survived' (Target Encoding)
 # Flip all labels: 0->1, 1->0. If leakage exists, encodings will flip.

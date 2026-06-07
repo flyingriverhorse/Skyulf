@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Activity, CheckCircle, XCircle, Clock, Search, 
+import {
+  Activity, CheckCircle, XCircle, Clock, Search,
   RefreshCw, Database, BarChart2, Cpu, Filter
 } from 'lucide-react';
 import { jobsApi, JobInfo } from '../core/api/jobs';
@@ -37,7 +37,7 @@ export const JobsPage: React.FC = () => {
     try {
       const currentSkip = reset ? 0 : skip;
       let fetchedJobs: JobInfo[] = [];
-      
+
       if (activeTab === 'training' || activeTab === 'tuning') {
         fetchedJobs = await jobsApi.getJobs(LIMIT, currentSkip, activeTab);
       } else if (activeTab === 'eda') {
@@ -45,10 +45,10 @@ export const JobsPage: React.FC = () => {
       } else if (activeTab === 'ingestion') {
         fetchedJobs = await jobsApi.getIngestionJobs(LIMIT, currentSkip);
       }
-      
+
       // Sort by created_at desc
       fetchedJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
+
       const isMore = fetchedJobs.length >= LIMIT;
       if (!isMore) {
         setHasMore(false);
@@ -70,7 +70,7 @@ export const JobsPage: React.FC = () => {
           return updated;
         });
       }
-      
+
       setSkip(currentSkip + LIMIT);
     } catch (error) {
       console.error('Failed to fetch jobs:', error);
@@ -116,15 +116,15 @@ export const JobsPage: React.FC = () => {
     const startTime = new Date(start).getTime();
     const endTime = new Date(end).getTime();
     const diff = endTime - startTime;
-    
+
     if (diff < 1000) return '< 1s';
-    
+
     const seconds = Math.floor(diff / 1000);
     if (seconds < 60) return `${seconds}s`;
-    
+
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
-    
+
     const hours = Math.floor(minutes / 60);
     return `${hours}h ${minutes % 60}m`;
   };
@@ -136,7 +136,7 @@ export const JobsPage: React.FC = () => {
           <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Jobs</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">Monitor and manage all your pipeline activities</p>
         </div>
-        <button 
+        <button
           onClick={() => fetchJobs()}
           className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-300"
         >
@@ -153,13 +153,13 @@ export const JobsPage: React.FC = () => {
           <TabButton active={activeTab === 'eda'} onClick={() => setActiveTab('eda')} icon={<BarChart2 size={16} />} label="EDA" />
           <TabButton active={activeTab === 'ingestion'} onClick={() => setActiveTab('ingestion')} icon={<Database size={16} />} label="Ingestion" />
         </div>
-        
+
         <div className="flex items-center gap-2">
           <div className="relative w-full md:w-56">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" size={16} />
-            <input 
-              type="text" 
-              placeholder="Search jobs..." 
+            <input
+              type="text"
+              placeholder="Search jobs..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-8 pr-4 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-slate-100"
@@ -254,7 +254,7 @@ export const JobsPage: React.FC = () => {
             </table>
           </div>
         )}
-        
+
         {/* Load More Button */}
         {!loading && hasMore && filteredJobs.length > 0 && (
           <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-center">
@@ -275,8 +275,8 @@ const TabButton = ({ active, onClick, icon, label }: { active: boolean; onClick:
   <button
     onClick={onClick}
     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
-      active 
-        ? 'bg-indigo-600 text-white shadow-sm' 
+      active
+        ? 'bg-indigo-600 text-white shadow-sm'
         : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
     }`}
   >
@@ -294,7 +294,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
     queued: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400',
   };
-  
+
   const icons = {
     succeeded: <CheckCircle size={14} />,
     completed: <CheckCircle size={14} />,

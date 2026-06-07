@@ -24,8 +24,8 @@ export const DecompositionTab: React.FC<DecompositionTabProps> = ({ datasetId, c
             <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 flex gap-4 items-end">
                 <div className="space-y-1">
                     <span className="text-xs font-medium text-slate-500">Analyze</span>
-                    <select 
-                        value={measureCol} 
+                    <select
+                        value={measureCol}
                         onChange={(e) => setMeasureCol(e.target.value)}
                         className="block w-[180px] rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                     >
@@ -39,8 +39,8 @@ export const DecompositionTab: React.FC<DecompositionTabProps> = ({ datasetId, c
                 {measureCol !== 'count' && (
                     <div className="space-y-1">
                         <span className="text-xs font-medium text-slate-500">Aggregation</span>
-                        <select 
-                            value={measureAgg} 
+                        <select
+                            value={measureAgg}
                             onChange={(e) => setMeasureAgg(e.target.value)}
                             className="block w-[120px] rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                         >
@@ -52,8 +52,8 @@ export const DecompositionTab: React.FC<DecompositionTabProps> = ({ datasetId, c
                     </div>
                 )}
 
-                <button 
-                    onClick={handleReset} 
+                <button
+                    onClick={handleReset}
                     className="p-2 border rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-slate-600 dark:text-slate-300"
                     title="Reset Tree"
                 >
@@ -63,7 +63,7 @@ export const DecompositionTab: React.FC<DecompositionTabProps> = ({ datasetId, c
 
             {/* Tree Visualization */}
             <div className="bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
-                <DecompositionTree 
+                <DecompositionTree
                     key={key}
                     datasetId={datasetId}
                     measureCol={measureCol}

@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { 
-  ReactFlow, 
-  Background, 
-  Controls, 
+import {
+  ReactFlow,
+  Background,
+  Controls,
   ReactFlowProvider,
   useReactFlow
 } from '@xyflow/react';
@@ -34,12 +34,12 @@ const edgeTypes = {
 const FlowCanvasContent: React.FC = () => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow();
-  
-  const { 
-    nodes, 
-    edges, 
-    onNodesChange, 
-    onEdgesChange, 
+
+  const {
+    nodes,
+    edges,
+    onNodesChange,
+    onEdgesChange,
     onConnect,
     addNode,
     executionResult,
@@ -221,8 +221,8 @@ const FlowCanvasContent: React.FC = () => {
   );
 
   return (
-    <div 
-      className="w-full h-full outline-none relative" 
+    <div
+      className="w-full h-full outline-none relative"
       ref={reactFlowWrapper}
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- canvas wrapper must be focusable to capture keyboard shortcuts
       tabIndex={0}
@@ -267,11 +267,11 @@ const FlowCanvasContent: React.FC = () => {
         onBeforeDelete={onBeforeDelete}
       >
         <Background />
-        <Controls 
-          position="bottom-left" 
+        <Controls
+          position="bottom-left"
           style={
-            (executionResult && !isResultsPanelExpanded) 
-              ? { marginBottom: '40px', transition: 'margin-bottom 0.3s ease-in-out' } 
+            (executionResult && !isResultsPanelExpanded)
+              ? { marginBottom: '40px', transition: 'margin-bottom 0.3s ease-in-out' }
               : { transition: 'margin-bottom 0.3s ease-in-out' }
           }
         />

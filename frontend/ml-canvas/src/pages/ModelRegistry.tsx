@@ -132,7 +132,7 @@ export const ModelRegistry: React.FC = () => {
     // frontend/ml-canvas/src/pages/ModelRegistry.tsx:194: if (!metrics) return '-';
     // Unnecessary conditional, value is always falsy.
     // This means metrics is NEVER falsy, i.e. it's always an object.
-    
+
     // Try to find common metrics
     const score = metrics.score || metrics.accuracy || metrics.f1_score || metrics.rmse || metrics.mse;
     if (score !== undefined) {
@@ -156,7 +156,7 @@ export const ModelRegistry: React.FC = () => {
   };
 
   const filteredModels = models.filter(model => {
-    const matchDataset = (model.dataset_name || '').toLowerCase().includes(datasetFilter.toLowerCase()) || 
+    const matchDataset = (model.dataset_name || '').toLowerCase().includes(datasetFilter.toLowerCase()) ||
                          (model.dataset_id || '').toLowerCase().includes(datasetFilter.toLowerCase());
     const matchModel = model.model_type.toLowerCase().includes(modelTypeFilter.toLowerCase());
     return matchDataset && matchModel;
@@ -167,7 +167,7 @@ export const ModelRegistry: React.FC = () => {
       <LoadingState message="Loading registry..." />
     </div>
   );
-  
+
   if (error) return (
     <div className="p-8">
       <ErrorState error={error} />
@@ -181,11 +181,11 @@ export const ModelRegistry: React.FC = () => {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Model Registry</h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">Manage versions, track metrics, and deploy your best models.</p>
         </div>
-        <button 
+        <button
           onClick={() => {
             void modelsQuery.refetch();
             void statsQuery.refetch();
-          }} 
+          }}
           className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
         >
           Refresh
@@ -194,21 +194,21 @@ export const ModelRegistry: React.FC = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatsCard 
-          title="Total Versions" 
-          value={stats?.total_versions || 0} 
-          icon={<Box className="text-blue-500" />} 
+        <StatsCard
+          title="Total Versions"
+          value={stats?.total_versions || 0}
+          icon={<Box className="text-blue-500" />}
         />
-        <StatsCard 
-          title="Active Deployments" 
-          value={stats?.active_deployments || 0} 
-          icon={<RocketIcon className="text-green-500" />} 
+        <StatsCard
+          title="Active Deployments"
+          value={stats?.active_deployments || 0}
+          icon={<RocketIcon className="text-green-500" />}
           valueColor="text-green-600 dark:text-green-400"
         />
-        <StatsCard 
-          title="Model Types" 
-          value={models.length} 
-          icon={<Archive className="text-purple-500" />} 
+        <StatsCard
+          title="Model Types"
+          value={models.length}
+          icon={<Archive className="text-purple-500" />}
           valueColor="text-purple-600 dark:text-purple-400"
         />
       </div>
@@ -217,9 +217,9 @@ export const ModelRegistry: React.FC = () => {
       <div className="mb-6 flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
           <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Filter by Model Type</span>
-          <input 
-            type="text" 
-            placeholder="e.g. RandomForest" 
+          <input
+            type="text"
+            placeholder="e.g. RandomForest"
             value={modelTypeFilter}
             onChange={(e) => { setModelTypeFilter(e.target.value); }}
             className="w-full px-4 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -227,9 +227,9 @@ export const ModelRegistry: React.FC = () => {
         </div>
         <div className="flex-1">
           <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Filter by Dataset</span>
-          <input 
-            type="text" 
-            placeholder="e.g. Iris Dataset" 
+          <input
+            type="text"
+            placeholder="e.g. Iris Dataset"
             value={datasetFilter}
             onChange={(e) => { setDatasetFilter(e.target.value); }}
             className="w-full px-4 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -276,7 +276,7 @@ export const ModelRegistry: React.FC = () => {
                 filteredModels.map((model) => {
                   const latest = model.latest_version;
                   if (!latest) return null;
-                  
+
                   const rowKey = `${model.model_type}-${model.dataset_id}`;
                   const isSystemDeployed = model.deployment_count > 0;
                   const isManuallyDeployed = manualDeployments[rowKey] || false;
@@ -316,12 +316,12 @@ export const ModelRegistry: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- inline checkbox-cell stopPropagation */}
                         <div className="flex items-center gap-2" onClick={(e) => { e.stopPropagation(); }}>
-                          <input 
-                            type="checkbox" 
-                            checked={isDeployed} 
+                          <input
+                            type="checkbox"
+                            checked={isDeployed}
                             onChange={() => { toggleManualDeployment(rowKey); }}
                             disabled={isSystemDeployed}
-                            className={`w-4 h-4 rounded border-gray-300 focus:ring-green-500 ${isSystemDeployed ? 'text-green-600 opacity-50 cursor-not-allowed' : 'text-blue-600 cursor-pointer'}`} 
+                            className={`w-4 h-4 rounded border-gray-300 focus:ring-green-500 ${isSystemDeployed ? 'text-green-600 opacity-50 cursor-not-allowed' : 'text-blue-600 cursor-pointer'}`}
                           />
                           {isDeployed ? (
                             <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 font-medium bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full text-xs">
@@ -333,7 +333,7 @@ export const ModelRegistry: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button 
+                        <button
                           onClick={() => { setSelectedModelKey(`${model.model_type}-${model.dataset_id}`); }}
                           className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 flex items-center justify-end gap-1 ml-auto"
                         >
@@ -348,7 +348,7 @@ export const ModelRegistry: React.FC = () => {
           </table>
         </div>
       </div>
-      
+
       {loading && models.length > 0 && (
         <div className="py-4 flex justify-center text-slate-500 dark:text-slate-400">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
@@ -371,7 +371,7 @@ export const ModelRegistry: React.FC = () => {
                 <X size={24} />
               </button>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-6">
               <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                 <thead>
@@ -416,9 +416,9 @@ export const ModelRegistry: React.FC = () => {
                           >
                             <Folder size={16} />
                           </button>
-                          
+
                           {version.status === 'completed' && !version.is_deployed && (
-                            <button 
+                            <button
                               onClick={() => { void handleDeploy(version.job_id); }}
                               disabled={deployingId === version.job_id}
                               className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 disabled:opacity-50 flex items-center gap-1"
@@ -443,9 +443,9 @@ export const ModelRegistry: React.FC = () => {
                 </tbody>
               </table>
             </div>
-            
+
             <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end">
-              <button 
+              <button
                 onClick={() => { setSelectedModelKey(null); }}
                 className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
@@ -471,7 +471,7 @@ export const ModelRegistry: React.FC = () => {
                 <X size={24} />
               </button>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-6">
               {loadingArtifacts ? (
                 <div className="flex justify-center py-8 text-slate-500 dark:text-slate-400">
@@ -499,7 +499,7 @@ export const ModelRegistry: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  
+
                   <ul className="space-y-2">
                     {artifacts.files.map((artifact, idx) => (
                       <li key={idx} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/30 border border-slate-100 dark:border-slate-700">
@@ -513,9 +513,9 @@ export const ModelRegistry: React.FC = () => {
                 </div>
               )}
             </div>
-            
+
             <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end">
-              <button 
+              <button
                 onClick={() => { setViewingArtifacts(null); }}
                 className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >

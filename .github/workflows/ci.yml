@@ -17,7 +17,52 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Fast Python validation gate: Checks formatting, style, and types before any heavy workloads.
+  # If any step here fails, the heavier `test` job never starts.
+  python-gate:
+    name: Python Static Checks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ matrix.python-version }}-${{ hashFiles('requirements-ci.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-${{ matrix.python-version }}-
+
+      - name: Install dependencies (uv)
+        run: |
+          uv pip install --system -r requirements-ci.txt
+
+      - name: Lint check (Ruff)
+        run: |
+          ruff check .
+
+      - name: Format check (Ruff)
+        run: |
+          ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py
+
+      - name: Type check (Ty)
+        run: |
+          ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py
+
   test:
+    needs: python-gate
     runs-on: ubuntu-latest
     services:
       redis:
@@ -56,20 +101,6 @@ jobs:
         run: |
           uv pip install --system -r requirements-ci.txt
 
-      - name: Lint (ruff)
-        run: |
-          ruff check .
-          # Non-blocking style/stats surface (informational; mirrors old flake8 --exit-zero).
-          ruff check . --statistics || true
-
-      - name: Format check (ruff)
-        run: |
-          ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py
-
-      - name: Type check (ty)
-        run: |
-          ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py
-
       - name: Complexity gate (lizard, CCN 8)
         run: |
           # Hard gate on green-field / known-clean packages so new code stays simple.
@@ -92,7 +123,8 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  frontend-build:
+  frontend-gate:
+    name: Frontend gate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -109,8 +141,30 @@ jobs:
         run: npm ci
         working-directory: frontend/ml-canvas
 
-      - name: Lint
+      - name: Lint (ESLint)
         run: npm run lint
+        working-directory: frontend/ml-canvas
+
+      - name: Type check (tsc)
+        run: npx tsc --project tsconfig.json --noEmit
+        working-directory: frontend/ml-canvas
+
+  frontend-build:
+    needs: frontend-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/ml-canvas/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
         working-directory: frontend/ml-canvas
 
       - name: Test
@@ -118,6 +172,8 @@ jobs:
         working-directory: frontend/ml-canvas
 
       - name: Build
+        # Notice: building here compiles the code anyway, but doing it inside
+        # frontend-build keeps the gate super fast!
         run: npm run build
         working-directory: frontend/ml-canvas
 

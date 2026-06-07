@@ -322,7 +322,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                 </div>
                 <div className="flex items-center gap-2">
                     {(job.status === 'running' || job.status === 'queued') && (
-                        <button 
+                        <button
                             onClick={() => { void handleCancel(); }}
                             disabled={isCancelling}
                             className="flex items-center gap-1 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded text-xs font-medium transition-colors border border-red-200 dark:border-red-800"
@@ -341,8 +341,8 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
             <div className="flex border-b border-gray-200 dark:border-gray-700 px-4">
                 <button
                     className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-                    activeTab === 'overview' 
-                        ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
+                    activeTab === 'overview'
+                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                         : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                     }`}
                     onClick={() => { setActiveTab('overview'); }}
@@ -352,8 +352,8 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                 </button>
                 <button
                     className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-                    activeTab === 'logs' 
-                        ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
+                    activeTab === 'logs'
+                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                         : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                     }`}
                     onClick={() => { setActiveTab('logs'); }}
@@ -385,8 +385,8 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                             <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
                                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Duration</div>
                                 <div className="font-medium text-gray-800 dark:text-gray-200 font-mono">
-                                    {job.start_time && job.end_time 
-                                        ? `${Math.round((new Date(job.end_time).getTime() - new Date(job.start_time).getTime()) / 1000)}s` 
+                                    {job.start_time && job.end_time
+                                        ? `${Math.round((new Date(job.end_time).getTime() - new Date(job.start_time).getTime()) / 1000)}s`
                                         : '-'}
                                 </div>
                             </div>
@@ -419,7 +419,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                         </span>
                                     )}
                                 </div>
-                                
+
                                 {job.job_type === 'basic_training' && !!(job.result as Record<string, unknown>).metrics && (
                                     <div className="space-y-4">
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -468,7 +468,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                                             : (node?.params?.tuning_config as TuningConfig | undefined);
                                                         const config: TuningConfig | undefined = rawConfig;
                                                         if (!config) return <div className="text-gray-400 col-span-2">No configuration found</div>;
-                                                        
+
                                                         const activeStrategy = config.strategy || config.search_strategy || '';
                                                         const sp = config.strategy_params;
                                                         const hasStrategyParams = sp && Object.keys(sp).length > 0;
@@ -545,7 +545,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                                                 <div>
                                                                     <span className="text-gray-500">Strategy:</span>
                                                                     <span className="ml-2 font-mono text-gray-700 dark:text-gray-300 capitalize">{activeStrategy || '-'}</span>
-                                                                    
+
                                                                 </div>
                                                                 <div className="col-span-2">
                                                                     <span className="text-gray-500">Strategy Params:</span>
@@ -621,7 +621,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                         )}
 
                             <FeatureImportancesSection result={job.result as Record<string, unknown>} />
-                                        
+
                                         {/* Best Params */}
                                         {!!(job.result as Record<string, unknown>).best_params && (
                                             <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">

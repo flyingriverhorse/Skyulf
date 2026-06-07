@@ -37,7 +37,7 @@ const CustomBinInput: React.FC<{
   };
 
   return (
-    <input 
+    <input
       type="text"
       className="w-full p-1 text-xs border rounded bg-background text-foreground"
       placeholder="0, 10, 20, 100..."
@@ -57,7 +57,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
   const droppedUpstream = useUpstreamDroppedColumns(nodeId);
-  
+
   // Responsive Layout
   const containerRef = useRef<HTMLDivElement>(null);
   const [isWide, setIsWide] = useState(false);
@@ -75,7 +75,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
   }, []);
 
   // Filter for numeric columns only
-  const numericColumns = schema 
+  const numericColumns = schema
     ? Object.values(schema.columns)
         .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
         .filter(c => !droppedUpstream.has(c.name))
@@ -211,7 +211,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
               />
               <label htmlFor="drop_original" className="text-sm">Drop Original Columns</label>
             </div>
-            
+
             {!config.drop_original && (
               <div className="space-y-1">
                 <span className="text-xs font-medium text-muted-foreground">Output Suffix</span>
@@ -230,11 +230,11 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
         {/* Right Column: Column Selection */}
         <div className="space-y-2 flex flex-col h-full min-h-[200px]">
           <span className="block text-sm font-medium">Target Columns</span>
-          
+
           <div className="flex gap-2">
-            <input 
-              className="w-full px-2 py-1 text-xs border rounded bg-background text-foreground" 
-              placeholder="Search columns..." 
+            <input
+              className="w-full px-2 py-1 text-xs border rounded bg-background text-foreground"
+              placeholder="Search columns..."
               value={searchTerm}
               onChange={e => { setSearchTerm(e.target.value); }}
             />

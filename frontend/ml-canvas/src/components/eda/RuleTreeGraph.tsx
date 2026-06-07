@@ -1,11 +1,11 @@
 import React, { useEffect, useCallback } from 'react';
 import dagre from 'dagre';
-import { 
-    ReactFlow, 
-    Background, 
-    Controls, 
-    useNodesState, 
-    useEdgesState, 
+import {
+    ReactFlow,
+    Background,
+    Controls,
+    useNodesState,
+    useEdgesState,
     MarkerType,
     Node,
     Edge,
@@ -41,7 +41,7 @@ const nodeHeight = 100;
 // Custom Node Component
 const DecisionNode = ({ data }: { data: RuleNodeData & { class_name?: string } }) => {
     const isLeaf = data.is_leaf;
-    
+
     // Calculate class distribution percentage
     const total = data.value.reduce((a: number, b: number) => a + b, 0);
     const maxVal = Math.max(...data.value);
@@ -50,7 +50,7 @@ const DecisionNode = ({ data }: { data: RuleNodeData & { class_name?: string } }
     return (
         <div className={`px-4 py-3 shadow-md rounded-md border-2 ${isLeaf ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-blue-500 bg-white dark:bg-gray-800'} min-w-[200px]`}>
             <Handle type="target" position={Position.Left} className="w-3 h-3 !bg-gray-400" />
-            
+
             <div className="flex flex-col gap-1">
                 {/* Header: Decision Rule */}
                 <div className="font-bold text-sm text-gray-900 dark:text-white border-b pb-1 mb-1">
@@ -98,7 +98,7 @@ const DecisionNode = ({ data }: { data: RuleNodeData & { class_name?: string } }
                     {/* Class Distribution Bar */}
                     <div className="w-full h-1.5 bg-gray-200 rounded-full mt-1 overflow-hidden flex">
                         {data.value.map((val: number, idx: number) => (
-                            <div 
+                            <div
                                 key={idx}
                                 style={{ width: `${(val / total) * 100}%`, backgroundColor: `hsl(${idx * 137.5}, 70%, 50%)` }}
                                 title={`Class ${idx}: ${val}`}

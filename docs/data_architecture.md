@@ -7,7 +7,7 @@ Skyulf uses a hybrid approach to data processing to balance **performance** (Ing
 ### A. Ingestion & Preview (Polars)
 *   **Engine:** [Polars](https://pola.rs/)
 *   **Why:** Polars is significantly faster than Pandas for reading large files (CSV, Parquet) and performing initial scans. It uses lazy evaluation and multi-threading.
-*   **Where:** 
+*   **Where:**
     *   `backend/data_ingestion/`: Reading uploaded files.
     *   `backend/services/data_service.py`: Generating data previews and samples for the UI.
 *   **Format:** Data is kept in Polars DataFrames or converted to Python dictionaries (`to_dicts()`) for JSON API responses.
@@ -15,7 +15,7 @@ Skyulf uses a hybrid approach to data processing to balance **performance** (Ing
 ### B. Machine Learning Core (Numpy / Scikit-Learn)
 *   **Engine:** [Numpy](https://numpy.org/) & [Scikit-Learn](https://scikit-learn.org/)
 *   **Why:** The vast majority of the Python ML ecosystem (Scikit-Learn, XGBoost, LightGBM) requires raw Numpy arrays (matrices) to perform fast, C++ bound mathematics.
-*   **Where:** 
+*   **Where:**
     *   `skyulf-core/`: The actual mathematical pipeline execution (e.g. Scikit-Learn Wrappers).
     *   `backend/ml_pipeline/execution/`: The orchestration layer running the nodes.
 *   **Format:** Data is structurally maintained as Polars or Pandas depending on the caller, but strictly converted to Numpy arrays when hitting statistical/ML nodes via the `SklearnBridge`.

@@ -40,7 +40,7 @@ const LastRunResults: React.FC<{ nodeId: string }> = ({ nodeId }) => {
                 | { metrics?: Record<string, unknown>; error?: string }
                 | undefined)
         : undefined;
-  
+
   if (!nodeResult) return null;
 
   // Helper to format metrics
@@ -49,7 +49,7 @@ const LastRunResults: React.FC<{ nodeId: string }> = ({ nodeId }) => {
     // Assuming strict null checks, if metrics is not optional, this check is redundant.
     // However, if it can be null/undefined, the check is valid.
     // Based on the error "Unnecessary conditional, value is always truthy", metrics is guaranteed.
-    
+
     return (
       <div className="space-y-1">
         {Object.entries(metrics).map(([key, value]) => {
@@ -117,7 +117,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
         | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
   const droppedUpstream = useUpstreamDroppedColumns(nodeId);
-  
+
   // Try to find a target column from upstream nodes configuration
     const upstreamTarget = upstreamData.find((d) => {
         const cfg = d.config;
@@ -136,8 +136,8 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                onChange({ ...config, target_column: targetColumn });
           } else if (schema?.columns) {
                // Simple heuristic: check for 'target' or 'class' or column_type
-               const potentialTarget = Object.values(schema.columns).find((c: ColumnProfile) => 
-                   c.name.toLowerCase() === 'target' || 
+               const potentialTarget = Object.values(schema.columns).find((c: ColumnProfile) =>
+                   c.name.toLowerCase() === 'target' ||
                    c.name.toLowerCase() === 'class' ||
                    c.column_type === 'target'
                );
@@ -173,7 +173,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
 
   const handleChange = (key: keyof ResamplingConfig, value: unknown) => {
     const newConfig = { ...config, [key]: value };
-    
+
     // Reset method defaults when type changes
     if (key === 'type') {
         if (value === 'oversampling') {
@@ -182,21 +182,21 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             newConfig.method = 'random_under_sampling';
         }
     }
-    
+
     onChange(newConfig);
   };
 
   return (
     <div ref={containerRef} className={`flex flex-col h-full w-full bg-white dark:bg-gray-900 ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-      
+
       <div className={`flex-1 min-h-0 p-4 gap-4 ${isWide ? 'grid grid-cols-2' : 'flex flex-col'}`}>
-        
+
         {/* Left Column (Main Settings) */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
-            
+
             <div className="space-y-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Resampling Type</span>
-                <select 
+                <select
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.type}
                     onChange={(e) => { handleChange('type', e.target.value as ResamplingConfig['type']); }}
@@ -208,7 +208,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
 
             <div className="space-y-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Method</span>
-                <select 
+                <select
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.method}
                     onChange={(e) => { handleChange('method', e.target.value); }}
@@ -232,8 +232,8 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     )}
                 </select>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {config.type === 'oversampling' 
-                        ? 'Generate synthetic samples for the minority class.' 
+                    {config.type === 'oversampling'
+                        ? 'Generate synthetic samples for the minority class.'
                         : 'Remove samples from the majority class.'}
                 </p>
             </div>
@@ -241,7 +241,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             <div className="space-y-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Target Column</span>
                 <div className="relative">
-                    <input 
+                    <input
                         type="text"
                         className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         placeholder="e.g., target"
@@ -264,7 +264,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
 
             <div className="space-y-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sampling Strategy</span>
-                <select 
+                <select
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.sampling_strategy}
                     onChange={(e) => { handleChange('sampling_strategy', e.target.value); }}
@@ -280,7 +280,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
 
             <div className="space-y-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Random State</span>
-                <input 
+                <input
                     type="number"
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.random_state}
@@ -292,14 +292,14 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
 
         {/* Right Column (Advanced Params & Results) */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pl-2 border-l border-gray-100 dark:border-gray-700' : 'shrink-0 pt-4 border-t border-gray-100 dark:border-gray-700'}`}>
-            
+
             {/* Method Specific Params */}
             {config.type === 'oversampling' && (
                 <>
                     {['smote', 'adasyn', 'borderline_smote', 'svm_smote', 'kmeans_smote'].includes(config.method) && (
                         <div className="space-y-2">
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">k Neighbors</span>
-                            <input 
+                            <input
                                 type="number"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.k_neighbors ?? 5}
@@ -307,11 +307,11 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                             />
                         </div>
                     )}
-                    
+
                     {['borderline_smote', 'svm_smote'].includes(config.method) && (
                         <div className="space-y-2">
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">m Neighbors</span>
-                            <input 
+                            <input
                                 type="number"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.m_neighbors ?? 10}
@@ -323,7 +323,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     {config.method === 'borderline_smote' && (
                         <div className="space-y-2">
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Kind</span>
-                            <select 
+                            <select
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.kind ?? 'borderline-1'}
                                 onChange={(e) => { handleChange('kind', e.target.value); }}
@@ -337,7 +337,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     {config.method === 'svm_smote' && (
                         <div className="space-y-2">
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Out Step</span>
-                            <input 
+                            <input
                                 type="number"
                                 step="0.1"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -351,7 +351,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                         <>
                             <div className="space-y-2">
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Cluster Balance Threshold</span>
-                                <input 
+                                <input
                                     type="number"
                                     step="0.1"
                                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -361,7 +361,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                             </div>
                             <div className="space-y-2">
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Density Exponent</span>
-                                <input 
+                                <input
                                     type="text"
                                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                     value={config.density_exponent ?? 'auto'}
@@ -379,7 +379,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300 block">Replacement</span>
                         <span className="text-xs text-gray-500 dark:text-gray-400">Sample with replacement</span>
                     </div>
-                    <input 
+                    <input
                         type="checkbox"
                         className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
                         checked={config.replacement ?? false}
@@ -391,7 +391,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             {config.type === 'undersampling' && config.method === 'nearmiss' && (
                 <div className="space-y-2">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Version</span>
-                    <select 
+                    <select
                         className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         value={config.version ?? 1}
                         onChange={(e) => { handleChange('version', parseInt(e.target.value)); }}
@@ -407,7 +407,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                 <>
                     <div className="space-y-2">
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">n Neighbors</span>
-                        <input 
+                        <input
                             type="number"
                             className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             value={config.n_neighbors ?? 3}
@@ -416,7 +416,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     </div>
                     <div className="space-y-2">
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selection Kind</span>
-                        <select 
+                        <select
                             className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             value={config.kind_sel ?? 'all'}
                             onChange={(e) => { handleChange('kind_sel', e.target.value); }}
@@ -430,7 +430,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
 
             {recommendations.length > 0 && (
                 <div className="mt-0 border rounded-md overflow-hidden border-gray-200 dark:border-gray-700">
-                    <button 
+                    <button
                         className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                         onClick={() => { setShowRecommendations(!showRecommendations); }}
                     >
@@ -439,11 +439,11 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                         </span>
                         {showRecommendations ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
-                    
+
                     {showRecommendations && (
                         <div className="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-                            <RecommendationsPanel 
-                                recommendations={recommendations} 
+                            <RecommendationsPanel
+                                recommendations={recommendations}
                                 onApply={handleApplyRecommendation}
                             />
                         </div>
@@ -464,7 +464,7 @@ const validate = (data: ResamplingConfig): ValidationResult => {
   if (!data.target_column) {
     return { isValid: false, message: 'Target column is required for resampling.' };
   }
-  
+
   if (data.type === 'oversampling') {
     if (['smote', 'adasyn', 'borderline_smote', 'svm_smote', 'kmeans_smote'].includes(data.method)) {
        if ((data.k_neighbors ?? 5) < 1) {

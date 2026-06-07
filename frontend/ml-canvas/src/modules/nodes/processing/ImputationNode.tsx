@@ -12,7 +12,7 @@ import { useGraphStore } from '../../../core/store/useGraphStore';
 interface ImputationConfig {
   columns: string[];
   method: 'simple' | 'knn' | 'iterative';
-  
+
   // Simple Imputer
   strategy: 'mean' | 'median' | 'most_frequent' | 'constant';
   fill_value?: string | number | undefined;
@@ -40,7 +40,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
     () => schema ? Object.values(schema.columns).map(c => c.name).filter(n => !droppedUpstream.has(n)) : [],
     [schema, droppedUpstream]
   );
-  
+
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
   const metrics: Record<string, unknown> | null =
@@ -70,7 +70,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
     observer.observe(containerRef.current);
     return () => { observer.disconnect(); };
   }, []);
-  
+
   const recommendations = useRecommendations(nodeId || '', {
     types: ['imputation'],
     suggestedNodeTypes: ['SimpleImputer', 'KNNImputer', 'IterativeImputer'],
@@ -85,7 +85,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
       onChange({ ...config, columns: newCols });
     }
   };
-  
+
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredColumns = useMemo(() => {
@@ -105,7 +105,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
     metrics ? (
       <div className="mt-4 p-3 bg-muted/50 rounded border text-xs">
         <div className="font-medium text-muted-foreground mb-2">Execution Feedback</div>
-        
+
         {fillValues && (
           <div className="space-y-1">
             <span className="text-muted-foreground block mb-1 font-medium">Imputed Values:</span>
@@ -138,7 +138,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
             )}
           </div>
         )}
-        
+
         {/* Generic success message if no specific metrics but successful */}
         {!fillValues && !missingCounts && nodeResult?.status === 'success' && (
           <div className="text-green-600">Imputation completed successfully.</div>
@@ -156,7 +156,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
             Connect a dataset node to see available columns.
           </div>
         )}
-        
+
         {isLoading && !!datasetId && (
           <div className="text-xs text-muted-foreground animate-pulse">
             Loading schema...
@@ -166,14 +166,14 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
 
       {/* Main Content Area */}
       <div className={`flex-1 min-h-0 p-4 gap-4 ${isWide ? 'grid grid-cols-2' : 'flex flex-col'}`}>
-        
+
         {/* Left Column (Settings) */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
           {/* Recommendations */}
           {recommendations.length > 0 && (
             <div className="shrink-0">
-              <RecommendationsPanel 
-                recommendations={recommendations} 
+              <RecommendationsPanel
+                recommendations={recommendations}
                 onApply={handleApplyRecommendation}
               />
             </div>
@@ -324,7 +324,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
               onChange={(e) => { setSearchTerm(e.target.value); }}
             />
           </div>
-          
+
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {filteredColumns.length > 0 ? (
               filteredColumns.map(col => (
@@ -360,7 +360,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
             )}
           </div>
         </div>
-        
+
         {/* Feedback Section - Show here if NOT wide (mobile/narrow) */}
         {!isWide && renderFeedback()}
       </div>

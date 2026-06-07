@@ -29,10 +29,10 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
     const selectedDataset = datasets.find(d => String(d.id) === selectedId);
-    onChange({ 
-      ...config, 
+    onChange({
+      ...config,
       datasetId: selectedId,
-      datasetName: selectedDataset?.name 
+      datasetName: selectedDataset?.name
     });
   };
 
@@ -56,7 +56,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
       <div className="space-y-2">
         <div className="flex justify-between items-center">
           <span className="block text-sm font-medium">Select Dataset</span>
-          <button 
+          <button
             onClick={() => { setShowUpload(true); }}
             className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium"
           >
@@ -64,7 +64,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
             New Upload
           </button>
         </div>
-        
+
         {loading ? (
           <div className="text-xs text-muted-foreground">Loading datasets...</div>
         ) : (
@@ -90,7 +90,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
             <TableProperties size={14} />
             <span>Dataset Schema</span>
           </div>
-          
+
           {isSchemaLoading ? (
             <div className="text-xs text-muted-foreground animate-pulse">Loading schema...</div>
           ) : schema ? (

@@ -142,9 +142,9 @@ export const DataSources: React.FC = () => {
 
   return (
     <div className="p-8 space-y-6">
-      <DatasetPreviewModal 
-        dataset={previewDataset} 
-        isOpen={!!previewDataset} 
+      <DatasetPreviewModal
+        dataset={previewDataset}
+        isOpen={!!previewDataset}
         onClose={() => { setPreviewDataset(null); }}
       />
 
@@ -287,8 +287,8 @@ export const DataSources: React.FC = () => {
               key={status}
               onClick={() => { setFilterStatus(status); }}
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
-                filterStatus === status 
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
+                filterStatus === status
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                   : 'bg-white dark:bg-slate-800 text-slate-600 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
               }`}
             >
@@ -353,7 +353,7 @@ export const DataSources: React.FC = () => {
                     </td>
                     <td className="px-3 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                        d.type === 's3' 
+                        d.type === 's3'
                           ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800'
                           : d.type === 'file'
                           ? 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'

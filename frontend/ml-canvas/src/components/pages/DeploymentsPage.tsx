@@ -74,7 +74,7 @@ export const DeploymentsPage: React.FC = () => {
           <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">Model Deployments</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage active models and view deployment history</p>
         </div>
-        <button 
+        <button
           onClick={() => { void loadData(); }}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
           title="Refresh"
@@ -95,7 +95,7 @@ export const DeploymentsPage: React.FC = () => {
             <Rocket className="w-5 h-5 text-green-500" />
             Active Deployment
           </h2>
-          
+
           {activeDeployment ? (
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-green-200 dark:border-green-900 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-start">
@@ -151,7 +151,7 @@ export const DeploymentsPage: React.FC = () => {
             <Clock className="w-5 h-5 text-blue-500" />
             Deployment History
           </h2>
-          
+
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
