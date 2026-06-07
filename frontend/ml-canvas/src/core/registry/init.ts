@@ -6,6 +6,7 @@ import { ImputationNode } from '../../modules/nodes/processing/ImputationNode';
 import { ScalingNode } from '../../modules/nodes/processing/ScalingNode';
 import { BasicTrainingNode } from '../../modules/nodes/modeling/BasicTrainingNode';
 import { AdvancedTuningNode } from '../../modules/nodes/modeling/AdvancedTuningNode';
+import { EnsembleNode } from '../../modules/nodes/modeling/EnsembleNode';
 import { FeatureSelectionNode } from '../../modules/nodes/processing/FeatureSelectionNode';
 import { TrainTestSplitNode } from '../../modules/nodes/modeling/TrainTestSplitNode';
 import { FeatureTargetSplitNode } from '../../modules/nodes/modeling/FeatureTargetSplitNode';
@@ -53,4 +54,5 @@ export const initializeRegistry = () => {
   registry.register(MissingIndicatorNode);
   registry.register(BasicTrainingNode);
   registry.register(AdvancedTuningNode);
+  registry.register(EnsembleNode);
 };

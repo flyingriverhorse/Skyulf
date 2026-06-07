@@ -18,6 +18,12 @@ keep working.
 
 from ._bayes import GAUSSIAN_NB_PARAMS
 from ._calibration import CALIBRATED_CLASSIFIER_PARAMS
+from ._ensemble import (
+    STACKING_CLASSIFIER_PARAMS,
+    STACKING_REGRESSOR_PARAMS,
+    VOTING_CLASSIFIER_PARAMS,
+    VOTING_REGRESSOR_PARAMS,
+)
 from ._field import HyperparameterField
 from ._linear import (
     ELASTICNET_REGRESSION_PARAMS,
@@ -31,6 +37,7 @@ from ._registry import (
     DEFAULT_SEARCH_SPACES,
     GRID_SEARCH_SPACES,
     MODEL_HYPERPARAMETERS,
+    build_ensemble_search_space,
     get_default_search_space,
     get_hyperparameters,
 )
@@ -59,6 +66,7 @@ __all__ = [
     "GRID_SEARCH_SPACES",
     "get_hyperparameters",
     "get_default_search_space",
+    "build_ensemble_search_space",
     # Linear
     "LOGISTIC_REGRESSION_PARAMS",
     "LINEAR_REGRESSION_PARAMS",
@@ -84,4 +92,9 @@ __all__ = [
     "KNN_PARAMS",
     "GAUSSIAN_NB_PARAMS",
     "CALIBRATED_CLASSIFIER_PARAMS",
+    # Ensembles
+    "VOTING_CLASSIFIER_PARAMS",
+    "STACKING_CLASSIFIER_PARAMS",
+    "VOTING_REGRESSOR_PARAMS",
+    "STACKING_REGRESSOR_PARAMS",
 ]

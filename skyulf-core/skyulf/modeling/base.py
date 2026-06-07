@@ -27,6 +27,25 @@ class BaseModelCalculator(ABC):
         """Default hyperparameters for the model."""
         return {}
 
+    def prepare_tuning_params(self, config: Dict[str, Any]) -> None:
+        """Hook for structural models (e.g. ensembles) to absorb their
+        sub-estimator selection before the tuner builds the base model.
+
+        No-op for plain models. Ensembles override this to inject the resolved
+        ``estimators`` (and ``final_estimator``) into :attr:`default_params` so
+        the tuner can construct a valid meta-estimator.
+        """
+        return None
+
+    def build_tuning_search_space(self, config: Dict[str, Any], strategy: str) -> Dict[str, Any]:
+        """Hook: let a model auto-build its tuning search space.
+
+        Returns an empty dict for plain models (the caller keeps the
+        user-provided space). Ensembles override this to expand their base
+        learners' parameter grids into nested ``<name>__<param>`` keys.
+        """
+        return {}
+
     @abstractmethod
     def fit(
         self,
