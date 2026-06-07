@@ -7,6 +7,7 @@ Combines all domain mixins into one flat ``Settings`` class.
 Each mixin lives in ``backend/config/mixins/`` and owns one domain's fields.
 """
 
+import json
 import logging
 import os
 import urllib.parse
@@ -66,6 +67,9 @@ class Settings(
     @classmethod
     def parse_cors_origins(cls, v: Any) -> List[str]:
         if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("["):
+                return cast(List[str], json.loads(v))
             return [origin.strip() for origin in v.split(",")]
         return cast(List[str], v)
 
@@ -73,6 +77,9 @@ class Settings(
     @classmethod
     def parse_allowed_hosts(cls, v: Any) -> List[str]:
         if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("["):
+                return cast(List[str], json.loads(v))
             return [host.strip() for host in v.split(",")]
         return cast(List[str], v)
 
@@ -80,6 +87,9 @@ class Settings(
     @classmethod
     def parse_allowed_extensions(cls, v: Any) -> List[str]:
         if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("["):
+                return cast(List[str], json.loads(v))
             return [ext.strip() for ext in v.split(",")]
         return cast(List[str], v)
 
