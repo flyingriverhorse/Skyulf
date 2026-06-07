@@ -3,7 +3,7 @@
 export interface HyperparameterDef {
     name: string;
     label: string;
-    type: 'number' | 'select' | 'boolean';
+    type: 'number' | 'select' | 'boolean' | 'multiselect';
     default: unknown;
     description?: string;
     options?: { label: string; value: unknown }[];

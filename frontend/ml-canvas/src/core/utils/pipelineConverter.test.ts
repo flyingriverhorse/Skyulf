@@ -242,3 +242,197 @@ describe('convertGraphToPipelineConfig', () => {
     expect(ids).toContain('ds');
   });
 });
+
+describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
+  it('derives base learners from connected model nodes and overrides the in-node selection', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      // Two model nodes feed the ensemble purely as base-learner specs.
+      node('rf', 'basic_training', {
+        target_column: 'y',
+        model_type: 'random_forest_classifier',
+        hyperparameters: { n_estimators: 200 },
+      }),
+      node('lr', 'basic_training', {
+        target_column: 'y',
+        model_type: 'logistic_regression',
+        hyperparameters: { C: 0.5 },
+      }),
+      node('ens', 'EnsembleNode', {
+        task: 'classification',
+        target_column: 'y',
+        model_type: 'voting_classifier',
+        run_mode: 'basic',
+        voting: 'soft',
+        // In-node selection that should be OVERRIDDEN by the wired models.
+        base_estimators: ['decision_tree'],
+        base_estimator_params: {},
+      }),
+    ];
+    const edges = [
+      edge('ds', 'rf'),
+      edge('ds', 'lr'),
+      edge('ds', 'ens'),
+      edge('rf', 'ens'),
+      edge('lr', 'ens'),
+    ];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const ens = cfg.nodes.find((n) => n.node_id === 'ens');
+    const hp = ens?.params.hyperparameters as Record<string, unknown>;
+    expect(hp.base_estimators).toEqual(['random_forest', 'logistic_regression']);
+    expect(hp.base_estimator_params).toMatchObject({
+      random_forest: { n_estimators: 200 },
+      logistic_regression: { C: 0.5 },
+    });
+    // Model-spec sources are stripped from the data inputs; only the dataset edge remains.
+    expect(ens?.inputs).toEqual(['ds']);
+    // The wired model nodes are spec providers, not standalone trainers.
+    const ids = cfg.nodes.map((n) => n.node_id);
+    expect(ids).not.toContain('rf');
+    expect(ids).not.toContain('lr');
+    expect(ids).toContain('ens');
+  });
+
+  it('falls back to the in-node base selection when no model nodes are wired', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('ens', 'EnsembleNode', {
+        task: 'classification',
+        target_column: 'y',
+        model_type: 'voting_classifier',
+        run_mode: 'basic',
+        base_estimators: ['random_forest', 'svc'],
+        base_estimator_params: { svc: { C: 2 } },
+      }),
+    ];
+    const edges = [edge('ds', 'ens')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const ens = cfg.nodes.find((n) => n.node_id === 'ens');
+    const hp = ens?.params.hyperparameters as Record<string, unknown>;
+    expect(hp.base_estimators).toEqual(['random_forest', 'svc']);
+    expect(hp.base_estimator_params).toMatchObject({ svc: { C: 2 } });
+    expect(ens?.inputs).toEqual(['ds']);
+  });
+
+  it('threads wired base learners into advanced tuning_config', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('gb', 'basic_training', {
+        target_column: 'y',
+        model_type: 'gradient_boosting_regressor',
+        hyperparameters: { learning_rate: 0.1 },
+      }),
+      node('ens', 'EnsembleNode', {
+        task: 'regression',
+        target_column: 'y',
+        model_type: 'voting_regressor',
+        run_mode: 'advanced',
+        search_strategy: 'random',
+        n_trials: 20,
+        base_estimators: ['ridge'],
+      }),
+    ];
+    const edges = [edge('ds', 'gb'), edge('ds', 'ens'), edge('gb', 'ens')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const ens = cfg.nodes.find((n) => n.node_id === 'ens');
+    expect(ens?.step_type).toBe('advanced_tuning');
+    const tuning = ens?.params.tuning_config as Record<string, unknown>;
+    expect(tuning.base_estimators).toEqual(['gradient_boosting']);
+    expect(tuning.base_estimator_params).toMatchObject({
+      gradient_boosting: { learning_rate: 0.1 },
+    });
+    expect(ens?.inputs).toEqual(['ds']);
+    expect(cfg.nodes.map((n) => n.node_id)).not.toContain('gb');
+  });
+
+  it('inherits the data source from wired models when the ensemble has no direct dataset edge', () => {
+    // Common flow: split → model → ensemble, with NO direct split → ensemble edge.
+    // The ensemble must still resolve a training dataset by inheriting the data
+    // its base-learner models consume (base learners are spec-only).
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('split', 'TrainTestSplitter', {}),
+      node('rf', 'basic_training', {
+        target_column: 'y',
+        model_type: 'random_forest_classifier',
+        hyperparameters: {},
+      }),
+      node('lr', 'basic_training', {
+        target_column: 'y',
+        model_type: 'logistic_regression',
+        hyperparameters: {},
+      }),
+      node('ens', 'EnsembleNode', {
+        task: 'classification',
+        target_column: 'y',
+        model_type: 'voting_classifier',
+        run_mode: 'basic',
+        base_estimators: [],
+      }),
+    ];
+    const edges = [
+      edge('ds', 'split'),
+      edge('split', 'rf'),
+      edge('split', 'lr'),
+      edge('rf', 'ens'),
+      edge('lr', 'ens'),
+    ];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const ens = cfg.nodes.find((n) => n.node_id === 'ens');
+    // Ensemble inherits the split as its data source (no direct edge existed).
+    expect(ens?.inputs).toEqual(['split']);
+    const hp = ens?.params.hyperparameters as Record<string, unknown>;
+    expect(hp.base_estimators).toEqual(['random_forest', 'logistic_regression']);
+    // Spec-only model nodes are dropped; the split is retained as the data root.
+    const ids = cfg.nodes.map((n) => n.node_id);
+    expect(ids).not.toContain('rf');
+    expect(ids).not.toContain('lr');
+    expect(ids).toContain('split');
+    expect(ids).toContain('ens');
+  });
+
+  it('skips unsupported model types (no ensemble base key) gracefully', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      // calibrated_classifier is a meta-model with no ensemble base-key mapping
+      // → skipped as a base learner.
+      node('cal', 'basic_training', {
+        target_column: 'y',
+        model_type: 'calibrated_classifier',
+        hyperparameters: {},
+      }),
+      node('rf', 'basic_training', {
+        target_column: 'y',
+        model_type: 'random_forest_classifier',
+        hyperparameters: {},
+      }),
+      node('ens', 'EnsembleNode', {
+        task: 'classification',
+        target_column: 'y',
+        model_type: 'voting_classifier',
+        run_mode: 'basic',
+        base_estimators: ['decision_tree'],
+      }),
+    ];
+    const edges = [
+      edge('ds', 'cal'),
+      edge('ds', 'rf'),
+      edge('ds', 'ens'),
+      edge('cal', 'ens'),
+      edge('rf', 'ens'),
+    ];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const ens = cfg.nodes.find((n) => n.node_id === 'ens');
+    const hp = ens?.params.hyperparameters as Record<string, unknown>;
+    // Only the supported model contributes a base key; the meta-model is dropped.
+    expect(hp.base_estimators).toEqual(['random_forest']);
+    // Both model sources are still excluded from the data inputs.
+    expect(ens?.inputs).toEqual(['ds']);
+  });
+});
+

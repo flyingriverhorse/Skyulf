@@ -10,6 +10,16 @@ from .classification import (
     RandomForestClassifierCalculator,
 )
 from .cross_validation import perform_cross_validation
+from .ensemble import (
+    StackingClassifierApplier,
+    StackingClassifierCalculator,
+    StackingRegressorApplier,
+    StackingRegressorCalculator,
+    VotingClassifierApplier,
+    VotingClassifierCalculator,
+    VotingRegressorApplier,
+    VotingRegressorCalculator,
+)
 from .hyperparameters import (
     HyperparameterField,
     get_default_search_space,
@@ -39,6 +49,14 @@ __all__ = [
     "RidgeRegressionApplier",
     "RandomForestRegressorCalculator",
     "RandomForestRegressorApplier",
+    "VotingClassifierCalculator",
+    "VotingClassifierApplier",
+    "StackingClassifierCalculator",
+    "StackingClassifierApplier",
+    "VotingRegressorCalculator",
+    "VotingRegressorApplier",
+    "StackingRegressorCalculator",
+    "StackingRegressorApplier",
     "perform_cross_validation",
     "HyperparameterField",
     "get_hyperparameters",

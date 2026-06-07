@@ -293,6 +293,18 @@ class NodeRunnersMixin:
 
         calculator, applier = self._get_model_components(algorithm)
 
+        # Structural models (ensembles) resolve their base estimators here so the
+        # tuner can construct a valid meta-estimator, and may auto-build a nested
+        # ``<name>__<param>`` search space for their base learners when the UI
+        # sent none. Plain models implement these as no-ops.
+        calculator.prepare_tuning_params(tuning_params)
+        if not tuning_params.get("search_space"):
+            auto_space = calculator.build_tuning_search_space(
+                tuning_params, tuning_params.get("strategy", "random")
+            )
+            if auto_space:
+                tuning_params["search_space"] = auto_space
+
         # Create Tuner components
         tuner_calc = TuningCalculator(calculator)
         tuner_applier = TuningApplier(applier)

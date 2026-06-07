@@ -15,6 +15,7 @@ faker>=19.0.0,<20.0.0
 pre-commit>=3.4.0
 moto[s3]>=5.0.0,<6.0.0              # Mock AWS services for testing
 safety>=3.6.1                        # Security vulnerability scanner (CLI)
+pyscan-rs>=2.1.3                     # Rust-based dependency vulnerability scanner (OSV database)
 types-setuptools
 types-requests
 types-PyYAML

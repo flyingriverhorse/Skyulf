@@ -36,11 +36,14 @@ async def test_all_transformers(sample_data, tmp_path):
     # List of nodes that are transformers (take df, return df)
     # We exclude data_loader, models, and splitters for now
     #
-    # Models are excluded dynamically by category ("Modeling") so that any
-    # newly-registered model node (e.g. calibrated_classifier) is automatically
-    # skipped here and exercised by the dedicated modeling tests instead —
-    # rather than silently failing this transformer smoke test.
-    model_nodes = {nid for nid, node in ALL_NODES.items() if node.category == "Modeling"}
+    # Models and ensembles are excluded dynamically by category ("Modeling" /
+    # "Ensemble") so that any newly-registered model node (e.g.
+    # calibrated_classifier, voting_classifier) is automatically skipped here and
+    # exercised by the dedicated modeling tests instead — rather than silently
+    # failing this transformer smoke test.
+    model_nodes = {
+        nid for nid, node in ALL_NODES.items() if node.category in ("Modeling", "Ensemble")
+    }
 
     excluded = model_nodes | {
         "data_loader",

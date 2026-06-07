@@ -130,4 +130,57 @@ describe('useBranchColors', () => {
     const dsImp = result.current.get('ds-imp');
     expect(dsImp?.shared).toBe(true);
   });
+
+  it('folds base models that feed an ensemble into the ensemble branch (no separate Path tabs)', () => {
+    // Two training nodes act purely as ensemble base learners. They must NOT
+    // become their own Path branches — the ensemble is the real terminal and
+    // its branch covers the whole `data → model → ensemble` chain. A standalone
+    // training node on the same data keeps its own branch so 2 branches remain.
+    const nodes = [
+      node('ds', 'dataset_node'),
+      node('rf', 'advanced_tuning', { model_type: 'random_forest_classifier' }),
+      node('lr', 'advanced_tuning', { model_type: 'logistic_regression' }),
+      node('ens', 'EnsembleNode', { model_type: 'voting_classifier' }),
+      node('solo', 'basic_training', { model_type: 'xgboost_classifier' }),
+    ];
+    const edges = [
+      edge('ds-rf', 'ds', 'rf'),
+      edge('ds-lr', 'ds', 'lr'),
+      edge('rf-ens', 'rf', 'ens'),
+      edge('lr-ens', 'lr', 'ens'),
+      edge('ds-solo', 'ds', 'solo'),
+    ];
+    const { result } = renderHook(() => useBranchColors(nodes, edges));
+    // The model→ensemble edges are coloured (part of the ensemble branch) but
+    // never carry their own "Path · Random Forest/Logistic Regression" label.
+    const rfEns = result.current.get('rf-ens');
+    const lrEns = result.current.get('lr-ens');
+    expect(rfEns).toBeDefined();
+    expect(lrEns).toBeDefined();
+    // No base-model branch label leaked onto the spec edges.
+    const labels = [...result.current.values()].map(v => v.label).filter(Boolean);
+    expect(labels.some(l => /Random Forest|Logistic Regression/.test(l ?? ''))).toBe(false);
+    // Exactly two terminals get a Path label: the ensemble (Voting) + the solo
+    // XGBoost training node.
+    expect(labels.some(l => /· Voting/.test(l ?? ''))).toBe(true);
+    expect(labels.some(l => /· Xgboost/.test(l ?? ''))).toBe(true);
+  });
+
+  it('keeps the ensemble branch when wired directly to data (no base models)', () => {
+    // Ensemble fed straight from a split + a standalone training node → two
+    // terminals, so the ensemble earns its own Path tab.
+    const nodes = [
+      node('ds', 'dataset_node'),
+      node('ens', 'EnsembleNode', { model_type: 'stacking_classifier' }),
+      node('solo', 'basic_training', { model_type: 'random_forest_classifier' }),
+    ];
+    const edges = [
+      edge('ds-ens', 'ds', 'ens'),
+      edge('ds-solo', 'ds', 'solo'),
+    ];
+    const { result } = renderHook(() => useBranchColors(nodes, edges));
+    const labels = [...result.current.values()].map(v => v.label).filter(Boolean);
+    expect(labels.some(l => /· Stacking/.test(l ?? ''))).toBe(true);
+    expect(labels.some(l => /· Random Forest/.test(l ?? ''))).toBe(true);
+  });
 });

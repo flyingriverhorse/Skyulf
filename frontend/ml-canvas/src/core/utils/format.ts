@@ -166,3 +166,94 @@ export const formatBytes = (bytes: number, decimals = 2) => {
 
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 };
+
+// --- Ensemble helpers -------------------------------------------------------
+
+/** Registry ids of the four ensemble meta-models (Voting / Stacking). */
+export const ENSEMBLE_MODEL_TYPES = new Set([
+  'voting_classifier',
+  'stacking_classifier',
+  'voting_regressor',
+  'stacking_regressor',
+]);
+
+export const isEnsembleModelType = (modelType?: string | null): boolean =>
+  !!modelType && ENSEMBLE_MODEL_TYPES.has(modelType);
+
+// Friendly labels for base-learner keys (mirrors EnsembleSettings option lists).
+const BASE_ESTIMATOR_LABELS: Record<string, string> = {
+  logistic_regression: 'Logistic Regression',
+  linear_regression: 'Linear Regression',
+  ridge: 'Ridge',
+  lasso: 'Lasso',
+  elasticnet: 'ElasticNet',
+  random_forest: 'Random Forest',
+  extra_trees: 'Extra Trees',
+  gradient_boosting: 'Gradient Boosting',
+  hist_gradient_boosting: 'Hist Gradient Boosting',
+  adaboost: 'AdaBoost',
+  decision_tree: 'Decision Tree',
+  gaussian_nb: 'Gaussian NB',
+  svc: 'SVC',
+  svr: 'SVR',
+  knn: 'KNN',
+  xgboost: 'XGBoost',
+  lightgbm: 'LightGBM',
+};
+
+/** Pretty-print a base-learner key, e.g. "random_forest" → "Random Forest". */
+export const formatBaseEstimator = (key: string): string =>
+  BASE_ESTIMATOR_LABELS[key] || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+export interface EnsembleSummary {
+  baseEstimators: string[];
+  finalEstimator?: string | undefined;
+  voting?: string | undefined;
+  passthrough?: boolean | undefined;
+  weights?: number[] | undefined;
+  nJobs?: number | undefined;
+  calibrateBaseModels?: boolean | undefined;
+  calibrationMethod?: string | undefined;
+  isStacking: boolean;
+}
+
+/**
+ * Pull an ensemble's structural selection (base learners + meta settings) out of
+ * a config bucket. The bucket is the nested `hyperparameters` map for basic
+ * training or the `tuning_config` for advanced tuning — both carry the same keys.
+ * Returns `null` when the model is not an ensemble or the bucket is missing.
+ */
+export const extractEnsembleSummary = (
+  modelType: string | undefined,
+  bucket: Record<string, unknown> | undefined,
+): EnsembleSummary | null => {
+  if (!isEnsembleModelType(modelType) || !bucket) return null;
+  const isStacking = !!modelType && modelType.startsWith('stacking');
+  const raw = bucket.base_estimators;
+  const baseEstimators = Array.isArray(raw)
+    ? raw.filter((v): v is string => typeof v === 'string')
+    : [];
+  const rawWeights = bucket.weights;
+  const weights = Array.isArray(rawWeights) && rawWeights.every((w) => typeof w === 'number')
+    ? (rawWeights as number[])
+    : undefined;
+  return {
+    baseEstimators,
+    finalEstimator: typeof bucket.final_estimator === 'string' ? bucket.final_estimator : undefined,
+    // ``voting`` and ``passthrough`` are mutually exclusive across the two
+    // strategies: voting models have no meta-learner CV/passthrough, stacking
+    // models have no voting rule. Only surface the key that applies so stale
+    // node-default values from the other strategy never leak into the UI.
+    voting: !isStacking && typeof bucket.voting === 'string' ? bucket.voting : undefined,
+    passthrough: isStacking && typeof bucket.passthrough === 'boolean' ? bucket.passthrough : undefined,
+    weights: !isStacking ? weights : undefined,
+    nJobs: typeof bucket.n_jobs === 'number' ? bucket.n_jobs : undefined,
+    // Calibration is classification-only; surface it when enabled.
+    calibrateBaseModels: bucket.calibrate_base_models === true ? true : undefined,
+    calibrationMethod:
+      bucket.calibrate_base_models === true && typeof bucket.calibration_method === 'string'
+        ? bucket.calibration_method
+        : undefined,
+    isStacking,
+  };
+};
